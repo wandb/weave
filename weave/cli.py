@@ -45,9 +45,7 @@ def cli() -> None:
 @click.option("--method", help="Method name to serve.")
 @click.option("--project", help="W&B project name.")
 @click.option("--env", default="development", help="Environment to tag the model with.")
-@click.option(
-    "--auth-entity", help="Enforce authorization for this entity using W&B API keys."
-)
+@click.option("--auth-entity", help="Enforce authorization for this entity using W&B API keys.")
 @click.option("--port", default=9996, type=int)
 def serve(
     model_ref: str,
@@ -71,9 +69,7 @@ def serve(
     api.init(project)
     # TODO: provide more control over attributes
     with api.attributes({"env": env}):
-        api.serve(
-            parsed_ref, method_name=method or None, auth_entity=auth_entity, port=port
-        )
+        api.serve(parsed_ref, method_name=method or None, auth_entity=auth_entity, port=port)
 
 
 @cli.group(help="Deploy weave models.")
@@ -86,9 +82,7 @@ def deploy() -> None:
 @click.option("--method", help="Method name to serve.")
 @click.option("--project", help="W&B project name.")
 @click.option("--gcp-project", help="GCP project name.")
-@click.option(
-    "--auth-entity", help="Enforce authorization for this entity using W&B API keys."
-)
+@click.option("--auth-entity", help="Enforce authorization for this entity using W&B API keys.")
 @click.option("--service-account", help="GCP service account.")
 @click.option("--dev", is_flag=True, help="Run the function locally.")
 def gcp(
@@ -106,9 +100,7 @@ def gcp(
         return
     print(f"Deploying model {model_ref}...")
     if auth_entity is None:
-        print(
-            "WARNING: No --auth-entity specified.  This endpoint will be publicly accessible."
-        )
+        print("WARNING: No --auth-entity specified.  This endpoint will be publicly accessible.")
     try:
         google.deploy(
             model_ref,
@@ -122,18 +114,14 @@ def gcp(
         if os.getenv("DEBUG") == "true":
             raise e
         else:
-            raise click.ClickException(
-                str(e) + "\nRun with DEBUG=true to see full exception."
-            )
+            raise click.ClickException(str(e) + "\nRun with DEBUG=true to see full exception.")
     print("Model deployed")
 
 
 @deploy.command(help="Deploy to Modal Labs.")
 @click.argument("model_ref")
 @click.option("--project", help="W&B project name.")
-@click.option(
-    "--auth-entity", help="Enforce authorization for this entity using W&B API keys."
-)
+@click.option("--auth-entity", help="Enforce authorization for this entity using W&B API keys.")
 @click.option("--dev", is_flag=True, help="Run the function locally.")
 def modal(model_ref: str, project: str, auth_entity: str, dev: bool = False) -> None:
     from .deploy import modal as mdp
@@ -144,18 +132,14 @@ def modal(model_ref: str, project: str, auth_entity: str, dev: bool = False) -> 
         return
     print(f"Deploying model {model_ref}...")
     if auth_entity is None:
-        print(
-            "WARNING: No --auth-entity specified.  This endpoint will be publicly accessible."
-        )
+        print("WARNING: No --auth-entity specified.  This endpoint will be publicly accessible.")
     try:
         mdp.deploy(model_ref, wandb_project=project, auth_entity=auth_entity)
     except ValueError as e:
         if os.getenv("DEBUG") == "true":
             raise e
         else:
-            raise click.ClickException(
-                str(e) + "\nRun with DEBUG=true to see full exception."
-            )
+            raise click.ClickException(str(e) + "\nRun with DEBUG=true to see full exception.")
     print("Model deployed")
 
 

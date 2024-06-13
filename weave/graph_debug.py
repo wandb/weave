@@ -38,10 +38,7 @@ def combine_common_nodes(outputs: list[graph.Node]) -> list[graph.Node]:
             new_node = graph.OutputNode(
                 forward_node.node.type,
                 forward_node.node.from_op.name,
-                {
-                    k: replacements.get(v, v)
-                    for k, v in forward_node.node.from_op.inputs.items()
-                },
+                {k: replacements.get(v, v) for k, v in forward_node.node.from_op.inputs.items()},
             )
             new_outputs.append(new_node)
             continue
@@ -51,31 +48,15 @@ def combine_common_nodes(outputs: list[graph.Node]) -> list[graph.Node]:
         # Find input forward nodes that are mergeable
         for fn in input_to:
             inputs = list(fn.node.from_op.inputs.values())
-            if all(
-                replacements.get(i, i) is forward_node.node
-                or (
-                    isinstance(i, graph.ConstNode)
-                    and not isinstance(i.val, graph.OutputNode)
-                )
-                for i in inputs
-            ):
+            if all(replacements.get(i, i) is forward_node.node or (isinstance(i, graph.ConstNode) and not isinstance(i.val, graph.OutputNode)) for i in inputs):
                 combinable_forward_nodes.add(fn)
             else:
                 if fn not in next_items:
                     next_items.append(fn)
 
         # Group by op and merge
-        name_key = (
-            lambda n: n.node.from_op.name
-            + "-"
-            + "".join(
-                "1" if isinstance(i, graph.ConstNode) else "0"
-                for i in n.node.from_op.inputs.values()
-            )
-        )
-        op_groups = itertools.groupby(
-            sorted(combinable_forward_nodes, key=name_key), key=name_key
-        )
+        name_key = lambda n: n.node.from_op.name + "-" + "".join("1" if isinstance(i, graph.ConstNode) else "0" for i in n.node.from_op.inputs.values())
+        op_groups = itertools.groupby(sorted(combinable_forward_nodes, key=name_key), key=name_key)
         for k, group_nodes_iter in op_groups:
             group_nodes = list(group_nodes_iter)
             node0 = group_nodes[0]
@@ -87,27 +68,16 @@ def combine_common_nodes(outputs: list[graph.Node]) -> list[graph.Node]:
                 node_inputs = {}
                 for input_name, input_node in node0_inputs:
                     if replacements.get(input_node, input_node) is forward_node.node:
-                        node_inputs[input_name] = replacements.get(
-                            input_node, input_node
-                        )
+                        node_inputs[input_name] = replacements.get(input_node, input_node)
                     else:
                         node_inputs[input_name] = graph.ConstNode(
                             input_node.type,
-                            _CombinedConstVal(
-                                [
-                                    op.node.from_op.inputs[input_name].val
-                                    for op in group_nodes
-                                ]
-                            ),
+                            _CombinedConstVal([op.node.from_op.inputs[input_name].val for op in group_nodes]),
                         )
-            new_inner_input_to: dict[
-                forward_graph.ForwardNode, typing.Literal[True]
-            ] = {}
+            new_inner_input_to: dict[forward_graph.ForwardNode, typing.Literal[True]] = {}
             for o in group_nodes:
                 new_inner_input_to.update(o.input_to)
-            new_node = graph.OutputNode(
-                node0.node.type, node0.node.from_op.name, node_inputs
-            )
+            new_node = graph.OutputNode(node0.node.type, node0.node.from_op.name, node_inputs)
             for o in group_nodes:
                 replacements[o.node] = new_node
             new_forward_node = forward_graph.ForwardNode(new_node)
@@ -128,15 +98,9 @@ def node_expr_str_full(node: graph.Node) -> str:
 
     if isinstance(node, graph.OutputNode):
         if node.from_op.name == "dict":
-            return "dict(%s)" % ", ".join(
-                "%s= %s" % (k, node_expr_str_full(v))
-                for k, v in node.from_op.inputs.items()
-            )
+            return "dict(%s)" % ", ".join("%s= %s" % (k, node_expr_str_full(v)) for k, v in node.from_op.inputs.items())
         elif node.from_op.name == "ArrowWeaveList-vectorizedDict":
-            return "ArrowWeaveList-vectorizedDict(%s)" % ", ".join(
-                "%s= %s" % (k, node_expr_str_full(v))
-                for k, v in node.from_op.inputs.items()
-            )
+            return "ArrowWeaveList-vectorizedDict(%s)" % ", ".join("%s= %s" % (k, node_expr_str_full(v)) for k, v in node.from_op.inputs.items())
         if node.from_op.name == "gqlroot-wbgqlquery":
             query_hash = "_query_"  # TODO: make a hash from the query for idenity
             return f"{node.from_op.friendly_name}({query_hash})"
@@ -148,10 +112,7 @@ def node_expr_str_full(node: graph.Node) -> str:
                 narrow_type = const.val
                 assert isinstance(narrow_type, partial_object.PartialObjectType)
             except AssertionError:
-                return (
-                    f"{node_expr_str_full(node.from_op.inputs[param_names[0]])}."
-                    f"querytoobj({node_expr_str_full(node.from_op.inputs[param_names[1]])}, ?)"
-                )
+                return f"{node_expr_str_full(node.from_op.inputs[param_names[0]])}." f"querytoobj({node_expr_str_full(node.from_op.inputs[param_names[1]])}, ?)"
             else:
                 return (
                     f"{node_expr_str_full(node.from_op.inputs[param_names[0]])}."
@@ -160,14 +121,10 @@ def node_expr_str_full(node: graph.Node) -> str:
                 )
 
         param_names = list(node.from_op.inputs.keys())
-        if all(
-            [not isinstance(n, graph.OutputNode) for n in node.from_op.inputs.values()]
-        ):
+        if all([not isinstance(n, graph.OutputNode) for n in node.from_op.inputs.values()]):
             return "%s(%s)" % (
                 graph.opuri_full_name(node.from_op.name),
-                ", ".join(
-                    node_expr_str_full(node.from_op.inputs[n]) for n in param_names
-                ),
+                ", ".join(node_expr_str_full(node.from_op.inputs[n]) for n in param_names),
                 # node.type.simple_str()[:100],
             )
         if not param_names:
@@ -176,9 +133,7 @@ def node_expr_str_full(node: graph.Node) -> str:
         return "%s\n  .%s(%s) " % (
             node_expr_str_full(node.from_op.inputs[param_names[0]]),
             graph.opuri_full_name(node.from_op.name),
-            ", ".join(
-                node_expr_str_full(node.from_op.inputs[n]) for n in param_names[1:]
-            ),
+            ", ".join(node_expr_str_full(node.from_op.inputs[n]) for n in param_names[1:]),
             # ""
             # node.type.simple_str()[:100],
         )
@@ -240,9 +195,7 @@ def to_assignment_form(
                     next_node_inputs[k] = assignments[v]
                 else:
                     next_node_inputs[k] = v
-            new_node = graph.OutputNode(
-                next_node.type, next_node.from_op.name, next_node_inputs
-            )
+            new_node = graph.OutputNode(next_node.type, next_node.from_op.name, next_node_inputs)
             forward_node = next_forward_node
             node = next_node
 
@@ -262,7 +215,4 @@ def to_assignment_form(
 
 
 def assignments_string(assignments: dict[graph.OutputNode, graph.VarNode]) -> str:
-    return "\n".join(
-        f"{str(var_node)} = {node_expr_str_full(expression)}"
-        for expression, var_node in assignments.items()
-    )
+    return "\n".join(f"{str(var_node)} = {node_expr_str_full(expression)}" for expression, var_node in assignments.items())

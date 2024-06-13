@@ -29,9 +29,7 @@ def dialect_to_pyarrow_options(
 def read_csv_with_dialect(path: str) -> pa.Table:
     dialect = sniff_dialect(path)
     read_options, parse_options = dialect_to_pyarrow_options(dialect)
-    table = pa_csv.read_csv(
-        path, read_options=read_options, parse_options=parse_options
-    )
+    table = pa_csv.read_csv(path, read_options=read_options, parse_options=parse_options)
     return table
 
 

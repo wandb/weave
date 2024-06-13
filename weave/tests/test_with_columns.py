@@ -3,9 +3,7 @@ from weave import ops_arrow
 
 
 def test_with_columns_basic():
-    t = weave.save(
-        ops_arrow.to_arrow([{"a": 5, "b": 6, "d": {"y": 9}}, {"a": 7, "d": {"y": 11}}])
-    )
+    t = weave.save(ops_arrow.to_arrow([{"a": 5, "b": 6, "d": {"y": 9}}, {"a": 7, "d": {"y": 11}}]))
     result_node = t.with_columns(
         {
             # should insert entries into d
@@ -19,9 +17,7 @@ def test_with_columns_basic():
         weave.types.TypedDict(
             {
                 "b": weave.types.optional(weave.types.Int()),
-                "d": weave.types.TypedDict(
-                    {"y": weave.types.Int(), "x": weave.types.Int()}
-                ),
+                "d": weave.types.TypedDict({"y": weave.types.Int(), "x": weave.types.Int()}),
                 "a": weave.types.Int(),
             }
         )
@@ -33,9 +29,7 @@ def test_with_columns_basic():
 
 
 def test_with_columns_non_dict():
-    t = weave.save(
-        ops_arrow.to_arrow([{"a": 5, "b": 6, "d": {"y": 9}}, {"a": 7, "d": {"y": 11}}])
-    )
+    t = weave.save(ops_arrow.to_arrow([{"a": 5, "b": 6, "d": {"y": 9}}, {"a": 7, "d": {"y": 11}}]))
     result_node = t.with_columns(
         {
             # a should be replaced with dict
@@ -59,9 +53,7 @@ def test_with_columns_non_dict():
 
 
 def test_with_columns_length_mismatch():
-    t = weave.save(
-        ops_arrow.to_arrow([{"a": 5, "b": 6, "d": {"y": 9}}, {"a": 7, "d": {"y": 11}}])
-    )
+    t = weave.save(ops_arrow.to_arrow([{"a": 5, "b": 6, "d": {"y": 9}}, {"a": 7, "d": {"y": 11}}]))
     result = weave.use(t.with_columns({"a": ops_arrow.to_arrow([1])}))
     assert result == None
     result = weave.use(t.with_columns({"a": ops_arrow.to_arrow([1, 2, 3])}))

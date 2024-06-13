@@ -25,18 +25,12 @@ def op_get_tag_type(obj_type: types.Type) -> graph.OutputNode:
     return registry_mem.memory_registry.get_op("op_get_tag_type")(obj_type)
 
 
-def op_make_type_key_tag(
-    obj_type: types.Type, key: str, tag_type: types.Type
-) -> graph.OutputNode:
-    return registry_mem.memory_registry.get_op("op_make_type_key_tag")(
-        obj_type, key, tag_type
-    )
+def op_make_type_key_tag(obj_type: types.Type, key: str, tag_type: types.Type) -> graph.OutputNode:
+    return registry_mem.memory_registry.get_op("op_make_type_key_tag")(obj_type, key, tag_type)
 
 
 def op_make_type_tagged(obj_type: types.Type, tag_type: types.Type) -> graph.OutputNode:
-    return registry_mem.memory_registry.get_op("op_make_type_tagged")(
-        obj_type, tag_type
-    )
+    return registry_mem.memory_registry.get_op("op_make_type_tagged")(obj_type, tag_type)
 
 
 def process_opdef_refined_output_type(
@@ -62,6 +56,4 @@ def process_opdef_refined_output_type(
 
 
 def _currently_weavifying(input_types: typing.Any) -> bool:
-    return isinstance(input_types, graph.Node) and types.TypedDict({}).assign_type(
-        input_types.type
-    )
+    return isinstance(input_types, graph.Node) and types.TypedDict({}).assign_type(input_types.type)

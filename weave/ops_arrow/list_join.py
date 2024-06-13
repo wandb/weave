@@ -21,9 +21,7 @@ from ..arrow.list_ import ArrowWeaveList, make_vec_dict, make_vec_taggedvalue, a
 tracer = engine_trace.tracer()  # type: ignore
 
 
-def join_all_zip_impl_lambda(
-    arrs: list[ArrowWeaveList], joinFn: graph.OutputNode, outer: bool
-):
+def join_all_zip_impl_lambda(arrs: list[ArrowWeaveList], joinFn: graph.OutputNode, outer: bool):
     # Filter Nones and pushdown tags
     arrs = [pushdown_list_tags(a) for a in arrs if a != None]
 
@@ -33,9 +31,7 @@ def join_all_zip_impl_lambda(
     return join_all_zip_impl_vec(arrs, join_key_cols, outer)
 
 
-def join_all_zip_impl_vec(
-    arrs: list[ArrowWeaveList], join_key_cols: list[ArrowWeaveList], outer: bool
-):
+def join_all_zip_impl_vec(arrs: list[ArrowWeaveList], join_key_cols: list[ArrowWeaveList], outer: bool):
     # Empty case
     if len(arrs) == 0:
         # TODO: I don't think the arrow type is correct here. Should turn validate on.
@@ -107,12 +103,7 @@ def join_all_impl(
     index_cols = [joined[f"index_t{i}"].combine_chunks() for i in range(len(arrs))]
 
     final_join_key_col: ArrowWeaveList = ArrowWeaveList(
-        safe_coalesce(
-            *[
-                a._arrow_data.take(index_col)
-                for index_col, a in zip(index_cols, join_key_cols)
-            ]
-        ),
+        safe_coalesce(*[a._arrow_data.take(index_col) for index_col, a in zip(index_cols, join_key_cols)]),
         join_key_cols[0].object_type,
         None,
     )
@@ -180,14 +171,10 @@ def join2_impl(
 
 
 def _join_all_output_type(input_types):
-    return _joined_all_output_type_of_arrs_type(
-        input_types["arrs"].object_type.object_type, input_types["joinFn"].output_type
-    )
+    return _joined_all_output_type_of_arrs_type(input_types["arrs"].object_type.object_type, input_types["joinFn"].output_type)
 
 
-def _joined_all_output_type_of_arrs_type(
-    arr_obj_type: types.TypedDict, join_fn_output_type: types.Type
-) -> types.Type:
+def _joined_all_output_type_of_arrs_type(arr_obj_type: types.TypedDict, join_fn_output_type: types.Type) -> types.Type:
     inner_type = _joined_all_output_type_inner_type(
         arr_obj_type,
     )
@@ -216,9 +203,7 @@ def _joined_all_output_type_tag_type(
     name="ArrowWeaveList-joinAll",
     input_type={
         "arrs": types.List(types.optional(ArrowWeaveListType(types.TypedDict({})))),
-        "joinFn": lambda input_types: types.Function(
-            {"row": input_types["arrs"].object_type.object_type}, types.Any()
-        ),
+        "joinFn": lambda input_types: types.Function({"row": input_types["arrs"].object_type.object_type}, types.Any()),
     },
     output_type=_join_all_output_type,
 )
@@ -235,12 +220,8 @@ def _join_2_output_type(input_types):
     input_type={
         "arr1": ArrowWeaveListType(types.TypedDict({})),
         "arr2": ArrowWeaveListType(types.TypedDict({})),
-        "join1Fn": lambda input_types: types.Function(
-            {"row": input_types["arr1"].object_type}, types.Any()
-        ),
-        "join2Fn": lambda input_types: types.Function(
-            {"row": input_types["arr2"].object_type}, types.Any()
-        ),
+        "join1Fn": lambda input_types: types.Function({"row": input_types["arr1"].object_type}, types.Any()),
+        "join2Fn": lambda input_types: types.Function({"row": input_types["arr2"].object_type}, types.Any()),
         "alias1": types.String(),
         "alias2": types.String(),
         "leftOuter": types.Boolean(),
@@ -249,6 +230,4 @@ def _join_2_output_type(input_types):
     output_type=_join_2_output_type,
 )
 def join_2(arr1, arr2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter):
-    return join2_impl(
-        arr1, arr2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter
-    )
+    return join2_impl(arr1, arr2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter)

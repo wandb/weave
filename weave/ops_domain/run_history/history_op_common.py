@@ -62,20 +62,11 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         return types.Boolean()
     elif tc_type == "map":
         keys = tc["keys"] if "keys" in tc else {}
-        return types.TypedDict(
-            {
-                key: types.union(
-                    *[history_key_type_count_to_weave_type(vv) for vv in val]
-                )
-                for key, val in keys.items()
-            }
-        )
+        return types.TypedDict({key: types.union(*[history_key_type_count_to_weave_type(vv) for vv in val]) for key, val in keys.items()})
     elif tc_type == "list":
         if "items" not in tc:
             return types.List(types.UnknownType())
-        return types.List(
-            types.union(*[history_key_type_count_to_weave_type(v) for v in tc["items"]])
-        )
+        return types.List(types.union(*[history_key_type_count_to_weave_type(v) for v in tc["items"]]))
     elif tc_type == "histogram":
         return wb_util.WbHistogram.WeaveType()  # type: ignore
     elif tc_type == "table-file":
@@ -83,14 +74,10 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
         return artifact_fs.FilesystemArtifactFileType(extension, table.TableType())
     elif tc_type == "joined-table":
         extension = types.Const(types.String(), "json")
-        return artifact_fs.FilesystemArtifactFileType(
-            extension, table.JoinedTableType()
-        )
+        return artifact_fs.FilesystemArtifactFileType(extension, table.JoinedTableType())
     elif tc_type == "partitioned-table":
         extension = types.Const(types.String(), "json")
-        return artifact_fs.FilesystemArtifactFileType(
-            extension, table.PartitionedTableType()
-        )
+        return artifact_fs.FilesystemArtifactFileType(extension, table.PartitionedTableType())
     elif tc_type == "image-file":
         return ImageArtifactFileRefType()
     elif tc_type == "wb_trace_tree":
@@ -109,14 +96,7 @@ def history_key_type_count_to_weave_type(tc: TypeCount) -> types.Type:
     # the `map` case above. This MUST go last however, since we want to properly
     # catch any named types first.
     if "keys" in tc:
-        return types.TypedDict(
-            {
-                key: types.union(
-                    *[history_key_type_count_to_weave_type(vv) for vv in val]
-                )
-                for key, val in tc["keys"].items()
-            }
-        )
+        return types.TypedDict({key: types.union(*[history_key_type_count_to_weave_type(vv) for vv in val]) for key, val in tc["keys"].items()})
     return types.UnknownType()
 
 
@@ -124,10 +104,7 @@ def get_top_level_keys(key_tree: KeyTree) -> list[str]:
     top_level_keys = list(
         map(
             _dict_utils.unescape_dots,
-            set(
-                next(iter(_dict_utils.split_escaped_string(key)))
-                for key in key_tree.keys()
-            ),
+            set(next(iter(_dict_utils.split_escaped_string(key))) for key in key_tree.keys()),
         )
     )
     return top_level_keys
@@ -141,9 +118,7 @@ def get_full_columns(columns: typing.Optional[list[str]]):
 
 def get_full_columns_prefixed(run: wdt.Run, columns: typing.Optional[list[str]]):
     all_columns = get_full_columns(columns)
-    all_paths = list(
-        gql_json_cache.use_json(run.get("historyKeys", "{}")).get("keys", {}).keys()
-    )
+    all_paths = list(gql_json_cache.use_json(run.get("historyKeys", "{}")).get("keys", {}).keys())
     return _filter_known_paths_to_requested_paths(all_paths, all_columns)
 
 
@@ -188,28 +163,15 @@ def _get_key_typed_node(node: graph.Node) -> graph.Node:
         # This block will not normally be needed. But in some cases (for example lambdas)
         # we will have to refine the node to get the history type.
         if not isinstance(node, graph.OutputNode):
-            raise errors.WeaveWBHistoryTranslationError(
-                f"Expected output node, found {type(node)}"
-            )
+            raise errors.WeaveWBHistoryTranslationError(f"Expected output node, found {type(node)}")
         op = registry_mem.memory_registry._ops[node.from_op.name]
         with compile.enable_compile():
             if not isinstance(op.input_type, op_args.OpNamedArgs):
-                raise errors.WeaveWBHistoryTranslationError(
-                    f"Expected named args, found {type(op.input_type)}"
-                )
-            return op.lazy_call(
-                **{
-                    k: n
-                    for k, n in zip(
-                        op.input_type.arg_types, node.from_op.inputs.values()
-                    )
-                }
-            )
+                raise errors.WeaveWBHistoryTranslationError(f"Expected named args, found {type(op.input_type)}")
+            return op.lazy_call(**{k: n for k, n in zip(op.input_type.arg_types, node.from_op.inputs.values())})
 
 
-def _filter_known_paths_to_requested_paths(
-    known_paths: list[str], requested_paths: list[str]
-) -> list[str]:
+def _filter_known_paths_to_requested_paths(known_paths: list[str], requested_paths: list[str]) -> list[str]:
     history_cols = []
     for path in known_paths:
         for requested_path in requested_paths:
@@ -280,9 +242,7 @@ def make_run_history_gql_field(inputs: InputAndStitchProvider, inner: str):
 
     all_known_paths += paths_from_node
 
-    history_cols = _filter_known_paths_to_requested_paths(
-        list(set(all_known_paths)), get_full_columns(top_level_keys)
-    )
+    history_cols = _filter_known_paths_to_requested_paths(list(set(all_known_paths)), get_full_columns(top_level_keys))
 
     project_fragment = """
         project {
@@ -328,15 +288,11 @@ def _refine_history_type_inner(
             continue
 
         type_counts: list[TypeCount] = key_details["typeCounts"]
-        wt = types.merge_many_types(
-            [history_key_type_count_to_weave_type(tc) for tc in type_counts]
-        )
+        wt = types.merge_many_types([history_key_type_count_to_weave_type(tc) for tc in type_counts])
 
         if wt == types.UnknownType():
             util.capture_exception_with_sentry_if_available(
-                errors.WeaveTypeWarning(
-                    f"Unable to determine history key type for key {key} with types {type_counts}"
-                ),
+                errors.WeaveTypeWarning(f"Unable to determine history key type for key {key} with types {type_counts}"),
                 (str([tc["type"] for tc in type_counts]),),
             )
             wt = types.NoneType()
@@ -378,9 +334,7 @@ def awl_from_local_parquet_path(
 
     # convert table to ArrowWeaveList
     with tracer.trace("make_awl") as span:
-        awl: ArrowWeaveList = ArrowWeaveList(
-            table, object_type=object_type, artifact=artifact
-        )
+        awl: ArrowWeaveList = ArrowWeaveList(table, object_type=object_type, artifact=artifact)
     return awl
 
 
@@ -400,17 +354,13 @@ def concat_awls(awls: list[ArrowWeaveList]):
 
 
 def awl_to_pa_table(awl: ArrowWeaveList):
-    rb = pa.RecordBatch.from_struct_array(
-        awl._arrow_data
-    )  # this pivots to columnar layout
+    rb = pa.RecordBatch.from_struct_array(awl._arrow_data)  # this pivots to columnar layout
     return pa.Table.from_batches([rb])
 
 
 def sort_history_pa_table(table: pa.Table):
     with tracer.trace("pq.sort"):
-        table_sorted_indices = pa.compute.bottom_k_unstable(
-            table, sort_keys=["_step"], k=len(table)
-        )
+        table_sorted_indices = pa.compute.bottom_k_unstable(table, sort_keys=["_step"], k=len(table))
 
     with tracer.trace("pq.take"):
         return table.take(table_sorted_indices)
@@ -431,9 +381,7 @@ def read_history_parquet(run: wdt.Run, columns=None):
     return process_history_awl_tables(tables)
 
 
-def mock_history_rows(
-    run: wdt.Run, use_arrow: bool = True
-) -> typing.Union[ArrowWeaveList, list]:
+def mock_history_rows(run: wdt.Run, use_arrow: bool = True) -> typing.Union[ArrowWeaveList, list]:
     # we are in the case where we have blindly requested the entire history object.
     # we refuse to fetch that, so instead we will just inspect the historyKeys and return
     # a dummy history object that can bte used as a proxy for downstream ops (e.g., count).

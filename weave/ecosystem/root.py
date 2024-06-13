@@ -114,7 +114,8 @@ class EcosystemPanel(panel.Panel):
                         ),
                         columns=[
                             lambda org_name: panels.WeaveLink(
-                                org_name, lambda org_name: ops.entity(org_name)  # type: ignore
+                                org_name,
+                                lambda org_name: ops.entity(org_name),  # type: ignore
                             )  # type: ignore
                         ],
                     ),  # type: ignore
@@ -144,7 +145,8 @@ class EcosystemPanel(panel.Panel):
                     ),
                 ),
                 panels.CardTab(
-                    name="Models", content=panels.Table(ecosystem.models())  # type: ignore
+                    name="Models",
+                    content=panels.Table(ecosystem.models()),  # type: ignore
                 ),
                 panels.CardTab(
                     name="Ops",

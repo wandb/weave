@@ -26,18 +26,14 @@ def init_sentry():
     sentry_sdk.init(integrations=[LoggingIntegration(level=None, event_level=None)])
 
 
-def raise_exception_with_sentry_if_available(
-    err: Exception, fingerprint: typing.Any
-) -> typing.NoReturn:
+def raise_exception_with_sentry_if_available(err: Exception, fingerprint: typing.Any) -> typing.NoReturn:
     # init_sentry()
     if isinstance(err, WeaveFingerprintErrorMixin):
         err.fingerprint = fingerprint
     raise err
 
 
-def capture_exception_with_sentry_if_available(
-    err: Exception, fingerprint: typing.Any
-) -> typing.Union[None, str]:
+def capture_exception_with_sentry_if_available(err: Exception, fingerprint: typing.Any) -> typing.Union[None, str]:
     # init_sentry()
     try:
         import sentry_sdk
@@ -74,9 +70,7 @@ def read_or_default(path: str, default: str = "") -> str:
 
 
 def rand_string_n(n: int) -> str:
-    return "".join(
-        random.choice(string.ascii_uppercase + string.digits) for _ in range(n)
-    )
+    return "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(n))
 
 
 def parse_boolean_env_var(name: str) -> bool:
@@ -155,9 +149,7 @@ def _resolve_path(path: str, current_working_directory: str) -> list[str]:
     return path_parts
 
 
-def relpath_no_syscalls(
-    target_path: str, start_path: str, current_working_directory: str
-) -> str:
+def relpath_no_syscalls(target_path: str, start_path: str, current_working_directory: str) -> str:
     target_parts = _resolve_path(target_path, current_working_directory)
     start_parts = _resolve_path(start_path, current_working_directory)
 
@@ -170,9 +162,7 @@ def relpath_no_syscalls(
             break
         common_length += 1
 
-    relative_parts = [".."] * (len(start_parts) - common_length) + target_parts[
-        common_length:
-    ]
+    relative_parts = [".."] * (len(start_parts) - common_length) + target_parts[common_length:]
     return os.path.sep.join(relative_parts)
 
 

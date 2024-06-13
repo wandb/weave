@@ -48,13 +48,7 @@ def fakewandbmodel_render(
             ),
             weave.panels.CardTab(
                 name="Predictions",
-                content=weave.ops.project("shawn", "ghostwrite-test1")
-                .runs()
-                .summary()["predictions"]
-                .table()
-                .rows()
-                .concat()
-                .to_py(),
+                content=weave.ops.project("shawn", "ghostwrite-test1").runs().summary()["predictions"].table().rows().concat().to_py(),
             ),
         ],
     )
@@ -80,9 +74,7 @@ def entity_render(
                                 "entity_name": entity_name_op(project.entity()),
                                 "project_name": project_name_op(project),
                             },
-                            to=lambda input, vars: weave.ops.project(
-                                vars["entity_name"], vars["project_name"]
-                            ),
+                            to=lambda input, vars: weave.ops.project(vars["entity_name"], vars["project_name"]),
                         ),
                     ],
                 ),
@@ -100,9 +92,7 @@ def entity_render(
                             vars={
                                 "entity_name": entity_name_op(entity),
                             },
-                            to=lambda input, vars: org_model(
-                                vars["entity_name"], input
-                            ),
+                            to=lambda input, vars: org_model(vars["entity_name"], input),
                         ),
                     ],
                 ),
@@ -128,9 +118,7 @@ class ProjectRunsTable(weave.Panel):
                         "project_name": project_name_op(run.project()),
                         "run_id": run.id(),
                     },
-                    to=lambda input, vars: weave.ops.project(
-                        vars["entity_name"], vars["project_name"]
-                    ).run(vars["run_id"]),
+                    to=lambda input, vars: weave.ops.project(vars["entity_name"], vars["project_name"]).run(vars["run_id"]),
                 ),
                 lambda run: run_ops.run_name(run),
                 lambda run: run.createdAt(),
@@ -165,9 +153,7 @@ class ProjectArtifactsTable(weave.Panel):
                         "project_name": project_name_op(artifact.project()),
                         "artifact_name": artifact._get_op("name")(),
                     },
-                    to=lambda input, vars: weave.ops.project(
-                        vars["entity_name"], vars["project_name"]
-                    ).artifact(vars["artifact_name"]),
+                    to=lambda input, vars: weave.ops.project(vars["entity_name"], vars["project_name"]).artifact(vars["artifact_name"]),
                 ),
                 lambda artifact: artifact.createdAt(),
             ],

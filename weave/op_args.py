@@ -24,12 +24,7 @@ class OpArgs:
     @staticmethod
     def from_dict(_type: typing.Union[str, typing.Dict]):
         if isinstance(_type, typing.Dict):
-            return OpNamedArgs(
-                {
-                    key: types.TypeRegistry.type_from_dict(val)
-                    for key, val in _type.items()
-                }
-            )
+            return OpNamedArgs({key: types.TypeRegistry.type_from_dict(val) for key, val in _type.items()})
         else:
             return OpVarArgs(types.TypeRegistry.type_from_dict(_type))
 
@@ -39,9 +34,7 @@ class OpArgs:
     def nonfirst_params_valid(self, param_types: list[types.Type]) -> bool:
         raise NotImplementedError
 
-    def why_are_params_invalid(
-        self, param_dict: dict[str, types.Type]
-    ) -> typing.Optional[str]:
+    def why_are_params_invalid(self, param_dict: dict[str, types.Type]) -> typing.Optional[str]:
         """Attempts to assign the given param types to the op args. Returns the
         dictionary of assignment results"""
         raise NotImplementedError()
@@ -127,9 +120,7 @@ class OpNamedArgs(OpArgs):
             valid_params[at_key] = at
         return True
 
-    def why_are_params_invalid(
-        self, param_dict: dict[str, types.Type]
-    ) -> typing.Optional[str]:
+    def why_are_params_invalid(self, param_dict: dict[str, types.Type]) -> typing.Optional[str]:
         valid_params: dict[str, types.Type] = {}
         reasons: list[str] = []
         for k, t in self.arg_types.items():
@@ -139,9 +130,7 @@ class OpNamedArgs(OpArgs):
             if callable(t):
                 t = t(valid_params)
             if not t.assign_type(param_dict[k]):
-                reasons.append(
-                    f'Parameter "{k}" has invalid type\n{debug_types.why_not_assignable(t, param_dict[k])}'
-                )
+                reasons.append(f'Parameter "{k}" has invalid type\n{debug_types.why_not_assignable(t, param_dict[k])}')
             valid_params[k] = t
         if reasons:
             return "\n".join(reasons)

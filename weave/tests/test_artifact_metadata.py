@@ -60,9 +60,7 @@ def test_artifact_metadata(user_by_api_key_in_env):
         "test_project",
         None,
     )
-    remote_ref = artifact_wandb.WandbArtifactRef.from_uri(
-        artifact_wandb.WeaveWBArtifactURI.parse(remote_uri)
-    )
+    remote_ref = artifact_wandb.WandbArtifactRef.from_uri(artifact_wandb.WeaveWBArtifactURI.parse(remote_uri))
     remote_art = remote_ref.artifact
     assert without_keys(remote_art.metadata.as_dict(), ["_weave_meta"]) == {
         "k_1": "v_3",
@@ -71,9 +69,7 @@ def test_artifact_metadata(user_by_api_key_in_env):
     }
 
     # Fork the artifact and sure the metadata persists
-    forked_art = artifact_local.LocalArtifact.fork_from_uri(
-        artifact_wandb.WeaveWBArtifactURI.parse(remote_uri)
-    )
+    forked_art = artifact_local.LocalArtifact.fork_from_uri(artifact_wandb.WeaveWBArtifactURI.parse(remote_uri))
     assert without_keys(forked_art.metadata.as_dict(), ["_weave_meta"]) == {
         "k_1": "v_3",
         "k_2": "v_2",
@@ -110,12 +106,5 @@ def test_artifact_files_count(user_by_api_key_in_env):
     run.log_artifact(artifact)
     run.finish()
 
-    count_node = (
-        weave.ops.project(run.entity, run.project)
-        .artifact("test")
-        .membershipForAlias("v0")
-        .artifactVersion()
-        .files()
-        .count()
-    )
+    count_node = weave.ops.project(run.entity, run.project).artifact("test").membershipForAlias("v0").artifactVersion().files().count()
     assert weave.use(count_node) == 4

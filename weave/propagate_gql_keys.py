@@ -32,9 +32,7 @@ def _propagate_gql_keys_for_node(
     # unwrap and rewrap tags
     original_input_type = input_types[first_arg_name]
 
-    unwrapped_input_type, wrap = tagged_value_type_helpers.unwrap_tags(
-        original_input_type
-    )
+    unwrapped_input_type, wrap = tagged_value_type_helpers.unwrap_tags(original_input_type)
 
     is_mapped = opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef
     if is_mapped:
@@ -51,9 +49,7 @@ def _propagate_gql_keys_for_node(
 
     # now we rewrap the types to propagate the tags
     if opdef_util.should_tag_op_def_outputs(opdef):
-        new_output_type = tagged_value_type.TaggedValueType(
-            types.TypedDict({first_arg_name: original_input_type}), new_output_type
-        )
+        new_output_type = tagged_value_type.TaggedValueType(types.TypedDict({first_arg_name: original_input_type}), new_output_type)
     elif opdef_util.should_flow_tags(opdef):
         new_output_type = wrap(new_output_type)
 
@@ -73,14 +69,9 @@ def propagate_gql_keys(
 
         if plugin is None or plugin.gql_op_output_type is None:
             if fq_opname.endswith("GQLResolver"):
-                original_opdef = registry_mem.memory_registry.get_op(
-                    fq_opname.replace("GQLResolver", "")
-                )
+                original_opdef = registry_mem.memory_registry.get_op(fq_opname.replace("GQLResolver", ""))
                 original_plugin = gql_op_plugin.get_gql_plugin(original_opdef)
-                if (
-                    original_plugin is not None
-                    and original_plugin.gql_op_output_type is not None
-                ):
+                if original_plugin is not None and original_plugin.gql_op_output_type is not None:
                     key_fn = original_plugin.gql_op_output_type
             if opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef:
                 scalar_plugin = gql_op_plugin.get_gql_plugin(opdef.derived_from)

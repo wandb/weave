@@ -29,9 +29,7 @@ def make_varname_for_type(t: types.Type):
     return t.name
 
 
-def make_container(
-    obj: typing.Union[panel.Panel, graph.Node], name: str
-) -> panel.Panel:
+def make_container(obj: typing.Union[panel.Panel, graph.Node], name: str) -> panel.Panel:
     from weave.panels import Group
 
     if isinstance(obj, graph.Node):
@@ -75,9 +73,7 @@ def make_show_obj(obj: typing.Any) -> tuple[typing.Union[panel.Panel, graph.Node
         node = ops.get(ref.uri)  # type: ignore
         return node, make_varname_for_type(ref.type)
 
-    raise errors.WeaveTypeError(
-        "%s not yet supported. Create a weave.Type to add support." % type(obj)
-    )
+    raise errors.WeaveTypeError("%s not yet supported. Create a weave.Type to add support." % type(obj))
 
 
 # Broken out into to separate function for testing
@@ -115,25 +111,18 @@ def show_url(obj=None):
     params = _show_params(obj)
     panel_url = f"{context.get_frontend_url()}?fullScreen"
     if "weave_node" in params:
-        panel_url += "&expNode=%s" % urllib.parse.quote(
-            json.dumps(params["weave_node"].to_json())
-        )
+        panel_url += "&expNode=%s" % urllib.parse.quote(json.dumps(params["weave_node"].to_json()))
     if "panel_id" in params:
         panel_url += "&panelId=%s" % urllib.parse.quote(params["panel_id"])
     if "panel_config" in params:
-        panel_url += "&panelConfig=%s" % urllib.parse.quote(
-            json.dumps(params["panel_config"])
-        )
+        panel_url += "&panelConfig=%s" % urllib.parse.quote(json.dumps(params["panel_config"]))
     return panel_url
 
 
 def show(obj: typing.Any = None, height: int = 400) -> typing.Any:
     if not util.is_notebook():
         usage_analytics.show_called({"error": True})
-        raise RuntimeError(
-            "`weave.show()` can only be called within notebooks. To extract the value of "
-            "a weave node, try `weave.use()`."
-        )
+        raise RuntimeError("`weave.show()` can only be called within notebooks. To extract the value of " "a weave node, try `weave.use()`.")
 
     if util.is_pandas_dataframe(obj):
         obj = ops.dataframe_to_arrow(obj)

@@ -34,9 +34,7 @@ def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
         try:
             payload_schema(**req.payload)
         except ValidationError as e:
-            raise InvalidRequest(
-                f"Invalid payload for feedback_type {req.feedback_type}: {e}"
-            )
+            raise InvalidRequest(f"Invalid payload for feedback_type {req.feedback_type}: {e}")
 
 
 MESSAGE_INVALID_PURGE = "Can only purge feedback by specifying one or more ids"

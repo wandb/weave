@@ -51,9 +51,7 @@ from . import gql_json_cache
 
 PROFILE = False
 
-OptionalAuthType = typing.Optional[
-    typing.Union[typing.Tuple[str, str], requests.models.HTTPBasicAuth]
-]
+OptionalAuthType = typing.Optional[typing.Union[typing.Tuple[str, str], requests.models.HTTPBasicAuth]]
 
 logger = logging.getLogger("root")
 
@@ -64,9 +62,7 @@ class HandleRequestResponse:
     nodes: value_or_error.ValueOrErrors[graph.Node]
 
 
-def handle_request(
-    request, deref=False, serialize_fn=storage.to_python
-) -> HandleRequestResponse:
+def handle_request(request, deref=False, serialize_fn=storage.to_python) -> HandleRequestResponse:
     # Stuff in the server path relies on lazy execution. Eager is now the default
     # in the weave package itself, so we need to switch to lazy mode here.
     with context.lazy_execution():
@@ -92,11 +88,7 @@ def handle_request(
 
             with tracer.trace("request:deref"):
                 if deref:
-                    result = result.zip(nodes).safe_map(
-                        lambda t: t[0]
-                        if isinstance(t[1].type, weave_types.RefType)
-                        else storage.deref(t[0])
-                    )
+                    result = result.zip(nodes).safe_map(lambda t: t[0] if isinstance(t[1].type, weave_types.RefType) else storage.deref(t[0]))
 
         # print("Server request %s (%0.5fs): %s..." % (start_time,
         #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
@@ -258,9 +250,7 @@ def capture_weave_server_logs(log_level: int = logging.INFO):
     root_logger.setLevel(log_level)
 
     console_log_settings: typing.Optional[logs.LogSettings] = None
-    if not util.is_notebook() or util.parse_boolean_env_var(
-        "WEAVE_SERVER_FORCE_HTTP_SERVER_CONSOLE_LOGS"
-    ):
+    if not util.is_notebook() or util.parse_boolean_env_var("WEAVE_SERVER_FORCE_HTTP_SERVER_CONSOLE_LOGS"):
         console_log_settings = logs.LogSettings(logs.LogFormat.PRETTY, level=None)
 
     logs.enable_stream_logging(

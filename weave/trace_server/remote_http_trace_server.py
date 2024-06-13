@@ -35,9 +35,7 @@ class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
 
 
-REMOTE_REQUEST_BYTES_LIMIT = (
-    (32 - 1) * 1024 * 1024
-)  # 32 MiB (real limit) - 1 MiB (buffer)
+REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024  # 32 MiB (real limit) - 1 MiB (buffer)
 
 REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
@@ -116,9 +114,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
+        wait=tenacity.wait_exponential_jitter(initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
@@ -140,9 +136,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
         estimated_bytes_per_item = encoded_bytes / len(batch)
         if _should_update_batch_size and estimated_bytes_per_item > 0:
-            target_batch_size = int(
-                REMOTE_REQUEST_BYTES_LIMIT // estimated_bytes_per_item
-            )
+            target_batch_size = int(REMOTE_REQUEST_BYTES_LIMIT // estimated_bytes_per_item)
             self.call_processor.max_batch_size = max(1, target_batch_size)
 
         # If the batch is too big, recursively split it in half
@@ -161,9 +155,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
+        wait=tenacity.wait_exponential_jitter(initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
@@ -188,9 +180,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             auth=self._auth,
         )
         if r.status_code == 413 and "obj/create" in url:
-            raise requests.HTTPError(
-                "413 Client Error. Request too large. Try using a weave.Dataset() object."
-            )
+            raise requests.HTTPError("413 Client Error. Request too large. Try using a weave.Dataset() object.")
         if r.status_code == 500:
             reason_val = r.text
             try:
@@ -206,9 +196,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
+        wait=tenacity.wait_exponential_jitter(initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
@@ -220,9 +208,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return ServerInfoRes.model_validate(r.json())
 
     # Call API
-    def call_start(
-        self, req: t.Union[tsi.CallStartReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallStartRes:
+    def call_start(self, req: t.Union[tsi.CallStartReq, t.Dict[str, t.Any]]) -> tsi.CallStartRes:
         if self.should_batch:
             req_as_obj: tsi.CallStartReq
             if isinstance(req, dict):
@@ -230,20 +216,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             else:
                 req_as_obj = req
             if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
-                raise ValueError(
-                    "CallStartReq must have id and trace_id when batching."
-                )
+                raise ValueError("CallStartReq must have id and trace_id when batching.")
             self.call_processor.enqueue([StartBatchItem(req=req_as_obj)])
-            return tsi.CallStartRes(
-                id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
-            )
-        return self._generic_request(
-            "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
-        )
+            return tsi.CallStartRes(id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id)
+        return self._generic_request("/call/start", req, tsi.CallStartReq, tsi.CallStartRes)
 
-    def call_end(
-        self, req: t.Union[tsi.CallEndReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallEndRes:
+    def call_end(self, req: t.Union[tsi.CallEndReq, t.Dict[str, t.Any]]) -> tsi.CallEndRes:
         if self.should_batch:
             req_as_obj: tsi.CallEndReq
             if isinstance(req, dict):
@@ -254,105 +232,55 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return tsi.CallEndRes()
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
-    def call_read(
-        self, req: t.Union[tsi.CallReadReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallReadRes:
-        return self._generic_request(
-            "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
-        )
+    def call_read(self, req: t.Union[tsi.CallReadReq, t.Dict[str, t.Any]]) -> tsi.CallReadRes:
+        return self._generic_request("/call/read", req, tsi.CallReadReq, tsi.CallReadRes)
 
-    def calls_query(
-        self, req: t.Union[tsi.CallsQueryReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallsQueryRes:
-        return self._generic_request(
-            "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
-        )
+    def calls_query(self, req: t.Union[tsi.CallsQueryReq, t.Dict[str, t.Any]]) -> tsi.CallsQueryRes:
+        return self._generic_request("/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes)
 
-    def calls_query_stats(
-        self, req: t.Union[tsi.CallsQueryStatsReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallsQueryStatsRes:
-        return self._generic_request(
-            "/calls/query_stats", req, tsi.CallsQueryStatsReq, tsi.CallsQueryStatsRes
-        )
+    def calls_query_stats(self, req: t.Union[tsi.CallsQueryStatsReq, t.Dict[str, t.Any]]) -> tsi.CallsQueryStatsRes:
+        return self._generic_request("/calls/query_stats", req, tsi.CallsQueryStatsReq, tsi.CallsQueryStatsRes)
 
-    def calls_delete(
-        self, req: t.Union[tsi.CallsDeleteReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallsDeleteRes:
-        return self._generic_request(
-            "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
-        )
+    def calls_delete(self, req: t.Union[tsi.CallsDeleteReq, t.Dict[str, t.Any]]) -> tsi.CallsDeleteRes:
+        return self._generic_request("/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes)
 
-    def call_update(
-        self, req: t.Union[tsi.CallUpdateReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallUpdateRes:
-        return self._generic_request(
-            "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
-        )
+    def call_update(self, req: t.Union[tsi.CallUpdateReq, t.Dict[str, t.Any]]) -> tsi.CallUpdateRes:
+        return self._generic_request("/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes)
 
     # Op API
 
-    def op_create(
-        self, req: t.Union[tsi.OpCreateReq, t.Dict[str, t.Any]]
-    ) -> tsi.OpCreateRes:
-        return self._generic_request(
-            "/op/create", req, tsi.OpCreateReq, tsi.OpCreateRes
-        )
+    def op_create(self, req: t.Union[tsi.OpCreateReq, t.Dict[str, t.Any]]) -> tsi.OpCreateRes:
+        return self._generic_request("/op/create", req, tsi.OpCreateReq, tsi.OpCreateRes)
 
     def op_read(self, req: t.Union[tsi.OpReadReq, t.Dict[str, t.Any]]) -> tsi.OpReadRes:
         return self._generic_request("/op/read", req, tsi.OpReadReq, tsi.OpReadRes)
 
-    def ops_query(
-        self, req: t.Union[tsi.OpQueryReq, t.Dict[str, t.Any]]
-    ) -> tsi.OpQueryRes:
+    def ops_query(self, req: t.Union[tsi.OpQueryReq, t.Dict[str, t.Any]]) -> tsi.OpQueryRes:
         return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
 
     # Obj API
 
-    def obj_create(
-        self, req: t.Union[tsi.ObjCreateReq, t.Dict[str, t.Any]]
-    ) -> tsi.ObjCreateRes:
-        return self._generic_request(
-            "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
-        )
+    def obj_create(self, req: t.Union[tsi.ObjCreateReq, t.Dict[str, t.Any]]) -> tsi.ObjCreateRes:
+        return self._generic_request("/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes)
 
-    def obj_read(
-        self, req: t.Union[tsi.ObjReadReq, t.Dict[str, t.Any]]
-    ) -> tsi.ObjReadRes:
+    def obj_read(self, req: t.Union[tsi.ObjReadReq, t.Dict[str, t.Any]]) -> tsi.ObjReadRes:
         return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
 
-    def objs_query(
-        self, req: t.Union[tsi.ObjQueryReq, t.Dict[str, t.Any]]
-    ) -> tsi.ObjQueryRes:
-        return self._generic_request(
-            "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
-        )
+    def objs_query(self, req: t.Union[tsi.ObjQueryReq, t.Dict[str, t.Any]]) -> tsi.ObjQueryRes:
+        return self._generic_request("/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes)
 
-    def table_create(
-        self, req: t.Union[tsi.TableCreateReq, t.Dict[str, t.Any]]
-    ) -> tsi.TableCreateRes:
-        return self._generic_request(
-            "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
-        )
+    def table_create(self, req: t.Union[tsi.TableCreateReq, t.Dict[str, t.Any]]) -> tsi.TableCreateRes:
+        return self._generic_request("/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes)
 
-    def table_query(
-        self, req: t.Union[tsi.TableQueryReq, t.Dict[str, t.Any]]
-    ) -> tsi.TableQueryRes:
-        return self._generic_request(
-            "/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes
-        )
+    def table_query(self, req: t.Union[tsi.TableQueryReq, t.Dict[str, t.Any]]) -> tsi.TableQueryRes:
+        return self._generic_request("/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes)
 
-    def refs_read_batch(
-        self, req: t.Union[tsi.RefsReadBatchReq, t.Dict[str, t.Any]]
-    ) -> tsi.RefsReadBatchRes:
-        return self._generic_request(
-            "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
-        )
+    def refs_read_batch(self, req: t.Union[tsi.RefsReadBatchReq, t.Dict[str, t.Any]]) -> tsi.RefsReadBatchRes:
+        return self._generic_request("/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes)
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
+        wait=tenacity.wait_exponential_jitter(initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
@@ -370,9 +298,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
+        wait=tenacity.wait_exponential_jitter(initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
@@ -391,23 +317,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
 
-    def feedback_create(
-        self, req: t.Union[tsi.FeedbackCreateReq, t.Dict[str, t.Any]]
-    ) -> tsi.FeedbackCreateRes:
-        return self._generic_request(
-            "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
-        )
+    def feedback_create(self, req: t.Union[tsi.FeedbackCreateReq, t.Dict[str, t.Any]]) -> tsi.FeedbackCreateRes:
+        return self._generic_request("/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes)
 
-    def feedback_query(
-        self, req: t.Union[tsi.FeedbackQueryReq, t.Dict[str, t.Any]]
-    ) -> tsi.FeedbackQueryRes:
-        return self._generic_request(
-            "/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes
-        )
+    def feedback_query(self, req: t.Union[tsi.FeedbackQueryReq, t.Dict[str, t.Any]]) -> tsi.FeedbackQueryRes:
+        return self._generic_request("/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes)
 
-    def feedback_purge(
-        self, req: t.Union[tsi.FeedbackPurgeReq, t.Dict[str, t.Any]]
-    ) -> tsi.FeedbackPurgeRes:
-        return self._generic_request(
-            "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
-        )
+    def feedback_purge(self, req: t.Union[tsi.FeedbackPurgeReq, t.Dict[str, t.Any]]) -> tsi.FeedbackPurgeRes:
+        return self._generic_request("/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes)

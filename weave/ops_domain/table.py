@@ -208,9 +208,7 @@ def _infer_type_from_row_dicts(rows: list[dict]) -> types.TypedDict:
     for row in rows:
         running_type = types.merge_types(running_type, _infer_type_from_row_dict(row))
     if not isinstance(running_type, types.TypedDict):
-        raise errors.WeaveInternalError(
-            f"Expected running_type to be a TypedDict, but got {running_type}"
-        )
+        raise errors.WeaveInternalError(f"Expected running_type to be a TypedDict, but got {running_type}")
     return running_type
 
 
@@ -279,10 +277,7 @@ def _in_place_join_in_linked_tables(
     type_map = column_types["params"]["type_map"]
     for column_name, column_type in type_map.items():
         col_wb_type = column_type["wb_type"]
-        if (
-            col_wb_type in wandb_util.foreign_key_type_names
-            or col_wb_type in wandb_util.foreign_index_type_names
-        ):
+        if col_wb_type in wandb_util.foreign_key_type_names or col_wb_type in wandb_util.foreign_index_type_names:
             peer_file = file.artifact.path_info(column_type["params"]["table"])
             if peer_file is None:
                 # if is none, then the file doesn't exist, so we can't join.
@@ -310,9 +305,7 @@ def _in_place_join_in_linked_tables(
                     if col_wb_type in wandb_util.foreign_index_type_names:
                         row[column_name] = peer_reader.row_at_index(row[column_name])
                     else:
-                        row[column_name] = peer_reader.row_at_key(
-                            column_type["params"]["col_name"], row[column_name]
-                        )
+                        row[column_name] = peer_reader.row_at_key(column_type["params"]["col_name"], row[column_name])
 
             # update the object type
             object_type.property_types[column_name] = peer_object_type
@@ -325,9 +318,7 @@ def _make_type_non_none(t: types.Type) -> types.Type:
     if isinstance(non_none_type, types.List):
         return types.List(_make_type_non_none(non_none_type.object_type))
     elif isinstance(non_none_type, types.TypedDict):
-        return types.TypedDict(
-            {k: _make_type_non_none(v) for k, v in non_none_type.property_types.items()}
-        )
+        return types.TypedDict({k: _make_type_non_none(v) for k, v in non_none_type.property_types.items()})
     return non_none_type
 
 
@@ -374,13 +365,9 @@ def _table_data_to_weave1_objects(
         ]:
             type_cls = types.type_name_to_type(file_type)
             if type_cls is not None and type_cls.instance_class is not None:
-                return type_cls.instance_class(
-                    file.artifact, file_path, cell.get("sha256", file_path)
-                )
+                return type_cls.instance_class(file.artifact, file_path, cell.get("sha256", file_path))
         else:
-            raise errors.WeaveTableDeserializationError(
-                f"Unsupported media type {file_type}"
-            )
+            raise errors.WeaveTableDeserializationError(f"Unsupported media type {file_type}")
 
     def _process_cell_value(cell: typing.Any, cell_type: types.Type) -> typing.Any:
         if (
@@ -393,18 +380,13 @@ def _table_data_to_weave1_objects(
             cell = [_process_cell_value(c, cell_type.object_type) for c in cell]
 
         elif isinstance(cell, dict) and isinstance(cell_type, types.TypedDict):
-            cell = {
-                k: _process_cell_value(v, cell_type.property_types[str(k)])
-                for k, v in cell.items()
-            }
+            cell = {k: _process_cell_value(v, cell_type.property_types[str(k)]) for k, v in cell.items()}
         # this is needed because tables store timestamps as unix epochs in ms, but the deserialized
         # representation in weave1 is a datetime object. we do the conversion here to ensure deserialized
         # timestamps all expose a common interface to weave1 callers.
         elif isinstance(cell_type, types.Timestamp):
             if cell is not None:
-                cell = weave_timestamp.ms_to_python_datetime(
-                    weave_timestamp.unitless_int_to_inferred_ms(cell)
-                )
+                cell = weave_timestamp.ms_to_python_datetime(weave_timestamp.unitless_int_to_inferred_ms(cell))
         elif isinstance(cell, dict):
             if isinstance(cell_type, possible_media_type_classes):
                 cell = _create_media_type_for_cell(cell)
@@ -420,10 +402,7 @@ def _table_data_to_weave1_objects(
 
     rows: list[dict] = []
     for data_row in row_data:
-        new_row = {
-            k: _process_cell_value(v, non_null_prop_types.property_types[str(k)])
-            for k, v in data_row.items()
-        }
+        new_row = {k: _process_cell_value(v, non_null_prop_types.property_types[str(k)]) for k, v in data_row.items()}
         rows.append(new_row)
 
     return rows
@@ -444,11 +423,7 @@ def _patch_legacy_image_file_types(
     Note: this does not work for lists of images!
     """
     return_prop_types = {}
-    class_types = (
-        (wbmedia.LegacyImageArtifactFileRefType,)
-        if not assume_legacy
-        else (wbmedia.LegacyImageArtifactFileRefType, wbmedia.ImageArtifactFileRefType)
-    )
+    class_types = (wbmedia.LegacyImageArtifactFileRefType,) if not assume_legacy else (wbmedia.LegacyImageArtifactFileRefType, wbmedia.ImageArtifactFileRefType)
     for col_name, col_type in object_type.property_types.items():
         return_prop_types[col_name] = col_type
         other_members = []
@@ -493,34 +468,21 @@ def _patch_legacy_image_file_types(
                 for box_set in image_example.boxes.values():
                     for box in box_set:
                         if "scores" in box and box["scores"] is not None:
-                            box_score_key_set.update(
-                                dict.fromkeys(box["scores"].keys())
-                            )
+                            box_score_key_set.update(dict.fromkeys(box["scores"].keys()))
 
             # Fetch the class data (requires a network call) and update the class map
             if image_example.classes is not None and "path" in image_example.classes:
                 classes_path = image_example.classes["path"]
                 classes_file = file.artifact.path_info(classes_path)
-                if classes_file is None or isinstance(
-                    classes_file, artifact_fs.FilesystemArtifactDir
-                ):
-                    raise errors.WeaveInternalError(
-                        "classes_file is None or a directory"
-                    )
+                if classes_file is None or isinstance(classes_file, artifact_fs.FilesystemArtifactDir):
+                    raise errors.WeaveInternalError("classes_file is None or a directory")
                 with classes_file.open() as f:
                     tracer = engine_trace.tracer()
                     with tracer.trace("classes_file:jsonload"):
                         classes_data = json.load(f)
-                if (
-                    "class_set" in classes_data
-                    and classes_data["class_set"] is not None
-                ):
+                if "class_set" in classes_data and classes_data["class_set"] is not None:
                     for class_item in classes_data["class_set"]:
-                        if (
-                            "id" in class_item
-                            and "name" in class_item
-                            and class_map.get(class_item["id"]) is None
-                        ):
+                        if "id" in class_item and "name" in class_item and class_map.get(class_item["id"]) is None:
                             class_map[class_item["id"]] = class_item["name"]
 
             # Update the number of loaded rows
@@ -548,9 +510,7 @@ def should_infer_type_from_data(col_type: types.Type) -> bool:
     status = {"found_unknown": False}
 
     def is_unknown_type_mapper(t: types.Type) -> None:
-        status["found_unknown"] = status["found_unknown"] or isinstance(
-            t, (types.UnknownType, types.Any)
-        )
+        status["found_unknown"] = status["found_unknown"] or isinstance(t, (types.UnknownType, types.Any))
 
     types.map_leaf_types(col_type, is_unknown_type_mapper)
 
@@ -565,21 +525,15 @@ def _get_rows_and_object_type_from_weave_format(
     rows = []
     artifact = file.artifact
     if not isinstance(artifact, artifact_wandb.WandbArtifact):
-        raise errors.WeaveInternalError(
-            "Weave table file format is only supported for wandb artifacts"
-        )
+        raise errors.WeaveInternalError("Weave table file format is only supported for wandb artifacts")
     row_data = data["data"]
     # Always convert the column names to string names
     column_types = data["column_types"]
     column_names = [str(c) for c in data["columns"]]
     converted_object_type = wandb_util.weave0_type_json_to_weave1_type(column_types)
     if not isinstance(converted_object_type, types.TypedDict):
-        raise errors.WeaveInternalError(
-            "Weave table file format only supports typed dicts"
-        )
-    converted_object_type = types.TypedDict(
-        {str(k): v for k, v in converted_object_type.property_types.items()}
-    )
+        raise errors.WeaveInternalError("Weave table file format only supports typed dicts")
+    converted_object_type = types.TypedDict({str(k): v for k, v in converted_object_type.property_types.items()})
     # Fix two things:
     # 1. incoming table column names may not match the order of column_types
     # 2. if we had an unknown (happens when old type is "PythonObjectType")
@@ -587,22 +541,16 @@ def _get_rows_and_object_type_from_weave_format(
     obj_prop_types = {}
     for i, key in enumerate(column_names):
         if key not in converted_object_type.property_types:
-            raise errors.WeaveTableDeserializationError(
-                f"Column name {key} not found in column_types"
-            )
+            raise errors.WeaveTableDeserializationError(f"Column name {key} not found in column_types")
         col_type = converted_object_type.property_types[key]
         if should_infer_type_from_data(col_type):
             # Sample some data to detect the type. Otherwise this
             # can be very expensive. This could cause down-stream crashes,
             # for example if we don't realize that a column is union of string
             # and int, saving to arrow will crash.
-            unknown_col_example_data = [
-                row[i] for row in util.sample_rows(row_data, sample_max_rows)
-            ]
+            unknown_col_example_data = [row[i] for row in util.sample_rows(row_data, sample_max_rows)]
             obj_prop_types[key] = _infer_type_from_col_list(unknown_col_example_data)
-            logging.warning(
-                f"Column {key} had type {col_type} requiring data-inferred type. Inferred type as {obj_prop_types[key]}. This may be incorrect due to data sampling"
-            )
+            logging.warning(f"Column {key} had type {col_type} requiring data-inferred type. Inferred type as {obj_prop_types[key]}. This may be incorrect due to data sampling")
         else:
             obj_prop_types[key] = col_type
     object_type = types.TypedDict(obj_prop_types)
@@ -611,9 +559,7 @@ def _get_rows_and_object_type_from_weave_format(
     rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
     object_type = _patch_legacy_image_file_types(rows, object_type, file)
 
-    rows, object_type = _in_place_join_in_linked_tables(
-        rows, object_type, column_types, file
-    )
+    rows, object_type = _in_place_join_in_linked_tables(rows, object_type, column_types, file)
 
     return rows, object_type
 
@@ -636,29 +582,17 @@ def _get_rows_and_object_type_from_weave_format_mixed(
     # parse, could error out, and the data is not even useful for the user.
     # Let's at least give them a string representation of the data and ensure
     # that it will be displayed.
-    rows = [
-        {
-            col_key: json.dumps(r[col_ndx])
-            if type(r[col_ndx]) in [list, dict]
-            else r[col_ndx]
-            for col_ndx, col_key in enumerate(data["columns"])
-        }
-        for r in data["data"]
-    ]
+    rows = [{col_key: json.dumps(r[col_ndx]) if type(r[col_ndx]) in [list, dict] else r[col_ndx] for col_ndx, col_key in enumerate(data["columns"])} for r in data["data"]]
     sampled_rows = util.sample_rows(rows, sample_max_rows)
     awl = ops_arrow.to_arrow(sampled_rows, None, file.artifact)
     return rows, awl.object_type
 
 
-def _get_rows_and_object_type_from_legacy_format(
-    data: dict, file: artifact_fs.FilesystemArtifactFile, sample_max_rows: int = 1000
-) -> tuple[list, types.TypedDict]:
+def _get_rows_and_object_type_from_legacy_format(data: dict, file: artifact_fs.FilesystemArtifactFile, sample_max_rows: int = 1000) -> tuple[list, types.TypedDict]:
     # W&B dataframe columns are ints, we always want strings
     data["columns"] = [str(c) for c in data["columns"]]
     raw_rows = [dict(zip(data["columns"], row)) for row in data["data"]]
-    object_type = _infer_type_from_row_dicts(
-        util.sample_rows(raw_rows, sample_max_rows)
-    )
+    object_type = _infer_type_from_row_dicts(util.sample_rows(raw_rows, sample_max_rows))
 
     rows = _table_data_to_weave1_objects(raw_rows, file, object_type)
     object_type = _patch_legacy_image_file_types(rows, object_type, file, True)
@@ -683,9 +617,7 @@ def _get_table_data_from_file(file: artifact_fs.FilesystemArtifactFile) -> dict:
 
 
 def _get_table_like_awl_from_file(
-    file: typing.Union[
-        artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir, None
-    ],
+    file: typing.Union[artifact_fs.FilesystemArtifactFile, artifact_fs.FilesystemArtifactDir, None],
     num_parts: int = 1,
 ) -> _TableLikeAWLFromFileResult:
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
@@ -698,9 +630,7 @@ def _get_table_like_awl_from_file(
     elif file.path.endswith(".table.json"):
         awl = _get_table_awl_from_file(data, file, num_parts)
     else:
-        raise errors.WeaveInternalError(
-            f"Unknown table file format for path: {file.path}"
-        )
+        raise errors.WeaveInternalError(f"Unknown table file format for path: {file.path}")
     return _TableLikeAWLFromFileResult(awl, data)
 
 
@@ -717,50 +647,34 @@ def _get_rows_and_object_type_awl_from_file(
     object_type = None
     with tracer.trace("get_table:get_rows_and_object_type"):
         sample_max_rows = max(1000 // num_parts, 1)
-        if USE_RAW_DATA_WHEN_MIXED and _data_is_weave_file_with_mixed_type_settings(
-            data
-        ):
+        if USE_RAW_DATA_WHEN_MIXED and _data_is_weave_file_with_mixed_type_settings(data):
             # `_data_is_weave_file_format` is known to be fallible, especially
             # with large datasets of heterogenous types. In this case, the user
             # explicitly told us that the types are mixed, so we will just
             # convert everything to strings.
-            rows, object_type = _get_rows_and_object_type_from_weave_format_mixed(
-                data, file, sample_max_rows
-            )
+            rows, object_type = _get_rows_and_object_type_from_weave_format_mixed(data, file, sample_max_rows)
         elif _data_is_weave_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_weave_format(
-                data, file, sample_max_rows
-            )
+            rows, object_type = _get_rows_and_object_type_from_weave_format(data, file, sample_max_rows)
         elif _data_is_legacy_run_file_format(data):
-            rows, object_type = _get_rows_and_object_type_from_legacy_format(
-                data, file, sample_max_rows
-            )
+            rows, object_type = _get_rows_and_object_type_from_legacy_format(data, file, sample_max_rows)
         else:
             raise errors.WeaveInternalError("Unknown table file format for data")
 
     return rows, object_type
 
 
-def _get_table_awl_from_rows_object_type(
-    rows: list, object_type: types.Type, file: artifact_fs.FilesystemArtifactFile
-) -> "ops_arrow.ArrowWeaveList":
+def _get_table_awl_from_rows_object_type(rows: list, object_type: types.Type, file: artifact_fs.FilesystemArtifactFile) -> "ops_arrow.ArrowWeaveList":
     tracer = engine_trace.tracer()
     with tracer.trace("get_table:to_arrow"):
-        return ops_arrow.to_arrow_from_list_and_artifact(
-            rows, object_type, file.artifact
-        )
+        return ops_arrow.to_arrow_from_list_and_artifact(rows, object_type, file.artifact)
 
 
-def _get_table_awl_from_file(
-    data: dict, file: artifact_fs.FilesystemArtifactFile, num_parts: int = 1
-) -> "ops_arrow.ArrowWeaveList":
+def _get_table_awl_from_file(data: dict, file: artifact_fs.FilesystemArtifactFile, num_parts: int = 1) -> "ops_arrow.ArrowWeaveList":
     rows, object_type = _get_rows_and_object_type_awl_from_file(data, file, num_parts)
     return _get_table_awl_from_rows_object_type(rows, object_type, file)
 
 
-def _get_partitioned_table_awl_from_file(
-    data: dict, file: artifact_fs.FilesystemArtifactFile
-) -> ops_arrow.ArrowWeaveList:
+def _get_partitioned_table_awl_from_file(data: dict, file: artifact_fs.FilesystemArtifactFile) -> ops_arrow.ArrowWeaveList:
     parts_path_root = data["parts_path"]
 
     all_aws: list[ops_arrow.ArrowWeaveList] = []
@@ -777,17 +691,13 @@ def _get_partitioned_table_awl_from_file(
         object_types: list[types.Type] = []
         for file in part_dir.files.values():
             data = _get_table_data_from_file(file)
-            rows, object_type = _get_rows_and_object_type_awl_from_file(
-                data, file, num_parts
-            )
+            rows, object_type = _get_rows_and_object_type_awl_from_file(data, file, num_parts)
             rrows.append(rows)
             object_types.append(object_type)
         object_type = types.union(*object_types)
 
         for rows, file in zip(rrows, part_dir.files.values()):
-            all_aws.append(
-                _get_table_awl_from_rows_object_type(rows, object_type, file)
-            )
+            all_aws.append(_get_table_awl_from_rows_object_type(rows, object_type, file))
     arrow_weave_list = ops_arrow.ops.concat.raw_resolve_fn(all_aws)
     return arrow_weave_list
 
@@ -802,19 +712,14 @@ async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
     tasks = set()
     async with client.connect() as conn:
         for file in files.values():
-            if (
-                isinstance(file.artifact, artifact_wandb.WandbArtifact)
-                and file.artifact._read_artifact_uri
-            ):
+            if isinstance(file.artifact, artifact_wandb.WandbArtifact) and file.artifact._read_artifact_uri:
                 uri = file.artifact._read_artifact_uri.with_path(file.path)
                 task = loop.create_task(conn.ensure_file(uri))
                 tasks.add(task)
         await asyncio.wait(tasks)
 
 
-def _get_joined_table_awl_from_file(
-    data: dict, file: artifact_fs.FilesystemArtifactFile
-) -> ops_arrow.ArrowWeaveList:
+def _get_joined_table_awl_from_file(data: dict, file: artifact_fs.FilesystemArtifactFile) -> ops_arrow.ArrowWeaveList:
     join_key = data["join_key"]
 
     table_1_path = data["table1"]
@@ -823,20 +728,14 @@ def _get_joined_table_awl_from_file(
     awl_1 = _get_table_like_awl_from_file(file.artifact.path_info(table_1_path)).awl
     awl_2 = _get_table_like_awl_from_file(file.artifact.path_info(table_2_path)).awl
 
-    join_fn_1 = weave_internal.define_fn(
-        {"row": awl_1.object_type}, lambda row: row[join_key]
-    )
-    join_fn_2 = weave_internal.define_fn(
-        {"row": awl_2.object_type}, lambda row: row[join_key]
-    )
+    join_fn_1 = weave_internal.define_fn({"row": awl_1.object_type}, lambda row: row[join_key])
+    join_fn_2 = weave_internal.define_fn({"row": awl_2.object_type}, lambda row: row[join_key])
 
     # Note: in WeaveJS, we allow the user to specify the join type, but
     # in practice it is always a full-outer join. If we want to parameterize that
     # then we need to filter out the unneeded rows in joinedTable-rows since we
     # eagerly construct the rows here.
-    arrow_weave_list = ops_arrow.list_join.join_2.raw_resolve_fn(
-        awl_1, awl_2, join_fn_1.val, join_fn_2.val, "0", "1", True, True
-    )
+    arrow_weave_list = ops_arrow.list_join.join_2.raw_resolve_fn(awl_1, awl_2, join_fn_1.val, join_fn_2.val, "0", "1", True, True)
     return arrow_weave_list
 
 

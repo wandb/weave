@@ -29,12 +29,8 @@ def test_serialize_const_string():
 
 def test_merge_typedict_keys_are_stable():
     for i in range(10):
-        t = types.TypedDict(
-            {"a": types.String(), "b": types.String(), "c": types.String()}
-        )
-        t2 = types.TypedDict(
-            {"a": types.String(), "b": types.String(), "c": types.String()}
-        )
+        t = types.TypedDict({"a": types.String(), "b": types.String(), "c": types.String()})
+        t2 = types.TypedDict({"a": types.String(), "b": types.String(), "c": types.String()})
         r = types.merge_types(t, t2)
         assert list(r.property_types.keys()) == ["a", "b", "c"]
 
@@ -42,15 +38,11 @@ def test_merge_typedict_keys_are_stable():
 def test_merge_through_tags():
     t = TaggedValueType(
         types.TypedDict({"tag": types.Number()}),
-        types.TypedDict(
-            {"a": types.String(), "b": types.Number(), "c": types.String()}
-        ),
+        types.TypedDict({"a": types.String(), "b": types.Number(), "c": types.String()}),
     )
     t2 = TaggedValueType(
         types.TypedDict({"tag": types.Number()}),
-        types.TypedDict(
-            {"a": types.String(), "b": types.String(), "d": types.String()}
-        ),
+        types.TypedDict({"a": types.String(), "b": types.String(), "d": types.String()}),
     )
     r = types.merge_types(t, t2)
     correct_type = TaggedValueType(
@@ -134,9 +126,7 @@ def test_typeof_list_runs():
 
     assert actual == types.List(
         types.RunType(
-            inputs=types.TypedDict(
-                {"a": types.String(), "b": types.optional(types.Int())}
-            ),
+            inputs=types.TypedDict({"a": types.String(), "b": types.optional(types.Int())}),
             history=types.List(types.UnknownType()),
             output=types.Float(),
         ),
@@ -145,32 +135,20 @@ def test_typeof_list_runs():
 
 def test_typeof_list_dict_merge():
     d = [{"a": 6, "b": "x"}, {"a": 5, "b": None}]
-    assert types.TypeRegistry.type_of(d) == types.List(
-        types.TypedDict({"a": types.Int(), "b": types.optional(types.String())})
-    )
+    assert types.TypeRegistry.type_of(d) == types.List(types.TypedDict({"a": types.Int(), "b": types.optional(types.String())}))
 
 
 def test_typeof_nested_dict_merge():
     """Tests that nested merging is disabled."""
-    t1 = weave.weave_types.TypedDict(
-        {"a": weave.weave_types.TypedDict({"b": types.Int()})}
-    )
-    t2 = weave.weave_types.TypedDict(
-        {"a": weave.weave_types.TypedDict({"c": types.String()})}
-    )
+    t1 = weave.weave_types.TypedDict({"a": weave.weave_types.TypedDict({"b": types.Int()})})
+    t2 = weave.weave_types.TypedDict({"a": weave.weave_types.TypedDict({"c": types.String()})})
     merged_type = _dict_utils.typeddict_merge_output_type({"self": t1, "other": t2})
-    assert merged_type == weave.weave_types.TypedDict(
-        {"a": weave.weave_types.TypedDict({"c": types.String()})}
-    )
+    assert merged_type == weave.weave_types.TypedDict({"a": weave.weave_types.TypedDict({"c": types.String()})})
 
 
 def test_dict_without_key_type():
-    fully_typed = weave.weave_types.TypeRegistry.type_from_dict(
-        {"type": "dict", "keyType": "string", "objectType": "number"}
-    )
-    partial_typed = weave.weave_types.TypeRegistry.type_from_dict(
-        {"type": "dict", "objectType": "number"}
-    )
+    fully_typed = weave.weave_types.TypeRegistry.type_from_dict({"type": "dict", "keyType": "string", "objectType": "number"})
+    partial_typed = weave.weave_types.TypeRegistry.type_from_dict({"type": "dict", "objectType": "number"})
     assert fully_typed.assign_type(partial_typed)
 
 
@@ -201,9 +179,7 @@ def test_union_access():
     ### Type return
 
     # Not all members have props
-    unioned = weave.weave_types.union(
-        weave.weave_types.String(), weave.weave_types.List(weave.weave_types.String())
-    )
+    unioned = weave.weave_types.union(weave.weave_types.String(), weave.weave_types.List(weave.weave_types.String()))
     with pytest.raises(AttributeError):
         unioned.object_type
 
@@ -212,17 +188,11 @@ def test_union_access():
         weave.weave_types.List(weave.weave_types.String()),
         weave.weave_types.List(weave.weave_types.Number()),
     )
-    assert unioned.object_type == weave.weave_types.union(
-        weave.weave_types.String(), weave.weave_types.Number()
-    )
+    assert unioned.object_type == weave.weave_types.union(weave.weave_types.String(), weave.weave_types.Number())
 
     # Nullable type
-    unioned = weave.weave_types.union(
-        weave.weave_types.NoneType(), weave.weave_types.List(weave.weave_types.String())
-    )
-    assert unioned.object_type == weave.weave_types.union(
-        weave.weave_types.String(), weave.weave_types.NoneType()
-    )
+    unioned = weave.weave_types.union(weave.weave_types.NoneType(), weave.weave_types.List(weave.weave_types.String()))
+    assert unioned.object_type == weave.weave_types.union(weave.weave_types.String(), weave.weave_types.NoneType())
 
     ### Dict Return
     # Not all members have props
@@ -252,15 +222,9 @@ def test_union_access():
     )
     assert unioned.property_types == {
         "same": weave.weave_types.Number(),
-        "solo_a": weave.weave_types.union(
-            weave.weave_types.Number(), weave.weave_types.NoneType()
-        ),
-        "solo_b": weave.weave_types.union(
-            weave.weave_types.String(), weave.weave_types.NoneType()
-        ),
-        "differ": weave.weave_types.union(
-            weave.weave_types.Number(), weave.weave_types.String()
-        ),
+        "solo_a": weave.weave_types.union(weave.weave_types.Number(), weave.weave_types.NoneType()),
+        "solo_b": weave.weave_types.union(weave.weave_types.String(), weave.weave_types.NoneType()),
+        "differ": weave.weave_types.union(weave.weave_types.Number(), weave.weave_types.String()),
     }
 
     # Nullable type
@@ -268,11 +232,7 @@ def test_union_access():
         weave.weave_types.NoneType(),
         weave.weave_types.TypedDict({"a": weave.weave_types.String()}),
     )
-    assert unioned.property_types == {
-        "a": weave.weave_types.union(
-            weave.weave_types.String(), weave.weave_types.NoneType()
-        )
-    }
+    assert unioned.property_types == {"a": weave.weave_types.union(weave.weave_types.String(), weave.weave_types.NoneType())}
 
 
 def test_typeof_node():
@@ -295,12 +255,8 @@ def test_subtype_list():
 
 
 def test_typeddict_to_dict():
-    assert types.Dict(types.String(), types.Int()).assign_type(
-        types.TypedDict({"a": types.Int(), "b": types.Int()})
-    )
-    assert not types.Dict(types.String(), types.Int()).assign_type(
-        types.TypedDict({"a": types.Int(), "b": types.String()})
-    )
+    assert types.Dict(types.String(), types.Int()).assign_type(types.TypedDict({"a": types.Int(), "b": types.Int()}))
+    assert not types.Dict(types.String(), types.Int()).assign_type(types.TypedDict({"a": types.Int(), "b": types.String()}))
 
 
 # The following test tests all permutionations of container types Consts, Tags,
@@ -354,18 +310,12 @@ def test_typeddict_to_dict():
         ),
         # Union Const Units
         (
-            types.union(
-                types.Const(types.NoneType(), None), types.Const(types.Number(), 5)
-            ),
+            types.union(types.Const(types.NoneType(), None), types.Const(types.Number(), 5)),
             types.Const(types.Number(), 5),
         ),
         (
-            types.union(
-                types.Const(types.String(), "hello"), types.Const(types.Number(), 5)
-            ),
-            types.union(
-                types.Const(types.String(), "hello"), types.Const(types.Number(), 5)
-            ),
+            types.union(types.Const(types.String(), "hello"), types.Const(types.Number(), 5)),
+            types.union(types.Const(types.String(), "hello"), types.Const(types.Number(), 5)),
         ),
         # Union Tagged Units
         (
@@ -395,40 +345,28 @@ def test_typeddict_to_dict():
         ),
         (
             types.union(
-                TaggedValueType(
-                    types.TypedDict({}), types.Const(types.String(), "hello")
-                ),
+                TaggedValueType(types.TypedDict({}), types.Const(types.String(), "hello")),
                 TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
             ),
             types.union(
-                TaggedValueType(
-                    types.TypedDict({}), types.Const(types.String(), "hello")
-                ),
+                TaggedValueType(types.TypedDict({}), types.Const(types.String(), "hello")),
                 TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
             ),
         ),
         # Tagged Union Units
         (
-            TaggedValueType(
-                types.TypedDict({}), types.union(types.NoneType(), types.Number())
-            ),
+            TaggedValueType(types.TypedDict({}), types.union(types.NoneType(), types.Number())),
             TaggedValueType(types.TypedDict({}), types.Number()),
         ),
         (
-            TaggedValueType(
-                types.TypedDict({}), types.union(types.String(), types.Number())
-            ),
-            TaggedValueType(
-                types.TypedDict({}), types.union(types.String(), types.Number())
-            ),
+            TaggedValueType(types.TypedDict({}), types.union(types.String(), types.Number())),
+            TaggedValueType(types.TypedDict({}), types.union(types.String(), types.Number())),
         ),
         # Union Tagged Union
         (
             types.UnionType(
                 types.NoneType(),
-                TaggedValueType(
-                    types.TypedDict({}), types.union(types.NoneType(), types.Number())
-                ),
+                TaggedValueType(types.TypedDict({}), types.union(types.NoneType(), types.Number())),
             ),
             TaggedValueType(types.TypedDict({}), types.Number()),
         ),
@@ -436,24 +374,18 @@ def test_typeddict_to_dict():
         (
             TaggedValueType(
                 types.TypedDict({}),
-                types.union(
-                    types.Const(types.NoneType(), None), types.Const(types.Number(), 5)
-                ),
+                types.union(types.Const(types.NoneType(), None), types.Const(types.Number(), 5)),
             ),
             TaggedValueType(types.TypedDict({}), types.Const(types.Number(), 5)),
         ),
         (
             TaggedValueType(
                 types.TypedDict({}),
-                types.union(
-                    types.Const(types.String(), "hello"), types.Const(types.Number(), 5)
-                ),
+                types.union(types.Const(types.String(), "hello"), types.Const(types.Number(), 5)),
             ),
             TaggedValueType(
                 types.TypedDict({}),
-                types.union(
-                    types.Const(types.String(), "hello"), types.Const(types.Number(), 5)
-                ),
+                types.union(types.Const(types.String(), "hello"), types.Const(types.Number(), 5)),
             ),
         ),
         # Union with multiple non-none members
@@ -463,9 +395,7 @@ def test_typeddict_to_dict():
         ),
         # Union with multiple none-like members
         (
-            types.union(
-                types.NoneType(), TaggedValueType(types.TypedDict({}), types.NoneType())
-            ),
+            types.union(types.NoneType(), TaggedValueType(types.TypedDict({}), types.NoneType())),
             types.Invalid(),
         ),
     ],
@@ -475,10 +405,7 @@ def test_non_none(in_type, out_type):
 
 
 def test_const_union_resolves_union():
-    assert (
-        types.Const(types.union(types.NoneType(), types.Number()), 5).val_type
-        == types.Int()
-    )
+    assert types.Const(types.union(types.NoneType(), types.Number()), 5).val_type == types.Int()
 
 
 def test_floatint_merged():
@@ -519,26 +446,23 @@ def test_union_of_typetype_can_be_compared_to_other():
 
 
 def test_assign_dict_to_typeddict():
-    assert weave.types.TypedDict({}).assign_type(
-        weave.types.Dict(weave.types.String(), weave.types.String())
-    )
+    assert weave.types.TypedDict({}).assign_type(weave.types.Dict(weave.types.String(), weave.types.String()))
 
 
 def test_type_of_empty_array_union():
-    assert weave.type_of([{"a": []}, {"a": [1]},]) == weave.types.List(
-        weave.types.TypedDict({"a": weave.types.List(weave.types.Int())})
-    )
+    assert weave.type_of(
+        [
+            {"a": []},
+            {"a": [1]},
+        ]
+    ) == weave.types.List(weave.types.TypedDict({"a": weave.types.List(weave.types.Int())}))
 
 
 def test_type_hash():
     assert hash(types.NoneType()) == hash(types.NoneType())
     assert hash(types.List(types.Int())) == hash(types.List(types.Int()))
-    assert hash(types.TypedDict({"a": types.Int()})) == hash(
-        types.TypedDict({"a": types.Int()})
-    )
-    assert hash(types.UnionType(types.NoneType(), types.String())) == hash(
-        types.UnionType(types.String(), types.NoneType())
-    )
+    assert hash(types.TypedDict({"a": types.Int()})) == hash(types.TypedDict({"a": types.Int()}))
+    assert hash(types.UnionType(types.NoneType(), types.String())) == hash(types.UnionType(types.String(), types.NoneType()))
 
 
 def test_tagged_value_flow():
@@ -597,30 +521,18 @@ MERGE_CONSTS_TEST_CASES = [
             },
         ),
         types.TypedDict(
-            {
-                "a": types.UnionType(
-                    types.Const(types.Int(), 1), types.Const(types.Int(), 2)
-                )
-            },
+            {"a": types.UnionType(types.Const(types.Int(), 1), types.Const(types.Int(), 2))},
         ),
     ),
     (
         types.TypedDict(
             {
-                "a": types.List(
-                    types.UnionType(
-                        types.Const(types.Int(), 1), types.Const(types.Int(), 2)
-                    )
-                ),
+                "a": types.List(types.UnionType(types.Const(types.Int(), 1), types.Const(types.Int(), 2))),
             },
         ),
         types.TypedDict(
             {
-                "a": types.List(
-                    types.UnionType(
-                        types.Const(types.Int(), 1), types.Const(types.Int(), 3)
-                    )
-                ),
+                "a": types.List(types.UnionType(types.Const(types.Int(), 1), types.Const(types.Int(), 3))),
             },
         ),
         types.TypedDict(
@@ -696,10 +608,7 @@ def test_init_image():
 
 def test_deserializes_single_member_union():
     # weave0 may produce these
-    assert (
-        types.TypeRegistry.type_from_dict({"members": ["int"], "type": "union"})
-        == types.Int()
-    )
+    assert types.TypeRegistry.type_from_dict({"members": ["int"], "type": "union"}) == types.Int()
 
 
 def test_wbrun_not_assignable_to_weave_run():
@@ -721,9 +630,7 @@ def test_generic_object_type():
 
 
 def test_union_auto_execute():
-    assert weave.types.optional(weave.types.Timestamp()).assign_type(
-        weave.types.Function(output_type=weave.types.optional(weave.types.Timestamp()))
-    )
+    assert weave.types.optional(weave.types.Timestamp()).assign_type(weave.types.Function(output_type=weave.types.optional(weave.types.Timestamp())))
 
 
 def test_load_unknown_subobj_type():

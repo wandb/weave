@@ -60,12 +60,8 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
                                         "message": types.optional(
                                             types.TypedDict(
                                                 {
-                                                    "role": types.optional(
-                                                        types.String()
-                                                    ),
-                                                    "content": types.optional(
-                                                        types.String()
-                                                    ),
+                                                    "role": types.optional(types.String()),
+                                                    "content": types.optional(types.String()),
                                                 },
                                                 not_required_keys=set(["role"]),
                                             )
@@ -198,37 +194,23 @@ def board(
 
     augmented_data = varbar.add(
         "augmented_data",
-        source_data.with_columns(
-            weave.ops.dict_(
-                **{
-                    "summary.cost": source_data.map(
-                        lambda row: openai_request_cost(row)
-                    )
-                }
-            )
-        ),
+        source_data.with_columns(weave.ops.dict_(**{"summary.cost": source_data.map(lambda row: openai_request_cost(row))})),
         hidden=True,
     )
 
     filter_fn = varbar.add(
         "filter_fn",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: weave_internal.const(True)
-        ),
+        weave_internal.define_fn({"row": input_node.type.object_type}, lambda row: weave_internal.const(True)),
         hidden=True,
     )
 
     grouping_fn = varbar.add(
         "grouping_fn",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: row["output.model"]
-        ),
+        weave_internal.define_fn({"row": input_node.type.object_type}, lambda row: row["output.model"]),
         hidden=True,
     )
 
-    filtered_data = varbar.add(
-        "filtered_data", augmented_data.filter(filter_fn), hidden=True
-    )
+    filtered_data = varbar.add("filtered_data", augmented_data.filter(filter_fn), hidden=True)
 
     # Setup date range variables:
     ## 1. raw_data_range is derived from raw_data
@@ -252,9 +234,7 @@ def board(
 
     ## 3. bin_range is derived from user_zoom_range and raw_data_range. This is
     ##    the range of data that will be displayed in the charts.
-    bin_range = varbar.add(
-        "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
-    )
+    bin_range = varbar.add("bin_range", user_zoom_range.coalesce(filtered_range), hidden=True)
     # Derive the windowed data to use in the plots as a function of bin_range
 
     window_data = varbar.add(
@@ -273,9 +253,7 @@ def board(
         weave.panels.FilterEditor(filter_fn, node=window_data),
     )
 
-    filtered_window_data = varbar.add(
-        "filtered_window_data", window_data.filter(filter_fn), hidden=True
-    )
+    filtered_window_data = varbar.add("filtered_window_data", window_data.filter(filter_fn), hidden=True)
 
     grouping = varbar.add(
         "grouping",
@@ -355,11 +333,13 @@ def board(
         filtered_window_data["summary.completion_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=12, y=height * 2, w=6, h=3),
     )
-    overview_tab.add(
-        "avg_total_tokens_per_req",
-        filtered_window_data["summary.total_tokens"].avg(),  # type: ignore
-        layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=3),
-    ),
+    (
+        overview_tab.add(
+            "avg_total_tokens_per_req",
+            filtered_window_data["summary.total_tokens"].avg(),  # type: ignore
+            layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=3),
+        ),
+    )
 
     # Show a plot for each attribute.
     # TODO: This doesn't really work yet (needs some manual UI configuration currently,
@@ -377,23 +357,17 @@ def board(
 
     requests_table = panels.Table(filtered_window_data)  # type: ignore
     requests_table.add_column(lambda row: row["output.model"], "Model")
-    requests_table.add_column(
-        lambda row: row["inputs.messages"][-1]["content"], "Last Prompt"
-    )
+    requests_table.add_column(lambda row: row["inputs.messages"][-1]["content"], "Last Prompt")
     requests_table.add_column(
         lambda row: row["output.choices"][-1]["message.content"],
         "Completion",
     )
     requests_table.add_column(lambda row: row["summary.prompt_tokens"], "Prompt Tokens")
-    requests_table.add_column(
-        lambda row: row["summary.completion_tokens"], "Completion Tokens"
-    )
+    requests_table.add_column(lambda row: row["summary.completion_tokens"], "Completion Tokens")
     requests_table.add_column(lambda row: row["summary.total_tokens"], "Total Tokens")
     requests_table.add_column(lambda row: row["summary.latency_s"], "Latency")
     requests_table.add_column(lambda row: row["summary.cost"], "Cost")
-    requests_table.add_column(
-        lambda row: row["timestamp"], "Timestamp", sort_dir="desc"
-    )
+    requests_table.add_column(lambda row: row["timestamp"], "Timestamp", sort_dir="desc")
 
     requests_table_var = overview_tab.add(
         "table",
@@ -434,9 +408,7 @@ def board(
     return panels.Board(vars=varbar, panels=overview_tab)
 
 
-instructions_md = util.read_or_default(
-    os.path.join(os.path.dirname(__file__), "instructions", "panel_llm_monitor.md")
-)
+instructions_md = util.read_or_default(os.path.join(os.path.dirname(__file__), "instructions", "panel_llm_monitor.md"))
 
 template_registry.register(
     board_name,

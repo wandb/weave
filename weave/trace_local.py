@@ -81,9 +81,7 @@ class TraceLocal:
         return self.get_run(run_key)
 
     def _single_run(self, run_key: RunKey) -> graph.Node[runs.Run]:
-        single_uri = artifact_local.WeaveLocalArtifactURI(
-            f"run-{run_key.op_simple_name}-{run_key.id}", "latest", "obj"
-        )
+        single_uri = artifact_local.WeaveLocalArtifactURI(f"run-{run_key.op_simple_name}-{run_key.id}", "latest", "obj")
         return weave_internal.manual_call(
             "get",
             {"uri": graph.ConstNode(types.String(), str(single_uri))},
@@ -91,9 +89,7 @@ class TraceLocal:
         )
 
     def _run_table(self, run_key: RunKey):
-        table_uri = artifact_local.WeaveLocalArtifactURI(
-            f"run-{run_key.op_simple_name}", "latest", "obj"
-        )
+        table_uri = artifact_local.WeaveLocalArtifactURI(f"run-{run_key.op_simple_name}", "latest", "obj")
         return weave_internal.manual_call(
             "get",
             {"uri": graph.ConstNode(types.String(), str(table_uri))},
@@ -144,11 +140,7 @@ class TraceLocal:
             return self.save_object(output)
         # TODO: table caching is currently disabled, but this path doesn't handle it
         # when we turn it back on!
-        return self.save_object(
-            output, name=f"run-{run_key.op_simple_name}-{run_key.id}-output"
-        )
+        return self.save_object(output, name=f"run-{run_key.op_simple_name}-{run_key.id}-output")
 
-    def save_object(
-        self, obj: typing.Any, name: typing.Optional[str] = None
-    ) -> ref_base.Ref:
+    def save_object(self, obj: typing.Any, name: typing.Optional[str] = None) -> ref_base.Ref:
         return storage.save(obj, name=name, branch="latest")

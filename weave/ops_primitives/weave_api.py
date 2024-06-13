@@ -126,9 +126,7 @@ def usedby_output_type(op_name: str) -> types.Type:
             # type variables. If this op outputs an output type with variables,
             # we could include them in the returned type here.
             # TODO: Fix
-            raise errors.WeaveInternalError(
-                "asking for used_by of op with callable output type not yet supported"
-            )
+            raise errors.WeaveInternalError("asking for used_by of op with callable output type not yet supported")
 
     return types.List(types.RunType(inputs=op_def.input_type.weave_type(), output=ot))
 
@@ -165,9 +163,7 @@ def call_op(name: str) -> Node[types.Any]:
 
 
 @op(hidden=True)
-def objects_refine_output_type(
-    of_type: types.Type, alias: str, timestamp: int
-) -> types.Type:
+def objects_refine_output_type(of_type: types.Type, alias: str, timestamp: int) -> types.Type:
     return types.List(types.RefType(of_type))
 
 
@@ -259,31 +255,25 @@ def _save(
         if isinstance(source_uri, artifact_wandb.WeaveWBArtifactURI):
             target_branch = "user-" + target_branch
     target_uri = artifact_local.WeaveLocalArtifactURI(
-        source_uri.name, target_branch, source_uri.path  # type: ignore
+        source_uri.name,
+        target_branch,
+        source_uri.path,  # type: ignore
     )
 
     ctx = object_context.get_object_context()
     if ctx:
-        ctx.add_mutation(
-            str(target_uri), str(source_uri), obj, make_new_type, mutation_record
-        )
+        ctx.add_mutation(str(target_uri), str(source_uri), obj, make_new_type, mutation_record)
     else:
         # Save immediately
         with object_context.object_context() as ctx:
-            ctx.add_mutation(
-                str(target_uri), str(source_uri), obj, make_new_type, mutation_record
-            )
+            ctx.add_mutation(str(target_uri), str(source_uri), obj, make_new_type, mutation_record)
     return str(target_uri)
 
 
 @dataclasses.dataclass
 class _MergeSpec:
-    to_uri: typing.Union[
-        artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI
-    ]
-    head_ref: typing.Union[
-        artifact_local.LocalArtifactRef, artifact_wandb.WandbArtifactRef
-    ]
+    to_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI]
+    head_ref: typing.Union[artifact_local.LocalArtifactRef, artifact_wandb.WandbArtifactRef]
     branch_point: artifact_fs.BranchPointType
 
 
@@ -301,16 +291,12 @@ def _get_merge_spec_unsafe(uri: str) -> _MergeSpec:
         obj_uri,
         (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
     ):
-        raise errors.WeaveMergeArtifactSpecError(
-            "Cannot merge artifact of type %s" % type(obj_uri)
-        )
+        raise errors.WeaveMergeArtifactSpecError("Cannot merge artifact of type %s" % type(obj_uri))
 
     head_ref = obj_uri.to_ref()
     obj_metadata = head_ref.artifact.read_metadata()
     if "branch_point" not in obj_metadata:
-        raise errors.WeaveMergeArtifactSpecError(
-            "Cannot merge into artifact without branch_point"
-        )
+        raise errors.WeaveMergeArtifactSpecError("Cannot merge into artifact without branch_point")
 
     branch_point: artifact_fs.BranchPointType = obj_metadata["branch_point"]
     to_uri = uris.WeaveURI.parse(branch_point["original_uri"])
@@ -318,9 +304,7 @@ def _get_merge_spec_unsafe(uri: str) -> _MergeSpec:
         to_uri,
         (artifact_local.WeaveLocalArtifactURI, artifact_wandb.WeaveWBArtifactURI),
     ):
-        raise errors.WeaveMergeArtifactSpecError(
-            "Cannot merge into artifact of type %s" % type(obj_uri)
-        )
+        raise errors.WeaveMergeArtifactSpecError("Cannot merge into artifact of type %s" % type(obj_uri))
 
     return _MergeSpec(
         to_uri=to_uri,
@@ -344,19 +328,12 @@ def _merge(name) -> str:
         original_artifact_hash = to_ref.artifact.version
     if branch_point["commit"] != original_artifact_hash:
         raise errors.WeaveUnmergableArtifactsError(
-            "Cannot merge artifacts: "
-            "target artifact commit hash does not match branch point",
+            "Cannot merge artifacts: " "target artifact commit hash does not match branch point",
             f" original_artifact_hash: {original_artifact_hash}; ",
             f" branch_point: {branch_point['commit']}",
         )
 
-    shared_branch_name = (
-        None
-        if to_uri != None
-        and to_uri.version is not None
-        and artifact_wandb.likely_commit_hash(to_uri.version)
-        else to_uri.version
-    )
+    shared_branch_name = None if to_uri != None and to_uri.version is not None and artifact_wandb.likely_commit_hash(to_uri.version) else to_uri.version
 
     obj = head_ref.get()
     # Crucially, we must compute the weave type using type_of
@@ -378,9 +355,7 @@ def _merge(name) -> str:
         )
     else:
         if to_uri.version is None:
-            raise errors.WeaveInternalError(
-                "Cannot merge into artifact without version"
-            )
+            raise errors.WeaveInternalError("Cannot merge into artifact without version")
 
         ref = storage.direct_save(
             obj=head_ref.get(),
@@ -475,9 +450,7 @@ def ref_branch_point(ref) -> typing.Optional[artifact_fs.BranchPointType]:
     # TODO: execute automatically derefs. Need to not do that if input type is Ref!
     real_ref = storage._get_ref(ref)
     if not isinstance(real_ref, artifact_fs.FilesystemArtifactRef):
-        raise errors.WeaveInternalError(
-            "ref_branch_point only works on filesystem artifact refs"
-        )
+        raise errors.WeaveInternalError("ref_branch_point only works on filesystem artifact refs")
     return real_ref.branch_point
 
 
@@ -491,9 +464,7 @@ def execute_setter(node, value, action=None):
         # TODO: The OutputNode code path needs to do the mutation
         #     on node, instead of going back up whatever constructed
         #     Node
-        raise errors.WeaveInternalError(
-            "Execute setter path not implemented for ", node
-        )
+        raise errors.WeaveInternalError("Execute setter path not implemented for ", node)
 
 
 @op(
@@ -534,11 +505,7 @@ def mutate_op_body(
     # Run through resolvers forward
     results = []
     op_inputs = []
-    arg0 = (
-        list(nodes[0].from_op.inputs.values())[0].val
-        if len(nodes[0].from_op.inputs) > 0
-        else None
-    )
+    arg0 = list(nodes[0].from_op.inputs.values())[0].val if len(nodes[0].from_op.inputs) > 0 else None
     for node in nodes:
         inputs = {}
         if len(node.from_op.inputs) > 0:
@@ -563,9 +530,7 @@ def mutate_op_body(
     # Make the updates backwards
     res = make_new_value(arg0)
 
-    for i, (node, inputs, result) in reversed(
-        list(enumerate(zip(nodes, op_inputs, results)))
-    ):
+    for i, (node, inputs, result) in reversed(list(enumerate(zip(nodes, op_inputs, results)))):
         op_def = registry_mem.memory_registry.get_op(node.from_op.name)
         if not op_def.setter:
             return res
@@ -576,9 +541,7 @@ def mutate_op_body(
             # )
         args = list(inputs.values())
         args.append(res)
-        if i == 0 and (
-            node.from_op.name == "get" or node.from_op.name == "withdefault-get"
-        ):
+        if i == 0 and (node.from_op.name == "get" or node.from_op.name == "withdefault-get"):
             # TODO hardcoded get to take root_args. Should just check if available on setter.
             args.append(root_args)
             args.append(make_new_type)
@@ -595,9 +558,7 @@ def mutate_op_body(
 
 
 @mutation
-def set(
-    self: graph.Node[typing.Any], val: typing.Any, root_args: typing.Any = None
-) -> typing.Any:
+def set(self: graph.Node[typing.Any], val: typing.Any, root_args: typing.Any = None) -> typing.Any:
     if root_args is None:
         root_args = {}
 
@@ -614,9 +575,7 @@ def set(
 
 
 @mutation
-def append(
-    self: graph.Node[list], val: typing.Any, root_args: typing.Any = None
-) -> typing.Any:
+def append(self: graph.Node[list], val: typing.Any, root_args: typing.Any = None) -> typing.Any:
     if root_args is None:
         root_args = {}
     return mutate_op_body(
@@ -634,9 +593,7 @@ def stream_table_log(self: graph.Node, val: typing.Any) -> typing.Any:
     from weave.monitoring import StreamTable
 
     if not isinstance(st_obj, StreamTable):
-        raise errors.WeaveInternalError(
-            "stream_table-log op must be called on a stream table"
-        )
+        raise errors.WeaveInternalError("stream_table-log op must be called on a stream table")
 
     # Tim: as part of weaveflow merge, i added underscores here. Not sure
     # how this ever worked before
@@ -656,48 +613,36 @@ def _get_uri_from_node(node: graph.Node[typing.Any], op_title: str) -> str:
         raise errors.WeaveInternalError(f"{op_title} target must be a get")
 
     if not isinstance(node.from_op.inputs["uri"], graph.ConstNode):
-        raise errors.WeaveInternalError(
-            f"{op_title} op argument must be a const string"
-        )
+        raise errors.WeaveInternalError(f"{op_title} op argument must be a const string")
 
     return node.from_op.inputs["uri"].val
 
 
-def _artifact_ref_from_uri(
-    uri: str, op_title: str
-) -> typing.Union[artifact_wandb.WandbArtifactRef, artifact_local.LocalArtifactRef]:
+def _artifact_ref_from_uri(uri: str, op_title: str) -> typing.Union[artifact_wandb.WandbArtifactRef, artifact_local.LocalArtifactRef]:
     obj_uri = uris.WeaveURI.parse(uri)
     if not isinstance(
         obj_uri,
         (artifact_wandb.WeaveWBArtifactURI, artifact_local.WeaveLocalArtifactURI),
     ):
-        raise errors.WeaveInternalError(
-            f"Cannot {op_title} artifact of type %s" % type(obj_uri)
-        )
+        raise errors.WeaveInternalError(f"Cannot {op_title} artifact of type %s" % type(obj_uri))
 
     return obj_uri.to_ref()
 
 
 @mutation
-def merge_artifact(
-    self: graph.Node[typing.Any], root_args: typing.Any = None
-) -> typing.Any:
+def merge_artifact(self: graph.Node[typing.Any], root_args: typing.Any = None) -> typing.Any:
     self = compile.compile_fix_calls([self])[0]
     return _merge(_get_uri_from_node(self, "Merge"))
 
 
 @mutation
-def delete_artifact(
-    self: graph.Node[typing.Any], root_args: typing.Any = None
-) -> typing.Any:
+def delete_artifact(self: graph.Node[typing.Any], root_args: typing.Any = None) -> typing.Any:
     head_ref = _artifact_ref_from_uri(_get_uri_from_node(self, "Delete"), "Delete")
     head_ref.artifact.delete()
 
 
 @mutation
-def undo_artifact(
-    self: graph.Node[typing.Any], root_args: typing.Any = None
-) -> typing.Any:
+def undo_artifact(self: graph.Node[typing.Any], root_args: typing.Any = None) -> typing.Any:
     head_ref = _artifact_ref_from_uri(_get_uri_from_node(self, "Undo"), "Undo")
     art = head_ref.artifact.undo()
     if art is None:
@@ -709,9 +654,7 @@ def undo_artifact(
 
 
 @mutation
-def rename_artifact(
-    self: graph.Node[typing.Any], new_name: str, root_args: typing.Any = None
-) -> typing.Any:
+def rename_artifact(self: graph.Node[typing.Any], new_name: str, root_args: typing.Any = None) -> typing.Any:
     head_ref = _artifact_ref_from_uri(_get_uri_from_node(self, "Rename"), "Rename")
     head_ref.artifact.rename(new_name)
 
@@ -745,9 +688,7 @@ class FunctionOps:
         output_type=lambda input_type: input_type["self"].output_type,
     )
     def __call__(self, arg1: typing.Any):
-        arg1_node = weave_internal.make_const_node(
-            types.TypeRegistry.type_of(arg1), arg1
-        )
+        arg1_node = weave_internal.make_const_node(types.TypeRegistry.type_of(arg1), arg1)
         called = weave_internal.better_call_fn(self, arg1_node)  # type: ignore
         return weave_internal.use(called)
 

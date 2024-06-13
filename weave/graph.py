@@ -120,9 +120,7 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
     from_op: Op[OpInputNodeT]
     val: typing.Any
 
-    def __init__(
-        self, type: weave_types.Type, op_name: str, op_inputs: dict[str, OpInputNodeT]
-    ) -> None:
+    def __init__(self, type: weave_types.Type, op_name: str, op_inputs: dict[str, OpInputNodeT]) -> None:
         self.type = type
         self.from_op = Op(op_name, op_inputs)
 
@@ -133,9 +131,7 @@ class OutputNode(Node, typing.Generic[OpInputNodeT]):
         for param_name, param_node_json in op_inputs.items():
             # I am not sure why we need a cast here, `OpInputNodeT` is bound to
             # `Node` so it should be fine.
-            inputs[param_name] = typing.cast(
-                OpInputNodeT, Node.node_from_json(param_node_json)
-            )
+            inputs[param_name] = typing.cast(OpInputNodeT, Node.node_from_json(param_node_json))
         return cls(
             weave_types.TypeRegistry.type_from_dict(val["type"]),
             val["fromOp"]["name"],
@@ -246,28 +242,16 @@ def node_expr_str(node: Node) -> str:
     if isinstance(node, OutputNode):
         param_names = list(node.from_op.inputs.keys())
         if node.from_op.name == "dict":
-            return "{%s}" % ", ".join(
-                (
-                    '"%s": %s' % (k, node_expr_str(n))
-                    for k, n in node.from_op.inputs.items()
-                )
-            )
+            return "{%s}" % ", ".join(('"%s": %s' % (k, node_expr_str(n)) for k, n in node.from_op.inputs.items()))
         elif node.from_op.name == "list":
-            return "[%s]" % ", ".join(
-                (
-                    '"%s": %s' % (k, node_expr_str(n))
-                    for k, n in node.from_op.inputs.items()
-                )
-            )
+            return "[%s]" % ", ".join(('"%s": %s' % (k, node_expr_str(n)) for k, n in node.from_op.inputs.items()))
         elif node.from_op.name.endswith("__getattr__"):
             inputs = list(node.from_op.inputs.values())
             return "%s.%s" % (
                 node_expr_str(inputs[0]),
                 inputs[1].val,
             )
-        elif node.from_op.name.endswith("pick") or node.from_op.name.endswith(
-            "__getitem__"
-        ):
+        elif node.from_op.name.endswith("pick") or node.from_op.name.endswith("__getitem__"):
             inputs = list(node.from_op.inputs.values())
             return "%s[%s]" % (
                 node_expr_str(inputs[0]),
@@ -283,10 +267,7 @@ def node_expr_str(node: Node) -> str:
                 narrow_type = const.val
                 assert isinstance(narrow_type, partial_object.PartialObjectType)
             except AssertionError:
-                return (
-                    f"{node_expr_str(node.from_op.inputs[param_names[0]])}."
-                    f"querytoobj({node_expr_str(node.from_op.inputs[param_names[1]])}, ?)"
-                )
+                return f"{node_expr_str(node.from_op.inputs[param_names[0]])}." f"querytoobj({node_expr_str(node.from_op.inputs[param_names[1]])}, ?)"
             else:
                 return (
                     f"{node_expr_str(node.from_op.inputs[param_names[0]])}."
@@ -354,20 +335,14 @@ def _map_nodes(
                 continue
             if any(n is not inputs[k] for k, n in curr_node.from_op.inputs.items()):
                 result_node = OutputNode(curr_node.type, curr_node.from_op.name, inputs)
-        elif (
-            walk_lambdas
-            and isinstance(curr_node, ConstNode)
-            and isinstance(curr_node.type, weave_types.Function)
-        ):
+        elif walk_lambdas and isinstance(curr_node, ConstNode) and isinstance(curr_node.type, weave_types.Function):
             is_static_lambda = len(curr_node.type.input_types) == 0
             if not is_static_lambda:
                 if curr_node.val not in already_mapped:
                     to_consider.append(curr_node.val)
                     continue
                 if curr_node.val is not already_mapped[curr_node.val]:
-                    result_node = ConstNode(
-                        curr_node.type, already_mapped[curr_node.val]
-                    )
+                    result_node = ConstNode(curr_node.type, already_mapped[curr_node.val])
 
         to_consider.pop()
         mapped_node = map_fn(result_node)
@@ -426,9 +401,7 @@ def all_nodes_full(leaf_nodes: list[Node]) -> list[Node]:
     return result
 
 
-def filter_nodes_top_level(
-    nodes: list[Node], filter_fn: typing.Callable[[Node], bool]
-) -> list[Node]:
+def filter_nodes_top_level(nodes: list[Node], filter_fn: typing.Callable[[Node], bool]) -> list[Node]:
     """Filter nodes in dag represented by leaf nodes, but not sub-lambdas"""
     result = []
 
@@ -441,9 +414,7 @@ def filter_nodes_top_level(
     return result
 
 
-def filter_nodes_full(
-    nodes: list[Node], filter_fn: typing.Callable[[Node], bool]
-) -> list[Node]:
+def filter_nodes_full(nodes: list[Node], filter_fn: typing.Callable[[Node], bool]) -> list[Node]:
     """Filter nodes in dag represented by leaf nodes, including sub-lambdas"""
     result = []
 
@@ -457,9 +428,7 @@ def filter_nodes_full(
 
 
 def expr_vars(node: Node) -> list[VarNode]:
-    return typing.cast(
-        list[VarNode], filter_nodes_top_level([node], lambda n: isinstance(n, VarNode))
-    )
+    return typing.cast(list[VarNode], filter_nodes_top_level([node], lambda n: isinstance(n, VarNode)))
 
 
 def resolve_vars(node: Node) -> Node:

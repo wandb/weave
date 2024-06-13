@@ -24,6 +24,4 @@ def test_optional_typeddict_keys():
     assert not assign_to.assign_type(types.TypedDict())
 
     # Optional key wrong type not ok
-    assert not assign_to.assign_type(
-        types.TypedDict({"a": types.String(), "b": types.Int(), "c": types.Int()})
-    )
+    assert not assign_to.assign_type(types.TypedDict({"a": types.String(), "b": types.Int(), "c": types.Int()}))

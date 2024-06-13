@@ -23,9 +23,7 @@ def _test_op_tag_input(x: typing.Any, tag_val: int):
     return x
 
 
-get_a_tag = make_tag_getter_op.make_tag_getter_op(
-    "a_tag", weave.types.Int(), op_name="tag-a_tag"
-)
+get_a_tag = make_tag_getter_op.make_tag_getter_op("a_tag", weave.types.Int(), op_name="tag-a_tag")
 
 
 @weave.op(hidden=True)
@@ -65,9 +63,7 @@ def test_list_none():
 def test_tagged_none():
     node = weave.save(None, "null")
     tagged_node = _test_op_tag_input(node, 1)
-    assert tagged_node.type == tagged_value_type.TaggedValueType(
-        weave.types.TypedDict({"a_tag": weave.types.Int()}), weave.types.NoneType()
-    )
+    assert tagged_node.type == tagged_value_type.TaggedValueType(weave.types.TypedDict({"a_tag": weave.types.Int()}), weave.types.NoneType())
     assert weave.use(get_a_tag(tagged_node)) == 1
 
 

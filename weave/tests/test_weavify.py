@@ -34,9 +34,7 @@ from . import geom
         (
             "recursive mixed",
             {"a": [1, 2], "b": {"c": 3}},
-            ops.dict_(
-                **{"a": ops.make_list(**{"0": 1, "1": 2}), "b": ops.dict_(**{"c": 3})}
-            ),
+            ops.dict_(**{"a": ops.make_list(**{"0": 1, "1": 2}), "b": ops.dict_(**{"c": 3})}),
         ),
         ("none", None, weave_internal.make_const_node(types.NoneType(), None)),
         # decorator_type() constructor generation is disabled.

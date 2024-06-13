@@ -18,9 +18,7 @@ class MemArtifact(artifact_base.Artifact):
     def refs(self) -> typing.Iterable[artifact_base.ArtifactRef]:
         return self._refs.values()
 
-    def set(
-        self, key: str, type_: types.Type, obj: typing.Any
-    ) -> artifact_base.ArtifactRef:
+    def set(self, key: str, type_: types.Type, obj: typing.Any) -> artifact_base.ArtifactRef:
         existing_ref = ref_base.get_ref(obj)
         if isinstance(existing_ref, artifact_base.ArtifactRef):
             return existing_ref

@@ -75,14 +75,10 @@ def gcloud(
 ) -> typing.Any:
     gcloud_absolute_path = shutil.which("gcloud")
     if gcloud_absolute_path is None:
-        raise ValueError(
-            "gcloud command required: https://cloud.google.com/sdk/docs/install"
-        )
+        raise ValueError("gcloud command required: https://cloud.google.com/sdk/docs/install")
     if os.getenv("DEBUG") == "true":
         print(f"Running gcloud {' '.join(args)}")
-    return execute(
-        [gcloud_absolute_path] + args, timeout=timeout, capture=capture, input=input
-    )
+    return execute([gcloud_absolute_path] + args, timeout=timeout, capture=capture, input=input)
 
 
 def enforce_login() -> None:
@@ -110,33 +106,21 @@ def compile(
     with open(os.path.join(reqs, "requirements.txt"), "w") as f:
         f.write(generate_requirements_txt(model_ref, reqs, dev))
     with open(os.path.join(dir, "Dockerfile"), "w") as f:
-        f.write(
-            generate_dockerfile(
-                model_ref, model_method, wandb_project, auth_entity, base_image
-            )
-        )
+        f.write(generate_dockerfile(model_ref, model_method, wandb_project, auth_entity, base_image))
     return dir
 
 
-def ensure_service_account(
-    name: str = "weave-default", project: typing.Optional[str] = None
-) -> str:
+def ensure_service_account(name: str = "weave-default", project: typing.Optional[str] = None) -> str:
     """Ensure the user has a service account."""
     if len(name) < 6 or len(name) > 30:
         raise ValueError("Service account name must be between 6 and 30 characters.")
     project = project or gcloud(["config", "get", "project", "--format=json"])
-    account = gcloud(["auth", "list", "--filter=status:ACTIVE", "--format=json"])[0][
-        "account"
-    ]
+    account = gcloud(["auth", "list", "--filter=status:ACTIVE", "--format=json"])[0]["account"]
     sa = f"{name}@{project}.iam.gserviceaccount.com"
-    exists = gcloud(
-        ["iam", "service-accounts", "list", f"--filter=email={sa}", "--format=json"]
-    )
+    exists = gcloud(["iam", "service-accounts", "list", f"--filter=email={sa}", "--format=json"])
     if len(exists) == 0:
         print(f"Creating service account {name}...")
-        display_name = (
-            " ".join([n.capitalize() for n in name.split("-")]) + " Service Account"
-        )
+        display_name = " ".join([n.capitalize() for n in name.split("-")]) + " Service Account"
         gcloud(
             [
                 "iam",
@@ -160,20 +144,14 @@ def ensure_service_account(
                 "--format=json",
             ]
         )
-        print(
-            "To grant additional permissions, run add-iam-policy-binding on the resource:"
-        )
-        print(
-            "  gcloud storage buckets add-iam-policy-binding gs://BUCKET --member=serviceAccount:{sa} --role=ROLE"
-        )
+        print("To grant additional permissions, run add-iam-policy-binding on the resource:")
+        print("  gcloud storage buckets add-iam-policy-binding gs://BUCKET --member=serviceAccount:{sa} --role=ROLE")
     else:
         print(f"Using service account: {sa}")
     return sa
 
 
-def ensure_secret(
-    name: str, value: str, service_account: str, project: typing.Optional[str] = None
-) -> None:
+def ensure_secret(name: str, value: str, service_account: str, project: typing.Optional[str] = None) -> None:
     """Ensure a secret exists and is accessbile by the service account."""
     project = project or gcloud(["config", "get", "project", "--format=json"])
     exists = gcloud(
@@ -240,16 +218,12 @@ def deploy(
     if region is None:
         region = gcloud(["config", "get", "functions/region", "--format=json"])
         if region == []:
-            raise ValueError(
-                "No default region set. Run `gcloud config set functions/region <region>` or set the region argument."
-            )
+            raise ValueError("No default region set. Run `gcloud config set functions/region <region>` or set the region argument.")
     if service_account is None:
         try:
             service_account = ensure_service_account(project=gcp_project)
         except ValueError:
-            print(
-                "WARNING: No service account specified.  Using the compute engine default service account..."
-            )
+            print("WARNING: No service account specified.  Using the compute engine default service account...")
     dir = compile(model_ref, model_method, wandb_project, auth_entity, base_image)
     ref = parse_uri(model_ref)
     if not isinstance(ref, ObjectRef):
@@ -299,7 +273,6 @@ def develop(
     base_image: typing.Optional[str] = "python:3.11",
     auth_entity: typing.Optional[str] = None,
 ) -> None:
-
     dir = compile(
         model_ref,
         model_method=model_method,
@@ -315,9 +288,7 @@ def develop(
     if docker is None:
         raise ValueError("docker command required: https://docs.docker.com/get-docker/")
     print("Building container from: ", dir)
-    execute(
-        [docker, "buildx", "build", "-t", name, "--load", "."], cwd=dir, capture=False
-    )
+    execute([docker, "buildx", "build", "-t", name, "--load", "."], cwd=dir, capture=False)
     env_api_key = environment.weave_wandb_api_key()
     if env_api_key is None:
         raise ValueError("WANDB_API_KEY environment variable required")

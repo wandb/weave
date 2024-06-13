@@ -14,23 +14,17 @@ from .models import *
 T = TypeVar("T")
 
 
-def update_combined_choice(
-    combined_choice: CombinedChoice, choice: Choice
-) -> CombinedChoice:
+def update_combined_choice(combined_choice: CombinedChoice, choice: Choice) -> CombinedChoice:
     combined_choice.content += choice.delta.content or ""
     combined_choice.role = combined_choice.role or choice.delta.role
-    combined_choice.function_call = (
-        combined_choice.function_call or choice.delta.function_call
-    )
+    combined_choice.function_call = combined_choice.function_call or choice.delta.function_call
     combined_choice.tool_calls = combined_choice.tool_calls or choice.delta.tool_calls
     if choice.finish_reason:
         combined_choice.finish_reason = choice.finish_reason
     return combined_choice
 
 
-def token_usage(
-    input_messages: List[dict], response_choices: list[Choice]
-) -> CompletionUsage:
+def token_usage(input_messages: List[dict], response_choices: list[Choice]) -> CompletionUsage:
     prompt_tokens = num_tokens_from_messages(input_messages)
     completion_tokens = 0
     for choice in response_choices:
@@ -45,9 +39,7 @@ def token_usage(
     )
 
 
-def num_tokens_from_messages(
-    messages: List[dict], model: str = "gpt-3.5-turbo-0613"
-) -> int:
+def num_tokens_from_messages(messages: List[dict], model: str = "gpt-3.5-turbo-0613") -> int:
     model_defaults = {
         "gpt-3.5-turbo-0613": ModelTokensConfig(per_message=3, per_name=1),
         "gpt-3.5-turbo-16k-0613": ModelTokensConfig(per_message=3, per_name=1),
@@ -61,9 +53,7 @@ def num_tokens_from_messages(
     config = model_defaults.get(model)
     if config is None:
         if "gpt-3.5-turbo" in model:
-            print(
-                "Warning: gpt-3.5-turbo may update over time. Assuming gpt-3.5-turbo-0613."
-            )
+            print("Warning: gpt-3.5-turbo may update over time. Assuming gpt-3.5-turbo-0613.")
             return num_tokens_from_messages(messages, "gpt-3.5-turbo-0613")
         elif "gpt-4" in model:
             print("Warning: gpt-4 may update over time. Assuming gpt-4-0613.")
@@ -87,9 +77,7 @@ def num_tokens_from_messages(
         # message['content'] is a list when we're sending images.
         # TODO: This doesn't account for image tokens, we just skip this
         # case!
-        if message.get("content") is not None and not isinstance(
-            message.get("content"), list
-        ):
+        if message.get("content") is not None and not isinstance(message.get("content"), list):
             num_tokens += len(encoding.encode(message["content"]))
         if message["role"] == "user":
             num_tokens += config.per_name

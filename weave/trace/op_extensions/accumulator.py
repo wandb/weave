@@ -53,18 +53,14 @@ def add_accumulator(
     ```
     """
 
-    def on_output(
-        value: Iterator[V], on_finish: FinishCallbackType, inputs: Dict
-    ) -> Iterator:
+    def on_output(value: Iterator[V], on_finish: FinishCallbackType, inputs: Dict) -> Iterator:
         def wrapped_on_finish(value: Any, e: Optional[BaseException] = None) -> None:
             if on_finish_post_processor is not None:
                 value = on_finish_post_processor(value)
             on_finish(value, e)
 
         if should_accumulate is None or should_accumulate(inputs):
-            return _build_iterator_from_accumulator_for_op(
-                value, accumulator, wrapped_on_finish
-            )
+            return _build_iterator_from_accumulator_for_op(value, accumulator, wrapped_on_finish)
         else:
             wrapped_on_finish(value)
             return value
@@ -149,9 +145,7 @@ class _IteratorWrapper(Generic[V]):
 
     def __next__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator, "__next__"):
-            raise TypeError(
-                f"Cannot call next on an iterator of type {type(self._iterator)}"
-            )
+            raise TypeError(f"Cannot call next on an iterator of type {type(self._iterator)}")
         try:
             value = next(self._iterator)  # type: ignore
             self._on_yield(value)
@@ -168,9 +162,7 @@ class _IteratorWrapper(Generic[V]):
 
     async def __anext__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator, "__anext__"):
-            raise TypeError(
-                f"Cannot call anext on an iterator of type {type(self._iterator)}"
-            )
+            raise TypeError(f"Cannot call anext on an iterator of type {type(self._iterator)}")
         try:
             value = await self._iterator.__anext__()  # type: ignore
             self._on_yield(value)

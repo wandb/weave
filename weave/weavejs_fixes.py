@@ -3,6 +3,7 @@
 TODO: this file is not complete. We should try to put all compability fixes here.
     Grep for "js_compat" to find other instances.
 """
+
 import typing
 import copy
 import math
@@ -13,15 +14,8 @@ from . import weave_types
 from . import errors
 
 
-def _convert_specific_opname_to_generic_opname(
-    name: str, inputs: dict[str, typing.Any]
-) -> tuple[str, dict[str, typing.Any]]:
-    if (
-        name == "typedDict-pick"
-        or name == "dict-pick"
-        or name == "list-pick"
-        or name == "ArrowWeaveListTypedDict-pick"
-    ):
+def _convert_specific_opname_to_generic_opname(name: str, inputs: dict[str, typing.Any]) -> tuple[str, dict[str, typing.Any]]:
+    if name == "typedDict-pick" or name == "dict-pick" or name == "list-pick" or name == "ArrowWeaveListTypedDict-pick":
         return "pick", {"obj": inputs["self"], "key": inputs["key"]}
     elif name == "ArrowWeaveList-concat":
         return "concat", {"arr": inputs["arr"]}
@@ -63,19 +57,12 @@ def _convert_specific_opname_to_generic_opname(
         return "dates-min", {"dates": inputs["self"]}
     elif name == "ArrowWeaveListDate-max":
         return "dates-max", {"dates": inputs["self"]}
-    elif (
-        name == "groupresult-__getitem__"
-        or name == "artifacts-__getitem__"
-        or name == "projectArtifactVersions-__getitem__"
-        or name == "ArrowWeaveList-__getitem__"
-    ):
+    elif name == "groupresult-__getitem__" or name == "artifacts-__getitem__" or name == "projectArtifactVersions-__getitem__" or name == "ArrowWeaveList-__getitem__":
         return "index", {"arr": inputs["self"], "index": inputs["index"]}
     return name, inputs
 
 
-def convert_specific_opname_to_generic_opname(
-    name: str, inputs: dict[str, typing.Any]
-) -> tuple[str, dict[str, typing.Any]]:
+def convert_specific_opname_to_generic_opname(name: str, inputs: dict[str, typing.Any]) -> tuple[str, dict[str, typing.Any]]:
     if name.startswith("mapped_"):
         unmapped_name = name[7:]
         return _convert_specific_opname_to_generic_opname(unmapped_name, inputs)
@@ -86,17 +73,11 @@ def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
     """Converts specific ops like typedDict-pick to generic ops like pick"""
 
     def convert_specific_op_to_generic_op(node: graph.Node):
-        if isinstance(node, graph.ConstNode) and isinstance(
-            node.type, weave_types.Function
-        ):
-            return graph.ConstNode(
-                node.type, convert_specific_ops_to_generic_ops_node(node.val)
-            )
+        if isinstance(node, graph.ConstNode) and isinstance(node.type, weave_types.Function):
+            return graph.ConstNode(node.type, convert_specific_ops_to_generic_ops_node(node.val))
         if not isinstance(node, graph.OutputNode):
             return node
-        name, inputs = convert_specific_opname_to_generic_opname(
-            node.from_op.name, node.from_op.inputs
-        )
+        name, inputs = convert_specific_opname_to_generic_opname(node.from_op.name, node.from_op.inputs)
         return graph.OutputNode(node.type, name, inputs)
 
     return graph.map_nodes_full([node], convert_specific_op_to_generic_op)[0]
@@ -115,9 +96,7 @@ def _dict_is_op_like(data: dict):
         # Those keys will be str and list respectively.
         if isinstance(data["name"], str) and isinstance(data["inputs"], dict):
             # And the inputs will be dicts that are node-like
-            return all(
-                _obj_is_node_like(in_node) for in_node in data["inputs"].values()
-            )
+            return all(_obj_is_node_like(in_node) for in_node in data["inputs"].values())
     return False
 
 
@@ -128,9 +107,7 @@ def convert_specific_ops_to_generic_ops_data(data):
     elif isinstance(data, dict):
         d = data
         if _dict_is_op_like(data):
-            d["name"], d["inputs"] = convert_specific_opname_to_generic_opname(
-                d["name"], d["inputs"]
-            )
+            d["name"], d["inputs"] = convert_specific_opname_to_generic_opname(d["name"], d["inputs"])
         return {k: convert_specific_ops_to_generic_ops_data(v) for k, v in d.items()}
     return data
 
@@ -175,11 +152,7 @@ def recursively_unwrap_unions(obj):
         if "_union_id" in obj and "_val" in obj:
             return recursively_unwrap_unions(obj["_val"])
         else:
-            return {
-                k: recursively_unwrap_unions(v)
-                for k, v in obj.items()
-                if k != "_union_id"
-            }
+            return {k: recursively_unwrap_unions(v) for k, v in obj.items() if k != "_union_id"}
     return obj
 
 

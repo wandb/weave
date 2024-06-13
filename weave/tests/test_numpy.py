@@ -150,10 +150,6 @@ def test_construct_numpy_type_from_table_file():
 
     art = artifact_wandb.WandbArtifact("test")
     fs_artifact_file = artifact_fs.FilesystemArtifactFile(art, "test")
-    _, object_type = table._get_rows_and_object_type_from_weave_format(
-        data, fs_artifact_file
-    )
+    _, object_type = table._get_rows_and_object_type_from_weave_format(data, fs_artifact_file)
 
-    assert types.List(types.List(types.List(types.Int()))).assign_type(
-        object_type.property_types["sbo"].property_types["image"]
-    )
+    assert types.List(types.List(types.List(types.Int()))).assign_type(object_type.property_types["sbo"].property_types["image"])

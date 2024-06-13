@@ -55,33 +55,17 @@ class PanelBankSectionConfig(typing.TypedDict):
 @weave.type()
 class GroupConfig(typing.Generic[ItemsType]):
     layoutMode: str = dataclasses.field(default_factory=lambda: "vertical")
-    showExpressions: typing.Union[bool, typing.Literal["editable"]] = dataclasses.field(
-        default_factory=lambda: False
-    )
+    showExpressions: typing.Union[bool, typing.Literal["editable"]] = dataclasses.field(default_factory=lambda: False)
     equalSize: bool = dataclasses.field(default_factory=lambda: False)
     style: str = dataclasses.field(default_factory=lambda: "")
     items: ItemsType = dataclasses.field(default_factory=dict)  # type: ignore
-    panelInfo: typing.Optional[dict[str, typing.Any]] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    gridConfig: typing.Optional[PanelBankSectionConfig] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    liftChildVars: typing.Optional[bool] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    allowedPanels: typing.Optional[list[str]] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    enableAddPanel: typing.Optional[bool] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    disableDeletePanel: typing.Optional[bool] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    childNameBase: typing.Optional[str] = dataclasses.field(
-        default_factory=lambda: None
-    )
+    panelInfo: typing.Optional[dict[str, typing.Any]] = dataclasses.field(default_factory=lambda: None)
+    gridConfig: typing.Optional[PanelBankSectionConfig] = dataclasses.field(default_factory=lambda: None)
+    liftChildVars: typing.Optional[bool] = dataclasses.field(default_factory=lambda: None)
+    allowedPanels: typing.Optional[list[str]] = dataclasses.field(default_factory=lambda: None)
+    enableAddPanel: typing.Optional[bool] = dataclasses.field(default_factory=lambda: None)
+    disableDeletePanel: typing.Optional[bool] = dataclasses.field(default_factory=lambda: None)
+    childNameBase: typing.Optional[str] = dataclasses.field(default_factory=lambda: None)
 
 
 GroupConfigType = typing.TypeVar("GroupConfigType")
@@ -113,14 +97,10 @@ class GroupPanel:
 @weave.type()
 class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
     id = "Group"
-    config: typing.Optional[GroupConfig] = dataclasses.field(
-        default_factory=lambda: None
-    )
+    config: typing.Optional[GroupConfig] = dataclasses.field(default_factory=lambda: None)
     # items: typing.TypeVar("items") = dataclasses.field(default_factory=dict)
 
-    def __init__(
-        self, input_node=graph.VoidNode(), vars=None, config=None, **options
-    ) -> None:
+    def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options) -> None:
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
         if self.config is None:
@@ -129,9 +109,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             layout_mode = options["layoutMode"]
             if isinstance(layout_mode, GroupLayoutFlow):
                 self.config.layoutMode = "flow"
-                self.config.gridConfig = flow_layout(
-                    layout_mode.rows, layout_mode.columns
-                )
+                self.config.gridConfig = flow_layout(layout_mode.rows, layout_mode.columns)
             else:
                 self.config.layoutMode = layout_mode
                 self.config.gridConfig = default_panel_bank_flow_section_config()
@@ -205,16 +183,9 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                     for child_name, child_item in child_config.items.items():
                         if child_missing_vars:
                             continue
-                        if not isinstance(child_item, graph.Node) and not isinstance(
-                            child_item, panel.Panel
-                        ):
-                            raise ValueError(
-                                "Group items must be panel.Panel or graph.Node, but panel at key '%s' is %s"
-                                % (child_name, type(child_item))
-                            )
-                        frame[child_name] = weave_internal.make_var_node(
-                            weave.type_of(child_item), child_name
-                        )
+                        if not isinstance(child_item, graph.Node) and not isinstance(child_item, panel.Panel):
+                            raise ValueError("Group items must be panel.Panel or graph.Node, but panel at key '%s' is %s" % (child_name, type(child_item)))
+                        frame[child_name] = weave_internal.make_var_node(weave.type_of(child_item), child_name)
             items[name] = child
 
             # We build up config one item at a time. Construct a version
@@ -257,19 +228,13 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             )
         missing_vars = self._normalize()
         if missing_vars:
-            raise errors.WeaveApiError(
-                "References to the following variables were not resolved at paths: %s"
-                % missing_vars
-            )
+            raise errors.WeaveApiError("References to the following variables were not resolved at paths: %s" % missing_vars)
         return weave_internal.make_var_for_value(node_or_panel, name)  # type: ignore
 
     def finalize(self):
         missing_vars = self._normalize()
         if missing_vars:
-            raise errors.WeaveApiError(
-                "References to the following variables were not resolved at paths: %s"
-                % missing_vars
-            )
+            raise errors.WeaveApiError("References to the following variables were not resolved at paths: %s" % missing_vars)
 
     def to_code(self) -> typing.Optional[str]:
         field_vals: list[tuple[str, str]] = []
@@ -281,10 +246,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                 return None
             if gc.style != "":
                 return None
-            if (
-                gc.gridConfig is not None
-                and gc.gridConfig != default_panel_bank_flow_section_config()
-            ):
+            if gc.gridConfig is not None and gc.gridConfig != default_panel_bank_flow_section_config():
                 return None
             if gc.liftChildVars is not None:
                 return None
@@ -296,30 +258,19 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             if self.config.layoutMode != "vertical":
                 field_vals.append(("layoutMode", codify.object_to_code(gc.layoutMode)))
             if gc.showExpressions != False:
-                field_vals.append(
-                    ("showExpressions", codify.object_to_code(gc.showExpressions))
-                )
+                field_vals.append(("showExpressions", codify.object_to_code(gc.showExpressions)))
             if hasattr(gc, "layered") and gc.layered != False:
                 field_vals.append(("layered", codify.object_to_code(gc.layered)))
             if gc.enableAddPanel != None and gc.enableAddPanel != False:
-                field_vals.append(
-                    ("enableAddPanel", codify.object_to_code(gc.enableAddPanel))
-                )
+                field_vals.append(("enableAddPanel", codify.object_to_code(gc.enableAddPanel)))
             prior_vars: list[str] = []
             code_items_map = {}
             if gc.items != {}:
                 for item_name, item in gc.items.items():
-                    code_items_map[
-                        item_name
-                    ] = codify.lambda_wrapped_object_to_code_no_format(item, prior_vars)
+                    code_items_map[item_name] = codify.lambda_wrapped_object_to_code_no_format(item, prior_vars)
                     prior_vars.append(item_name)
                 if len(code_items_map) > 0:
-                    items_val = (
-                        ",".join(
-                            ['"' + n + '":' + i for n, i in code_items_map.items()]
-                        )
-                        + ","
-                    )
+                    items_val = ",".join(['"' + n + '":' + i for n, i in code_items_map.items()]) + ","
                     items_val = "{" + items_val + "}"
                     field_vals.append(("items", items_val))
 
@@ -329,9 +280,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
 
         param_str = ""
         if len(field_vals) > 0:
-            param_str = (
-                ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
-            )
+            param_str = ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
         return f"""weave.panels.panel_group.Group({input_node_str} {param_str})"""
 
     # @property

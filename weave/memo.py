@@ -8,9 +8,7 @@ from . import engine_trace
 
 statsd = engine_trace.statsd()  # type: ignore
 
-_memo_storage: contextvars.ContextVar[typing.Optional[dict]] = contextvars.ContextVar(
-    "memo_storage", default=None
-)
+_memo_storage: contextvars.ContextVar[typing.Optional[dict]] = contextvars.ContextVar("memo_storage", default=None)
 
 
 @contextlib.contextmanager

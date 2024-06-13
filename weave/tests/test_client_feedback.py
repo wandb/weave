@@ -6,7 +6,6 @@ from ..trace_server.interface.query import Query
 
 
 def test_feedback_apis(client):
-
     project_id = client._project_id()
 
     # Emoji from Jamie
@@ -201,7 +200,6 @@ def test_feedback_apis(client):
 
 
 def test_feedback_create_too_large(client):
-
     project_id = client._project_id()
 
     value = "a" * 10000

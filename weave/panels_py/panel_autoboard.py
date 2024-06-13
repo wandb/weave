@@ -212,23 +212,17 @@ def node_qualifies_for_autoboard(input_node: weave.Node[typing.Any]) -> bool:
     object_type = input_type.object_type  # type: ignore
     if not weave.types.TypedDict().assign_type(object_type):
         return False
-    property_types = typing.cast(
-        dict[str, weave.types.Type], object_type.property_types
-    )
+    property_types = typing.cast(dict[str, weave.types.Type], object_type.property_types)
     x_axis = None
 
     for k, prop_type in property_types.items():
-        if not weave.types.NoneType().assign_type(prop_type) and weave.types.optional(
-            weave.types.Timestamp()
-        ).assign_type(prop_type):
+        if not weave.types.NoneType().assign_type(prop_type) and weave.types.optional(weave.types.Timestamp()).assign_type(prop_type):
             x_axis = k
             x_axis_type = prop_type
             break
     if x_axis is None:
         for step_key in ["_step", "step"]:
-            if step_key in property_types and weave.types.optional(
-                weave.types.Int()
-            ).assign_type(property_types[step_key]):
+            if step_key in property_types and weave.types.optional(weave.types.Int()).assign_type(property_types[step_key]):
                 x_axis = step_key
                 x_axis_type = property_types[step_key]
 
@@ -250,50 +244,35 @@ def auto_panels(
     object_type = input_type.object_type  # type: ignore
     if not weave.types.TypedDict().assign_type(object_type):
         raise ValueError("Input node must be a list of objects")
-    property_types = typing.cast(
-        dict[str, weave.types.Type], object_type.property_types
-    )
+    property_types = typing.cast(dict[str, weave.types.Type], object_type.property_types)
     x_axis = None
 
     for k, prop_type in property_types.items():
-        if not weave.types.NoneType().assign_type(prop_type) and weave.types.optional(
-            weave.types.Timestamp()
-        ).assign_type(prop_type):
+        if not weave.types.NoneType().assign_type(prop_type) and weave.types.optional(weave.types.Timestamp()).assign_type(prop_type):
             x_axis = k
             x_axis_type = prop_type
             break
     if x_axis is None:
         for step_key in ["_step", "step"]:
-            if step_key in property_types and weave.types.optional(
-                weave.types.Int()
-            ).assign_type(property_types[step_key]):
+            if step_key in property_types and weave.types.optional(weave.types.Int()).assign_type(property_types[step_key]):
                 x_axis = step_key
                 x_axis_type = property_types[step_key]
 
     if x_axis is None:
         # TODO: handle instead
-        raise ValueError(
-            'No suitable x-axis (Timestamp type, or _step) property found in input type "%s"'
-            % input_type
-        )
+        raise ValueError('No suitable x-axis (Timestamp type, or _step) property found in input type "%s"' % input_type)
 
     groupby = weave_internal.const(None)
     for k, prop_type in property_types.items():
-        if ("version" in k or "snapshot" in k) and weave.types.optional(
-            weave.types.String()
-        ).assign_type(prop_type):
+        if ("version" in k or "snapshot" in k) and weave.types.optional(weave.types.String()).assign_type(prop_type):
             groupby = weave_internal.const(k)
 
     metric_panels = []
     categorical_panels = []
 
     data_node = weave_internal.make_var_node(input_node.type, "data")
-    x_domain_node = weave_internal.make_var_node(
-        weave.types.optional(weave.types.List(x_axis_type)), "zoom_range"
-    )
-    time_domain_node = weave_internal.make_var_node(
-        weave.types.List(x_axis_type), "bin_range"
-    )
+    x_domain_node = weave_internal.make_var_node(weave.types.optional(weave.types.List(x_axis_type)), "zoom_range")
+    time_domain_node = weave_internal.make_var_node(weave.types.List(x_axis_type), "bin_range")
     window_data_node = weave_internal.make_var_node(input_node.type, "window_data")
 
     groupby_key_node = weave_internal.make_var_node(groupby.type, "groupby")
@@ -310,11 +289,7 @@ def auto_panels(
                 50,
             )
             metric_panels.append(panel)
-        elif (
-            weave.types.optional(weave.types.String()).assign_type(prop_type)
-            and key != "prompt"
-            and key != "completion"
-        ):
+        elif weave.types.optional(weave.types.String()).assign_type(prop_type) and key != "prompt" and key != "completion":
             panel = categorical_dist(window_data_node, key)
             categorical_panels.append(panel)
 
@@ -334,9 +309,7 @@ def auto_panels(
         # TODO: We need a filter editor. Can start with a filter expression
         # editor and make it more user-friendly later
         weave.panels.GroupPanel(
-            lambda data: weave.ops.make_list(
-                a=data[x_axis].min(), b=data[x_axis].max()
-            ),
+            lambda data: weave.ops.make_list(a=data[x_axis].min(), b=data[x_axis].max()),
             id="data_range",
             hidden=True,
         ),
@@ -347,9 +320,7 @@ def auto_panels(
             hidden=True,
         ),
         weave.panels.GroupPanel(
-            lambda data, zoom_range: weave.panels.DateRange(
-                zoom_range, domain=data[x_axis]
-            ),
+            lambda data, zoom_range: weave.panels.DateRange(zoom_range, domain=data[x_axis]),
             id="date_picker",
         ),
         # TODO: groupby should really be a Dropdown / multi-select instead
@@ -359,11 +330,7 @@ def auto_panels(
             id="groupby",
         ),
         weave.panels.GroupPanel(
-            lambda data, bin_range: data.filter(
-                lambda row: weave.ops.Boolean.bool_and(
-                    row[x_axis] >= bin_range[0], row[x_axis] < bin_range[1]
-                )
-            ),
+            lambda data, bin_range: data.filter(lambda row: weave.ops.Boolean.bool_and(row[x_axis] >= bin_range[0], row[x_axis] < bin_range[1])),
             id="window_data",
             hidden=True,
         ),
@@ -431,9 +398,7 @@ def seed_autoboard(
     return auto_panels(input_node, config)  # type: ignore
 
 
-instructions_md = util.read_or_default(
-    os.path.join(os.path.dirname(__file__), "instructions", "panel_autoboard.md")
-)
+instructions_md = util.read_or_default(os.path.join(os.path.dirname(__file__), "instructions", "panel_autoboard.md"))
 
 
 # Removing this from registry for now since it is pretty buggy and not well tested.

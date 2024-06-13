@@ -41,9 +41,7 @@ from .language_features.tagging import tagged_value_type_helpers
 DEBUG_COMPILE = False
 
 
-def _dispatch_error_is_client_error(
-    op_name: str, input_types: dict[str, types.Type]
-) -> bool:
+def _dispatch_error_is_client_error(op_name: str, input_types: dict[str, types.Type]) -> bool:
     from .ops_domain import wbmedia
 
     if op_name in set(
@@ -64,9 +62,7 @@ def _dispatch_error_is_client_error(
         # All the cases we've seen of this lately are clearly client errors, so
         # we'll send back a 400!
         return True
-    elif op_name == "file-path" and types.optional(
-        wbmedia.ImageArtifactFileRefType()
-    ).assign_type(input_types["file"]):
+    elif op_name == "file-path" and types.optional(wbmedia.ImageArtifactFileRefType()).assign_type(input_types["file"]):
         # You shouldn't be able to call file-path on ImageArtifactFileRef.
         return True
     return False
@@ -74,7 +70,9 @@ def _dispatch_error_is_client_error(
 
 def _call_run_await(run_node: graph.Node) -> graph.OutputNode:
     return graph.OutputNode(
-        run_node.type.output_type.output, "run-await", {"self": run_node}  # type: ignore
+        run_node.type.output_type.output,
+        "run-await",
+        {"self": run_node},  # type: ignore
     )
 
 
@@ -82,13 +80,9 @@ def _call_run_await(run_node: graph.Node) -> graph.OutputNode:
 # those depend on the decorators, which aren't defined in the engine.
 def _call_execute(function_node: graph.Node) -> graph.OutputNode:
     function_node_type = typing.cast(types.Function, function_node.type)
-    if isinstance(function_node, graph.ConstNode) and isinstance(
-        function_node.val.type, types.Function
-    ):
+    if isinstance(function_node, graph.ConstNode) and isinstance(function_node.val.type, types.Function):
         return _call_execute(function_node.val)
-    return graph.OutputNode(
-        function_node_type.output_type, "execute", {"node": function_node}
-    )
+    return graph.OutputNode(function_node_type.output_type, "execute", {"node": function_node})
 
 
 def _quote_node(node: graph.Node) -> graph.Node:
@@ -102,11 +96,7 @@ def _static_function_types(node: graph.Node) -> typing.Optional[graph.Node]:
     # that the rest of the system has the correct types. This is needed because
     # we do not map into static lambdas and do not compile their inner contents
     # as it should be treated as a literal, quoted graph.
-    if (
-        isinstance(node, graph.ConstNode)
-        and isinstance(node.type, types.Function)
-        and len(node.type.input_types) == 0
-    ):
+    if isinstance(node, graph.ConstNode) and isinstance(node.type, types.Function) and len(node.type.input_types) == 0:
         inner_node = node.val
         if isinstance(inner_node, graph.OutputNode):
             compiled_node = _compile([inner_node])[0]
@@ -163,18 +153,13 @@ def _dispatch_map_fn_no_refine(node: graph.Node) -> typing.Optional[graph.Output
                 pass
             if op is None:
                 if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
-                    raise errors.WeaveBadRequest(
-                        "Error while dispatching (no refine phase): %s. This is most likely a client error"
-                        % from_op.name
-                    )
+                    raise errors.WeaveBadRequest("Error while dispatching (no refine phase): %s. This is most likely a client error" % from_op.name)
                 else:
                     raise
 
         params = from_op.inputs
         if isinstance(op.input_type, op_args.OpNamedArgs):
-            params = {
-                k: n for k, n in zip(op.input_type.arg_types, from_op.inputs.values())
-            }
+            params = {k: n for k, n in zip(op.input_type.arg_types, from_op.inputs.values())}
 
         output_type = node.type
         # In the case where we are dispatching to a new op, we want to use the
@@ -218,17 +203,9 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
         # sends this pattern down a lot right now, and it causes us to break out
         # of arrow vectorization.
         lhs, rhs = node.from_op.inputs.values()
-        if (
-            isinstance(lhs, graph.OutputNode)
-            and lhs.from_op.friendly_name == "dict"
-            and not lhs.from_op.inputs
-        ):
+        if isinstance(lhs, graph.OutputNode) and lhs.from_op.friendly_name == "dict" and not lhs.from_op.inputs:
             return rhs
-        if (
-            isinstance(rhs, graph.OutputNode)
-            and rhs.from_op.friendly_name == "dict"
-            and not rhs.from_op.inputs
-        ):
+        if isinstance(rhs, graph.OutputNode) and rhs.from_op.friendly_name == "dict" and not rhs.from_op.inputs:
             return lhs
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "count":
         # When the graph is `run.history.count`, we can avoid the more costly
@@ -239,9 +216,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
         # refinement, table row count, and with logic that is conditioned on
         # empty tables
         arr_node = node.from_op.inputs["arr"]
-        if isinstance(arr_node, graph.OutputNode) and arr_node.from_op.name.startswith(
-            "run-history"
-        ):
+        if isinstance(arr_node, graph.OutputNode) and arr_node.from_op.name.startswith("run-history"):
             run_node = arr_node.from_op.inputs["run"]
             return graph.OutputNode(
                 node.type,
@@ -257,19 +232,11 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
         # Note: we cannot perform such optimization on pure lists because we
         # don't have a way to operate on the type of the node itself.
         arr_node = node.from_op.inputs["arr"]
-        if (
-            isinstance(arr_node, graph.OutputNode)
-            and arr_node.from_op.name == "ArrowWeaveList-flatten"
-        ):
+        if isinstance(arr_node, graph.OutputNode) and arr_node.from_op.name == "ArrowWeaveList-flatten":
             arr_node_2 = arr_node.from_op.inputs["arr"]
-            if (
-                isinstance(arr_node_2, graph.OutputNode)
-                and arr_node_2.from_op.name == "ArrowWeaveListTypedDict-keys"
-            ):
+            if isinstance(arr_node_2, graph.OutputNode) and arr_node_2.from_op.name == "ArrowWeaveListTypedDict-keys":
                 awl_node = arr_node_2.from_op.inputs["self"]
-                return graph.OutputNode(
-                    node.type, "ArrowWeaveListTypedDict-columnNames", {"self": awl_node}
-                )
+                return graph.OutputNode(node.type, "ArrowWeaveListTypedDict-columnNames", {"self": awl_node})
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "flatten":
         from .arrow.arrow import ArrowWeaveListType
         from .ops_arrow.list_ops import _concat_output_type
@@ -277,9 +244,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
         # The operation of flattening a lists of arrow weave lists is exactly equal to the far
         # more efficient, vectorized concat operation. If this is the case, use it!.
         arr_node = node.from_op.inputs["arr"]
-        if types.List().assign_type(arr_node.type) and ArrowWeaveListType().assign_type(
-            arr_node.type.object_type
-        ):
+        if types.List().assign_type(arr_node.type) and ArrowWeaveListType().assign_type(arr_node.type.object_type):
             return graph.OutputNode(
                 _concat_output_type({"arr": arr_node.type}),
                 "ArrowWeaveList-concat",
@@ -292,9 +257,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
         # The operation of concat on a awl of lists is exactly equal to the far
         # more efficient, vectorized flatten operation. If this is the case, use it!.
         arr_node = node.from_op.inputs["arr"]
-        if ArrowWeaveListType().assign_type(arr_node.type) and types.List().assign_type(
-            arr_node.type.object_type
-        ):
+        if ArrowWeaveListType().assign_type(arr_node.type) and types.List().assign_type(arr_node.type.object_type):
             return graph.OutputNode(
                 flatten_return_type({"arr": arr_node.type}),
                 "ArrowWeaveList-flatten",
@@ -365,9 +328,7 @@ def _make_auto_op_map_fn(when_type: typing.Callable[[types.Type], bool], call_op
                 elif isinstance(op_def.input_type, op_args.OpVarArgs):
                     op_input_type = op_def.input_type.arg_type
                 else:
-                    raise ValueError(
-                        f"Unexpected op input type {op_def.input_type} for op {op_def.name}"
-                    )
+                    raise ValueError(f"Unexpected op input type {op_def.input_type} for op {op_def.name}")
                 if callable(op_input_type):
                     continue
                 if not when_type(op_input_type):
@@ -396,9 +357,7 @@ def _make_inverse_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
                 elif isinstance(op_def.input_type, op_args.OpVarArgs):
                     op_input_type = op_def.input_type.arg_type
                 else:
-                    raise ValueError(
-                        f"Unexpected op input type {op_def.input_type} for op {op_def.name}"
-                    )
+                    raise ValueError(f"Unexpected op input type {op_def.input_type} for op {op_def.name}")
                 if callable(op_input_type):
                     continue
                 if isinstance(op_input_type, when_type):
@@ -411,21 +370,16 @@ def _make_inverse_auto_op_map_fn(when_type: type[types.Type], call_op_fn):
 
 
 _await_run_outputs_map_fn = _make_auto_op_map_fn(
-    lambda t: isinstance(t, types.Function)
-    and isinstance(t.output_type, types.RunType),
+    lambda t: isinstance(t, types.Function) and isinstance(t.output_type, types.RunType),
     _call_run_await,
 )
 
-_execute_nodes_map_fn = _make_auto_op_map_fn(
-    lambda t: isinstance(types.split_none(t)[1], types.Function), _call_execute
-)
+_execute_nodes_map_fn = _make_auto_op_map_fn(lambda t: isinstance(types.split_none(t)[1], types.Function), _call_execute)
 
 _quote_nodes_map_fn = _make_inverse_auto_op_map_fn(types.Function, _quote_node)
 
 
-def compile_apply_column_pushdown(
-    leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
-) -> list[graph.Node]:
+def compile_apply_column_pushdown(leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None) -> list[graph.Node]:
     # This is specific to project-runs2 (not yet used in W&B production) for now. But it
     # is a general pattern that will work for all arrow tables.
 
@@ -472,9 +426,7 @@ def compile_apply_column_pushdown(
                         node.from_op.name + "_with_columns",
                         {
                             "run": node.from_op.inputs["run"],
-                            "history_cols": weave_internal.const(
-                                list(set([*history_cols, "_step"]))
-                            ),
+                            "history_cols": weave_internal.const(list(set([*history_cols, "_step"]))),
                         },
                     )
         return node
@@ -482,9 +434,7 @@ def compile_apply_column_pushdown(
     return graph.map_nodes_full(leaf_nodes, _replace_with_column_pushdown, on_error)
 
 
-def compile_dedupe(
-    leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
-) -> list[graph.Node]:
+def compile_dedupe(leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None) -> list[graph.Node]:
     nodes: dict[str, graph.Node] = {}
 
     def _dedupe(node: graph.Node) -> graph.Node:
@@ -545,9 +495,7 @@ def compile_execute(
         if isinstance(node, graph.OutputNode) and node.from_op.name == "execute":
             res = weave_internal.use(node.from_op.inputs["node"])
             if not isinstance(res, graph.Node):
-                raise ValueError(
-                    f"Expected node to be a Node, got {res} of type {type(res)}"
-                )
+                raise ValueError(f"Expected node to be a Node, got {res} of type {type(res)}")
             return compile_fix_calls([res])[0]
         return None
 
@@ -555,23 +503,15 @@ def compile_execute(
 
 
 def _resolve_function_calls(node: graph.Node) -> typing.Optional[graph.Node]:
-    if (
-        not isinstance(node, graph.OutputNode)
-        or node.from_op.name != "function-__call__"
-    ):
+    if not isinstance(node, graph.OutputNode) or node.from_op.name != "function-__call__":
         return node
 
     inputs = list(node.from_op.inputs.values())
     fn_node = inputs[0]
-    if not (
-        isinstance(fn_node, graph.ConstNode)
-        and isinstance(fn_node.type, types.Function)
-    ):
+    if not (isinstance(fn_node, graph.ConstNode) and isinstance(fn_node.type, types.Function)):
         return node
 
-    while isinstance(fn_node.val, graph.ConstNode) and isinstance(
-        fn_node.type, types.Function
-    ):
+    while isinstance(fn_node.val, graph.ConstNode) and isinstance(fn_node.type, types.Function):
         fn_node = fn_node.val
 
     return weave_internal.better_call_fn(fn_node, *inputs[1:])
@@ -613,15 +553,9 @@ def _needs_gql_propagation(node: graph.OutputNode) -> bool:
 
     if opdef.derived_from and opdef.derived_from.derived_ops["mapped"] == opdef:
         plugin = gql_op_plugin.get_gql_plugin(opdef.derived_from)
-        unwrapped_first_arg_type = typing.cast(
-            types.List, unwrapped_first_arg_type
-        ).object_type
+        unwrapped_first_arg_type = typing.cast(types.List, unwrapped_first_arg_type).object_type
 
-    return opdef.is_gql_root_resolver() or (
-        plugin is not None
-        and plugin.gql_op_output_type is not None
-        and isinstance(unwrapped_first_arg_type, partial_object.PartialObjectType)
-    )
+    return opdef.is_gql_root_resolver() or (plugin is not None and plugin.gql_op_output_type is not None and isinstance(unwrapped_first_arg_type, partial_object.PartialObjectType))
 
 
 def _initialize_gql_types_map_fn(node: graph.Node) -> typing.Optional[graph.Node]:
@@ -630,15 +564,9 @@ def _initialize_gql_types_map_fn(node: graph.Node) -> typing.Optional[graph.Node
 
         if from_op.name == "gqlroot-wbgqlquery":
             # get the initial type
-            assert "query_str" in from_op.inputs and isinstance(
-                from_op.inputs["query_str"], graph.ConstNode
-            )
+            assert "query_str" in from_op.inputs and isinstance(from_op.inputs["query_str"], graph.ConstNode)
 
-            output_type = gql_to_weave.get_query_weave_type(
-                compile_domain.normalize_gql_query_string(
-                    from_op.inputs["query_str"].val
-                )
-            )
+            output_type = gql_to_weave.get_query_weave_type(compile_domain.normalize_gql_query_string(from_op.inputs["query_str"].val))
 
             return graph.OutputNode(
                 output_type,
@@ -650,24 +578,16 @@ def _initialize_gql_types_map_fn(node: graph.Node) -> typing.Optional[graph.Node
             )
 
         if from_op.name == "gqlroot-querytoobj":
-            assert "gql_query_fragment" in from_op.inputs and isinstance(
-                from_op.inputs["gql_query_fragment"], graph.ConstNode
-            )
+            assert "gql_query_fragment" in from_op.inputs and isinstance(from_op.inputs["gql_query_fragment"], graph.ConstNode)
             inner_fragment = from_op.inputs["gql_query_fragment"].val
 
-            assert "output_type" in from_op.inputs and isinstance(
-                from_op.inputs["output_type"], graph.ConstNode
-            )
+            assert "output_type" in from_op.inputs and isinstance(from_op.inputs["output_type"], graph.ConstNode)
             output_type = from_op.inputs["output_type"].val
 
             if isinstance(output_type, partial_object.PartialObjectTypeGeneratorType):
                 key_type = typing.cast(
                     types.TypedDict,
-                    gql_to_weave.get_query_weave_type(
-                        compile_domain.normalize_gql_query_string(
-                            compile_domain.fragment_to_query(inner_fragment)
-                        )
-                    ),
+                    gql_to_weave.get_query_weave_type(compile_domain.normalize_gql_query_string(compile_domain.fragment_to_query(inner_fragment))),
                 )
 
                 key = gql_to_weave.get_outermost_alias(inner_fragment)
@@ -693,19 +613,11 @@ def compile_initialize_gql_types(
     return graph.map_nodes_full(nodes, _initialize_gql_types_map_fn, on_error)
 
 
-def _call_gql_propagate_keys(
-    node: graph.OutputNode, p: stitch.StitchedGraph, original_node: graph.Node
-) -> types.Type:
+def _call_gql_propagate_keys(node: graph.OutputNode, p: stitch.StitchedGraph, original_node: graph.Node) -> types.Type:
     """Calls the GQL key propagation function for a node."""
 
-    const_node_input_vals = {
-        key: value.val
-        for key, value in node.from_op.inputs.items()
-        if isinstance(value, graph.ConstNode)
-    }
-    ip = input_provider.InputAndStitchProvider(
-        const_node_input_vals, p.get_result(original_node)
-    )
+    const_node_input_vals = {key: value.val for key, value in node.from_op.inputs.items() if isinstance(value, graph.ConstNode)}
+    ip = input_provider.InputAndStitchProvider(const_node_input_vals, p.get_result(original_node))
 
     # Propagate GQL types
     return propagate_gql_keys.propagate_gql_keys(node, ip)
@@ -731,8 +643,7 @@ def _compile_refine_and_propagate_gql_inner(
         len(
             graph.filter_nodes_full(
                 nodes,
-                lambda n: isinstance(n, graph.OutputNode)
-                and n.from_op.name == "gqlroot-wbgqlquery",
+                lambda n: isinstance(n, graph.OutputNode) and n.from_op.name == "gqlroot-wbgqlquery",
             )
         )
         > 0
@@ -776,16 +687,9 @@ def _compile_refine_and_propagate_gql_inner(
                 op = dispatch.get_op_for_inputs(from_op.name, from_op.input_types)
                 params = from_op.inputs
                 if isinstance(op.input_type, op_args.OpNamedArgs):
-                    params = {
-                        k: n
-                        for k, n in zip(
-                            op.input_type.arg_types, from_op.inputs.values()
-                        )
-                    }
+                    params = {k: n for k, n in zip(op.input_type.arg_types, from_op.inputs.values())}
 
-                fixed_params = _propagate_updated_types_through_lambdas(
-                    op, params, on_error
-                )
+                fixed_params = _propagate_updated_types_through_lambdas(op, params, on_error)
                 res = op.lazy_call(**fixed_params)
 
                 # The GQL key propagation logic needs to happen in the refine pass rather than the GQL
@@ -840,10 +744,7 @@ def _compile_refine_and_propagate_gql_inner(
                     re.sub(r'[\\]+"', '"', graph_debug.node_expr_str_full(node)),
                 )
                 if _dispatch_error_is_client_error(from_op.name, from_op.input_types):
-                    err = errors.WeaveBadRequest(
-                        "Error while dispatching: %s. This is most likely a client error"
-                        % from_op.name
-                    )
+                    err = errors.WeaveBadRequest("Error while dispatching: %s. This is most likely a client error" % from_op.name)
                     err.fingerprint = [
                         "error-while-dispatching-client-error",
                         from_op.name,
@@ -865,9 +766,7 @@ def _compile_refine_and_propagate_gql_inner(
     return graph.map_nodes_full(nodes, _dispatch_map_fn_refining, on_error)
 
 
-def _propagate_updated_types_through_lambdas(
-    op: OpDef, params: dict[str, graph.Node], on_error: graph.OnErrorFnType = None
-):
+def _propagate_updated_types_through_lambdas(op: OpDef, params: dict[str, graph.Node], on_error: graph.OnErrorFnType = None):
     """
     This method ensures that the lambda variables for a given op are correctly
     typed. Since the lambda function's variable typing is dependent on: a) the
@@ -890,10 +789,7 @@ def _propagate_updated_types_through_lambdas(
     updated_params: dict[str, graph.Node] = {**params}
 
     for k, target_node in params.items():
-        if not (
-            isinstance(target_node, graph.ConstNode)
-            and isinstance(target_node.type, types.Function)
-        ):
+        if not (isinstance(target_node, graph.ConstNode) and isinstance(target_node.type, types.Function)):
             continue
 
         input_arg_type = op.input_type.arg_types[k]
@@ -910,9 +806,7 @@ def _propagate_updated_types_through_lambdas(
         expected_input_types = expected_type.input_types
         dirty_input_keys = set()
         for input_key, expected_input_type in expected_input_types.items():
-            if input_key not in updated_input_types or expected_input_type.assign_type(
-                updated_input_types[input_key]
-            ):
+            if input_key not in updated_input_types or expected_input_type.assign_type(updated_input_types[input_key]):
                 continue
             dirty_input_keys.add(input_key)
             updated_input_types[input_key] = expected_input_types[input_key]
@@ -926,12 +820,8 @@ def _propagate_updated_types_through_lambdas(
             return node
 
         working_nodes = [target_node.val]
-        working_nodes = graph.map_nodes_top_level(
-            [target_node.val], _update_fn_vars, on_error
-        )
-        working_nodes = _compile_refine_and_propagate_gql_inner(
-            working_nodes, True, on_error
-        )
+        working_nodes = graph.map_nodes_top_level([target_node.val], _update_fn_vars, on_error)
+        working_nodes = _compile_refine_and_propagate_gql_inner(working_nodes, True, on_error)
         updated_params[k] = graph.ConstNode(
             types.Function(updated_input_types, target_node.type.output_type),
             working_nodes[0],
@@ -1007,21 +897,13 @@ def _compile_lambda_uniqueness(node: graph.Node) -> typing.Optional[graph.Node]:
     if isinstance(node, graph.OutputNode):
         new_inputs = {}
         for input_key, input_node in node.from_op.inputs.items():
-            if isinstance(input_node, graph.ConstNode) and isinstance(
-                input_node.val, graph.Node
-            ):
+            if isinstance(input_node, graph.ConstNode) and isinstance(input_node.val, graph.Node):
                 uniq_lambda = compile_lambda_uniqueness([input_node.val])[0]
                 if uniq_lambda is not input_node.val:
-                    new_inputs[input_key] = graph.ConstNode(
-                        input_node.type, uniq_lambda
-                    )
+                    new_inputs[input_key] = graph.ConstNode(input_node.type, uniq_lambda)
         if len(new_inputs) > 0:
-            use_inputs: dict[str, graph.Node] = {
-                k: new_inputs.get(k, v) for k, v in node.from_op.inputs.items()
-            }
-            return weave_internal.make_output_node(
-                node.type, node.from_op.name, use_inputs
-            )
+            use_inputs: dict[str, graph.Node] = {k: new_inputs.get(k, v) for k, v in node.from_op.inputs.items()}
+            return weave_internal.make_output_node(node.type, node.from_op.name, use_inputs)
 
     # This is where the magic happens. We need to ensure that var nodes
     # are unique in memory
@@ -1046,9 +928,7 @@ def _track_errors(fn):
 
         inner_res = fn(nodes, on_error)
 
-        results: list[value_or_error.ValueOrError[graph.Node]] = [
-            value_or_error.Value(node) for node in inner_res
-        ]
+        results: list[value_or_error.ValueOrError[graph.Node]] = [value_or_error.Value(node) for node in inner_res]
         for ndx, e in compile_errors:
             results[ndx] = value_or_error.Error(e)
 
@@ -1138,9 +1018,7 @@ def _compile(
     # optimizations. These do not depend on having correct types in the graph.
 
     with tracer.trace("compile:gql_query"):
-        results = results.batch_map(
-            _track_errors(compile_domain.apply_domain_op_gql_translation)
-        )
+        results = results.batch_map(_track_errors(compile_domain.apply_domain_op_gql_translation))
 
     with tracer.trace("compile:initialize_gql_types"):
         results = results.batch_map(_track_errors(compile_initialize_gql_types))
@@ -1172,9 +1050,7 @@ def _compile(
     return results
 
 
-_compile_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "_compile_disabled", default=False
-)
+_compile_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar("_compile_disabled", default=False)
 
 
 def _is_compiling() -> bool:

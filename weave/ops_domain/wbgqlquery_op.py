@@ -38,14 +38,10 @@ def wbgqlquery(query_str, alias_list, output_type):
     num_timeout_retries = environment.num_gql_timeout_retries()
     with tracer.trace("wbgqlquery:public_api"):
         logging.info("Executing GQL query: %s", query_str)
-        gql_payload = wandb_gql_query(
-            query_str, num_timeout_retries=num_timeout_retries
-        )
+        gql_payload = wandb_gql_query(query_str, num_timeout_retries=num_timeout_retries)
     for alias in alias_list:
         if alias not in gql_payload:
-            raise errors.WeaveGQLExecuteMissingAliasError(
-                f"Alias {alias} not found in query results"
-            )
+            raise errors.WeaveGQLExecuteMissingAliasError(f"Alias {alias} not found in query results")
     mapper = mappers_gql.map_from_gql(output_type, None)
     return mapper.apply(gql_payload)
 
@@ -72,16 +68,12 @@ def querytoobj(result_dict, result_key, output_type, gql_query_fragment):
         output_type = output_type.value
 
     if not isinstance(output_type, partial_object.PartialObjectType):
-        raise ValueError(
-            f"Invalid output type for gqlroot-querytoobj, must be a PartialObjectType, got {output_type}"
-        )
+        raise ValueError(f"Invalid output type for gqlroot-querytoobj, must be a PartialObjectType, got {output_type}")
 
     instance_class = output_type.keyless_weave_type_class.instance_class
 
     if instance_class is None or not issubclass(instance_class, wdt.PartialObject):
-        raise ValueError(
-            f"Invalid output type for gqlroot-querytoobj, must be a PartialObjectType, got {output_type}"
-        )
+        raise ValueError(f"Invalid output type for gqlroot-querytoobj, must be a PartialObjectType, got {output_type}")
     res_gql = result_dict[result_key]
     if res_gql == None:
         return None

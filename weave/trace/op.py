@@ -54,9 +54,7 @@ class Op:
         self._on_output_handler = None
         self.display_name = None
 
-    def __get__(
-        self, obj: Optional[object], objtype: Optional[type[object]] = None
-    ) -> "BoundOp":
+    def __get__(self, obj: Optional[object], objtype: Optional[type[object]] = None) -> "BoundOp":
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -90,9 +88,7 @@ class Op:
 
         has_finished = False
 
-        def finish(
-            output: Any = None, exception: Optional[BaseException] = None
-        ) -> None:
+        def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
             nonlocal has_finished
             if has_finished:
                 raise ValueError("Should not call finish more than once")
@@ -162,9 +158,7 @@ class BoundOp(Op):
     arg0: Any
     op: Op
 
-    def __init__(
-        self, arg0: object, arg0_class: Optional[type[object]], op: Op
-    ) -> None:
+    def __init__(self, arg0: object, arg0_class: Optional[type[object]], op: Op) -> None:
         self.arg0 = arg0
         self.op = op  # type: ignore
         if arg0_class is None:
@@ -214,9 +208,7 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
     return wrap
 
 
-def _apply_fn_defaults_to_inputs(
-    fn: typing.Callable, inputs: Mapping[str, typing.Any]
-) -> dict[str, typing.Any]:
+def _apply_fn_defaults_to_inputs(fn: typing.Callable, inputs: Mapping[str, typing.Any]) -> dict[str, typing.Any]:
     inputs = {**inputs}
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():

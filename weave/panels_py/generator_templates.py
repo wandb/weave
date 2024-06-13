@@ -1,7 +1,7 @@
 """
 Contains the TemplateRegistry class, which is used to register
 templates for the PyBoard generator. I think we might want to make
-this even more generic and allow any panel to be a generator, but for 
+this even more generic and allow any panel to be a generator, but for
 now this is a simple abstraction that will work for basic use cases.
 
 # TODO: Generalize this to work with panels like /weave/ecosystem/wandb/panel_time_series.py
@@ -14,7 +14,6 @@ now this is a simple abstraction that will work for basic use cases.
 
 However, this current implementation is simple and easy to refactor.
 """
-
 
 import dataclasses
 import typing
@@ -30,9 +29,7 @@ class TemplateRegistrySpec:
     display_name: str
     description: str
     op_name: str
-    input_node_predicate: typing.Optional[
-        typing.Callable[[graph.Node[typing.Any]], bool]
-    ] = None
+    input_node_predicate: typing.Optional[typing.Callable[[graph.Node[typing.Any]], bool]] = None
     config_type: typing.Optional[weave_types.Type] = None
     is_featured: typing.Optional[bool] = None
     instructions_md: typing.Optional[str] = None
@@ -41,9 +38,7 @@ class TemplateRegistrySpec:
 
 @dataclasses.dataclass
 class _TemplateRegistry:
-    _specs: typing.Dict[str, TemplateRegistrySpec] = dataclasses.field(
-        default_factory=dict
-    )
+    _specs: typing.Dict[str, TemplateRegistrySpec] = dataclasses.field(default_factory=dict)
 
     def register(
         self,
@@ -51,9 +46,7 @@ class _TemplateRegistry:
         display_name: str,
         description: str,
         *,
-        input_node_predicate: typing.Optional[
-            typing.Callable[[graph.Node[typing.Any]], bool]
-        ] = None,
+        input_node_predicate: typing.Optional[typing.Callable[[graph.Node[typing.Any]], bool]] = None,
         config_type: typing.Optional[weave_types.Type] = None,
         is_featured: typing.Optional[bool] = None,
         instructions_md: typing.Optional[str] = None,

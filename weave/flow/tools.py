@@ -82,9 +82,7 @@ def get_tool(tools: list[Callable], name: str) -> Callable:
     raise KeyError(f"No tool with name {name} found")
 
 
-def perform_tool_calls(
-    tools: list[Callable], tool_calls: list[ChatCompletionMessageToolCall]
-) -> list[dict]:
+def perform_tool_calls(tools: list[Callable], tool_calls: list[ChatCompletionMessageToolCall]) -> list[dict]:
     messages = []
     for tool_call in tool_calls:
         function_name = tool_call.function.name

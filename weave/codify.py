@@ -41,9 +41,7 @@ def object_to_code_no_format(obj: typing.Any) -> str:
     return _otc_using_storage_fallback(obj)
 
 
-_var_node_frame: contextvars.ContextVar[
-    typing.Optional[list[str]]
-] = contextvars.ContextVar("var_node_frame", default=None)
+_var_node_frame: contextvars.ContextVar[typing.Optional[list[str]]] = contextvars.ContextVar("var_node_frame", default=None)
 
 
 @contextlib.contextmanager
@@ -57,16 +55,12 @@ def additional_var_nodes(names: list[str]) -> typing.Generator[None, None, None]
     _var_node_frame.reset(token)
 
 
-def lambda_wrapped_object_to_code_no_format(
-    obj: typing.Any, new_lambda_vars: list[str]
-) -> str:
+def lambda_wrapped_object_to_code_no_format(obj: typing.Any, new_lambda_vars: list[str]) -> str:
     if len(new_lambda_vars) == 0:
         return object_to_code_no_format(obj)
     else:
         with additional_var_nodes(new_lambda_vars):
-            return (
-                f"lambda {', '.join(new_lambda_vars)}: {object_to_code_no_format(obj)}"
-            )
+            return f"lambda {', '.join(new_lambda_vars)}: {object_to_code_no_format(obj)}"
 
 
 # Private Apis
@@ -122,9 +116,7 @@ def _try_otc_using_dataclasses(obj: typing.Any) -> typing.Optional[str]:
         return None
 
     class_type = type(obj)
-    if class_type.__module__.startswith("weave.decorator_type") and issubclass(
-        class_type, weave_types.Type
-    ):
+    if class_type.__module__.startswith("weave.decorator_type") and issubclass(class_type, weave_types.Type):
         qualified_classpath = "weave.weave_types"
         qualified_classname = f"type_name_to_type('{class_type.name}')"
     else:
@@ -144,13 +136,9 @@ def _try_otc_using_dataclasses(obj: typing.Any) -> typing.Optional[str]:
             field_name = f.name
             if field_name in allowed_init_params:
                 obj_val = getattr(obj, field_name)
-                if f.default is not dataclasses.MISSING and _equality_helper(
-                    obj_val, f.default
-                ):
+                if f.default is not dataclasses.MISSING and _equality_helper(obj_val, f.default):
                     continue
-                if f.default_factory is not dataclasses.MISSING and _equality_helper(
-                    obj_val, f.default_factory()
-                ):
+                if f.default_factory is not dataclasses.MISSING and _equality_helper(obj_val, f.default_factory()):
                     continue
                 fields_to_use[field_name] = obj_val
 
@@ -215,29 +203,17 @@ def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
         inputs = list(node.from_op.inputs.values())
 
         if node.from_op.name == "dict":
-            args = ",".join(
-                [
-                    key + "=" + _node_to_code(val, False)
-                    for key, val in node.from_op.inputs.items()
-                ]
-            )
+            args = ",".join([key + "=" + _node_to_code(val, False) for key, val in node.from_op.inputs.items()])
             if len(node.from_op.inputs) > 0:
                 args += ","
             return f"weave.ops_primitives.dict.dict_({args})"
         elif node.from_op.name == "list":
-            args = ",".join(
-                [
-                    key + "=" + _node_to_code(val, False)
-                    for key, val in node.from_op.inputs.items()
-                ]
-            )
+            args = ",".join([key + "=" + _node_to_code(val, False) for key, val in node.from_op.inputs.items()])
             if len(node.from_op.inputs) > 0:
                 args += ","
             return f"weave.ops_primitives.list_.make_list({args})"
 
-        is_root = len(inputs) == 0 or not isinstance(
-            inputs[0], (graph.OutputNode, graph.VarNode)
-        )
+        is_root = len(inputs) == 0 or not isinstance(inputs[0], (graph.OutputNode, graph.VarNode))
 
         if is_root:
             # In this case we need to find the qualified op name

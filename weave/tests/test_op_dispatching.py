@@ -194,9 +194,4 @@ def test_dispatch_of_ambiguous_ops():
     ],
 )
 def test_get_op_for_inputs(name, first_arg_type, exp_op_name):
-    assert (
-        _resolve_op_ambiguity(
-            _dispatch_first_arg(name, first_arg_type), first_arg_type
-        ).name
-        == exp_op_name
-    )
+    assert _resolve_op_ambiguity(_dispatch_first_arg(name, first_arg_type), first_arg_type).name == exp_op_name

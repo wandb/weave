@@ -12,16 +12,12 @@ def make_object_getattribute(
         attribute = object.__getattribute__(self, name)
         if name not in allowed_attributes:
             return attribute
-        return ref_util.val_with_relative_ref(
-            self, attribute, [ref_util.OBJECT_ATTR_EDGE_NAME, str(name)]
-        )
+        return ref_util.val_with_relative_ref(self, attribute, [ref_util.OBJECT_ATTR_EDGE_NAME, str(name)])
 
     return object_getattribute
 
 
-def make_object_lookup_path() -> (
-    typing.Callable[[typing.Any, typing.List[str]], typing.Any]
-):
+def make_object_lookup_path() -> typing.Callable[[typing.Any, typing.List[str]], typing.Any]:
     def object_lookup_path(self: typing.Any, path: typing.List[str]) -> typing.Any:
         assert len(path) > 1
         edge_type = path[0]
@@ -37,9 +33,7 @@ def make_object_lookup_path() -> (
     return object_lookup_path
 
 
-def build_ref_aware_object_subclass(
-    target_name: str, starting_class: type, allowed_attributes: list[str]
-) -> type:
+def build_ref_aware_object_subclass(target_name: str, starting_class: type, allowed_attributes: list[str]) -> type:
     return type(
         target_name,
         (starting_class,),

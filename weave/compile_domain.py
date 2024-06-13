@@ -26,9 +26,7 @@ def fragment_to_query(fragment: str) -> str:
 # special op that calls such query and constructs the correct type. It makes heavy use of the
 # `stitch` module to do this. Moreover, all GQL is zipped and deduped so that the minimum request
 # is made to the server. See the helper functions below for more details.
-def apply_domain_op_gql_translation(
-    leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None
-) -> list[graph.Node]:
+def apply_domain_op_gql_translation(leaf_nodes: list[graph.Node], on_error: graph.OnErrorFnType = None) -> list[graph.Node]:
     # Only apply this transformation at least one of the leaf nodes is a root node
     if not graph.filter_nodes_full(leaf_nodes, _is_root_node):
         return leaf_nodes
@@ -72,9 +70,7 @@ def apply_domain_op_gql_translation(
                     "result_dict": query_root_node,
                     "result_key": graph.ConstNode(types.String(), alias),
                     "output_type": graph.ConstNode(types.TypeType(), output_type),
-                    "gql_query_fragment": graph.ConstNode(
-                        types.String(), inner_fragment
-                    ),
+                    "gql_query_fragment": graph.ConstNode(types.String(), inner_fragment),
                 },
             )
 
@@ -126,23 +122,13 @@ def _get_fragment(node: graph.OutputNode, stitchedGraph: stitch.StitchedGraph) -
 
     forward_obj = stitchedGraph.get_result(node)
     calls = forward_obj.calls
-    child_fragment = "\n".join(
-        [
-            _get_fragment(call.node, stitchedGraph)
-            for call in calls
-            if isinstance(call.node, graph.OutputNode)
-        ]
-    )
+    child_fragment = "\n".join([_get_fragment(call.node, stitchedGraph) for call in calls if isinstance(call.node, graph.OutputNode)])
 
     if is_passthrough:
         return child_fragment
     wb_domain_gql = typing.cast(gql_op_plugin.GqlOpPlugin, wb_domain_gql)
 
-    const_node_input_vals = {
-        key: value.val
-        for key, value in node.from_op.inputs.items()
-        if isinstance(value, graph.ConstNode)
-    }
+    const_node_input_vals = {key: value.val for key, value in node.from_op.inputs.items() if isinstance(value, graph.ConstNode)}
     ip = InputAndStitchProvider(const_node_input_vals, forward_obj)
 
     fragment = wb_domain_gql.query_fn(
@@ -157,26 +143,18 @@ def _get_configsummaryhistory_keys_or_specs(
     field: graphql.language.ast.FieldNode,
 ) -> typing.Optional[typing.List[str]]:
     if len(field.arguments) > 1:
-        raise errors.WeaveInternalError(
-            "Custom merge for config, summaryMetrics, and sampledHistory only supports one argument"
-        )
+        raise errors.WeaveInternalError("Custom merge for config, summaryMetrics, and sampledHistory only supports one argument")
     if not field.arguments:
         return None
     field_arg0 = field.arguments[0]
     if field_arg0.name.value not in ["keys", "specs", "liveKeys"]:
-        raise errors.WeaveInternalError(
-            "First argument for custom merge must be 'keys' or 'specs'"
-        )
+        raise errors.WeaveInternalError("First argument for custom merge must be 'keys' or 'specs'")
     if not isinstance(field_arg0.value, graphql.language.ast.ListValueNode):
-        raise errors.WeaveInternalError(
-            "First argument for custom merge must be a list"
-        )
+        raise errors.WeaveInternalError("First argument for custom merge must be a list")
     keys: list[str] = []
     for key in field_arg0.value.values:
         if not isinstance(key, graphql.language.ast.StringValueNode):
-            raise errors.WeaveInternalError(
-                "First argument for custom merge must be a list of strings"
-            )
+            raise errors.WeaveInternalError("First argument for custom merge must be a list of strings")
         keys.append(key.value)
     return keys
 
@@ -196,11 +174,7 @@ def _field_selections_hardcoded_merge(
         "parquetHistory",
     ]:
         return False
-    if (
-        merge_from.alias is None
-        or merge_to.alias is None
-        or merge_from.alias.value != merge_to.alias.value
-    ):
+    if merge_from.alias is None or merge_to.alias is None or merge_from.alias.value != merge_to.alias.value:
         return False
     if (
         merge_from.alias.value != "configSubset"
@@ -221,9 +195,7 @@ def _field_selections_hardcoded_merge(
         for k in merge_from_keys:
             if k not in merge_to_keys:
                 merge_to_keys.append(k)
-        merge_to.arguments[0].value.values = tuple(
-            graphql.language.ast.StringValueNode(value=k) for k in merge_to_keys
-        )
+        merge_to.arguments[0].value.values = tuple(graphql.language.ast.StringValueNode(value=k) for k in merge_to_keys)
     return True
 
 
@@ -237,11 +209,7 @@ def _field_selections_are_mergeable(
         return False
     if selection1.alias is not None and selection2.alias is None:
         return False
-    if (
-        selection1.alias is not None
-        and selection2.alias is not None
-        and selection1.alias.value != selection2.alias.value
-    ):
+    if selection1.alias is not None and selection2.alias is not None and selection1.alias.value != selection2.alias.value:
         return False
     if len(selection1.arguments) != len(selection2.arguments):
         return False
@@ -266,15 +234,9 @@ def _zip_selection_set(
     selections = selection_set.selections
     # Two selections can be merged if their alias, name, and arguments are the same
     # unfortunately, this seems to be O(n^2) in the number of selections
-    new_selections: list[
-        typing.Union[
-            graphql.language.ast.FieldNode, graphql.language.ast.InlineFragmentNode
-        ]
-    ] = []
+    new_selections: list[typing.Union[graphql.language.ast.FieldNode, graphql.language.ast.InlineFragmentNode]] = []
     for selection in selections:
-        if isinstance(selection, graphql.language.ast.FieldNode) or isinstance(
-            selection, graphql.language.ast.InlineFragmentNode
-        ):
+        if isinstance(selection, graphql.language.ast.FieldNode) or isinstance(selection, graphql.language.ast.InlineFragmentNode):
             for new_selection in new_selections:
                 did_custom_merge = (
                     isinstance(selection, graphql.language.ast.FieldNode)
@@ -291,17 +253,13 @@ def _zip_selection_set(
                 )
                 should_merge = should_merge or (
                     isinstance(selection, graphql.language.ast.InlineFragmentNode)
-                    and isinstance(
-                        new_selection, graphql.language.ast.InlineFragmentNode
-                    )
+                    and isinstance(new_selection, graphql.language.ast.InlineFragmentNode)
                     and _fragment_selections_are_mergeable(selection, new_selection)
                 )
                 if should_merge:
                     if selection.selection_set:
                         if new_selection.selection_set is None:
-                            new_selection.selection_set = (
-                                graphql.language.ast.SelectionSetNode(selections=())
-                            )
+                            new_selection.selection_set = graphql.language.ast.SelectionSetNode(selections=())
                         new_selection.selection_set.selections = (
                             *new_selection.selection_set.selections,
                             *selection.selection_set.selections,
@@ -310,9 +268,7 @@ def _zip_selection_set(
             else:
                 new_selections.append(selection)
         else:
-            raise ValueError(
-                f"Found unsupported selection type {type(selection)}, please add implementation in compile_domain.py"
-            )
+            raise ValueError(f"Found unsupported selection type {type(selection)}, please add implementation in compile_domain.py")
     for selection in new_selections:
         if selection.selection_set:
             selection.selection_set = _zip_selection_set(selection.selection_set)
@@ -337,9 +293,7 @@ def _zip_gql_doc(
 def normalize_gql_query_string(query_str: str) -> str:
     gql_doc = graphql.language.parse(query_str)
     gql_doc = _zip_gql_doc(gql_doc)
-    return graphql.utilities.strip_ignored_characters(
-        graphql.language.print_ast(gql_doc)
-    )
+    return graphql.utilities.strip_ignored_characters(graphql.language.print_ast(gql_doc))
 
 
 def _is_root_node(node: graph.Node) -> bool:
@@ -371,9 +325,7 @@ def required_const_input_names(node: graph.Node) -> typing.Optional[list[str]]:
     if wb_domain_gql is None:
         return None
     if not isinstance(op_def.input_type, op_args.OpNamedArgs):
-        raise errors.WeaveInternalError(
-            'Only named args are supported for "gql" domain'
-        )
+        raise errors.WeaveInternalError('Only named args are supported for "gql" domain')
     input_names = list(op_def.input_type.arg_types.keys())
     if wb_domain_gql.is_root:
         return input_names

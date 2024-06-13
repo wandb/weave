@@ -19,15 +19,11 @@ def path_return_type(dir: file_base.Dir, path: str) -> types.Type:
     name="dir-path",
     refine_output_type=path_return_type,
 )
-def open(
-    dir: file_base.Dir, path: str
-) -> typing.Union[file_base.File, file_base.Dir, None]:
+def open(dir: file_base.Dir, path: str) -> typing.Union[file_base.File, file_base.Dir, None]:
     return dir.path_info(path)
 
 
-def _file_dict_from_manifest(
-    file: FilesystemArtifactFile, manifest: WandbArtifactManifest
-) -> dict:
+def _file_dict_from_manifest(file: FilesystemArtifactFile, manifest: WandbArtifactManifest) -> dict:
     art = file.artifact
     if not isinstance(art, WandbArtifact):
         return _file_dict(file)
@@ -69,9 +65,7 @@ def _file_dict_from_manifest(
 
 def _file_dict(file: FilesystemArtifactFile) -> dict:
     if isinstance(file.artifact, WandbArtifact):
-        raise ValueError(
-            "WandbArtifact passed to _file_dict. This is not supported. Use _file_dict_from_manifest instead."
-        )
+        raise ValueError("WandbArtifact passed to _file_dict. This is not supported. Use _file_dict_from_manifest instead.")
 
     return {
         "birthArtifactID": "TODO",
@@ -87,9 +81,7 @@ def _file_dict(file: FilesystemArtifactFile) -> dict:
     name="dir-_as_w0_dict_",
 )
 def _as_w0_dict_(dir: file_base.Dir) -> dict:
-    if isinstance(dir, FilesystemArtifactDir) and isinstance(
-        dir.artifact, WandbArtifact
-    ):
+    if isinstance(dir, FilesystemArtifactDir) and isinstance(dir.artifact, WandbArtifact):
         manifest = dir.artifact._manifest()
     else:
         manifest = None
@@ -107,12 +99,7 @@ def _as_w0_dict_(dir: file_base.Dir) -> dict:
             }
             for k, v in dir.dirs.items()
         },
-        "files": {
-            k: _file_dict_from_manifest(v, manifest)
-            if manifest is not None
-            else _file_dict(v)
-            for k, v in dir.files.items()
-        },
+        "files": {k: _file_dict_from_manifest(v, manifest) if manifest is not None else _file_dict(v) for k, v in dir.files.items()},
     }
 
 

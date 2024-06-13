@@ -57,7 +57,7 @@ class LocalFile(file_base.File):
         return self
 
     def _contents(self) -> str:
-        with (open(self.path, encoding="ISO-8859-1")) as f:
+        with open(self.path, encoding="ISO-8859-1") as f:
             return f.read()
 
 
@@ -78,9 +78,7 @@ class LocalDirType(types.ObjectType):
 
 
 class LocalDir(file_base.Dir):
-    def path_info(
-        self, path: str
-    ) -> typing.Optional[typing.Union["LocalDir", LocalFile]]:
+    def path_info(self, path: str) -> typing.Optional[typing.Union["LocalDir", LocalFile]]:
         return get_path_info(os.path.join(self.fullPath, path))
 
 
@@ -116,9 +114,7 @@ def get_path_info(path: str) -> typing.Optional[typing.Union["LocalDir", LocalFi
                         subdir_dirs[sub_fname] = 1
                     else:
                         subdir_files[sub_fname] = LocalFile(full_path)
-                sub_dir = file_base.SubDir(
-                    full_path, 10, subdir_dirs, subdir_files
-                )  # TODO: size
+                sub_dir = file_base.SubDir(full_path, 10, subdir_dirs, subdir_files)  # TODO: size
                 sub_dirs[fname] = sub_dir
             else:
                 # sub_file = LocalFile(full_path, os.path.getsize(full_path), {}, {})

@@ -79,9 +79,7 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
     return None
 
 
-def get_scorer_attributes(
-    scorer: Union[Callable, Op, Scorer]
-) -> Tuple[str, Callable, Callable]:
+def get_scorer_attributes(scorer: Union[Callable, Op, Scorer]) -> Tuple[str, Callable, Callable]:
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
         if scorer_name == None:
@@ -90,9 +88,7 @@ def get_scorer_attributes(
             score_fn = scorer.score
             summarize_fn = scorer.summarize  # type: ignore
         except AttributeError:
-            raise ValueError(
-                f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
-            )
+            raise ValueError(f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?")
     elif callable(scorer):
         if isinstance(scorer, Op):
             scorer_name = scorer.name
@@ -128,18 +124,10 @@ class MultiTaskBinaryClassificationF1(Scorer):
         result = {}
         for class_name in self.class_names:
             class_scores = [row.get(class_name) for row in score_rows]
-            true_positives = sum(
-                not score["negative"] and score["correct"] for score in class_scores
-            )
-            false_positives = sum(
-                not score["negative"] and not score["correct"] for score in class_scores
-            )
-            false_negatives = sum(
-                score["negative"] and not score["correct"] for score in class_scores
-            )
-            precision, recall, f1 = p_r_f1(
-                true_positives, false_positives, false_negatives
-            )
+            true_positives = sum(not score["negative"] and score["correct"] for score in class_scores)
+            false_positives = sum(not score["negative"] and not score["correct"] for score in class_scores)
+            false_negatives = sum(score["negative"] and not score["correct"] for score in class_scores)
+            precision, recall, f1 = p_r_f1(true_positives, false_positives, false_negatives)
             result[class_name] = {"f1": f1, "precision": precision, "recall": recall}
         return result
 

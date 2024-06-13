@@ -3,9 +3,7 @@ import contextvars
 import typing
 
 
-_error_on_non_vectorized_history_transform: contextvars.ContextVar[
-    bool
-] = contextvars.ContextVar("_error_on_non_vectorized_history_transform", default=False)
+_error_on_non_vectorized_history_transform: contextvars.ContextVar[bool] = contextvars.ContextVar("_error_on_non_vectorized_history_transform", default=False)
 
 
 @contextlib.contextmanager

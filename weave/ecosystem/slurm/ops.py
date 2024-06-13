@@ -81,9 +81,7 @@ class Slurm:
         resp = requests.get(self.full_url + "/nodes")
         nodes = resp.json()["nodes"]
 
-        return [
-            SlurmNode(node_name=n["name"], state=n["state"]) for n in reversed(nodes)
-        ]
+        return [SlurmNode(node_name=n["name"], state=n["state"]) for n in reversed(nodes)]
 
 
 @weave.op(render_info={"type": "function"})
@@ -105,12 +103,8 @@ def slurm_render(
                 content=weave.panels.Group(
                     prefer_horizontal=True,
                     items=[
-                        weave.panels.LabeledItem(
-                            item=slurm.jobs().count(), label="Total jobs"
-                        ),
-                        weave.panels.LabeledItem(
-                            item=slurm.nodes().count(), label="Total nodes"
-                        ),
+                        weave.panels.LabeledItem(item=slurm.jobs().count(), label="Total jobs"),
+                        weave.panels.LabeledItem(item=slurm.nodes().count(), label="Total nodes"),
                     ],
                 ),
             ),

@@ -177,12 +177,7 @@ def peak(v, m):
 
 
 def make_np_image(dim=128):
-    return np.array(
-        [
-            [(peak(col, dim) * peak(row, dim)) ** 0.5 for col in range(dim)]
-            for row in range(dim)
-        ]
-    )
+    return np.array([[(peak(col, dim) * peak(row, dim)) ** 0.5 for col in range(dim)] for row in range(dim)])
 
 
 def make_wb_image(use_middle=False, use_pixels=False):
@@ -243,13 +238,7 @@ def make_wb_image(use_middle=False, use_pixels=False):
                 ],
             },
         },
-        masks={
-            "mask_set_1": {
-                "mask_data": np.array(
-                    [[row % 4 for col in range(128)] for row in range(128)]
-                )
-            }
-        },
+        masks={"mask_set_1": {"mask_data": np.array([[row % 4 for col in range(128)] for row in range(128)])}},
         classes=[
             {"id": 0, "name": "c_zero"},
             {"id": 1, "name": "c_one"},
@@ -509,14 +498,10 @@ def test_annotated_images_in_tables(fake_wandb):
 
     ot = weave.use(table_rows_type).object_type
     assert ot == TaggedValueType(
-        types.TypedDict(
-            {"_ct_fake_run": types.String(), "_ct_fake_project": types.String()}
-        ),
+        types.TypedDict({"_ct_fake_run": types.String(), "_ct_fake_project": types.String()}),
         weave.types.TypedDict(
             {
-                "label": weave.types.UnionType(
-                    weave.types.NoneType(), weave.types.String()
-                ),
+                "label": weave.types.UnionType(weave.types.NoneType(), weave.types.String()),
                 "image": weave.types.UnionType(
                     ImageArtifactFileRefType(
                         boxLayers={"box_set_1": [0], "box_set_2": [2]},
@@ -568,14 +553,10 @@ def test_annotated_legacy_images_in_tables(fake_wandb):
 
     ot = weave.use(table_rows_type).object_type
     assert ot == TaggedValueType(
-        types.TypedDict(
-            {"_ct_fake_run": types.String(), "_ct_fake_project": types.String()}
-        ),
+        types.TypedDict({"_ct_fake_run": types.String(), "_ct_fake_project": types.String()}),
         weave.types.TypedDict(
             {
-                "label": weave.types.UnionType(
-                    weave.types.NoneType(), weave.types.String()
-                ),
+                "label": weave.types.UnionType(weave.types.NoneType(), weave.types.String()),
                 "image": weave.types.UnionType(
                     ImageArtifactFileRefType(
                         # Both box and mask layers have all the keys because
@@ -611,11 +592,7 @@ def make_simple_image_table():
                     np.ones((32, 32)) * group,
                     masks={
                         # Here, we add a mask set unique to each image to ensure that the mask is not considered in grouping
-                        f"mask_set-{group}-{item}": {
-                            "mask_data": np.array(
-                                [[row % 4 for col in range(128)] for row in range(128)]
-                            )
-                        }
+                        f"mask_set-{group}-{item}": {"mask_data": np.array([[row % 4 for col in range(128)] for row in range(128)])}
                     },
                 ),
             )
@@ -791,9 +768,7 @@ def test_join_2_on_images(fake_wandb):
     assert len(raw_data) == exp_join_length
     got = [[row["t1"]["label"], row["t2"]["label"]] for row in raw_data]
     print("GOT", got)
-    assert [
-        [row["t1"]["label"], row["t2"]["label"]] for row in raw_data
-    ] == exp_join2_labels
+    assert [[row["t1"]["label"], row["t2"]["label"]] for row in raw_data] == exp_join2_labels
     group_keys = weave.use(joined.joinObj()).to_pylist_notags()
     got = [key["sha256"] for key in group_keys]
     print("GOT", got)
@@ -849,10 +824,7 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
     # wait for history to be uploaded
     def wait_for():
         history = get_raw_gorilla_history(run.entity, run.project, run.id)
-        return (
-            len(history["parquetHistory"]["parquetUrls"]) > 0
-            or len(history["parquetHistory"]["liveData"]) > 0
-        )
+        return len(history["parquetHistory"]["parquetUrls"]) > 0 or len(history["parquetHistory"]["liveData"]) > 0
 
     wait_for_x_times(wait_for)
 
@@ -860,9 +832,7 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
 
     for history_op_name in ["history3", "history"]:
         history_node = run_node._get_op(history_op_name)()
-        mapped_node = history_node.map(
-            lambda row: weave.ops.dict_(**{key: row[key] for key in log_dict.keys()})
-        )
+        mapped_node = history_node.map(lambda row: weave.ops.dict_(**{key: row[key] for key in log_dict.keys()}))
 
         history = weave.use(mapped_node)
         if history_op_name == "history3":

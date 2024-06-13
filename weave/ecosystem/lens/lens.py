@@ -48,19 +48,8 @@ def histogram(
     scale_color = lambda val_id: val_id / len(val_series)
 
     for series_id, vals in enumerate(val_series):
-        curr_color = (
-            default_colors[num_series][series_id]
-            if num_series < 3
-            else color_map(scale_color(series_id))
-        )
-        ax.hist(
-            vals,
-            bins,
-            alpha=0.5,
-            label=series_names[series_id],
-            color=curr_color,
-            **kwargs
-        )
+        curr_color = default_colors[num_series][series_id] if num_series < 3 else color_map(scale_color(series_id))
+        ax.hist(vals, bins, alpha=0.5, label=series_names[series_id], color=curr_color, **kwargs)
 
     ax.set_xticks(np.arange(min_val - bin_size, max_val + bin_size, bin_size))
     ax.set_xlim([min_val - bin_size, max_val + bin_size])

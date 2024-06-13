@@ -18,11 +18,7 @@ def get_obj_creator(ref: ref_base.Ref) -> typing.Optional[runs.Run]:
     # Extremely inefficient!
     # TODO
     for art_name in os.listdir(artifact_local.local_artifact_dir()):
-        if (
-            art_name.startswith("run-")
-            and not art_name.endswith("-output")
-            and artifact_local.local_artifact_exists(art_name, "latest")
-        ):
+        if art_name.startswith("run-") and not art_name.endswith("-output") and artifact_local.local_artifact_exists(art_name, "latest"):
             try:
                 cache_obj = artifact_local.get_local_version(art_name, "latest")
             except errors.WeaveSerializeError:
@@ -78,9 +74,6 @@ def used_by(ref, op_name: str) -> list[runs.Run]:
             run_inputs = list(run.inputs.values())
             if run.op_name == op_name and run_inputs:
                 input0 = run_inputs[0]
-                if (
-                    isinstance(input0, artifact_local.LocalArtifactRef)
-                    and ref.uri == input0.uri
-                ):
+                if isinstance(input0, artifact_local.LocalArtifactRef) and ref.uri == input0.uri:
                     users.append(run)
     return users

@@ -27,9 +27,7 @@ class TorchVisionDataset(typing.TypedDict):
     data: dict[str, list[TypedDictAny]]
 
 
-def make_torchvision_splits(
-    dataset_fn, limit, split_specs, example_keys, example_constructor
-) -> dict:
+def make_torchvision_splits(dataset_fn, limit, split_specs, example_keys, example_constructor) -> dict:
     splits = {}
     for split_name, dataset_fn_kwargs in split_specs:
         raw_data = dataset_fn(".", download=True, **dataset_fn_kwargs)
@@ -41,13 +39,7 @@ def make_torchvision_splits(
     return splits
 
 
-@weave.op(
-    input_type={
-        "dataset": weave.types.Function(
-            {}, infer_types.python_type_to_type(TorchVisionDataset)
-        )
-    }
-)
+@weave.op(input_type={"dataset": weave.types.Function({}, infer_types.python_type_to_type(TorchVisionDataset))})
 def torch_vision_dataset_card(dataset) -> panels.Card:
     # TODO: split should be chosen from dropdown rather than via tab.
     #   - or ideally, it should look like one big table with a "split" column.
@@ -60,9 +52,7 @@ def torch_vision_dataset_card(dataset) -> panels.Card:
         split_tabs.append(
             panels.CardTab(
                 name=f"{split_name} split",
-                content=panels.LabeledItem(
-                    item=split_data, height=500, label=f"{split_name} split"
-                ),
+                content=panels.LabeledItem(item=split_data, height=500, label=f"{split_name} split"),
             ),
         )
     return panels.Card(
@@ -73,9 +63,7 @@ def torch_vision_dataset_card(dataset) -> panels.Card:
                 name="Overview",
                 content=panels.Group(
                     items={
-                        "description": panels.LabeledItem(
-                            item=dataset["description"], label="Description"
-                        ),
+                        "description": panels.LabeledItem(item=dataset["description"], label="Description"),
                     }
                 ),
             ),

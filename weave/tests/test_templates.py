@@ -14,9 +14,7 @@ class DummyBoardConfig:
     pass
 
 
-board_input_type = weave.types.List(
-    weave.types.TypedDict({"a": weave.types.optional(weave.types.String())})
-)
+board_input_type = weave.types.List(weave.types.TypedDict({"a": weave.types.optional(weave.types.String())}))
 
 
 @weave.op(  # type: ignore
@@ -119,13 +117,7 @@ def test_templates_for_logged_table_valid(user_by_api_key_in_env):
     run.log({"table": wandb.Table(data=[["hello"]], columns=["a"])})
     run.finish()
 
-    table_node = (
-        weave.ops.project(run.entity, run.project)
-        .run(run.id)
-        .summary()["table"]
-        .table()
-        .rows()
-    )
+    table_node = weave.ops.project(run.entity, run.project).run(run.id).summary()["table"].table().rows()
 
     assert_valid_node(table_node)
 
@@ -135,13 +127,7 @@ def test_templates_for_logged_table_invalid(user_by_api_key_in_env):
     run.log({"table": wandb.Table(data=[[42]], columns=["a"])})
     run.finish()
 
-    table_node = (
-        weave.ops.project(run.entity, run.project)
-        .run(run.id)
-        .summary()["table"]
-        .table()
-        .rows()
-    )
+    table_node = weave.ops.project(run.entity, run.project).run(run.id).summary()["table"].table().rows()
 
     assert_invalid_node(table_node)
 

@@ -32,9 +32,7 @@ class Queue(Generic[QueueItemType]):
 
 class ProcessQueue(Queue, Generic[QueueItemType]):
     def __init__(self, maxsize: int = 0):
-        self._queue: aioprocessing.Queue = aioprocessing.AioJoinableQueue(
-            maxsize=maxsize
-        )
+        self._queue: aioprocessing.Queue = aioprocessing.AioJoinableQueue(maxsize=maxsize)
 
     async def async_put(self, item: QueueItemType) -> None:
         await self._queue.coro_put(item)

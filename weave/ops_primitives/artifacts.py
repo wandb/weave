@@ -12,9 +12,7 @@ from .. import artifact_fs
 
 
 @op(name="FilesystemArtifact-fileRefineType", hidden=True)
-def artifact_file_refine_type(
-    artifact: artifact_fs.FilesystemArtifact, path: str
-) -> types.Type:
+def artifact_file_refine_type(artifact: artifact_fs.FilesystemArtifact, path: str) -> types.Type:
     return types.TypeRegistry.type_of(artifact.path_info(path))
 
 
@@ -116,9 +114,7 @@ def most_recent_version(
     latest_dir = None
 
     for obj_path in reversed(obj_paths):
-        if not obj_path.name.startswith(
-            WORKING_DIR_PREFIX
-        ) and not obj_path.name.startswith("."):
+        if not obj_path.name.startswith(WORKING_DIR_PREFIX) and not obj_path.name.startswith("."):
             if obj_path.is_symlink() and latest_sym is None:
                 latest_sym = obj_path
             elif obj_path.is_dir() and latest_dir is None:

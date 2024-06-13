@@ -46,9 +46,7 @@ def js_to_py_typename(typename: str) -> str:
 def all_subclasses(cls):
     # Note using a list here... this doesn't dedupe star pattern!
     # But it does preserve tree order.
-    return list(cls.__subclasses__()) + [
-        s for c in cls.__subclasses__() for s in all_subclasses(c)
-    ]
+    return list(cls.__subclasses__()) + [s for c in cls.__subclasses__() for s in all_subclasses(c)]
 
 
 def get_type_classes():
@@ -125,11 +123,7 @@ class TypeRegistry:
     def type_of(obj: typing.Any) -> "Type":
         from . import ref_base
 
-        if (
-            context_state.ref_tracking_enabled()
-            and _reffed_type_is_ref.get()
-            and not isinstance(obj, ref_base.Ref)
-        ):
+        if context_state.ref_tracking_enabled() and _reffed_type_is_ref.get() and not isinstance(obj, ref_base.Ref):
             obj_ref = ref_base.get_ref(obj)
             if obj_ref is not None:
                 # Directly construct the RefTypeClass instead of doing
@@ -231,9 +225,7 @@ class Type(metaclass=_TypeSubclassWatcher):
     _base_type: typing.ClassVar[typing.Optional[typing.Type["Type"]]] = None
 
     instance_class: typing.ClassVar[typing.Optional[type]]
-    instance_classes: typing.ClassVar[
-        typing.Union[type, typing.List[type], None]
-    ] = None
+    instance_classes: typing.ClassVar[typing.Union[type, typing.List[type], None]] = None
 
     _type_attrs = None
     _hash = None
@@ -266,10 +258,7 @@ class Type(metaclass=_TypeSubclassWatcher):
     def type_attrs(cls):
         type_attrs = []
         for field in dataclasses.fields(cls):
-            if (inspect.isclass(field.type) and issubclass(field.type, Type)) or (
-                field.type.__origin__ == typing.Union
-                and any(issubclass(a, Type) for a in field.type.__args__)
-            ):
+            if (inspect.isclass(field.type) and issubclass(field.type, Type)) or (field.type.__origin__ == typing.Union and any(issubclass(a, Type) for a in field.type.__args__)):
                 type_attrs.append(field.name)
         return type_attrs
 
@@ -391,9 +380,7 @@ class Type(metaclass=_TypeSubclassWatcher):
         if self._base_type is not None:
             type_props["_base_type"] = {"type": self._base_type.name}
             if self._base_type._base_type is not None:
-                type_props["_base_type"]["_base_type"] = {
-                    "type": self._base_type._base_type.name
-                }
+                type_props["_base_type"]["_base_type"] = {"type": self._base_type._base_type.name}
         for field in fields:
             # TODO: I really don't like this change. Only needed because
             # FileType has optional fields... Remove?
@@ -413,19 +400,14 @@ class Type(metaclass=_TypeSubclassWatcher):
                 type_attrs[field.name] = TypeRegistry.type_from_dict(d[field_name])
         return cls(**type_attrs)
 
-    def save_instance(
-        self, obj, artifact, name
-    ) -> typing.Optional[typing.Union[list[str], "artifact_base.ArtifactRef"]]:
+    def save_instance(self, obj, artifact, name) -> typing.Optional[typing.Union[list[str], "artifact_base.ArtifactRef"]]:
         d = None
         try:
             d = self.instance_to_dict(obj)
         except NotImplementedError:
             pass
         if d is None:
-            raise errors.WeaveSerializeError(
-                "Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s"
-                % self
-            )
+            raise errors.WeaveSerializeError("Object is not serializable. Provide instance_<to/from>_dict or <save/load>_instance methods on Type: %s" % self)
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(d, f)
         return None
@@ -473,9 +455,7 @@ class _PlainStringNamedType(Type):
 class BasicType(_PlainStringNamedType):
     def save_instance(self, obj, artifact, name):
         if artifact is None:
-            raise errors.WeaveSerializeError(
-                "save_instance invalid when artifact is None for type: %s" % self
-            )
+            raise errors.WeaveSerializeError("save_instance invalid when artifact is None for type: %s" % self)
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(obj, f)
 
@@ -686,9 +666,7 @@ class LegacyDate(Type):
 
     def save_instance(self, obj, artifact, name):
         if artifact is None:
-            raise errors.WeaveSerializeError(
-                "save_instance invalid when artifact is None for type: %s" % self
-            )
+            raise errors.WeaveSerializeError("save_instance invalid when artifact is None for type: %s" % self)
         with artifact.new_file(f"{name}.object.json") as f:
             v = weave_timestamp.python_datetime_to_ms(obj)
             json.dump(v, f)
@@ -705,9 +683,7 @@ class TimeDelta(Type):
 
     def save_instance(self, obj: datetime.timedelta, artifact, name):
         if artifact is None:
-            raise errors.WeaveSerializeError(
-                "save_instance invalid when artifact is None for type: %s" % self
-            )
+            raise errors.WeaveSerializeError("save_instance invalid when artifact is None for type: %s" % self)
         with artifact.new_file(f"{name}.object.json") as f:
             # Uses internal python representation of timedelta for serialization
             v = [obj.days, obj.seconds, obj.microseconds]
@@ -731,9 +707,7 @@ class Timestamp(Type):
 
     def save_instance(self, obj, artifact, name):
         if artifact is None:
-            raise errors.WeaveSerializeError(
-                "save_instance invalid when artifact is None for type: %s" % self
-            )
+            raise errors.WeaveSerializeError("save_instance invalid when artifact is None for type: %s" % self)
         with artifact.new_file(f"{name}.object.json") as f:
             v = weave_timestamp.python_datetime_to_ms(obj)
             json.dump(v, f)
@@ -769,9 +743,7 @@ class UnionType(Type):
         if not all_members:
             raise errors.WeaveInternalError("Attempted to construct empty union")
         if len(all_members) == 1:
-            raise errors.WeaveInternalError(
-                "Attempted to construct union with only one member, did you mean to use union()?"
-            )
+            raise errors.WeaveInternalError("Attempted to construct union with only one member, did you mean to use union()?")
         object.__setattr__(self, "members", all_members)
 
     # def __repr__(self):
@@ -799,9 +771,7 @@ class UnionType(Type):
     #     raise Exception('invalid')
     @classmethod
     def from_dict(cls, d):
-        return merge_many_types(
-            [TypeRegistry.type_from_dict(mem) for mem in d["members"]]
-        )
+        return merge_many_types([TypeRegistry.type_from_dict(mem) for mem in d["members"]])
 
     def _to_dict(self):
         return {"members": [mem.to_dict() for mem in self.members]}
@@ -815,32 +785,22 @@ class UnionType(Type):
             else:
                 results.append(getattr(mem, attr))
         if len(results) == 0:
-            raise errors.WeaveTypeError(
-                f"Attempt to get attribute {attr} from UnionType with no non-none members"
-            )
+            raise errors.WeaveTypeError(f"Attempt to get attribute {attr} from UnionType with no non-none members")
         first_result = results[0]
         if isinstance(first_result, Type):
             if any((not isinstance(res, Type)) for res in results):
-                raise errors.WeaveTypeError(
-                    f"Attempt to get attribute {attr} from UnionType with inconsistent types"
-                )
+                raise errors.WeaveTypeError(f"Attempt to get attribute {attr} from UnionType with inconsistent types")
             if has_none:
                 results.append(none_type)
             return union(*results)
         if isinstance(first_result, dict):
             if any((not isinstance(res, dict)) for res in results):
-                raise errors.WeaveTypeError(
-                    f"Attempt to get attribute {attr} from UnionType with inconsistent types"
-                )
+                raise errors.WeaveTypeError(f"Attempt to get attribute {attr} from UnionType with inconsistent types")
             all_keys = set(k for res in results for k in res.keys())
             if has_none:
                 results.append({})
-            return {
-                k: union(*[res.get(k, NoneType()) for res in results]) for k in all_keys
-            }
-        raise errors.WeaveTypeError(
-            f"Attempt to get attribute {attr} from UnionType resulted in type {type(first_result)}, expected Type or dict"
-        )
+            return {k: union(*[res.get(k, NoneType()) for res in results]) for k in all_keys}
+        raise errors.WeaveTypeError(f"Attempt to get attribute {attr} from UnionType resulted in type {type(first_result)}, expected Type or dict")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -899,10 +859,7 @@ class TypedDict(Type):
     not_required_keys: set[str] = dataclasses.field(default_factory=set)
 
     def _hashable(self):
-        return tuple(
-            (k, hash(v), k in self.not_required_keys)
-            for k, v in self.property_types.items()
-        )
+        return tuple((k, hash(v), k in self.not_required_keys) for k, v in self.property_types.items())
 
     def __getitem__(self, key: str) -> Type:
         return self.property_types[key]
@@ -920,9 +877,7 @@ class TypedDict(Type):
         for k, ptype in self.property_types.items():
             if k in self.not_required_keys and k not in other_type.property_types:
                 continue
-            if k not in other_type.property_types or not ptype.assign_type(
-                other_type.property_types[k]
-            ):
+            if k not in other_type.property_types or not ptype.assign_type(other_type.property_types[k]):
                 return False
         return True
 
@@ -998,10 +953,7 @@ class Dict(Type):
 
     def _assign_type_inner(self, other_type):
         if isinstance(other_type, TypedDict):
-            return all(
-                self.object_type.assign_type(t)
-                for t in other_type.property_types.values()
-            )
+            return all(self.object_type.assign_type(t) for t in other_type.property_types.values())
         return super()._assign_type_inner(other_type)
 
     @classmethod
@@ -1070,11 +1022,7 @@ class ObjectType(Type):
         base_type = ObjectType
         if len(bases) > 0:
             base0 = bases[0]
-            if (
-                issubclass(base0, pydantic.BaseModel)
-                and base0.__name__ != "BaseModel"
-                and base0.__name__ != "Object"
-            ):
+            if issubclass(base0, pydantic.BaseModel) and base0.__name__ != "BaseModel" and base0.__name__ != "Object":
                 base_type = cls.typeclass_of_class(base0)
 
         type_attrs = {}
@@ -1147,10 +1095,7 @@ class ObjectType(Type):
         return mapper.apply(result)
 
     def __eq__(self, other) -> bool:
-        return (
-            type(self) == type(other)
-            and self.property_types() == other.property_types()
-        )
+        return type(self) == type(other) and self.property_types() == other.property_types()
 
 
 def is_serialized_object_type(t: dict) -> bool:
@@ -1181,13 +1126,9 @@ DESERIALIZED_OBJECT_TYPE_CLASSES: dict[str, type[ObjectType]] = {}
 def validate_kwarg_name(name: str) -> bool:
     """Return True if name is a valid python kwarg name"""
     if name in keyword.kwlist:
-        raise ValueError(
-            f"{name} is a Python keyword and cannot be used as a kwarg name"
-        )
+        raise ValueError(f"{name} is a Python keyword and cannot be used as a kwarg name")
     if not name.isidentifier():
-        raise ValueError(
-            f"{name} is not a valid Python identifier and cannot be used as a kwarg name"
-        )
+        raise ValueError(f"{name} is not a valid Python identifier and cannot be used as a kwarg name")
     return True
 
 
@@ -1206,11 +1147,7 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
             type_attr_types[k] = TypeRegistry.type_from_dict(v)
     import textwrap
 
-    object_constructor_arg_names = [
-        k if k != "_name" else "name"
-        for k, t in type_attr_types.items()
-        if t.name != "OpDef"
-    ]
+    object_constructor_arg_names = [k if k != "_name" else "name" for k, t in type_attr_types.items() if t.name != "OpDef"]
     # Sanitize
     for k in object_constructor_arg_names:
         if not validate_kwarg_name(k):
@@ -1226,9 +1163,7 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     )
     exec(object_init_code)
 
-    object_getattribute = object_type_ref_util.make_object_getattribute(
-        list(type_attr_types.keys())
-    )
+    object_getattribute = object_type_ref_util.make_object_getattribute(list(type_attr_types.keys()))
     object_lookup_path = object_type_ref_util.make_object_lookup_path()
 
     new_object_class = type(
@@ -1247,18 +1182,14 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
         "instance_classes": new_object_class,
     }
     if "_base_type" in t:
-        all_attr_types["_base_type"] = deserialize_relocatable_object_type(
-            t["_base_type"]
-        )
+        all_attr_types["_base_type"] = deserialize_relocatable_object_type(t["_base_type"])
     new_type_class = type(type_class_name, (ObjectType,), all_attr_types)
     setattr(new_type_class, "_relocatable", True)
     setattr(new_type_class, "__annotations__", {})
     for k, v in type_attr_types.items():
         setattr(new_type_class, k, v)
         new_type_class.__dict__["__annotations__"][k] = Type
-    new_type_dataclass: type[ObjectType] = dataclasses.dataclass(frozen=True)(
-        new_type_class
-    )
+    new_type_dataclass: type[ObjectType] = dataclasses.dataclass(frozen=True)(new_type_class)
     DESERIALIZED_OBJECT_TYPE_CLASSES[key] = new_type_dataclass
     return new_type_dataclass()
 
@@ -1344,10 +1275,7 @@ class Function(Type):
 
     @classmethod
     def from_dict(cls, json):
-        input_types = {
-            pname: TypeRegistry.type_from_dict(ptype)
-            for (pname, ptype) in json["inputTypes"].items()
-        }
+        input_types = {pname: TypeRegistry.type_from_dict(ptype) for (pname, ptype) in json["inputTypes"].items()}
         return cls(input_types, TypeRegistry.type_from_dict(json["outputType"]))
 
     def _to_dict(self):
@@ -1389,9 +1317,7 @@ class RefType(Type):
 
         obj_ref = ref_base.get_ref(obj)
         if obj_ref is None:
-            raise errors.WeaveSerializeError(
-                "save_instance invalid when ref is None for type: %s" % self
-            )
+            raise errors.WeaveSerializeError("save_instance invalid when ref is None for type: %s" % self)
         return obj_ref
 
     # TODO: Address this comment. I'm sure this introduced the same type
@@ -1456,9 +1382,7 @@ def is_optional(type_: Type) -> bool:
     if isinstance(type_, TaggedValueType):
         return is_optional(type_.value)
 
-    return isinstance(type_, UnionType) and any(
-        (none_type.assign_type(m)) for m in type_.members
-    )
+    return isinstance(type_, UnionType) and any((none_type.assign_type(m)) for m in type_.members)
 
 
 def simple_non_none(type_: Type) -> Type:
@@ -1485,9 +1409,7 @@ def non_none(type_: Type) -> Type:
 
     if is_optional(type_):
         type_ = typing.cast(UnionType, type_)
-        new_members = [
-            non_none(m) for m in type_.members if not none_type.assign_type(m)
-        ]
+        new_members = [non_none(m) for m in type_.members if not none_type.assign_type(m)]
         # Can happen if there are Nones and Tagged Nones
         if len(new_members) == 0:
             return Invalid()
@@ -1581,9 +1503,7 @@ def merge_types(a: Type, b: Type) -> Type:
         if a.__class__ == Float or b.__class__ == Float:
             return Float()
         return Int()
-    if isinstance(a, tagged_value_type.TaggedValueType) and isinstance(
-        b, tagged_value_type.TaggedValueType
-    ):
+    if isinstance(a, tagged_value_type.TaggedValueType) and isinstance(b, tagged_value_type.TaggedValueType):
         merged_tag_type: TypedDict = typing.cast(TypedDict, merge_types(a.tag, b.tag))
         merged_value_type: Type = merge_types(a.value, b.value)
         return tagged_value_type.TaggedValueType(merged_tag_type, merged_value_type)
@@ -1693,12 +1613,7 @@ def unknown_coalesce(in_type: Type) -> Type:
     elif isinstance(in_type, Dict):
         return Dict(in_type.key_type, unknown_coalesce(in_type.object_type))
     elif isinstance(in_type, TypedDict):
-        return TypedDict(
-            {
-                key: unknown_coalesce(value_type)
-                for key, value_type in in_type.property_types.items()
-            }
-        )
+        return TypedDict({key: unknown_coalesce(value_type) for key, value_type in in_type.property_types.items()})
     elif isinstance(in_type, TaggedValueType):
         return TaggedValueType(
             unknown_coalesce(in_type.tag),  # type: ignore
@@ -1720,20 +1635,14 @@ def _unknown_coalesce_on_union(u_type: UnionType) -> Type:
     # This helper function will remove all the unknowns from a a union's members,
     # then apply the `unknown_coalesce` function to each known member. This ensures
     # that each member is processed before comparing to it's peers.
-    known_members = [
-        unknown_coalesce(member) for member in _filter_unknowns(u_type.members)
-    ]
+    known_members = [unknown_coalesce(member) for member in _filter_unknowns(u_type.members)]
 
     if len(known_members) == 0:
         return UnknownType()
 
     final_types: list[Type] = []
     for ndx in range(len(known_members)):
-        final_types.append(
-            _merge_unknowns_of_type_with_types(
-                known_members[ndx], known_members[:ndx] + known_members[ndx + 1 :]
-            )
-        )
+        final_types.append(_merge_unknowns_of_type_with_types(known_members[ndx], known_members[:ndx] + known_members[ndx + 1 :]))
 
     return union(*final_types)
 
@@ -1752,12 +1661,7 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
 
     # If the current type itself is a union, then we need to recurse into it
     if isinstance(of_type, UnionType):
-        return union(
-            *[
-                _merge_unknowns_of_type_with_types(member, with_types)
-                for member in of_type.members
-            ]
-        )
+        return union(*[_merge_unknowns_of_type_with_types(member, with_types) for member in of_type.members])
 
     # if the current type is unknown, then we just return the next peer type.
     elif isinstance(of_type, UnknownType):
@@ -1765,27 +1669,28 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
 
     # Next, we filter down to peer types that have the same type class, and recurse
     # into each container type.
-    with_types = [
-        member for member in with_types if member.__class__ == of_type.__class__
-    ]
+    with_types = [member for member in with_types if member.__class__ == of_type.__class__]
     if isinstance(of_type, List):
         return List(
             _merge_unknowns_of_type_with_types(
-                of_type.object_type, [t.object_type for t in with_types]  # type: ignore
+                of_type.object_type,
+                [t.object_type for t in with_types],  # type: ignore
             )
         )
     elif isinstance(of_type, Dict):
         return Dict(
             of_type.key_type,
             _merge_unknowns_of_type_with_types(
-                of_type.value_type, [t.value_type for t in with_types]  # type: ignore
+                of_type.value_type,
+                [t.value_type for t in with_types],  # type: ignore
             ),
         )
     elif isinstance(of_type, TypedDict):
         return TypedDict(
             {
                 key: _merge_unknowns_of_type_with_types(
-                    value_type, [t.property_types.get(key, NoneType()) for t in with_types]  # type: ignore
+                    value_type,
+                    [t.property_types.get(key, NoneType()) for t in with_types],  # type: ignore
                 )
                 for key, value_type in of_type.property_types.items()
             }
@@ -1794,13 +1699,15 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
         return TaggedValueType(
             _merge_unknowns_of_type_with_types(of_type.tag, [t.tag for t in with_types]),  # type: ignore
             _merge_unknowns_of_type_with_types(
-                of_type.value, [t.value for t in with_types]  # type: ignore
+                of_type.value,
+                [t.value for t in with_types],  # type: ignore
             ),
         )
     elif isinstance(of_type, Const):
         return Const(
             _merge_unknowns_of_type_with_types(
-                of_type.val_type, [t.val_type for t in with_types]  # type: ignore
+                of_type.val_type,
+                [t.val_type for t in with_types],  # type: ignore
             ),
             of_type.value,
         )
@@ -1912,9 +1819,7 @@ def _map_leaf_types_null_safe(t: Type, fn: typing.Callable[[Type], Type]) -> Typ
     if isinstance(t, List):
         return List(_map_leaf_types_null_safe(t.object_type, fn))
     elif isinstance(t, TypedDict):
-        return TypedDict(
-            {k: _map_leaf_types_null_safe(v, fn) for k, v in t.property_types.items()}
-        )
+        return TypedDict({k: _map_leaf_types_null_safe(v, fn) for k, v in t.property_types.items()})
     elif isinstance(t, Dict):
         return Dict(t.key_type, _map_leaf_types_null_safe(t.object_type, fn))
     elif isinstance(t, ObjectType):

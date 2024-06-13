@@ -18,9 +18,7 @@ EditorType = typing.TypeVar("EditorType")
 
 @weave.type()
 class QueryCondition:
-    expression: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
+    expression: weave.Node[typing.Any] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
     editor: EditorType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 
 
@@ -36,9 +34,7 @@ class QueryConfig:
 class Query(panel.Panel):
     id = "Query"
     input_node: weave.Node[list[typing.Any]]
-    config: typing.Optional[QueryConfig] = dataclasses.field(
-        default_factory=lambda: None
-    )
+    config: typing.Optional[QueryConfig] = dataclasses.field(default_factory=lambda: None)
 
     def __init__(self, input_node, vars=None, config=None, **options):
         super().__init__(input_node=input_node, vars=vars)
@@ -53,10 +49,7 @@ class Query(panel.Panel):
                 pinnedRows={"": [0]},
             )
         if "conditions" in options:
-            conds = [
-                cond(weave_internal.make_var_node(self.input_node.type, "queryInput"))
-                for cond in options["conditions"]
-            ]
+            conds = [cond(weave_internal.make_var_node(self.input_node.type, "queryInput")) for cond in options["conditions"]]
             self.config.conditions = conds
 
     @weave.op(hidden=True)
@@ -72,15 +65,9 @@ class Query(panel.Panel):
 
         # Apply Filters
         table_node = self.input_node
-        if (
-            self.config
-            and self.config.tableState.preFilterFunction is not None
-            and self.config.tableState.preFilterFunction.type != weave.types.Invalid()
-        ):
+        if self.config and self.config.tableState.preFilterFunction is not None and self.config.tableState.preFilterFunction.type != weave.types.Invalid():
             table_node = weave.ops.List.filter(
                 table_node,
-                lambda row: weave_internal.call_fn(
-                    self.config.tableState.preFilterFunction, {"row": row}
-                ),
+                lambda row: weave_internal.call_fn(self.config.tableState.preFilterFunction, {"row": row}),
             )
         return table_node

@@ -10,9 +10,7 @@ from .. import weave_internal
 
 @weave.type()
 class WeaveLinkConfig:
-    to: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
+    to: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
     vars: typing.Dict[str, graph.Node] = dataclasses.field(default_factory=dict)
 
 
@@ -25,9 +23,7 @@ class WeaveLink(panel.Panel):
         self,
         input_node,
         # This is frame
-        to: typing.Callable[
-            [graph.VarNode, typing.Dict[str, graph.VarNode]], graph.Node
-        ],
+        to: typing.Callable[[graph.VarNode, typing.Dict[str, graph.VarNode]], graph.Node],
         vars: typing.Dict[str, graph.Node] = {},
         config=None,
     ):
@@ -42,10 +38,7 @@ class WeaveLink(panel.Panel):
         if self.config.vars:
             self.config.to = to_node(
                 input_node,
-                {
-                    var_name: weave_internal.make_var_node(node.type, var_name)
-                    for var_name, node in self.config.vars.items()
-                },
+                {var_name: weave_internal.make_var_node(node.type, var_name) for var_name, node in self.config.vars.items()},
             )
         else:
             self.config.to = to_node(input_node)

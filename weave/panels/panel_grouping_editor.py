@@ -17,13 +17,9 @@ class GroupingEditorConfig(typing.Generic[ExpressionType]):
 @weave.type()
 class GroupingEditor(panel.Panel):
     id = "GroupingEditor"
-    config: GroupingEditorConfig = dataclasses.field(
-        default_factory=GroupingEditorConfig
-    )
+    config: GroupingEditorConfig = dataclasses.field(default_factory=GroupingEditorConfig)
 
-    def __init__(
-        self, input_node=graph.VoidNode(), vars=None, config=None, **options
-    ) -> None:
+    def __init__(self, input_node=graph.VoidNode(), vars=None, config=None, **options) -> None:
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
         if self.config is None:

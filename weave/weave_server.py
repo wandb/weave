@@ -91,9 +91,7 @@ from weave import ops
 # A wandb fix should go out in 0.13.5.
 # TODO: remove this hack when wandb 0.13.5 is released.
 if os.environ.get("FLASK_DEBUG"):
-    print(
-        "!!! Weave server removing watchdog from sys.path for development mode. This could break other libraries"
-    )
+    print("!!! Weave server removing watchdog from sys.path for development mode. This could break other libraries")
     sys.modules["watchdog.observers"] = None  # type: ignore
 
 
@@ -190,10 +188,7 @@ def list_ops():
         if not environment.wandb_production():
             registry_mem.memory_registry.load_saved_ops()
             pass
-        if (
-            ops_cache is None
-            or ops_cache["updated_at"] < registry_mem.memory_registry.updated_at()
-        ):
+        if ops_cache is None or ops_cache["updated_at"] < registry_mem.memory_registry.updated_at():
             ops = registry_mem.memory_registry.list_ops()
             ret = []
             for op in ops:
@@ -222,9 +217,7 @@ class ResponseDict(typing.TypedDict):
     node_to_error: dict[int, int]
 
 
-def _exception_to_error_details(
-    e: Exception, sentry_id: typing.Union[str, None]
-) -> ErrorDetailsDict:
+def _exception_to_error_details(e: Exception, sentry_id: typing.Union[str, None]) -> ErrorDetailsDict:
     return {
         "error_type": type(e).__name__,
         "message": str(e),
@@ -254,17 +247,12 @@ def _value_or_errors_to_response(
             data.append(val)
     return {
         "data": data,
-        "errors": [
-            _exception_to_error_details(k, e_sentry_id)
-            for k, (e_ndx, e_sentry_id) in error_lookup.items()
-        ],
+        "errors": [_exception_to_error_details(k, e_sentry_id) for k, (e_ndx, e_sentry_id) in error_lookup.items()],
         "node_to_error": node_errors,
     }
 
 
-def _log_errors(
-    processed_response: ResponseDict, nodes: value_or_error.ValueOrErrors[graph.Node]
-):
+def _log_errors(processed_response: ResponseDict, nodes: value_or_error.ValueOrErrors[graph.Node]):
     errors: list[dict] = []
 
     for error in processed_response["errors"]:
@@ -355,8 +343,7 @@ def execute():
             if root_span:
                 root_span.set_tag(
                     "profile_url",
-                    "http://localhost:8080/snakeviz/"
-                    + urllib.parse.quote(profile_filename),
+                    "http://localhost:8080/snakeviz/" + urllib.parse.quote(profile_filename),
                 )
 
     fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
@@ -396,9 +383,7 @@ def send_local_file(path):
     # path is given relative to the FS root. check to see that path is a subdirectory of the
     # local artifacts path. if not, return 403. then if there is a cache scope function defined
     # call it to make sure we have access to the path
-    abspath = "/" / pathlib.Path(
-        path
-    )  # add preceding slash as werkzeug strips this by default and it is reappended below in send_from_directory
+    abspath = "/" / pathlib.Path(path)  # add preceding slash as werkzeug strips this by default and it is reappended below in send_from_directory
     try:
         local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).absolute()
     except errors.WeaveAccessDeniedError:

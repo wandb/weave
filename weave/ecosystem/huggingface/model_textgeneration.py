@@ -56,12 +56,8 @@ class FullTextGenerationPanel(weave.Panel):
         return weave.panels.Group(
             preferHorizontal=True,
             items={
-                "input": weave.panels.LabeledItem(
-                    label="input", item=output.model_input
-                ),
-                "output": weave.panels.LabeledItem(
-                    label="output", item=output.model_output
-                ),
+                "input": weave.panels.LabeledItem(label="input", item=output.model_input),
+                "output": weave.panels.LabeledItem(label="output", item=output.model_output),
             },
         )
 
@@ -94,14 +90,9 @@ class HFModelTextGeneration(hfmodel.HFModel):
     #    method. Need to find the docs for each of those.
     #    It'd be nice to call these different types, and therefore have different signatures
     #    for this call!
-    def call_list(
-        self, input: typing.List[str]
-    ) -> typing.List[FullTextGenerationPipelineOutput]:
+    def call_list(self, input: typing.List[str]) -> typing.List[FullTextGenerationPipelineOutput]:
         output = map(self.pipeline(), input)
-        return [
-            FullTextGenerationPipelineOutput(self, i, o)
-            for (i, o) in zip(input, output)
-        ]
+        return [FullTextGenerationPipelineOutput(self, i, o) for (i, o) in zip(input, output)]
 
 
 HFModelTextGenerationType.instance_classes = HFModelTextGeneration

@@ -53,15 +53,10 @@ def _get_weave_type_with_refs(obj: typing.Any):
     try:
         return types.type_of_with_refs(obj)
     except errors.WeaveTypeError as e:
-        raise errors.WeaveSerializeError(
-            "weave type error during serialization for object: %s. %s"
-            % (obj, str(e.args))
-        )
+        raise errors.WeaveSerializeError("weave type error during serialization for object: %s. %s" % (obj, str(e.args)))
 
 
-def _ensure_object_components_are_published(
-    obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
-):
+def _ensure_object_components_are_published(obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact):
     from weave.mappers_publisher import map_to_python_remote
 
     mapper = map_to_python_remote(wb_type, artifact)
@@ -72,19 +67,14 @@ def _assert_valid_name_part(part: typing.Optional[str] = None):
     if part is None:
         return
     if not re.match(r"^[a-zA-Z0-9_\-]+$", part):
-        raise ValueError(
-            "Invalid name part %s. Must be alphanumeric, dashes, or underscores." % part
-        )
+        raise ValueError("Invalid name part %s. Must be alphanumeric, dashes, or underscores." % part)
 
 
 def _assert_valid_entity_name(part: typing.Optional[str] = None):
     if part is None:
         return
     if not re.match(r"^[a-z0-9_\-]+$", part):
-        raise ValueError(
-            "Invalid entity name %s. Must be lowercase, digits, dashes, or underscores."
-            % part
-        )
+        raise ValueError("Invalid entity name %s. Must be lowercase, digits, dashes, or underscores." % part)
 
 
 def _assert_valid_project_name(part: typing.Optional[str] = None):
@@ -93,9 +83,7 @@ def _assert_valid_project_name(part: typing.Optional[str] = None):
     if len(part) > 128:
         raise ValueError("Invalid project name %s. Must be <= 128 characters." % part)
     if re.match(r"[\\#?%:]", part):
-        raise ValueError(
-            "Invalid project name %s. Can not contain \\, #, ?, %%, or :" % part
-        )
+        raise ValueError("Invalid project name %s. Can not contain \\, #, ?, %%, or :" % part)
 
 
 def _assert_valid_artifact_name(part: typing.Optional[str] = None):
@@ -104,10 +92,7 @@ def _assert_valid_artifact_name(part: typing.Optional[str] = None):
     if len(part) > 128:
         raise ValueError("Invalid artifact name %s. Must be <= 128 characters." % part)
     if not re.match(r"^[a-zA-Z0-9_\-.]+$", part):  # from W&B Artifacts
-        raise ValueError(
-            "Invalid artifact name %s. Must be alphanumeric, periods, dashes, or underscores."
-            % part
-        )
+        raise ValueError("Invalid artifact name %s. Must be alphanumeric, periods, dashes, or underscores." % part)
 
 
 class PublishTargetProject(typing.TypedDict):
@@ -116,9 +101,7 @@ class PublishTargetProject(typing.TypedDict):
     project_name: str
 
 
-_pubish_target_project: contextvars.ContextVar[
-    typing.Optional[typing.Optional[PublishTargetProject]]
-] = contextvars.ContextVar("publish_target_project", default=None)
+_pubish_target_project: contextvars.ContextVar[typing.Optional[typing.Optional[PublishTargetProject]]] = contextvars.ContextVar("publish_target_project", default=None)
 
 
 @contextlib.contextmanager
@@ -135,9 +118,7 @@ def get_publish_target_project() -> typing.Optional[PublishTargetProject]:
 # Keep a cache of published local ref -> wandb ref. This is used to ensure
 # we publish any needed op defs at the beginning of graph execution one time,
 # to avoid parallel publishing them many times later in mapped operations.
-PUBLISH_CACHE_BY_LOCAL_ART: dict[
-    artifact_local.LocalArtifactRef, artifact_wandb.WandbArtifactRef
-] = {}
+PUBLISH_CACHE_BY_LOCAL_ART: dict[artifact_local.LocalArtifactRef, artifact_wandb.WandbArtifactRef] = {}
 
 
 def _direct_publish(
@@ -190,9 +171,7 @@ def _direct_publish(
     artifact_fs.update_weave_meta(weave_type, artifact)
     ref = artifact.set("obj", weave_type, obj)
     if not isinstance(ref, artifact_wandb.WandbArtifactRef):
-        raise errors.WeaveSerializeError(
-            "Expected a WandbArtifactRef, got %s" % type(ref)
-        )
+        raise errors.WeaveSerializeError("Expected a WandbArtifactRef, got %s" % type(ref))
 
     # Only save if we have a ref into the artifact we created above. Otherwise
     # nothing new was created, so just return the existing ref.
@@ -342,9 +321,7 @@ def all_objects():
     return [r[1] for r in sorted(result)]
 
 
-def objects(
-    of_type: types.Type, alias: str = "latest"
-) -> typing.List[artifact_local.LocalArtifactRef]:
+def objects(of_type: types.Type, alias: str = "latest") -> typing.List[artifact_local.LocalArtifactRef]:
     result = []
     for art_name in os.listdir(artifact_local.local_artifact_dir()):
         try:
@@ -378,9 +355,7 @@ def recursively_unwrap_arrow(obj):
     return obj
 
 
-def _default_ref_persister_artifact(
-    type: types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]
-) -> artifact_base.Artifact:
+def _default_ref_persister_artifact(type: types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]) -> artifact_base.Artifact:
     fs_art = artifact_local.LocalArtifact(type.name, "latest")
     # Save all the reffed objects into the new artifact.
     for mem_ref in refs:
@@ -393,9 +368,7 @@ def _default_ref_persister_artifact(
 def to_python(
     obj: typing.Any,
     wb_type: typing.Optional[types.Type] = None,
-    ref_persister: typing.Callable[
-        [types.Type, typing.Iterable[artifact_base.ArtifactRef]], artifact_base.Artifact
-    ] = _default_ref_persister_artifact,
+    ref_persister: typing.Callable[[types.Type, typing.Iterable[artifact_base.ArtifactRef]], artifact_base.Artifact] = _default_ref_persister_artifact,
 ) -> dict:
     if wb_type is None:
         wb_type = types.type_of_with_refs(obj)
@@ -464,26 +437,16 @@ def to_json_with_refs(
     elif isinstance(wb_type, types.TypedDict):
         if not isinstance(obj, dict):
             raise ValueError("Expected dict for TypedDict, got %s" % type(obj).__name__)
-        return {
-            k: to_json_with_refs(
-                v, artifact, path + [k], wb_type=wb_type.property_types[k]
-            )
-            for (k, v) in obj.items()
-        }
+        return {k: to_json_with_refs(v, artifact, path + [k], wb_type=wb_type.property_types[k]) for (k, v) in obj.items()}
     elif isinstance(wb_type, types.List):
         if not isinstance(obj, list):
             raise ValueError("Expected list for List, got %s" % type(obj).__name__)
-        return [
-            to_json_with_refs(v, artifact, path + [str(i)], wb_type=wb_type.object_type)
-            for i, v in enumerate(obj)
-        ]
+        return [to_json_with_refs(v, artifact, path + [str(i)], wb_type=wb_type.object_type) for i, v in enumerate(obj)]
     elif isinstance(obj, op_def.OpDef):
         try:
             gc = graph_client_context.require_graph_client()
         except errors.WeaveInitError:
-            raise errors.WeaveSerializeError(
-                "Can't serialize OpDef with a client initialization"
-            )
+            raise errors.WeaveSerializeError("Can't serialize OpDef with a client initialization")
         return gc.save_object(obj, obj.name, "latest")
     else:
         res = artifact.set("/".join(path), wb_type, obj)
@@ -525,9 +488,7 @@ def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
     if artifact is None:
         artifact = artifact_mem.MemArtifact()
 
-    mapper = mappers_python.map_to_python(
-        wb_type, artifact, mapper_options={"use_stable_refs": False}
-    )
+    mapper = mappers_python.map_to_python(wb_type, artifact, mapper_options={"use_stable_refs": False})
     return mapper.apply(obj)
 
 
@@ -539,8 +500,6 @@ def artifact_path_ref(artifact_path: str) -> artifact_base.ArtifactRef:
     """
     loading_artifact = artifact_fs.get_loading_artifact()
     if loading_artifact is None:
-        raise errors.WeaveSerializeError(
-            "artifact_path_ref can only be used while loading an artifact."
-        )
+        raise errors.WeaveSerializeError("artifact_path_ref can only be used while loading an artifact.")
 
     return loading_artifact.ref_from_local_str(artifact_path)

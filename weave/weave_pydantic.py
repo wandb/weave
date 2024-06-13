@@ -4,9 +4,7 @@ from . import infer_types
 import enum
 
 
-def weave_type_to_pydantic(
-    property_types: dict[str, types.Type], name: str
-) -> BaseModel:
+def weave_type_to_pydantic(property_types: dict[str, types.Type], name: str) -> BaseModel:
     field_types = {}
     for k, v in property_types.items():
         if isinstance(v, types.TypedDict):

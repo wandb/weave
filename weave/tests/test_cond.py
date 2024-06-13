@@ -10,9 +10,7 @@ def test_cond_basic():
 
 def test_cond_mapped_vector():
     conds = weave.save(
-        ops_arrow.to_arrow(
-            [{"a": True, "b": False}, {"a": False, "b": False}, {"a": False, "b": True}]
-        ),
+        ops_arrow.to_arrow([{"a": True, "b": False}, {"a": False, "b": False}, {"a": False, "b": True}]),
         "conds",
     )
     assert weave.use(conds.cond({"a": 5, "b": 6})).to_pylist_raw() == [5, None, 6]
@@ -20,9 +18,7 @@ def test_cond_mapped_vector():
 
 def test_cond_mapped_vector_arr_value():
     conds = weave.save(
-        ops_arrow.to_arrow(
-            [{"a": True, "b": False}, {"a": False, "b": False}, {"a": False, "b": True}]
-        ),
+        ops_arrow.to_arrow([{"a": True, "b": False}, {"a": False, "b": False}, {"a": False, "b": True}]),
         "conds",
     )
     assert weave.use(conds.cond({"a": [1, 2], "b": [5, 6]})).to_pylist_raw() == [

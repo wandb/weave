@@ -11,15 +11,9 @@ from . import weave_plotly
 
 @weave.type()
 class ScatterConfig:
-    x_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
-    y_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
-    label_fn: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
+    x_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
+    y_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
+    label_fn: weave.Node[typing.Any] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
 
 
 @weave.type()
@@ -35,13 +29,16 @@ class Scatter(weave.Panel):
         unnested = weave.ops.unnest(input_node)
         return ScatterConfig(
             x_fn=weave_internal.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item  # type: ignore
+                {"item": unnested.type.object_type},
+                lambda item: item,  # type: ignore
             ),
             y_fn=weave_internal.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item  # type: ignore
+                {"item": unnested.type.object_type},
+                lambda item: item,  # type: ignore
             ),
             label_fn=weave_internal.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item  # type: ignore
+                {"item": unnested.type.object_type},
+                lambda item: item,  # type: ignore
             ),
         )
 
@@ -51,15 +48,9 @@ class Scatter(weave.Panel):
         config = typing.cast(ScatterConfig, self.config)
         return weave.panels.Group(
             items={
-                "x_fn": weave.panels.LabeledItem(
-                    label="x", item=weave.panels.FunctionEditor(config.x_fn)
-                ),
-                "y_fn": weave.panels.LabeledItem(
-                    label="y", item=weave.panels.FunctionEditor(config.y_fn)
-                ),
-                "label_fn": weave.panels.LabeledItem(
-                    label="label", item=weave.panels.FunctionEditor(config.label_fn)
-                ),
+                "x_fn": weave.panels.LabeledItem(label="x", item=weave.panels.FunctionEditor(config.x_fn)),
+                "y_fn": weave.panels.LabeledItem(label="y", item=weave.panels.FunctionEditor(config.y_fn)),
+                "label_fn": weave.panels.LabeledItem(label="label", item=weave.panels.FunctionEditor(config.label_fn)),
             }
         )
 
@@ -71,12 +62,8 @@ class Scatter(weave.Panel):
         unnested = weave.ops.unnest(input_node)
         if (
             not weave.types.optional(weave.types.Float()).assign_type(config.x_fn.type)
-            or not weave.types.optional(weave.types.Float()).assign_type(
-                config.y_fn.type
-            )
-            or not weave.types.optional(weave.types.String()).assign_type(
-                config.label_fn.type
-            )
+            or not weave.types.optional(weave.types.Float()).assign_type(config.y_fn.type)
+            or not weave.types.optional(weave.types.String()).assign_type(config.label_fn.type)
         ):
             return weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
         if config.label_fn.type == weave.types.Invalid():
@@ -100,22 +87,12 @@ class Scatter(weave.Panel):
             lambda item: weave.ops.Boolean.bool_and(
                 weave.ops.Boolean.bool_and(
                     weave.ops.Boolean.bool_and(
-                        config.x_fn(item)
-                        > weave.ops.TypedDict.pick(
-                            self._renderAsPanel.config.selected, "xMin"
-                        ),
-                        config.x_fn(item)
-                        < weave.ops.TypedDict.pick(
-                            self._renderAsPanel.config.selected, "xMax"
-                        ),
+                        config.x_fn(item) > weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "xMin"),
+                        config.x_fn(item) < weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "xMax"),
                     ),
-                    config.y_fn(item)
-                    > weave.ops.TypedDict.pick(
-                        self._renderAsPanel.config.selected, "yMin"
-                    ),
+                    config.y_fn(item) > weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "yMin"),
                 ),
-                config.y_fn(item)
-                < weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "yMax"),
+                config.y_fn(item) < weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "yMax"),
             )
         )
         return weave_internal.use(filtered)

@@ -164,9 +164,7 @@ def make_rpt_op(plot_name, output_row_type):
         hidden=True,
     )
     def root_rpt(repoName):
-        raise errors.WeaveGQLCompileError(
-            "root-allProjects should not be executed directly. If you see this error, it is a bug in the Weave compiler."
-        )
+        raise errors.WeaveGQLCompileError("root-allProjects should not be executed directly. If you see this error, it is a bug in the Weave compiler.")
 
     return root_rpt
 

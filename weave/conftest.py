@@ -117,9 +117,7 @@ def pre_post_each_test(test_artifact_dir, caplog):
     caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
     # Tests rely on full cache mode right now.
     os.environ["WEAVE_CACHE_MODE"] = "full"
-    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
-        pathlib.Path(__file__).parent.parent / "wb_schema.gql"
-    )
+    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(pathlib.Path(__file__).parent.parent / "wb_schema.gql")
     try:
         shutil.rmtree(test_artifact_dir)
     except (FileNotFoundError, OSError):
@@ -317,24 +315,18 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     weave_server_flag = request.config.getoption("--weave-server")
     tsi: trace_server_interface.TraceServerInterface
     if weave_server_flag == "sqlite":
-        sql_lite_server = sqlite_trace_server.SqliteTraceServer(
-            "file::memory:?cache=shared"
-        )
+        sql_lite_server = sqlite_trace_server.SqliteTraceServer("file::memory:?cache=shared")
         sql_lite_server.drop_tables()
         sql_lite_server.setup_tables()
         tsi = sql_lite_server
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(use_async_insert=False)
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
         tsi = ch_server
     elif weave_server_flag.startswith("http"):
-        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
-            weave_server_flag
-        )
+        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(weave_server_flag)
         tsi = remote_server
     elif weave_server_flag == ("prod"):
         inited_client = weave_init.init_weave("dev_testing")

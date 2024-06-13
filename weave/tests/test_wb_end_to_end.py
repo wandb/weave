@@ -51,10 +51,7 @@ def _test_basic_publish(user_fixture):
     # that changes to the publish flow will bread this test
     # and you might need to update how you get the ref.
     uri = ref.uri
-    assert (
-        uri
-        == f"wandb-artifact:///{user_fixture.username}/weave/list:0cdf3358dc939f961ca9/obj"
-    )
+    assert uri == f"wandb-artifact:///{user_fixture.username}/weave/list:0cdf3358dc939f961ca9/obj"
     assert weave.ref_base.Ref.from_str(uri).get() == [1, 2, 3]
 
 
@@ -68,9 +65,7 @@ def test_run_histories(user_by_api_key_in_env):
     run.log({"a": 2})
     run.finish()
 
-    history_node = (
-        weave.ops.project(run.entity, run.project).runs().history().concat()["a"]
-    )
+    history_node = weave.ops.project(run.entity, run.project).runs().history().concat()["a"]
     history = weave.use(history_node)
 
     # Runs return in reverse chronological order

@@ -30,9 +30,7 @@ def test_trace():
     assert res == 48
     mult_run = trace_legacy.get_obj_creator(storage._get_ref(res))
     assert mult_run.op_name == "number-mult"
-    assert re.match(
-        "^local-artifact://.*run-number-add-.*-output:.*$", str(mult_run.inputs["lhs"])
-    )
+    assert re.match("^local-artifact://.*run-number-add-.*-output:.*$", str(mult_run.inputs["lhs"]))
     assert mult_run.inputs["rhs"] == 4
     add_run = trace_legacy.get_obj_creator(mult_run.inputs["lhs"])
     assert add_run.op_name == "number-add"

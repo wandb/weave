@@ -39,9 +39,7 @@ class UMAPOptions(TypedDict):
 
 
 @weave.op()
-def umap_project(
-    data: list[list[float]], options: typing.Optional[UMAPOptions]
-) -> ops_arrow.ArrowWeaveList[list[float]]:
+def umap_project(data: list[list[float]], options: typing.Optional[UMAPOptions]) -> ops_arrow.ArrowWeaveList[list[float]]:
     if options == None:
         options = {}  # type: ignore
     model = get_umap().UMAP(**options)

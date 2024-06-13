@@ -36,9 +36,7 @@ class VectorizeError(errors.WeaveBaseError):
 def make_vectorized_object_constructor(constructor_op_name: str) -> None:
     constructor_op = registry_mem.memory_registry.get_op(constructor_op_name)
     if callable(constructor_op.raw_output_type):
-        raise errors.WeaveInternalError(
-            "Unexpected. All object type constructors have fixed return types."
-        )
+        raise errors.WeaveInternalError("Unexpected. All object type constructors have fixed return types.")
 
     type_name = constructor_op.raw_output_type.name
     vectorized_constructor_op_name = f'ArrowWeaveList-{type_name.replace("-", "_")}'
@@ -62,9 +60,7 @@ def make_vectorized_object_constructor(constructor_op_name: str) -> None:
             ot = output_type({"attributes": types.TypeRegistry.type_of(attributes)})
         else:
             ot = output_type
-        return ArrowWeaveList(
-            attributes._arrow_data, ot.object_type, attributes._artifact
-        )
+        return ArrowWeaveList(attributes._arrow_data, ot.object_type, attributes._artifact)
 
 
 def _create_manually_mapped_op(
@@ -73,9 +69,7 @@ def _create_manually_mapped_op(
     vectorized_keys: set[str],
 ):
     if len(vectorized_keys) == 1:
-        return _create_manually_mapped_op_singular(
-            op_name, inputs, list(vectorized_keys)[0]
-        )
+        return _create_manually_mapped_op_singular(op_name, inputs, list(vectorized_keys)[0])
     op = registry_mem.memory_registry.get_op(op_name)
     inputs = _vectorized_inputs_as_awl_non_vectorized_as_lists(inputs, vectorized_keys)
 
@@ -89,9 +83,7 @@ def _create_manually_mapped_op(
     map_op = registry_mem.memory_registry.get_op("map")
     return map_op(
         input_arr,
-        lambda input_dict: op(
-            **{k: input_dict[k] for k in mapped_inputs}, **rest_inputs
-        ),
+        lambda input_dict: op(**{k: input_dict[k] for k in mapped_inputs}, **rest_inputs),
     )
 
 
@@ -109,9 +101,7 @@ def _create_manually_mapped_op_singular(
     # AWL.groupby().map(lambda x: x.groupby()) will correctly keep all of the data
     # in arrow and use the arrow groupby for the inner call.
 
-    inputs = _vectorized_inputs_as_awl_non_vectorized_as_lists(
-        inputs, set([vectorized_key])
-    )
+    inputs = _vectorized_inputs_as_awl_non_vectorized_as_lists(inputs, set([vectorized_key]))
 
     rest_inputs = {k: v for k, v in inputs.items() if k != vectorized_key}
 
@@ -140,10 +130,7 @@ def _ensure_list_like_node_is_awl(node: graph.Node) -> graph.Node:
     if _type_is_assignable_to_awl_list(node.type):
         return node
     elif _type_is_assignable_to_py_list_not_awl_list(node.type):
-        if (
-            isinstance(node, graph.OutputNode)
-            and node.from_op.name == "ArrowWeaveList-to_py"
-        ):
+        if isinstance(node, graph.OutputNode) and node.from_op.name == "ArrowWeaveList-to_py":
             return list(node.from_op.inputs.values())[0]
         else:
             return convert_ops.list_to_arrow(node)
@@ -159,10 +146,7 @@ def _ensure_list_like_node_is_list(node: graph.Node) -> graph.Node:
     if _type_is_assignable_to_py_list_not_awl_list(node.type):
         return node
     elif _type_is_assignable_to_awl_list(node.type):
-        if (
-            isinstance(node, graph.OutputNode)
-            and node.from_op.name == "op-list_to_arrow"
-        ):
+        if isinstance(node, graph.OutputNode) and node.from_op.name == "op-list_to_arrow":
             return list(node.from_op.inputs.values())[0]
         else:
             return convert_ops.to_py(node)
@@ -183,31 +167,18 @@ def _process_vectorized_inputs(
         on_path = identity
     if off_path is None:
         off_path = identity
-    return {
-        k: (on_path(in_node) if k in vectorized_keys else off_path(in_node))
-        for k, in_node in inputs.items()
-    }
+    return {k: (on_path(in_node) if k in vectorized_keys else off_path(in_node)) for k, in_node in inputs.items()}
 
 
-def _vectorized_inputs_as_list(
-    inputs: dict[str, graph.Node], vectorized_keys: set[str]
-) -> dict[str, graph.Node]:
-    return _process_vectorized_inputs(
-        inputs, vectorized_keys, on_path=_ensure_list_like_node_is_list
-    )
+def _vectorized_inputs_as_list(inputs: dict[str, graph.Node], vectorized_keys: set[str]) -> dict[str, graph.Node]:
+    return _process_vectorized_inputs(inputs, vectorized_keys, on_path=_ensure_list_like_node_is_list)
 
 
-def _vectorized_inputs_as_awl(
-    inputs: dict[str, graph.Node], vectorized_keys: set[str]
-) -> dict[str, graph.Node]:
-    return _process_vectorized_inputs(
-        inputs, vectorized_keys, on_path=_ensure_list_like_node_is_awl
-    )
+def _vectorized_inputs_as_awl(inputs: dict[str, graph.Node], vectorized_keys: set[str]) -> dict[str, graph.Node]:
+    return _process_vectorized_inputs(inputs, vectorized_keys, on_path=_ensure_list_like_node_is_awl)
 
 
-def _vectorized_inputs_as_awl_non_vectorized_as_lists(
-    inputs: dict[str, graph.Node], vectorized_keys: set[str]
-) -> dict[str, graph.Node]:
+def _vectorized_inputs_as_awl_non_vectorized_as_lists(inputs: dict[str, graph.Node], vectorized_keys: set[str]) -> dict[str, graph.Node]:
     return _process_vectorized_inputs(
         inputs,
         vectorized_keys,
@@ -236,12 +207,7 @@ def _vectorize_lambda_output_node(node: graph.OutputNode, vectorized_keys: set[s
 
 
 def _is_lambda_output_node(node: graph.OutputNode):
-    return (
-        node.from_op.name.endswith("map")
-        or node.from_op.name.endswith("groupby")
-        or node.from_op.name.endswith("filter")
-        or node.from_op.name.endswith("sort")
-    )
+    return node.from_op.name.endswith("map") or node.from_op.name.endswith("groupby") or node.from_op.name.endswith("filter") or node.from_op.name.endswith("sort")
 
 
 def _is_non_simd_node(node: graph.OutputNode, vectorized_keys: set[str]):
@@ -266,14 +232,10 @@ def _is_non_simd_node(node: graph.OutputNode, vectorized_keys: set[str]):
         "numbers-max",  # this is now SIMD
     ]
     first_arg_is_vectorized = list(node.from_op.inputs.keys())[0] in vectorized_keys
-    return first_arg_is_vectorized and any(
-        node.from_op.name.endswith(op_name) for op_name in non_vectorized_awl_op_names
-    )
+    return first_arg_is_vectorized and any(node.from_op.name.endswith(op_name) for op_name in non_vectorized_awl_op_names)
 
 
-def _safe_get_op_for_inputs(
-    name: str, inputs: dict[str, graph.Node]
-) -> typing.Optional[op_def.OpDef]:
+def _safe_get_op_for_inputs(name: str, inputs: dict[str, graph.Node]) -> typing.Optional[op_def.OpDef]:
     try:
         return dispatch.get_op_for_inputs(name, {k: v.type for k, v in inputs.items()})
     except errors.WeaveDispatchError:
@@ -298,9 +260,7 @@ def _safe_get_weavified_op(op: op_def.OpDef) -> typing.Optional[graph.Node]:
 def _vectorize_list_special_case(node_name, node_inputs, vectorized_keys):
     # Unfortunately, we need to check to see if the types are all the same
     # else arrow cannot make the list.
-    possible_inputs = _vectorized_inputs_as_awl_non_vectorized_as_lists(
-        node_inputs, vectorized_keys
-    )
+    possible_inputs = _vectorized_inputs_as_awl_non_vectorized_as_lists(node_inputs, vectorized_keys)
     running_type = None
     is_valid = True
     for v in possible_inputs.values():
@@ -426,41 +386,29 @@ def vectorize(
         # appropriately. See comments in header of function
         if node_name == "dict":
             op = registry_mem.memory_registry.get_op("ArrowWeaveList-vectorizedDict")
-            return op.lazy_call(
-                **_vectorized_inputs_as_awl_non_vectorized_as_lists(
-                    node_inputs, vectorized_keys
-                )
-            )
+            return op.lazy_call(**_vectorized_inputs_as_awl_non_vectorized_as_lists(node_inputs, vectorized_keys))
         if node_name == "list":
             return _vectorize_list_special_case(node_name, node_inputs, vectorized_keys)
 
         if node_name == "merge":
-            return _vectorize_merge_special_case(
-                node_name, node_inputs, vectorized_keys
-            )
+            return _vectorize_merge_special_case(node_name, node_inputs, vectorized_keys)
 
         # 3. In the case of `Object-__getattr__`, we need to special case it will only work when the first arg is AWL
         # and the second is a string:
         if node_name == "Object-__getattr__":
             arg_names = list(node_inputs.keys())
             if arg_names[0] in vectorized_keys and arg_names[1] not in vectorized_keys:
-                op = registry_mem.memory_registry.get_op(
-                    "ArrowWeaveListObject-__vectorizedGetattr__"
-                )
+                op = registry_mem.memory_registry.get_op("ArrowWeaveListObject-__vectorizedGetattr__")
                 return op.lazy_call(
                     **{
-                        arg_names[0]: _ensure_list_like_node_is_awl(
-                            node_inputs[arg_names[0]]
-                        ),
+                        arg_names[0]: _ensure_list_like_node_is_awl(node_inputs[arg_names[0]]),
                         arg_names[1]: node_inputs[arg_names[1]],
                     }
                 )
 
         input0_name = list(node_inputs.keys())[0]
         input0 = list(node_inputs.values())[0]
-        if input0_name in vectorized_keys and types.List(
-            types.optional(types.List())
-        ).assign_type(input0.type):
+        if input0_name in vectorized_keys and types.List(types.optional(types.List())).assign_type(input0.type):
             if node_name.endswith("index") or node_name.endswith("__getitem__"):
                 inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
                 return arraylist_ops.listindex(*inputs_as_awl.values())
@@ -483,17 +431,13 @@ def vectorize(
         if node_name == "dropna":
             arg_names = list(node_inputs.keys())
             if arg_names[0] in vectorized_keys:
-                op = registry_mem.memory_registry.get_op(
-                    "ArrowWeaveListList-vectorizedDropna"
-                )
+                op = registry_mem.memory_registry.get_op("ArrowWeaveListList-vectorizedDropna")
                 inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
                 return op.lazy_call(*inputs_as_awl.values())
         elif node_name.endswith("isNone"):
             arg_names = list(node_inputs.keys())
             if arg_names[0] in vectorized_keys:
-                op = registry_mem.memory_registry.get_op(
-                    "ArrowWeaveList-vectorizedIsNone"
-                )
+                op = registry_mem.memory_registry.get_op("ArrowWeaveList-vectorizedIsNone")
                 inputs_as_awl = _vectorized_inputs_as_awl(node_inputs, vectorized_keys)
                 return op.lazy_call(*inputs_as_awl.values())
         elif node_name.endswith("-equal") or node_name.endswith("-notEqual"):
@@ -533,9 +477,7 @@ def vectorize(
         maybe_weavified_op = _safe_get_weavified_op(node_op)
         if maybe_weavified_op is not None:
             with_respect_to = None  # TODO: only vectorize the vectorization path!
-            vectorized = vectorize(
-                maybe_weavified_op, with_respect_to, stack_depth=stack_depth + 1
-            )
+            vectorized = vectorize(maybe_weavified_op, with_respect_to, stack_depth=stack_depth + 1)
             return weave_internal.call_fn(vectorized, inputs_as_awl)
 
         # Part 3: Attempt to dispatch using the list-like inputs (this is preferred to the final case)
@@ -549,9 +491,7 @@ def vectorize(
             # TODO: other arguments may also be vectorized. In that case this will crash
             input_vals = list(node_inputs.values())
             map_each_op = registry_mem.memory_registry.get_op("ArrowWeaveList-mapEach")
-            return map_each_op(
-                input_vals[0], lambda x: node_op.derived_from(x, *input_vals[1:])
-            )
+            return map_each_op(input_vals[0], lambda x: node_op.derived_from(x, *input_vals[1:]))
         # If an op is already an arrow version, we may still need to use mapeach
         # to lift it to another dimension. This needs to be generalized I think.
         # Added for now for timeseries plot.
@@ -582,9 +522,7 @@ def vectorize(
                 node_inputs,
                 vectorized_keys,
             )
-            message = (
-                f"Encountered non-dispatchable op ({node_name}) during vectorization."
-            )
+            message = f"Encountered non-dispatchable op ({node_name}) during vectorization."
             message += "This is likely due to vectorization path of the function not leading to the"
             message += "first parameter. Bailing out to manual mapping"
             logging.warning(message)
@@ -610,9 +548,7 @@ def vectorize(
             return new_node
         elif isinstance(node, graph.VarNode):
             # Vectorize variable
-            if with_respect_to is None or any(
-                node is wrt_node for wrt_node in with_respect_to
-            ):
+            if with_respect_to is None or any(node is wrt_node for wrt_node in with_respect_to):
                 new_node = graph.VarNode(ArrowWeaveListType(node.type), node.name)
                 already_vectorized_nodes.add(new_node)
                 return new_node
@@ -624,16 +560,12 @@ def vectorize(
         else:
             raise errors.WeaveInternalError("Unexpected node: %s" % node)
 
-    weave_fn = graph.map_nodes_top_level(
-        [weave_fn], ensure_object_constructors_created
-    )[0]
+    weave_fn = graph.map_nodes_top_level([weave_fn], ensure_object_constructors_created)[0]
     weave_fn = graph.map_nodes_top_level([weave_fn], expand_nodes)[0]
     return graph.map_nodes_top_level([weave_fn], vectorize_along_wrt_paths)[0]
 
 
-_raise_on_python_bailout: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "_raise_on_python_bailout", default=False
-)
+_raise_on_python_bailout: contextvars.ContextVar[bool] = contextvars.ContextVar("_raise_on_python_bailout", default=False)
 
 
 def _should_raise_on_python_bailout() -> bool:
@@ -649,9 +581,7 @@ def raise_on_python_bailout():
         _raise_on_python_bailout.reset(token)
 
 
-def _call_and_ensure_awl(
-    awl: ArrowWeaveList, called: graph.OutputNode
-) -> ArrowWeaveList:
+def _call_and_ensure_awl(awl: ArrowWeaveList, called: graph.OutputNode) -> ArrowWeaveList:
     from .. import compile
 
     with compile.disable_compile():
@@ -683,9 +613,7 @@ def _call_and_ensure_awl(
     return res
 
 
-def _call_vectorized_fn_node_maybe_awl(
-    awl: ArrowWeaveList, vectorized_fn: graph.OutputNode
-) -> graph.OutputNode:
+def _call_vectorized_fn_node_maybe_awl(awl: ArrowWeaveList, vectorized_fn: graph.OutputNode) -> graph.OutputNode:
     index_awl: ArrowWeaveList[int] = ArrowWeaveList(pa.array(np.arange(len(awl))))
     row_type = ArrowWeaveListType(awl.object_type)
     try:
@@ -693,9 +621,7 @@ def _call_vectorized_fn_node_maybe_awl(
             vectorized_fn,
             {
                 "row": weave_internal.make_const_node(row_type, awl),
-                "index": weave_internal.make_const_node(
-                    ArrowWeaveListType(types.Int()), index_awl
-                ),
+                "index": weave_internal.make_const_node(ArrowWeaveListType(types.Int()), index_awl),
             },
         )
     except errors.WeaveMissingVariableError as e:
@@ -703,16 +629,12 @@ def _call_vectorized_fn_node_maybe_awl(
     return typing.cast(graph.OutputNode, weave_internal.refine_graph(fn_res_node))
 
 
-def _apply_fn_node_with_tag_pushdown(
-    awl: ArrowWeaveList, fn: graph.OutputNode
-) -> ArrowWeaveList:
+def _apply_fn_node_with_tag_pushdown(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     tagged_awl = pushdown_list_tags(awl)
     return _apply_fn_node(tagged_awl, fn)
 
 
-def _ensure_variadic_fn(
-    fn: graph.OutputNode, dummy_var_type: types.Type, dummy_var_name: str = "row"
-) -> graph.OutputNode:
+def _ensure_variadic_fn(fn: graph.OutputNode, dummy_var_type: types.Type, dummy_var_name: str = "row") -> graph.OutputNode:
     # Check if fn contains variables.
     contains_vars = len(graph.expr_vars(fn)) > 0
     # if it does, return early.
@@ -730,9 +652,7 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
     if len(awl) == 0:
         # Short circuit empty list for performance reasons and to avoid calling
         # aggregations on empty lists.
-        logging.info(
-            "Short circuiting vectorization on %s because it is empty.", debug_str
-        )
+        logging.info("Short circuiting vectorization on %s because it is empty.", debug_str)
         return convert.to_arrow([], types.List(fn.type), artifact=awl._artifact)
 
     from .. import execute_fast

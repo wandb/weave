@@ -6,9 +6,7 @@ def make_error_message(missing_ops, section_name):
     missing_ops.sort()
     no_prefix_ops = [op for op in missing_ops if "-" not in op]
     prefixed_ops = [op for op in missing_ops if "-" in op]
-    error_msg += "* No Prefix:\n" + "\n".join(
-        [f"  * [ ] `{op}`" for op in no_prefix_ops]
-    )
+    error_msg += "* No Prefix:\n" + "\n".join([f"  * [ ] `{op}`" for op in no_prefix_ops])
     curr_prefix = None
     for op in prefixed_ops:
         op_prefix = op.split("-")[0]
@@ -23,19 +21,10 @@ def make_error_message(missing_ops, section_name):
 def test_op_coverage():
     ops = registry_mem.memory_registry.list_ops()
     all_py_names = set([op.name for op in ops])
-    missing_visible_ops = list(
-        visible_js_ops - js_op_exceptions - js_ops_with_new_names - all_py_names
-    )
-    missing_hidden_ops = list(
-        hidden_js_ops - js_op_exceptions - js_ops_with_new_names - all_py_names
-    )
+    missing_visible_ops = list(visible_js_ops - js_op_exceptions - js_ops_with_new_names - all_py_names)
+    missing_hidden_ops = list(hidden_js_ops - js_op_exceptions - js_ops_with_new_names - all_py_names)
     total_missing = len(missing_visible_ops) + len(missing_hidden_ops)
-    error_msg = (
-        f"**{total_missing} Missing Ops**\n\n"
-        + make_error_message(missing_visible_ops, "Visible")
-        + "\n\n"
-        + make_error_message(missing_hidden_ops, "Hidden")
-    )
+    error_msg = f"**{total_missing} Missing Ops**\n\n" + make_error_message(missing_visible_ops, "Visible") + "\n\n" + make_error_message(missing_hidden_ops, "Hidden")
 
     assert total_missing == 0, error_msg
 

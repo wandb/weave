@@ -95,9 +95,7 @@ class PlotConstantsInputDict(typing.TypedDict):
     lineStyle: typing.Optional[LineStyleOption]
 
 
-DropdownWithExpressionMode = typing.Union[
-    typing.Literal["dropdown"], typing.Literal["expression"]
-]
+DropdownWithExpressionMode = typing.Union[typing.Literal["dropdown"], typing.Literal["expression"]]
 
 
 @weave.type()
@@ -162,9 +160,7 @@ class Series:
         if select_functions:
             for dimname in groupby_dims:
                 if dimname not in select_functions:
-                    raise ValueError(
-                        f"select_functions must contain a function for groupby dim {dimname}"
-                    )
+                    raise ValueError(f"select_functions must contain a function for groupby dim {dimname}")
                 table.enable_groupby(getattr(dims, dimname))
                 if dimname == "label":
                     table.enable_groupby(dims.color)
@@ -188,9 +184,7 @@ class Series:
         for attr in ["table", "dims", "constants", "uiState"]:
             value = config.get(attr, None)
             if value is None:
-                raise ValueError(
-                    f'Config must contain "{attr}" to initialize new series.'
-                )
+                raise ValueError(f'Config must contain "{attr}" to initialize new series.')
             setattr(series, attr, value)
         return series
 
@@ -259,9 +253,7 @@ class AxisScale:
     # `type` serializes to the same key as the
     # `type` used by ObjectType
     scaleType: typing.Optional[ScaleType] = "linear"
-    range: typing.Optional[
-        dict[typing.Literal["field"], typing.Callable[[str], str]]
-    ] = None
+    range: typing.Optional[dict[typing.Literal["field"], typing.Callable[[str], str]]] = None
     base: typing.Optional[float] = None  # for log scale
 
 
@@ -342,9 +334,7 @@ class PlotConfig:
     configVersion: int = 15
 
 
-def set_through_array(
-    obj: typing.Any, path: typing.List[str], value: typing.Any
-) -> None:
+def set_through_array(obj: typing.Any, path: typing.List[str], value: typing.Any) -> None:
     """
     Recursively sets an attribute, key or index specified by a path in a nested object structure to a given value
     (consisting of dictionaries, lists or custom objects). The path is a list of strings, with the special value '#'
@@ -371,9 +361,7 @@ def set_through_array(
     if first == "#":
         if isinstance(obj, list):
             for i, item in enumerate(obj):
-                set_through_array(
-                    item, rest, (value[i] if isinstance(value, list) else value)
-                )
+                set_through_array(item, rest, (value[i] if isinstance(value, list) else value))
     elif len(rest) == 0:
         if isinstance(obj, dict):
             obj[first] = value
@@ -385,9 +373,7 @@ def set_through_array(
         raise ValueError(f"Could not set {path} in {obj} to {value}")
 
 
-def get_through_array(
-    obj: typing.Any, path: typing.List[str], coerce_list_of_nodes_to_node=False
-) -> typing.Any:
+def get_through_array(obj: typing.Any, path: typing.List[str], coerce_list_of_nodes_to_node=False) -> typing.Any:
     """
     Recursively retrieves a value from an attribute, key or index specified by a path in a nested object structure
     (consisting of dictionaries, lists or custom objects). The path is a list of strings, with the special value '#'
@@ -422,9 +408,7 @@ def get_through_array(
                 )
                 for item in obj
             ]
-            if coerce_list_of_nodes_to_node and all(
-                isinstance(item, graph.Node) for item in result
-            ):
+            if coerce_list_of_nodes_to_node and all(isinstance(item, graph.Node) for item in result):
                 result = list_.make_list({i: item for i, item in enumerate(result)})
             return result
         else:
@@ -533,9 +517,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             if domain_y is not None:
                 signals.domain.y = domain_y
 
-            config_axisSettings = AxisSettings(
-                x=default_axis(), y=default_axis(), color=default_axis()
-            )
+            config_axisSettings = AxisSettings(x=default_axis(), y=default_axis(), color=default_axis())
 
             config_axisSettings.x.title = x_title
             config_axisSettings.y.title = y_title
@@ -586,9 +568,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             raise errors.WeaveInternalError("config is None")
 
         if self.config.axisSettings is None:
-            self.config.axisSettings = AxisSettings(
-                x=default_axis(), y=default_axis(), color=default_axis()
-            )
+            self.config.axisSettings = AxisSettings(x=default_axis(), y=default_axis(), color=default_axis())
 
         self.config.axisSettings.x = AxisSetting(
             noLabels=True,
@@ -622,9 +602,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             domain=LazyAxisSelections(),
             selection=AxisSelections(x=None, y=None),
         )
-        default_axisSettings = AxisSettings(
-            x=default_axis(), y=default_axis(), color=default_axis()
-        )
+        default_axisSettings = AxisSettings(x=default_axis(), y=default_axis(), color=default_axis())
 
         default_legendSettings = LegendSettings(
             x=LegendSetting(),
@@ -651,21 +629,11 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
         if self.config is not None:
             if self.config.signals != default_signals:
                 return None
-            if (
-                self.config.axisSettings != default_axisSettings
-                and self.config.axisSettings != default_axisSettings_asDict
-            ):
+            if self.config.axisSettings != default_axisSettings and self.config.axisSettings != default_axisSettings_asDict:
                 return None
-            if (
-                self.config.legendSettings != default_legendSettings
-                and self.config.legendSettings != default_legendSettings_asDict
-            ):
+            if self.config.legendSettings != default_legendSettings and self.config.legendSettings != default_legendSettings_asDict:
                 return None
-            if (
-                self.config.configOptionsExpanded != default_configOptionsExpanded
-                and self.config.configOptionsExpanded
-                != default_configOptionsExpanded_asDict
-            ):
+            if self.config.configOptionsExpanded != default_configOptionsExpanded and self.config.configOptionsExpanded != default_configOptionsExpanded_asDict:
                 return None
             if len(self.config.series) != 1:
                 return None
@@ -690,17 +658,13 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
                     field_vals.append(
                         (
                             dim_name,
-                            codify.lambda_wrapped_object_to_code_no_format(
-                                sel_fn, ["row"]
-                            ),
+                            codify.lambda_wrapped_object_to_code_no_format(sel_fn, ["row"]),
                         )
                     )
 
         param_str = ""
         if len(field_vals) > 0:
-            param_str = (
-                ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
-            )
+            param_str = ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
         return f"""weave.panels.panel_plot.Plot({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
 
@@ -782,11 +746,7 @@ for dim in dataclasses.fields(PlotConstants):
 
 
 def selection_is_continuous(selection: Selection) -> bool:
-    return (
-        isinstance(selection, (tuple, list))
-        and len(selection) == 2
-        and all(isinstance(i, (int, float)) for i in selection)
-    )
+    return isinstance(selection, (tuple, list)) and len(selection) == 2 and all(isinstance(i, (int, float)) for i in selection)
 
 
 def selection_is_discrete(selection: Selection) -> bool:
@@ -794,9 +754,7 @@ def selection_is_discrete(selection: Selection) -> bool:
 
 
 # TODO: keep in arrow
-def filter_node_to_selection(
-    node: graph.Node, selection: LazySelection, key: str
-) -> graph.Node:
+def filter_node_to_selection(node: graph.Node, selection: LazySelection, key: str) -> graph.Node:
     if isinstance(selection, graph.Node):
         selection = weave_internal.call_fn(selection, {})
 
@@ -815,23 +773,15 @@ def filter_node_to_selection(
             # range defined with bins ("start", "stop") instead of a single timestamp.
             # Should naievly handle selection of data from plots using op timestamps-binsnice
             if (
-                weave.types.TypedDict({"start": weave.types.Timestamp()}).assign_type(
-                    target.type
-                )
+                weave.types.TypedDict({"start": weave.types.Timestamp()}).assign_type(target.type)
                 and isinstance(selection_min, (int, float))
                 and isinstance(selection_max, (int, float))
             ):
                 target = target["start"].toNumber()
-            elif (
-                weave.types.Timestamp().assign_type(target.type)
-                and isinstance(selection_min, (int, float))
-                and isinstance(selection_max, (int, float))
-            ):
+            elif weave.types.Timestamp().assign_type(target.type) and isinstance(selection_min, (int, float)) and isinstance(selection_max, (int, float)):
                 target = target.toNumber()
 
-            return boolean.Boolean.bool_and(
-                target >= selection_min, target <= selection_max
-            )
+            return boolean.Boolean.bool_and(target >= selection_min, target <= selection_max)
 
     else:
 
@@ -884,18 +834,14 @@ def _get_selected_rows_node(plot: Plot) -> graph.Node:
         if len(plot.config.series) > 1:
 
             def merge_func(row: graph.Node[types.TypedDict]):
-                return dict_.TypedDict.merge(
-                    row, dict_.dict_(y_expr_str=series.y_expr_str)
-                )
+                return dict_.TypedDict.merge(row, dict_.dict_(y_expr_str=series.y_expr_str))
 
             func = weave_internal.define_fn({"row": node.type.object_type}, merge_func)
             node = list_.List.map(node, func)
 
         table_nodes.append(node)
 
-    node_list = list_.make_list(
-        **{str(i): node for (i, node) in enumerate(table_nodes)}
-    )
+    node_list = list_.make_list(**{str(i): node for (i, node) in enumerate(table_nodes)})
     concatted = list_.List.concat(node_list)
     return concatted
 
@@ -937,18 +883,14 @@ def _get_selected_data_node(plot: Plot) -> graph.Node:
         if len(plot.config.series) > 1:
 
             def merge_func(row: graph.Node[types.TypedDict]):
-                return dict_.TypedDict.merge(
-                    row, dict_.dict_(y_expr_str=series.y_expr_str)
-                )
+                return dict_.TypedDict.merge(row, dict_.dict_(y_expr_str=series.y_expr_str))
 
             func = weave_internal.define_fn({"row": node.type.object_type}, merge_func)
             node = list_.List.map(node, func)
 
         table_nodes.append(node)
 
-    node_list = list_.make_list(
-        **{str(i): node for (i, node) in enumerate(table_nodes)}
-    )
+    node_list = list_.make_list(**{str(i): node for (i, node) in enumerate(table_nodes)})
     concatted = list_.List.concat(node_list)
     if concatted.type.object_type == types.UnknownType():
         return concatted
@@ -967,9 +909,7 @@ def selected_rows_refine(self: Plot) -> weave.types.Type:
         table_panel = panel_table.Table(self.input_node, config=table_config)
         node = list_.unnest(panel_table.rows(table_panel))
         if len(self.config.series) > 1:
-            node = dict_.TypedDict.merge(
-                node[0], dict_.dict_(y_expr_str=series.y_expr_str)
-            )
+            node = dict_.TypedDict.merge(node[0], dict_.dict_(y_expr_str=series.y_expr_str))
         else:
             node = node[0]
         nodes.append(node)

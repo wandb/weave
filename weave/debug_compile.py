@@ -8,15 +8,9 @@ def assign_type_weave0_weave1(w0_type: types.Type, w1_type: types.Type) -> bool:
     pass
 
 
-def check_weave0_compile_result(
-    weave0_nodes: list[graph.Node], weave1_nodes: list[graph.Node]
-) -> None:
-    weave0_flat: list[graph.OutputNode] = [
-        n for n in graph.all_nodes_full(weave0_nodes) if isinstance(n, graph.OutputNode)
-    ]
-    weave1_flat: list[graph.OutputNode] = [
-        n for n in graph.all_nodes_full(weave1_nodes) if isinstance(n, graph.OutputNode)
-    ]
+def check_weave0_compile_result(weave0_nodes: list[graph.Node], weave1_nodes: list[graph.Node]) -> None:
+    weave0_flat: list[graph.OutputNode] = [n for n in graph.all_nodes_full(weave0_nodes) if isinstance(n, graph.OutputNode)]
+    weave1_flat: list[graph.OutputNode] = [n for n in graph.all_nodes_full(weave1_nodes) if isinstance(n, graph.OutputNode)]
     if len(weave0_flat) != len(weave1_flat):
         print("weave0 and weave1 have different lengths")
         raise ValueError

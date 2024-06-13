@@ -158,16 +158,8 @@ def wb_span_to_weave_spans(
     attributes = {**wb_span.attributes} if wb_span.attributes is not None else {}
     if hasattr(wb_span, "span_kind") and wb_span.span_kind is not None:
         attributes["span_kind"] = str(wb_span.span_kind)
-    inputs = (
-        wb_span.results[0].inputs
-        if wb_span.results is not None and len(wb_span.results) > 0
-        else None
-    )
-    outputs = (
-        wb_span.results[0].outputs
-        if wb_span.results is not None and len(wb_span.results) > 0
-        else None
-    )
+    inputs = wb_span.results[0].inputs if wb_span.results is not None and len(wb_span.results) > 0 else None
+    outputs = wb_span.results[0].outputs if wb_span.results is not None and len(wb_span.results) > 0 else None
 
     # Super Hack - fix merge!
     dummy_dict = {"_": ""} if parent_id == None else {}
@@ -176,12 +168,7 @@ def wb_span_to_weave_spans(
     if span_id is None:
         span_id = str(uuid4())
 
-    if (
-        wb_span.start_time_ms is None
-        or wb_span.end_time_ms is None
-        or span_id is None
-        or wb_span.name is None
-    ):
+    if wb_span.start_time_ms is None or wb_span.end_time_ms is None or span_id is None or wb_span.name is None:
         return []
 
     span = TraceSpanDict(
@@ -198,9 +185,7 @@ def wb_span_to_weave_spans(
         summary=dummy_dict,
         inputs=inputs,
         output=outputs,
-        exception=wb_span.status_message
-        if wb_span.status_message is not None
-        else None,
+        exception=wb_span.status_message if wb_span.status_message is not None else None,
     )
     spans = [span]
     for child in wb_span.child_spans or []:

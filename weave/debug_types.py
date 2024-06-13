@@ -31,9 +31,7 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
                 return None
             reasons.append(f"{short_type(to_member)}: {reason}")
 
-    elif isinstance(from_type, tagged_value_type.TaggedValueType) and not isinstance(
-        to_type, tagged_value_type.TaggedValueType
-    ):
+    elif isinstance(from_type, tagged_value_type.TaggedValueType) and not isinstance(to_type, tagged_value_type.TaggedValueType):
         reason = why_not_assignable(to_type, from_type.value)
         if reason is not None:
             reasons.append(reason)
@@ -58,9 +56,7 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
         for k, from_td_type in from_type.property_types.items():
             sub_reason = why_not_assignable(to_type.object_type, from_td_type)
             if sub_reason is not None:
-                reasons.append(
-                    f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
-                )
+                reasons.append(f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}")
 
     elif isinstance(from_type, TypedDict) and isinstance(to_type, TypedDict):
         for k, to_type_type in to_type.property_types.items():
@@ -70,9 +66,7 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
             else:
                 sub_reason = why_not_assignable(to_type_type, from_type_type)
                 if sub_reason is not None:
-                    reasons.append(
-                        f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
-                    )
+                    reasons.append(f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}")
 
     elif to_type.name == from_type.name:
         type_vars = to_type.type_vars
@@ -83,9 +77,7 @@ def why_not_assignable(to_type: Type, from_type: Type) -> typing.Optional[str]:
             else:
                 sub_reason = why_not_assignable(to_type_type, from_type_type)
                 if sub_reason is not None:
-                    reasons.append(
-                        f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}"
-                    )
+                    reasons.append(f"Property {k} is not assignable\n{textwrap.indent(sub_reason, '  ')}")
     else:
         reasons.append("Incompatible types")
     if reasons:

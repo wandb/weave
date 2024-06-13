@@ -70,9 +70,7 @@ class Filesystem:
         return os.stat(self.path(path))
 
     @contextlib.contextmanager
-    def open_write(
-        self, path: str, mode: str = "wb"
-    ) -> typing.Generator[typing.IO, None, None]:
+    def open_write(self, path: str, mode: str = "wb") -> typing.Generator[typing.IO, None, None]:
         path = self.path(path)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         tmp_name = f"{path}.tmp-{util.rand_string_n(16)}"
@@ -82,9 +80,7 @@ class Filesystem:
             os.rename(tmp_name, path)
 
     @contextlib.contextmanager
-    def open_read(
-        self, path: str, mode: str = "rb"
-    ) -> typing.Generator[typing.IO, None, None]:
+    def open_read(self, path: str, mode: str = "rb") -> typing.Generator[typing.IO, None, None]:
         safe_path = self.path(path)
         with open(safe_path, mode) as f:
             if environment.enable_touch_on_read():
@@ -120,16 +116,14 @@ class FilesystemAsync:
         self,
         path: str,
         mode: typing.Literal["w"],
-    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]: ...
 
     @typing.overload
     def open_write(
         self,
         path: str,
         mode: typing.Literal["wb"] = "wb",
-    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]: ...
 
     @contextlib.asynccontextmanager
     async def open_write(
@@ -150,16 +144,14 @@ class FilesystemAsync:
         self,
         path: str,
         mode: typing.Literal["r"],
-    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]: ...
 
     @typing.overload
     def open_read(
         self,
         path: str,
         mode: typing.Literal["rb"] = "rb",
-    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]: ...
 
     @contextlib.asynccontextmanager
     async def open_read(

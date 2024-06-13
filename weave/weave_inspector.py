@@ -249,9 +249,7 @@ def _print_type_table(
                 if len(_type_props(type_iter.node_type)) == 0:
                     row["TYPE NAME"] = name_prefix + _type_name(type_iter.node_type)
                 else:
-                    row["TYPE NAME"] = (
-                        name_prefix + f"TYPE_ID({type_to_id_map[type_iter.node_type]})"
-                    )
+                    row["TYPE NAME"] = name_prefix + f"TYPE_ID({type_to_id_map[type_iter.node_type]})"
                 table.append(row)
         else:
             row["TYPE ID"] = type_to_id_map[type_iter.node_type]
@@ -329,9 +327,7 @@ class NodeInspector:
                             parent_node=node_iter.node,
                         ),
                     )
-            elif isinstance(node_iter.node, graph.ConstNode) and isinstance(
-                node_iter.node.val, graph.Node
-            ):
+            elif isinstance(node_iter.node, graph.ConstNode) and isinstance(node_iter.node.val, graph.Node):
                 stack.insert(
                     0,
                     NodeIter(
@@ -386,9 +382,7 @@ class NodeInspector:
             if node_iter.is_last:
                 depth_state[node_iter.depth] = "CLOSED"
                 depth_state = depth_state[: node_iter.depth + 1]
-            if isinstance(node_iter.node, graph.ConstNode) and isinstance(
-                node_iter.node.val, graph.Node
-            ):
+            if isinstance(node_iter.node, graph.ConstNode) and isinstance(node_iter.node.val, graph.Node):
                 depth_state[node_iter.depth] = "FUNCTION"
             name_prefix = ""
             for depth, state in enumerate(depth_state):
@@ -428,9 +422,7 @@ class NodeInspector:
                 reference_nodes.add(node_iter.node)
                 if not (node_iter.parent_node in reference_nodes):
                     row["NODE ID"] = "."
-                    row["NAME"] = (
-                        name_prefix + f"NODE_ID({self.node_to_id_map[node_iter.node]})"
-                    )
+                    row["NAME"] = name_prefix + f"NODE_ID({self.node_to_id_map[node_iter.node]})"
                     table.append(row)
             else:
                 row["NODE ID"] = self.node_to_id_map[node_iter.node]

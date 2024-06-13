@@ -14,9 +14,7 @@ try:
     from modal.cli.import_refs import import_stub
     import dotenv
 except ImportError:
-    raise ImportError(
-        "modal must be installed and configured: \n  pip install weave[modal]\n  modal setup"
-    )
+    raise ImportError("modal must be installed and configured: \n  pip install weave[modal]\n  modal setup")
 
 
 def compile(
@@ -64,16 +62,11 @@ def generate_modal_stub(
 
     project = project_name or os.getenv("PROJECT_NAME")
     if project is None:
-        raise ValueError(
-            "project must be specified from command line or via the PROJECT_NAME env var"
-        )
+        raise ValueError("project must be specified from command line or via the PROJECT_NAME env var")
     reqs = reqs or []
     reqs.append("weave @ git+https://github.com/wandb/weave@weaveflow")
     reqs.append("fastapi>=0.104.0")
-    return str(
-        compile(model_ref, project, reqs, secrets=secrets, auth_entity=auth_entity)
-        / "weave_model.py"
-    )
+    return str(compile(model_ref, project, reqs, secrets=secrets, auth_entity=auth_entity) / "weave_model.py")
 
 
 def extract_secrets(model_ref: str) -> dict[str, str]:
@@ -110,9 +103,7 @@ def deploy(
 
 def develop(model_ref: str, auth_entity: typing.Optional[str] = None) -> None:
     """Run a model for testing."""
-    ref = generate_modal_stub(
-        model_ref, secrets=extract_secrets(model_ref), auth_entity=auth_entity
-    )
+    ref = generate_modal_stub(model_ref, secrets=extract_secrets(model_ref), auth_entity=auth_entity)
     print(f"Serving live code from: {ref}")
     stub = import_stub(ref)
     timeout = 1800

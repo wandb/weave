@@ -37,9 +37,7 @@ for name in os.listdir("./weave"):
         bad_dirs.add(name)
 
 if len(bad_dirs) > 0:
-    raise ValueError(
-        f"Unknown directories: {bad_dirs}, modify MANIFEST.in or build.py to include them."
-    )
+    raise ValueError(f"Unknown directories: {bad_dirs}, modify MANIFEST.in or build.py to include them.")
 
 if os.getenv("WEAVE_SKIP_BUILD") == None:
     subprocess.run(["bash", "weave/frontend/build.sh"], check=True)
@@ -49,6 +47,4 @@ else:
 subprocess.run(["python", "-m", "build"], check=True)
 
 print("Push to pypi with: python -m twine upload --repository pypi dist/*")
-print(
-    "  replace pypi with pypitest for testing, install with --index-url https://test.pypi.org/simple/"
-)
+print("  replace pypi with pypitest for testing, install with --index-url https://test.pypi.org/simple/")

@@ -75,9 +75,7 @@ def test_artifact_query():
                                             {
                                                 "id": types.String(),
                                                 "name": types.String(),
-                                                "summaryMetricsSubset": types.optional(
-                                                    types.String()
-                                                ),
+                                                "summaryMetricsSubset": types.optional(types.String()),
                                                 "project": types.TypedDict(
                                                     {
                                                         "id": types.String(),
@@ -275,9 +273,7 @@ def test_inline_fragments():
                                                                                                 ),
                                                                                                 "id": types.String(),
                                                                                                 "name": types.String(),
-                                                                                                "displayName": types.optional(
-                                                                                                    types.String()
-                                                                                                ),
+                                                                                                "displayName": types.optional(types.String()),
                                                                                             }
                                                                                         ),
                                                                                         types.TypedDict(
@@ -370,9 +366,7 @@ def test_json_array():
                                 property_types={
                                     # important that liveData is a string
                                     "liveData": types.String(),
-                                    "parquetUrls": types.List(
-                                        object_type=types.String()
-                                    ),
+                                    "parquetUrls": types.List(object_type=types.String()),
                                 },
                                 not_required_keys=set(),
                             ),

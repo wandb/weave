@@ -9,9 +9,7 @@ from . import weave_types as types
 
 # A GQLOutputTypeFn is a function that is called during the refinement phase of the compile pass
 # to propagate the GQL keys of a node's input types to its output type.
-GQLOutputTypeFn = typing.Callable[
-    [input_provider.InputProvider, types.Type], types.Type
-]
+GQLOutputTypeFn = typing.Callable[[input_provider.InputProvider, types.Type], types.Type]
 
 
 _ROOT_RESOLVERS: set[op_def.OpDef] = set()
@@ -47,11 +45,7 @@ def wb_gql_op_plugin(
     root_resolver: typing.Optional["op_def.OpDef"] = None,
     gql_op_output_type: typing.Optional[GQLOutputTypeFn] = None,
 ) -> dict[str, GqlOpPlugin]:
-    return {
-        "wb_domain_gql": GqlOpPlugin(
-            query_fn, is_root, root_resolver, gql_op_output_type
-        )
-    }
+    return {"wb_domain_gql": GqlOpPlugin(query_fn, is_root, root_resolver, gql_op_output_type)}
 
 
 def get_gql_plugin(

@@ -1,4 +1,5 @@
 """Functions for determining which op is being called."""
+
 from dataclasses import dataclass
 import functools
 import logging
@@ -40,9 +41,7 @@ def _op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
         # (supports get_with_default style op)
         if len(lhs.arg_types) > len(rhs.arg_types):
             return False
-        for self_type, other_type in list(
-            zip(lhs.initial_arg_types.values(), rhs.initial_arg_types.values())
-        )[:1]:
+        for self_type, other_type in list(zip(lhs.initial_arg_types.values(), rhs.initial_arg_types.values()))[:1]:
             if not self_type.assign_type(other_type):
                 return False
         return True
@@ -56,16 +55,11 @@ def _op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
         raise errors.WeaveInternalError("unknown op_args types: %s, %s" % (lhs, rhs))
 
 
-def _nullability_ambiguity_resolution_rule(
-    candidates: list[op_def.OpDef], first_arg_type: types.Type
-) -> list[op_def.OpDef]:
+def _nullability_ambiguity_resolution_rule(candidates: list[op_def.OpDef], first_arg_type: types.Type) -> list[op_def.OpDef]:
     # nullability, if the first argument is None or List[None], then any
     # of the candidates can handle it. Choose the first one (choosing the
     # first ensures we choose a tag getter if there is one).
-    if first_arg_type and (
-        types.NoneType().assign_type(first_arg_type)
-        or types.List(types.NoneType()).assign_type(first_arg_type)
-    ):
+    if first_arg_type and (types.NoneType().assign_type(first_arg_type) or types.List(types.NoneType()).assign_type(first_arg_type)):
         return [candidates[0]]
     return candidates
 
@@ -76,31 +70,21 @@ def _is_mapped_op(op: op_def.OpDef) -> bool:
     # or isinstance(op, op_def.AutoTagHandlingArrowOpDef)
 
 
-def _mapped_ambiguity_resolution_rule(
-    candidates: list[op_def.OpDef], first_arg_type: types.Type
-) -> list[op_def.OpDef]:
-    non_mapped_candidates = [
-        candidate for candidate in candidates if not _is_mapped_op(candidate)
-    ]
+def _mapped_ambiguity_resolution_rule(candidates: list[op_def.OpDef], first_arg_type: types.Type) -> list[op_def.OpDef]:
+    non_mapped_candidates = [candidate for candidate in candidates if not _is_mapped_op(candidate)]
     if len(non_mapped_candidates) > 0:
         return non_mapped_candidates
     return candidates
 
 
-def _tagged_ambiguity_resolution_rule(
-    candidates: list[op_def.OpDef], first_arg_type: types.Type
-) -> list[op_def.OpDef]:
-    non_tagged_candidates = [
-        candidate for candidate in candidates if not is_tag_getter(candidate)
-    ]
+def _tagged_ambiguity_resolution_rule(candidates: list[op_def.OpDef], first_arg_type: types.Type) -> list[op_def.OpDef]:
+    non_tagged_candidates = [candidate for candidate in candidates if not is_tag_getter(candidate)]
     if len(non_tagged_candidates) > 0:
         return non_tagged_candidates
     return candidates
 
 
-def _subtype_sorting_ambiguity_resolution_rule_cmp(
-    a: op_def.OpDef, b: op_def.OpDef
-) -> int:
+def _subtype_sorting_ambiguity_resolution_rule_cmp(a: op_def.OpDef, b: op_def.OpDef) -> int:
     # TODO: make this less hacky
     # If we're mapping contains, don't do substring matching
     ambiguous_contains = ["mapped_string-contains", "contains"]
@@ -112,22 +96,15 @@ def _subtype_sorting_ambiguity_resolution_rule_cmp(
     b_is_subtype = _op_args_is_subtype(a.input_type, b.input_type)
     a_is_subtype = _op_args_is_subtype(b.input_type, a.input_type)
     if a_is_subtype and b_is_subtype:
-        raise errors.WeaveDispatchError(
-            "Ambiguous ops %s, %s. Ops' input types are equivalent" % (a.name, b.name)
-        )
+        raise errors.WeaveDispatchError("Ambiguous ops %s, %s. Ops' input types are equivalent" % (a.name, b.name))
     if a_is_subtype:
         return -1
     if b_is_subtype:
         return 1
-    raise errors.WeaveDispatchError(
-        "Ambiguous ops %s, %s. Ops' input types first arguments must be subset in one direction or the other."
-        % (a.name, b.name)
-    )
+    raise errors.WeaveDispatchError("Ambiguous ops %s, %s. Ops' input types first arguments must be subset in one direction or the other." % (a.name, b.name))
 
 
-def _subtype_sorting_ambiguity_resolution_rule(
-    candidates: list[op_def.OpDef], first_arg_type: types.Type
-) -> list[op_def.OpDef]:
+def _subtype_sorting_ambiguity_resolution_rule(candidates: list[op_def.OpDef], first_arg_type: types.Type) -> list[op_def.OpDef]:
     return sorted(
         candidates,
         key=functools.cmp_to_key(_subtype_sorting_ambiguity_resolution_rule_cmp),
@@ -137,27 +114,19 @@ def _subtype_sorting_ambiguity_resolution_rule(
 def _apply_ambiguity_rules(
     candidates: list[op_def.OpDef],
     first_arg_type: types.Type,
-    rules: list[
-        typing.Tuple[
-            str, typing.Callable[[list[op_def.OpDef], types.Type], list[op_def.OpDef]]
-        ]
-    ],
+    rules: list[typing.Tuple[str, typing.Callable[[list[op_def.OpDef], types.Type], list[op_def.OpDef]]]],
 ) -> list[op_def.OpDef]:
     for rule_name, rule in rules:
         reduced_candidates = rule(candidates, first_arg_type)
         if len(reduced_candidates) < len(candidates):
-            logging.debug(
-                f"Dispatch Ambiguity Resolution - {rule_name} Rule reduced set from {len(candidates)} to {len(reduced_candidates)}"
-            )
+            logging.debug(f"Dispatch Ambiguity Resolution - {rule_name} Rule reduced set from {len(candidates)} to {len(reduced_candidates)}")
         candidates = reduced_candidates
         if len(candidates) == 1:
             return candidates
     return candidates
 
 
-def _resolve_op_ambiguity(
-    candidates: list[op_def.OpDef], first_arg_type: types.Type
-) -> op_def.OpDef:
+def _resolve_op_ambiguity(candidates: list[op_def.OpDef], first_arg_type: types.Type) -> op_def.OpDef:
     if len(candidates) == 1:
         return candidates[0]
     final_candidates = _apply_ambiguity_rules(
@@ -189,9 +158,7 @@ def _get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
         shared_name_ops = [op] + derived_ops
     # Else, we lookup all the ops with the same common name
     else:
-        shared_name_ops = registry_mem.memory_registry.find_ops_by_common_name(
-            op_def.common_name(fq_op_name)
-        )
+        shared_name_ops = registry_mem.memory_registry.find_ops_by_common_name(op_def.common_name(fq_op_name))
     return shared_name_ops
 
 
@@ -224,9 +191,7 @@ def _dispatch_first_arg(name: str, first_arg: types.Type) -> list[op_def.OpDef]:
     return _dispatch_first_arg_inner(name, first_arg)
 
 
-def _dispatch_remaining_args(
-    first_arg_ops: list[op_def.OpDef], kwargs: dict[str, types.Type]
-) -> list[op_def.OpDef]:
+def _dispatch_remaining_args(first_arg_ops: list[op_def.OpDef], kwargs: dict[str, types.Type]) -> list[op_def.OpDef]:
     candidates: list[op_def.OpDef] = []
     for op in first_arg_ops:
         if op.input_type.nonfirst_params_valid(list(kwargs.values())):
@@ -239,23 +204,14 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
         # zero argument ops
         ops = _get_ops_by_name(name)
         if not ops:
-            err = errors.WeaveDispatchError(
-                f'Cannot dispatch op "{name}"; no matching op found'
-            )
+            err = errors.WeaveDispatchError(f'Cannot dispatch op "{name}"; no matching op found')
             util.raise_exception_with_sentry_if_available(err, [name])
         elif len(ops) > 1:
-            err = errors.WeaveDispatchError(
-                f'Cannot dispatch zero-arg op "{name}"; multiple matching ops found'
-            )
+            err = errors.WeaveDispatchError(f'Cannot dispatch zero-arg op "{name}"; multiple matching ops found')
             util.raise_exception_with_sentry_if_available(err, [name])
         return ops[0]
 
-    if (
-        name.startswith("panel_table")
-        or name.startswith("Query")
-        or name.startswith("Facet")
-        or name.startswith("panel_plot")
-    ):
+    if name.startswith("panel_table") or name.startswith("Query") or name.startswith("Facet") or name.startswith("panel_plot"):
         # The types don't work for TableState for some reason. This is hacked elsewhere..
         # Hack it some more :(
         # TODO: remove.
@@ -265,8 +221,7 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
         ops = [
             o
             for o in ops
-            if name.split("-")[0].removeprefix("panel_").lower()
-            in json.dumps(list(o.input_type.arg_types.values())[0].to_dict()).lower()  # type: ignore
+            if name.split("-")[0].removeprefix("panel_").lower() in json.dumps(list(o.input_type.arg_types.values())[0].to_dict()).lower()  # type: ignore
         ]
 
         return ops[0]
@@ -283,18 +238,12 @@ def get_op_for_inputs(name: str, kwargs: dict[str, types.Type]) -> op_def.OpDef:
     ops = _dispatch_first_arg(name, input_types[0])
     if not ops:
         logging.info('No ops found for "%s" with first arg "%s"', name, input_types[0])
-        err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{name}"; no matching op found for first arg type: {input_types[0]}'
-        )
+        err = errors.WeaveDispatchError(f'Cannot dispatch op "{name}"; no matching op found for first arg type: {input_types[0]}')
         util.raise_exception_with_sentry_if_available(err, [name])
 
-    final_ops = _dispatch_remaining_args(
-        ops, dict(zip(input_keys[1:], input_types[1:]))
-    )
+    final_ops = _dispatch_remaining_args(ops, dict(zip(input_keys[1:], input_types[1:])))
     if not final_ops:
-        err = errors.WeaveDispatchError(
-            f'Cannot dispatch op "{name}"; ops {ops} matched first arg type, but no matching ops found for remaining arg types: {input_types[1:]}'
-        )
+        err = errors.WeaveDispatchError(f'Cannot dispatch op "{name}"; ops {ops} matched first arg type, but no matching ops found for remaining arg types: {input_types[1:]}')
         util.raise_exception_with_sentry_if_available(err, [name])
 
     return _resolve_op_ambiguity(final_ops, input_types[0])
@@ -312,9 +261,7 @@ def _type_of_input_param(v: typing.Any) -> types.Type:
         if not isinstance(input_type, op_args.OpNamedArgs):
             raise errors.WeaveInternalError("Function conversion requires named args")
         if callable(output_type):
-            raise errors.WeaveInternalError(
-                "Function conversion does not support callable output types"
-            )
+            raise errors.WeaveInternalError("Function conversion does not support callable output types")
         return types.Function(
             input_type.arg_types,
             output_type,
@@ -323,9 +270,7 @@ def _type_of_input_param(v: typing.Any) -> types.Type:
         return types.Const(types.TypeRegistry.type_of(v), v)
 
 
-def _get_self_bound_input_types(
-    self_node: graph.Node, *args: list[typing.Any], **kwargs: dict[str, typing.Any]
-) -> dict[str, types.Type]:
+def _get_self_bound_input_types(self_node: graph.Node, *args: list[typing.Any], **kwargs: dict[str, typing.Any]) -> dict[str, types.Type]:
     input_types = {"self": _type_of_input_param(self_node)}
     input_types.update({str(i): _type_of_input_param(v) for i, v in enumerate(args)})
     input_types.update({k: _type_of_input_param(v) for k, v in kwargs.items()})
@@ -341,9 +286,7 @@ class BoundPotentialOpDefs:
         inputs = _get_self_bound_input_types(self.self_node, *args, **kwargs)
         input_keys = list(inputs.keys())
         input_types = list(inputs.values())
-        ops = _dispatch_remaining_args(
-            self.potential_ops, dict(zip(input_keys[1:], input_types[1:]))
-        )
+        ops = _dispatch_remaining_args(self.potential_ops, dict(zip(input_keys[1:], input_types[1:])))
         if not ops:
             if any(callable(v) for v in args + tuple(kwargs.values())):
                 # _dispatch_remaining_args is broken for callable args. They
@@ -352,12 +295,8 @@ class BoundPotentialOpDefs:
                 # TODO: add proper fix
                 ops = self.potential_ops
             else:
-                err = errors.WeaveDispatchError(
-                    f'Cannot dispatch choose op from "{self.potential_ops}"; no matching op found'
-                )
-                util.raise_exception_with_sentry_if_available(
-                    err, [str(self.potential_ops)]
-                )
+                err = errors.WeaveDispatchError(f'Cannot dispatch choose op from "{self.potential_ops}"; no matching op found')
+                util.raise_exception_with_sentry_if_available(err, [str(self.potential_ops)])
         op = _resolve_op_ambiguity(ops, input_types[0])
         params = op.input_type.create_param_dict([self.self_node] + list(args), kwargs)
         return op(**params)
@@ -366,9 +305,7 @@ class BoundPotentialOpDefs:
 def _dispatch_dunder(
     name: str,
 ) -> typing.Callable[..., "RuntimeOutputNode"]:
-    def dispatch_dunder_inner(
-        self_node: graph.Node, *args: typing.Any, **kwargs: typing.Any
-    ) -> "RuntimeOutputNode":
+    def dispatch_dunder_inner(self_node: graph.Node, *args: typing.Any, **kwargs: typing.Any) -> "RuntimeOutputNode":
         input_types = _get_self_bound_input_types(self_node, *args, **kwargs)
         op = get_op_for_inputs(name, input_types)
         params = op.input_type.create_param_dict([self_node] + list(args), kwargs)
@@ -410,16 +347,12 @@ class DispatchMixin:
         possible_prop_node = self._get_prop(attr)
         if possible_prop_node is not None:
             return possible_prop_node
-        raise errors.WeaveDispatchError(
-            'No ops called "%s" available on type "%s"' % (attr, node_self.type)
-        )
+        raise errors.WeaveDispatchError('No ops called "%s" available on type "%s"' % (attr, node_self.type))
 
     # This implementation is not directly inside of __getattr__ so that
     # tests can call it directly in cases where attributes are overrode
     # by the node class (ex. name, type)
-    def _get_op(
-        self, attr: str
-    ) -> typing.Optional[typing.Union[BoundPotentialOpDefs, op_def.BoundOpDef]]:
+    def _get_op(self, attr: str) -> typing.Optional[typing.Union[BoundPotentialOpDefs, op_def.BoundOpDef]]:
         node_self = typing.cast(graph.Node, self)
         ops_with_name_and_arg = _dispatch_first_arg(attr, node_self.type)
         if len(ops_with_name_and_arg) > 0:
@@ -445,10 +378,7 @@ class DispatchMixin:
                 obj_getattr = registry_mem.memory_registry.get_op("Object-__getattr__")
                 return obj_getattr(node_self, attr)
             else:
-                raise errors.WeaveDispatchError(
-                    'No attributes called "%s" available on Object "%s"'
-                    % (attr, node_self.type)
-                )
+                raise errors.WeaveDispatchError('No attributes called "%s" available on Object "%s"' % (attr, node_self.type))
         return None
 
     __call__ = _dispatch_dunder("__call__")

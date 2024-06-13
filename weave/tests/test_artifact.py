@@ -10,9 +10,7 @@ from .. import ops_arrow as arrow
 def test_artifact():
     data = arrow.to_arrow([{"a": 5}])
     data_ref = storage.save(data)
-    assert data_ref.type == arrow.ArrowWeaveListType(
-        object_type=weave.types.TypedDict(property_types={"a": weave.types.Int()})
-    )
+    assert data_ref.type == arrow.ArrowWeaveListType(object_type=weave.types.TypedDict(property_types={"a": weave.types.Int()}))
     assert data_ref.get() == data
 
     art = data_ref.artifact
@@ -54,16 +52,11 @@ def test_artifact():
     assert len(art_dir.files) == 3
 
     art_file1 = art_dir_files["obj.ArrowWeaveList.feather"]
-    assert art_file1 == artifact_fs.FilesystemArtifactFile(
-        art, "obj.ArrowWeaveList.feather"
-    )
+    assert art_file1 == artifact_fs.FilesystemArtifactFile(art, "obj.ArrowWeaveList.feather")
 
     # Here we don't create a new object
     art_file1_ref = storage.save(art_file1)
-    assert (
-        art_file1_ref.artifact == art
-        and art_file1_ref.path == "obj.ArrowWeaveList.feather"
-    )
+    assert art_file1_ref.artifact == art and art_file1_ref.path == "obj.ArrowWeaveList.feather"
     assert art_file1_ref.type == exp_art_file1_type
 
     assert len(art_dir.dirs) == 0

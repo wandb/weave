@@ -34,9 +34,5 @@ class XGBoostHyperparams(typing.TypedDict):
 
 
 @weave.op()
-def xgboost_train(
-    xy: typing.Any, hyperparams: XGBoostHyperparams
-) -> xgboost.core.Booster:
-    return xgboost.train(
-        hyperparams, xgboost.DMatrix(xy["X"], label=xy["y"].to_numpy()), 100
-    )
+def xgboost_train(xy: typing.Any, hyperparams: XGBoostHyperparams) -> xgboost.core.Booster:
+    return xgboost.train(hyperparams, xgboost.DMatrix(xy["X"], label=xy["y"].to_numpy()), 100)

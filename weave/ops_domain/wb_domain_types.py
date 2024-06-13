@@ -150,9 +150,7 @@ class ArtifactCollection(GQLBase):
 
 
 ArtifactCollectionType = ArtifactCollection.WeaveType()  # type: ignore
-ArtifactCollectionType = typing.cast(
-    PartialObjectTypeGeneratorType, ArtifactCollectionType
-)
+ArtifactCollectionType = typing.cast(PartialObjectTypeGeneratorType, ArtifactCollectionType)
 
 
 @gql_type("artifactVersion")
@@ -174,9 +172,7 @@ class ArtifactCollectionMembership(GQLBase):
 
 
 ArtifactCollectionMembershipType = ArtifactCollectionMembership.WeaveType()  # type: ignore
-ArtifactCollectionMembershipType = typing.cast(
-    PartialObjectTypeGeneratorType, ArtifactCollectionMembershipType
-)
+ArtifactCollectionMembershipType = typing.cast(PartialObjectTypeGeneratorType, ArtifactCollectionMembershipType)
 
 
 @gql_type("artifactAlias")

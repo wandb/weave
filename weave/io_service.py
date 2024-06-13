@@ -61,9 +61,7 @@ class ServerRequestContext:
         wandb_api_context = None
         wandb_api_context_json = json.get("wandb_api_context")
         if wandb_api_context_json:
-            wandb_api_context = wandb_api.WandbApiContext.from_json(
-                wandb_api_context_json
-            )
+            wandb_api_context = wandb_api.WandbApiContext.from_json(wandb_api_context_json)
         cache_prefix_context = json.get("cache_prefix_context", None)
         if cache_prefix_context:
             cache_prefix_context = str(cache_prefix_context)
@@ -111,9 +109,7 @@ class ServerRequest:
             "id": self.id,
         }
 
-    def error_response(
-        self, http_error_code: int, error: Exception
-    ) -> "ServerResponse":
+    def error_response(self, http_error_code: int, error: Exception) -> "ServerResponse":
         return ServerResponse(
             http_error_code=http_error_code,
             client_id=self.client_id,
@@ -161,9 +157,7 @@ class ShutDown:
         return isinstance(other, ShutDown)
 
 
-shutdown_request = ServerRequest(
-    "", "shutdown", (), ServerRequestContext(None, None, None)
-)
+shutdown_request = ServerRequest("", "shutdown", (), ServerRequestContext(None, None, None))
 shutdown_response = ServerResponse("", 0, ShutDown())
 
 HandlerFunction = Callable[..., Any]
@@ -193,9 +187,7 @@ class Server:
         # that are both in the user process.
         self.client_response_queues: Dict[
             str,
-            typing.Union[
-                queue.Queue[ServerResponse], async_queue.ThreadQueue[ServerResponse]
-            ],
+            typing.Union[queue.Queue[ServerResponse], async_queue.ThreadQueue[ServerResponse]],
         ] = {}
 
         self._shutting_down = multiprocessing.Event()
@@ -209,31 +201,23 @@ class Server:
 
         # Register handlers
         self.register_handler_fn("ensure_manifest", self.handle_ensure_manifest)
-        self.register_handler_fn(
-            "ensure_file_downloaded", self.handle_ensure_file_downloaded
-        )
+        self.register_handler_fn("ensure_file_downloaded", self.handle_ensure_file_downloaded)
         self.register_handler_fn("ensure_file", self.handle_ensure_file)
         self.register_handler_fn("direct_url", self.handle_direct_url)
         self.register_handler_fn("sleep", self.handle_sleep)
 
         if process:
-            self.request_handler = aioprocessing.AioProcess(
-                target=self._request_handler_fn, name="IO Server", daemon=True
-            )
+            self.request_handler = aioprocessing.AioProcess(target=self._request_handler_fn, name="IO Server", daemon=True)
             self.request_queue = async_queue.ProcessQueue()
             self._internal_response_queue = async_queue.ProcessQueue()
         else:
-            self.request_handler = threading.Thread(
-                target=self._request_handler_fn, name="IO Server", daemon=True
-            )
+            self.request_handler = threading.Thread(target=self._request_handler_fn, name="IO Server", daemon=True)
             self.request_queue = async_queue.ThreadQueue()
             self._internal_response_queue = async_queue.ThreadQueue()
 
         # runs in the user process and puts responses from the server into the appropriate
         # client-consumed response queues.
-        self.response_queue_router = threading.Thread(
-            target=self._response_queue_router_fn, daemon=True
-        )
+        self.response_queue_router = threading.Thread(target=self._response_queue_router_fn, daemon=True)
 
     # server_process runs the server's main coroutine
     def _request_handler_fn(self) -> None:
@@ -317,8 +301,7 @@ class Server:
                         traceback.format_exc(),
                     )
                     resp = req.error_response(
-                        server_error_handling.maybe_extract_code_from_exception(e)
-                        or 500,
+                        server_error_handling.maybe_extract_code_from_exception(e) or 500,
                         e,
                     )
                 else:
@@ -338,9 +321,7 @@ class Server:
         loop = asyncio.get_running_loop()
         active_tasks: set[asyncio.Task[typing.Any]] = set()
         async with net:
-            self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(
-                fs, net, await wandb_api.get_wandb_api()
-            )
+            self.wandb_file_manager = wandb_file_manager.WandbFileManagerAsync(fs, net, await wandb_api.get_wandb_api())
 
             self._request_handler_ready_event.set()
             while True:
@@ -356,9 +337,7 @@ class Server:
                     break
                 tracer.context_provider.activate(req.context.trace_context)
                 with wandb_api.wandb_api_context(req.context.wandb_api_context):
-                    with cache.time_interval_cache_prefix(
-                        req.context.cache_prefix_context
-                    ):
+                    with cache.time_interval_cache_prefix(req.context.cache_prefix_context):
                         # launch a task to handle the request
                         task = loop.create_task(self._handle(req))
                         active_tasks.add(task)
@@ -370,35 +349,25 @@ class Server:
         self.handlers[name] = handler
 
     @contextlib.contextmanager
-    def registered_client(
-        self, client: typing.Union["AsyncClient", "SyncClient"]
-    ) -> Iterator[None]:
+    def registered_client(self, client: typing.Union["AsyncClient", "SyncClient"]) -> Iterator[None]:
         self.register_client(client)
         try:
             yield
         finally:
             self.unregister_client(client)
 
-    def register_client(
-        self, client: typing.Union["SyncClient", "AsyncClient"]
-    ) -> None:
+    def register_client(self, client: typing.Union["SyncClient", "AsyncClient"]) -> None:
         if client.client_id not in self.client_response_queues:
             if isinstance(client, SyncClient):
                 self.client_response_queues[client.client_id] = queue.Queue()
             else:
-                self.client_response_queues[
-                    client.client_id
-                ] = async_queue.ThreadQueue()
+                self.client_response_queues[client.client_id] = async_queue.ThreadQueue()
 
-    def unregister_client(
-        self, client: typing.Union["SyncClient", "AsyncClient"]
-    ) -> None:
+    def unregister_client(self, client: typing.Union["SyncClient", "AsyncClient"]) -> None:
         if client.client_id in self.client_response_queues:
             del self.client_response_queues[client.client_id]
 
-    async def handle_ensure_manifest(
-        self, artifact_uri: str
-    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+    async def handle_ensure_manifest(self, artifact_uri: str) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         return await self.wandb_file_manager.manifest(uri)
 
@@ -406,9 +375,7 @@ class Server:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         return await self.wandb_file_manager.ensure_file(uri)
 
-    async def handle_ensure_file_downloaded(
-        self, download_url: str
-    ) -> typing.Optional[str]:
+    async def handle_ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
         return await self.wandb_file_manager.ensure_file_downloaded(download_url)
 
     async def handle_direct_url(self, artifact_uri: str) -> typing.Optional[str]:
@@ -448,9 +415,7 @@ class AsyncConnection:
         self.request_id = 0
         self.requests: typing.Dict[int, asyncio.Future] = {}
         self.request_queue: async_queue.Queue[ServerRequest] = request_queue
-        self.response_queue: async_queue.ThreadQueue[ServerResponse] = typing.cast(
-            async_queue.ThreadQueue[ServerResponse], response_queue
-        )
+        self.response_queue: async_queue.ThreadQueue[ServerResponse] = typing.cast(async_queue.ThreadQueue[ServerResponse], response_queue)
         self.response_task = asyncio.create_task(self.handle_responses())
         self.response_task.add_done_callback(self.response_task_ended)
         self.connected = True
@@ -495,9 +460,7 @@ class AsyncConnection:
 
         if is_shutting_down:
             self.response_task.cancel()
-            raise errors.WeaveWandbArtifactManagerError(
-                "Server is shutting down, cannot make request"
-            )
+            raise errors.WeaveWandbArtifactManagerError("Server is shutting down, cannot make request")
 
         if isinstance(self.request_queue, async_queue.ThreadQueue):
             # this is fast
@@ -508,26 +471,16 @@ class AsyncConnection:
 
         if server_resp.error:
             if server_resp.http_error_code != None:
-                raise server_error_handling.WeaveInternalHttpException.from_code(
-                    server_resp.http_error_code
-                )
-            raise errors.WeaveWandbArtifactManagerError(
-                "Request error: " + server_resp.value
-            )
+                raise server_error_handling.WeaveInternalHttpException.from_code(server_resp.http_error_code)
+            raise errors.WeaveWandbArtifactManagerError("Request error: " + server_resp.value)
 
         return server_resp.value
 
-    async def manifest(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
-        manifest: typing.Optional[
-            artifact_wandb.WandbArtifactManifest
-        ] = await self.request("ensure_manifest", str(artifact_uri))
+    async def manifest(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+        manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = await self.request("ensure_manifest", str(artifact_uri))
         return manifest
 
-    async def ensure_file(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[str]:
+    async def ensure_file(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> typing.Optional[str]:
         res = await self.request("ensure_file", str(artifact_uri))
         return res
 
@@ -535,9 +488,7 @@ class AsyncConnection:
         res = await self.request("ensure_file_downloaded", download_url)
         return res
 
-    async def direct_url(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[str]:
+    async def direct_url(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> typing.Optional[str]:
         res = await self.request("direct_url", str(artifact_uri))
         return res
 
@@ -588,9 +539,7 @@ class SyncClient:
                 is_shutting_down = self.server._shutting_down.is_set()
 
             if is_shutting_down:
-                raise errors.WeaveWandbArtifactManagerError(
-                    "Server is shutting down, cannot make request"
-                )
+                raise errors.WeaveWandbArtifactManagerError("Server is shutting down, cannot make request")
 
             self.server.request_queue.put(request)
             server_resp = response_queue.get()
@@ -598,33 +547,21 @@ class SyncClient:
 
         if server_resp.error:
             if server_resp.http_error_code != None:
-                raise server_error_handling.WeaveInternalHttpException.from_code(
-                    server_resp.http_error_code
-                )
-            raise errors.WeaveWandbArtifactManagerError(
-                "Request error: " + server_resp.value
-            )
+                raise server_error_handling.WeaveInternalHttpException.from_code(server_resp.http_error_code)
+            raise errors.WeaveWandbArtifactManagerError("Request error: " + server_resp.value)
         return server_resp.value
 
-    def manifest(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
-        manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = self.request(
-            "ensure_manifest", str(artifact_uri)
-        )
+    def manifest(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+        manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = self.request("ensure_manifest", str(artifact_uri))
         return manifest
 
-    def ensure_file(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[str]:
+    def ensure_file(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> typing.Optional[str]:
         return self.request("ensure_file", str(artifact_uri))
 
     def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
         return self.request("ensure_file_downloaded", download_url)
 
-    def direct_url(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[str]:
+    def direct_url(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> typing.Optional[str]:
         return self.request("direct_url", str(artifact_uri))
 
     def sleep(self, seconds: float) -> None:
@@ -636,26 +573,18 @@ class ServerlessClient:
         self.fs = fs
         self.http = weave_http.Http(self.fs)
         self.wandb_api = wandb_api.WandbApi()
-        self.wandb_file_manager = wandb_file_manager.WandbFileManager(
-            self.fs, self.http, self.wandb_api
-        )
+        self.wandb_file_manager = wandb_file_manager.WandbFileManager(self.fs, self.http, self.wandb_api)
 
-    def manifest(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+    def manifest(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         return self.wandb_file_manager.manifest(artifact_uri)
 
-    def ensure_file(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[str]:
+    def ensure_file(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> typing.Optional[str]:
         return self.wandb_file_manager.ensure_file(artifact_uri)
 
     def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
         return self.wandb_file_manager.ensure_file_downloaded(download_url)
 
-    def direct_url(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
-    ) -> typing.Optional[str]:
+    def direct_url(self, artifact_uri: artifact_wandb.WeaveWBArtifactURI) -> typing.Optional[str]:
         return self.wandb_file_manager.direct_url(artifact_uri)
 
     def sleep(self, seconds: float) -> None:

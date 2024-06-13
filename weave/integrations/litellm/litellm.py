@@ -48,21 +48,13 @@ def litellm_accumulator(
                     finish_reason=None,
                 )
             )
-        acc.choices[delta_choice.index].message.role = (
-            delta_choice.delta.role or acc.choices[delta_choice.index].message.role
-        )
-        acc.choices[delta_choice.index].message.content += (
-            delta_choice.delta.content or ""
-        )
+        acc.choices[delta_choice.index].message.role = delta_choice.delta.role or acc.choices[delta_choice.index].message.role
+        acc.choices[delta_choice.index].message.content += delta_choice.delta.content or ""
         if delta_choice.delta.tool_calls:
             if acc.choices[delta_choice.index].message.tool_calls is None:
                 acc.choices[delta_choice.index].message.tool_calls = []
-            acc.choices[
-                delta_choice.index
-            ].message.tool_calls += delta_choice.delta.tool_calls
-        acc.choices[delta_choice.index].finish_reason = (
-            delta_choice.finish_reason or acc.choices[delta_choice.index].finish_reason
-        )
+            acc.choices[delta_choice.index].message.tool_calls += delta_choice.delta.tool_calls
+        acc.choices[delta_choice.index].finish_reason = delta_choice.finish_reason or acc.choices[delta_choice.index].finish_reason
 
     return acc
 

@@ -40,13 +40,9 @@ def make_tag_getter_op(
     @decorator_op.op(  # type: ignore
         name=op_name,
         input_type={
-            "obj": tagged_value_type.TaggedValueType(
-                types.TypedDict({tag_key: types.optional(tag_type)}), base_type
-            ),
+            "obj": tagged_value_type.TaggedValueType(types.TypedDict({tag_key: types.optional(tag_type)}), base_type),
         },
-        output_type=lambda input_types: input_types["obj"].tag.property_types.get(
-            tag_key, types.NoneType()
-        ),
+        output_type=lambda input_types: input_types["obj"].tag.property_types.get(tag_key, types.NoneType()),
     )
     def tag_getter_op(obj):  # type: ignore
         return tag_store.find_tag(obj, tag_key, tag_type)
@@ -59,14 +55,10 @@ def make_tag_getter_op(
         name=f"ArrowWeaveList_{op_name}",
         input_type={
             "obj": ArrowWeaveListType(
-                tagged_value_type.TaggedValueType(
-                    types.TypedDict({tag_key: types.optional(tag_type)}), base_type
-                ),
+                tagged_value_type.TaggedValueType(types.TypedDict({tag_key: types.optional(tag_type)}), base_type),
             )
         },
-        output_type=lambda input_types: ArrowWeaveListType(
-            input_types["obj"].object_type.tag.property_types[tag_key]
-        ),
+        output_type=lambda input_types: ArrowWeaveListType(input_types["obj"].object_type.tag.property_types[tag_key]),
     )
     def awl_tag_getter_op(obj):  # type: ignore
         return ArrowWeaveList(

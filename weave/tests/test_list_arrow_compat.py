@@ -150,9 +150,7 @@ def inv_filter_fn(row) -> bool:
     ],
 )
 def test_list_arrow_compatibility(data, fn_name, fn_def, res, extra_args):
-    test_list_arrow_fn_results_maybe_incompatible(
-        data, fn_name, fn_def, res, res, extra_args
-    )
+    test_list_arrow_fn_results_maybe_incompatible(data, fn_name, fn_def, res, res, extra_args)
 
 
 @pytest.mark.parametrize(
@@ -173,9 +171,7 @@ def test_list_arrow_compatibility(data, fn_name, fn_def, res, extra_args):
         )
     ],
 )
-def test_list_arrow_fn_results_maybe_incompatible(
-    data, fn_name, fn_def, list_res, arrow_res, extra_args
-):
+def test_list_arrow_fn_results_maybe_incompatible(data, fn_name, fn_def, list_res, arrow_res, extra_args):
     list_node = list_.make_list(**{f"{i}": v for i, v in enumerate(data)})
     arrow_node = weave.save(arrow.to_arrow(data))
 
@@ -198,13 +194,9 @@ def compare_join_results(results, exp_results):
     error_msg = f"Expected {exp_results}, got {results}"
     assert len(results) == len(exp_results), f"Result length is wrong; {error_msg}"
     for exp_result in exp_results:
-        assert (
-            exp_result in results
-        ), f"Expected result {exp_result} not found; {error_msg}"
+        assert exp_result in results, f"Expected result {exp_result} not found; {error_msg}"
     for result in results:
-        assert (
-            result in exp_results
-        ), f"unexpected result {exp_result} found; {error_msg}"
+        assert result in exp_results, f"unexpected result {exp_result} found; {error_msg}"
 
 
 @pytest.mark.parametrize("li", lath.ListInterfaces)
@@ -418,18 +410,10 @@ def test_join_2(li):
         lambda row: row["val"],
     )
 
-    joined_inner_node = list_node_1.join(
-        list_node_2, join_fn, join_fn, "a0", "a1", False, False
-    )
-    joined_left_outer_node = list_node_1.join(
-        list_node_2, join_fn, join_fn, "a0", "a1", True, False
-    )
-    joined_right_outer_node = list_node_1.join(
-        list_node_2, join_fn, join_fn, "a0", "a1", False, True
-    )
-    joined_full_outer_node = list_node_1.join(
-        list_node_2, join_fn, join_fn, "a0", "a1", True, True
-    )
+    joined_inner_node = list_node_1.join(list_node_2, join_fn, join_fn, "a0", "a1", False, False)
+    joined_left_outer_node = list_node_1.join(list_node_2, join_fn, join_fn, "a0", "a1", True, False)
+    joined_right_outer_node = list_node_1.join(list_node_2, join_fn, join_fn, "a0", "a1", False, True)
+    joined_full_outer_node = list_node_1.join(list_node_2, join_fn, join_fn, "a0", "a1", True, True)
 
     # TODO: Arrow and List have different permutation ordering here - probably fix list implementation to match arrow
     exp_results = [
@@ -501,19 +485,13 @@ algos = [
 @pytest.mark.timeout(60)
 @pytest.mark.parametrize(
     "li, algo, options",
-    [
-        (li, algo_options[0], algo_options[1])
-        for li in lath.ListInterfaces
-        for algo_options in algos
-    ],
+    [(li, algo_options[0], algo_options[1]) for li in lath.ListInterfaces for algo_options in algos],
 )
 def test_2d_projection(li, algo, options):
     n_rows = 15
     n_cols = 6
     data = np.random.rand(n_rows, n_cols)
-    data_as_dicts = [
-        {f"col_{item_ndx}": item for item_ndx, item in enumerate(row)} for row in data
-    ]
+    data_as_dicts = [{f"col_{item_ndx}": item for item_ndx, item in enumerate(row)} for row in data]
     col_names = [f"col_{item_ndx}" for item_ndx in range(n_cols)]
     node = li.make_node(data_as_dicts)
     projection = node._get_op("2DProjection")(algo, "many", col_names, options)
@@ -645,14 +623,7 @@ def test_tag_pushdown_on_list_of_lists(use_arrow):
 
     context_state.clear_loading_built_ins(_loading_builtins_token)
 
-    inner_func = (
-        lambda n: n
-        + row_tag_getter(n)
-        + col_tag_getter(n)
-        + list_tag_getter(n)
-        - top_tag_getter(n)
-        + 3
-    )
+    inner_func = lambda n: n + row_tag_getter(n) + col_tag_getter(n) + list_tag_getter(n) - top_tag_getter(n) + 3
 
     outer_func = lambda row: row.map(inner_func)
     mapped = list_node.map(outer_func)
@@ -684,9 +655,7 @@ def test_tag_pushdown_on_list_of_lists(use_arrow):
     if use_arrow:
         output = output.to_pylist_tagged()
 
-    assert output == [
-        [data[i][j] + 3 + i + j - 2 + i for j in range(3)] for i in range(3)
-    ]
+    assert output == [[data[i][j] + 3 + i + j - 2 + i for j in range(3)] for i in range(3)]
 
 
 @pytest.mark.parametrize(

@@ -42,9 +42,7 @@ class PanelTraceConfig:
 @weave.type("tracePanel")
 class Trace(panel.Panel):
     id = "tracePanel"
-    config: typing.Optional[PanelTraceConfig] = dataclasses.field(
-        default_factory=lambda: None
-    )
+    config: typing.Optional[PanelTraceConfig] = dataclasses.field(default_factory=lambda: None)
 
     def __init__(self, input_node, vars=None, config=None, **options):
         super().__init__(input_node=input_node, vars=vars)

@@ -109,12 +109,8 @@ class ExecuteStats:
                 self.op_stats[op_name]["count"] += op_stats["count"]
                 self.op_stats[op_name]["total_time"] += op_stats["total_time"]
                 self.op_stats[op_name]["cache_used"] += op_stats["cache_used"]
-                self.op_stats[op_name]["already_executed"] += op_stats[
-                    "already_executed"
-                ]
-                self.op_stats[op_name]["bytes_read_to_arrow"] += op_stats[
-                    "bytes_read_to_arrow"
-                ]
+                self.op_stats[op_name]["already_executed"] += op_stats["already_executed"]
+                self.op_stats[op_name]["bytes_read_to_arrow"] += op_stats["bytes_read_to_arrow"]
 
     def op_summary(self) -> dict[str, OpExecuteSummaryStats]:
         summary_op_stats: dict[str, OpExecuteSummaryStats] = {}
@@ -125,9 +121,7 @@ class ExecuteStats:
             }
         sortable_stats = [(k, v) for k, v in summary_op_stats.items()]
 
-        return dict(
-            list(reversed(sorted(sortable_stats, key=lambda s: s[1]["total_time"])))
-        )
+        return dict(list(reversed(sorted(sortable_stats, key=lambda s: s[1]["total_time"]))))
 
     def summary(self) -> OpExecuteStats:
         summary: OpExecuteStats = {
@@ -150,17 +144,14 @@ def is_panelplot_data_fetch_query(node: graph.Node) -> bool:
     if isinstance(node, graph.OutputNode) and node.from_op.name == "list":
         return all(
             map(
-                lambda input: isinstance(input, graph.OutputNode)
-                and input.from_op.name == "unnest",
+                lambda input: isinstance(input, graph.OutputNode) and input.from_op.name == "unnest",
                 node.from_op.inputs.values(),
             )
         )
     return False
 
 
-_top_level_stats_ctx: contextvars.ContextVar[
-    typing.Optional[ExecuteStats]
-] = contextvars.ContextVar("_top_level_stats_ctx", default=None)
+_top_level_stats_ctx: contextvars.ContextVar[typing.Optional[ExecuteStats]] = contextvars.ContextVar("_top_level_stats_ctx", default=None)
 
 
 @contextlib.contextmanager
@@ -189,7 +180,7 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
             "Executing %s leaf nodes. (showing first 10)\n%s"
             % (
                 len(nodes),
-                "\n".join([graph_debug.node_expr_str_full(n) for n in nodes[:10]])
+                "\n".join([graph_debug.node_expr_str_full(n) for n in nodes[:10]]),
                 # graph_debug.assignments_string(
                 #     graph_debug.to_assignment_form(
                 #         graph_debug.combine_common_nodes(nodes)
@@ -210,21 +201,12 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                 # assumption is violated.
                 with forward_graph.node_result_store():
                     compile_results = compile.compile(nodes)
-                    nodes_to_print = [
-                        node
-                        for node, err in compile_results.iter_items()
-                        if err == None
-                    ]
+                    nodes_to_print = [node for node, err in compile_results.iter_items() if err == None]
                     logging.debug(
                         "Compiled %s leaf nodes. (showing first 10)\n%s"
                         % (
                             len(nodes_to_print),
-                            "\n".join(
-                                [
-                                    graph_debug.node_expr_str_full(node)
-                                    for node in nodes_to_print[:10]
-                                ]
-                            ),
+                            "\n".join([graph_debug.node_expr_str_full(node) for node in nodes_to_print[:10]]),
                         )
                     )
 
@@ -245,11 +227,7 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                         # an `ExecutableNode` (Output or Const) and we currently have
                         # general `Node`. This is not because of the ValueOrError typing.
                         res = compile_results.safe_map(fg.get_result)  # type: ignore
-                        res = res.raw_map(
-                            lambda i: value_or_error.Error(i.error)
-                            if isinstance(i, forward_graph.ErrorResult)
-                            else value_or_error.Value(i)
-                        )
+                        res = res.raw_map(lambda i: value_or_error.Error(i.error) if isinstance(i, forward_graph.ErrorResult) else value_or_error.Value(i))
 
     top_level_stats = get_top_level_stats()
     if top_level_stats is not None:
@@ -277,16 +255,10 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
         for op_name, group_iter in groups:
             group = list(group_iter)
             op_def = registry_mem.memory_registry.get_op(op_name)
-            if (
-                parallel_budget != 1
-                and len(group) > 1
-                and op_policy.should_run_in_parallel(op_name)
-            ):
+            if parallel_budget != 1 and len(group) > 1 and op_policy.should_run_in_parallel(op_name):
                 # Parallel threaded case
                 num_threads = min(len(group), parallel_budget)
-                remaining_budget_per_thread = (
-                    parallelism.get_remaining_budget_per_thread(len(group))
-                )
+                remaining_budget_per_thread = parallelism.get_remaining_budget_per_thread(len(group))
 
                 def do_one(
                     x,
@@ -312,10 +284,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         time.time() - start_time,
                     )
 
-                logging.info(
-                    "Running %s on %s threads with %s remaining parallel budget each"
-                    % (op_name, num_threads, remaining_budget_per_thread)
-                )
+                logging.info("Running %s on %s threads with %s remaining parallel budget each" % (op_name, num_threads, remaining_budget_per_thread))
 
                 for (
                     fn,
@@ -336,34 +305,21 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                     start_time = time.time()
                     span = None
                     if isinstance(forward_node.node, graph.OutputNode):
-                        span = tracer.trace(
-                            "op.%s" % graph.op_full_name(forward_node.node.from_op)
-                        )
+                        span = tracer.trace("op.%s" % graph.op_full_name(forward_node.node.from_op))
                     try:
                         with tag_store.set_curr_node(
                             id(forward_node.node),
-                            [
-                                id(input_node)
-                                for input_node in forward_node.node.from_op.inputs.values()
-                            ],
+                            [id(input_node) for input_node in forward_node.node.from_op.inputs.values()],
                         ):
                             # Lambdas and async functions do not use object_context (object caching
                             # and mutational transactions).
                             if op_def.is_async or (
-                                any(
-                                    isinstance(input_node.type, types.Function)
-                                    for input_node in forward_node.node.from_op.inputs.values()
-                                )
-                                and not op_def.mutation
+                                any(isinstance(input_node.type, types.Function) for input_node in forward_node.node.from_op.inputs.values()) and not op_def.mutation
                             ):
-                                report = execute_forward_node(
-                                    fg, forward_node, no_cache=no_cache
-                                )
+                                report = execute_forward_node(fg, forward_node, no_cache=no_cache)
                             else:
                                 with object_context.object_context():
-                                    report = execute_forward_node(
-                                        fg, forward_node, no_cache=no_cache
-                                    )
+                                    report = execute_forward_node(fg, forward_node, no_cache=no_cache)
 
                     except Exception as e:
                         logging.info(
@@ -423,9 +379,7 @@ def async_op_body(run_key: trace_local.RunKey, run_body, inputs, wandb_api_ctx):
         run.set_state("finished")  # type: ignore
 
 
-def execute_async_op(
-    op_def: op_def.OpDef, inputs: Mapping[str, typing.Any], run_key: trace_local.RunKey
-):
+def execute_async_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any], run_key: trace_local.RunKey):
     wandb_api_ctx = wandb_api.get_wandb_api_context()
     job = threading.Thread(
         target=async_op_body,
@@ -450,14 +404,9 @@ def get_bytes_read_to_arrow(node: graph.Node, result: typing.Any) -> int:
     # deref if we have a ref
     result = ref_base.deref(result)
 
-    if (
-        isinstance(node, graph.OutputNode)
-        and node.from_op.name in op_policy.ARROW_FS_OPS
-    ):
+    if isinstance(node, graph.OutputNode) and node.from_op.name in op_policy.ARROW_FS_OPS:
         if node.from_op.name.startswith("mapped"):
-            return sum(
-                r._arrow_data.nbytes for r in result if isinstance(r, ArrowWeaveList)
-            )
+            return sum(r._arrow_data.nbytes for r in result if isinstance(r, ArrowWeaveList))
         if isinstance(result, ArrowWeaveList):
             return result._arrow_data.nbytes
     return 0
@@ -471,9 +420,7 @@ class NodeExecutionReport(typing.TypedDict):
 
 # This function is not called in prod - but helpful when debugging
 # to print out the entire stack of nodes that were executed.
-def _debug_node_stack(
-    fg: forward_graph.ForwardGraph, node: graph.Node, depth=0, prefix=""
-):
+def _debug_node_stack(fg: forward_graph.ForwardGraph, node: graph.Node, depth=0, prefix=""):
     padding = " " * depth
     if isinstance(node, graph.OutputNode):
         input_nodes = node.from_op.inputs
@@ -552,9 +499,7 @@ def execute_forward_node(
         run_key = None
         if use_cache or op_def.is_async:
             # Compute the run ID, which is deterministic if the op is pure
-            run_key = trace_local.make_run_key(
-                op_def, input_refs, impure_cache_key=client_cache_key
-            )
+            run_key = trace_local.make_run_key(op_def, input_refs, impure_cache_key=client_cache_key)
 
         if run_key:
             run = TRACE_LOCAL.get_run_val(run_key)
@@ -594,16 +539,11 @@ def execute_forward_node(
                         return {
                             "cache_used": True,
                             "already_executed": False,
-                            "bytes_read_to_arrow": get_bytes_read_to_arrow(
-                                node, output
-                            ),
+                            "bytes_read_to_arrow": get_bytes_read_to_arrow(node, output),
                         }
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
-        inputs = {
-            input_name: _tag_safe_deref(input)
-            for input_name, input in input_refs.items()
-        }
+        inputs = {input_name: _tag_safe_deref(input) for input_name, input in input_refs.items()}
 
     if op_def.is_async and run_key:
         with tracer.trace("execute-async"):
@@ -632,9 +572,7 @@ def execute_forward_node(
                     result = None
                 # Still need to flow tags
                 if opdef_util.should_flow_tags(op_def):
-                    result = process_opdef_resolve_fn.flow_tags(
-                        next(iter(inputs.values())), box.box(result)
-                    )
+                    result = process_opdef_resolve_fn.flow_tags(next(iter(inputs.values())), box.box(result))
             else:
                 result = op_execute.execute_op(op_def, inputs)
 
@@ -662,12 +600,7 @@ def execute_forward_node(
             # TODO: This actually should work correctly, but mutation tracing
             #    does not really work yet. (mutated objects set their run output
             #    as the original ref rather than the new ref, which causes problems)
-            if (
-                use_cache
-                and run_key is not None
-                and not is_run_op(node.from_op)
-                and not box.is_none(result)
-            ):
+            if use_cache and run_key is not None and not is_run_op(node.from_op) and not box.is_none(result):
                 logging.debug("Saving run")
                 TRACE_LOCAL.new_run(run_key, inputs=input_refs, output=result)
         return {

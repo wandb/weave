@@ -52,9 +52,7 @@ def test_nested():
     panel = Group(
         items={
             "a": Group(items={"a1": 5, "a2": lambda a1: a1 + 5}),
-            "b": Group(
-                items={"b1": lambda a: a.items["a1"], "b2": lambda a: a.items["a2"]}
-            ),
+            "b": Group(items={"b1": lambda a: a.items["a1"], "b2": lambda a: a.items["a2"]}),
         }
     )
     panel.normalize()
@@ -90,9 +88,7 @@ def test_object_picker_choice_type():
 
 
 def test_facet_selected():
-    data = weave.save(
-        [{"guess": "dog", "truth": "cat"}, {"guess": "dog", "truth": "dog"}]
-    )
+    data = weave.save([{"guess": "dog", "truth": "cat"}, {"guess": "dog", "truth": "dog"}])
     facet = weave.panels.Group(
         equalSize=True,
         items={
@@ -125,12 +121,8 @@ def test_board():
 
 
 def test_plot_constants_assign():
-    assert panel_plot.PlotConstants.WeaveType().assign_type(
-        weave.type_of(panel_plot.PlotConstants())
-    )
+    assert panel_plot.PlotConstants.WeaveType().assign_type(weave.type_of(panel_plot.PlotConstants()))
 
 
 def test_plot_assign():
-    assert weave.panels.Plot.WeaveType().assign_type(
-        weave.type_of(weave.panels.Plot([{"a": 5}]))
-    )
+    assert weave.panels.Plot.WeaveType().assign_type(weave.type_of(weave.panels.Plot([{"a": 5}])))

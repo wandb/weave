@@ -23,9 +23,6 @@ def test_list_image_same_sizes():
 
 @pytest.mark.skip("type merging is just the simple union algorithm for now")
 def test_list_image_different_sizes_merges():
-    ims = [
-        Image.linear_gradient("L").resize((256 - i, 256)).rotate(i * 4)
-        for i in range(3)
-    ]
+    ims = [Image.linear_gradient("L").resize((256 - i, 256)).rotate(i * 4) for i in range(3)]
     # We'd need to change this line if we want to use this test
     assert weave.type_of(ims) == weave.types.Invalid()

@@ -61,15 +61,11 @@ def determine_scope(fixture_name, config):
 
 
 @pytest.fixture(scope=determine_scope)
-def bootstrap_user(
-    worker_id: str, fixture_fn, base_url, wandb_debug
-) -> Generator[LocalBackendFixturePayload, None, None]:
+def bootstrap_user(worker_id: str, fixture_fn, base_url, wandb_debug) -> Generator[LocalBackendFixturePayload, None, None]:
     username = f"user-{worker_id}-{random_string()}"
     command = UserFixtureCommand(command="up", username=username)
     fixture_fn(command)
-    command = UserFixtureCommand(
-        command="password", username=username, password=username
-    )
+    command = UserFixtureCommand(command="password", username=username, password=username)
     fixture_fn(command)
 
     with unittest.mock.patch.dict(
@@ -109,9 +105,7 @@ def user_by_http_headers_in_context(
 
 
 @pytest.fixture(scope=determine_scope)
-def user_by_api_key_in_env(
-    bootstrap_user: LocalBackendFixturePayload, serial
-) -> Generator[LocalBackendFixturePayload, None, None]:
+def user_by_api_key_in_env(bootstrap_user: LocalBackendFixturePayload, serial) -> Generator[LocalBackendFixturePayload, None, None]:
     with unittest.mock.patch.dict(
         os.environ,
         {
@@ -136,9 +130,7 @@ def user_by_api_key_netrc(
     try:
         with open(netrc_path, "w") as f:
             url = urllib.parse.urlparse(bootstrap_user.base_url).netloc
-            f.write(
-                f"machine {url}\n  login user\n  password {bootstrap_user.api_key}\n"
-            )
+            f.write(f"machine {url}\n  login user\n  password {bootstrap_user.api_key}\n")
         with from_environment():
             yield bootstrap_user
     finally:
@@ -221,9 +213,7 @@ def random_string(length: int = 12) -> str:
     :param length: Length of the string to generate.
     :return: Random string.
     """
-    return "".join(
-        secrets.choice(string.ascii_lowercase + string.digits) for _ in range(length)
-    )
+    return "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(length))
 
 
 @pytest.fixture(scope="session")
@@ -248,9 +238,7 @@ def wandb_debug(request):
     return request.config.getoption("--wandb-debug", default=False)
 
 
-def check_server_health(
-    base_url: str, endpoint: str, num_retries: int = 1, sleep_time: int = 1
-) -> bool:
+def check_server_health(base_url: str, endpoint: str, num_retries: int = 1, sleep_time: int = 1) -> bool:
     """Check if wandb server is healthy.
 
     :param base_url:
@@ -267,9 +255,7 @@ def check_server_health(
         except requests.exceptions.ConnectionError:
             time.sleep(sleep_time)
 
-    print(
-        f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: no response"
-    )
+    print(f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: no response")
     return False
 
 
@@ -312,11 +298,7 @@ def check_server_up(
             f"{FIXTURE_SERVICE_PORT}:{FIXTURE_SERVICE_PORT}",
             "-e",
             "WANDB_ENABLE_TEST_CONTAINER=true",
-            *(
-                ["-e", "PARQUET_ENABLED=true"]
-                if os.environ.get("PARQUET_ENABLED")
-                else []
-            ),
+            *(["-e", "PARQUET_ENABLED=true"] if os.environ.get("PARQUET_ENABLED") else []),
             "--name",
             "wandb-local",
             "--platform",
@@ -329,19 +311,13 @@ def check_server_up(
         ]
         subprocess.Popen(command)
         # wait for the server to start
-        server_is_up = check_server_health(
-            base_url=base_url, endpoint=app_health_endpoint, num_retries=30
-        )
+        server_is_up = check_server_health(base_url=base_url, endpoint=app_health_endpoint, num_retries=30)
         if not server_is_up:
             return False
         # check that the fixture service is accessible
-        return check_server_health(
-            base_url=fixture_url, endpoint=fixture_health_endpoint, num_retries=30
-        )
+        return check_server_health(base_url=fixture_url, endpoint=fixture_health_endpoint, num_retries=30)
 
-    return check_server_health(
-        base_url=fixture_url, endpoint=fixture_health_endpoint, num_retries=10
-    )
+    return check_server_health(base_url=fixture_url, endpoint=fixture_health_endpoint, num_retries=10)
 
 
 @dataclasses.dataclass
@@ -366,9 +342,7 @@ class AddAdminAndEnsureNoDefaultUser:
 
 @pytest.fixture(scope="session")
 def fixture_fn(base_url, wandb_server_tag, wandb_server_pull):
-    def fixture_util(
-        cmd: Union[UserFixtureCommand, AddAdminAndEnsureNoDefaultUser]
-    ) -> bool:
+    def fixture_util(cmd: Union[UserFixtureCommand, AddAdminAndEnsureNoDefaultUser]) -> bool:
         endpoint = urllib.parse.urljoin(
             base_url.replace(LOCAL_BASE_PORT, cmd.port),
             cmd.endpoint,
@@ -411,9 +385,7 @@ def dev_only_admin_env_override() -> Generator[None, None, None]:
     new_env = {}
     admin_path = "../config/.admin.env"
     if not os.path.exists(admin_path):
-        print(
-            f"WARNING: Could not find admin env file at {admin_path}. Please follow instructions in README.md to create one."
-        )
+        print(f"WARNING: Could not find admin env file at {admin_path}. Please follow instructions in README.md to create one.")
         yield
         return
     with open(admin_path) as file:

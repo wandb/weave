@@ -65,9 +65,7 @@ def test_run_ops():
 @pytest.mark.timeout(1.5)
 def test_run_ops_mapped():
     input = api.save([1, 2])
-    result = input.map(
-        lambda item: async_demo.slowmult(item, 4, 0.01).await_final_output()
-    )
+    result = input.map(lambda item: async_demo.slowmult(item, 4, 0.01).await_final_output())
 
     # We can call any ops that are available on the run's output type.
     # So this should not fail!
@@ -82,7 +80,4 @@ def test_async_op_expr():
     model = train_result.model()
     saved_model = api.save(model, "model")
 
-    assert (
-        str(saved_model)
-        == 'get("local-artifact:///list:54643291a9d1a0f06a45/obj").train().model().save("model")'
-    )
+    assert str(saved_model) == 'get("local-artifact:///list:54643291a9d1a0f06a45/obj").train().model().save("model")'

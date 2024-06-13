@@ -26,9 +26,7 @@ def async_disabled():
 @pytest.mark.skip()
 def test_monitoring_basic(user_by_api_key_in_env):
     with async_disabled():
-        mon = monitor.new_monitor(
-            "%s/%s/test_monitoring" % (user_by_api_key_in_env.username, "test")
-        )
+        mon = monitor.new_monitor("%s/%s/test_monitoring" % (user_by_api_key_in_env.username, "test"))
 
         @mon.trace()
         def example(a, b):
@@ -56,7 +54,6 @@ def test_monitoring_basic(user_by_api_key_in_env):
 @pytest.mark.skip("Feature removed")
 def test_monitoring_auto_false(user_by_api_key_in_env):
     with async_disabled():
-
         # @monitoring.monitor(
         #     entity_name=user_by_api_key_in_env.username,
         #     project_name="test",
@@ -88,7 +85,6 @@ def test_monitoring_auto_false(user_by_api_key_in_env):
 @pytest.mark.skip("Feature removed")
 def test_monitoring_capture_errors(user_by_api_key_in_env):
     with async_disabled():
-
         # @monitoring.monitor(
         #     entity_name=user_by_api_key_in_env.username,
         #     project_name="test",
@@ -117,9 +113,7 @@ def test_monitoring_capture_errors(user_by_api_key_in_env):
         example._stream_table.finish()
         node = example.rows()
 
-        input_results, output_results, exception_results = weave.use(
-            [node["inputs"], node["output"], node["exception"]]
-        )
+        input_results, output_results, exception_results = weave.use([node["inputs"], node["output"], node["exception"]])
 
         assert input_results.to_pylist_tagged() == rows
         assert output_results.to_pylist_tagged() == results
@@ -129,7 +123,6 @@ def test_monitoring_capture_errors(user_by_api_key_in_env):
 @pytest.mark.skip("Feature removed")
 def test_monitoring_processors(user_by_api_key_in_env):
     with async_disabled():
-
         # @monitoring.monitor(
         #     entity_name=user_by_api_key_in_env.username,
         #     project_name="test",

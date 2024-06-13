@@ -113,11 +113,7 @@ def assert_equal(v1, v2):
                     "b": [
                         None,
                         TaggedValue(
-                            {
-                                "yy": _TestMyObj(
-                                    {"x": "xx5", "y": "yy5", "z": 1024}, 0.0001
-                                )
-                            },
+                            {"yy": _TestMyObj({"x": "xx5", "y": "yy5", "z": 1024}, 0.0001)},
                             -100,
                         ),
                     ],
@@ -143,11 +139,7 @@ def assert_equal(v1, v2):
                         "a",
                         None,
                         TaggedValue(
-                            {
-                                "j": _TestMyObj(
-                                    {"x": "aaa", "y": "aba", "z": -11111}, 1.23
-                                )
-                            },
+                            {"j": _TestMyObj({"x": "aaa", "y": "aba", "z": -11111}, 1.23)},
                             [55, "xx", None],
                         ),
                     ]

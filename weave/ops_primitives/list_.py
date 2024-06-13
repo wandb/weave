@@ -112,9 +112,7 @@ class List:
         name="sort",
         input_type={
             "arr": types.List(types.Any()),
-            "compFn": lambda input_types: types.Function(
-                {"row": input_types["arr"].object_type}, types.List(types.Any())
-            ),
+            "compFn": lambda input_types: types.Function({"row": input_types["arr"].object_type}, types.List(types.Any())),
             "columnDirs": types.List(types.String()),
         },
         output_type=lambda input_types: input_types["arr"],
@@ -169,9 +167,7 @@ class List:
         name="_listmap",
         input_type={
             "arr": types.List(types.Any()),
-            "mapFn": lambda input_types: types.Function(
-                {"row": input_types["arr"].object_type}, types.Any()
-            ),
+            "mapFn": lambda input_types: types.Function({"row": input_types["arr"].object_type}, types.Any()),
         },
         output_type=lambda input_types: types.List(input_types["mapFn"].output_type),
     )
@@ -182,9 +178,7 @@ class List:
         name="groupby",
         input_type={
             "arr": types.List(types.Any()),
-            "groupByFn": lambda input_types: types.Function(
-                {"row": input_types["arr"].object_type}, types.Any()
-            ),
+            "groupByFn": lambda input_types: types.Function({"row": input_types["arr"].object_type}, types.Any()),
         },
         output_type=lambda input_types: types.List(
             tagged_value_type.TaggedValueType(
@@ -236,9 +230,7 @@ class List:
         name="dropna",
         input_type={"arr": types.List(types.Any())},
         output_type=lambda input_types: types.List(
-            types.non_none(input_types["arr"].object_type)
-            if types.non_none(input_types["arr"].object_type) != types.Invalid()
-            else types.NoneType()
+            types.non_none(input_types["arr"].object_type) if types.non_none(input_types["arr"].object_type) != types.Invalid() else types.NoneType()
         ),
     )
     def dropna(arr):
@@ -246,9 +238,7 @@ class List:
 
     @op(
         name="concat",
-        input_type={
-            "arr": types.List(types.union(types.NoneType(), types.List(types.Any())))
-        },
+        input_type={"arr": types.List(types.union(types.NoneType(), types.List(types.Any())))},
         output_type=lambda input_types: input_types["arr"].object_type,
     )
     def concat(arr):
@@ -281,9 +271,7 @@ def group_result_index_output_type(input_types):
 
 def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Function:
     if types.List().assign_type(input_types["arr"]):
-        return _map_each_function_type(
-            {"arr": typing.cast(types.List, input_types["arr"]).object_type}
-        )
+        return _map_each_function_type({"arr": typing.cast(types.List, input_types["arr"]).object_type})
     return types.Function({"row": input_types["arr"]}, types.Any())
 
 
@@ -299,11 +287,7 @@ def _map_each_output_type(input_types: dict[str, types.Type]):
                 t_as_tagged = typing.cast(tagged_value_type.TaggedValueType, t)
                 return tagged_value_type.TaggedValueType(
                     t_as_tagged.tag,
-                    types.List(
-                        get_next_type(
-                            typing.cast(types.List, t_as_tagged.value).object_type
-                        )
-                    ),
+                    types.List(get_next_type(typing.cast(types.List, t_as_tagged.value).object_type)),
                 )
             return types.List(get_next_type(t_as_list.object_type))
         elif tagged_value_type_helpers.is_tagged_value_type(t):
@@ -315,9 +299,7 @@ def _map_each_output_type(input_types: dict[str, types.Type]):
 
 
 def _map_each(arr: list, fn):
-    existing_tags = [
-        tag_store.get_tags(item) if tag_store.is_tagged(item) else None for item in arr
-    ]
+    existing_tags = [tag_store.get_tags(item) if tag_store.is_tagged(item) else None for item in arr]
 
     if isinstance(arr, list) and len(arr) > 0 and isinstance(arr[0], list):
         result = [_map_each(item, fn) for item in arr]
@@ -506,9 +488,7 @@ def pick_output_type(input_types):
         if output_type is None:
             output_type = types.none_type
     else:
-        raise errors.WeaveInternalError(
-            "pick received invalid input types: %s" % input_types
-        )
+        raise errors.WeaveInternalError("pick received invalid input types: %s" % input_types)
     if is_list:
         output_type = types.List(output_type)
     return output_type
@@ -540,12 +520,8 @@ def _join_output_type(input_types):
     input_type={
         "arr1": types.List(types.TypedDict({})),
         "arr2": types.List(types.TypedDict({})),
-        "keyFn1": lambda input_types: types.Function(
-            {"row": input_types["arr1"].object_type}, types.Any()
-        ),
-        "keyFn2": lambda input_types: types.Function(
-            {"row": input_types["arr2"].object_type}, types.Any()
-        ),
+        "keyFn1": lambda input_types: types.Function({"row": input_types["arr1"].object_type}, types.Any()),
+        "keyFn2": lambda input_types: types.Function({"row": input_types["arr2"].object_type}, types.Any()),
     },
     output_type=_join_output_type,
 )
@@ -568,9 +544,7 @@ def join2(arr1, arr2, keyFn1, keyFn2):  # type: ignore
 
 
 def _join_2_output_row_type(input_types):
-    both_aliases_are_consts = isinstance(
-        input_types["alias1"], types.Const
-    ) and isinstance(input_types["alias2"], types.Const)
+    both_aliases_are_consts = isinstance(input_types["alias1"], types.Const) and isinstance(input_types["alias2"], types.Const)
     arr1_obj_type = input_types["arr1"].object_type
     arr2_obj_type = input_types["arr2"].object_type
     if both_aliases_are_consts:
@@ -610,12 +584,8 @@ def _join_2_output_type(input_types):
     input_type={
         "arr1": types.List(),
         "arr2": types.List(),
-        "join1Fn": lambda input_types: types.Function(
-            {"row": input_types["arr1"].object_type}, types.Any()
-        ),
-        "join2Fn": lambda input_types: types.Function(
-            {"row": input_types["arr2"].object_type}, types.Any()
-        ),
+        "join1Fn": lambda input_types: types.Function({"row": input_types["arr1"].object_type}, types.Any()),
+        "join2Fn": lambda input_types: types.Function({"row": input_types["arr2"].object_type}, types.Any()),
         "alias1": types.String(),
         "alias2": types.String(),
         "leftOuter": types.Boolean(),
@@ -682,9 +652,7 @@ def _filter_none(arrs: list[typing.Any]) -> list[typing.Any]:
     return [a for a in arrs if a != None]
 
 
-def _all_join_keys_mapping(
-    arrs: list[list[dict]], join_keys: list[list[typing.Any]]
-) -> typing.Tuple[set[typing.Any], list[dict[typing.Any, list[typing.Any]]]]:
+def _all_join_keys_mapping(arrs: list[list[dict]], join_keys: list[list[typing.Any]]) -> typing.Tuple[set[typing.Any], list[dict[typing.Any, list[typing.Any]]]]:
     all_join_keys: set[typing.Any] = set([])
     join_key_mapping = []
     for arr, keys in zip(arrs, join_keys):
@@ -704,9 +672,7 @@ def _all_join_keys_mapping(
     name="joinAll",
     input_type={
         "arrs": types.List(types.optional(types.List(types.TypedDict({})))),
-        "joinFn": lambda input_types: types.Function(
-            {"row": input_types["arrs"].object_type.object_type}, types.Any()
-        ),
+        "joinFn": lambda input_types: types.Function({"row": input_types["arrs"].object_type.object_type}, types.Any()),
     },
     output_type=_join_all_output_type,
 )
@@ -776,9 +742,7 @@ def join_all(arrs, joinFn, outer: bool):
     output_type=lambda input_types: types.List(
         types.TypedDict(
             {
-                "projection": types.TypedDict(
-                    {"x": types.Number(), "y": types.Number()}
-                ),
+                "projection": types.TypedDict({"x": types.Number(), "y": types.Number()}),
                 "source": input_types["table"].object_type,
             }
         )
@@ -798,16 +762,9 @@ def list_2Dprojection(
         embeddings = []
         for row in table:
             if inputCardinality == "single":
-                embeddings.append(
-                    tag_aware_dict_val_for_escaped_key(row, inputColumnNames[0])
-                )
+                embeddings.append(tag_aware_dict_val_for_escaped_key(row, inputColumnNames[0]))
             else:
-                embeddings.append(
-                    [
-                        tag_aware_dict_val_for_escaped_key(row, c)
-                        for c in inputColumnNames
-                    ]
-                )
+                embeddings.append([tag_aware_dict_val_for_escaped_key(row, c) for c in inputColumnNames])
         np_array_of_embeddings = np.array(embeddings)
         np_projection = projection_utils.perform_2D_projection_with_timeout(
             np_array_of_embeddings,
@@ -839,9 +796,7 @@ def list_2Dprojection(
     output_type=lambda input_types: types.List(
         types.TypedDict(
             {
-                "projection": types.TypedDict(
-                    {"x": types.Number(), "y": types.Number()}
-                ),
+                "projection": types.TypedDict({"x": types.Number(), "y": types.Number()}),
                 "source": input_types["table"].object_type,
             }
         )
@@ -861,20 +816,11 @@ def list_projection2D(
         embeddings = []
         for row in table:
             if inputCardinality == "single":
-                embeddings.append(
-                    tag_aware_dict_val_for_escaped_key(row, inputColumnNames[0])
-                )
+                embeddings.append(tag_aware_dict_val_for_escaped_key(row, inputColumnNames[0]))
             else:
-                embeddings.append(
-                    [
-                        tag_aware_dict_val_for_escaped_key(row, c)
-                        for c in inputColumnNames
-                    ]
-                )
+                embeddings.append([tag_aware_dict_val_for_escaped_key(row, c) for c in inputColumnNames])
         np_array_of_embeddings = np.array(embeddings)
-        np_projection = projection_utils.perform_2D_projection_with_timeout(
-            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
-        )
+        np_projection = projection_utils.perform_2D_projection_with_timeout(np_array_of_embeddings, projectionAlgorithm, algorithmOptions)
         projection = np_projection.tolist()
     return [
         {

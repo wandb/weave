@@ -248,9 +248,7 @@ def fix_for_compare(x1):
     elif isinstance(x1, dict):
         return {k: fix_for_compare(v) for k, v in x1.items()}
     elif dataclasses.is_dataclass(x1):
-        return x1.__class__(
-            **{k: fix_for_compare(v) for k, v in dataclasses.asdict(x1).items()}
-        )
+        return x1.__class__(**{k: fix_for_compare(v) for k, v in dataclasses.asdict(x1).items()})
     elif isinstance(x1, artifact_local.LocalArtifact):
         # Same hack as what we did to construct UNSAVED_TEST_ARTIFACT above.
         if x1._read_dirname is None:
@@ -294,9 +292,7 @@ def test_extend(l1, l2):
     # print("EXP ARROW", expected._arrow_data)
 
     # assert result.object_type == expected.object_type
-    assert fix_for_compare(result.to_pylist_tagged()) == fix_for_compare(
-        expected.to_pylist_tagged()
-    )
+    assert fix_for_compare(result.to_pylist_tagged()) == fix_for_compare(expected.to_pylist_tagged())
 
     # Not working yet because of null handling
     # assert result._arrow_data == expected._arrow_data
@@ -392,17 +388,12 @@ def make_random_python_scalar():
 
 def make_random_python_list(depth=0):
     # Generate random python list
-    return [
-        make_random_python_val(depth=depth + 1) for _ in range(random.randint(0, 3))
-    ]
+    return [make_random_python_val(depth=depth + 1) for _ in range(random.randint(0, 3))]
 
 
 def make_random_python_dict(depth=0):
     # Generate random python dict
-    return {
-        str(i): make_random_python_val(depth=depth + 1)
-        for i in range(random.randint(0, 3))
-    }
+    return {str(i): make_random_python_val(depth=depth + 1) for i in range(random.randint(0, 3))}
 
 
 def make_random_python_val(depth=0):
@@ -442,9 +433,7 @@ def test_random(l1, l2):
     print("EXPECTED PY", expected.to_pylist_notags())
     print("RESULT PY", result.to_pylist_notags())
 
-    assert fix_for_compare(result.to_pylist_tagged()) == fix_for_compare(
-        expected.to_pylist_tagged()
-    )
+    assert fix_for_compare(result.to_pylist_tagged()) == fix_for_compare(expected.to_pylist_tagged())
 
 
 CONVERT_TEST_CASES = [

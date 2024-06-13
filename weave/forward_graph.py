@@ -25,9 +25,7 @@ class NodeResultStore:
     _from_store: typing.Optional[collections.defaultdict[graph.OutputNode, typing.Any]]
     _store: collections.defaultdict[graph.OutputNode, typing.Any]
 
-    def __init__(
-        self, initialize_with: typing.Optional["NodeResultStore"] = None
-    ) -> None:
+    def __init__(self, initialize_with: typing.Optional["NodeResultStore"] = None) -> None:
         if initialize_with is None:
             self._from_store = None
         else:
@@ -51,9 +49,7 @@ class NodeResultStore:
             self._store[key] = value
 
 
-_node_result_store: contextvars.ContextVar[
-    typing.Optional[NodeResultStore]
-] = contextvars.ContextVar("_top_level_forward_graph_ctx", default=None)
+_node_result_store: contextvars.ContextVar[typing.Optional[NodeResultStore]] = contextvars.ContextVar("_top_level_forward_graph_ctx", default=None)
 
 
 # Each top level call to execute.execute_nodes creates its own result store.
@@ -93,9 +89,7 @@ class ForwardNode:
     def __str__(self):
         return "<ForwardNode(%s): %s input_to %s>" % (
             id(self),
-            self.node.from_op.name
-            if isinstance(self.node, graph.OutputNode)
-            else self.node.val,
+            self.node.from_op.name if isinstance(self.node, graph.OutputNode) else self.node.val,
             " ".join([str(id(fn)) for fn in self.input_to]),
         )
 
@@ -129,17 +123,13 @@ class ForwardGraph:
 
     def add_node(self, node: graph.Node):
         if isinstance(node, graph.VoidNode):
-            raise errors.WeaveBadRequest(
-                "Found void node when constructing ForwardGraph: %s" % node
-            )
+            raise errors.WeaveBadRequest("Found void node when constructing ForwardGraph: %s" % node)
         elif isinstance(node, graph.ConstNode):
             return
         if node in self._node_to_forward_node:
             return
         if isinstance(node, graph.VarNode) and not self._allow_var_nodes:
-            raise errors.WeaveBadRequest(
-                "Found var node when constructing ForwardGraph: %s" % node
-            )
+            raise errors.WeaveBadRequest("Found var node when constructing ForwardGraph: %s" % node)
 
         forward_node = ForwardNode(node)  # type: ignore
         self._node_to_forward_node[node] = forward_node

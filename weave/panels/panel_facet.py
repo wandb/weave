@@ -36,15 +36,9 @@ class FacetConfig:
     dims: FacetDimsConfig
     cellSize: FacetCellSize
     padding: int
-    selectedCell: typing.Optional[FacetCell] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    xAxisLabel: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
-    yAxisLabel: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
+    selectedCell: typing.Optional[FacetCell] = dataclasses.field(default_factory=lambda: None)
+    xAxisLabel: weave.Node[str] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
+    yAxisLabel: weave.Node[str] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
 
 
 @weave.type()
@@ -94,9 +88,7 @@ class Facet(panel.Panel):
         for dim in ["x", "y", "select", "detail"]:
             print(
                 dim,
-                self.config.table.columnSelectFunctions[
-                    getattr(self.config.dims, dim)
-                ].__repr__(),
+                self.config.table.columnSelectFunctions[getattr(self.config.dims, dim)].__repr__(),
             )
 
     def set_x(self, expr):
@@ -117,9 +109,7 @@ class Facet(panel.Panel):
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):
         if self.config.selectedCell == None:
-            return weave_internal.make_const_node(
-                list_.ArrowWeaveListType(types.NoneType()), list_.make_vec_none(0)
-            )
+            return weave_internal.make_const_node(list_.ArrowWeaveListType(types.NoneType()), list_.make_vec_none(0))
         x_fn = self.config.table.columnSelectFunctions[self.config.dims.x]
         y_fn = self.config.table.columnSelectFunctions[self.config.dims.y]
         filtered = weave.ops.List.filter(

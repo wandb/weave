@@ -112,9 +112,7 @@ rows_tests = [
     rows_tests,
 )
 def test_end_to_end_stream_table_history_path_batch_1(user_by_api_key_in_env, rows):
-    return do_test_end_to_end_stream_table_history_path(
-        user_by_api_key_in_env.username, rows
-    )
+    return do_test_end_to_end_stream_table_history_path(user_by_api_key_in_env.username, rows)
 
 
 def do_test_end_to_end_stream_table_history_path(username, rows):
@@ -123,9 +121,7 @@ def do_test_end_to_end_stream_table_history_path(username, rows):
 
         for key in user_logged_keys:
             column_node = history_node[key]
-            assert_type_assignment(
-                row_object_type.property_types[key], column_node.type.object_type
-            )
+            assert_type_assignment(row_object_type.property_types[key], column_node.type.object_type)
             column_value = weave.use(column_node).to_pylist_tagged()
             expected = []
 
@@ -250,9 +246,7 @@ def do_logging(username, rows, finish=False):
     return row_accumulator, st, all_keys
 
 
-def history_is_uploaded(
-    run_node, exp_len, exp_cols_len, entity_name, project_name, run_name
-):
+def history_is_uploaded(run_node, exp_len, exp_cols_len, entity_name, project_name, run_name):
     history_node = run_node._get_op(HISTORY_OP_NAME)()
     run_data = get_raw_gorilla_history(
         entity_name,
@@ -261,9 +255,7 @@ def history_is_uploaded(
     )
     history = run_data.get("parquetHistory", {})
     return (
-        len(history.get("liveData", []))
-        == exp_len
-        == (run_data.get("historyKeys", {}).get("lastStep", -999) + 1)
+        len(history.get("liveData", [])) == exp_len == (run_data.get("historyKeys", {}).get("lastStep", -999) + 1)
         and history.get("parquetUrls") == []
         and exp_cols_len == len(history_node.type.object_type.property_types)
     )
@@ -271,10 +263,7 @@ def history_is_uploaded(
 
 def history_moved_to_parquet(entity_name, project_name, run_name):
     history = get_raw_gorilla_history(entity_name, project_name, run_name)
-    return (
-        history.get("parquetHistory", {}).get("liveData") == []
-        and len(history.get("parquetHistory", {}).get("parquetUrls", [])) > 0
-    )
+    return history.get("parquetHistory", {}).get("liveData") == [] and len(history.get("parquetHistory", {}).get("parquetUrls", [])) > 0
 
 
 def compare_objects(a, b):
@@ -283,9 +272,7 @@ def compare_objects(a, b):
     elif isinstance(a, list) and isinstance(b, list):
         return len(a) == len(b) and all(compare_objects(a_, b_) for a_, b_ in zip(a, b))
     elif isinstance(a, dict) and isinstance(b, dict):
-        return len(a) == len(b) and all(
-            k in b and compare_objects(a[k], b[k]) for k in a
-        )
+        return len(a) == len(b) and all(k in b and compare_objects(a[k], b[k]) for k in a)
     elif isinstance(a, datetime.datetime) and isinstance(b, datetime.datetime):
         return int(a.timestamp() * 1000) == int(b.timestamp() * 1000)
     return a == b
@@ -295,18 +282,14 @@ def make_optional_type(type_: weave.types.Type):
     if isinstance(type_, weave.types.List):
         type_ = weave.types.List(make_optional_type(type_.object_type))
     elif isinstance(type_, weave.types.TypedDict):
-        type_ = weave.types.TypedDict(
-            {k: make_optional_type(v) for k, v in type_.property_types.items()}
-        )
+        type_ = weave.types.TypedDict({k: make_optional_type(v) for k, v in type_.property_types.items()})
     return weave.types.optional(type_)
 
 
 def assert_type_assignment(a, b):
     a = _without_tags(a)
     b = _without_tags(b)
-    if weave.types.optional(weave.types.TypedDict({})).assign_type(
-        a
-    ) and weave.types.optional(weave.types.TypedDict({})).assign_type(b):
+    if weave.types.optional(weave.types.TypedDict({})).assign_type(a) and weave.types.optional(weave.types.TypedDict({})).assign_type(b):
         for k, ptype in a.property_types.items():
             assert k in b.property_types
             assert_type_assignment(ptype, b.property_types[k])

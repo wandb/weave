@@ -28,26 +28,18 @@ class LegacyImageArtifactFileRefType(types.ObjectType):
     instance_classes = LegacyImageArtifactFileRef  # type: ignore
 
     def property_types(self) -> dict[str, types.Type]:
-        raise errors.WeaveTypeError(
-            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
-        )
+        raise errors.WeaveTypeError("LegacyImageArtifactFileRefType should never be used! it is a temp type")
 
     @classmethod
     def type_of_instance(cls, obj):
-        raise errors.WeaveTypeError(
-            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
-        )
+        raise errors.WeaveTypeError("LegacyImageArtifactFileRefType should never be used! it is a temp type")
 
     def _to_dict(self) -> dict:
-        raise errors.WeaveTypeError(
-            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
-        )
+        raise errors.WeaveTypeError("LegacyImageArtifactFileRefType should never be used! it is a temp type")
 
     @classmethod
     def from_dict(cls, d):
-        raise errors.WeaveTypeError(
-            "LegacyImageArtifactFileRefType should never be used! it is a temp type"
-        )
+        raise errors.WeaveTypeError("LegacyImageArtifactFileRefType should never be used! it is a temp type")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -61,9 +53,7 @@ class ImageArtifactFileRefType(types.ObjectType):
     # TODO: This should probably be standard for Type!
     def __post_init__(self):
         for type_attr in self.type_attrs():
-            self.__dict__[type_attr] = types.parse_constliteral_type(
-                self.__dict__[type_attr]
-            )
+            self.__dict__[type_attr] = types.parse_constliteral_type(self.__dict__[type_attr])
 
     def _to_dict(self) -> dict:
         d: dict = {"_is_object": True}
@@ -125,16 +115,7 @@ class ImageArtifactFileRefType(types.ObjectType):
                                                 }
                                             ),
                                         ),
-                                        "scores": types.optional(
-                                            types.TypedDict(
-                                                {
-                                                    score_key: types.optional(
-                                                        types.Float()
-                                                    )
-                                                    for score_key in boxScoreKeys
-                                                }
-                                            )
-                                        ),
+                                        "scores": types.optional(types.TypedDict({score_key: types.optional(types.Float()) for score_key in boxScoreKeys})),
                                     }
                                 )
                             )
@@ -165,11 +146,7 @@ class ImageArtifactFileRefType(types.ObjectType):
     @classmethod
     def type_of_instance(cls, obj):
         if obj.boxes:
-            boxLayers = {
-                key: [row["class_id"] for row in value]
-                for key, value in obj.boxes.items()
-                if value is not None
-            }
+            boxLayers = {key: [row["class_id"] for row in value] for key, value in obj.boxes.items() if value is not None}
         else:
             boxLayers = {}
         boxScoreKeysSet = {}
@@ -210,12 +187,8 @@ class ImageArtifactFileRef:
     height: int
     width: int
     sha256: str
-    boxes: typing.Optional[dict[str, list[dict]]] = dataclasses.field(
-        default_factory=dict
-    )  # type: ignore
-    masks: typing.Optional[dict[str, dict[str, str]]] = dataclasses.field(
-        default_factory=dict
-    )  # type: ignore
+    boxes: typing.Optional[dict[str, list[dict]]] = dataclasses.field(default_factory=dict)  # type: ignore
+    masks: typing.Optional[dict[str, dict[str, str]]] = dataclasses.field(default_factory=dict)  # type: ignore
     classes: typing.Optional[typing.Optional[dict]] = None
 
 
@@ -348,9 +321,7 @@ def asset_file(asset):
     return asset.artifact.path_info(asset.path)
 
 
-@weave.op(
-    name="file-media", output_type=lambda input_types: input_types["file"].wbObjectType
-)
+@weave.op(name="file-media", output_type=lambda input_types: input_types["file"].wbObjectType)
 def file_media(file: artifact_fs.FilesystemArtifactFile):
     if isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
@@ -383,14 +354,8 @@ def file_media(file: artifact_fs.FilesystemArtifactFile):
     ):
         type_cls, _ = file_base.wb_object_type_from_path(file.path)
         if type_cls.instance_class is None:
-            raise errors.WeaveInternalError(
-                f"op file-media: Media Type has not bound instance_class: {file.path}: {type_cls}"
-            )
-        res = type_cls.instance_class(
-            file.artifact, file_path, data.get("sha256", file_path)
-        )
+            raise errors.WeaveInternalError(f"op file-media: Media Type has not bound instance_class: {file.path}: {type_cls}")
+        res = type_cls.instance_class(file.artifact, file_path, data.get("sha256", file_path))
     else:
-        raise errors.WeaveInternalError(
-            f"op file-media: Unknown media file type: {file.path}"
-        )
+        raise errors.WeaveInternalError(f"op file-media: Unknown media file type: {file.path}")
     return res

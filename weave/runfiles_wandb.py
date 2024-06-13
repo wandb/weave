@@ -124,9 +124,7 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
         return artifact_fs.FilesystemArtifactFile(self, path)
 
     @contextlib.contextmanager
-    def open(
-        self, path: str, binary: bool = False
-    ) -> typing.Generator[typing.IO, None, None]:
+    def open(self, path: str, binary: bool = False) -> typing.Generator[typing.IO, None, None]:
         mode = "rb" if binary else "r"
         p = self.path(path)
         with file_util.safe_open(p, mode) as f:
@@ -134,9 +132,7 @@ class WandbRunFiles(artifact_fs.FilesystemArtifact):
 
 
 class WandbRunFilesType(artifact_fs.FilesystemArtifactType):
-    def save_instance(
-        self, obj: typing.Any, artifact: typing.Any, name: str
-    ) -> "WandbRunFilesRef":
+    def save_instance(self, obj: typing.Any, artifact: typing.Any, name: str) -> "WandbRunFilesRef":
         return WandbRunFilesRef(obj, None)
 
 
@@ -152,9 +148,7 @@ class WandbRunFilesRef(artifact_fs.FilesystemArtifactRef):
     @classmethod
     def from_uri(cls, uri: "uris.WeaveURI") -> "WandbRunFilesRef":
         if not isinstance(uri, (WeaveWBRunFilesURI)):
-            raise errors.WeaveInternalError(
-                f"Invalid URI class passed to WandbRunFilesRef.from_uri: {type(uri)}"
-            )
+            raise errors.WeaveInternalError(f"Invalid URI class passed to WandbRunFilesRef.from_uri: {type(uri)}")
         return cls(
             WandbRunFiles(uri.name, uri=uri),
             path=uri.path,

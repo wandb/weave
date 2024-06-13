@@ -34,10 +34,7 @@ def vectorized_input_types(input_types: dict[str, types.Type]) -> dict[str, type
     for input_name, input_type in input_types.items():
         if isinstance(input_type, types.Const):
             input_type = input_type.val_type
-        if isinstance(input_type, tagged_value_type.TaggedValueType) and (
-            isinstance(input_type.value, ArrowWeaveListType)
-            or types.is_list_like(input_type.value)
-        ):
+        if isinstance(input_type, tagged_value_type.TaggedValueType) and (isinstance(input_type.value, ArrowWeaveListType) or types.is_list_like(input_type.value)):
             outer_tag_type = input_type.tag
             object_type = input_type.value.object_type  # type: ignore
             if isinstance(object_type, tagged_value_type.TaggedValueType):
@@ -51,22 +48,16 @@ def vectorized_input_types(input_types: dict[str, types.Type]) -> dict[str, type
                     object_type.value,
                 )
             else:
-                new_prop_type = tagged_value_type.TaggedValueType(
-                    outer_tag_type, object_type
-                )
+                new_prop_type = tagged_value_type.TaggedValueType(outer_tag_type, object_type)
             prop_types[input_name] = new_prop_type
-        elif isinstance(input_type, ArrowWeaveListType) or types.is_list_like(
-            input_type
-        ):
+        elif isinstance(input_type, ArrowWeaveListType) or types.is_list_like(input_type):
             prop_types[input_name] = input_type.object_type  # type: ignore
         else:  # is scalar
             prop_types[input_name] = input_type
     return prop_types
 
 
-def vectorized_container_constructor_preprocessor(
-    input_dict: dict[str, typing.Any]
-) -> VectorizedContainerConstructorResults:
+def vectorized_container_constructor_preprocessor(input_dict: dict[str, typing.Any]) -> VectorizedContainerConstructorResults:
     if len(input_dict) == 0:
         return VectorizedContainerConstructorResults([], {}, 0, None)
 
@@ -103,9 +94,7 @@ def vectorized_container_constructor_preprocessor(
 
     for l in array_lens:
         if l is not None and l != max_len:
-            raise errors.WeaveInternalError(
-                f"Cannot create ArrowWeaveDict with different length arrays (scalars are ok): {array_lens}"
-            )
+            raise errors.WeaveInternalError(f"Cannot create ArrowWeaveDict with different length arrays (scalars are ok): {array_lens}")
 
     for i, (a, l) in enumerate(zip(arrays, array_lens)):
         if l is None:
@@ -116,10 +105,6 @@ def vectorized_container_constructor_preprocessor(
                 a = box.unbox(a)
             arrays[i] = repeat(a, max_len)
             if tags is not None:
-                arrays[i] = arrow_tags.tag_arrow_array_elements_with_single_tag_dict(
-                    arrays[i], tags
-                )
+                arrays[i] = arrow_tags.tag_arrow_array_elements_with_single_tag_dict(arrays[i], tags)
 
-    return VectorizedContainerConstructorResults(
-        arrays, prop_types, max_len, awl_artifact
-    )
+    return VectorizedContainerConstructorResults(arrays, prop_types, max_len, awl_artifact)

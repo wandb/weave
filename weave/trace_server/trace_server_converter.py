@@ -5,9 +5,7 @@ from pydantic import BaseModel
 from . import refs_internal as ri
 
 
-def universal_ext_to_int_ref_converter(
-    obj: typing.Any, convert_ext_to_int_project_id: typing.Callable[[str], str]
-) -> typing.Any:
+def universal_ext_to_int_ref_converter(obj: typing.Any, convert_ext_to_int_project_id: typing.Callable[[str], str]) -> typing.Any:
     """Takes any object and recursively replaces all external references with
     internal references. The external references are expected to be in the
     format of `weave:///entity/project/...` and the internal references are
@@ -35,9 +33,7 @@ def universal_ext_to_int_ref_converter(
         entity, project, tail = parts
         project_key = f"{entity}/{project}"
         if project_key not in ext_to_int_project_cache:
-            ext_to_int_project_cache[project_key] = convert_ext_to_int_project_id(
-                project_key
-            )
+            ext_to_int_project_cache[project_key] = convert_ext_to_int_project_id(project_key)
         internal_project_id = ext_to_int_project_cache[project_key]
         return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
 
@@ -80,9 +76,7 @@ def universal_int_to_ext_ref_converter(
             raise ValueError(f"Invalid URI: {ref_str}")
         project_id, tail = parts
         if project_id not in int_to_ext_project_cache:
-            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
-                project_id
-            )
+            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(project_id)
         external_project_id = int_to_ext_project_cache[project_id]
         return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
 
@@ -94,9 +88,7 @@ def universal_int_to_ext_ref_converter(
     return _map_values(obj, mapper)
 
 
-def _map_values(
-    obj: typing.Any, func: typing.Callable[[typing.Any], typing.Any]
-) -> typing.Any:
+def _map_values(obj: typing.Any, func: typing.Callable[[typing.Any], typing.Any]) -> typing.Any:
     if isinstance(obj, BaseModel):
         # `by_alias` is required since we have Mongo-style properties in the
         # query models that are aliased to conform to start with `$`. Without

@@ -31,11 +31,7 @@ class Channel:
 
                 # actual messages from users don't have subtype set
                 continue
-            channel_messages.append(
-                Message(
-                    message["ts"], self.channel_name, message["text"], message["user"]
-                )
-            )
+            channel_messages.append(Message(message["ts"], self.channel_name, message["text"], message["user"]))
         return channel_messages
 
 
@@ -47,10 +43,7 @@ class Slack:
     @weave.op()
     def channels(self) -> list[Channel]:
         # TODO: sorted?
-        return [
-            self.channel.resolve_fn(self, name)
-            for name in self.slack_api.channel_names()
-        ]
+        return [self.channel.resolve_fn(self, name) for name in self.slack_api.channel_names()]
 
     @weave.op()
     def channel(self, name: str) -> Channel:

@@ -32,9 +32,7 @@ def run_variable_lambdas(
         injected = obj(**param_nodes)
         return run_variable_lambdas(injected, vars)
     if isinstance(obj, list):
-        item_results = [
-            run_variable_lambdas(v, vars, path + [i]) for i, v in enumerate(obj)
-        ]
+        item_results = [run_variable_lambdas(v, vars, path + [i]) for i, v in enumerate(obj)]
         new_obj = [r[0] for r in item_results]
         new_missing_vars = {}
         for r in item_results:
@@ -42,9 +40,7 @@ def run_variable_lambdas(
                 new_missing_vars[k] = v
         return new_obj, new_missing_vars
     elif isinstance(obj, dict):
-        d_item_results = {
-            k: run_variable_lambdas(v, vars, path + [k]) for k, v in obj.items()
-        }
+        d_item_results = {k: run_variable_lambdas(v, vars, path + [k]) for k, v in obj.items()}
         d_new_obj = {k: r[0] for k, r in d_item_results.items()}
         new_missing_vars = {}
         for r in d_item_results.values():
@@ -66,11 +62,7 @@ class ConfigDescriptor:
             return {}
         conf = {}
         for field in fields:
-            if (
-                field.name == "input_node"
-                or field.name == "vars"
-                or field.name == "config"
-            ):
+            if field.name == "input_node" or field.name == "vars" or field.name == "config":
                 continue
             conf[field.name] = getattr(obj, field.name)
         return conf
@@ -92,9 +84,7 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
     input_node: graph.Node = dataclasses.field(default=graph.VoidNode())
     vars: dict[str, graph.Node] = dataclasses.field(default_factory=dict)
 
-    def __init__(
-        self, input_node=None, vars=None, config=None, _renderAsPanel=None, **options
-    ):
+    def __init__(self, input_node=None, vars=None, config=None, _renderAsPanel=None, **options):
         self.vars = {}
         if vars:
             for name, val in vars.items():
@@ -124,12 +114,8 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
             config_val = getattr(self.config, k)
             if config_val is None:
                 raise TypeError(f'Panel {self.id} has not option "{k}"')
-            if isinstance(config_val, graph.Node) and isinstance(
-                config_val.type, types.Function
-            ):
-                new_config_val = weave_internal.define_fn(
-                    config_val.type.input_types, v
-                )
+            if isinstance(config_val, graph.Node) and isinstance(config_val.type, types.Function):
+                new_config_val = weave_internal.define_fn(config_val.type.input_types, v)
             elif isinstance(config_val, graph.Node):
                 new_config_val = panel_util.make_node(v)
             else:

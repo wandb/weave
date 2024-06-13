@@ -136,9 +136,7 @@ class ObjectContext:
             self.finish_mutation(target_uri)
 
 
-_object_context: contextvars.ContextVar[
-    typing.Optional[ObjectContext]
-] = contextvars.ContextVar("_object_context", default=None)
+_object_context: contextvars.ContextVar[typing.Optional[ObjectContext]] = contextvars.ContextVar("_object_context", default=None)
 
 
 @contextlib.contextmanager

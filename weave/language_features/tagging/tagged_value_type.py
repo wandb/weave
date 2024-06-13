@@ -152,28 +152,20 @@ def flatten_tag_type_to_typed_dict(tag_type: types.Type) -> types.TypedDict:
     # Finally, if the tag_type is a TaggedValue, then we want to merge the tag
     # and value props together.
     elif isinstance(tag_type, TaggedValueType):
-        assert types.TypedDict({}).assign_type(tag_type.tag), (
-            "tag_type.tag must be assignable to TypedDict, found %s" % tag_type.tag
-        )
-        assert types.TypedDict({}).assign_type(tag_type.value), (
-            "tag_type.value must be assignable to TypedDict, found %s" % tag_type.value
-        )
+        assert types.TypedDict({}).assign_type(tag_type.tag), "tag_type.tag must be assignable to TypedDict, found %s" % tag_type.tag
+        assert types.TypedDict({}).assign_type(tag_type.value), "tag_type.value must be assignable to TypedDict, found %s" % tag_type.value
         return types.TypedDict(
             {**tag_type.tag.property_types, **tag_type.value.property_types}  # type: ignore
         )
     else:
-        raise errors.WeaveTypeError(
-            f"tag_type must be TypedDict, UnionType, or TaggedValueType, found {tag_type}"
-        )
+        raise errors.WeaveTypeError(f"tag_type must be TypedDict, UnionType, or TaggedValueType, found {tag_type}")
 
 
 # A custom Weave Type used to represent tagged values.
 @dataclasses.dataclass(frozen=True)
 class TaggedValueType(types.Type):
     name = "tagged"
-    tag: types.TypedDict = dataclasses.field(
-        default_factory=lambda: types.TypedDict({})
-    )
+    tag: types.TypedDict = dataclasses.field(default_factory=lambda: types.TypedDict({}))
     value: types.Type = dataclasses.field(default_factory=lambda: types.Any())
 
     _assignment_form_cached = None
@@ -189,9 +181,7 @@ class TaggedValueType(types.Type):
                 }
             )
             if isinstance(self.value.value, TaggedValueType):
-                raise errors.WeaveTypeError(
-                    f"TaggedValueType value types cannot be TaggedValueType, found {self.value.value}"
-                )
+                raise errors.WeaveTypeError(f"TaggedValueType value types cannot be TaggedValueType, found {self.value.value}")
             self.__dict__["value"] = self.value.value
 
         # This post processing step is to handle the case where the value is a
@@ -245,10 +235,7 @@ class TaggedValueType(types.Type):
                     new_tag = types.TypedDict(
                         {
                             **self.tag.property_types,
-                            **{
-                                k: types.optional(v)
-                                for k, v in maybe_tagged_value_type.tag.property_types.items()
-                            },
+                            **{k: types.optional(v) for k, v in maybe_tagged_value_type.tag.property_types.items()},
                         }
                     )
                     new_value = maybe_tagged_value_type.value
@@ -262,9 +249,7 @@ class TaggedValueType(types.Type):
     @functools.cached_property
     def _assignment_form(self) -> types.Type:
         if isinstance(self.value, types.UnionType):
-            return types.union(
-                *[TaggedValueType(self.tag, mem) for mem in self.value.members]
-            )
+            return types.union(*[TaggedValueType(self.tag, mem) for mem in self.value.members])
         return self
 
     def _is_assignable_to(self, other_type: types.Type) -> typing.Optional[bool]:
@@ -297,9 +282,7 @@ class TaggedValueType(types.Type):
         tags = tag_store.get_tags(obj)
         with tag_store.with_visited_obj(obj):
             tag_type = types.TypeRegistry.type_of(tags)
-            assert isinstance(tag_type, types.TypedDict), (
-                "Tags must be a dictionary, found %s" % tag_type
-            )
+            assert isinstance(tag_type, types.TypedDict), "Tags must be a dictionary, found %s" % tag_type
             value_type = types.TypeRegistry.type_of(obj)
         res = cls(
             tag_type,
@@ -309,9 +292,7 @@ class TaggedValueType(types.Type):
 
     @classmethod
     def from_dict(cls, d: dict) -> "TaggedValueType":
-        tag_type = flatten_tag_type_to_typed_dict(
-            types.TypeRegistry.type_from_dict(d["tag"])
-        )
+        tag_type = flatten_tag_type_to_typed_dict(types.TypeRegistry.type_from_dict(d["tag"]))
         value_type = types.TypeRegistry.type_from_dict(d["value"])
         res = cls(
             tag_type,
@@ -322,9 +303,7 @@ class TaggedValueType(types.Type):
     def _to_dict(self) -> dict:
         return {"tag": self.tag.to_dict(), "value": self.value.to_dict()}
 
-    def save_instance(
-        self, obj: types.Any, artifact: "artifact_fs.FilesystemArtifact", name: str
-    ) -> None:
+    def save_instance(self, obj: types.Any, artifact: "artifact_fs.FilesystemArtifact", name: str) -> None:
         serializer = mappers_python.map_to_python(self, artifact)
 
         result = serializer.apply(obj)
@@ -343,9 +322,7 @@ class TaggedValueType(types.Type):
         return mapper.apply(result)
 
     def __repr__(self) -> str:
-        return (
-            f"TaggedValueType({{{list(self.tag.property_types.keys())}}}, {self.value})"
-        )
+        return f"TaggedValueType({{{list(self.tag.property_types.keys())}}}, {self.value})"
 
 
 class TaggedValueMapper(mappers.Mapper):
@@ -366,15 +343,9 @@ class TaggedValueToPy(TaggedValueMapper):
     def apply(self, obj: typing.Any) -> dict:
         result = {}
         obj_tags = tag_store.get_tags(obj)
-        expected_tag_keys = set(
-            key
-            for key, tag_type in self.type.tag.property_types.items()
-            if not types.is_optional(tag_type)
-        )
+        expected_tag_keys = set(key for key, tag_type in self.type.tag.property_types.items() if not types.is_optional(tag_type))
         if len(expected_tag_keys - set(obj_tags.keys())) > 0:
-            raise errors.WeaveTypeError(
-                f"Expected tags {self.type.tag.property_types.keys()}, found {obj_tags.keys()}"
-            )
+            raise errors.WeaveTypeError(f"Expected tags {self.type.tag.property_types.keys()}, found {obj_tags.keys()}")
         result["_tag"] = self._tag_serializer.apply(obj_tags)
         result["_value"] = self._value_serializer.apply(obj)
         return result

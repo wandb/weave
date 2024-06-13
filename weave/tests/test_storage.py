@@ -282,9 +282,7 @@ def mock_get_wandb_read_artifact_uri():
 
     def _mock_get_wandb_read_artifact_uri(path: str):
         stats.call_count += 1
-        return artifact_wandb.WeaveWBArtifactURI(
-            "my-uri", "a_specific_version", "entity", "project", None, "path"
-        )
+        return artifact_wandb.WeaveWBArtifactURI("my-uri", "a_specific_version", "entity", "project", None, "path")
 
     artifact_wandb.get_wandb_read_artifact_uri = _mock_get_wandb_read_artifact_uri
     yield stats
@@ -298,9 +296,7 @@ def test_to_conversion_uri_resolution(
         return artifact_wandb.WandbArtifact(
             "my-art",
             "my-type",
-            artifact_wandb.WeaveWBArtifactURI(
-                "my-uri", "latest", "entity", "project", None, "path"
-            ),
+            artifact_wandb.WeaveWBArtifactURI("my-uri", "latest", "entity", "project", None, "path"),
         )
 
     wb_type = types.TypeRegistry.type_of(make_art())
@@ -323,9 +319,7 @@ def test_to_conversion_uri_resolution(
     }
 
     # Tell the mapper not to resolve
-    mapper = mappers_python.map_to_python(
-        wb_type, artifact_mem.MemArtifact(), mapper_options={"use_stable_refs": False}
-    )
+    mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact(), mapper_options={"use_stable_refs": False})
     assert mock_get_wandb_read_artifact_uri.call_count == 2
     res = mapper.apply(make_art())
     assert res == "wandb-artifact:///entity/project/my-uri:latest"
@@ -409,9 +403,7 @@ def test_to_python_ref():
 def test_to_python_toplevel_ref():
     data = ops_arrow.to_arrow([{"x": 14}])
     result = storage.to_python(data)
-    assert result["_val"] == test_helpers.RegexMatcher(
-        "local-artifact:///ArrowWeaveList:.*/0"
-    )
+    assert result["_val"] == test_helpers.RegexMatcher("local-artifact:///ArrowWeaveList:.*/0")
 
     data2 = storage.from_python(result)
     assert data.to_pylist_raw() == data2.to_pylist_raw()

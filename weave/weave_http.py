@@ -45,9 +45,7 @@ def logging_trace_config() -> aiohttp.TraceConfig:
         ) -> None:
             if not hasattr(trace_config_ctx, "events"):
                 trace_config_ctx.events = []
-            trace_config_ctx.events.append(
-                (event_name, asyncio.get_event_loop().time())
-            )
+            trace_config_ctx.events.append((event_name, asyncio.get_event_loop().time()))
 
         return on_event
 
@@ -67,16 +65,10 @@ def logging_trace_config() -> aiohttp.TraceConfig:
         print("Req done: ", time.time(), s)
 
     trace_config = aiohttp.TraceConfig()
-    trace_config.on_connection_queued_start.append(
-        make_trace_event_handler("queued_start")
-    )
+    trace_config.on_connection_queued_start.append(make_trace_event_handler("queued_start"))
     trace_config.on_connection_queued_end.append(make_trace_event_handler("queued_end"))
-    trace_config.on_connection_create_start.append(
-        make_trace_event_handler("conn_create_start")
-    )
-    trace_config.on_connection_create_end.append(
-        make_trace_event_handler("conn_create_end")
-    )
+    trace_config.on_connection_create_start.append(make_trace_event_handler("conn_create_start"))
+    trace_config.on_connection_create_end.append(make_trace_event_handler("conn_create_end"))
     trace_config.on_request_start.append(make_trace_event_handler("request_start"))
     trace_config.on_request_start.append(make_trace_event_handler("request_redirect"))
     trace_config.on_request_end.append(on_request_end)
@@ -118,17 +110,13 @@ class HttpAsync:
             # yarl.URL encoded=True is very important! Otherwise aiohttp
             # will encode the url again and we'll get a 404 for things like
             # signed URLs
-            async with self.session.get(
-                yarl.URL(url, encoded=True), headers=headers, cookies=cookies, auth=auth
-            ) as r:
+            async with self.session.get(yarl.URL(url, encoded=True), headers=headers, cookies=cookies, auth=auth) as r:
                 if r.status == 200:
                     async with self.fs.open_write(path, mode="wb") as f:
                         async for data in r.content.iter_chunked(16 * 1024):
                             await f.write(data)
                 else:
-                    raise server_error_handling.WeaveInternalHttpException.from_code(
-                        r.status, "Download failed"
-                    )
+                    raise server_error_handling.WeaveInternalHttpException.from_code(r.status, "Download failed")
 
 
 class Http:
@@ -168,5 +156,6 @@ class Http:
                         f.write(r.content)  # type: ignore
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
-                        r.status_code, "Download failed"  # type: ignore
+                        r.status_code,
+                        "Download failed",  # type: ignore
                     )

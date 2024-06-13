@@ -31,10 +31,7 @@ def test_combine_nodes():
 
     result = graph_debug.combine_common_nodes([n1, n2, n3, n4, n5])
     assert len(result) == 1
-    assert (
-        graph.node_expr_str(result[0])
-        == "_test_cn_op1().map(_test_cn_op2(row, 1))[EACH[0, 1]][EACH['a', 'b', 'c']]"
-    )
+    assert graph.node_expr_str(result[0]) == "_test_cn_op1().map(_test_cn_op2(row, 1))[EACH[0, 1]][EACH['a', 'b', 'c']]"
 
 
 def test_to_assignment_form():

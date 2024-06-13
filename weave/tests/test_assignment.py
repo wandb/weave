@@ -34,9 +34,7 @@ def test_const_assignment(type_name, type_cls):
         ]
 
     cls_type = type_cls(*params)
-    const_type = weave.types.Const(
-        cls_type, None
-    )  # technically `None` is invalid, but we're just testing the assignment
+    const_type = weave.types.Const(cls_type, None)  # technically `None` is invalid, but we're just testing the assignment
 
     # Validate that you can assign a const type to a general type
     assert cls_type.assign_type(const_type)

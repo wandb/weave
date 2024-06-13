@@ -5,9 +5,7 @@ from pydantic import BaseModel, Field
 
 from .interface.query import Query
 
-WB_USER_ID_DESCRIPTION = (
-    "Do not set directly. Server will automatically populate this field."
-)
+WB_USER_ID_DESCRIPTION = "Do not set directly. Server will automatically populate this field."
 
 
 class CallSchema(BaseModel):
@@ -365,9 +363,7 @@ class Feedback(FeedbackCreateReq):
 
 class FeedbackQueryReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
-    fields: typing.Optional[list[str]] = Field(
-        default=None, examples=[["id", "feedback_type", "payload.note"]]
-    )
+    fields: typing.Optional[list[str]] = Field(default=None, examples=[["id", "feedback_type", "payload.note"]])
     query: typing.Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
@@ -416,58 +412,45 @@ class TraceServerInterface:
 
     # Call API
     @abc.abstractmethod
-    def call_start(self, req: CallStartReq) -> CallStartRes:
-        ...
+    def call_start(self, req: CallStartReq) -> CallStartRes: ...
 
     @abc.abstractmethod
-    def call_end(self, req: CallEndReq) -> CallEndRes:
-        ...
+    def call_end(self, req: CallEndReq) -> CallEndRes: ...
 
     @abc.abstractmethod
-    def call_read(self, req: CallReadReq) -> CallReadRes:
-        ...
+    def call_read(self, req: CallReadReq) -> CallReadRes: ...
 
     @abc.abstractmethod
-    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
-        ...
+    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
 
     @abc.abstractmethod
-    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
-        ...
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
 
     @abc.abstractmethod
-    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
-        ...
+    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
 
     @abc.abstractmethod
-    def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
-        ...
+    def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
 
     # Op API
     @abc.abstractmethod
-    def op_create(self, req: OpCreateReq) -> OpCreateRes:
-        ...
+    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
 
     @abc.abstractmethod
-    def op_read(self, req: OpReadReq) -> OpReadRes:
-        ...
+    def op_read(self, req: OpReadReq) -> OpReadRes: ...
 
     @abc.abstractmethod
-    def ops_query(self, req: OpQueryReq) -> OpQueryRes:
-        ...
+    def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
     # Obj API
     @abc.abstractmethod
-    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
-        ...
+    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
 
     @abc.abstractmethod
-    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
-        ...
+    def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
 
     @abc.abstractmethod
-    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
-        ...
+    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
 
     @abc.abstractmethod
     def table_create(self, req: TableCreateReq) -> TableCreateRes:

@@ -55,16 +55,12 @@ if patch_context:
 
 # Set to the op uri if we're in the process of loading
 # an op from an artifact.
-_no_op_register: contextvars.ContextVar[typing.Optional[bool]] = contextvars.ContextVar(
-    "loading_op_location", default=None
-)
+_no_op_register: contextvars.ContextVar[typing.Optional[bool]] = contextvars.ContextVar("loading_op_location", default=None)
 
 
 # Set to true if we're in the process of loading builtin functions
 # this prevents us from storing the op as an artifact
-_loading_built_ins: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "loading_built_ins", default=False
-)
+_loading_built_ins: contextvars.ContextVar[bool] = contextvars.ContextVar("loading_built_ins", default=False)
 
 
 @contextlib.contextmanager
@@ -101,17 +97,11 @@ def get_loading_built_ins() -> bool:
     return _loading_built_ins.get()
 
 
-_analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "analytics_enabled", default=True
-)
+_analytics_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar("analytics_enabled", default=True)
 
-_weave_client: contextvars.ContextVar[
-    typing.Optional["client_interface.ClientInterface"]
-] = contextvars.ContextVar("weave_client", default=None)
+_weave_client: contextvars.ContextVar[typing.Optional["client_interface.ClientInterface"]] = contextvars.ContextVar("weave_client", default=None)
 
-_monitor_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "monitor_disabled", default=False
-)
+_monitor_disabled: contextvars.ContextVar[bool] = contextvars.ContextVar("monitor_disabled", default=False)
 
 
 @contextlib.contextmanager
@@ -131,9 +121,7 @@ def set_client(client: "client_interface.ClientInterface"):
     _weave_client.set(client)
 
 
-_http_server: contextvars.ContextVar[
-    typing.Optional["server_interface.BaseServer"]
-] = contextvars.ContextVar("http_server", default=None)
+_http_server: contextvars.ContextVar[typing.Optional["server_interface.BaseServer"]] = contextvars.ContextVar("http_server", default=None)
 
 
 @contextlib.contextmanager
@@ -153,9 +141,7 @@ def set_server(server: "server_interface.BaseServer"):
     _http_server.set(server)
 
 
-_frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar(
-    "frontend_url", default=None
-)
+_frontend_url: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar("frontend_url", default=None)
 
 
 @contextlib.contextmanager
@@ -173,9 +159,7 @@ def set_frontend_url(url: str):
     _frontend_url.set(url)
 
 
-_eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "eager_mode", default=True
-)
+_eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar("eager_mode", default=True)
 
 
 @contextlib.contextmanager
@@ -226,9 +210,7 @@ def disable_analytics():
     return _analytics_enabled.set(False)
 
 
-_client_cache_key: contextvars.ContextVar[
-    typing.Optional[str]
-] = contextvars.ContextVar("client_cache_key", default=None)
+_client_cache_key: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar("client_cache_key", default=None)
 
 
 @contextlib.contextmanager
@@ -264,28 +246,18 @@ class WandbApiContext:
 
 
 ## wandb_api.py context
-_wandb_api_context: contextvars.ContextVar[
-    typing.Optional[WandbApiContext]
-] = contextvars.ContextVar("wandb_api_context", default=None)
+_wandb_api_context: contextvars.ContextVar[typing.Optional[WandbApiContext]] = contextvars.ContextVar("wandb_api_context", default=None)
 
 ## urls.py Context
-_use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "use_local_urls", default=False
-)
+_use_local_urls: contextvars.ContextVar[bool] = contextvars.ContextVar("use_local_urls", default=False)
 
 ## graph_client_context.py Context
-_graph_client: contextvars.ContextVar[
-    typing.Optional["GraphClient"]
-] = contextvars.ContextVar("graph_client", default=None)
+_graph_client: contextvars.ContextVar[typing.Optional["GraphClient"]] = contextvars.ContextVar("graph_client", default=None)
 
 
-_cache_prefix_context: contextvars.ContextVar[
-    typing.Optional[str]
-] = contextvars.ContextVar("cache_prefix", default=None)
+_cache_prefix_context: contextvars.ContextVar[typing.Optional[str]] = contextvars.ContextVar("cache_prefix", default=None)
 
-_ref_tracking_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "ref_tracking_enabled", default=False
-)
+_ref_tracking_enabled: contextvars.ContextVar[bool] = contextvars.ContextVar("ref_tracking_enabled", default=False)
 
 
 def ref_tracking_enabled() -> bool:
@@ -299,9 +271,7 @@ def ref_tracking(enabled: bool):
     _ref_tracking_enabled.reset(token)
 
 
-_serverless_io_service: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "_serverless_io_service", default=False
-)
+_serverless_io_service: contextvars.ContextVar[bool] = contextvars.ContextVar("_serverless_io_service", default=False)
 
 
 def serverless_io_service() -> bool:
@@ -310,9 +280,7 @@ def serverless_io_service() -> bool:
 
 # Throw an error if op saving encounters an unknonwn condition.
 # The default behavior is to warn.
-_strict_op_saving: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "_strict_op_saving", default=False
-)
+_strict_op_saving: contextvars.ContextVar[bool] = contextvars.ContextVar("_strict_op_saving", default=False)
 
 
 def get_strict_op_saving() -> bool:

@@ -36,7 +36,8 @@ def number_bins_fixed(step):
         "bins": types.Number(),
     },
     output_type=Function(
-        input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
+        input_types={"row": types.Number()},
+        output_type=NumberBinType,  # type: ignore
     ),
     render_info={"type": "function"},
 )
@@ -55,7 +56,8 @@ def numbers_bins_equal(arr, bins):
         "in_": types.Number(),
         "bin_fn": types.optional(
             Function(
-                input_types={"row": types.Number()}, output_type=NumberBinType  # type: ignore
+                input_types={"row": types.Number()},
+                output_type=NumberBinType,  # type: ignore
             )
         ),
     },

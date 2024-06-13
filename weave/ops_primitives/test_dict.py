@@ -16,13 +16,9 @@ def test_keys_type():
 
 
 def test_pick():
-    obj = weave_internal.make_const_node(
-        weave.types.Dict(object_type=weave.types.String()), {"a": "x"}
-    )
+    obj = weave_internal.make_const_node(weave.types.Dict(object_type=weave.types.String()), {"a": "x"})
     key = weave_internal.make_const_node(
-        tagged_value_type.TaggedValueType(
-            weave.types.TypedDict({"w": weave.types.String()}), weave.types.String()
-        ),
+        tagged_value_type.TaggedValueType(weave.types.TypedDict({"w": weave.types.String()}), weave.types.String()),
         "a",
     )
     assert weave.use(weave.ops.TypedDict.pick(obj, key)) == "x"

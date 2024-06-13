@@ -5,12 +5,7 @@ ops = weave.registry_mem.memory_registry.list_ops()
 
 
 def output_type_dict_is_const_function_node(output_type_dict):
-    return (
-        "nodeType" in output_type_dict
-        and output_type_dict["nodeType"] == "const"
-        and "type" in output_type_dict["type"]
-        and output_type_dict["type"]["type"] == "function"
-    )
+    return "nodeType" in output_type_dict and output_type_dict["nodeType"] == "const" and "type" in output_type_dict["type"] and output_type_dict["type"]["type"] == "function"
 
 
 def const_funtion_node_val(node_dict):

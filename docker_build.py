@@ -21,9 +21,7 @@ def exec_read(cmd: str) -> str:
 
 
 def exec_stream(cmd: str):
-    return subprocess.run(
-        cmd.replace("\n", "").replace("\\", ""), shell=True, check=True
-    )
+    return subprocess.run(cmd.replace("\n", "").replace("\\", ""), shell=True, check=True)
 
 
 def print_green(msg):
@@ -67,9 +65,7 @@ def qualified_image_name(image: str, tag: str) -> str:
     return f"{REGISTRY}/{image}:{tag}"
 
 
-def _build_common(
-    image: str, context_path: str, dockerfile: str, platform: str = "linux/amd64"
-) -> str:
+def _build_common(image: str, context_path: str, dockerfile: str, platform: str = "linux/amd64") -> str:
     command = f"docker buildx build {context_path}"
     command += f" \ \n  --file={dockerfile}"
 
@@ -88,17 +84,13 @@ def _build_common(
     # details
     if CI:
         # Everyone can read from the registry, but only authorized users can push.
-        print_green(
-            f'Image will be pushed to {REGISTRY}. Set CI="" to load into the local docker daemon.'
-        )
+        print_green(f'Image will be pushed to {REGISTRY}. Set CI="" to load into the local docker daemon.')
         command += " \ \n  --push"
     else:
         # if we're not pushing, we'll assume we want to load the image into the running
         # docker agent (there's really no point to building if you don't do at least one of these two
         # things, since the resultant image would just remain in cache, unusable)
-        print_green(
-            f"Image will be loaded into the local docker daemon. Set CI=1 to push to {REGISTRY}"
-        )
+        print_green(f"Image will be loaded into the local docker daemon. Set CI=1 to push to {REGISTRY}")
         command += " \ \n  --load"
 
     return command
@@ -215,16 +207,12 @@ def build_deps_cmd(args: argparse.Namespace):
 
 # The intention is that this should run on a regular cadence from master,
 # ensuring that all built images start with fairly recent deps.
-def build_deps(
-    image: str, target: str, context_path: str = ".", dockerfile: Optional[str] = None
-):
+def build_deps(image: str, target: str, context_path: str = ".", dockerfile: Optional[str] = None):
     dockerfile = dockerfile if dockerfile else f"{context_path}/Dockerfile"
 
     print_green(f"Building deps for {image} at commit {GIT_SHA_DIRTY}...")
 
-    print_green(
-        f"Image will build to target {target} without cache, and push to tag latest-deps"
-    )
+    print_green(f"Image will build to target {target} without cache, and push to tag latest-deps")
 
     command = _build_common(image, context_path, dockerfile)
 
@@ -250,10 +238,7 @@ def manifest_cmd(args: argparse.Namespace):
 def manifest(manifest_list_name: str, manifest_names: List[str]):
     manifest_names_str = " ".join(manifest_names)
 
-    print_green(
-        f"Manifest will be generated joining {manifest_names_str} into "
-        + f"target {manifest_list_name}"
-    )
+    print_green(f"Manifest will be generated joining {manifest_names_str} into " + f"target {manifest_list_name}")
 
     # a "manifest list" is a single name that points to multiple image
     # manifests for multi-platform support (e.g. manifest list myimage
@@ -285,15 +270,11 @@ def manifest(manifest_list_name: str, manifest_names: List[str]):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="wandb utilities for interacting with docker images"
-    )
+    parser = argparse.ArgumentParser(description="wandb utilities for interacting with docker images")
 
     subparsers = parser.add_subparsers(title="commands")
 
-    build_parser = subparsers.add_parser(
-        "build", help="builds an image using builds from the registry as cache"
-    )
+    build_parser = subparsers.add_parser("build", help="builds an image using builds from the registry as cache")
     build_parser.add_argument("image", type=str)
     build_parser.add_argument("context_path", type=str, nargs="?", default=".")
     build_parser.add_argument("dockerfile", type=str, nargs="?", default=None)
@@ -301,8 +282,7 @@ if __name__ == "__main__":
 
     deps_parser = subparsers.add_parser(
         "build_deps",
-        help="builds a partial image, without cache, for other builds to "
-        + "use as a dependency cache",
+        help="builds a partial image, without cache, for other builds to " + "use as a dependency cache",
     )
     deps_parser.add_argument("image", type=str)
     deps_parser.add_argument("target", type=str)
@@ -310,9 +290,7 @@ if __name__ == "__main__":
     deps_parser.add_argument("dockerfile", type=str, nargs="?", default=None)
     deps_parser.set_defaults(func=build_deps_cmd)
 
-    manifest_parser = subparsers.add_parser(
-        "manifest", help="joins multiple images under one name"
-    )
+    manifest_parser = subparsers.add_parser("manifest", help="joins multiple images under one name")
     manifest_parser.add_argument(
         "manifest_list_name",
         type=str,

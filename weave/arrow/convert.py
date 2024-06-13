@@ -34,12 +34,7 @@ def recursively_merge_union_types_if_they_are_unions_of_structs(
 ) -> types.Type:
     """Input preprocessor for to_arrow()."""
     if isinstance(type_, types.TypedDict):
-        return types.TypedDict(
-            {
-                k: recursively_merge_union_types_if_they_are_unions_of_structs(v)
-                for k, v in type_.property_types.items()
-            }
-        )
+        return types.TypedDict({k: recursively_merge_union_types_if_they_are_unions_of_structs(v) for k, v in type_.property_types.items()})
     elif isinstance(type_, types.UnionType):
         if type_.is_simple_nullable() or len(type_.members) < 2:
             return type_
@@ -55,17 +50,9 @@ def recursively_merge_union_types_if_they_are_unions_of_structs(
         return recursively_merge_union_types_if_they_are_unions_of_structs(new_type)
 
     elif isinstance(type_, types.List):
-        return types.List(
-            recursively_merge_union_types_if_they_are_unions_of_structs(
-                type_.object_type
-            )
-        )
+        return types.List(recursively_merge_union_types_if_they_are_unions_of_structs(type_.object_type))
     elif isinstance(type_, ArrowWeaveListType):
-        return ArrowWeaveListType(
-            recursively_merge_union_types_if_they_are_unions_of_structs(
-                type_.object_type
-            )
-        )
+        return ArrowWeaveListType(recursively_merge_union_types_if_they_are_unions_of_structs(type_.object_type))
     elif isinstance(type_, tagged_value_type.TaggedValueType):
         return tagged_value_type.TaggedValueType(
             typing.cast(
@@ -99,9 +86,7 @@ def recursively_build_pyarrow_array(
                 yield obj
 
     if isinstance(mapper.type, types.UnionType) and mapper.type.is_simple_nullable():
-        nonnull_mapper = [
-            m for m in mapper._member_mappers if m.type != types.NoneType()
-        ][0]
+        nonnull_mapper = [m for m in mapper._member_mappers if m.type != types.NoneType()][0]
 
         return recursively_build_pyarrow_array(
             list(none_unboxer(py_objs)),
@@ -142,10 +127,7 @@ def recursively_build_pyarrow_array(
                     _dictionary[id] = (new_index, py_obj)
                     indices.append(new_index)
 
-            dictionary = [
-                mapper.apply(v[1]) if v[1] is not None else None
-                for v in _dictionary.values()
-            ]
+            dictionary = [mapper.apply(v[1]) if v[1] is not None else None for v in _dictionary.values()]
             array = recursively_build_pyarrow_array(
                 dictionary,
                 pyarrow_type,
@@ -255,14 +237,10 @@ def recursively_build_pyarrow_array(
 
                 arrays.append(array)
                 keys.append(field.name)
-            return pa.StructArray.from_arrays(
-                arrays, keys, mask=pa.array(mask, type=pa.bool_())
-            )
+            return pa.StructArray.from_arrays(arrays, keys, mask=pa.array(mask, type=pa.bool_()))
     elif pa.types.is_union(pyarrow_type):
         assert isinstance(mapper, mappers_arrow.UnionToArrowUnion)
-        type_codes: list[int] = [
-            0 if o == None else mapper.type_code_of_obj(o) for o in py_objs
-        ]
+        type_codes: list[int] = [0 if o == None else mapper.type_code_of_obj(o) for o in py_objs]
         offsets: list[int] = []
         py_data: list[list] = []
         for _ in range(len(pyarrow_type)):
@@ -303,9 +281,7 @@ def recursively_build_pyarrow_array(
             mapper._object_type,
             py_objs_already_mapped,
         )
-        return pa.ListArray.from_arrays(
-            offsets, new_objs, mask=pa.array(mask, type=pa.bool_())
-        )
+        return pa.ListArray.from_arrays(offsets, new_objs, mask=pa.array(mask, type=pa.bool_()))
     elif pa.types.is_temporal(pyarrow_type):
         if py_objs_already_mapped:
             return pa.array(py_objs, type=pyarrow_type)
@@ -337,15 +313,11 @@ def to_arrow_from_list_and_artifact(
     py_objs_already_mapped: bool = False,
 ) -> ArrowWeaveList:
     # Get what the parquet type will be.
-    merged_object_type = recursively_merge_union_types_if_they_are_unions_of_structs(
-        object_type
-    )
+    merged_object_type = recursively_merge_union_types_if_they_are_unions_of_structs(object_type)
     mapper = mappers_arrow.map_to_arrow(merged_object_type, artifact)
     pyarrow_type = mapper.result_type()
 
-    arrow_obj = recursively_build_pyarrow_array(
-        obj, pyarrow_type, mapper, py_objs_already_mapped=py_objs_already_mapped
-    )
+    arrow_obj = recursively_build_pyarrow_array(obj, pyarrow_type, mapper, py_objs_already_mapped=py_objs_already_mapped)
     return ArrowWeaveList(arrow_obj, merged_object_type, artifact)
 
 
@@ -364,20 +336,14 @@ def to_arrow(
         outer_tags = tag_store.get_tags(obj)
         wb_type = wb_type.value
     if isinstance(wb_type, types.List):
-        merged_object_type = (
-            recursively_merge_union_types_if_they_are_unions_of_structs(
-                wb_type.object_type
-            )
-        )
+        merged_object_type = recursively_merge_union_types_if_they_are_unions_of_structs(wb_type.object_type)
 
         # Convert to arrow, serializing Custom objects to the artifact
         mapper = mappers_arrow.map_to_arrow(merged_object_type, artifact)
         pyarrow_type = arrow_util.arrow_type(mapper.result_type())
 
         arrow_obj = recursively_build_pyarrow_array(obj, pyarrow_type, mapper)
-        weave_obj: ArrowWeaveList = ArrowWeaveList(
-            arrow_obj, merged_object_type, artifact
-        )
+        weave_obj: ArrowWeaveList = ArrowWeaveList(arrow_obj, merged_object_type, artifact)
 
         # Save the weave object to the artifact
         # ref = storage.save(weave_obj, artifact=artifact)
@@ -395,9 +361,7 @@ def to_weave_arrow(v: typing.Any):
 
 
 def to_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
-    def _convert_col_to_parquet_friendly(
-        col: ArrowWeaveList, path: PathType
-    ) -> typing.Optional[ArrowWeaveList]:
+    def _convert_col_to_parquet_friendly(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
         _, non_none_type = types.split_none(col.object_type)
         if isinstance(non_none_type, types.UnionType):
             full_length_fields = []
@@ -405,9 +369,7 @@ def to_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
                 member_field = col._arrow_data.field(i)
                 padding = len(col) - len(member_field)
                 if padding > 0:
-                    member_field = pa.concat_arrays(
-                        [member_field, pa.nulls(padding, type=member_field.type)]
-                    )
+                    member_field = pa.concat_arrays([member_field, pa.nulls(padding, type=member_field.type)])
                 else:
                     # A case where this can happen:
                     # pa.nulls(1, pa.list_(pa.dense_union([pa.field('a', pa.int32()), pa.field('b', pa.float64())])))
@@ -416,10 +378,8 @@ def to_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
                     member_field = member_field.slice(0, len(col))
                 full_length_fields.append(member_field)
             struct = pa.StructArray.from_arrays(
-                [col._arrow_data.type_codes, col._arrow_data.offsets]
-                + full_length_fields,
-                ["type_codes", "offsets"]
-                + [str(i) for i in list(range(len(full_length_fields)))],
+                [col._arrow_data.type_codes, col._arrow_data.offsets] + full_length_fields,
+                ["type_codes", "offsets"] + [str(i) for i in list(range(len(full_length_fields)))],
             )
             return ArrowWeaveList(struct, col.object_type, col._artifact)
         elif isinstance(col.object_type, types.TypedDict):
@@ -439,9 +399,7 @@ def from_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
     def _ident(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
         return None
 
-    def _convert_col_from_parquet_friendly(
-        col: ArrowWeaveList, path: PathType
-    ) -> typing.Optional[ArrowWeaveList]:
+    def _convert_col_from_parquet_friendly(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
         _, non_none_type = types.split_none(col.object_type)
         if isinstance(non_none_type, types.UnionType):
             struct = col._arrow_data
@@ -466,16 +424,12 @@ def from_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:
                 if type_codes.null_count != len(type_codes):
                     # I think this only happens when we have empty objects somewhere
                     # in the tree?
-                    raise errors.WeaveInternalError(
-                        "Unexpected nulls in type_codes for union"
-                    )
+                    raise errors.WeaveInternalError("Unexpected nulls in type_codes for union")
                 type_codes = type_codes.fill_null(0)
                 offsets = offsets.fill_null(0)
                 if len(member_fields[0]) == 0:
                     member_fields[0] = pa.nulls(1, member_fields[0].type)
-            union = pa.UnionArray.from_dense(
-                type_codes.fill_null(0), offsets.fill_null(0), member_fields
-            )
+            union = pa.UnionArray.from_dense(type_codes.fill_null(0), offsets.fill_null(0), member_fields)
             return ArrowWeaveList(union, col.object_type, col._artifact)
         elif isinstance(col.object_type, types.TypedDict):
             if not col.object_type.property_types:
@@ -509,9 +463,7 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
     from ..ops_domain.wbmedia import ArtifactAssetType
 
     # Returns a number of string arrow weave list, possibly with Nones
-    def _to_compare_safe(
-        col: ArrowWeaveList, path: PathType
-    ) -> typing.Optional[ArrowWeaveList]:
+    def _to_compare_safe(col: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
         if pa.types.is_null(col._arrow_data.type):
             return ArrowWeaveList(
                 pa.nulls(len(col), type=pa.string()),
@@ -522,9 +474,7 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
             return ArrowWeaveList(col._arrow_data, types.String(), None)
         elif pa.types.is_dictionary(col._arrow_data.type):
             if not isinstance(col.object_type, types.String):
-                raise errors.WeaveInternalError(
-                    "Unexpected dictionary type for non-string type"
-                )
+                raise errors.WeaveInternalError("Unexpected dictionary type for non-string type")
             return ArrowWeaveList(col._arrow_data, types.String(), None)
         elif pa.types.is_floating(col._arrow_data.type):
             # Ensure that -0.0 is 0. If we end up converting to a string
@@ -541,9 +491,7 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
             # Cast to int64 and then string. Leaving this as timestamp
             # means it will later be cast directly to string, which is very expensive in
             # pyarrow (1.6s for 500k records v. 0.01s for int64, a 100x improvement)
-            return ArrowWeaveList(
-                col._arrow_data.cast(pa.int64()).cast(pa.string()), types.String(), None
-            )
+            return ArrowWeaveList(col._arrow_data.cast(pa.int64()).cast(pa.string()), types.String(), None)
         elif pa.types.is_boolean(col._arrow_data.type):
             return ArrowWeaveList(col._arrow_data, types.Boolean(), None)
         elif ArtifactAssetType.assign_type(col.object_type):
@@ -559,9 +507,7 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
                 value_string_arrs.append(
                     pa.compute.binary_join_element_wise(
                         "__sk_%s" % (field_name),
-                        simple_to_string(col._arrow_data.field(field_name)).fill_null(
-                            "__none_"
-                        ),
+                        simple_to_string(col._arrow_data.field(field_name)).fill_null("__none_"),
                         "_",
                     )
                 )
@@ -571,9 +517,7 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
                     types.String(),
                     None,
                 )
-            struct_strings = pa.compute.binary_join_element_wise(
-                *value_string_arrs, "-"
-            )
+            struct_strings = pa.compute.binary_join_element_wise(*value_string_arrs, "-")
             return ArrowWeaveList(
                 pa.compute.replace_with_mask(
                     struct_strings,
@@ -611,9 +555,7 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
                     continue
                 string_field = simple_to_string(field)
                 mask = pa.compute.equal(col._arrow_data.type_codes, type_code)
-                indexes = pa.compute.multiply(
-                    mask.cast(pa.int8()), col._arrow_data.offsets
-                )
+                indexes = pa.compute.multiply(mask.cast(pa.int8()), col._arrow_data.offsets)
                 values = string_field.take(indexes)
                 merged = pa.compute.if_else(mask, values, merged)
 
@@ -623,9 +565,7 @@ def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
                 None,
             )
         else:
-            raise errors.WeaveInternalError(
-                'Unhandled type in "to_compare_safe" %s' % col._arrow_data.type
-            )
+            raise errors.WeaveInternalError('Unhandled type in "to_compare_safe" %s' % col._arrow_data.type)
 
     return awl.map_column(_to_compare_safe)
 

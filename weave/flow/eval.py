@@ -24,9 +24,7 @@ from rich import print
 console = Console()
 
 
-def async_call(
-    func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
-) -> typing.Coroutine:
+def async_call(func: typing.Union[Callable, Op], *args: Any, **kwargs: Any) -> typing.Coroutine:
     is_async = False
     if isinstance(func, Op):
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
@@ -93,9 +91,7 @@ class Evaluation(Object):
             if isinstance(scorer, Scorer):
                 pass
             elif isinstance(scorer, type):
-                raise ValueError(
-                    f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
-                )
+                raise ValueError(f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?")
             elif callable(scorer) and not isinstance(scorer, Op):
                 scorer = weave.op()(scorer)
             elif isinstance(scorer, Op):
@@ -112,9 +108,7 @@ class Evaluation(Object):
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
     @weave.op()
-    async def predict_and_score(
-        self, model: Union[Callable, Model], example: dict
-    ) -> dict:
+    async def predict_and_score(self, model: Union[Callable, Model], example: dict) -> dict:
         if self.preprocess_model_input == None:
             model_input = example
         else:
@@ -125,11 +119,7 @@ class Evaluation(Object):
         else:
             model_predict = get_infer_method(model)
 
-        model_predict_fn_name = (
-            model_predict.name
-            if isinstance(model_predict, Op)
-            else model_predict.__name__
-        )
+        model_predict_fn_name = model_predict.name if isinstance(model_predict, Op) else model_predict.__name__
 
         if isinstance(model_predict, Op):
             predict_signature = model_predict.signature
@@ -143,16 +133,12 @@ class Evaluation(Object):
             model_predict_arg_names = model_predict_arg_names[1:]
 
         if isinstance(model_input, dict):
-            model_predict_args = {
-                k: v for k, v in model_input.items() if k in model_predict_arg_names
-            }
+            model_predict_args = {k: v for k, v in model_input.items() if k in model_predict_arg_names}
         else:
             if len(model_predict_arg_names) == 1:
                 model_predict_args = {model_predict_arg_names[0]: model_input}
             else:
-                raise ValueError(
-                    f"{model_predict} expects arguments: {model_predict_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
-                )
+                raise ValueError(f"{model_predict} expects arguments: {model_predict_arg_names}, provide a preprocess_model_input function that returns a dict with those keys.")
         try:
             model_start_time = time.time()
             model_output = await async_call(model_predict, **model_predict_args)
@@ -161,11 +147,7 @@ class Evaluation(Object):
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
             if len(dataset_column_names) > 3:
                 dataset_column_names_str += ", ..."
-            required_arg_names = [
-                param.name
-                for param in predict_signature.parameters.values()
-                if param.default == inspect.Parameter.empty
-            ]
+            required_arg_names = [param.name for param in predict_signature.parameters.values() if param.default == inspect.Parameter.empty]
             if isinstance(model_predict, BoundOp):
                 required_arg_names = required_arg_names[1:]
 
@@ -203,9 +185,7 @@ class Evaluation(Object):
                 score_arg_names = score_arg_names[1:]
 
             if "model_output" not in score_arg_names:
-                raise OpCallError(
-                    f"Scorer {scorer_name} must have a 'model_output' argument, to receive the output of the model function."
-                )
+                raise OpCallError(f"Scorer {scorer_name} must have a 'model_output' argument, to receive the output of the model function.")
 
             if isinstance(example, dict):
                 score_args = {k: v for k, v in example.items() if k in score_arg_names}
@@ -213,9 +193,7 @@ class Evaluation(Object):
                 if len(score_arg_names) == 2:
                     score_args = {score_arg_names[0]: example}
                 else:
-                    raise ValueError(
-                        f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
-                    )
+                    raise ValueError(f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys.")
             score_args["model_output"] = model_output
 
             try:
@@ -225,11 +203,7 @@ class Evaluation(Object):
                 dataset_column_names_str = ", ".join(dataset_column_names[:3])
                 if len(dataset_column_names) > 3:
                     dataset_column_names_str += ", ..."
-                required_arg_names = [
-                    param.name
-                    for param in score_signature.parameters.values()
-                    if param.default == inspect.Parameter.empty
-                ]
+                required_arg_names = [param.name for param in score_signature.parameters.values() if param.default == inspect.Parameter.empty]
                 if isinstance(score_fn, BoundOp):
                     required_arg_names = required_arg_names[1:]
                 required_arg_names.remove("model_output")
@@ -295,9 +269,7 @@ class Evaluation(Object):
         dataset = typing.cast(Dataset, self.dataset)
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
-        async for example, eval_row in util.async_foreach(
-            trial_rows, eval_example, get_weave_parallelism()
-        ):
+        async for example, eval_row in util.async_foreach(trial_rows, eval_example, get_weave_parallelism()):
             n_complete += 1
             duration = time.time() - start_time
             print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
@@ -329,7 +301,5 @@ def evaluate(
     scores: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[Callable] = None,
 ) -> dict:
-    eval = Evaluation(
-        dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
-    )
+    eval = Evaluation(dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input)
     return asyncio.run(eval.evaluate(model))

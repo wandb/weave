@@ -27,9 +27,7 @@ def test_zlib_playback(dev_only_admin_env_override, use_server_gql_schema):
                 break
         if use_node is None:
             raise Exception("Did not find filter node")
-        json_data["graphs"]["targetNodes"] = [
-            json_data["graphs"]["targetNodes"][use_node]
-        ]
+        json_data["graphs"]["targetNodes"] = [json_data["graphs"]["targetNodes"][use_node]]
 
     execute_args = {
         "request": json_data,

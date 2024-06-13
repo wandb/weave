@@ -24,9 +24,7 @@ def union_output_type(input_type):
     vals2 = get_const_union_vals(s2_type, types.String())
     if vals1 and vals2:
         union_vals = set(vals1).union(vals2)
-        return types.List(
-            types.UnionType(*(types.Const(types.String(), v) for v in union_vals))
-        )
+        return types.List(types.UnionType(*(types.Const(types.String(), v) for v in union_vals)))
     return types.List(types.String())
 
 
@@ -43,9 +41,7 @@ def difference_output_type(input_type):
     vals2 = get_const_union_vals(s2_type, types.String())
     if vals1 and vals2:
         union_vals = set(vals1).difference(vals2)
-        return types.List(
-            types.union(*(types.Const(types.String(), v) for v in union_vals))
-        )
+        return types.List(types.union(*(types.Const(types.String(), v) for v in union_vals)))
     return types.List(types.String())
 
 

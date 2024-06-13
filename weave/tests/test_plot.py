@@ -15,11 +15,7 @@ from contextlib import contextmanager
 
 @contextmanager
 def const_nodes_equal():
-    graph.ConstNode.__eq__ = (
-        lambda self, other: isinstance(other, graph.ConstNode)
-        and self.val == other.val
-        and self.type == other.type
-    )
+    graph.ConstNode.__eq__ = lambda self, other: isinstance(other, graph.ConstNode) and self.val == other.val and self.type == other.type
     yield
     del graph.ConstNode.__eq__
 
@@ -29,21 +25,14 @@ def test_run_segment_plot_config():
     weave.save(last_segment)
     config = Plot(last_segment.experiment()).config
     assert len(config.series) == 1
-    assert all(
-        isinstance(v, (graph.VoidNode, graph.ConstNode))
-        for v in config.series[0].table.columnSelectFunctions.values()
-    )
+    assert all(isinstance(v, (graph.VoidNode, graph.ConstNode)) for v in config.series[0].table.columnSelectFunctions.values())
 
 
 def test_multi_series_plot_config_with_grouping():
     last_segment = create_experiment(1000, 3, 0.8)
     weave.save(last_segment)
     plot = Plot(last_segment.experiment())
-    plot.set_x(
-        lambda row: weave.ops.number_bin(
-            row["step"], weave.ops.numbers_bins_equal([1, 2000], 2)
-        )
-    )
+    plot.set_x(lambda row: weave.ops.number_bin(row["step"], weave.ops.numbers_bins_equal([1, 2000], 2)))
     plot.set_y(lambda row: weave.ops.numbers_avg(row["metric0"]))
 
     plot.groupby_x()
@@ -61,8 +50,7 @@ def test_multi_series_plot_config_with_grouping():
     assert len(plot.config.series) == 2
     assert all(
         isinstance(v, (graph.VoidNode, graph.ConstNode, graph.OutputNode))
-        for v in list(plot.config.series[0].table.columnSelectFunctions.values())
-        + list(plot.config.series[1].table.columnSelectFunctions.values())
+        for v in list(plot.config.series[0].table.columnSelectFunctions.values()) + list(plot.config.series[1].table.columnSelectFunctions.values())
     )
 
 
@@ -70,11 +58,7 @@ def test_multi_series_grouping():
     last_segment = create_experiment(1000, 3, 0.8)
     weave.save(last_segment)
     plot = Plot(last_segment.experiment())
-    plot.set_x(
-        lambda row: weave.ops.number_bin(
-            row["step"], weave.ops.numbers_bins_equal([1, 2000], 2)
-        )
-    )
+    plot.set_x(lambda row: weave.ops.number_bin(row["step"], weave.ops.numbers_bins_equal([1, 2000], 2)))
     plot.groupby_x()
 
     plot.set_y(lambda row: weave.ops.numbers_avg(row["metric0"]))
@@ -101,11 +85,7 @@ def test_multi_series_setting():
     last_segment = create_experiment(1000, 3, 0.8)
     weave.save(last_segment)
     plot = Plot(last_segment.experiment())
-    plot.set_x(
-        lambda row: weave.ops.number_bin(
-            row["step"], weave.ops.numbers_bins_equal([1, 2000], 2)
-        )
-    )
+    plot.set_x(lambda row: weave.ops.number_bin(row["step"], weave.ops.numbers_bins_equal([1, 2000], 2)))
 
     plot.set_y(lambda row: row["metric0"])
     plot.set_mark_constant("line")
@@ -150,18 +130,12 @@ def test_constructor():
     )
 
 
-@pytest.mark.skip(
-    "I have to constantly update these random values and it doesn't always agree with CI"
-)
+@pytest.mark.skip("I have to constantly update these random values and it doesn't always agree with CI")
 def test_actual_config_value(fixed_random_seed):
     last_segment = create_experiment(1000, 3, 0.8)
     weave.save(last_segment)
     plot = Plot(last_segment.experiment())
-    plot.set_x(
-        lambda row: weave.ops.number_bin(
-            row["step"], weave.ops.numbers_bins_equal([1, 2000], 2)
-        )
-    )
+    plot.set_x(lambda row: weave.ops.number_bin(row["step"], weave.ops.numbers_bins_equal([1, 2000], 2)))
     plot.set_y(lambda row: weave.ops.numbers_avg(row["metric0"]))
     plot.set_mark_constant("line")
 

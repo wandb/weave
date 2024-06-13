@@ -39,11 +39,7 @@ def bucket_timestamp(interval_days: int) -> str:
     num_intervals = int(now / interval_seconds)
     # use the bucket end time because this makes it easy to know when a cache interval will no longer be used
     bucket_end_time = (num_intervals + 1) * interval_seconds
-    return str(
-        datetime.datetime.fromtimestamp(bucket_end_time, datetime.timezone.utc)
-        .timestamp()
-        .__floor__()
-    )
+    return str(datetime.datetime.fromtimestamp(bucket_end_time, datetime.timezone.utc).timestamp().__floor__())
 
 
 @contextlib.contextmanager
@@ -151,9 +147,7 @@ class LruTimeWindowCache(typing.Generic[CacheKeyType, CacheValueType]):
             typing.Tuple[datetime.datetime, CacheValueType],
         ] = {}
 
-    def _full_key(
-        self, key: CacheKeyType
-    ) -> typing.Tuple[typing.Optional[str], CacheKeyType]:
+    def _full_key(self, key: CacheKeyType) -> typing.Tuple[typing.Optional[str], CacheKeyType]:
         return (get_user_cache_key(), key)
 
     def _prune(self, now: datetime.datetime) -> None:

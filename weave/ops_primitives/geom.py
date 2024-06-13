@@ -25,9 +25,7 @@ class BoundingBox2D:
 
     @weave.op()
     def center(self) -> Point2D:
-        return Point2D(
-            self.top_left.x + self.size.w / 2, self.top_left.y + self.size.h / 2
-        )
+        return Point2D(self.top_left.x + self.size.w / 2, self.top_left.y + self.size.h / 2)
 
 
 @weave.type()

@@ -60,9 +60,7 @@ class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
     def temp_dir(self) -> str:
         if self._temp_dir is None:
             rand_part = "".join(random.choice("0123456789ABCDEF") for _ in range(16))
-            self._temp_dir = os.path.join(
-                runfiles_wandb.wandb_run_dir(), "upload_cache", f"tmp_{rand_part}"
-            )
+            self._temp_dir = os.path.join(runfiles_wandb.wandb_run_dir(), "upload_cache", f"tmp_{rand_part}")
             os.makedirs(self._temp_dir, exist_ok=True)
         return self._temp_dir
 
@@ -75,13 +73,9 @@ class WandbLiveRunFiles(runfiles_wandb.WandbRunFiles):
         self.cleanup()
 
     @contextlib.contextmanager
-    def new_file(
-        self, path: str, binary: bool = False
-    ) -> typing.Generator[typing.IO, None, None]:
+    def new_file(self, path: str, binary: bool = False) -> typing.Generator[typing.IO, None, None]:
         if self._file_pusher is None:
-            raise ValueError(
-                "WandbLiveRunFiles must be associated with a file pusher to use new_file"
-            )
+            raise ValueError("WandbLiveRunFiles must be associated with a file pusher to use new_file")
 
         dir_path = self.temp_dir()
         file_path = os.path.join(dir_path, path)
@@ -117,16 +111,12 @@ class _StreamTableSync:
             pass
         elif len(splits) == 2:
             if project_name is not None:
-                raise ValueError(
-                    f"Cannot specify project_name and table_name with '/' in it: {table_name}"
-                )
+                raise ValueError(f"Cannot specify project_name and table_name with '/' in it: {table_name}")
             project_name = splits[0]
             table_name = splits[1]
         elif len(splits) == 3:
             if project_name is not None or entity_name is not None:
-                raise ValueError(
-                    f"Cannot specify project_name or entity_name and table_name with 2 '/'s in it: {table_name}"
-                )
+                raise ValueError(f"Cannot specify project_name or entity_name and table_name with 2 '/'s in it: {table_name}")
             entity_name = splits[0]
             project_name = splits[1]
             table_name = splits[2]
@@ -137,9 +127,7 @@ class _StreamTableSync:
             entity_name = api.default_entity_name()
             # get default entity
             if entity_name is None or entity_name == "":
-                raise ValueError(
-                    "Entity not specified and no default entity found. Please specify entity_name or set default entity with `wandb login --entity <entity_name>`"
-                )
+                raise ValueError("Entity not specified and no default entity found. Please specify entity_name or set default entity with `wandb login --entity <entity_name>`")
 
         if project_name is None or project_name == "":
             raise ValueError("Must specify project_name")
@@ -205,9 +193,7 @@ class _StreamTableSync:
 
         if self._weave_stream_table_ref is None:
             raise errors.WeaveInternalError("ref is None after ensure")
-        return stream_table_ops.rows(
-            weave_api.get(str(self._weave_stream_table_ref.uri))
-        )
+        return stream_table_ops.rows(weave_api.get(str(self._weave_stream_table_ref.uri)))
 
     def _ipython_display_(self) -> graph.Node:
         from .. import show
@@ -318,10 +304,7 @@ def maybe_history_type_to_weave_type(tc_type: str) -> typing.Optional[weave_type
 
 
 def is_weave_encoded_history_cell(cell: dict) -> bool:
-    return "_val" in cell and (
-        "_weave_type" in cell
-        or (cell.get("_type") != None and cell["_type"].startswith(TYPE_ENCODE_PREFIX))
-    )
+    return "_val" in cell and ("_weave_type" in cell or (cell.get("_type") != None and cell["_type"].startswith(TYPE_ENCODE_PREFIX)))
 
 
 def from_weave_encoded_history_cell(cell: dict) -> typing.Any:
@@ -340,9 +323,7 @@ def from_weave_encoded_history_cell(cell: dict) -> typing.Any:
     return storage.from_python(weave_json)
 
 
-def row_to_weave(
-    row: typing.Dict[str, typing.Any], artifact: WandbLiveRunFiles
-) -> typing.Dict[str, typing.Any]:
+def row_to_weave(row: typing.Dict[str, typing.Any], artifact: WandbLiveRunFiles) -> typing.Dict[str, typing.Any]:
     return {key: obj_to_weave(value, artifact) for key, value in row.items()}
 
 
@@ -382,9 +363,7 @@ def w_type_to_type_name(w_type: typing.Union[str, dict]) -> str:
 
 
 def leaf_to_weave(leaf: typing.Any, artifact: WandbLiveRunFiles) -> typing.Any:
-    def ref_persister_artifact(
-        type: weave_types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]
-    ) -> artifact_base.Artifact:
+    def ref_persister_artifact(type: weave_types.Type, refs: typing.Iterable[artifact_base.ArtifactRef]) -> artifact_base.Artifact:
         # Save all the reffed objects into the new artifact.
         for mem_ref in refs:
             if mem_ref.path is not None and mem_ref._type is not None:

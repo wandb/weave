@@ -109,9 +109,7 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
 
     @property
     def non_none_members(self):
-        return [
-            m for m in self._member_mappers if not isinstance(m.type, types.NoneType)
-        ]
+        return [m for m in self._member_mappers if not isinstance(m.type, types.NoneType)]
 
     def result_type(self):
         nullable = False
@@ -136,9 +134,7 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
     def type_code_of_type(self, type: types.Type) -> int:
         """Return the arrow type code for the given type."""
         if self.is_single_object_nullable:
-            raise errors.WeaveTypeError(
-                "Cannot get type code of type in a union that is nullable"
-            )
+            raise errors.WeaveTypeError("Cannot get type code of type in a union that is nullable")
         elif isinstance(type, types.NoneType):
             raise errors.WeaveTypeError("Cannot get type code of NoneType")
         else:
@@ -146,9 +142,7 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
                 return self._type_codes[type]
             except KeyError:
                 for member_type, member_type_code in self._type_codes.items():
-                    if not isinstance(
-                        types.merge_types(member_type, type), types.UnionType
-                    ):
+                    if not isinstance(types.merge_types(member_type, type), types.UnionType):
                         return member_type_code
                 raise errors.WeaveTypeError(f"Could not find type code for {type}")
 
@@ -160,15 +154,11 @@ class UnionToArrowUnion(mappers_weave.UnionMapper):
     def mapper_of_type_code(self, type_code: int) -> mappers.Mapper:
         """Return the mapper for the given type code."""
         if self.is_single_object_nullable:
-            raise errors.WeaveTypeError(
-                "Cannot get mapper of type code in a union that is nullable"
-            )
+            raise errors.WeaveTypeError("Cannot get mapper of type code in a union that is nullable")
         try:
             return self._type_code_to_member_mapper[type_code]
         except KeyError:
-            raise errors.WeaveTypeError(
-                f"Could not find mapper for type code {type_code}"
-            )
+            raise errors.WeaveTypeError(f"Could not find mapper for type code {type_code}")
 
     def apply(self, obj):
         obj_type = types.TypeRegistry.type_of(obj)
@@ -311,9 +301,7 @@ class DefaultToArrow(mappers_python.DefaultToPy):
         elif self.type.name == "ndarray":
             return pa.null()
 
-        raise errors.WeaveInternalError(
-            "Type not yet handled by mappers_arrow: %s" % self.type
-        )
+        raise errors.WeaveInternalError("Type not yet handled by mappers_arrow: %s" % self.type)
 
     def apply(self, obj):
         # Hacking... when its a panel, we need to json dump the node and config
@@ -344,23 +332,14 @@ class ArrowToArrowWeaveListOrPylist(mappers_python.ListToPyList):
 
 class GQLHasKeysToArrowStruct(mappers_python.GQLClassWithKeysToPyDict):
     def result_type(self):
-        return pa.struct(
-            [
-                pa.field(key, self._property_serializers[key].result_type())
-                for key in self.type.keys
-            ]
-        )
+        return pa.struct([pa.field(key, self._property_serializers[key].result_type()) for key in self.type.keys])
 
     def as_typeddict_mapper(self):
         typed_dict_type = types.TypedDict(self.type.keys)
-        return TypedDictToArrowStruct(
-            typed_dict_type, self.mapper, self._artifact, self.path
-        )
+        return TypedDictToArrowStruct(typed_dict_type, self.mapper, self._artifact, self.path)
 
 
-def map_to_arrow_(
-    type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None
-):
+def map_to_arrow_(type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None):
     if isinstance(type, types.Const):
         type = type.val_type
     if isinstance(type, types.TypedDict):

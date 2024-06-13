@@ -33,9 +33,7 @@ def test_with_keys_not_assignability():
 
 def test_type_of_run_with_keys():
     run = wdt.Run.from_keys({"a": "1"})
-    assert types.TypeRegistry.type_of(run) == wdt.RunType.with_keys(
-        {"a": types.String()}
-    )
+    assert types.TypeRegistry.type_of(run) == wdt.RunType.with_keys({"a": types.String()})
 
 
 def test_serialize_deserialize_run_type():

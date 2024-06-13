@@ -52,9 +52,7 @@ def root_all_reports_gql_resolver(gql_result):
     ),
 )
 def root_all_reports():
-    raise errors.WeaveGQLCompileError(
-        "root-allReports should not be executed directly. If you see this error, it is a bug in the Weave compiler."
-    )
+    raise errors.WeaveGQLCompileError("root-allReports should not be executed directly. If you see this error, it is a bug in the Weave compiler.")
 
 
 # Section 3/6: Attribute Getters

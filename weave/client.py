@@ -12,10 +12,7 @@ class Client:
         # Deref if node output type is not RefType
         # TODO: move to language_ref.py, do in compile pass
         # TODO: this logic is duplicated in server.py:_handle_request
-        return [
-            r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
-            for (n, r) in zip(nodes, results)
-        ]
+        return [r if isinstance(n.type, weave_types.RefType) else storage.deref(r) for (n, r) in zip(nodes, results)]
 
 
 class NonCachingClient:
@@ -24,7 +21,4 @@ class NonCachingClient:
 
     def execute(self, nodes):
         res = self.server.execute(nodes, no_cache=True)
-        return [
-            r if isinstance(n.type, weave_types.RefType) else storage.deref(r)
-            for (n, r) in zip(nodes, res)
-        ]
+        return [r if isinstance(n.type, weave_types.RefType) else storage.deref(r) for (n, r) in zip(nodes, res)]

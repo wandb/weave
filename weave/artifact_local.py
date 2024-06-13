@@ -89,17 +89,13 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
     @classmethod
     def fork_from_uri(
         cls,
-        source_uri: typing.Union[
-            "WeaveLocalArtifactURI", artifact_wandb.WeaveWBArtifactURI
-        ],
+        source_uri: typing.Union["WeaveLocalArtifactURI", artifact_wandb.WeaveWBArtifactURI],
     ):
         art = cls(source_uri.name, source_uri.version)
         art._original_uri = str(source_uri)
         source_art = source_uri.to_ref().artifact
         if not isinstance(source_art, (LocalArtifact, artifact_wandb.WandbArtifact)):
-            raise errors.WeaveInternalError(
-                "Cannot fork from non-local artifact: %s" % source_art
-            )
+            raise errors.WeaveInternalError("Cannot fork from non-local artifact: %s" % source_art)
         art._version = source_art.version
         art._metadata = source_art.metadata.as_dict()
         return art
@@ -127,9 +123,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
     @property
     def version(self):
         if not self.is_saved:
-            raise errors.WeaveInternalError(
-                "artifact must be saved before calling version!"
-            )
+            raise errors.WeaveInternalError("artifact must be saved before calling version!")
         return self._version
 
     @property
@@ -166,12 +160,8 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
 
         # Make sure we're undoing to an artifact uri
         original_uri_obj = uris.WeaveURI.parse(previous_uri)
-        if not isinstance(
-            original_uri_obj, (artifact_wandb.WeaveWBArtifactURI, WeaveLocalArtifactURI)
-        ):
-            raise errors.WeaveInternalError(
-                "Cannot undo to non artifact uri: %s" % previous_uri
-            )
+        if not isinstance(original_uri_obj, (artifact_wandb.WeaveWBArtifactURI, WeaveLocalArtifactURI)):
+            raise errors.WeaveInternalError("Cannot undo to non artifact uri: %s" % previous_uri)
 
         # Get the previous version
         previous_version = original_uri_obj.to_ref().artifact
@@ -198,9 +188,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
     def _setup_dirs(self):
         # NOTE: do not write to the filesystem here! This is called to construct
         # an artifact that may not exist or ever be read or written to.
-        self._write_dirname = os.path.join(
-            self._root, f"{WORKING_DIR_PREFIX}-{util.rand_string_n(12)}"
-        )
+        self._write_dirname = os.path.join(self._root, f"{WORKING_DIR_PREFIX}-{util.rand_string_n(12)}")
         self._read_dirname = None
         if self._version:
             read_dirname = os.path.join(self._root, self._version)
@@ -214,9 +202,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 # if this is a branch, set to the actual specific version it points to
                 if os.path.islink(self._read_dirname):
                     self._branch = self._version
-                    self._version = os.path.basename(
-                        os.path.realpath(self._read_dirname)
-                    )
+                    self._version = os.path.basename(os.path.realpath(self._read_dirname))
                     self._read_dirname = os.path.join(self._root, self._version)
         if self._branch != None:
             self._original_uri = str(
@@ -236,11 +222,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
     def _get_write_path(self, path: str) -> pathlib.Path:
         write_dirname = pathlib.Path(self._write_dirname)
         full_path = write_dirname / path
-        if (
-            not pathlib.Path(full_path)
-            .resolve()
-            .is_relative_to(write_dirname.resolve())
-        ):
+        if not pathlib.Path(full_path).resolve().is_relative_to(write_dirname.resolve()):
             raise errors.WeaveAccessDeniedError()
         return full_path
 
@@ -333,18 +315,14 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
     def read_metadata(self):
         if not self._read_dirname:
             return {}
-        with file_util.safe_open(
-            os.path.join(self._read_dirname, ".artifact-version.json")
-        ) as f:
+        with file_util.safe_open(os.path.join(self._read_dirname, ".artifact-version.json")) as f:
             obj = json.load(f)
             obj["created_at"] = datetime.fromisoformat(obj["created_at"])
             return obj
 
     def write_metadata(self, dirname, metadata):
         self._makedir(dirname)
-        with file_util.safe_open(
-            os.path.join(dirname, ".artifact-version.json"), "w"
-        ) as f:
+        with file_util.safe_open(os.path.join(dirname, ".artifact-version.json"), "w") as f:
             json.dump({"created_at": datetime.now().isoformat(), **metadata}, f)
 
     def save(self, branch=None):
@@ -363,9 +341,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 if f != ".artifact-version.json":
                     full_path = os.path.join(dirpath, f)
                     manifest[f] = md5_hash_file(full_path)
-        commit_hash = md5_string(json.dumps(manifest, sort_keys=True, indent=2))[
-            : artifact_wandb.WANDB_COMMIT_HASH_LENGTH
-        ]
+        commit_hash = md5_string(json.dumps(manifest, sort_keys=True, indent=2))[: artifact_wandb.WANDB_COMMIT_HASH_LENGTH]
 
         new_dirname = os.path.join(self._root, commit_hash)
 
@@ -420,9 +396,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 if key == "previous_commit_uri":
                     last_previous_uri = metadata[key]
                 del metadata[key]
-        if self._original_uri != None and (
-            branch != self._branch or self._original_uri.startswith("wandb-artifact://")
-        ):
+        if self._original_uri != None and (branch != self._branch or self._original_uri.startswith("wandb-artifact://")):
             # new branch
             metadata["branch_point"] = {
                 "original_uri": self._original_uri,
@@ -434,12 +408,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             if self.branch_point:
                 metadata["branch_point"] = self.branch_point
                 metadata["branch_point"]["n_commits"] += 1
-        if (
-            self.is_saved
-            and self.version
-            and artifact_wandb.likely_commit_hash(self.version)
-            and self.version != commit_hash
-        ):
+        if self.is_saved and self.version and artifact_wandb.likely_commit_hash(self.version) and self.version != commit_hash:
             metadata["previous_commit_uri"] = str(self.uri_obj)
         elif last_previous_uri != None:
             # TODO: Refactor this to be more sane - we should be explicit about
@@ -460,13 +429,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         else:
             make_link("latest")
 
-    def _path_info(
-        self, path: str
-    ) -> typing.Optional[
-        typing.Union[
-            "artifact_fs.FilesystemArtifactFile", "artifact_fs.FilesystemArtifactDir"
-        ]
-    ]:
+    def _path_info(self, path: str) -> typing.Optional[typing.Union["artifact_fs.FilesystemArtifactFile", "artifact_fs.FilesystemArtifactDir"]]:
         read_dirname = pathlib.Path(self._read_dirname)
         local_path = self._get_read_path(path)
         if local_path.is_file():
@@ -479,9 +442,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                 if relpath == ".artifact-version.json":
                     continue
                 if sub_path.is_file():
-                    sub_files[sub_path.name] = artifact_fs.FilesystemArtifactFile(
-                        self, relpath
-                    )
+                    sub_files[sub_path.name] = artifact_fs.FilesystemArtifactFile(self, relpath)
                 else:
                     sub_dirs[sub_path.name] = file_base.SubDir(
                         relpath,
@@ -489,19 +450,13 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
                         {},
                         {},
                     )
-            return artifact_fs.FilesystemArtifactDir(
-                self, path, 14, sub_dirs, sub_files
-            )
+            return artifact_fs.FilesystemArtifactDir(self, path, 14, sub_dirs, sub_files)
         else:
             return None
 
     @property
     def metadata(self) -> artifact_fs.ArtifactMetadata:
-        read_metadata = {
-            k: v
-            for k, v in self.read_metadata().items()
-            if k not in RESERVED_METADATA_KEYS
-        }
+        read_metadata = {k: v for k, v in self.read_metadata().items() if k not in RESERVED_METADATA_KEYS}
         return artifact_fs.ArtifactMetadata(self._metadata, read_metadata)
 
 
@@ -527,20 +482,13 @@ class LocalArtifactRef(artifact_fs.FilesystemArtifactRef):
         artifact_path = os.path.join(local_artifact_dir(), self.artifact.name)
         versions = []
         for version_name in os.listdir(artifact_path):
-            if (
-                not os.path.islink(os.path.join(artifact_path, version_name))
-                and not version_name.startswith(WORKING_DIR_PREFIX)
-                and not version_name.startswith(".")
-            ):
+            if not os.path.islink(os.path.join(artifact_path, version_name)) and not version_name.startswith(WORKING_DIR_PREFIX) and not version_name.startswith("."):
                 # This is ass-backward, have to get the full object to just
                 # get the ref.
                 # TODO
                 art = self.artifact.get_other_version(version_name)
                 if art is None:
-                    raise errors.WeaveInternalError(
-                        "Could not get other version: %s %s"
-                        % (self.artifact, version_name)
-                    )
+                    raise errors.WeaveInternalError("Could not get other version: %s %s" % (self.artifact, version_name))
                 ref = LocalArtifactRef(art, path="obj")
                 # obj = uri.get()
                 # ref = get_ref(obj)
@@ -550,9 +498,7 @@ class LocalArtifactRef(artifact_fs.FilesystemArtifactRef):
     @classmethod
     def from_uri(cls, uri: uris.WeaveURI) -> "LocalArtifactRef":
         if not isinstance(uri, WeaveLocalArtifactURI):
-            raise errors.WeaveInternalError(
-                f"Invalid URI class passed to WandbLocalArtifactRef.from_uri: {type(uri)}"
-            )
+            raise errors.WeaveInternalError(f"Invalid URI class passed to WandbLocalArtifactRef.from_uri: {type(uri)}")
         return cls(
             LocalArtifact(uri.name, uri.version),
             path=uri.path,

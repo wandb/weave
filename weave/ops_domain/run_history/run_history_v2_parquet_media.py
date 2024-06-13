@@ -41,14 +41,8 @@ def refine_history2_type(run: wdt.Run) -> types.Type:
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
     hidden=True,
 )
-def refine_history2_with_columns_type(
-    run: wdt.Run, history_cols: list[str]
-) -> types.Type:
-    return ArrowWeaveListType(
-        history_op_common.refine_history_type(
-            run, columns=history_op_common.get_full_columns_prefixed(run, history_cols)
-        )
-    )
+def refine_history2_with_columns_type(run: wdt.Run, history_cols: list[str]) -> types.Type:
+    return ArrowWeaveListType(history_op_common.refine_history_type(run, columns=history_op_common.get_full_columns_prefixed(run, history_cols)))
 
 
 @op(
@@ -59,9 +53,7 @@ def refine_history2_with_columns_type(
     hidden=True,
 )
 def history2_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _get_history2(
-        run, history_op_common.get_full_columns_prefixed(run, history_cols)
-    )
+    return _get_history2(run, history_op_common.get_full_columns_prefixed(run, history_cols))
 
 
 # DEPRECATED: see comment at top.
@@ -123,11 +115,7 @@ def _get_history2(run: wdt.Run, columns=None):
     # get binary fields from history schema - these are serialized json
     if parquet_history is not None:
         fields = [field.name for field in parquet_history.schema]
-        binary_fields = {
-            field.name
-            for field in parquet_history.schema
-            if pa.types.is_binary(field.type)
-        }
+        binary_fields = {field.name for field in parquet_history.schema if pa.types.is_binary(field.type)}
 
         # deserialize json if any is present
         with tracer.trace("process_non_basic_fields"):
@@ -154,9 +142,7 @@ def _get_history2(run: wdt.Run, columns=None):
                         artifact=artifact,
                     )
                     new_col = pa.chunked_array([awl._arrow_data])
-                    parquet_history = parquet_history.set_column(
-                        fields.index(field), field, new_col
-                    )
+                    parquet_history = parquet_history.set_column(fields.index(field), field, new_col)
 
     if parquet_history is not None and len(parquet_history) > 0:
         with tracer.trace("parquet_history_to_arrow"):

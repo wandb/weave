@@ -15,33 +15,19 @@ def eval_board(dataset, eval_result0, eval_result1):  # type: ignore
     summary = varbar.add(
         "summary",
         weave.ops.make_list(
-            a=weave.ops.TypedDict.merge(
-                weave.ops.dict_(name="baseline"), baseline_eval_result["summary"]
-            ),
-            b=weave.ops.TypedDict.merge(
-                weave.ops.dict_(name="candidate"), candidate_eval_result["summary"]
-            ),
+            a=weave.ops.TypedDict.merge(weave.ops.dict_(name="baseline"), baseline_eval_result["summary"]),
+            b=weave.ops.TypedDict.merge(weave.ops.dict_(name="candidate"), candidate_eval_result["summary"]),
         ),
     )
 
-    weave.ops.make_list(
-        a=baseline_eval_result["eval_table"], b=baseline_eval_result["eval_table"]
-    )
+    weave.ops.make_list(a=baseline_eval_result["eval_table"], b=baseline_eval_result["eval_table"])
 
     concatted_evals = varbar.add(
         "concatted_evals",
         weave.ops.List.concat(
             weave.ops.make_list(
-                a=baseline_eval_result["eval_table"].map(
-                    lambda row: weave.ops.TypedDict.merge(
-                        weave.ops.dict_(name="baseline"), row
-                    )
-                ),
-                b=candidate_eval_result["eval_table"].map(
-                    lambda row: weave.ops.TypedDict.merge(
-                        weave.ops.dict_(name="candidate"), row
-                    )
-                ),
+                a=baseline_eval_result["eval_table"].map(lambda row: weave.ops.TypedDict.merge(weave.ops.dict_(name="baseline"), row)),
+                b=candidate_eval_result["eval_table"].map(lambda row: weave.ops.TypedDict.merge(weave.ops.dict_(name="candidate"), row)),
             )
         ),
     )
@@ -217,9 +203,7 @@ def eval_board(dataset, eval_result0, eval_result1):  # type: ignore
         ),
         "result.shares",
     )
-    sel_ex_table.add_column(
-        lambda row: row["dataset.label.directors"], "label.directors"
-    )
+    sel_ex_table.add_column(lambda row: row["dataset.label.directors"], "label.directors")
     sel_ex_table.add_column(
         lambda row: weave.ops.dict_(
             baseilne=row["evals.result"][0]["directors"].toString(),

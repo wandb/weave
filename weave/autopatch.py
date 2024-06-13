@@ -12,9 +12,7 @@ def autopatch_openai() -> None:
         pass
     else:
         if openai.__version__ < "1":
-            print(
-                "To automatically track openai calls, upgrade the openai package to a version >= '1.0'"
-            )
+            print("To automatically track openai calls, upgrade the openai package to a version >= '1.0'")
             return
         from weave.monitoring.openai import patch
 

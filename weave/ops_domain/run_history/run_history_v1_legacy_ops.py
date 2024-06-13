@@ -42,14 +42,8 @@ def history(run: wdt.Run):
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
     hidden=True,
 )
-def refine_history_with_columns_type(
-    run: wdt.Run, history_cols: list[str]
-) -> types.Type:
-    return types.List(
-        history_op_common.refine_history_type(
-            run, columns=history_op_common.get_full_columns_prefixed(run, history_cols)
-        )
-    )
+def refine_history_with_columns_type(run: wdt.Run, history_cols: list[str]) -> types.Type:
+    return types.List(history_op_common.refine_history_type(run, columns=history_op_common.get_full_columns_prefixed(run, history_cols)))
 
 
 @op(
@@ -60,9 +54,7 @@ def refine_history_with_columns_type(
     hidden=True,
 )
 def history_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _get_history(
-        run, history_op_common.get_full_columns_prefixed(run, history_cols)
-    )
+    return _get_history(run, history_op_common.get_full_columns_prefixed(run, history_cols))
 
 
 def _get_history(run: wdt.Run, columns=None):
@@ -72,23 +64,16 @@ def _get_history(run: wdt.Run, columns=None):
     # download the files from the urls
 
     with tracer.trace("read_history_parquet"):
-        parquet_history = history_op_common.read_history_parquet(
-            run, columns=columns
-        ) or pa.table([])
+        parquet_history = history_op_common.read_history_parquet(run, columns=columns) or pa.table([])
 
     # turn the liveset into an arrow table. the liveset is a list of dictionaries
     live_data = gql_json_cache.use_json(run["sampledParquetHistory"]["liveData"])
 
     with tracer.trace("liveSet.impute"):
-        live_data = [
-            {**row, **{colname: None for colname in columns if colname not in row}}
-            for row in live_data
-        ]
+        live_data = [{**row, **{colname: None for colname in columns if colname not in row}} for row in live_data]
 
     # get binary fields from history schema - these are serialized json
-    binary_fields = [
-        field.name for field in parquet_history.schema if pa.types.is_binary(field.type)
-    ]
+    binary_fields = [field.name for field in parquet_history.schema if pa.types.is_binary(field.type)]
 
     with tracer.trace("pq.to_pylist"):
         parquet_history = parquet_history.to_pylist()

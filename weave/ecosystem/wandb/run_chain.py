@@ -35,11 +35,7 @@ class RunChain:
 
                 history_nodes.append(hist_node)
 
-            history_node = weave.ops.List.concat(
-                weave.ops.make_list(
-                    **{f"node{i}": n for i, n in enumerate(history_nodes)}
-                )
-            )
+            history_node = weave.ops.List.concat(weave.ops.make_list(**{f"node{i}": n for i, n in enumerate(history_nodes)}))
             return history_node
 
     @weave.op()
@@ -84,9 +80,7 @@ def run_chain(run_path: str) -> RunChain:
         checkpoint_name = checkpoint_names[0]
 
         # Get the sequence of runs and checkpoints that lead here.
-        seq = gql_artifact_dag.get_run_checkpoint_chain(
-            entity, project, checkpoint_name
-        )
+        seq = gql_artifact_dag.get_run_checkpoint_chain(entity, project, checkpoint_name)
 
         # Fetch the contents of the checkpoint file for all checkpoints so we can get
         # the step for each.
@@ -111,12 +105,6 @@ def run_chain(run_path: str) -> RunChain:
         # Construct our segment objects.
         segments = []
         for run_info, checkpoint_step in zip(run_infos, checkpoint_steps):
-            segments.append(
-                RunChainSegmentInfo(
-                    run_name=run_info["runName"], final_step=checkpoint_step
-                )
-            )
-        segments.append(
-            RunChainSegmentInfo(run_name=run_infos[-1]["runName"], final_step=None)
-        )
+            segments.append(RunChainSegmentInfo(run_name=run_info["runName"], final_step=checkpoint_step))
+        segments.append(RunChainSegmentInfo(run_name=run_infos[-1]["runName"], final_step=None))
         return RunChain(entity_name=entity, project_name=project, segments=segments)

@@ -58,11 +58,7 @@ def test_merge():
     modified_dict_obj = weave.ops.get("local-artifact:///my-dict:my-branch/obj")
     new_uri = weave.ops.merge_artifact(modified_dict_obj)
     dict_obj_node = weave.ops.get(new_uri)
-    assert (
-        weave.use(dict_obj_node)
-        == weave.use(weave.ops.get("local-artifact:///my-dict:latest/obj"))
-        == {"a": 17, "b": 6}
-    )
+    assert weave.use(dict_obj_node) == weave.use(weave.ops.get("local-artifact:///my-dict:latest/obj")) == {"a": 17, "b": 6}
 
 
 def test_merge_no_version():
@@ -145,9 +141,7 @@ def test_artifact_history_remote_with_branch(user_by_api_key_in_env):
     art = weave.ops.get(uri)
     published_art_uri = weave.ops.publish_artifact(art, "art", None, None)
 
-    art = weave.ops.get(
-        f"wandb-artifact:///{user_by_api_key_in_env.username}/weave/art:latest/obj"
-    )
+    art = weave.ops.get(f"wandb-artifact:///{user_by_api_key_in_env.username}/weave/art:latest/obj")
 
     for i in range(num_versions):
         res_uri = art.append(i + 1)

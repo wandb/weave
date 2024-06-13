@@ -33,9 +33,7 @@ class StatusCode:
     ERROR = "ERROR"
 
 
-def _arguments_to_dict(
-    fn: typing.Callable, args: tuple[typing.Any, ...], kwargs: dict[str, typing.Any]
-) -> dict[str, typing.Any]:
+def _arguments_to_dict(fn: typing.Callable, args: tuple[typing.Any, ...], kwargs: dict[str, typing.Any]) -> dict[str, typing.Any]:
     """Given a function and arguments used to call that function, return a dictionary of key value pairs
     that are the bound arguments to the function.
     """
@@ -138,9 +136,7 @@ class Span:
 
     def asdict(self) -> stream_data_interfaces.TraceSpanDict:
         if self.end_time is None:
-            raise ValueError(
-                "Cannot log a span that has not been ended.  Call span.end() before logging."
-            )
+            raise ValueError("Cannot log a span that has not been ended.  Call span.end() before logging.")
         start_time_s = self.start_time.timestamp()
         end_time_s = self.end_time.timestamp()
         self.summary["latency_s"] = end_time_s - start_time_s
@@ -154,11 +150,7 @@ class Span:
             "end_time_s": end_time_s,
             "inputs": self.inputs,
             "output": self.output,
-            "exception": (
-                f"{type(self.exception).__name__}: {str(self.exception)}"
-                if self.exception is not None
-                else None
-            ),
+            "exception": (f"{type(self.exception).__name__}: {str(self.exception)}" if self.exception is not None else None),
             "attributes": self.attributes,
             "summary": self.summary,
         }
@@ -179,11 +171,7 @@ class Span:
             "end_time_s": end_time_s,  # type: ignore
             "inputs": self.inputs,
             "output": self.output,
-            "exception": (
-                f"{type(self.exception).__name__}: {str(self.exception)}"
-                if self.exception is not None
-                else None
-            ),
+            "exception": (f"{type(self.exception).__name__}: {str(self.exception)}" if self.exception is not None else None),
             "attributes": self.attributes,
             "summary": self.summary,
         }
@@ -271,9 +259,7 @@ class Monitor:
         def decorator(fn: typing.Callable[..., typing.Any]) -> typing.Any:
             if asyncio.iscoroutinefunction(fn):
 
-                async def async_wrapper(
-                    *args: typing.Any, **kwargs: typing.Any
-                ) -> typing.Any:
+                async def async_wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
                     attributes = {}
                     attributes.update(static_attributes or {})
                     attributes.update(kwargs.pop("monitor_attributes", {}))
@@ -333,9 +319,7 @@ def _init_monitor_streamtable(stream_key: str) -> typing.Optional[StreamTable]:
     elif len(tokens) == 3:
         entity_name, project_name, stream_name = tokens
     else:
-        raise ValueError(
-            "stream_key must be of the form 'entity/project/stream_name' or 'project/stream_name'"
-        )
+        raise ValueError("stream_key must be of the form 'entity/project/stream_name' or 'project/stream_name'")
 
     stream_table = None
     try:
@@ -368,9 +352,7 @@ def _get_global_monitor() -> typing.Optional[Monitor]:
         # if not isinstance(
         #     client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
         # ):
-        raise ValueError(
-            "monitor logging (via openai patch for example) is only supported with wandb client currently"
-        )
+        raise ValueError("monitor logging (via openai patch for example) is only supported with wandb client currently")
         return Monitor(client.runs_st)
     return _global_monitor
 

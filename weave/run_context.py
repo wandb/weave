@@ -8,9 +8,7 @@ if typing.TYPE_CHECKING:
     # from .run import Run
     from .weave_client import Call
 
-_run_stack: contextvars.ContextVar[list["Call"]] = contextvars.ContextVar(
-    "run", default=[]
-)
+_run_stack: contextvars.ContextVar[list["Call"]] = contextvars.ContextVar("run", default=[])
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +36,7 @@ def push_call(run: "Call") -> None:
 def pop_call(call_id: typing.Optional[str]) -> None:
     new_stack = copy.copy(_run_stack.get())
     if len(new_stack) == 0:
-        logger.warning(
-            f"weave pop_call error: Found empty callstack when popping call_id: {call_id}."
-        )
+        logger.warning(f"weave pop_call error: Found empty callstack when popping call_id: {call_id}.")
         # raise ValueError("Call stack is empty")
         return
     if call_id:
@@ -53,9 +49,7 @@ def pop_call(call_id: typing.Optional[str]) -> None:
                 new_stack = new_stack[:target_index]
                 break
         else:
-            logger.warning(
-                f"weave pop_call error: Call with id {call_id} not found in stack."
-            )
+            logger.warning(f"weave pop_call error: Call with id {call_id} not found in stack.")
             # raise ValueError(f"Call with id {call_id} not found in stack")
             return
     else:

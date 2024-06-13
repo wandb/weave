@@ -175,12 +175,8 @@ class FullPipelineOutput:
         pipeline = weave.use(self._model.pipeline())
         tokenizer = pipeline.tokenizer
         # re-initialize model with output_attentions=True
-        model = pipeline.model.__class__.from_pretrained(
-            self._model._id, output_attentions=True
-        )
+        model = pipeline.model.__class__.from_pretrained(self._model._id, output_attentions=True)
         encoded_input = tokenizer.encode(self.model_input, return_tensors="pt")
         model_output = model(encoded_input)
-        bmo = BaseModelOutput(
-            self._model, self.model_input, encoded_input, model_output
-        )
+        bmo = BaseModelOutput(self._model, self.model_input, encoded_input, model_output)
         return ModelOutputAttention(bmo, model_output[-1])

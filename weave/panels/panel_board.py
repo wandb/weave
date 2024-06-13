@@ -64,7 +64,6 @@ def Board(
     panels: typing.Union[panel_group.Group, list[BoardPanel]],
     editable=True,
 ):
-
     showExpressions = True if editable else "titleBar"
     vb = vars
     if not isinstance(vb, weave.panels.Group):

@@ -27,8 +27,7 @@ class NumpyArrayType(types.Type):
         if not isinstance(next_type, NumpyArrayType):
             return False
         if (
-            self.dtype != next_type.dtype
-            and next_type.dtype != np.dtype("object")  # object is like "any"
+            self.dtype != next_type.dtype and next_type.dtype != np.dtype("object")  # object is like "any"
         ) or tuple(self.shape) != tuple(next_type.shape):
             return False
         return True

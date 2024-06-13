@@ -59,9 +59,7 @@ def test_publish_table(user_by_api_key_in_env):
         ],
     )
     ref = storage.publish(table_obj, "weave/table")
-    assert (
-        ref.get().input_node.from_op.inputs["uri"].val.startswith("wandb-artifact://")
-    )
+    assert ref.get().input_node.from_op.inputs["uri"].val.startswith("wandb-artifact://")
 
 
 def test_publish_group(user_by_api_key_in_env):
@@ -296,14 +294,10 @@ def _perform_post_persist_assertions(
         assert isinstance(p_uri, WeaveLocalArtifactURI)
         assert target_entity is None
         assert target_project_name is None
-        expected_uri_with_hash = (
-            f"local-artifact:///{target_artifact_name}:{expected_commit_hash}/obj"
-        )
+        expected_uri_with_hash = f"local-artifact:///{target_artifact_name}:{expected_commit_hash}/obj"
         expected_uri_with_branch = None
         if branch_name:
-            expected_uri_with_branch = (
-                f"local-artifact:///{target_artifact_name}:{branch_name}/obj"
-            )
+            expected_uri_with_branch = f"local-artifact:///{target_artifact_name}:{branch_name}/obj"
     else:
         assert isinstance(p_ref, WandbArtifactRef)
         p_art = p_ref.artifact
@@ -333,9 +327,7 @@ def _perform_post_persist_assertions(
         assert p_uri.entity_name == target_entity
         assert p_uri.project_name == target_project_name
     assert p_ref.name == p_art.name == p_uri.name == target_artifact_name
-    assert likely_commit_hash(expected_commit_hash) and (
-        p_ref.version == p_art.version == p_uri.version == expected_commit_hash
-    )
+    assert likely_commit_hash(expected_commit_hash) and (p_ref.version == p_art.version == p_uri.version == expected_commit_hash)
     if not is_local:
         assert isinstance(p_art, WandbArtifact)
         assert p_art.commit_hash == expected_commit_hash
@@ -422,9 +414,7 @@ def test_mutate_remote_with_branch(user_by_api_key_in_env):
     obj = weave.ops.get(p_ref.branch_uri)[0]
     obj.set(new_data[0])
     new_branch_name = f"user-{branch_name}"
-    new_p_ref = LocalArtifactRef.from_str(
-        f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj"
-    )
+    new_p_ref = LocalArtifactRef.from_str(f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj")
 
     _perform_post_persist_assertions(
         is_local=True,
@@ -471,9 +461,7 @@ def test_mutate_local_with_commit_hash(user_by_api_key_in_env, new_branch_name=N
             n_commits=1,
             original_uri=str(p_ref.branch_uri).replace("/obj", ""),
         )
-    new_p_ref = LocalArtifactRef.from_str(
-        f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj"
-    )
+    new_p_ref = LocalArtifactRef.from_str(f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj")
 
     _perform_post_persist_assertions(
         is_local=True,
@@ -486,9 +474,7 @@ def test_mutate_local_with_commit_hash(user_by_api_key_in_env, new_branch_name=N
     )
 
 
-def test_mutate_local_with_commit_hash_and_branchpoint(
-    user_by_api_key_in_env, new_branch_name=None
-):
+def test_mutate_local_with_commit_hash_and_branchpoint(user_by_api_key_in_env, new_branch_name=None):
     data = ["test_data"]
     target_entity = user_by_api_key_in_env.username
     target_project_name = "test_project"
@@ -512,11 +498,7 @@ def test_mutate_local_with_commit_hash_and_branchpoint(
 
     obj = weave.ops.get(p_ref.branch_uri)[0]
     obj.set("PLACEHOLDER")
-    mod_ref = LocalArtifactRef.from_uri(
-        WeaveLocalArtifactURI.parse(
-            f"local-artifact:///{target_artifact_name}:user-{branch_name}/obj"
-        )
-    )
+    mod_ref = LocalArtifactRef.from_uri(WeaveLocalArtifactURI.parse(f"local-artifact:///{target_artifact_name}:user-{branch_name}/obj"))
     obj = weave.ops.get(mod_ref.branch_uri)[0]
     if new_branch_name == None:
         obj.set(new_data[0])
@@ -536,9 +518,7 @@ def test_mutate_local_with_commit_hash_and_branchpoint(
             original_uri=str(mod_ref.branch_uri).replace("/obj", ""),
         )
 
-    new_p_ref = LocalArtifactRef.from_str(
-        f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj"
-    )
+    new_p_ref = LocalArtifactRef.from_str(f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj")
 
     _perform_post_persist_assertions(
         is_local=True,
@@ -582,9 +562,7 @@ def test_mutate_local_with_branch(user_by_api_key_in_env, new_branch_name=None):
             original_uri=str(p_ref.branch_uri).replace("/obj", ""),
         )
     new_branch_name = branch_name
-    new_p_ref = LocalArtifactRef.from_str(
-        f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj"
-    )
+    new_p_ref = LocalArtifactRef.from_str(f"local-artifact:///{target_artifact_name}:{new_branch_name}/obj")
 
     _perform_post_persist_assertions(
         is_local=True,
@@ -621,13 +599,9 @@ def test_mutate_local_with_branch_and_branchpoint(user_by_api_key_in_env):
 
     obj = weave.ops.get(p_ref.branch_uri)[0]
     obj.set("PLACEHOLDER")
-    obj = weave.ops.get(
-        f"local-artifact:///{target_artifact_name}:user-{branch_name}/obj"
-    )[0]
+    obj = weave.ops.get(f"local-artifact:///{target_artifact_name}:user-{branch_name}/obj")[0]
     obj.set(new_data[0])
-    new_p_ref = LocalArtifactRef.from_str(
-        f"local-artifact:///{target_artifact_name}:user-{branch_name}/obj"
-    )
+    new_p_ref = LocalArtifactRef.from_str(f"local-artifact:///{target_artifact_name}:user-{branch_name}/obj")
 
     _perform_post_persist_assertions(
         is_local=True,
@@ -652,9 +626,7 @@ def test_merge_from_local_with_commit_hash_onto_remote_with_commit_hash(
 ):
     test_mutate_remote_with_commit_hash(user_by_api_key_in_env)
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj"))
 
     assert merged_uri.startswith("wandb-artifact://")
     assert "5a61da7b34feb72c2af8" in merged_uri
@@ -678,9 +650,7 @@ def test_merge_from_local_with_commit_hash_onto_remote_with_branch(
 ):
     test_mutate_remote_with_branch(user_by_api_key_in_env)
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj"))
 
     assert merged_uri.startswith("wandb-artifact://")
     assert "remote_branch" in merged_uri
@@ -704,9 +674,7 @@ def test_merge_from_local_with_commit_hash_onto_local_with_commit_hash(
 ):
     test_mutate_local_with_commit_hash(user_by_api_key_in_env, "new_branch_name")
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj"))
 
     assert merged_uri.startswith("local-artifact://")
     assert "61f78c8877df22942d23" in merged_uri
@@ -736,9 +704,7 @@ def test_merge_from_local_with_commit_hash_onto_local_with_branch(
 ):
     test_mutate_local_with_branch(user_by_api_key_in_env, "new_branch_name")
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj"))
 
     assert merged_uri.startswith("local-artifact://")
     assert "my_branch" in merged_uri
@@ -758,13 +724,9 @@ def test_merge_from_local_with_commit_hash_onto_local_with_branch(
 def test_merge_from_local_with_commit_hash_onto_local_with_branch_and_branchpoint(
     user_by_api_key_in_env,
 ):
-    test_mutate_local_with_commit_hash_and_branchpoint(
-        user_by_api_key_in_env, "new_branch_name"
-    )
+    test_mutate_local_with_commit_hash_and_branchpoint(user_by_api_key_in_env, "new_branch_name")
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:61f78c8877df22942d23/obj"))
 
     assert merged_uri.startswith("local-artifact://")
     assert "remote_branch" in merged_uri
@@ -813,9 +775,7 @@ def test_merge_from_local_with_branch_onto_remote_with_commit_hash(
 ):
     test_mutate_remote_with_commit_hash(user_by_api_key_in_env)
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:user-74d5ba98aca469b59e18/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:user-74d5ba98aca469b59e18/obj"))
 
     assert merged_uri.startswith("wandb-artifact://")
     assert "5a61da7b34feb72c2af8" in merged_uri
@@ -837,9 +797,7 @@ def test_merge_from_local_with_branch_onto_remote_with_commit_hash(
 def test_merge_from_local_with_branch_onto_remote_with_branch(user_by_api_key_in_env):
     test_mutate_remote_with_branch(user_by_api_key_in_env)
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:user-remote_branch/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:user-remote_branch/obj"))
 
     assert merged_uri.startswith("wandb-artifact://")
     assert "remote_branch" in merged_uri
@@ -863,9 +821,7 @@ def test_merge_from_local_with_branch_onto_local_with_commit_hash(
 ):
     test_mutate_local_with_commit_hash(user_by_api_key_in_env, "new_branch_name")
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:new_branch_name/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:new_branch_name/obj"))
 
     assert merged_uri.startswith("local-artifact://")
     assert "61f78c8877df22942d23" in merged_uri
@@ -893,9 +849,7 @@ def test_merge_from_local_with_branch_onto_local_with_commit_hash(
 def test_merge_from_local_with_branch_onto_local_with_branch(user_by_api_key_in_env):
     test_mutate_local_with_branch(user_by_api_key_in_env, "new_branch_name")
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:new_branch_name/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:new_branch_name/obj"))
 
     assert merged_uri.startswith("local-artifact://")
     assert "my_branch" in merged_uri
@@ -915,13 +869,9 @@ def test_merge_from_local_with_branch_onto_local_with_branch(user_by_api_key_in_
 def test_merge_from_local_with_branch_onto_local_with_branch_and_branchpoint(
     user_by_api_key_in_env,
 ):
-    test_mutate_local_with_commit_hash_and_branchpoint(
-        user_by_api_key_in_env, "new_branch_name"
-    )
+    test_mutate_local_with_commit_hash_and_branchpoint(user_by_api_key_in_env, "new_branch_name")
 
-    merged_uri = weave.ops.merge_artifact(
-        weave.ops.get("local-artifact:///test_artifact:new_branch_name/obj")
-    )
+    merged_uri = weave.ops.merge_artifact(weave.ops.get("local-artifact:///test_artifact:new_branch_name/obj"))
 
     assert merged_uri.startswith("local-artifact://")
     assert "remote_branch" in merged_uri

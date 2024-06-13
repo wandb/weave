@@ -17,9 +17,7 @@ from . import wandb_api
 MAX_PARALLELISM = 16
 assert MAX_PARALLELISM & (MAX_PARALLELISM - 1) == 0
 
-_parallel_budget_ctx: contextvars.ContextVar[Optional[int]] = contextvars.ContextVar(
-    "_parallel_budget_ctx", default=MAX_PARALLELISM
-)
+_parallel_budget_ctx: contextvars.ContextVar[Optional[int]] = contextvars.ContextVar("_parallel_budget_ctx", default=MAX_PARALLELISM)
 
 
 def get_parallel_budget() -> int:
@@ -42,9 +40,7 @@ ItemType = TypeVar("ItemType")
 ResultType = TypeVar("ResultType")
 
 
-def do_in_parallel(
-    do_one: Callable[[ItemType], ResultType], items: list[ItemType]
-) -> Iterator[ResultType]:
+def do_in_parallel(do_one: Callable[[ItemType], ResultType], items: list[ItemType]) -> Iterator[ResultType]:
     parallel_budget = get_parallel_budget()
 
     if parallel_budget <= 1:
@@ -73,9 +69,7 @@ def do_in_parallel(
                             with wandb_api.wandb_api_context(wandb_api_ctx):
                                 with cache.time_interval_cache_prefix(cache_prefix):
                                     with context.execution_client():
-                                        with forward_graph.node_result_store(
-                                            result_store
-                                        ) as thread_result_store:
+                                        with forward_graph.node_result_store(result_store) as thread_result_store:
                                             with execute.top_level_stats() as thread_top_level_stats:
                                                 return do_one(x)
         finally:
@@ -85,9 +79,7 @@ def do_in_parallel(
             if top_level_stats is not None and thread_top_level_stats is not None:
                 top_level_stats.merge(thread_top_level_stats)
 
-    return ThreadPoolExecutor(max_workers=parallel_budget).map(
-        do_one_with_memo_and_parallel_budget, items
-    )
+    return ThreadPoolExecutor(max_workers=parallel_budget).map(do_one_with_memo_and_parallel_budget, items)
 
 
 def get_remaining_budget_per_thread(item_count: int) -> int:

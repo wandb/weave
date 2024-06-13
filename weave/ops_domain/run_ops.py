@@ -175,10 +175,7 @@ def config_to_values(config: dict) -> dict:
     Unfortunately config values from wandb have their data located at the .value
     property inside of the config object.
     """
-    return {
-        key: value["value"] if isinstance(value, dict) and "value" in value else value
-        for key, value in config.items()
-    }
+    return {key: value["value"] if isinstance(value, dict) and "value" in value else value for key, value in config.items()}
 
 
 @op(
@@ -305,11 +302,7 @@ def summary(run: wdt.Run) -> dict[str, typing.Any]:
 
 
 def _history_as_of_plugin(inputs, inner):
-    min_step = (
-        inputs.raw["asOfStep"]
-        if "asOfStep" in inputs.raw and inputs.raw["asOfStep"] != None
-        else 0
-    )
+    min_step = inputs.raw["asOfStep"] if "asOfStep" in inputs.raw and inputs.raw["asOfStep"] != None else 0
     max_step = min_step + 1
     alias = _make_alias(str(inputs.raw["asOfStep"]), prefix="history")
     return f"{alias}: history(minStep: {min_step}, maxStep: {max_step}, maxKeyLimit: {LIMIT_RUN_HISTORY_KEYS})"
@@ -449,8 +442,6 @@ def run_logged_artifact_version_gql_plugin(inputs, inner):
     name="run-loggedArtifactVersion",
     plugins=wb_gql_op_plugin(run_logged_artifact_version_gql_plugin),
 )
-def run_logged_artifact_version(
-    run: wdt.Run, artifactVersionName: str
-) -> wdt.ArtifactVersion:
+def run_logged_artifact_version(run: wdt.Run, artifactVersionName: str) -> wdt.ArtifactVersion:
     alias = _make_alias(artifactVersionName, prefix="artifact")
     return wdt.ArtifactVersion.from_keys(run["project"][alias])

@@ -107,12 +107,7 @@ class TimeSeriesData(typing.TypedDict):
         "data": weave.types.List(
             weave.types.TypedDict(
                 {
-                    "x": weave.types.TypedDict(
-                        {
-                            key: weave.types.optional(weave.types.Timestamp())
-                            for key in ["start", "stop"]
-                        }
-                    ),
+                    "x": weave.types.TypedDict({key: weave.types.optional(weave.types.Timestamp()) for key in ["start", "stop"]}),
                     "y": weave.types.optional(weave.types.Float()),
                     "label": weave.types.optional(weave.types.String()),
                 }
@@ -138,9 +133,7 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
 
     if mark == "point":
         data = [{**d, "x": bin_center(d)} for d in data]  # type: ignore
-        fig = px.scatter(
-            data, x="x", y="y", color="label", template="plotly_white", labels=labels
-        )
+        fig = px.scatter(data, x="x", y="y", color="label", template="plotly_white", labels=labels)
         fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
         fig.update_layout(dragmode="select")
         return fig
@@ -166,9 +159,7 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
         return fig
     elif mark == "line":
         data = [{**d, "x": bin_center(d)} for d in data]  # type: ignore
-        fig = px.line(
-            data, x="x", y="y", color="label", template="plotly_white", labels=labels
-        )
+        fig = px.line(data, x="x", y="y", color="label", template="plotly_white", labels=labels)
         fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
         fig.update_layout(dragmode="select")
         return fig
@@ -206,7 +197,7 @@ def plotly_geo(data: list[GeoData]) -> plotly.graph_objs.Figure:
             lat=de["lat"],
             mode="markers",
             # text=de["Map label"],  # str(de["Magnitude"]) + " " + de["Date"],
-            marker_color=de["color"]  # , colors[df["Type"][0]]
+            marker_color=de["color"],  # , colors[df["Type"][0]]
             # showlegend=True,
             # marker=dict(
             #     color=de["Magnitude"], size=15, opacity=0.9, colorscale="Sunset"

@@ -28,9 +28,7 @@ class SortDef(typing.TypedDict):
     columnId: str
 
 
-_use_consistent_col_ids: contextvars.ContextVar[
-    typing.Optional[bool]
-] = contextvars.ContextVar("use_consistent_col_ids", default=False)
+_use_consistent_col_ids: contextvars.ContextVar[typing.Optional[bool]] = contextvars.ContextVar("use_consistent_col_ids", default=False)
 
 
 @contextlib.contextmanager
@@ -45,13 +43,9 @@ class TableState:
     input_node: graph.Node = dataclasses.field(default_factory=lambda: graph.VoidNode())
     autoColumns: bool = dataclasses.field(default=False)
     columns: dict[str, PanelDef] = dataclasses.field(default_factory=dict)
-    preFilterFunction: graph.Node = dataclasses.field(
-        default_factory=lambda: graph.VoidNode()
-    )
+    preFilterFunction: graph.Node = dataclasses.field(default_factory=lambda: graph.VoidNode())
     columnNames: dict[str, str] = dataclasses.field(default_factory=dict)
-    columnSelectFunctions: dict[str, graph.Node] = dataclasses.field(
-        default_factory=dict
-    )
+    columnSelectFunctions: dict[str, graph.Node] = dataclasses.field(default_factory=dict)
     order: list[str] = dataclasses.field(default_factory=list)
     groupBy: list[str] = dataclasses.field(default_factory=list)
     sort: list[SortDef] = dataclasses.field(default_factory=list)
@@ -81,9 +75,7 @@ class TableState:
             else:
                 self._col_id_counter = 0
             return f"col_{self._col_id_counter}"
-        return "".join(
-            random.choice(string.ascii_uppercase + string.digits) for _ in range(14)
-        )
+        return "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(14))
 
     def _expr_to_fn_node(self, fn, post_group_dimensionality=False):
         if isinstance(fn, graph.Node):
@@ -95,18 +87,12 @@ class TableState:
 
         # TODO: we are not deriving this type correctly
         if post_group_dimensionality:
-            object_type = tagged_value_type.TaggedValueType(
-                weave_types.TypedDict({}), weave_types.List(object_type)
-            )
+            object_type = tagged_value_type.TaggedValueType(weave_types.TypedDict({}), weave_types.List(object_type))
 
         sig = inspect.signature(fn)
         kwargs = {}
         if "domain" in sig.parameters:
-            kwargs = {
-                "domain": weave_internal.make_var_node(
-                    weave_types.List(object_type), "domain"
-                )
-            }
+            kwargs = {"domain": weave_internal.make_var_node(weave_types.List(object_type), "domain")}
         if "index" in sig.parameters:
             kwargs["index"] = weave_internal.make_var_node(weave_types.Int(), "index")
         return fn(weave_internal.make_var_node(object_type, "row"), **kwargs)
@@ -154,9 +140,7 @@ class TableState:
         self.sort.append(SortDef(dir=dir, columnId=col_id))
 
     def update_col(self, col_id, select_expr):
-        selected = self._expr_to_fn_node(
-            select_expr, self.groupBy and col_id not in self.groupBy
-        )
+        selected = self._expr_to_fn_node(select_expr, self.groupBy and col_id not in self.groupBy)
 
         if isinstance(selected, panel.Panel):
             self.columnSelectFunctions[col_id] = selected.input_node
@@ -182,14 +166,9 @@ class TableState:
     def to_json(self):
         # TODO: its annoying that we have to manually rename everything to fix js
         # v python conventions. Automate or settle on one.
-        columns = {
-            id: {"panelId": v.panelId, "panelConfig": v.panelConfig}
-            for (id, v) in self.columns.items()
-        }
+        columns = {id: {"panelId": v.panelId, "panelConfig": v.panelConfig} for (id, v) in self.columns.items()}
         pre_filter_function = self.preFilterFunction.to_json()
-        column_select_functions = {
-            id: v.to_json() for (id, v) in self.columnSelectFunctions.items()
-        }
+        column_select_functions = {id: v.to_json() for (id, v) in self.columnSelectFunctions.items()}
         return {
             "autoColumns": self.autoColumns,
             "columns": columns,

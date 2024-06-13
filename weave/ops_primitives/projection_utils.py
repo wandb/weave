@@ -39,21 +39,13 @@ def perform_2D_projection(
     algorithmOptions: dict,
 ) -> np.ndarray:
     if len(np_array_of_embeddings.shape) != 2:
-        raise errors.WeaveInternalError(
-            f"The input to the 2D projection must be a 2D array of embeddings, found {np_array_of_embeddings.shape}"
-        )
+        raise errors.WeaveInternalError(f"The input to the 2D projection must be a 2D array of embeddings, found {np_array_of_embeddings.shape}")
     if projectionAlgorithm == "pca":
-        projection = perform_2D_projection_pca(
-            np_array_of_embeddings, algorithmOptions.get("pca", {})
-        )
+        projection = perform_2D_projection_pca(np_array_of_embeddings, algorithmOptions.get("pca", {}))
     elif projectionAlgorithm == "tsne":
-        projection = perform_2D_projection_tsne(
-            np_array_of_embeddings, algorithmOptions.get("tsne", {})
-        )
+        projection = perform_2D_projection_tsne(np_array_of_embeddings, algorithmOptions.get("tsne", {}))
     elif projectionAlgorithm == "umap":
-        projection = perform_2D_projection_umap(
-            np_array_of_embeddings, algorithmOptions.get("umap", {})
-        )
+        projection = perform_2D_projection_umap(np_array_of_embeddings, algorithmOptions.get("umap", {}))
     else:
         raise Exception("Unknown projection algorithm: " + projectionAlgorithm)
     return projection
@@ -66,9 +58,7 @@ def perform_2D_projection_async(
     result_queue: queue.Queue[ResultQueueItemType],
 ):
     try:
-        projection = perform_2D_projection(
-            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
-        )
+        projection = perform_2D_projection(np_array_of_embeddings, projectionAlgorithm, algorithmOptions)
         result_queue.put(projection)
     except Exception as e:
         result_queue.put(e)
@@ -81,9 +71,7 @@ def perform_2D_projection_with_timeout(
     timeout: typing.Optional[typing.Union[int, float]] = DEFAULT_TIMEOUT_SEC,
 ) -> np.ndarray:
     if timeout is None:
-        return perform_2D_projection(
-            np_array_of_embeddings, projectionAlgorithm, algorithmOptions
-        )
+        return perform_2D_projection(np_array_of_embeddings, projectionAlgorithm, algorithmOptions)
 
     # otherwise run it in another process and kill it if it goes over time
 
@@ -115,25 +103,19 @@ def perform_2D_projection_with_timeout(
     return result
 
 
-def limit_embedding_dimensions(
-    np_array_of_embeddings: np.ndarray, max_dimensions: int = 50
-) -> np.ndarray:
+def limit_embedding_dimensions(np_array_of_embeddings: np.ndarray, max_dimensions: int = 50) -> np.ndarray:
     max_dimensions = min(max_dimensions, len(np_array_of_embeddings))
     if np_array_of_embeddings.shape[1] > max_dimensions:
         return PCA(n_components=max_dimensions).fit_transform(np_array_of_embeddings)
     return np_array_of_embeddings
 
 
-def perform_2D_projection_pca(
-    np_array_of_embeddings: np.ndarray, options: dict
-) -> np.ndarray:
+def perform_2D_projection_pca(np_array_of_embeddings: np.ndarray, options: dict) -> np.ndarray:
     model = PCA(n_components=2)
     return model.fit_transform(np_array_of_embeddings)
 
 
-def perform_2D_projection_tsne(
-    np_array_of_embeddings: np.ndarray, options
-) -> np.ndarray:
+def perform_2D_projection_tsne(np_array_of_embeddings: np.ndarray, options) -> np.ndarray:
     n_samples = len(np_array_of_embeddings)
     return TSNE(
         n_components=2,
@@ -150,9 +132,7 @@ def perform_2D_projection_tsne(
 umap_lock = threading.Lock()
 
 
-def perform_2D_projection_umap(
-    np_array_of_embeddings: np.ndarray, options: dict
-) -> np.ndarray:
+def perform_2D_projection_umap(np_array_of_embeddings: np.ndarray, options: dict) -> np.ndarray:
     model = _get_umap().UMAP(
         n_components=2,
         # Letting the library choose defaults

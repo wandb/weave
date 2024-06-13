@@ -50,9 +50,7 @@ class ObjectRecorder:
     val: typing.Optional[typing.Any] = None
     calls: list[OpCall] = dataclasses.field(default_factory=list)
 
-    def call_node(
-        self, node: graph.OutputNode, input_dict: dict[str, "ObjectRecorder"]
-    ) -> "ObjectRecorder":
+    def call_node(self, node: graph.OutputNode, input_dict: dict[str, "ObjectRecorder"]) -> "ObjectRecorder":
         output = ObjectRecorder(node)
         self.calls.append(OpCall(node, input_dict, output))
         return output
@@ -92,31 +90,19 @@ class StitchedGraph:
 
     def print_debug_summary(self) -> None:
         res = ""
-        node_names = {
-            orig_node: f"<{i}-{node_shortname(orig_node)}>"
-            for i, (orig_node, recorder) in enumerate(self._node_map.items())
-        }
+        node_names = {orig_node: f"<{i}-{node_shortname(orig_node)}>" for i, (orig_node, recorder) in enumerate(self._node_map.items())}
         res += "\n" + "StitchedGraph Summary:"
         res += "\n" + "  Nodes:"
         for curr_node, curr_node_name in node_names.items():
             if isinstance(curr_node, graph.OutputNode):
-                res += (
-                    "\n"
-                    + f"  * {curr_node_name}({','.join([node_names[input_node] for input_node in  curr_node.from_op.inputs.values()])})"
-                )
+                res += "\n" + f"  * {curr_node_name}({','.join([node_names[input_node] for input_node in  curr_node.from_op.inputs.values()])})"
             else:
                 res += "\n" + f"  * {curr_node_name}"
             recorder = self._node_map[curr_node]
             if recorder.calls:
-                res += (
-                    "\n"
-                    + f"    calls: {','.join([node_names[call.node] for call in recorder.calls])}"
-                )
+                res += "\n" + f"    calls: {','.join([node_names[call.node] for call in recorder.calls])}"
             if recorder.tags:
-                res += (
-                    "\n"
-                    + f"    tags: {','.join([str((tag_name, node_names[tag_recorder.node])) for tag_name, tag_recorder in recorder.tags.items()])}"
-                )
+                res += "\n" + f"    tags: {','.join([str((tag_name, node_names[tag_recorder.node])) for tag_name, tag_recorder in recorder.tags.items()])}"
         print(res)
 
 
@@ -179,21 +165,13 @@ def stitch(
     return sg
 
 
-def subgraph_stitch(
-    function_node: graph.Node, args: dict[str, ObjectRecorder], sg: StitchedGraph
-) -> ObjectRecorder:
+def subgraph_stitch(function_node: graph.Node, args: dict[str, ObjectRecorder], sg: StitchedGraph) -> ObjectRecorder:
     result_graph = stitch([function_node], args, stitched_graph=sg)
     return result_graph.get_result(function_node)
 
 
 def is_root_op(op: op_def.OpDef) -> bool:
-    return (
-        op.name == "root-project"
-        or op.name == "get"
-        or op.name == "getReturnType"
-        or op.name == "render_table_runs2"
-        or op.name == "project-runs2"
-    )
+    return op.name == "root-project" or op.name == "get" or op.name == "getReturnType" or op.name == "render_table_runs2" or op.name == "project-runs2"
 
 
 def is_mapped_get_tag_op(op: op_def.OpDef) -> bool:
@@ -207,22 +185,16 @@ def is_get_tag_op(op: op_def.OpDef) -> bool:
 
 
 def get_tag_name_from_tag_getter_op(op: op_def.OpDef) -> str:
-    assert (
-        op._gets_tag_by_name != None
-    ), "Caller should verify that this is a tag getter op"
+    assert op._gets_tag_by_name != None, "Caller should verify that this is a tag getter op"
     return op._gets_tag_by_name  # type: ignore
 
 
 def get_tag_name_from_mapped_tag_getter_op(op: op_def.OpDef) -> str:
-    assert (
-        op.derived_from != None
-    ), "Caller should verify that this is a mapped tag getter op"
+    assert op.derived_from != None, "Caller should verify that this is a mapped tag getter op"
     return get_tag_name_from_tag_getter_op(op.derived_from)  # type: ignore
 
 
-def stitch_node_inner(
-    node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
-) -> ObjectRecorder:
+def stitch_node_inner(node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph) -> ObjectRecorder:
     """
     It is the responsibility of the `stitch_node` function to do do two things:
     1. Ensure that the ObjectRecorder for the node is created (if not existing) and return it
@@ -269,10 +241,7 @@ def stitch_node_inner(
             if len(path) == 0:
                 return ObjectRecorder(node, inputs[0].tags)
             key = _dict_utils.unescape_dots(path[0])
-            if (
-                isinstance(inputs[0], LiteralDictObjectRecorder)
-                and key in inputs[0].val
-            ):
+            if isinstance(inputs[0], LiteralDictObjectRecorder) and key in inputs[0].val:
                 val = inputs[0].val.get(key)
                 if val is not None:
                     if len(path) == 1:
@@ -345,9 +314,7 @@ def stitch_node_inner(
             raise errors.WeaveInternalError("non-const not yet supported")
         joinKey1 = subgraph_stitch(fn1, {"row": inputs[0]}, sg)
         joinKey2 = subgraph_stitch(fn2, {"row": inputs[1]}, sg)
-        result = LiteralDictObjectRecorder(
-            node, val={alias1: inputs[0], alias2: inputs[1]}
-        )
+        result = LiteralDictObjectRecorder(node, val={alias1: inputs[0], alias2: inputs[1]})
         # We only pass joinKey1 in as tag. I think this is ok, as stitch has already determined
         # that everything in the tag is a necessary column (we needed those columns to produce
         # the join key in the first place).
@@ -410,9 +377,7 @@ def _apply_tag_rules_to_stitch_result(
         result.tags.update(inputs[0].tags)
 
 
-def stitch_node(
-    node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph
-) -> ObjectRecorder:
+def stitch_node(node: graph.OutputNode, input_dict: dict[str, ObjectRecorder], sg: StitchedGraph) -> ObjectRecorder:
     op = registry_mem.memory_registry.get_op(node.from_op.name)
     input_names = list(input_dict.keys())
     inputs = list(input_dict.values())

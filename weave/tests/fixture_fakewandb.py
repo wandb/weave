@@ -26,9 +26,7 @@ from .. import io_service
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacits/test_res_1fwmcd3q:v0"
 ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
 
-shared_artifact_dir = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "testdata", "shared_artifact_dir")
-)
+shared_artifact_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "testdata", "shared_artifact_dir"))
 
 
 class FakeEntry:
@@ -103,11 +101,7 @@ class FakeFilesystemManifest:
         if self.dir_to_use != None:
             target = os.path.join(self.dir_to_use, cur_dir)
             if os.path.exists(target) and os.path.isdir(target):
-                return [
-                    os.path.join(cur_dir, sub_path)
-                    for sub_path in sorted(os.listdir(target), reverse=True)
-                    if os.path.isfile(os.path.join(target, sub_path))
-                ]
+                return [os.path.join(cur_dir, sub_path) for sub_path in sorted(os.listdir(target), reverse=True) if os.path.isfile(os.path.join(target, sub_path))]
         return []
 
 
@@ -141,9 +135,7 @@ class FakePath:
         return self.path
 
 
-shared_artifact_dir = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "testdata", "shared_artifact_dir")
-)
+shared_artifact_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "testdata", "shared_artifact_dir"))
 
 
 @dataclass
@@ -201,9 +193,7 @@ class FakeRun:
 @dataclass
 class FakeClient:
     execute_log: typing.List[dict[str, typing.Any]] = field(default_factory=list)
-    mock_handlers: typing.List[
-        typing.Callable[[dict[str, typing.Any], int], typing.Optional[dict]]
-    ] = field(default_factory=list)
+    mock_handlers: typing.List[typing.Callable[[dict[str, typing.Any], int], typing.Optional[dict]]] = field(default_factory=list)
 
     def execute(self, gql, variable_values):
         args = {"gql": gql, "variable_values": variable_values}
@@ -300,9 +290,7 @@ class FakeIoServiceClient:
     def ensure_file(self, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
         if uri_str in self.mocked_artifacts:
-            entry = self.mocked_artifacts[uri_str].artifact.manifest.entries.get(
-                artifact_uri.path
-            )
+            entry = self.mocked_artifacts[uri_str].artifact.manifest.entries.get(artifact_uri.path)
             if entry is None:
                 return None
             return entry.local_path
@@ -333,9 +321,7 @@ class SetupResponse:
             "fake_project": "test_project",
         },
     ):
-        artifact_uri = WeaveWBArtifactURI.parse(
-            f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:{artifact.commit_hash}"
-        )
+        artifact_uri = WeaveWBArtifactURI.parse(f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:{artifact.commit_hash}")
 
         self.fake_io.add_artifact(artifact, artifact_uri)
         res = weave.save(

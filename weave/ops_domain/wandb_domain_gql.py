@@ -72,9 +72,7 @@ def _alias(
     return alias
 
 
-def register_vectorized_gql_prop_op(
-    scalar_op: op_def.OpDef, prop_name: str, scalar_output_type: weave_types.Type
-) -> None:
+def register_vectorized_gql_prop_op(scalar_op: op_def.OpDef, prop_name: str, scalar_output_type: weave_types.Type) -> None:
     op_args = scalar_op.input_type
 
     first_arg_name: str
@@ -84,9 +82,7 @@ def register_vectorized_gql_prop_op(
     original_scalar_input_type = op_args.initial_arg_types[first_arg_name]
 
     # require that the desired key be present on the object type
-    assert isinstance(
-        original_scalar_input_type, partial_object.PartialObjectTypeGeneratorType
-    )
+    assert isinstance(original_scalar_input_type, partial_object.PartialObjectTypeGeneratorType)
     scalar_input_type = original_scalar_input_type
 
     vectorized_op_name = "ArrowWeaveList" + scalar_op_name
@@ -98,9 +94,7 @@ def register_vectorized_gql_prop_op(
         object_type = typing.cast(partial_object.PartialObjectType, self.object_type)
         return ArrowWeaveList(
             # keep things dictionary encoded
-            pa.DictionaryArray.from_arrays(
-                self._arrow_data.indices, self._arrow_data.dictionary.field(prop_name)
-            ),
+            pa.DictionaryArray.from_arrays(self._arrow_data.indices, self._arrow_data.dictionary.field(prop_name)),
             object_type.keys[prop_name],
             self._artifact,
         )
@@ -155,8 +149,7 @@ def gql_prop_op(
 def _get_required_fragment(output_type: weave_types.Type):
     return (
         output_type.instance_class.REQUIRED_FRAGMENT  # type: ignore
-        if output_type.instance_class is not None
-        and hasattr(output_type.instance_class, "REQUIRED_FRAGMENT")
+        if output_type.instance_class is not None and hasattr(output_type.instance_class, "REQUIRED_FRAGMENT")
         else ""
     )
 
@@ -189,12 +182,8 @@ def gql_direct_edge_op(
 ):
     is_root = input_type is None
     first_arg_name: str = "gql_obj" if input_type is None else input_type.name
-    if not output_type.instance_class or isinstance(
-        output_type.instance_class, wb_domain_types.PartialObject
-    ):
-        raise ValueError(
-            f"output_type must be a GQLTypeMixin, got {output_type} instead"
-        )
+    if not output_type.instance_class or isinstance(output_type.instance_class, wb_domain_types.PartialObject):
+        raise ValueError(f"output_type must be a GQLTypeMixin, got {output_type} instead")
 
     def query_fn(inputs, inner):
         alias = ""
@@ -211,18 +200,14 @@ def gql_direct_edge_op(
             }}
         """
 
-    def key_fn(
-        input_provider: InputProvider, self_type: weave_types.Type
-    ) -> weave_types.Type:
+    def key_fn(input_provider: InputProvider, self_type: weave_types.Type) -> weave_types.Type:
         alias = _alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
         ret_type = output_type
         if isinstance(self_type, partial_object.PartialObjectType):
             keys = self_type.keys
-            assert isinstance(
-                output_type, partial_object.PartialObjectTypeGeneratorType
-            )
+            assert isinstance(output_type, partial_object.PartialObjectTypeGeneratorType)
             new_keys = keys[key]
             if is_many:
                 new_keys = typing.cast(weave_types.List, new_keys).object_type
@@ -238,17 +223,13 @@ def gql_direct_edge_op(
     if is_root:
 
         def gql_relationship_getter_op(**inputs):
-            raise errors.WeaveGQLCompileError(
-                f"{op_name} should not be executed directly. If you see this error, it is a bug in the Weave compiler."
-            )
+            raise errors.WeaveGQLCompileError(f"{op_name} should not be executed directly. If you see this error, it is a bug in the Weave compiler.")
 
     else:
 
         def gql_relationship_getter_op(**inputs):
             gql_obj: partial_object.PartialObject = inputs[first_arg_name]
-            additional_inputs = {
-                key: value for key, value in inputs.items() if key != first_arg_name
-            }
+            additional_inputs = {key: value for key, value in inputs.items() if key != first_arg_name}
             name = prop_name
             if param_str_fn:
                 param_str = param_str_fn(InputProvider(additional_inputs))
@@ -257,12 +238,8 @@ def gql_direct_edge_op(
             assert issubclass(output_type.instance_class, partial_object.PartialObject)
 
             if is_many:
-                return [
-                    output_type.instance_class.from_keys(item) for item in gql_obj[name]
-                ]
-            if (
-                len(gql_obj.keys) is None
-            ):  # == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
+                return [output_type.instance_class.from_keys(item) for item in gql_obj[name]]
+            if len(gql_obj.keys) is None:  # == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
                 return None
             gql_val = gql_obj[name]
             if gql_val is None:
@@ -270,27 +247,16 @@ def gql_direct_edge_op(
             return output_type.instance_class.from_keys(gql_val)
 
     sig = signature(gql_relationship_getter_op)
-    base_params = (
-        [Parameter(first_arg_name, Parameter.POSITIONAL_OR_KEYWORD)]
-        if not is_root
-        else []
-    )
+    base_params = [Parameter(first_arg_name, Parameter.POSITIONAL_OR_KEYWORD)] if not is_root else []
     new_params = [
         *base_params,
-        *[
-            Parameter(key, Parameter.POSITIONAL_OR_KEYWORD)
-            for key in additional_inputs_types.keys()
-        ],
+        *[Parameter(key, Parameter.POSITIONAL_OR_KEYWORD) for key in additional_inputs_types.keys()],
     ]
     sig = sig.replace(parameters=tuple(new_params))
     gql_relationship_getter_op.__signature__ = sig  # type: ignore
     gql_relationship_getter_op.sig = sig  # type: ignore
 
-    base_input_type: dict[str, weave_types.Type] = (
-        {first_arg_name: typing.cast(weave_types.Type, input_type)}
-        if not is_root
-        else {}
-    )
+    base_input_type: dict[str, weave_types.Type] = {first_arg_name: typing.cast(weave_types.Type, input_type)} if not is_root else {}
     _output_type = output_type
     if is_many:
         _output_type = weave_types.List(output_type)
@@ -313,12 +279,8 @@ def gql_connection_op(
     param_str_fn: typing.Optional[typing.Callable[[InputProvider], str]] = None,
 ):
     first_arg_name = "gql_obj" if input_type is None else input_type.name
-    if not output_type.instance_class or isinstance(
-        output_type.instance_class, wb_domain_types.PartialObject
-    ):
-        raise ValueError(
-            f"output_type must be a GQLTypeMixin, got {output_type} instead"
-        )
+    if not output_type.instance_class or isinstance(output_type.instance_class, wb_domain_types.PartialObject):
+        raise ValueError(f"output_type must be a GQLTypeMixin, got {output_type} instead")
 
     def query_fn(inputs, inner):
         alias = ""
@@ -340,26 +302,20 @@ def gql_connection_op(
             }}
         """
 
-    def key_fn(
-        input_provider: InputProvider, self_type: weave_types.Type
-    ) -> weave_types.Type:
+    def key_fn(input_provider: InputProvider, self_type: weave_types.Type) -> weave_types.Type:
         alias = _alias(input_provider, param_str_fn, prop_name)
         key = alias if alias != "" else prop_name
 
         if isinstance(self_type, partial_object.PartialObjectType):
             keys = self_type.keys
-            assert isinstance(
-                output_type, partial_object.PartialObjectTypeGeneratorType
-            )
+            assert isinstance(output_type, partial_object.PartialObjectTypeGeneratorType)
             new_keys = typing.cast(
                 weave_types.TypedDict,
                 typing.cast(
                     weave_types.TypedDict,
                     typing.cast(
                         weave_types.List,
-                        typing.cast(weave_types.TypedDict, keys[key]).property_types[
-                            "edges"
-                        ],
+                        typing.cast(weave_types.TypedDict, keys[key]).property_types["edges"],
                     ).object_type,
                 ).property_types["node"],
             )
@@ -371,30 +327,20 @@ def gql_connection_op(
 
     def gql_connection_walker_op(**inputs):
         gql_obj: partial_object.PartialObject = inputs[first_arg_name]
-        additional_inputs = {
-            key: value for key, value in inputs.items() if key != first_arg_name
-        }
+        additional_inputs = {key: value for key, value in inputs.items() if key != first_arg_name}
         name = prop_name
         if param_str_fn:
             param_str = param_str_fn(InputProvider(additional_inputs))
             name = _make_alias(param_str, prefix=prop_name)
         # If we have a None argument, return an empty list.
-        if (
-            gql_obj.keys == []
-        ):  #  == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
+        if gql_obj.keys == []:  #  == wb_domain_types.UntypedOpaqueDict.from_json_dict(None):
             return []
-        return [
-            output_type.instance_class.from_keys(edge["node"])
-            for edge in gql_obj[name]["edges"]
-        ]
+        return [output_type.instance_class.from_keys(edge["node"]) for edge in gql_obj[name]["edges"]]
 
     sig = signature(gql_connection_walker_op)
     new_params = [
         Parameter(first_arg_name, Parameter.POSITIONAL_OR_KEYWORD),
-        *[
-            Parameter(key, Parameter.POSITIONAL_OR_KEYWORD)
-            for key in additional_inputs_types.keys()
-        ],
+        *[Parameter(key, Parameter.POSITIONAL_OR_KEYWORD) for key in additional_inputs_types.keys()],
     ]
     sig = sig.replace(parameters=tuple(new_params))
     gql_connection_walker_op.__signature__ = sig  # type: ignore
@@ -417,9 +363,7 @@ def make_root_op_gql_op_output_type(
 ) -> gql_op_plugin.GQLOutputTypeFn:
     """Creates a GQLOutputTypeFn for a root op that returns a list of objects with keys."""
 
-    def _root_op_gql_op_output_type(
-        inputs: InputProvider, input_type: weave_types.Type
-    ) -> weave_types.Type:
+    def _root_op_gql_op_output_type(inputs: InputProvider, input_type: weave_types.Type) -> weave_types.Type:
         key = (
             prop_name
             if not use_alias
@@ -438,9 +382,7 @@ def make_root_op_gql_op_output_type(
             if isinstance(key_type, weave_types.TypedDict):
                 key_type = key_type.property_types[key]
 
-        object_type = output_type.with_keys(
-            typing.cast(weave_types.TypedDict, key_type).property_types
-        )
+        object_type = output_type.with_keys(typing.cast(weave_types.TypedDict, key_type).property_types)
         return weave_types.List(object_type)
 
     return _root_op_gql_op_output_type

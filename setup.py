@@ -30,9 +30,7 @@ def check_build_deps() -> bool:
             print("Attempting to install yarn...")
             subprocess.run(["npm", "install", "-g", "yarn"], capture_output=True)
         except OSError:
-            raise RuntimeError(
-                "You must have node v16+ (https://nodejs.org/en/download) installed to build weave."
-            )
+            raise RuntimeError("You must have node v16+ (https://nodejs.org/en/download) installed to build weave.")
     return True
 
 
@@ -45,9 +43,7 @@ def build_frontend() -> None:
         raise RuntimeError("Failed to build frontend.")
 
 
-def download_and_extract_tarball(
-    url: str, extract_path: Union[Path, str] = "."
-) -> None:
+def download_and_extract_tarball(url: str, extract_path: Union[Path, str] = ".") -> None:
     file_name = os.path.basename(url)
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = os.path.join(temp_dir, file_name)

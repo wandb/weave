@@ -27,17 +27,11 @@ def filter_fn_to_pandas_filter(df, filter_fn_node):
     elif isinstance(filter_fn_node, graph.OutputNode):
         op_name = graph.op_full_name(filter_fn_node.from_op)
         if op_name == "number-greater":
-            return filter_fn_to_pandas_filter(
-                df, filter_fn_node.from_op.inputs["lhs"]
-            ) > filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
+            return filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["lhs"]) > filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
         elif op_name == "pick":
-            return filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["obj"])[
-                filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])
-            ]
+            return filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["obj"])[filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
         elif op_name == "typedDict-pick":
-            return filter_fn_to_pandas_filter(
-                df, filter_fn_node.from_op.inputs["self"]
-            )[filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
+            return filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["self"])[filter_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
         raise Exception("unhandled op name", op_name)
     elif isinstance(filter_fn_node, graph.VarNode):
         if filter_fn_node.name == "row":
@@ -51,25 +45,16 @@ def groupby_fn_to_pandas_filter(df, filter_fn_node):
     elif isinstance(filter_fn_node, graph.OutputNode):
         op_name = graph.op_full_name(filter_fn_node.from_op)
         if op_name == "number-greater":
-            return groupby_fn_to_pandas_filter(
-                df, filter_fn_node.from_op.inputs["lhs"]
-            ) > groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
+            return groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["lhs"]) > groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["rhs"])
         elif op_name == "pick":
-            return groupby_fn_to_pandas_filter(
-                df, filter_fn_node.from_op.inputs["obj"]
-            )[groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
+            return groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["obj"])[groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
         elif op_name == "typedDict-pick":
-            return groupby_fn_to_pandas_filter(
-                df, filter_fn_node.from_op.inputs["self"]
-            )[groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
+            return groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["self"])[groupby_fn_to_pandas_filter(df, filter_fn_node.from_op.inputs["key"])]
         elif op_name == "dict":
             # Return as list... though we'll need to keep track of that
             # we did this and remap the result keys.
             # TODO
-            return list(
-                groupby_fn_to_pandas_filter(df, n)
-                for n in filter_fn_node.from_op.inputs.values()
-            )
+            return list(groupby_fn_to_pandas_filter(df, n) for n in filter_fn_node.from_op.inputs.values())
         raise Exception("unhandled op name", op_name)
     elif isinstance(filter_fn_node, graph.VarNode):
         if filter_fn_node.name == "row":
@@ -118,9 +103,7 @@ class DataFrameType(types.Type):
                 weave_type = types.Boolean()
 
             else:
-                raise errors.WeaveTypeError(
-                    "Type conversion not implemented for dtype: %s" % dtype
-                )
+                raise errors.WeaveTypeError("Type conversion not implemented for dtype: %s" % dtype)
             obj_prop_types[col_name] = weave_type
         return cls(types.TypedDict(obj_prop_types))
 
@@ -234,9 +217,7 @@ class DataFrameTable:
 
     @op(
         input_type={
-            "filterFn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
+            "filterFn": lambda input_types: types.Function({"row": input_types["self"].object_type}, types.Any()),
         },
         output_type=lambda input_types: input_types["self"],
     )
@@ -245,9 +226,7 @@ class DataFrameTable:
 
     @op(
         input_type={
-            "map_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
+            "map_fn": lambda input_types: types.Function({"row": input_types["self"].object_type}, types.Any()),
         },
         output_type=lambda input_types: types.List(input_types["self"].object_type),
     )
@@ -259,9 +238,7 @@ class DataFrameTable:
 
     @op(
         input_type={
-            "group_by_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
+            "group_by_fn": lambda input_types: types.Function({"row": input_types["self"].object_type}, types.Any()),
         },
         output_type=lambda input_types: types.List(
             tagged_value_type.TaggedValueType(
@@ -349,6 +326,4 @@ def pandasreadcsv(file):
     try:
         return DataFrameTable(pandas.read_csv(local_path, low_memory=False))
     except:
-        return DataFrameTable(
-            pandas.read_csv(local_path, delimiter=";", low_memory=False)
-        )
+        return DataFrameTable(pandas.read_csv(local_path, delimiter=";", low_memory=False))

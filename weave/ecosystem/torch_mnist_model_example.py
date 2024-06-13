@@ -65,9 +65,7 @@ class Model:
     )
     def predict(self, X):
         # Note, this is a copy of the transform in TorchMnistDataset!
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-        )
+        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
         inputs = [transform(x) for x in X]
         class_preds = self.pred_fn(torch.stack(inputs))
         _, final_preds = torch.max(class_preds.data, 1)
@@ -92,9 +90,7 @@ class TorchMnistTrainConfig(typing.TypedDict):
 
 
 class TorchMnistDataset(Dataset):
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-    )
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
 
     def __init__(self, X, y):
         self.X = X
@@ -142,9 +138,7 @@ def train_epoch(network, loader, optimizer):
     output_type=ModelType(),
 )
 def train(X, y, config: TorchMnistTrainConfig):
-    loader = torch.utils.data.DataLoader(
-        TorchMnistDataset(X, y), batch_size=config["batch_size"]
-    )
+    loader = torch.utils.data.DataLoader(TorchMnistDataset(X, y), batch_size=config["batch_size"])
     network = build_network(config["fc_layer_size"], config["dropout"])
     optimizer = optim.Adam(network.parameters(), lr=config["learning_rate"])
     for epoch in range(config["epochs"]):

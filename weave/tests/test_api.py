@@ -15,15 +15,9 @@ def test_print_save_val():
 
     # show should use the same expression
     show_params = _show_params(ref)
-    assert (
-        str(show_params["weave_node"])
-        == 'get("local-artifact:///dashboard-my-data:latest/obj")'
-    )
+    assert str(show_params["weave_node"]) == 'get("local-artifact:///dashboard-my-data:latest/obj")'
     panel = weave.use(show_params["weave_node"])
-    assert (
-        str(panel.config.items["my-data"])
-        == 'get("local-artifact:///my-data:latest/obj")'
-    )
+    assert str(panel.config.items["my-data"]) == 'get("local-artifact:///my-data:latest/obj")'
 
     versions = weave.versions(ref)
     assert len(versions) == 1
@@ -38,15 +32,9 @@ def test_print_save_val():
 
     assert str(ref) == 'get("local-artifact:///my-data:latest/obj")'
     show_params = _show_params(ref)
-    assert (
-        str(show_params["weave_node"])
-        == 'get("local-artifact:///dashboard-my-data:latest/obj")'
-    )
+    assert str(show_params["weave_node"]) == 'get("local-artifact:///dashboard-my-data:latest/obj")'
     panel = weave.use(show_params["weave_node"])
-    assert (
-        str(panel.config.items["my-data"])
-        == 'get("local-artifact:///my-data:latest/obj")'
-    )
+    assert str(panel.config.items["my-data"]) == 'get("local-artifact:///my-data:latest/obj")'
 
     versions = weave.versions(ref)
     assert len(versions) == 2

@@ -28,15 +28,11 @@ def project_weave_root_url(entity_name: str, project_name: str) -> str:
         return remote_project_weave_root_url(entity_name, project_name)
 
 
-def op_version_path(
-    entity_name: str, project_name: str, op_name: str, op_version: str
-) -> str:
+def op_version_path(entity_name: str, project_name: str, op_name: str, op_version: str) -> str:
     return f"{project_weave_root_url(entity_name, project_name)}/ops/{op_name}/versions/{op_version}"
 
 
-def object_version_path(
-    entity_name: str, project_name: str, object_name: str, obj_version: str
-) -> str:
+def object_version_path(entity_name: str, project_name: str, object_name: str, obj_version: str) -> str:
     return f"{project_weave_root_url(entity_name, project_name)}/objects/{quote(object_name)}/versions/{obj_version}"
 
 

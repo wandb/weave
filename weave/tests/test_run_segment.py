@@ -74,33 +74,24 @@ def create_branch(
         previous_metrics = previous_segment.metrics
         n_previous_metrics = len(previous_metrics)
         if n_previous_metrics > 0:
-            previous_segment_branch_index = (
-                int(previous_segment_branch_frac * n_previous_metrics) - 1
-            )
+            previous_segment_branch_index = int(previous_segment_branch_frac * n_previous_metrics) - 1
 
             # this run segment has a different root than the previous one
             if previous_segment_branch_index < 0:
                 raise ValueError(
-                    f"Invalid branch point on RunSegment: previous_segment_branch_index "
-                    f"{previous_segment_branch_index} must be between 0 and {len(previous_metrics) - 1}"
+                    f"Invalid branch point on RunSegment: previous_segment_branch_index " f"{previous_segment_branch_index} must be between 0 and {len(previous_metrics) - 1}"
                 )
 
-            previous_segment_branch_step = (
-                previous_metrics._index(0)["step"] + previous_segment_branch_index
-            )
+            previous_segment_branch_step = previous_metrics._index(0)["step"] + previous_segment_branch_index
 
             ref = storage.save(previous_segment)
-            new_metrics = random_metrics(
-                n=length, starting_step=previous_segment_branch_step + 1
-            )
+            new_metrics = random_metrics(n=length, starting_step=previous_segment_branch_step + 1)
 
             return RunSegment(name, new_metrics, ref.uri, previous_segment_branch_index)
     return RunSegment(name, random_metrics(length, 0), None, 0)
 
 
-def create_experiment(
-    num_steps: int, num_runs: int, branch_frac: float = 0.8
-) -> typing.Optional[RunSegment]:
+def create_experiment(num_steps: int, num_runs: int, branch_frac: float = 0.8) -> typing.Optional[RunSegment]:
     num_steps_per_run = num_steps // num_runs
     segment = None
     for i in range(num_runs):
@@ -139,23 +130,14 @@ def test_experiment_branching(branch_frac, num_steps, num_runs):
     else:
         storage.save(segment)
         experiment = api.use(segment.experiment())
-        assert (
-            len(experiment)
-            == int(steps_per_run * branch_frac) * (num_runs - 1) + steps_per_run
-        )
+        assert len(experiment) == int(steps_per_run * branch_frac) * (num_runs - 1) + steps_per_run
 
-        assert (
-            get_awl_col(experiment, "step").to_pylist()
-            == list(range(int(steps_per_run * branch_frac) * (num_runs - 1)))
-            + get_awl_col(segment.metrics, "step").to_pylist()
-        )
+        assert get_awl_col(experiment, "step").to_pylist() == list(range(int(steps_per_run * branch_frac) * (num_runs - 1))) + get_awl_col(segment.metrics, "step").to_pylist()
 
 
 @pytest.mark.parametrize("delta_step", [1, 2, 3])
 def test_explicit_experiment_construction(delta_step):
-    root_segment = RunSegment(
-        "my-first-run", random_metrics(10, delta_step=delta_step), None, 0
-    )
+    root_segment = RunSegment("my-first-run", random_metrics(10, delta_step=delta_step), None, 0)
     ref1 = storage.save(root_segment)
     segment1 = RunSegment(
         "my-second-run",
@@ -173,9 +155,7 @@ def test_explicit_experiment_construction(delta_step):
     storage.save(segment2)
     experiment = api.use(segment2.experiment())
 
-    assert get_awl_col(experiment, "step").to_pylist() == list(
-        range(0, 15 * delta_step, delta_step)
-    )
+    assert get_awl_col(experiment, "step").to_pylist() == list(range(0, 15 * delta_step, delta_step))
     assert (
         get_awl_col(experiment, "string_col").to_pylist()
         == get_awl_col(root_segment.metrics, "string_col").to_pylist()[:5]
@@ -183,11 +163,7 @@ def test_explicit_experiment_construction(delta_step):
         + get_awl_col(segment2.metrics, "string_col").to_pylist()
     )
 
-    assert get_awl_col(experiment, "run_name").to_pylist() == list(
-        chain(
-            *[[name] * 5 for name in ["my-first-run", "my-second-run", "my-third-run"]]
-        )
-    )
+    assert get_awl_col(experiment, "run_name").to_pylist() == list(chain(*[[name] * 5 for name in ["my-first-run", "my-second-run", "my-third-run"]]))
 
 
 def test_invalid_explicit_experiment_construction():
@@ -276,9 +252,7 @@ def test_number_bin_fn_node_type(number_bin_fn_node):
 def test_number_bin_generation(number_bin_fn_node):
     # extract the function from its containing node
     function = api.use(number_bin_fn_node)
-    call_node = ops.call_fn(
-        function, {"row": weave_internal.make_const_node(types.Number(), 2.5)}
-    )
+    call_node = ops.call_fn(function, {"row": weave_internal.make_const_node(types.Number(), 2.5)})
     result = api.use(call_node)
 
     assert np.isclose(result["start"], 2.4)
@@ -312,9 +286,7 @@ def test_group_by_bins_arrow_vectorized():
         assigned_number_bin_node = ops.number_bin(in_=step, bin_fn=number_bin_fn_node)
         return ops.dict_(number_bin_col_name=assigned_number_bin_node)
 
-    func_node = weave_internal.define_fn(
-        {"row": api.type_of(segment.metrics).object_type}, groupby_func
-    )
+    func_node = weave_internal.define_fn({"row": api.type_of(segment.metrics).object_type}, groupby_func)
     groupby_node = weave_internal.const(segment.metrics).groupby(func_node)
 
     result = api.use(groupby_node)
@@ -343,9 +315,7 @@ def test_map_merge_cache_busting():
         )
         return const_dict.merge(merge_dict)
 
-    fn_node = weave_internal.define_fn(
-        {"row": root_segment.metrics.object_type}, map_fn_1_body
-    )
+    fn_node = weave_internal.define_fn({"row": root_segment.metrics.object_type}, map_fn_1_body)
     query = api.get(ref).metrics.map(fn_node)
     result1 = api.use(query)
 
@@ -362,21 +332,13 @@ def test_map_merge_cache_busting():
         )
         return const_dict.merge(merge_dict)
 
-    fn_node = weave_internal.define_fn(
-        {"row": root_segment.metrics.object_type}, map_fn_2_body
-    )
+    fn_node = weave_internal.define_fn({"row": root_segment.metrics.object_type}, map_fn_2_body)
     query = api.get(ref).metrics.map(fn_node)
     result2 = api.use(query)
 
     assert result1._arrow_data != result2._arrow_data
-    assert (
-        result1._arrow_data.type.get_field_index("metric0") != -1
-        and result2._arrow_data.type.get_field_index("metric0") == -1
-    )
-    assert (
-        result1._arrow_data.type.get_field_index("metric1") == -1
-        and result2._arrow_data.type.get_field_index("metric1") != -1
-    )
+    assert result1._arrow_data.type.get_field_index("metric0") != -1 and result2._arrow_data.type.get_field_index("metric0") == -1
+    assert result1._arrow_data.type.get_field_index("metric1") == -1 and result2._arrow_data.type.get_field_index("metric1") != -1
 
 
 @pytest.mark.skip()  # TODO(dg): enable
@@ -393,9 +355,7 @@ def test_map_experiment_profile_post_groupby_map():
         assigned_number_bin_node = ops.number_bin(in_=step, bin_fn=number_bin_fn_node)
         return ops.dict_(**{group_key_name: assigned_number_bin_node})
 
-    groupby_node = weave_internal.define_fn(
-        {"row": experiment.type.object_type}, groupby_fn
-    )
+    groupby_node = weave_internal.define_fn({"row": experiment.type.object_type}, groupby_fn)
     groupby = experiment.groupby(groupby_node)
 
     def map_fn_1_body(row):
@@ -412,11 +372,7 @@ def test_map_experiment_profile_post_groupby_map():
         return row_key.merge(merge_dict)
 
     map_fn_node = weave_internal.define_fn(
-        {
-            "row": ops.arrow.awl_group_by_result_object_type(
-                experiment.type.object_type, groupby_node.type.output_type
-            )
-        },
+        {"row": ops.arrow.awl_group_by_result_object_type(experiment.type.object_type, groupby_node.type.output_type)},
         map_fn_1_body,
     )
     mapped = ops.list_.make_list(**{"0": ops.list_.unnest(groupby.map(map_fn_node))})

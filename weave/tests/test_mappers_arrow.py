@@ -9,11 +9,7 @@ def test_map_list():
     d_type = types.TypeRegistry.type_of(d)
     m = mappers_arrow.map_to_arrow(d_type, None)
     res_type = m.result_type()
-    assert res_type == pa.list_(
-        pa.field(
-            "item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.string())])
-        )
-    )
+    assert res_type == pa.list_(pa.field("item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.string())])))
     d2 = m.apply(d)
     assert d == d2
     m2 = mappers_arrow.map_from_arrow(d_type, None)
@@ -26,11 +22,7 @@ def test_map_list_with_none():
     d_type = types.TypeRegistry.type_of(d)
     m = mappers_arrow.map_to_arrow(d_type, None)
     res_type = m.result_type()
-    assert res_type == pa.list_(
-        pa.field(
-            "item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.null())])
-        )
-    )
+    assert res_type == pa.list_(pa.field("item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.null())])))
     d2 = m.apply(d)
     assert d == d2
     m2 = mappers_arrow.map_from_arrow(d_type, None)
@@ -43,11 +35,7 @@ def test_map_list_with_maybe():
     d_type = types.TypeRegistry.type_of(d)
     m = mappers_arrow.map_to_arrow(d_type, None)
     res_type = m.result_type()
-    assert res_type == pa.list_(
-        pa.field(
-            "item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.string())])
-        )
-    )
+    assert res_type == pa.list_(pa.field("item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.string())])))
     d2 = m.apply(d)
     assert d == d2
     m2 = mappers_arrow.map_from_arrow(d_type, None)
@@ -60,11 +48,7 @@ def test_map_list_with_nan():
     d_type = types.TypeRegistry.type_of(d)
     m = mappers_arrow.map_to_arrow(d_type, None)
     res_type = m.result_type()
-    assert res_type == pa.list_(
-        pa.field(
-            "item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.float64())])
-        )
-    )
+    assert res_type == pa.list_(pa.field("item", pa.struct([pa.field("a", pa.int64()), pa.field("b", pa.float64())])))
     d2 = m.apply(d)
     assert d[0]["a"] == d2[0]["a"]
     assert math.isnan(d2[0]["b"])

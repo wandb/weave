@@ -87,9 +87,7 @@ def serialize(graphs: typing.List[graph.Node]) -> SerializedReturnType:
 
 
 def _is_lambda(node: graph.Node):
-    return isinstance(node, graph.ConstNode) and (
-        isinstance(node.val, graph.OutputNode) or isinstance(node.val, graph.VarNode)
-    )
+    return isinstance(node, graph.ConstNode) and (isinstance(node.val, graph.OutputNode) or isinstance(node.val, graph.VarNode))
 
 
 @memo.memo
@@ -97,19 +95,14 @@ def node_id(node: graph.Node):
     hashable: dict[str, typing.Any] = {}
     if isinstance(node, graph.OutputNode):
         hashable["op_name"] = node.from_op.name
-        hashable["inputs"] = {
-            arg_name: node_id(arg_node)
-            for arg_name, arg_node in node.from_op.inputs.items()
-        }
+        hashable["inputs"] = {arg_name: node_id(arg_node) for arg_name, arg_node in node.from_op.inputs.items()}
     elif isinstance(node, graph.VarNode):
         # Must include type here, Const and OutputNode types can
         # be inferred from the graph, but VarNode types cannot.
         hashable["type"] = node.type.to_dict()
         hashable["name"] = node.name
     elif isinstance(node, graph.ConstNode):
-        if isinstance(node.val, graph.OutputNode) or isinstance(
-            node.val, graph.VarNode
-        ):
+        if isinstance(node.val, graph.OutputNode) or isinstance(node.val, graph.VarNode):
             hashable["val"] = {"lambda": True, "body": node_id(node.val)}
         else:
             hashable["val"] = storage.to_python(node.val)
@@ -143,10 +136,7 @@ def _deserialize_node(
                 )
             elif fn_body_node["nodeType"] == "const":
                 fn_body_const_val = fn_body_node["val"]
-                if (
-                    isinstance(fn_body_const_val, dict)
-                    and "nodeType" in fn_body_const_val
-                ):
+                if isinstance(fn_body_const_val, dict) and "nodeType" in fn_body_const_val:
                     # This case happens when we have a quoted function.
                     fn_body_const_val = graph.Node.node_from_json(fn_body_const_val)
                 parsed_fn_body_node = weave_internal.make_const_node(
@@ -157,38 +147,26 @@ def _deserialize_node(
                 op = nodes[fn_body_node["fromOp"]]
                 params = {}
                 for param_name, param_node_index in op["inputs"].items():
-                    params[param_name] = _deserialize_node(
-                        param_node_index, nodes, parsed_nodes, hashed_nodes
-                    )
+                    params[param_name] = _deserialize_node(param_node_index, nodes, parsed_nodes, hashed_nodes)
                 node_type = types.TypeRegistry.type_from_dict(node["type"])
                 if not isinstance(node_type, types.Function):
-                    raise errors.WeaveInternalError(
-                        "expected function type, got %s" % node_type
-                    )
+                    raise errors.WeaveInternalError("expected function type, got %s" % node_type)
                 parsed_fn_body_node = weave_internal.make_output_node(
                     node_type.output_type,
                     op["name"],
                     params,
                 )
             else:
-                raise errors.WeaveInternalError(
-                    "invalid function node encountered in deserialize"
-                )
-            parsed_node = graph.ConstNode(
-                types.TypeRegistry.type_from_dict(node["type"]), parsed_fn_body_node
-            )
+                raise errors.WeaveInternalError("invalid function node encountered in deserialize")
+            parsed_node = graph.ConstNode(types.TypeRegistry.type_from_dict(node["type"]), parsed_fn_body_node)
         else:
             parsed_node = graph.ConstNode.from_json(node)
     elif node["nodeType"] == "output":
         op = nodes[node["fromOp"]]
         params = {}
         for param_name, param_node_index in op["inputs"].items():
-            params[param_name] = _deserialize_node(
-                param_node_index, nodes, parsed_nodes, hashed_nodes
-            )
-        parsed_node = graph.OutputNode(
-            types.TypeRegistry.type_from_dict(node["type"]), op["name"], params
-        )
+            params[param_name] = _deserialize_node(param_node_index, nodes, parsed_nodes, hashed_nodes)
+        parsed_node = graph.OutputNode(types.TypeRegistry.type_from_dict(node["type"]), op["name"], params)
     elif node["nodeType"] == "var":
         parsed_node = graph.VarNode.from_json(node)
     id_ = node_id(parsed_node)
@@ -220,6 +198,4 @@ def deserialize(
     target_node_values = value_or_error.ValueOrErrors.from_values(target_nodes)
 
     with memo.memo_storage():
-        return target_node_values.safe_map(
-            lambda i: _deserialize_node(i, nodes, parsed_nodes, hashed_nodes)
-        )
+        return target_node_values.safe_map(lambda i: _deserialize_node(i, nodes, parsed_nodes, hashed_nodes))

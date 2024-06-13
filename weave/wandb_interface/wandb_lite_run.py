@@ -76,10 +76,7 @@ class InMemoryLazyLiteRun:
             group = "weave_hidden_runs"
         self._group = group
 
-        self._use_async_file_stream = (
-            _use_async_file_stream
-            and os.getenv("WEAVE_DISABLE_ASYNC_FILE_STREAM") == None
-        )
+        self._use_async_file_stream = _use_async_file_stream and os.getenv("WEAVE_DISABLE_ASYNC_FILE_STREAM") == None
 
         self._project_created = False
         self._is_log_setup = False
@@ -90,9 +87,7 @@ class InMemoryLazyLiteRun:
     @property
     def i_api(self) -> InternalApi:
         if self._i_api is None:
-            self._i_api = InternalApi(
-                {"project": self._project_name, "entity": self._entity_name}
-            )
+            self._i_api = InternalApi({"project": self._project_name, "entity": self._entity_name})
         return self._i_api
 
     @property
@@ -139,13 +134,9 @@ class InMemoryLazyLiteRun:
     def stream(self) -> file_stream.FileStreamApi:
         if self._stream is None:
             # Setup the FileStream
-            self._stream = file_stream.FileStreamApi(
-                self.i_api, self.run.id, datetime.datetime.utcnow().timestamp()
-            )
+            self._stream = file_stream.FileStreamApi(self.i_api, self.run.id, datetime.datetime.utcnow().timestamp())
             if self._use_async_file_stream:
-                self._stream._client.headers.update(
-                    {"X-WANDB-USE-ASYNC-FILESTREAM": "true"}
-                )
+                self._stream._client.headers.update({"X-WANDB-USE-ASYNC-FILESTREAM": "true"})
             self._stream.start()
 
         return self._stream
@@ -232,9 +223,7 @@ class InMemoryLazyLiteRun:
 
     def upsert_project(self) -> None:
         if not self._project_created:
-            self.i_api.upsert_project(
-                project=self._project_name, entity=self._entity_name
-            )
+            self.i_api.upsert_project(project=self._project_name, entity=self._entity_name)
             self._project_created = True
 
     def finish(self) -> None:

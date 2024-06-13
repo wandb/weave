@@ -27,16 +27,15 @@ items = weave.save(
 )
 
 panel: wandb.Distribution = wandb.Distribution(
-    items, value_fn=lambda x: x["loss1"], label_fn=lambda x: x["str_val"], bin_size=1.5  # type: ignore
+    items,
+    value_fn=lambda x: x["loss1"],
+    label_fn=lambda x: x["str_val"],
+    bin_size=1.5,  # type: ignore
 )
 
 panel = panels.Board(
     {},
-    [
-        panels.BoardPanel(
-            panel, layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12)
-        )
-    ],
+    [panels.BoardPanel(panel, layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12))],
 )
 
 print(show_url(panel))

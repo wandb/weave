@@ -16,9 +16,7 @@ from .. import weave_internal
 
 
 def test_tagged_value():
-    tv = tagged_value_type.TaggedValueType(
-        types.TypedDict({"a": types.Number()}), types.String()
-    )
+    tv = tagged_value_type.TaggedValueType(types.TypedDict({"a": types.Number()}), types.String())
     assert tv.value == types.String()
     assert tv.tag == types.TypedDict({"a": types.Number()})
 
@@ -61,9 +59,7 @@ def test_tagged_types():
     ).assign_type(ten.type)
     assert (
         isinstance(ten.type, tagged_value_type.TaggedValueType)
-        and isinstance(
-            ten.type.tag.property_types["d"], tagged_value_type.TaggedValueType
-        )
+        and isinstance(ten.type.tag.property_types["d"], tagged_value_type.TaggedValueType)
         and isinstance(ten.type.tag.property_types["d"].value, _TestNumber.WeaveType)
     )
     assert weave.use(ten).inner == 10
@@ -287,12 +283,7 @@ def test_keytypes_tagged():
     "list_data",
     [
         lambda: box.box([1, 2, 3]),
-        lambda: box.box(
-            [
-                tag_store.add_tags(box.box(elem), {"int": i})
-                for i, elem in enumerate([1, 2, 3])
-            ]
-        ),
+        lambda: box.box([tag_store.add_tags(box.box(elem), {"int": i}) for i, elem in enumerate([1, 2, 3])]),
     ],
 )
 def test_list_tags_accessible_to_map_elements(list_data):
@@ -301,25 +292,19 @@ def test_list_tags_accessible_to_map_elements(list_data):
     tagged = tag_store.add_tags(list_data(), {"run": run})
     saved_node = weave.save(tagged)
     map_fn = lambda row: run_tag_getter_op(row)
-    fn = weave_internal.define_fn(
-        {"row": tagged_value_type.TaggedValueType(tag_type, types.Int())}, map_fn
-    )
+    fn = weave_internal.define_fn({"row": tagged_value_type.TaggedValueType(tag_type, types.Int())}, map_fn)
     mapped = list_ops.List.map(saved_node, fn)
     assert weave.use(mapped) == [run, run, run]
 
 
 def test_unwrap_rewrap_tags():
-    t1 = tagged_value_type.TaggedValueType(
-        types.TypedDict({"a": types.Int()}), types.Int()
-    )
+    t1 = tagged_value_type.TaggedValueType(types.TypedDict({"a": types.Int()}), types.Int())
 
     unwrapped, rewrap = tagged_value_type_helpers.unwrap_tags(t1)
     assert unwrapped == types.Int()
     assert rewrap(unwrapped) == t1
 
-    t2 = tagged_value_type.TaggedValueType(
-        types.TypedDict({"a": types.Int()}), types.TypedDict({"b": types.Int()})
-    )
+    t2 = tagged_value_type.TaggedValueType(types.TypedDict({"a": types.Int()}), types.TypedDict({"b": types.Int()}))
 
     unwrapped, rewrap = tagged_value_type_helpers.unwrap_tags(t2)
     assert unwrapped == types.TypedDict({"b": types.Int()})

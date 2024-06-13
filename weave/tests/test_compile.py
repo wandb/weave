@@ -64,9 +64,7 @@ def test_automatic_await_compile():
                             types.Number(),
                             "add",
                             {
-                                "lhs": graph.ConstNode(
-                                    types.List(types.Number()), [1, 2, 3]
-                                ),
+                                "lhs": graph.ConstNode(types.List(types.Number()), [1, 2, 3]),
                                 "rhs": graph.ConstNode(types.Number(), 2),
                             },
                         ),
@@ -99,9 +97,7 @@ def test_automatic_await_compile():
                                                     types.List(types.Number()),
                                                     [1, 2, 3],
                                                 ),
-                                                "rhs": graph.ConstNode(
-                                                    types.Number(), 2
-                                                ),
+                                                "rhs": graph.ConstNode(types.Number(), 2),
                                             },
                                         ),
                                     },
@@ -147,25 +143,10 @@ def test_executing_js_multi_root():
 
 def test_optimize_merge_empty_dict():
     non_empty_dict = weave.ops.dict_(a=5, b=2)
-    assert (
-        compile.compile_simple_optimizations(
-            [weave.ops.TypedDict.merge(non_empty_dict, weave.ops.dict_())]
-        )[0].to_json()
-        == non_empty_dict.to_json()
-    )
-    assert (
-        compile.compile_simple_optimizations(
-            [weave.ops.TypedDict.merge(weave.ops.dict_(), non_empty_dict)]
-        )[0].to_json()
-        == non_empty_dict.to_json()
-    )
-    non_simplified_merge = weave.ops.TypedDict.merge(
-        weave.ops.dict_(j=3), non_empty_dict
-    )
-    assert (
-        compile.compile_simple_optimizations([non_simplified_merge])[0].to_json()
-        == non_simplified_merge.to_json()
-    )
+    assert compile.compile_simple_optimizations([weave.ops.TypedDict.merge(non_empty_dict, weave.ops.dict_())])[0].to_json() == non_empty_dict.to_json()
+    assert compile.compile_simple_optimizations([weave.ops.TypedDict.merge(weave.ops.dict_(), non_empty_dict)])[0].to_json() == non_empty_dict.to_json()
+    non_simplified_merge = weave.ops.TypedDict.merge(weave.ops.dict_(j=3), non_empty_dict)
+    assert compile.compile_simple_optimizations([non_simplified_merge])[0].to_json() == non_simplified_merge.to_json()
 
 
 def test_compile_lambda_uniqueness():
@@ -224,9 +205,7 @@ def test_compile_through_function_call(user_by_api_key_in_env):
     """
     fn_node = define_fn(
         {"entity_name": types.String()},
-        lambda entity_name: (
-            weave.ops.project(entity_name, run.project).run(run.id).history2()
-        ),
+        lambda entity_name: (weave.ops.project(entity_name, run.project).run(run.id).history2()),
     )
     called_node = fn_node(run.entity)
     pick = called_node.pick("val")

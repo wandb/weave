@@ -10,14 +10,14 @@ simplifications:
     is column-oriented. However, the more expressive aggregation language can be
     used for both direct queries, but also for column comparison and
     calculations. We can add support for the "query" operators in the future if
-    needed. 
-    
+    needed.
+
 * We only support a subset of the operators / shorthand forms for now. We can add
     more operators in the future as needed.
-    
+
     * One notable omission here is the lack of support for "$field" as a shorthand for
         the "getField"  operator.
-    
+
 * We have _added_ a `$contains` operator which is not in the MongoDB query
     language. This is a simple substring match operator.
 """
@@ -41,12 +41,11 @@ class Query(BaseModel):
 # Starting with these operators for now since they are the most common and with negation
 # can cover most of the other operators.
 
+
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/literal/
 # Can be any standard json-able value
 class LiteralOperation(BaseModel):
-    literal_: typing.Union[
-        str, int, float, bool, dict[str, "LiteralOperation"], list["LiteralOperation"]
-    ] = Field(alias="$literal")
+    literal_: typing.Union[str, int, float, bool, dict[str, "LiteralOperation"], list["LiteralOperation"]] = Field(alias="$literal")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/getField/
@@ -134,9 +133,7 @@ Operation = typing.Union[
     GteOperation,
     ContainsOperation,
 ]
-Operand = typing.Union[
-    LiteralOperation, GetFieldOperator, ConvertOperation, "Operation"
-]
+Operand = typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, "Operation"]
 
 
 # Update the models to include the recursive types

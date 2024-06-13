@@ -25,17 +25,11 @@ NICE_BIN_SIZES_SEC = [
     1800,  # 30 min
     *(3600 * i for i in range(1, 25)),  # 1 - 24 hr, increments of 1hr
     *(86400 * i for i in range(2, 31)),  # 2 - 30 days, increments of 1 day
-    *(
-        86400 * 30 * i for i in range(2, 13)
-    ),  # 2 - 12 months (assuming 1 month = 30days) increments of 1 month
-    *(
-        365 * 86400 * i for i in range(1, 11)
-    ),  # 1 - 10 years (assuming 1 year = 365 days) increments of 1 year
+    *(86400 * 30 * i for i in range(2, 13)),  # 2 - 12 months (assuming 1 month = 30days) increments of 1 month
+    *(365 * 86400 * i for i in range(1, 11)),  # 1 - 10 years (assuming 1 year = 365 days) increments of 1 year
 ]
 
-NICE_BIN_SIZES_SEC_NODE = weave_internal.make_const_node(
-    types.List(types.Number()), NICE_BIN_SIZES_SEC
-)
+NICE_BIN_SIZES_SEC_NODE = weave_internal.make_const_node(types.List(types.Number()), NICE_BIN_SIZES_SEC)
 
 
 @op(
@@ -61,7 +55,8 @@ def timestamp_bins_fixed(bin_size_s: float):
         "target_n_bins": types.Number(),
     },
     output_type=Function(
-        input_types={"ts": types.Timestamp()}, output_type=TimestampBinType  # type: ignore
+        input_types={"ts": types.Timestamp()},
+        output_type=TimestampBinType,  # type: ignore
     ),
     render_info={"type": "function"},
 )
@@ -69,11 +64,7 @@ def timestamp_bins_nice(arr, target_n_bins):
     arr_min = min(arr) if len(arr) > 0 else 0
     arr_max = max(arr) if len(arr) > 0 else 0
     exact_bin_size = ((arr_max - arr_min) / target_n_bins).total_seconds()  # type: ignore
-    bin_size_s = (
-        min(NICE_BIN_SIZES_SEC, key=lambda x: abs(x / exact_bin_size - 1))
-        if exact_bin_size != 0
-        else 1
-    )
+    bin_size_s = min(NICE_BIN_SIZES_SEC, key=lambda x: abs(x / exact_bin_size - 1)) if exact_bin_size != 0 else 1
     return use(timestamp_bins_fixed(bin_size_s))
 
 
@@ -83,7 +74,8 @@ def timestamp_bins_nice(arr, target_n_bins):
         "in_": types.Timestamp(),
         "bin_fn": types.optional(
             Function(
-                input_types={"row": types.Timestamp()}, output_type=TimestampBinType  # type: ignore
+                input_types={"row": types.Timestamp()},
+                output_type=TimestampBinType,  # type: ignore
             )
         ),
     },

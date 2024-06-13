@@ -81,8 +81,6 @@ def artifact_versions(
 ) -> list[wdt.ArtifactVersion]:
     res = []
     for artifactCollectionEdge in artifactType[first_100_collections_alias]["edges"]:
-        for artifactEdge in artifactCollectionEdge["node"][first_100_artifacts_alias][
-            "edges"
-        ]:
+        for artifactEdge in artifactCollectionEdge["node"][first_100_artifacts_alias]["edges"]:
             res.append(wdt.ArtifactVersion.from_keys(artifactEdge["node"]))
     return res

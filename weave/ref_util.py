@@ -19,9 +19,7 @@ def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]
     return path, extra.split("/")
 
 
-def val_with_relative_ref(
-    parent_object: typing.Any, child_object: typing.Any, ref_extra_parts: list[str]
-) -> typing.Any:
+def val_with_relative_ref(parent_object: typing.Any, child_object: typing.Any, ref_extra_parts: list[str]) -> typing.Any:
     from . import context_state
     from . import ref_base
 

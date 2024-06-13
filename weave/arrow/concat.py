@@ -90,17 +90,11 @@ def _concatenate_typeddicts(
     for key in all_keys:
         indent_print(depth, "TypedDict key", key)
         if key not in l1.object_type.property_types:
-            properties[key] = _concatenate(
-                make_vec_none(len(l1._arrow_data)), l2.column(key), depth=depth + 1
-            )
+            properties[key] = _concatenate(make_vec_none(len(l1._arrow_data)), l2.column(key), depth=depth + 1)
         elif key not in l2.object_type.property_types:
-            properties[key] = _concatenate(
-                l1.column(key), make_vec_none(len(l2)), depth=depth + 1
-            )
+            properties[key] = _concatenate(l1.column(key), make_vec_none(len(l2)), depth=depth + 1)
         else:
-            properties[key] = _concatenate(
-                l1.column(key), l2.column(key), depth=depth + 1
-            )
+            properties[key] = _concatenate(l1.column(key), l2.column(key), depth=depth + 1)
 
     return ArrowWeaveList(
         pa.StructArray.from_arrays(
@@ -126,9 +120,7 @@ def _concatenate_objects(
 ) -> ArrowWeaveList:
     assert l1.object_type.name == l2.object_type.name
     attrs: dict[str, ArrowWeaveList] = {}
-    merged_type = typing.cast(
-        types.ObjectType, types.merge_types(l1.object_type, l2.object_type)
-    )
+    merged_type = typing.cast(types.ObjectType, types.merge_types(l1.object_type, l2.object_type))
     for key in merged_type.property_types():
         attrs[key] = _concatenate(l1.column(key), l2.column(key), depth=depth + 1)
     return ArrowWeaveList(
@@ -154,9 +146,7 @@ def _concatenate_taggedvalues(
     depth: int = 0,
 ) -> ArrowWeaveList:
     tag = _concatenate(l1.tagged_value_tag(), l2.tagged_value_tag(), depth=depth + 1)
-    value = _concatenate(
-        l1.tagged_value_value(), l2.tagged_value_value(), depth=depth + 1
-    )
+    value = _concatenate(l1.tagged_value_value(), l2.tagged_value_value(), depth=depth + 1)
     return ArrowWeaveList(
         pa.StructArray.from_arrays(
             [tag._arrow_data, value._arrow_data],
@@ -174,9 +164,7 @@ def _concatenate_taggedvalues(
     )
 
 
-def convert_null_array_to_list(
-    array: typing.Union[pa.ListArray, pa.NullArray]
-) -> pa.ListArray:
+def convert_null_array_to_list(array: typing.Union[pa.ListArray, pa.NullArray]) -> pa.ListArray:
     if isinstance(array, pa.NullArray):
         return pc.cast(array, pa.list_(pa.null()))
     else:
@@ -191,12 +179,8 @@ def _concatenate_lists(
     l1_arrow_data = convert_null_array_to_list(l1._arrow_data)
     l2_arrow_data = convert_null_array_to_list(l2._arrow_data)
 
-    self_values: ArrowWeaveList = ArrowWeaveList(
-        l1_arrow_data.flatten(), l1.object_type.object_type, l2._artifact
-    )
-    other_values: ArrowWeaveList = ArrowWeaveList(
-        l2_arrow_data.flatten(), l2.object_type.object_type, l2._artifact
-    )
+    self_values: ArrowWeaveList = ArrowWeaveList(l1_arrow_data.flatten(), l1.object_type.object_type, l2._artifact)
+    other_values: ArrowWeaveList = ArrowWeaveList(l2_arrow_data.flatten(), l2.object_type.object_type, l2._artifact)
     concatted_values = _concatenate(self_values, other_values, depth=depth + 1)
     new_offsets = pa_concat_arrays(
         [
@@ -218,17 +202,13 @@ def _concatenate_lists(
                 ]
             ),
         ),
-        types.List(
-            types.merge_types(l1.object_type.object_type, l2.object_type.object_type)
-        ),
+        types.List(types.merge_types(l1.object_type.object_type, l2.object_type.object_type)),
         l1._artifact,
         invalid_reason="Possibly nullable",
     )
 
 
-def _concatenate_non_unions(
-    self: ArrowWeaveList, other: ArrowWeaveList, depth: int = 0
-) -> typing.Optional[ArrowWeaveList]:
+def _concatenate_non_unions(self: ArrowWeaveList, other: ArrowWeaveList, depth: int = 0) -> typing.Optional[ArrowWeaveList]:
     if is_typedict_arrowweavelist(self) and is_typedict_arrowweavelist(other):
         return _concatenate_typeddicts(self, other, depth=depth)
     elif is_object_arrowweavelist(self) and is_object_arrowweavelist(other):
@@ -240,13 +220,9 @@ def _concatenate_non_unions(
         # Lists with different object types
         return _concatenate_lists(self, other, depth=depth)
 
-    if isinstance(self.object_type, types.Number) and isinstance(
-        other.object_type, types.Number
-    ):
+    if isinstance(self.object_type, types.Number) and isinstance(other.object_type, types.Number):
         # Numeric special case
-        indent_print(
-            depth, "Extend case number types", self.object_type, other.object_type
-        )
+        indent_print(depth, "Extend case number types", self.object_type, other.object_type)
 
         # Weave numeric types are odd for legacy reasons. We have three numeric types
         # Number, Float, Int. Unfortunately Number is a Union of Float and Int, but
@@ -268,9 +244,7 @@ def _concatenate_non_unions(
         elif pa.types.is_floating(new_arrow_type):
             new_weave_type = types.Float()
         else:
-            raise errors.WeaveInternalError(
-                f'Unexpected type "{new_arrow_type}" for "Number" type.'
-            )
+            raise errors.WeaveInternalError(f'Unexpected type "{new_arrow_type}" for "Number" type.')
 
         if len(self) == 0:
             data = other._arrow_data
@@ -283,17 +257,13 @@ def _concatenate_non_unions(
                     other._arrow_data.cast(new_arrow_type),
                 ]
             )
-        return ArrowWeaveList(
-            data, new_weave_type, self._artifact, invalid_reason="Possibly nullable"
-        )
+        return ArrowWeaveList(data, new_weave_type, self._artifact, invalid_reason="Possibly nullable")
     elif (
         # Types exactly equal case
         self.object_type == other.object_type
         or (
             # Types are refs, so arrow type is string
-            is_ref_arrowweavelist(self)
-            and is_ref_arrowweavelist(other)
-            and self.object_type.__class__ == other.object_type.__class__
+            is_ref_arrowweavelist(self) and is_ref_arrowweavelist(other) and self.object_type.__class__ == other.object_type.__class__
         )
     ):
         indent_print(depth, "Extend case equal", self.object_type, other.object_type)
@@ -312,9 +282,7 @@ def _concatenate_non_unions(
     return None
 
 
-def _concatenate(
-    self: "ArrowWeaveList", other: "ArrowWeaveList", depth=0
-) -> "ArrowWeaveList":
+def _concatenate(self: "ArrowWeaveList", other: "ArrowWeaveList", depth=0) -> "ArrowWeaveList":
     if depth > 50:
         raise ValueError("Maximum recursion depth exceeded")
     indent_print(depth, "EXTEND TOP", depth, self.object_type, other.object_type)
@@ -331,21 +299,15 @@ def _concatenate(
         if len(self) == 0:
             return other
         else:
-            raise errors.WeaveInternalError(
-                'Encountered non-zero length "UnknownType" array'
-            )
+            raise errors.WeaveInternalError('Encountered non-zero length "UnknownType" array')
     if other.object_type == types.UnknownType():
         if len(other) == 0:
             return self
         else:
-            raise errors.WeaveInternalError(
-                'Encountered non-zero length "UnknownType" array'
-            )
+            raise errors.WeaveInternalError('Encountered non-zero length "UnknownType" array')
 
     # Cases where one of the types is None
-    if isinstance(self.object_type, types.NoneType) and isinstance(
-        other.object_type, types.NoneType
-    ):
+    if isinstance(self.object_type, types.NoneType) and isinstance(other.object_type, types.NoneType):
         return make_vec_none(len(self) + len(other))
     elif isinstance(self.object_type, types.NoneType):
         indent_print(depth, "Extend case self None")
@@ -371,17 +333,11 @@ def _concatenate(
     # Separate nulls from type
     self_nullable, self_non_none_type = types.split_none(self.object_type)
     other_nullable, other_non_none_type = types.split_none(other.object_type)
-    self = self._with_object_type(
-        self_non_none_type, invalid_reason="Possibly nullable"
-    )
-    other = other._with_object_type(
-        other_non_none_type, invalid_reason="Possibly nullable"
-    )
+    self = self._with_object_type(self_non_none_type, invalid_reason="Possibly nullable")
+    other = other._with_object_type(other_non_none_type, invalid_reason="Possibly nullable")
     result_nullable = self_nullable or other_nullable
 
-    if not isinstance(self.object_type, types.UnionType) and not isinstance(
-        other.object_type, types.UnionType
-    ):
+    if not isinstance(self.object_type, types.UnionType) and not isinstance(other.object_type, types.UnionType):
         result = _concatenate_non_unions(self, other, depth=depth)
         if result is not None:
             if result_nullable:
@@ -395,9 +351,7 @@ def _concatenate(
         self_field_types = self.object_type.members
         self_type_codes = self._arrow_data.type_codes
         self_offsets = self._arrow_data.offsets
-        self_fields = [
-            self._arrow_data.field(i) for i in range(len(self._arrow_data.type))
-        ]
+        self_fields = [self._arrow_data.field(i) for i in range(len(self._arrow_data.type))]
     else:
         self_field_types = [self.object_type]
         self_type_codes = pa.array(np.zeros(len(self), dtype=np.int8))
@@ -408,9 +362,7 @@ def _concatenate(
         other_field_types = other.object_type.members
         other_type_codes = other._arrow_data.type_codes
         other_offsets = other._arrow_data.offsets
-        other_fields = [
-            other._arrow_data.field(i) for i in range(len(other._arrow_data.type))
-        ]
+        other_fields = [other._arrow_data.field(i) for i in range(len(other._arrow_data.type))]
     else:
         other_field_types = [other.object_type]
         other_type_codes = pa.array(np.zeros(len(other), dtype=np.int8))
@@ -434,9 +386,7 @@ def _concatenate(
     #     indent_print(depth + 1, member)
 
     remaining_other_indexes = {i: True for i in range(len(other_fields))}
-    for self_i, (self_member_type, self_field) in enumerate(
-        zip(self_field_types, self_fields)
-    ):
+    for self_i, (self_member_type, self_field) in enumerate(zip(self_field_types, self_fields)):
         for other_i in remaining_other_indexes:
             other_member_type = other_field_types[other_i]
             other_field = other_fields[other_i]
@@ -452,9 +402,7 @@ def _concatenate(
                     other_member_type,
                 )
                 concatted = _concatenate_non_unions(
-                    ArrowWeaveList(
-                        self_field, self_member_type, invalid_reason="Possibly nullable"
-                    ),
+                    ArrowWeaveList(self_field, self_member_type, invalid_reason="Possibly nullable"),
                     ArrowWeaveList(
                         other_field,
                         other_member_type,
@@ -462,28 +410,20 @@ def _concatenate(
                     ),
                 )
                 if concatted is None:
-                    raise errors.WeaveInternalError(
-                        "Could not concatenate mergable types"
-                    )
+                    raise errors.WeaveInternalError("Could not concatenate mergable types")
                 new_member_awls.append(
                     UnionMember(
                         values=concatted,
                         mask=pa_concat_arrays(
                             [
-                                pa.compute.equal(self_type_codes, self_i).cast(
-                                    pa.int8()
-                                ),
-                                pa.compute.equal(other_type_codes, other_i).cast(
-                                    pa.int8()
-                                ),
+                                pa.compute.equal(self_type_codes, self_i).cast(pa.int8()),
+                                pa.compute.equal(other_type_codes, other_i).cast(pa.int8()),
                             ]
                         ),
                         offsets=pa_concat_arrays(
                             [
                                 self_offsets,
-                                pa.compute.add(other_offsets, len(self_field)).cast(
-                                    pa.int32()
-                                ),
+                                pa.compute.add(other_offsets, len(self_field)).cast(pa.int32()),
                             ]
                         ),
                     )
@@ -558,9 +498,7 @@ def _concatenate(
 
     result_type_codes = pa.array(np.zeros(len(self) + len(other), dtype=np.int8))
     for i, new_member_awl in enumerate(new_member_awls):
-        result_type_codes = pa.compute.add(
-            result_type_codes, pa.compute.multiply(new_member_awl.mask, i)
-        )
+        result_type_codes = pa.compute.add(result_type_codes, pa.compute.multiply(new_member_awl.mask, i))
     result_offsets = pa.array(np.zeros(len(self) + len(other), dtype=np.int32))
     for i, new_member_awl in enumerate(new_member_awls):
         result_offsets = pa.compute.add(
@@ -600,9 +538,7 @@ def _concatenate(
     )
 
 
-def concatenate(
-    self: "ArrowWeaveList", other: "ArrowWeaveList", depth=0
-) -> "ArrowWeaveList":
+def concatenate(self: "ArrowWeaveList", other: "ArrowWeaveList", depth=0) -> "ArrowWeaveList":
     with unsafe_awl_construction("Possibly nullable"):
         result = _concatenate(self, other, depth)
     result.validate()

@@ -21,10 +21,7 @@ from . import op_policy
 def _execute_fn_no_engine(item, index, map_fn):
     # executes map_fn without using the execute engine.
     if isinstance(map_fn, graph.OutputNode):
-        inputs = {
-            name: _execute_fn_no_engine(item, index, node)
-            for name, node in map_fn.from_op.inputs.items()
-        }
+        inputs = {name: _execute_fn_no_engine(item, index, node) for name, node in map_fn.from_op.inputs.items()}
         op_def = registry_mem.memory_registry.get_op(map_fn.from_op.name)
         if language_nullability.should_force_none_result(inputs, op_def):
             return None
@@ -40,9 +37,7 @@ def _execute_fn_no_engine(item, index, map_fn):
         elif map_fn.name == "index":
             return index
         else:
-            raise errors.WeaveInternalError(
-                "Encountered unknown variable: %s" % map_fn.name
-            )
+            raise errors.WeaveInternalError("Encountered unknown variable: %s" % map_fn.name)
     else:
         raise errors.WeaveInternalError("Invalid Node: %s" % map_fn)
 
@@ -53,18 +48,13 @@ def _resolve_static_branches(map_fn):
         if result_store.has(map_fn):
             return graph.ConstNode(map_fn.type, result_store[map_fn])
 
-        inputs = {
-            name: _resolve_static_branches(node)
-            for name, node in map_fn.from_op.inputs.items()
-        }
+        inputs = {name: _resolve_static_branches(node) for name, node in map_fn.from_op.inputs.items()}
 
         if map_fn.from_op.name == "function-__call__":
             # Special case to expand function calls
             self = inputs["self"]
             if isinstance(self, graph.ConstNode):
-                if isinstance(self.val, graph.ConstNode) and isinstance(
-                    self.val.type, types.Function
-                ):
+                if isinstance(self.val, graph.ConstNode) and isinstance(self.val.type, types.Function):
                     self = self.val
 
                 res = weave_internal.better_call_fn(
@@ -95,12 +85,7 @@ def op_can_be_async(op_name: str) -> bool:
     try:
         op = registry_mem.memory_registry.get_op(op_name)
     except errors.WeaveMissingOpDefError:
-        return any(
-            [
-                o.is_async
-                for o in registry_mem.memory_registry.find_ops_by_common_name(op_name)
-            ]
-        )
+        return any([o.is_async for o in registry_mem.memory_registry.find_ops_by_common_name(op_name)])
     return op.is_async
 
 
@@ -108,12 +93,7 @@ def _can_fast_map(map_fn):
     not_fastmappable_nodes = graph.filter_nodes_full(
         [map_fn],
         lambda n: isinstance(n, graph.OutputNode)
-        and (
-            op_can_be_async(n.from_op.name)
-            or "://" in n.from_op.name
-            or op_policy.should_cache(n.from_op.name)
-            or op_policy.should_run_in_parallel(n.from_op.name)
-        ),
+        and (op_can_be_async(n.from_op.name) or "://" in n.from_op.name or op_policy.should_cache(n.from_op.name) or op_policy.should_run_in_parallel(n.from_op.name)),
     )
     return len(not_fastmappable_nodes) == 0
 
@@ -160,19 +140,13 @@ def fast_map_fn(input_list, map_fn):
     # now map the remaining weave_fn (after resolving static branches above)
     # over the input list
     with tracer.trace("fast_map:map"):
-        list_tags = (
-            None
-            if not tag_store.is_tagged(input_list)
-            else tag_store.get_tags(input_list)
-        )
+        list_tags = None if not tag_store.is_tagged(input_list) else tag_store.get_tags(input_list)
         result = []
         for i, item in enumerate(input_list):
             item = box.box(item)
             if list_tags is not None:
                 # push down list tags to elements, mirroring arrow map (apply_fn_node_with_tag_pushdown)
-                tag_store.add_tags(
-                    item, list_tags, give_precedence_to_existing_tags=True
-                )
+                tag_store.add_tags(item, list_tags, give_precedence_to_existing_tags=True)
 
             item_result = _execute_fn_no_engine(item, i, map_fn)
             result.append(item_result)

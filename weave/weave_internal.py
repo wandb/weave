@@ -6,9 +6,7 @@ from . import errors
 from . import client_interface
 
 
-def dereference_variables(
-    node: graph.Node, var_values: graph.Frame, missing_ok: bool = False
-) -> graph.Node:
+def dereference_variables(node: graph.Node, var_values: graph.Frame, missing_ok: bool = False) -> graph.Node:
     def map_fn(n: graph.Node) -> graph.Node:
         if isinstance(n, graph.VarNode):
             try:
@@ -32,9 +30,7 @@ def call_fn(
 def better_call_fn(weave_fn: graph.ConstNode, *inputs: graph.Node) -> graph.Node:
     call_inputs = {}
     if not isinstance(weave_fn.type, types.Function):
-        raise errors.WeaveInternalError(
-            "Expected function type, got %s" % weave_fn.type
-        )
+        raise errors.WeaveInternalError("Expected function type, got %s" % weave_fn.type)
     for input_name, input in zip(weave_fn.type.input_types.keys(), inputs):
         call_inputs[input_name] = input
     res = call_fn(weave_fn.val, call_inputs)  # type: ignore
@@ -112,9 +108,7 @@ def make_var_for_value(v: typing.Any, name: str) -> graph.VarNode:
     return new_var
 
 
-def make_output_node(
-    type_: types.Type, op_name: str, op_params: dict[str, graph.Node]
-) -> graph.OutputNode:
+def make_output_node(type_: types.Type, op_name: str, op_params: dict[str, graph.Node]) -> graph.OutputNode:
     # Circular import. TODO: fix
     from . import dispatch
 
@@ -122,9 +116,7 @@ def make_output_node(
 
 
 # Given a registered op, make a mapped version of it.
-def define_fn(
-    parameters: dict[str, types.Type], body: typing.Callable[..., graph.Node]
-) -> graph.ConstNode:
+def define_fn(parameters: dict[str, types.Type], body: typing.Callable[..., graph.Node]) -> graph.ConstNode:
     var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
     try:
         from . import op_def
@@ -139,9 +131,7 @@ def define_fn(
 
 
 ENVType = typing.Union[graph.Node, typing.Callable[..., graph.Node]]
-ENInputTypeType = typing.Optional[
-    typing.Union[types.Type, typing.Callable[..., types.Type]]
-]
+ENInputTypeType = typing.Optional[typing.Union[types.Type, typing.Callable[..., types.Type]]]
 ENBoundParamsType = typing.Optional[dict[str, graph.Node]]
 
 
@@ -166,14 +156,10 @@ def refine_graph(node: graph.Node) -> graph.Node:
         return op(**refined_inputs)
 
     else:
-        raise NotImplementedError(
-            "refine_graph cannot yet handle nodes of type %s" % type(node)
-        )
+        raise NotImplementedError("refine_graph cannot yet handle nodes of type %s" % type(node))
 
 
-def manual_call(
-    op_name: str, inputs: dict[str, graph.Node], output_type: types.Type
-) -> graph.Node:
+def manual_call(op_name: str, inputs: dict[str, graph.Node], output_type: types.Type) -> graph.Node:
     """Produce an output node manually.
 
     You can produce incorrect nodes this way. Use with caution.

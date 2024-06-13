@@ -13,15 +13,9 @@ from . import weave_plotly
 # in the UI by clicking on the gear icon.)
 @weave.type()
 class GeoConfig:
-    x_fn: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
-    y_fn: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
-    color_fn: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
+    x_fn: weave.Node[float] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
+    y_fn: weave.Node[float] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
+    color_fn: weave.Node[float] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
 
 
 # This is boilerplate that I'd like to get rid of.
@@ -53,24 +47,16 @@ def geo_default_config(
     input_type_item_type = weave.type_of(unnested_node).object_type  # type: ignore
     if config == None:
         return GeoConfig(
-            x_fn=weave_internal.define_fn(
-                {"item": input_type_item_type}, lambda item: item
-            ),
-            y_fn=weave_internal.define_fn(
-                {"item": input_type_item_type}, lambda item: item
-            ),
-            color_fn=weave_internal.define_fn(
-                {"item": input_type_item_type}, lambda item: item
-            ),
+            x_fn=weave_internal.define_fn({"item": input_type_item_type}, lambda item: item),
+            y_fn=weave_internal.define_fn({"item": input_type_item_type}, lambda item: item),
+            color_fn=weave_internal.define_fn({"item": input_type_item_type}, lambda item: item),
         )
     return config
 
 
 # The render op. This renders the panel.
 @weave.op(name="Geo")
-def geo(
-    input_node: weave.Node[list[typing.Any]], config: GeoConfig
-) -> weave_plotly.PanelPlotly:
+def geo(input_node: weave.Node[list[typing.Any]], config: GeoConfig) -> weave_plotly.PanelPlotly:
     unnested = weave.ops.unnest(input_node)
     config = geo_default_config(config, unnested)
     plot_data = unnested.map(
@@ -86,30 +72,22 @@ def geo(
 
 # The config render op. This renders the config editor.
 @weave.op(name="Geo_config")
-def geo_config(
-    input_node: weave.Node[list[typing.Any]], config: GeoConfig
-) -> weave.panels.Group:
+def geo_config(input_node: weave.Node[list[typing.Any]], config: GeoConfig) -> weave.panels.Group:
     unnested = weave.ops.unnest(input_node)
     config = geo_default_config(config, unnested)
     return weave.panels.Group(
         items={
             "x_fn": weave.panels.LabeledItem(
                 label="x",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.x_fn)
-                ),
+                item=weave.panels.FunctionEditor(config=weave.panels.FunctionEditorConfig(config.x_fn)),
             ),
             "y_fn": weave.panels.LabeledItem(
                 label="y",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.y_fn)
-                ),
+                item=weave.panels.FunctionEditor(config=weave.panels.FunctionEditorConfig(config.y_fn)),
             ),
             "color_fn": weave.panels.LabeledItem(
                 label="color",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.color_fn)
-                ),
+                item=weave.panels.FunctionEditor(config=weave.panels.FunctionEditorConfig(config.color_fn)),
             ),
         }
     )
@@ -120,13 +98,9 @@ def geo_config(
 class Geo(weave.Panel):
     id = "Geo"
     config: typing.Optional[GeoConfig] = None
-    _renderAsPanel: typing.Optional[weave_plotly.PanelPlotly] = dataclasses.field(
-        default_factory=lambda: None
-    )
+    _renderAsPanel: typing.Optional[weave_plotly.PanelPlotly] = dataclasses.field(default_factory=lambda: None)
 
-    def __init__(
-        self, input_node, vars=None, config=None, _renderAsPanel=None, **options
-    ):
+    def __init__(self, input_node, vars=None, config=None, _renderAsPanel=None, **options):
         super().__init__(input_node=input_node, vars=vars)
         self._renderAsPanel = _renderAsPanel
         if self._renderAsPanel is None:
@@ -140,33 +114,21 @@ class Geo(weave.Panel):
             if "x_fn" in options:
                 sig = inspect.signature(options["x_fn"])
                 param_name = list(sig.parameters.values())[0].name
-                self.config.x_fn = weave_internal.define_fn(
-                    {param_name: unnested.type.object_type}, options["x_fn"]
-                )
+                self.config.x_fn = weave_internal.define_fn({param_name: unnested.type.object_type}, options["x_fn"])
             else:
-                self.config.x_fn = weave_internal.define_fn(
-                    {"item": unnested.type.object_type}, lambda item: item
-                )
+                self.config.x_fn = weave_internal.define_fn({"item": unnested.type.object_type}, lambda item: item)
             if "y_fn" in options:
                 sig = inspect.signature(options["y_fn"])
                 param_name = list(sig.parameters.values())[0].name
-                self.config.y_fn = weave_internal.define_fn(
-                    {param_name: unnested.type.object_type}, options["y_fn"]
-                )
+                self.config.y_fn = weave_internal.define_fn({param_name: unnested.type.object_type}, options["y_fn"])
             else:
-                self.config.y_fn = weave_internal.define_fn(
-                    {"item": unnested.type.object_type}, lambda item: item
-                )
+                self.config.y_fn = weave_internal.define_fn({"item": unnested.type.object_type}, lambda item: item)
             if "color_fn" in options:
                 sig = inspect.signature(options["color_fn"])
                 param_name = list(sig.parameters.values())[0].name
-                self.config.color_fn = weave_internal.define_fn(
-                    {param_name: unnested.type.object_type}, options["color_fn"]
-                )
+                self.config.color_fn = weave_internal.define_fn({param_name: unnested.type.object_type}, options["color_fn"])
             else:
-                self.config.color_fn = weave_internal.define_fn(
-                    {"item": unnested.type.object_type}, lambda item: item
-                )
+                self.config.color_fn = weave_internal.define_fn({"item": unnested.type.object_type}, lambda item: item)
 
     # This function currently requires a paired output_type implementation in WeaveJS!
     # TODO: Fix
@@ -179,22 +141,12 @@ class Geo(weave.Panel):
             lambda item: weave.ops.Boolean.bool_and(
                 weave.ops.Boolean.bool_and(
                     weave.ops.Boolean.bool_and(
-                        config.x_fn(item)
-                        > weave.ops.TypedDict.pick(
-                            self._renderAsPanel.config.selected, "xMin"
-                        ),
-                        config.x_fn(item)
-                        < weave.ops.TypedDict.pick(
-                            self._renderAsPanel.config.selected, "xMax"
-                        ),
+                        config.x_fn(item) > weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "xMin"),
+                        config.x_fn(item) < weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "xMax"),
                     ),
-                    config.y_fn(item)
-                    > weave.ops.TypedDict.pick(
-                        self._renderAsPanel.config.selected, "yMin"
-                    ),
+                    config.y_fn(item) > weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "yMin"),
                 ),
-                config.y_fn(item)
-                < weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "yMax"),
+                config.y_fn(item) < weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "yMax"),
             )
         )
         return weave_internal.use(filtered)

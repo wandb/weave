@@ -8,7 +8,7 @@ TODOS:
     - [ ] Add a single `call` method to the model class where the input data type is
         dependent on the model type. Shawn has ideas around how to do this (to make the
         type of arguments dependent on previous arguments). Moreover, the return type
-        will also be dependent on the model. Currently we have a nasty `call_string_to_number` and `call_string_to_string` 
+        will also be dependent on the model. Currently we have a nasty `call_string_to_number` and `call_string_to_string`
         as placeholders.
     - [ ] Figure out the correct way to do batching. There are two considerations:
         1. We allow tensors to have any number of `None` dimensions. We may want to remove this allowance, or restrict to just a single `None` dimension.
@@ -17,7 +17,6 @@ TODOS:
         1. The pre- and post- processing is hard coded for the example model - we need a way to properly handle a DAG/Series of transforms.
         2. The input is a URL - we need a way to nicely interop with the rest of the Images in our ecosystem.
 """
-
 
 from dataclasses import dataclass
 from enum import Enum
@@ -68,21 +67,10 @@ DTYPE_TO_TYPE: dict[dtypes.bfloat16, weave.types.Type] = {
 
 
 def shape_to_dict(shape: typing.List[typing.Optional[int]]) -> weave.types.TypedDict:
-    return weave.types.TypedDict(
-        {
-            f"{shape_ndx}": (
-                weave.types.NoneType()
-                if dim is None
-                else weave.types.Const(weave.types.Number(), dim)
-            )
-            for shape_ndx, dim in enumerate(shape)
-        }
-    )
+    return weave.types.TypedDict({f"{shape_ndx}": (weave.types.NoneType() if dim is None else weave.types.Const(weave.types.Number(), dim)) for shape_ndx, dim in enumerate(shape)})
 
 
-def shape_to_list(
-    shape: typing.List[typing.Optional[int]], inner_type: weave.types.Type
-) -> weave.types.Type:
+def shape_to_list(shape: typing.List[typing.Optional[int]], inner_type: weave.types.Type) -> weave.types.Type:
     if len(shape) == 0:
         return inner_type
     else:
@@ -105,9 +93,7 @@ class KerasTensorType(weave.types.Type):
         return cls(
             shape=shape_to_dict(obj.shape.as_list()),
             data_type=DTYPE_TO_TYPE[obj.dtype],
-            weave_vector_type=shape_to_list(
-                obj.shape.as_list(), DTYPE_TO_TYPE[obj.dtype]
-            ),
+            weave_vector_type=shape_to_list(obj.shape.as_list(), DTYPE_TO_TYPE[obj.dtype]),
         )
 
     # This is just a helper function for building the type of a KerasTensor
@@ -134,14 +120,8 @@ class KerasModel(weave.types.Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        inputs_as_dict = {
-            f"{k}": weave.types.TypeRegistry.type_of(v)
-            for k, v in enumerate(obj.inputs)
-        }
-        outputs_as_dict = {
-            f"{k}": weave.types.TypeRegistry.type_of(v)
-            for k, v in enumerate(obj.outputs)
-        }
+        inputs_as_dict = {f"{k}": weave.types.TypeRegistry.type_of(v) for k, v in enumerate(obj.inputs)}
+        outputs_as_dict = {f"{k}": weave.types.TypeRegistry.type_of(v) for k, v in enumerate(obj.outputs)}
         return cls(
             weave.types.TypedDict(inputs_as_dict),
             weave.types.TypedDict(outputs_as_dict),
@@ -158,27 +138,11 @@ class KerasModel(weave.types.Type):
     @classmethod
     def make_type(
         cls: Type["KerasModel"],
-        inputs_def: Optional[
-            list[typing.Union[KerasTensorType, weave.types.Any]]
-        ] = None,
-        outputs_def: Optional[
-            list[typing.Union[KerasTensorType, weave.types.Type]]
-        ] = None,
+        inputs_def: Optional[list[typing.Union[KerasTensorType, weave.types.Any]]] = None,
+        outputs_def: Optional[list[typing.Union[KerasTensorType, weave.types.Type]]] = None,
     ) -> "KerasModel":
-        inputs = (
-            weave.types.TypedDict(
-                {f"{input_ndx}": t for input_ndx, t in enumerate(inputs_def)}
-            )
-            if inputs_def is not None
-            else weave.types.Any()
-        )
-        outputs = (
-            weave.types.TypedDict(
-                {f"{input_ndx}": t for input_ndx, t in enumerate(outputs_def)}
-            )
-            if outputs_def is not None
-            else weave.types.Any()
-        )
+        inputs = weave.types.TypedDict({f"{input_ndx}": t for input_ndx, t in enumerate(inputs_def)}) if inputs_def is not None else weave.types.Any()
+        outputs = weave.types.TypedDict({f"{input_ndx}": t for input_ndx, t in enumerate(outputs_def)}) if outputs_def is not None else weave.types.Any()
         return cls(inputs, outputs)
 
 
@@ -204,9 +168,7 @@ def byte_vector_to_string(maybe_byte_vector: typing.Any) -> typing.Union[list, s
         ),
         "input": weave.types.String(),
     },
-    output_type=lambda input_types: input_types["model"]
-    .outputs_type.property_types["0"]
-    .weave_vector_type.object_type,
+    output_type=lambda input_types: input_types["model"].outputs_type.property_types["0"].weave_vector_type.object_type,
 )
 def call_string(model, input):
     res = model.predict([[input]]).tolist()[0]

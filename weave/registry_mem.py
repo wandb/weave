@@ -147,12 +147,7 @@ class Registry:
     # Perhaps a better extension is to require a return type that
     # subclasses some abstract package type?
     def list_packages(self) -> typing.List["OpDef"]:
-        packages = [
-            a
-            for a in list(self._ops.values())
-            if isinstance(a.input_type, OpNamedArgs)
-            and len(a.input_type.arg_types.keys()) == 0
-        ]
+        packages = [a for a in list(self._ops.values()) if isinstance(a.input_type, OpNamedArgs) and len(a.input_type.arg_types.keys()) == 0]
         return packages
 
     def rename_op(self, name, new_name):

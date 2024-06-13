@@ -59,9 +59,7 @@ def test_table_create(client):
             )
         )
     )
-    result = client.server.table_query(
-        TableQueryReq(project_id="test/test-project", digest=res.digest)
-    )
+    result = client.server.table_query(TableQueryReq(project_id="test/test-project", digest=res.digest))
     assert result.rows[0].val["val"] == 1
     assert result.rows[1].val["val"] == 2
     assert result.rows[2].val["val"] == 3
@@ -483,9 +481,7 @@ def test_mutations(client):
             operation="setitem",
             args=("a", 12),
         ),
-        weave_client.MutationSetattr(
-            path=[], operation="setattr", args=("cows", "moo")
-        ),
+        weave_client.MutationSetattr(path=[], operation="setattr", args=("cows", "moo")),
     ]
     new_ref = dataset.save()
     new_ds = client.get(new_ref)
@@ -715,10 +711,7 @@ def test_evaluate(client):
 
     model_obj = child0.inputs["model"]
     assert isinstance(model_obj, Op)
-    assert (
-        weave_client.get_ref(model_obj).uri()
-        == weave_client.get_ref(model_predict).uri()
-    )
+    assert weave_client.get_ref(model_obj).uri() == weave_client.get_ref(model_predict).uri()
 
     example0_obj = child0.inputs["example"]
     assert example0_obj.ref.name == "Dataset"
@@ -867,13 +860,9 @@ def test_large_files(client):
 
 def test_server_file(client):
     f_bytes = b"0" * 10000005
-    res = client.server.file_create(
-        FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes)
-    )
+    res = client.server.file_create(FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes))
 
-    read_res = client.server.file_content_read(
-        FileContentReadReq(project_id="shawn/test-project", digest=res.digest)
-    )
+    read_res = client.server.file_content_read(FileContentReadReq(project_id="shawn/test-project", digest=res.digest))
     assert f_bytes == read_res.content
 
 
@@ -950,13 +939,7 @@ def test_summary_tokens(client):
 
     @weave.op()
     def models(text):
-        return (
-            model_a(text)["result"]
-            + " "
-            + model_a(text)["result"]
-            + " "
-            + model_b(text)["result"]
-        )
+        return model_a(text)["result"] + " " + model_a(text)["result"] + " " + model_b(text)["result"]
 
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
@@ -992,15 +975,7 @@ def test_summary_descendents(client):
 
     @weave.op()
     def models(text):
-        return (
-            model_a(text)
-            + " "
-            + model_a(text)
-            + " "
-            + model_b(text)
-            + " "
-            + model_error_catch(text)
-        )
+        return model_a(text) + " " + model_a(text) + " " + model_b(text) + " " + model_error_catch(text)
 
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello error: hello"

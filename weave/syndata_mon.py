@@ -13,9 +13,7 @@ from weave.arrow.list_ import ArrowWeaveList
 
 
 # Generate the version schedule
-def generate_version_schedule(
-    start_date: datetime.datetime, end_date: datetime.datetime
-) -> dict:
+def generate_version_schedule(start_date: datetime.datetime, end_date: datetime.datetime) -> dict:
     current_date = start_date
     versions = ["1.0"]
     version_schedule = {}
@@ -36,9 +34,7 @@ def generate_version_schedule(
 
 
 # Generate the latency schedule
-def generate_latency_schedule(
-    start_date: datetime.datetime, end_date: datetime.datetime
-) -> dict:
+def generate_latency_schedule(start_date: datetime.datetime, end_date: datetime.datetime) -> dict:
     latency_schedule = {}
     for current_date in pd.date_range(start_date, end_date):
         base_latency = random.uniform(0.1, 1)
@@ -66,9 +62,7 @@ def generate_cost_schedule(
     return cost_schedule
 
 
-def generate_user_usage_schedule(
-    start_date: datetime.datetime, end_date: datetime.datetime, users: list
-) -> list:
+def generate_user_usage_schedule(start_date: datetime.datetime, end_date: datetime.datetime, users: list) -> list:
     user_usage_schedule = []
     for user in users:
         current_date = start_date + timedelta(days=random.randrange(90))
@@ -77,9 +71,7 @@ def generate_user_usage_schedule(
             for _ in range(usage_periods):
                 period_length_timedelta = timedelta(hours=random.randint(1, 24 * 7))
                 rate = random.uniform(0.1, 10)
-                user_usage_schedule.append(
-                    (current_date, user, period_length_timedelta, rate)
-                )
+                user_usage_schedule.append((current_date, user, period_length_timedelta, rate))
                 current_date += period_length_timedelta  # Increment current_date
                 if current_date > end_date:
                     break
@@ -93,9 +85,7 @@ def random_predictions(n_users: int = 10) -> ArrowWeaveList:
 
     # Read the file and generate prompts
     with open(
-        os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "testdata/t8.shakespeare.txt")
-        ),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "testdata/t8.shakespeare.txt")),
         "r",
     ) as f:
         lines = f.read().split("\n")
@@ -114,9 +104,7 @@ def random_predictions(n_users: int = 10) -> ArrowWeaveList:
     # Helper function to generate a random completion
     def generate_completion(prompt: str) -> str:
         words = prompt.split()
-        completion = " ".join(
-            random.choices(words, k=int(len(words) * (random.random() + 0.1) * 10))
-        )
+        completion = " ".join(random.choices(words, k=int(len(words) * (random.random() + 0.1) * 10)))
         return completion
 
     data = []
@@ -136,13 +124,9 @@ def random_predictions(n_users: int = 10) -> ArrowWeaveList:
             total_percent = sum([percent for version, percent in active_versions])
             if total_percent == 0:
                 continue
-            normalized_percentages = [
-                percent / total_percent for version, percent in active_versions
-            ]
+            normalized_percentages = [percent / total_percent for version, percent in active_versions]
 
-            version = np.random.choice(
-                [v for v, p in active_versions], p=normalized_percentages
-            )
+            version = np.random.choice([v for v, p in active_versions], p=normalized_percentages)
 
             # Find the cost during this usage
             cost_per_token = cost_schedule[usage_date.date()]

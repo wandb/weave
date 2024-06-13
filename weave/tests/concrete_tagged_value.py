@@ -26,10 +26,7 @@ def concrete_to_tagstore(val: typing.Any) -> typing.Any:
         tag_store.add_tags(v, concrete_to_tagstore(val.tag))
         return v
     elif dataclasses.is_dataclass(val):
-        params = {
-            f.name: concrete_to_tagstore(getattr(val, f.name))
-            for f in dataclasses.fields(val)
-        }
+        params = {f.name: concrete_to_tagstore(getattr(val, f.name)) for f in dataclasses.fields(val)}
         return val.__class__(**params)
     return val
 
@@ -49,9 +46,6 @@ def _concrete_from_tagstore_inner(val: typing.Any):
     elif isinstance(val, list):
         return [concrete_from_tagstore(v) for v in val]
     elif dataclasses.is_dataclass(val):
-        params = {
-            f.name: concrete_from_tagstore(getattr(val, f.name))
-            for f in dataclasses.fields(val)
-        }
+        params = {f.name: concrete_from_tagstore(getattr(val, f.name)) for f in dataclasses.fields(val)}
         return val.__class__(**params)
     return val

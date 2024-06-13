@@ -14,9 +14,7 @@ import contextlib
 
 # This context var is used to store the json cache. It maps the serialized json string
 # to the deserialized python object.
-_GQL_JSON_CACHE: contextvars.ContextVar[dict[str, typing.Any]] = contextvars.ContextVar(
-    "gql_json_cache", default={}
-)
+_GQL_JSON_CACHE: contextvars.ContextVar[dict[str, typing.Any]] = contextvars.ContextVar("gql_json_cache", default={})
 
 
 @contextlib.contextmanager

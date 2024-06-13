@@ -70,9 +70,7 @@ def create_arrow_data(n_rows, n_extra_cols=0, images=False):
     x_choices = string.ascii_lowercase
     extra_cols = [chr(ord("a") + i) for i in range(n_extra_cols)]
     ims = []
-    for i, (rotate, shear, _) in enumerate(
-        itertools.product(range(5), range(5), range(inner_count))
-    ):
+    for i, (rotate, shear, _) in enumerate(itertools.product(range(5), range(5), range(inner_count))):
         im = {
             "rotate": rotate,
             "shear": shear,
@@ -80,9 +78,7 @@ def create_arrow_data(n_rows, n_extra_cols=0, images=False):
             "y": simple_hash(i, 10),
         }
         if images:
-            im["image"] = base_im.rotate(rotate * 4).transform(
-                (256, 256), Image.AFFINE, (1, shear / 10, 0, 0, 1, 0), Image.BICUBIC
-            )
+            im["image"] = base_im.rotate(rotate * 4).transform((256, 256), Image.AFFINE, (1, shear / 10, 0, 0, 1, 0), Image.BICUBIC)
         for j, col in enumerate(extra_cols):
             im[col] = x_choices[simple_hash(i * 13**j, 11)]
         ims.append(im)
@@ -92,11 +88,7 @@ def create_arrow_data(n_rows, n_extra_cols=0, images=False):
 
 def test_groupby_index_count():
     ref = create_arrow_data(1000)
-    node = (
-        weave.get(ref)
-        .groupby(lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"]))[1]
-        .count()
-    )
+    node = weave.get(ref).groupby(lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"]))[1].count()
     assert weave.use(node) == 40
 
 
@@ -111,9 +103,7 @@ def test_groupby_index_count():
         # in the UI anyway)
         # (lambda row: list_.make_list(a=row.pick("rotate").avg()), ["desc"], 4),
         (
-            lambda row: list_.make_list(
-                a=row.groupkey().pick("shear"), b=row.groupkey().pick("rotate")
-            ),
+            lambda row: list_.make_list(a=row.groupkey().pick("shear"), b=row.groupkey().pick("rotate")),
             ["asc", "desc"],
             4,
         ),
@@ -121,9 +111,7 @@ def test_groupby_index_count():
 )
 def test_groupby_sort(sort_lambda, sort_dirs, exp_rotation_avg):
     ref = create_arrow_data(1000)
-    grouped_node = weave.get(ref).groupby(
-        lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"])
-    )
+    grouped_node = weave.get(ref).groupby(lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"]))
     sorted_node = grouped_node.sort(sort_lambda, sort_dirs)
     first_group = sorted_node[0]
     first_group_rotations = first_group.pick("rotate")
@@ -190,13 +178,7 @@ def test_map_scalar_map():
 
 def test_groupby_mapped_groupby():
     ref = create_arrow_data(1000)
-    node = (
-        weave.get(ref)
-        .groupby(lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"]))
-        .map(lambda row: row.groupby(lambda row: row["y"]))
-        .dropna()
-        .count()
-    )
+    node = weave.get(ref).groupby(lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"])).map(lambda row: row.groupby(lambda row: row["y"])).dropna().count()
     assert weave.use(node) == 25
 
 
@@ -236,9 +218,7 @@ def test_custom_types_tagged():
     width_node = data_node[0]["im"].width_()
     assert weave.use(width_node) == 256
 
-    assert width_node.type == tagged_value_type.TaggedValueType(
-        types.TypedDict({"a": types.Int()}), types.Int()
-    )
+    assert width_node.type == tagged_value_type.TaggedValueType(types.TypedDict({"a": types.Int()}), types.Int())
 
     mapped_width_node = data_node.map(lambda row: row["im"].width_())
     assert weave.use(mapped_width_node).to_pylist_raw() == [
@@ -246,11 +226,7 @@ def test_custom_types_tagged():
         256,
     ]
 
-    assert mapped_width_node.type == arrow.ArrowWeaveListType(
-        tagged_value_type.TaggedValueType(
-            types.TypedDict({"a": types.Int()}), types.Int()
-        )
-    )
+    assert mapped_width_node.type == arrow.ArrowWeaveListType(tagged_value_type.TaggedValueType(types.TypedDict({"a": types.Int()}), types.Int()))
 
 
 def test_custom_saveload():
@@ -313,15 +289,7 @@ def test_custom_tagged_groupby1():
         types.TypedDict({"a": types.Int()}),
     )
 
-    assert (
-        weave.use(
-            data_node.groupby(lambda row: ops.dict_(a=row["a"]))[0]
-            .pick("im")
-            .offset(0)[0]
-            .width_()
-        )
-        == 256
-    )
+    assert weave.use(data_node.groupby(lambda row: ops.dict_(a=row["a"]))[0].pick("im").offset(0)[0].width_()) == 256
 
 
 def test_custom_tagged_groupby2():
@@ -350,13 +318,7 @@ def test_custom_tagged_groupby2():
                 }
             ),
             # types.TypedDict({"a": types.Int()}),
-            types.TypedDict(
-                {
-                    "inner_group_key": tagged_value_type.TaggedValueType(
-                        types.TypedDict({"list_tag": types.Int()}), types.Int()
-                    )
-                }
-            ),
+            types.TypedDict({"inner_group_key": tagged_value_type.TaggedValueType(types.TypedDict({"list_tag": types.Int()}), types.Int())}),
         ),
     )
     assert grouped_node.type == target
@@ -373,15 +335,7 @@ def test_custom_groupby_1():
         ]
     )
 
-    assert (
-        weave.use(
-            data.groupby(lambda row: ops.dict_(a=row["a"]))[0]
-            .pick("im")
-            .offset(0)[0]
-            .width_()
-        )
-        == 256
-    )
+    assert weave.use(data.groupby(lambda row: ops.dict_(a=row["a"]))[0].pick("im").offset(0)[0].width_()) == 256
 
 
 def test_custom_groupby_intermediate_save():
@@ -394,9 +348,7 @@ def test_custom_groupby_intermediate_save():
     node = data.groupby(lambda row: ops.dict_(a=row["a"]))[0]
     saved_node = weave.save(node, "test_custom_groupby_intermediate_save:latest")
     weave.use(saved_node)
-    loaded_node = ops.get(
-        "local-artifact:///test_custom_groupby_intermediate_save:latest/obj"
-    )
+    loaded_node = ops.get("local-artifact:///test_custom_groupby_intermediate_save:latest/obj")
     assert weave.use(loaded_node.pick("im").offset(0)[0].width_()) == 256
 
 
@@ -461,9 +413,7 @@ def test_arrow_nested_with_refs():
     # As of this writing, the first time we call `to_arrow`, the underlying
     # `save` operation does not convert relative artifact paths to URIs. This is
     # in `ArrowWeaveList::save_instance`.
-    data_node = arrow.to_arrow(
-        [{"outer": [{"inner": Image.linear_gradient("L").rotate(0)}]}]
-    )
+    data_node = arrow.to_arrow([{"outer": [{"inner": Image.linear_gradient("L").rotate(0)}]}])
 
     raw_path = data_node._arrow_data[0]["outer"][0]["inner"].as_py()
 
@@ -496,9 +446,7 @@ def test_map_object():
 
 @pytest.mark.skip("not working yet")
 def test_map_typeddict_object():
-    data = arrow.to_weave_arrow(
-        [{"a": 0, "p": Point2(1, 2)}, {"a": 3, "p": Point2(9, 12)}]
-    )
+    data = arrow.to_weave_arrow([{"a": 0, "p": Point2(1, 2)}, {"a": 3, "p": Point2(9, 12)}])
     assert weave.use(data.map(lambda row: row["p"])).to_pylist_raw() == []
 
 
@@ -553,9 +501,7 @@ def test_nested_arrow_element_tagging():
     tag_getter_op = make_tag_getter_op.make_tag_getter_op("mytag", types.String())
     awl_node = weave.save(awl)
     element_node = awl_node[0]
-    assert isinstance(
-        element_node.type.property_types["a"], tagged_value_type.TaggedValueType
-    )
+    assert isinstance(element_node.type.property_types["a"], tagged_value_type.TaggedValueType)
     tag_value = weave.use(tag_getter_op(element_node["a"]))
     assert tag_value == "test2"
     assert weave.use(element_node) == list[0]
@@ -567,9 +513,7 @@ def test_tagging_concat():
         list = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
         for i, elem in enumerate(list):
             taggable = box.box(elem["a"])
-            list[i]["a"] = tag_store.add_tags(
-                taggable, {"element_tag": f"test{elem['a'] + 1}"}
-            )
+            list[i]["a"] = tag_store.add_tags(taggable, {"element_tag": f"test{elem['a'] + 1}"})
 
         awl = arrow.to_arrow(list)
         tag_store.add_tags(awl, {"list_tag": f"index{index}"})
@@ -594,9 +538,7 @@ def test_tagging_concat():
         )
     )
 
-    get_element_tag = make_tag_getter_op.make_tag_getter_op(
-        "element_tag", types.String()
-    )
+    get_element_tag = make_tag_getter_op.make_tag_getter_op("element_tag", types.String())
 
     assert weave.use(get_element_tag(concatenated[0]["a"])) == "test2"
 
@@ -612,13 +554,9 @@ def test_tagging_concat():
 
 def test_arrow_unnest():
     data = arrow.to_arrow([{"a": [1, 2, 3], "b": "c"}, {"a": [4, 5, 6], "b": "d"}])
-    assert weave.type_of(data) == arrow.ArrowWeaveListType(
-        types.TypedDict({"a": types.List(types.Int()), "b": types.String()})
-    )
+    assert weave.type_of(data) == arrow.ArrowWeaveListType(types.TypedDict({"a": types.List(types.Int()), "b": types.String()}))
     unnest_node = weave_internal.const(data).unnest()
-    assert unnest_node.type == arrow.ArrowWeaveListType(
-        types.TypedDict({"a": types.Int(), "b": types.String()})
-    )
+    assert unnest_node.type == arrow.ArrowWeaveListType(types.TypedDict({"a": types.Int(), "b": types.String()}))
     assert weave.use(weave_internal.const(data).unnest()).to_pylist_raw() == [
         {"a": 1, "b": "c"},
         {"a": 2, "b": "c"},
@@ -646,9 +584,7 @@ def test_arrow_unnest_two_list_cols():
         )
     )
     unnest_node = weave_internal.const(data).unnest()
-    assert unnest_node.type == arrow.ArrowWeaveListType(
-        types.TypedDict({"a": types.Int(), "b": types.String(), "c": types.String()})
-    )
+    assert unnest_node.type == arrow.ArrowWeaveListType(types.TypedDict({"a": types.Int(), "b": types.String(), "c": types.String()}))
     assert weave.use(weave_internal.const(data).unnest()).to_pylist_raw() == [
         {"a": 1, "b": "c", "c": "a"},
         {"a": 2, "b": "c", "c": "b"},
@@ -669,17 +605,13 @@ def test_arrow_nullable_concat():
     assert weave.use(result).to_pylist_raw() == [1, 2, 3, 4, 2, 3, 4, 5]
 
     # Second pass - forcing none type to be first in member list
-    list_of_awl.type = types.List(
-        types.union(types.NoneType(), arrow.ArrowWeaveListType(types.Int()))
-    )
+    list_of_awl.type = types.List(types.union(types.NoneType(), arrow.ArrowWeaveListType(types.Int())))
     result = list_of_awl.concat()
     assert weave.use(result).to_pylist_raw() == [1, 2, 3, 4, 2, 3, 4, 5]
 
 
 def test_arrow_weave_list_groupby_struct_type_table():
-    table = pa.Table.from_pylist(
-        [{"d": {"a": 1, "b": 2}, "c": 1}, {"d": {"a": 3, "b": 4}, "c": 2}]
-    )
+    table = pa.Table.from_pylist([{"d": {"a": 1, "b": 2}, "c": 1}, {"d": {"a": 3, "b": 4}, "c": 2}])
     awl = arrow.ArrowWeaveList(table)
 
     def group_func_body(row):
@@ -698,17 +630,9 @@ def test_arrow_weave_list_groupby_struct_chunked_array_type():
     ref = create_arrow_data(1000)
 
     # chunkedarray is used when there are two levels of nesting
-    node = (
-        weave.get(ref)
-        .groupby(lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"]))
-        .map(lambda row: row.groupby(lambda row: row["y"]))
-        .dropna()[0][0]
-    )
+    node = weave.get(ref).groupby(lambda row: ops.dict_(rotate=row["rotate"], shear=row["shear"])).map(lambda row: row.groupby(lambda row: row["y"])).dropna()[0][0]
 
-    assert (
-        weave.use(node).to_pylist_raw()
-        == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
-    )
+    assert weave.use(node).to_pylist_raw() == [{"rotate": 0, "shear": 0, "x": "a", "y": 5}] * 5
 
 
 def _make_tagged_awl():
@@ -802,9 +726,7 @@ def test_arrow_filter_nulls():
 def test_grouped_typed_dict_assign():
     assert types.List(types.TypedDict(property_types={})).assign_type(
         arrow.ops.awl_group_by_result_object_type(
-            object_type=types.TypedDict(
-                property_types={"a": types.Int(), "im": types.Int()}
-            ),
+            object_type=types.TypedDict(property_types={"a": types.Int(), "im": types.Int()}),
             _key=types.TypedDict(property_types={"a": types.String()}),
         )
     )
@@ -817,9 +739,7 @@ def test_arrow_index_var():
 
 
 def test_concat_multiple_table_types():
-    datal = weave.save(
-        arrow.to_weave_arrow([{"prompt": "a"}, {"prompt": None}, {"prompt": "b"}])
-    )
+    datal = weave.save(arrow.to_weave_arrow([{"prompt": "a"}, {"prompt": None}, {"prompt": "b"}]))
     datar = weave.save(
         arrow.to_weave_arrow(
             [
@@ -877,9 +797,7 @@ def test_concat_multiple_table_types_tagged():
             types.TypedDict(
                 property_types={
                     "prompt": types.UnionType(types.String(), types.NoneType()),
-                    "generation_prompt": types.UnionType(
-                        types.String(), types.NoneType()
-                    ),
+                    "generation_prompt": types.UnionType(types.String(), types.NoneType()),
                 }
             ),
         )
@@ -901,9 +819,7 @@ def test_concat_multiple_table_types_tagged():
 def test_arrow_union_int_string():
     data = [1, "a", 2]
     result = weave.save(arrow.to_arrow(data))
-    assert result.type == arrow.ArrowWeaveListType(
-        object_type=types.UnionType(types.Int(), types.String())
-    )
+    assert result.type == arrow.ArrowWeaveListType(object_type=types.UnionType(types.Int(), types.String()))
 
     assert weave.use(result).to_pylist_raw() == data
 
@@ -911,9 +827,7 @@ def test_arrow_union_int_string():
 def test_arrow_union_int_string_custom_type():
     data = [1, "a", 2, Point2(1, 2)]
     result = weave.save(arrow.to_arrow(data))
-    assert result.type == arrow.ArrowWeaveListType(
-        object_type=types.UnionType(types.Int(), types.String(), Point2.WeaveType())
-    )
+    assert result.type == arrow.ArrowWeaveListType(object_type=types.UnionType(types.Int(), types.String(), Point2.WeaveType()))
 
     awl = weave.use(result)
     assert [awl._index(i) for i in range(len(data))] == data
@@ -1133,9 +1047,7 @@ def test_unflatten_structs_in_flattened_table():
             {"a": {"b": {"c": 3, "d": 6}, "e": 9}, "g": "c"},
         ]
     )
-    assert result == pa.table(
-        {"a": struct_result.field("a"), "g": struct_result.field("g")}
-    )
+    assert result == pa.table({"a": struct_result.field("a"), "g": struct_result.field("g")})
 
 
 def test_map_with_index():
@@ -1147,9 +1059,7 @@ def test_map_with_index():
 
 def verify_pyarrow_array_type_is_valid_for_tag_array(pa_type: pa.DataType):
     if pa.types.is_string(pa_type):
-        raise errors.WeaveInternalError(
-            "Encountered invalid tag array, expected a DictionaryArray, got a StringArray"
-        )
+        raise errors.WeaveInternalError("Encountered invalid tag array, expected a DictionaryArray, got a StringArray")
     elif pa.types.is_struct(pa_type):
         for field in pa_type:
             verify_pyarrow_array_type_is_valid_for_tag_array(field.type)
@@ -1261,17 +1171,7 @@ def test_verify_dictionary_encoding_of_strings():
     ],
 )
 def test_arrow_concat_mixed(list_of_data, exp_res):
-    assert (
-        weave.use(
-            ops.make_list(
-                **{
-                    f"{ndx}": weave.save(arrow.to_arrow(data))
-                    for ndx, data in enumerate(list_of_data)
-                }
-            ).concat()
-        ).to_pylist_raw()
-        == exp_res
-    )
+    assert weave.use(ops.make_list(**{f"{ndx}": weave.save(arrow.to_arrow(data)) for ndx, data in enumerate(list_of_data)}).concat()).to_pylist_raw() == exp_res
 
 
 def test_complex_concat_union():
@@ -1386,9 +1286,7 @@ context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_concat_nulls():
-    datal = weave.save(
-        arrow.to_arrow([{"prompt": None}, {"prompt": None}, {"prompt": None}])
-    )
+    datal = weave.save(arrow.to_arrow([{"prompt": None}, {"prompt": None}, {"prompt": None}]))
     datar = weave.save(
         arrow.to_arrow(
             [
@@ -1416,25 +1314,15 @@ def test_automap_more_than_one():
     data = [1, 2, -5, -100]
     arrow_data = weave.save(arrow.to_arrow(data))
 
-    assert weave.use(
-        arrow_data.map(lambda x: _test_arrow_do_op(x, x, [4]))
-    ).to_pylist_raw() == [_test_arrow_do_body(x, x, [4]) for x in data]
+    assert weave.use(arrow_data.map(lambda x: _test_arrow_do_op(x, x, [4]))).to_pylist_raw() == [_test_arrow_do_body(x, x, [4]) for x in data]
 
-    assert weave.use(
-        arrow_data.map(lambda x: _test_arrow_do_op(x + 1, x, [4]))
-    ).to_pylist_raw() == [_test_arrow_do_body(x + 1, x, [4]) for x in data]
+    assert weave.use(arrow_data.map(lambda x: _test_arrow_do_op(x + 1, x, [4]))).to_pylist_raw() == [_test_arrow_do_body(x + 1, x, [4]) for x in data]
 
-    assert weave.use(
-        arrow_data.map(lambda x: _test_arrow_do_op(x + 1, x, ops.make_list(a=x * 2)))
-    ).to_pylist_raw() == [_test_arrow_do_body(x + 1, x, [x * 2]) for x in data]
+    assert weave.use(arrow_data.map(lambda x: _test_arrow_do_op(x + 1, x, ops.make_list(a=x * 2)))).to_pylist_raw() == [_test_arrow_do_body(x + 1, x, [x * 2]) for x in data]
 
-    assert weave.use(
-        arrow_data.map(lambda x: _test_arrow_do_op(-1, x, ops.make_list(a=x * 2)))
-    ).to_pylist_raw() == [_test_arrow_do_body(-1, x, [x * 2]) for x in data]
+    assert weave.use(arrow_data.map(lambda x: _test_arrow_do_op(-1, x, ops.make_list(a=x * 2)))).to_pylist_raw() == [_test_arrow_do_body(-1, x, [x * 2]) for x in data]
 
-    assert weave.use(
-        arrow_data.map(lambda x: _test_arrow_do_op(-1, -9, ops.make_list(a=x * 2)))
-    ).to_pylist_raw() == [_test_arrow_do_body(-1, -9, [x * 2]) for x in data]
+    assert weave.use(arrow_data.map(lambda x: _test_arrow_do_op(-1, -9, ops.make_list(a=x * 2)))).to_pylist_raw() == [_test_arrow_do_body(-1, -9, [x * 2]) for x in data]
 
 
 def test_serialization_of_boxed_nones():
@@ -1464,12 +1352,8 @@ def test_join_tag_support():
                 tag(
                     cst_dict(
                         {
-                            "id": tag(
-                                cst(f"id_val_{r_i}"), {"id_tag": f"id_{row_key}"}
-                            ),
-                            "col": tag(
-                                cst(f"col_val_{row_key}"), {"col_tag": f"col_{row_key}"}
-                            ),
+                            "id": tag(cst(f"id_val_{r_i}"), {"id_tag": f"id_{row_key}"}),
+                            "col": tag(cst(f"col_val_{row_key}"), {"col_tag": f"col_{row_key}"}),
                         }
                     ),
                     {"row_tag": f"row_{row_key}"},
@@ -1570,9 +1454,7 @@ def test_offset_on_group():
 
 
 def test_map_column():
-    arr = arrow.to_arrow(
-        [{"a": {"c": 6, "d": 7}, "b": 9}, {"a": {"c": 14, "d": 7}, "b": 5}]
-    )
+    arr = arrow.to_arrow([{"a": {"c": 6, "d": 7}, "b": 9}, {"a": {"c": 14, "d": 7}, "b": 5}])
 
     def _map(awl, path):
         if isinstance(awl.object_type, types.TypedDict):
@@ -1602,9 +1484,7 @@ def test_encode_decode_list_of_dictionary_encoded_strings():
             )
         ),
     )
-    awl._arrow_data = recursively_encode_pyarrow_strings_as_dictionaries(
-        awl._arrow_data
-    )
+    awl._arrow_data = recursively_encode_pyarrow_strings_as_dictionaries(awl._arrow_data)
     result = awl.to_pylist_raw()
     assert result == data
 
@@ -1650,9 +1530,7 @@ def test_groupby_concat():
 
     # now concat all the groups together
     concatted_2 = arrow.ops.concat(dropped)
-    selected = concatted_2.map(
-        lambda row: ops.dict_(time=row.groupkey()["time"], model_type=row["model_type"])
-    )
+    selected = concatted_2.map(lambda row: ops.dict_(time=row.groupkey()["time"], model_type=row["model_type"]))
 
     result = weave.use(selected).to_pylist_notags()
     assert result == ([data[0]] * 4) + ([data[1]] * 4)
@@ -1690,9 +1568,7 @@ def test_object_types_nullable():
     )
     assert weave.use(data_node[0]["point"].get_x()) == 256
 
-    assert weave.use(
-        data_node.map(lambda row: row["point"].get_x())
-    ).to_pylist_raw() == [
+    assert weave.use(data_node.map(lambda row: row["point"].get_x())).to_pylist_raw() == [
         256,
         None,
     ]
@@ -1730,11 +1606,7 @@ def test_arrow_op_decorator_handles_optional_tagged_type():
     tag_store.add_tags(obj[1], {"mytag": "a"})
     tag_store.add_tags(obj[2], {"mytag": "b"})
     awl = arrow.to_arrow(obj)
-    assert awl.object_type == types.optional(
-        tagged_value_type.TaggedValueType(
-            types.TypedDict({"mytag": types.String()}), types.Int()
-        )
-    )
+    assert awl.object_type == types.optional(tagged_value_type.TaggedValueType(types.TypedDict({"mytag": types.String()}), types.Int()))
 
     node = weave.save(awl)
     toTimestamp = node.toTimestamp()

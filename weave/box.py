@@ -82,9 +82,7 @@ class BoxedDict(dict):
 
     def __getitem__(self, __key: typing.Any) -> typing.Any:
         val = super().__getitem__(__key)
-        return ref_util.val_with_relative_ref(
-            self, val, [ref_util.DICT_KEY_EDGE_NAME, str(__key)]
-        )
+        return ref_util.val_with_relative_ref(self, val, [ref_util.DICT_KEY_EDGE_NAME, str(__key)])
 
 
 class BoxedList(list):
@@ -108,25 +106,17 @@ class BoxedList(list):
 
     def __getitem__(self, __index: typing.Any) -> typing.Any:
         val = super().__getitem__(__index)
-        return ref_util.val_with_relative_ref(
-            self, val, [ref_util.LIST_INDEX_EDGE_NAME, str(__index)]
-        )
+        return ref_util.val_with_relative_ref(self, val, [ref_util.LIST_INDEX_EDGE_NAME, str(__index)])
 
 
 class BoxedDatetime(datetime.datetime):
     def __eq__(self, other):
-        return (
-            isinstance(other, datetime.datetime)
-            and self.timestamp() == other.timestamp()
-        )
+        return isinstance(other, datetime.datetime) and self.timestamp() == other.timestamp()
 
 
 class BoxedTimedelta(datetime.timedelta):
     def __eq__(self, other):
-        return (
-            isinstance(other, datetime.timedelta)
-            and self.total_seconds() == other.total_seconds()
-        )
+        return isinstance(other, datetime.timedelta) and self.total_seconds() == other.total_seconds()
 
 
 def cannot_have_weakref(obj: typing.Any):

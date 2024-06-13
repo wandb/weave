@@ -34,9 +34,7 @@ class FileBaseType(types.Type):
     def type_of_instance(cls, obj: "File") -> "FileBaseType":
         # Default implementation for Types that take no arguments.
         wbObjectType, ext = wb_object_type_from_path(obj.path)
-        return cls(
-            extension=types.Const(types.String(), ext), wbObjectType=wbObjectType
-        )
+        return cls(extension=types.Const(types.String(), ext), wbObjectType=wbObjectType)
 
     def _to_dict(self) -> dict:
         # NOTE: js_compat

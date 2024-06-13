@@ -43,9 +43,7 @@ file_path_response = {
                     {
                         "node": {
                             **fwb.artifactSequence_payload,  # type: ignore
-                            "artifacts_c1233b7003317090ab5e2a75db4ad965": {
-                                "edges": [{"node": fwb.artifactVersion_payload}]
-                            },
+                            "artifacts_c1233b7003317090ab5e2a75db4ad965": {"edges": [{"node": fwb.artifactVersion_payload}]},
                         }
                     }
                 ]
@@ -108,11 +106,7 @@ def workspace_response(include_display_name=True):
                             **fwb.run_payload,  # type: ignore
                             "summaryMetricsSubset": workspace_response_run1_summary_metrics,
                             "summaryMetrics": workspace_response_run1_summary_metrics,
-                            **(
-                                {"displayName": "amber-glade-100"}
-                                if include_display_name
-                                else {}
-                            ),
+                            **({"displayName": "amber-glade-100"} if include_display_name else {}),
                         },
                     },
                     {
@@ -120,11 +114,7 @@ def workspace_response(include_display_name=True):
                             **fwb.run2_payload,  # type: ignore
                             "summaryMetricsSubset": json.dumps({}),
                             "summaryMetrics": json.dumps({}),
-                            **(
-                                {"displayName": "run2-display_name"}
-                                if include_display_name
-                                else {}
-                            ),
+                            **({"displayName": "run2-display_name"} if include_display_name else {}),
                         },
                     },
                     {
@@ -132,11 +122,7 @@ def workspace_response(include_display_name=True):
                             **fwb.run3_payload,  # type: ignore
                             "summaryMetricsSubset": workspace_response_run3_summary_metrics,
                             "summaryMetrics": workspace_response_run3_summary_metrics,
-                            **(
-                                {"displayName": "run3-display_name"}
-                                if include_display_name
-                                else {}
-                            ),
+                            **({"displayName": "run3-display_name"} if include_display_name else {}),
                         },
                     },
                 ]
@@ -275,24 +261,12 @@ artifact_version_sdk_response = {
     [
         # Path used in weave demos
         (
-            (
-                lambda: ops.project("stacey", "mendeleev")
-                .artifactType("test_results")
-                .artifacts()[0]
-                .versions()[0]
-                .file("test_results.table.json")
-            ),
+            (lambda: ops.project("stacey", "mendeleev").artifactType("test_results").artifacts()[0].versions()[0].file("test_results.table.json")),
             file_path_response,
         ),
         # Path used in artifact browser
         (
-            (
-                lambda: ops.project("stacey", "mendeleev")
-                .artifact("test_res_1fwmcd3q")
-                .membershipForAlias("v0")
-                .artifactVersion()
-                .file("test_results.table.json")
-            ),
+            (lambda: ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q").membershipForAlias("v0").artifactVersion().file("test_results.table.json")),
             artifact_browser_response,
         ),
     ],
@@ -309,13 +283,7 @@ def test_table_call(table_file_node_fn, mock_response, fake_wandb):
 
 def test_avfile_type(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
-    f = (
-        ops.project("stacey", "mendeleev")
-        .artifactType("test_results")
-        .artifacts()[0]
-        .versions()[0]
-        .file("test_results.table.json")
-    )
+    f = ops.project("stacey", "mendeleev").artifactType("test_results").artifacts()[0].versions()[0].file("test_results.table.json")
     t = weavejs_ops.file_type(f)
     assert TaggedValueType(
         types.TypedDict(property_types={"project": wdt.ProjectType}),
@@ -328,26 +296,13 @@ def test_avfile_type(fake_wandb):
 
 def test_table_col_order_and_unknown_types(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
-    node = (
-        ops.project("stacey", "mendeleev")
-        .artifactType("test_results")
-        .artifacts()[0]
-        .versions()[0]
-        .file("weird_table.table.json")
-        .table()
-    )
+    node = ops.project("stacey", "mendeleev").artifactType("test_results").artifacts()[0].versions()[0].file("weird_table.table.json").table()
     assert weave.use(node.rows()[0]["c"]) == 9.93
 
 
 def test_missing_file(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
-    node = (
-        ops.project("stacey", "mendeleev")
-        .artifactType("test_results")
-        .artifacts()[0]
-        .versions()[0]
-        .file("does_not_exist")
-    )
+    node = ops.project("stacey", "mendeleev").artifactType("test_results").artifacts()[0].versions()[0].file("does_not_exist")
     assert weave.use(node) == None
 
 
@@ -379,30 +334,13 @@ def table_mock_empty_workspace(q, ndx):
 
 def test_map_gql_op(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: project_run_artifact_response)
-    node = (
-        ops.project("stacey", "mendeleev")
-        .runs()
-        .limit(1)
-        .loggedArtifactVersions()
-        .limit(1)[0][0]
-        .name()
-    )
+    node = ops.project("stacey", "mendeleev").runs().limit(1).loggedArtifactVersions().limit(1)[0][0].name()
     assert weave.use(node) == "test_res_1fwmcd3q:v0"
 
 
 def test_legacy_run_file_table_format(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(table_mock1)
-    cell_node = (
-        ops.project("stacey", "mendeleev")
-        .runs()
-        .limit(1)
-        .summary()["legacy_table"]
-        .table()
-        .rows()
-        .dropna()
-        .concat()
-        .createIndexCheckpointTag()[1]["col1"]
-    )
+    cell_node = ops.project("stacey", "mendeleev").runs().limit(1).summary()["legacy_table"].table().rows().dropna().concat().createIndexCheckpointTag()[1]["col1"]
     assert weave.use(cell_node) == "c"
     assert weave.use(cell_node.indexCheckpoint()) == 1
     assert weave.use(cell_node.run().name()) == "amber-glade-100"
@@ -411,17 +349,7 @@ def test_legacy_run_file_table_format(fake_wandb, cache_mode_minimal):
 
 def test_mapped_table_empty(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(table_mock_empty_workspace)
-    cell_node = (
-        ops.project("stacey", "mendeleev")
-        .runs()
-        .limit(1)
-        .summary()["table"]
-        .table()
-        .rows()
-        .dropna()
-        .concat()
-        .createIndexCheckpointTag()[5]["score_Amphibia"]
-    )
+    cell_node = ops.project("stacey", "mendeleev").runs().limit(1).summary()["table"].table().rows().dropna().concat().createIndexCheckpointTag()[5]["score_Amphibia"]
     assert weave.use(cell_node.indexCheckpoint()) == None
     assert weave.use(cell_node.run().name()) == None
     assert weave.use(cell_node.project().name()) == "mendeleev"
@@ -429,17 +357,7 @@ def test_mapped_table_empty(fake_wandb, cache_mode_minimal):
 
 def test_mapped_table_tags(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(table_mock1)
-    cell_node = (
-        ops.project("stacey", "mendeleev")
-        .runs()
-        .limit(1)
-        .summary()["table"]
-        .table()
-        .rows()
-        .dropna()
-        .concat()
-        .createIndexCheckpointTag()[5]["score_Amphibia"]
-    )
+    cell_node = ops.project("stacey", "mendeleev").runs().limit(1).summary()["table"].table().rows().dropna().concat().createIndexCheckpointTag()[5]["score_Amphibia"]
     assert weave.use(cell_node.indexCheckpoint()) == 5
     assert weave.use(cell_node.run().name()) == "amber-glade-100"
     assert weave.use(cell_node.project().name()) == "mendeleev"
@@ -447,15 +365,7 @@ def test_mapped_table_tags(fake_wandb, cache_mode_minimal):
 
 def test_table_tags_row_first(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock1)
-    cell_node = (
-        ops.project("stacey", "mendeleev")
-        .runs()
-        .limit(10)[0]
-        .summary()["table"]
-        .table()
-        .rows()
-        .createIndexCheckpointTag()[5]["score_Amphibia"]
-    )
+    cell_node = ops.project("stacey", "mendeleev").runs().limit(10)[0].summary()["table"].table().rows().createIndexCheckpointTag()[5]["score_Amphibia"]
     assert weave.use(cell_node.indexCheckpoint()) == 5
     assert weave.use(cell_node.run().name()) == "amber-glade-100"
     assert weave.use(cell_node.project().name()) == "mendeleev"
@@ -480,9 +390,7 @@ def test_workspace_table_type(fake_wandb):
 
 def test_workspace_table_rows_type(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock2)
-    cell_node = (
-        ops.project("stacey", "mendeleev").runs().summary()["table"].table().rows()
-    )
+    cell_node = ops.project("stacey", "mendeleev").runs().summary()["table"].table().rows()
     assert TaggedValueType(
         types.TypedDict(property_types={"project": wdt.ProjectType}),
         types.List(
@@ -493,9 +401,7 @@ def test_workspace_table_rows_type(fake_wandb):
                         object_type=types.TypedDict(
                             property_types={
                                 "id": types.optional(types.String()),
-                                "image": types.optional(
-                                    ops.ImageArtifactFileRef.WeaveType()
-                                ),
+                                "image": types.optional(ops.ImageArtifactFileRef.WeaveType()),
                                 "guess": types.optional(types.String()),
                                 "truth": types.optional(types.String()),
                                 "score_Animalia": types.optional(types.Number()),
@@ -519,15 +425,7 @@ def test_workspace_table_rows_type(fake_wandb):
 
 def test_table_tags_column_first(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock1)
-    cell_node = (
-        ops.project("stacey", "mendeleev")
-        .runs()
-        .limit(1)[0]
-        .summary()["table"]
-        .table()
-        .rows()
-        .createIndexCheckpointTag()["score_Amphibia"][5]
-    )
+    cell_node = ops.project("stacey", "mendeleev").runs().limit(1)[0].summary()["table"].table().rows().createIndexCheckpointTag()["score_Amphibia"][5]
     assert weave.use(cell_node.indexCheckpoint()) == 5
     assert weave.use(cell_node.run().name()) == "amber-glade-100"
     assert weave.use(cell_node.project().name()) == "mendeleev"
@@ -557,21 +455,9 @@ def table_mock_filtered(q, ndx):
 
 def test_tag_run_color_lookup(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_filtered)
-    colors_node = weave.save(
-        {"1ht5692d": "rgb(218, 76, 76)", "2ed5xwpn": "rgb(83, 135, 221)"}
-    )
+    colors_node = weave.save({"1ht5692d": "rgb(218, 76, 76)", "2ed5xwpn": "rgb(83, 135, 221)"})
     run_id = (
-        ops.project("stacey", "mendeleev")
-        .filteredRuns("{}", "-createdAt")
-        .limit(50)
-        .summary()["table"]
-        .table()
-        .rows()
-        .dropna()
-        .concat()
-        .createIndexCheckpointTag()[5]
-        .run()
-        .id()
+        ops.project("stacey", "mendeleev").filteredRuns("{}", "-createdAt").limit(50).summary()["table"].table().rows().dropna().concat().createIndexCheckpointTag()[5].run().id()
     )
     run_color = colors_node[run_id]
     assert weave.use(run_color) == "rgb(83, 135, 221)"
@@ -611,14 +497,7 @@ def test_domain_gql_fragments(fake_wandb):
             }
         }
     )
-    node = (
-        ops.project("stacey", "mendeleev")
-        .artifactType("test_results")
-        .artifacts()[0]
-        .versions()[0]
-        .createdBy()
-        .name()
-    )
+    node = ops.project("stacey", "mendeleev").artifactType("test_results").artifacts()[0].versions()[0].createdBy().name()
     assert weave.use(node) == "amber-glade-100"
 
 
@@ -668,14 +547,8 @@ def test_domain_gql_around_fn_nodes(fake_wandb):
 
 
 def test_lambda_gql_stitch(fake_wandb):
-    fake_wandb.fake_api.add_mock(
-        lambda q, ndx: {"project_518fa79465d8ffaeb91015dce87e092f": fwb.project_payload}
-    )
-    weave.use(
-        ops.make_list(a="a", b="b", c="c").map(
-            lambda x: x + ops.project("stacey", "mendeleev").name()
-        )
-    ) == None
+    fake_wandb.fake_api.add_mock(lambda q, ndx: {"project_518fa79465d8ffaeb91015dce87e092f": fwb.project_payload})
+    weave.use(ops.make_list(a="a", b="b", c="c").map(lambda x: x + ops.project("stacey", "mendeleev").name())) == None
 
 
 def test_arrow_groupby_nested_tag_stripping(fake_wandb):
@@ -717,14 +590,7 @@ def test_arrow_groupby_sort(fake_wandb):
 def test_arrow_tag_stripping(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
     awl_node = (
-        ops.project("stacey", "mendeleev")
-        .artifactType("test_results")
-        .artifacts()[0]
-        .versions()[0]
-        .file("test_results.table.json")
-        .table()
-        .rows()
-        .createIndexCheckpointTag()
+        ops.project("stacey", "mendeleev").artifactType("test_results").artifacts()[0].versions()[0].file("test_results.table.json").table().rows().createIndexCheckpointTag()
     )
     awl = weave.use(awl_node)
     tag_stripped = awl._arrow_data_asarray_no_tags()
@@ -733,14 +599,7 @@ def test_arrow_tag_stripping(fake_wandb):
 
 def test_arrow_tag_serialization_can_handle_runs_in_concat(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_filtered)
-    rows_node = (
-        ops.project("stacey", "mendeleev")
-        .filteredRuns("{}", "-createdAt")
-        .limit(50)
-        .summary()["table"]
-        .table()
-        .rows()
-    )
+    rows_node = ops.project("stacey", "mendeleev").filteredRuns("{}", "-createdAt").limit(50).summary()["table"].table().rows()
 
     const_list = ops.make_list(l=rows_node, r=rows_node)
     concatted_list = list_.List.concat(const_list)
@@ -801,12 +660,8 @@ def test_loading_artifact_browser_request_2(fake_wandb, cache_mode_minimal):
                     **fwb.artifactSequence_payload,  # type: ignore
                     "__typename": "ArtifactSequence",
                     "project": fwb.project_payload,
-                    "artifacts_c1233b7003317090ab5e2a75db4ad965": {
-                        "edges": [{"node": {**fwb.artifactVersion_payload}}]
-                    },
-                    "artifactMembership_fe9cc269bee939ccb54ebba88c6087dd": {
-                        **fwb.artifactMembership_payload
-                    },
+                    "artifacts_c1233b7003317090ab5e2a75db4ad965": {"edges": [{"node": {**fwb.artifactVersion_payload}}]},
+                    "artifactMembership_fe9cc269bee939ccb54ebba88c6087dd": {**fwb.artifactMembership_payload},
                     "artifactMemberships_first_1": {
                         "edges": [
                             {
@@ -861,9 +716,7 @@ def test_loading_artifact_browser_request_2(fake_wandb, cache_mode_minimal):
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
-                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {
-                        **fwb.artifactMembership_payload
-                    },
+                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {**fwb.artifactMembership_payload},
                 },
             }
         }
@@ -879,9 +732,7 @@ def test_loading_artifact_browser_request_2(fake_wandb, cache_mode_minimal):
                 **fwb.project_payload,  # type: ignore
                 "artifactCollection_d651817074b6a8074e87e9dfd5767726": {
                     **fwb.artifactSequence_payload,  # type: ignore
-                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {
-                        **fwb.artifactMembership_payload
-                    },
+                    "artifactMembership_78e7a3fd51159b4fdfb0815be0b0f92c": {**fwb.artifactMembership_payload},
                 },
             }
         }
@@ -1060,10 +911,7 @@ def test_loading_artifact_browser_request_3(fake_wandb, cache_mode_minimal):
             "hasPortfolios": mem_collection_node.project()
             .entity()
             .portfolios()
-            .filter(
-                lambda row: row._get_op("type")().name()
-                == mem_collection_node._get_op("type")().name()
-            )
+            .filter(lambda row: row._get_op("type")().name() == mem_collection_node._get_op("type")().name())
             .count()
             >= 1,
         }
@@ -1101,9 +949,7 @@ def test_loading_artifact_browser_request_3(fake_wandb, cache_mode_minimal):
             }
         }
     )
-    portfolios_node = (
-        av_node.memberships().filter(lambda row: row.collection().isPortfolio()).count()
-    )
+    portfolios_node = av_node.memberships().filter(lambda row: row.collection().isPortfolio()).count()
     assert weave.use(portfolios_node) != None
 
     # Leaf 7: Is Weave
@@ -1324,9 +1170,7 @@ def test_run_history(fake_wandb):
                 # "system/gpu.0.powerWatts": types.optional(types.Number()),
                 "epoch": types.optional(types.Number()),
                 "predictions_10K": types.optional(
-                    artifact_fs.FilesystemArtifactFileType(
-                        types.Const(types.String(), "json"), table.TableType()
-                    ),
+                    artifact_fs.FilesystemArtifactFileType(types.Const(types.String(), "json"), table.TableType()),
                 ),
             }
         )
@@ -1347,9 +1191,7 @@ def test_run_history(fake_wandb):
     pred_node = node["predictions_10K"]
     assert types.List(
         types.optional(
-            artifact_fs.FilesystemArtifactFileType(
-                types.Const(types.String(), "json"), table.TableType()
-            ),
+            artifact_fs.FilesystemArtifactFileType(types.Const(types.String(), "json"), table.TableType()),
         )
     ).assign_type(pred_node.type.value)
 
@@ -1360,10 +1202,7 @@ def test_run_history(fake_wandb):
     # check the types, result lengths
     assert all(len(r) == 10 for r in result)
     assert all(r == None or isinstance(r, (int, float)) for r in result[0])
-    assert all(
-        r == None or isinstance(r, artifact_fs.FilesystemArtifactFile)
-        for r in result[1]
-    )
+    assert all(r == None or isinstance(r, artifact_fs.FilesystemArtifactFile) for r in result[1])
 
 
 def test_run_history_2(fake_wandb):
@@ -1378,9 +1217,7 @@ def test_run_history_2(fake_wandb):
                 # "system/gpu.0.powerWatts": types.optional(types.Number()),
                 "epoch": types.optional(types.Number()),
                 "predictions_10K": types.optional(
-                    artifact_fs.FilesystemArtifactFileType(
-                        types.Const(types.String(), "json"), table.TableType()
-                    ),
+                    artifact_fs.FilesystemArtifactFileType(types.Const(types.String(), "json"), table.TableType()),
                 ),
             }
         )
@@ -1421,10 +1258,7 @@ def test_run_history_2(fake_wandb):
     assert all(len(r) == 10 for r in result)
     assert all(r == None or isinstance(r, (int, float)) for r in result[0])
     assert all(r == None or isinstance(r, (int, float)) for r in result[1])
-    assert all(
-        r == None or isinstance(r, artifact_fs.FilesystemArtifactFile)
-        for r in result[2]
-    )
+    assert all(r == None or isinstance(r, artifact_fs.FilesystemArtifactFile) for r in result[2])
 
 
 def test_run_history2_media_types(fake_wandb, cache_mode_minimal):
@@ -1438,9 +1272,7 @@ def test_run_history2_media_types(fake_wandb, cache_mode_minimal):
     # simulates what a table call would do, selecting multiple columns
     result = weave.use([image_node, metric2_node])
 
-    assert types.List(types.optional(wbmedia.ImageArtifactFileRefType())).assign_type(
-        image_node.type
-    )
+    assert types.List(types.optional(wbmedia.ImageArtifactFileRefType())).assign_type(image_node.type)
     assert types.List(types.optional(types.Number())).assign_type(metric2_node.type)
     assert len(result) == 2
     assert len(result[0]) == 1001
@@ -1458,10 +1290,7 @@ def test_run_history2_media_types(fake_wandb, cache_mode_minimal):
     assert last_img.format == "png"
     assert last_img.width == 1024
     assert last_img.height == 1024
-    assert (
-        last_img.sha256
-        == "051320f86e77a481d041cd317fd2ab66925a2db8218c5e0c6fb61d740f24e8b5"
-    )
+    assert last_img.sha256 == "051320f86e77a481d041cd317fd2ab66925a2db8218c5e0c6fb61d740f24e8b5"
 
 
 def run_history_as_of_mocker(q, ndx):
@@ -1473,9 +1302,7 @@ def run_history_as_of_mocker(q, ndx):
                     {
                         "node": {
                             **fwb.run_payload,  # type: ignore
-                            "history_c81e728d9d4c2f636f067f89cc14862c": [
-                                example_history[2]
-                            ],
+                            "history_c81e728d9d4c2f636f067f89cc14862c": [example_history[2]],
                         }
                     }
                 ]
@@ -1504,18 +1331,12 @@ def test_run_history_as_of(fake_wandb):
     keys = ["_step", "_timestamp", "_runtime", "predictions_10K"]
     nodes = [node[key] for key in keys]
 
-    assert weave.use(nodes) == [
-        json.loads(example_history[2]).get(key, None) for key in keys
-    ]
+    assert weave.use(nodes) == [json.loads(example_history[2]).get(key, None) for key in keys]
 
 
 def test_artifact_membership_link(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: artifact_browser_response)
-    node = amo.artifact_membership_link(
-        ops.project("stacey", "mendeleev")
-        .artifact("test_res_1fwmcd3q")
-        .membershipForAlias("v0")
-    )
+    node = amo.artifact_membership_link(ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q").membershipForAlias("v0"))
 
     assert weave.use(node) == wdt.Link(
         name="test_res_1fwmcd3q:v0",
@@ -1525,9 +1346,7 @@ def test_artifact_membership_link(fake_wandb):
 
 def test_run_colors(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_filtered)
-    colors_node = ops.dict_(
-        **{"1ht5692d": "rgb(218, 76, 76)", "2ed5xwpn": "rgb(83, 135, 221)"}
-    )
+    colors_node = ops.dict_(**{"1ht5692d": "rgb(218, 76, 76)", "2ed5xwpn": "rgb(83, 135, 221)"})
     node = (
         ops.project("stacey", "mendeleev")
         .filteredRuns("{}", "-createdAt")
@@ -1538,11 +1357,7 @@ def test_run_colors(fake_wandb):
         .rows()
         .dropna()
         .concat()
-        .map(
-            lambda row: ops.dict_(
-                color=colors_node.pick(row.run().id()), name=row.run().name()
-            )
-        )
+        .map(lambda row: ops.dict_(color=colors_node.pick(row.run().id()), name=row.run().name()))
         .index(0)
         .pick("color")
     )
@@ -1635,15 +1450,7 @@ def test_arrow_unnest_deep_tags(fake_wandb):
 def test_arrow_unnest_inner_tags(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_filtered)
     run_name = (
-        (
-            ops.project("stacey", "mendeleev")
-            .filteredRuns("{}", "-createdAt")
-            .limit(50)
-            .summary()
-            .pick("table")
-            .table()
-            .rows()
-        )
+        (ops.project("stacey", "mendeleev").filteredRuns("{}", "-createdAt").limit(50).summary().pick("table").table().rows())
         .joinAll(lambda row: row["truth"], True)
         .map(lambda row: ops.dict_(x=row["truth"], y=row["guess"]))
         .unnest()[0]["x"]
@@ -1655,17 +1462,8 @@ def test_arrow_unnest_inner_tags(fake_wandb):
 
 def test_image_sha_from_table(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock2)
-    img_node = (
-        ops.project("stacey", "mendeleev")
-        .runs()[0]
-        .summary()["table"]
-        .table()
-        .rows()[0]["image"]
-    )
-    assert (
-        weave.use(img_node.sha256)
-        == "50a7232cb6785ffae981038af58de306192e5739a0b9d9903fa436f9f508e7d5"
-    )
+    img_node = ops.project("stacey", "mendeleev").runs()[0].summary()["table"].table().rows()[0]["image"]
+    assert weave.use(img_node.sha256) == "50a7232cb6785ffae981038af58de306192e5739a0b9d9903fa436f9f508e7d5"
 
 
 def test_image_in_summary(fake_wandb):
@@ -1673,10 +1471,7 @@ def test_image_in_summary(fake_wandb):
 
     img_node = ops.project("stacey", "mendeleev").runs()[0].summary()["image"]
 
-    assert (
-        weave.use(img_node).sha256
-        == "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025"
-    )
+    assert weave.use(img_node).sha256 == "440fab0d6f537b4557a106fa7853453332650631ef580fd328c620bd8aa5a025"
 
 
 @pytest.mark.parametrize(
@@ -1752,9 +1547,7 @@ def test_is_valid_version_string():
 def test_artifact_path_character_escaping():
     name = 12347187287418787843872388177814
     path = "table #3.table.json"
-    result = wb_util.escape_artifact_path(
-        f"wandb-client-artifact://{name}:latest/{path}"
-    )
+    result = wb_util.escape_artifact_path(f"wandb-client-artifact://{name}:latest/{path}")
     uri = artifact_wandb.WeaveWBLoggedArtifactURI.parse(result)
 
     assert uri.path == path
@@ -1769,22 +1562,13 @@ def _do_test_gql_artifact_dir_path(node):
     file_type_node = file_node._get_op("type")()
 
     assert artifact_fs.FilesystemArtifactDirType().assign_type(weave.use(dir_type_node))
-    assert artifact_fs.FilesystemArtifactFileType(
-        weave.types.Const(weave.types.String(), "json"), wbObjectType=ops.TableType()
-    ).assign_type(weave.use(dir_file_type_node))
-    assert artifact_fs.FilesystemArtifactFileType(
-        weave.types.Const(weave.types.String(), "json"), wbObjectType=ops.TableType()
-    ).assign_type(weave.use(file_type_node))
+    assert artifact_fs.FilesystemArtifactFileType(weave.types.Const(weave.types.String(), "json"), wbObjectType=ops.TableType()).assign_type(weave.use(dir_file_type_node))
+    assert artifact_fs.FilesystemArtifactFileType(weave.types.Const(weave.types.String(), "json"), wbObjectType=ops.TableType()).assign_type(weave.use(file_type_node))
 
 
 def test_gql_artifact_dir_path(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: artifact_browser_response)
-    version_node = (
-        ops.project("stacey", "mendeleev")
-        .artifact("test_res_1fwmcd3q")
-        .membershipForAlias("v0")
-        .artifactVersion()
-    )
+    version_node = ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q").membershipForAlias("v0").artifactVersion()
     _do_test_gql_artifact_dir_path(version_node)
 
 
@@ -1797,9 +1581,7 @@ def test_filesystem_artifact_dir_path(fake_wandb):
 
 
 def test_filesystem_artifact_dir_dict(fake_wandb):
-    table = wandb.Table(
-        data=[[1, wandb.Image(np.zeros((32, 32)))]], columns=["a", "image"]
-    )
+    table = wandb.Table(data=[[1, wandb.Image(np.zeros((32, 32)))]], columns=["a", "image"])
     art = wandb.Artifact("test_name", "test_type")
     art.add(table, "test_results")
     art.add_reference("https://www.google.com", "google_link")
@@ -1844,15 +1626,7 @@ def test_non_const_input_node(fake_wandb, cache_mode_minimal):
         # projectName arg is an OutputNode. Compile should execute
         # the branch to convert it to a ConstNode, so the gql compile
         # pass can see the value.
-        ops.project("stacey", data_obj["project_name"])
-        .runs()
-        .limit(1)
-        .summary()["table"]
-        .table()
-        .rows()
-        .dropna()
-        .concat()
-        .createIndexCheckpointTag()[5]["score_Amphibia"]
+        ops.project("stacey", data_obj["project_name"]).runs().limit(1).summary()["table"].table().rows().dropna().concat().createIndexCheckpointTag()[5]["score_Amphibia"]
     )
     assert weave.use(cell_node.indexCheckpoint()) == 5
     assert weave.use(cell_node.run().name()) == "amber-glade-100"

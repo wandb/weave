@@ -69,7 +69,5 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> None:
                 else:
                     raise exception
             else:
-                raise UnableToCreateProject(
-                    f"Failed to create project {entity_name}/{project_name}"
-                )
+                raise UnableToCreateProject(f"Failed to create project {entity_name}/{project_name}")
     return

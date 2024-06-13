@@ -92,17 +92,7 @@ def test_execute_cache_mode_minimal_no_recursive_refinement(weave_cache_mode_min
 
 def test_we_dont_over_execute(fake_wandb):
     fake_wandb.fake_api.add_mock(test_wb.table_mock1)
-    cell_node = (
-        ops.project("stacey", "mendeleev")
-        .runs()
-        .limit(1)
-        .summary()["table"]
-        .table()
-        .rows()
-        .dropna()
-        .concat()
-        .createIndexCheckpointTag()[5]["score_Amphibia"]
-    )
+    cell_node = ops.project("stacey", "mendeleev").runs().limit(1).summary()["table"].table().rows().dropna().concat().createIndexCheckpointTag()[5]["score_Amphibia"]
     with execute.top_level_stats() as stats:
         assert weave.use(cell_node.indexCheckpoint()) == 5
 
@@ -136,18 +126,7 @@ def table_mock_respecting_run_name(q, ndx):
 
 def test_outer_tags_propagate_on_cache_hit(fake_wandb):
     fake_wandb.fake_api.add_mock(table_mock_respecting_run_name)
-    row = (
-        ops.project("stacey", "mendeleev")
-        .runs()
-        .limit(50)
-        .summary()
-        .pick("table")
-        .offset(0)
-        .limit(2)[0]
-        .table()
-        .rows()
-        .createIndexCheckpointTag()[0]
-    )
+    row = ops.project("stacey", "mendeleev").runs().limit(50).summary().pick("table").offset(0).limit(2)[0].table().rows().createIndexCheckpointTag()[0]
     # The first query does not select run.displayName, but it caches
     # results along the way.
     weave.use(row)
@@ -179,9 +158,7 @@ def test_cache_column():
     res = weave.use(mapped)
     assert res == expected_result
 
-    latest_obj = weave.use(
-        weave.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
-    )
+    latest_obj = weave.use(weave.ops.get("local-artifact:///run-op-expensive_op:latest/obj"))
     assert len(latest_obj) == len(input_vals)
     assert len(weave.versions(latest_obj)) == 1
 
@@ -198,8 +175,6 @@ def test_none_not_cached():
     res = weave.use(mapped)
     assert res == expected_result
 
-    latest_obj = weave.use(
-        weave.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
-    )
+    latest_obj = weave.use(weave.ops.get("local-artifact:///run-op-expensive_op:latest/obj"))
     assert len(latest_obj) == 1  # not 2! None not cached!
     assert len(weave.versions(latest_obj)) == 1

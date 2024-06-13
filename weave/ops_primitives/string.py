@@ -172,9 +172,7 @@ class String:
         return str.rstrip()
 
     @op()
-    def format(
-        self, named_items: dict[str, typing.Optional[typing.Union[str, int]]]
-    ) -> str:
+    def format(self, named_items: dict[str, typing.Optional[typing.Union[str, int]]]) -> str:
         return self.format(**named_items)
 
     @op(hidden=True)

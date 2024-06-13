@@ -55,9 +55,7 @@ def wandb_api_context(
     ctx: typing.Optional[WandbApiContext],
 ) -> typing.Generator[None, None, None]:
     if ctx:
-        token = set_wandb_api_context(
-            ctx.user_id, ctx.api_key, ctx.headers, ctx.cookies
-        )
+        token = set_wandb_api_context(ctx.user_id, ctx.api_key, ctx.headers, ctx.cookies)
     try:
         yield
     finally:
@@ -101,9 +99,7 @@ class WandbApiAsync:
     def __init__(self) -> None:
         self.connector = aiohttp.TCPConnector(limit=50)
 
-    async def query(
-        self, query: graphql.DocumentNode, **kwargs: typing.Any
-    ) -> typing.Any:
+    async def query(self, query: graphql.DocumentNode, **kwargs: typing.Any) -> typing.Any:
         wandb_context = get_wandb_api_context()
         headers = None
         cookies = None
@@ -175,9 +171,7 @@ class WandbApiAsync:
         """
     )
 
-    async def artifact_manifest_url(
-        self, entity_name: str, project_name: str, name: str
-    ) -> typing.Optional[str]:
+    async def artifact_manifest_url(self, entity_name: str, project_name: str, name: str) -> typing.Optional[str]:
         try:
             result = await self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
@@ -232,19 +226,12 @@ class WandbApiAsync:
         """
     )
 
-    async def can_access_entity(
-        self, entity: str, api_key: typing.Optional[str]
-    ) -> bool:
+    async def can_access_entity(self, entity: str, api_key: typing.Optional[str]) -> bool:
         try:
-            result = await self.query(
-                self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key
-            )
+            result = await self.query(self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key)
         except gql.transport.exceptions.TransportQueryError as e:
             return False
-        return (
-            result.get("viewer")
-            and result.get("entity", {}).get("readOnly", True) == False
-        )
+        return result.get("viewer") and result.get("entity", {}).get("readOnly", True) == False
 
 
 class WandbApi:
@@ -259,9 +246,7 @@ class WandbApi:
             if wandb_context.api_key is not None:
                 auth = HTTPBasicAuth("api", wandb_context.api_key)
         url_base = weave_env.wandb_base_url()
-        transport = RequestsHTTPTransport(
-            url=url_base + "/graphql", headers=headers, cookies=cookies, auth=auth
-        )
+        transport = RequestsHTTPTransport(url=url_base + "/graphql", headers=headers, cookies=cookies, auth=auth)
         # Warning: we do not use the recommended context manager pattern, because we're
         # using connector_owner to tell the session not to close our connection pool.
         # There is a bug in aiohttp that causes session close to hang for the ssl_close_timeout
@@ -306,9 +291,7 @@ class WandbApi:
         """
     )
 
-    def artifact_manifest_url(
-        self, entity_name: str, project_name: str, name: str
-    ) -> typing.Optional[str]:
+    def artifact_manifest_url(self, entity_name: str, project_name: str, name: str) -> typing.Optional[str]:
         try:
             result = self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
@@ -370,6 +353,7 @@ def get_wandb_api_sync() -> WandbApi:
 
 
 DEFAULT_WANDB_BASE_URL = "https://api.wandb.ai/"
+
 
 # Currently weave only supports WANDB_BASE_URL="https://api.wandb.ai/"
 # Remove once we expand to support other base urls

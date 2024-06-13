@@ -16,10 +16,7 @@ class Table:
             except ImportError:
                 pass
         if not isinstance(rows, list):
-            raise ValueError(
-                "Attempted to construct a Table with a non-list object. Found: "
-                + str(type(rows))
-            )
+            raise ValueError("Attempted to construct a Table with a non-list object. Found: " + str(type(rows)))
         self.rows = rows
         self.ref = None
 

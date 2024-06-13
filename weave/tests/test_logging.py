@@ -12,7 +12,6 @@ import pytest
 
 
 def test_logfile_created(fresh_server_logfile):
-
     server.capture_weave_server_logs()
     with context.local_http_client():
         # run this to kick off a server

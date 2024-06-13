@@ -77,9 +77,7 @@ def propagate_arrow_tags(
         tag_type = first_arg_val.object_type.tag
     elif _is_optional_tagged_value(first_arg_val.object_type):
         first_arg_tags = first_arg_val._arrow_data.field("_tag")
-        tag_type = typing.cast(
-            TaggedValueType, types.non_none(first_arg_val.object_type)
-        ).tag
+        tag_type = typing.cast(TaggedValueType, types.non_none(first_arg_val.object_type)).tag
         is_optional_tagged = True
     else:
         first_arg_tags = None

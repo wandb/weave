@@ -43,12 +43,8 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
-def test_litellm_quickstart(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
-) -> None:
+@pytest.mark.vcr(filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"])
+def test_litellm_quickstart(client: weave.weave_client.WeaveClient, patch_litellm: None) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
@@ -75,21 +71,15 @@ def test_litellm_quickstart(
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
-    assert (
-        output["usage"]["completion_tokens"] == model_usage["completion_tokens"] == 31
-    )
+    assert output["usage"]["completion_tokens"] == model_usage["completion_tokens"] == 31
     assert output["usage"]["prompt_tokens"] == model_usage["prompt_tokens"] == 13
     assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 44
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"])
 @pytest.mark.asyncio
-async def test_litellm_quickstart_async(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
-) -> None:
+async def test_litellm_quickstart_async(client: weave.weave_client.WeaveClient, patch_litellm: None) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
@@ -116,20 +106,14 @@ async def test_litellm_quickstart_async(
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
-    assert (
-        output["usage"]["completion_tokens"] == model_usage["completion_tokens"] == 35
-    )
+    assert output["usage"]["completion_tokens"] == model_usage["completion_tokens"] == 35
     assert output["usage"]["prompt_tokens"] == model_usage["prompt_tokens"] == 13
     assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 48
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
-def test_litellm_quickstart_stream(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
-) -> None:
+@pytest.mark.vcr(filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"])
+def test_litellm_quickstart_stream(client: weave.weave_client.WeaveClient, patch_litellm: None) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
@@ -169,13 +153,9 @@ def test_litellm_quickstart_stream(
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"])
 @pytest.mark.asyncio
-async def test_litellm_quickstart_stream_async(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
-) -> None:
+async def test_litellm_quickstart_stream_async(client: weave.weave_client.WeaveClient, patch_litellm: None) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),

@@ -28,12 +28,8 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
                         {
                             "tpu": types.optional(types.Number()),
                             "cpu": types.optional(types.Number()),
-                            "cpu_cores_util": types.optional(
-                                types.List(types.Number())
-                            ),
-                            "gpu_cores_util": types.optional(
-                                types.List(types.Number())
-                            ),
+                            "cpu_cores_util": types.optional(types.List(types.Number())),
+                            "gpu_cores_util": types.optional(types.List(types.Number())),
                             "gpu_cores_mem": types.optional(types.List(types.Number())),
                             "memory": types.optional(types.Number()),
                             "disk": types.TypedDict(
@@ -46,9 +42,7 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
                                 {
                                     "memory": types.TypedDict(
                                         {
-                                            "availableMB": types.optional(
-                                                types.Number()
-                                            ),
+                                            "availableMB": types.optional(types.Number()),
                                         }
                                     )
                                 }
@@ -128,15 +122,11 @@ def observability(
         hidden=True,
     )
 
-    group_by_user = weave_internal.define_fn(
-        {"row": source_data.type.object_type}, lambda row: row["entity_name"]
-    )
+    group_by_user = weave_internal.define_fn({"row": source_data.type.object_type}, lambda row: row["entity_name"])
 
     grouping_fn = varbar.add(
         "grouping_fn",
-        weave_internal.define_fn(
-            {"row": source_data.type.object_type}, lambda row: row["entity_name"]
-        ),
+        weave_internal.define_fn({"row": source_data.type.object_type}, lambda row: row["entity_name"]),
         hidden=True,
     )
 
@@ -170,9 +160,7 @@ def observability(
         "Time_range",
         panels.DateRange(user_zoom_range, domain=filtered_range),
     )
-    bin_range = varbar.add(
-        "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
-    )
+    bin_range = varbar.add("bin_range", user_zoom_range.coalesce(filtered_range), hidden=True)
 
     window_data = source_data.filter(
         lambda row: weave.ops.Boolean.bool_and(
@@ -242,9 +230,7 @@ def observability(
 
     state_transitions_plot = panels.Plot(
         filtered_window_data,
-        x=lambda row: row[timestamp_col_name].bin(
-            weave.ops.timestamp_bins_nice(bin_range, num_buckets)
-        ),
+        x=lambda row: row[timestamp_col_name].bin(weave.ops.timestamp_bins_nice(bin_range, num_buckets)),
         x_title="Time",
         y=lambda row: row.count(),
         y_title="Count of transitions by state",
@@ -301,9 +287,7 @@ def observability(
 
     queued_time_plot = panels.Plot(
         runs_mapped_filtered,
-        x=lambda row: row["run_start"].bin(
-            weave.ops.timestamp_bins_nice(bin_range, num_buckets)
-        ),
+        x=lambda row: row["run_start"].bin(weave.ops.timestamp_bins_nice(bin_range, num_buckets)),
         x_title="Time",
         y=lambda row: row["duration"].sum(),
         y_title="Time spent queued (m)",
@@ -384,9 +368,7 @@ def observability(
     )
     jobs_table.add_column(lambda row: row["job"][0], "Job")
     jobs_table.add_column(lambda row: row["entity_name"][0], "User")
-    jobs_table.add_column(
-        lambda row: row[timestamp_col_name][0], "Start Time", sort_dir="desc"
-    )
+    jobs_table.add_column(lambda row: row[timestamp_col_name][0], "Start Time", sort_dir="desc")
     jobs_table.add_column(
         lambda row: row["state"][-1],
         "Current state",
@@ -473,9 +455,7 @@ def observability(
         "Avg. mem (MB)",
     )
 
-    runs_table_data = weave.ops.List.groupby(
-        filtered_window_data, lambda row: row["trace_id"]
-    )
+    runs_table_data = weave.ops.List.groupby(filtered_window_data, lambda row: row["trace_id"])
     runs_table_data_mapped = varbar.add(
         "runs_table_data",
         weave.ops.List.map(
@@ -550,9 +530,7 @@ def observability(
         no_legend=True,
     )
 
-    metric_plot_data = weave.ops.List.groupby(
-        start_stop_states, lambda row: row["trace_id"]
-    )
+    metric_plot_data = weave.ops.List.groupby(start_stop_states, lambda row: row["trace_id"])
     metric_plot_data_mapped = varbar.add(
         "metric_plot_data",
         weave.ops.List.map(
@@ -689,9 +667,7 @@ def observability(
             )
         )
     )
-    errors_table.add_column(
-        lambda row: row[timestamp_col_name], "Timestamp", sort_dir="desc"
-    )
+    errors_table.add_column(lambda row: row[timestamp_col_name], "Timestamp", sort_dir="desc")
     errors_table.add_column(lambda row: row["job"], "Job")
     errors_table.add_column(lambda row: row["error"], "Error", panel_def="object")
 

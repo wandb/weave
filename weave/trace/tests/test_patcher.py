@@ -6,9 +6,7 @@ def test_symbol_patcher():
     from .test_patcher_module.example_class import ExampleClass
 
     patcher = SymbolPatcher(
-        lambda: importlib.import_module(
-            "weave.trace.tests.test_patcher_module.example_class"
-        ),
+        lambda: importlib.import_module("weave.trace.tests.test_patcher_module.example_class"),
         "ExampleClass.example_fn",
         lambda original_fn: lambda self: 43,
     )
@@ -36,9 +34,7 @@ def test_symbol_patcher_invalid_module():
 
 def test_symbol_patcher_invalid_attr():
     patcher = SymbolPatcher(
-        lambda: importlib.import_module(
-            "weave.trace.tests.test_patcher_module.example_class"
-        ),
+        lambda: importlib.import_module("weave.trace.tests.test_patcher_module.example_class"),
         "NotARealExampleClass.example_fn",
         lambda original_fn: lambda self: 43,
     )
@@ -51,9 +47,7 @@ def test_symbol_patcher_invalid_patching():
     from .test_patcher_module.example_class import ExampleClass
 
     patcher = SymbolPatcher(
-        lambda: importlib.import_module(
-            "weave.trace.tests.test_patcher_module.example_class"
-        ),
+        lambda: importlib.import_module("weave.trace.tests.test_patcher_module.example_class"),
         "ExampleClass.example_fn",
         lambda original_fn: [] + 42,
     )

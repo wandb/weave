@@ -14,6 +14,7 @@ The primary user-facing functions are:
 * `find_tag` - used to recursively lookup the tag for a given object
 
 """
+
 import logging
 import contextvars
 from contextlib import contextmanager
@@ -42,9 +43,7 @@ _OBJ_TAGS_MEM_MAP: contextvars.ContextVar[
 ] = contextvars.ContextVar("obj_tags_mem_map", default=None)
 
 # Current node id for scoping tags
-_OBJ_TAGS_CURR_NODE_ID: contextvars.ContextVar[int] = contextvars.ContextVar(
-    "obj_tags_curr_node", default=-1
-)
+_OBJ_TAGS_CURR_NODE_ID: contextvars.ContextVar[int] = contextvars.ContextVar("obj_tags_curr_node", default=-1)
 
 
 # gets the current tag memory map for the current node
@@ -71,9 +70,7 @@ def record_current_tag_store_size() -> None:
 
 
 @contextmanager
-def with_tag_store_state(
-    curr_node_id: int, tags_mem_map: typing.Optional[TagStoreType]
-) -> typing.Iterator[None]:
+def with_tag_store_state(curr_node_id: int, tags_mem_map: typing.Optional[TagStoreType]) -> typing.Iterator[None]:
     tag_store_token = _OBJ_TAGS_MEM_MAP.set(tags_mem_map)
     curr_node_id_token = _OBJ_TAGS_CURR_NODE_ID.set(curr_node_id)
     yield
@@ -98,9 +95,7 @@ def set_curr_node(node_id: int, parent_node_ids: list[int]) -> typing.Iterator[N
 
 # Private global objects used to keep track of the python ids of objects that are
 # currently being visited.
-_VISITED_OBJ_IDS: contextvars.ContextVar[set[int]] = contextvars.ContextVar(
-    "visited_obj_ids", default=set()
-)
+_VISITED_OBJ_IDS: contextvars.ContextVar[set[int]] = contextvars.ContextVar("visited_obj_ids", default=set())
 
 
 # Callers can create an isolated tagging context by using this context manager
@@ -212,9 +207,7 @@ def get_tags(obj: typing.Any) -> dict[str, typing.Any]:
 
 
 # Recursively looks up the tag for the object, given a key and target tag_type.
-def find_tag(
-    obj: typing.Any, key: str, tag_type: types.Type = types.Any()
-) -> typing.Any:
+def find_tag(obj: typing.Any, key: str, tag_type: types.Type = types.Any()) -> typing.Any:
     # TODO: Implement tag type filtering using tag_type
     cur_tags = get_tags(obj)
     if key in cur_tags:

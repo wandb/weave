@@ -34,9 +34,7 @@ class Object(BaseModel):
     # and after the standard pydantic validation.
     @model_validator(mode="wrap")
     @classmethod
-    def handle_relocatable_object(
-        cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
-    ) -> Any:
+    def handle_relocatable_object(cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo) -> Any:
         if isinstance(v, ObjectRef):
             return v.get()
         if isinstance(v, TraceObject):

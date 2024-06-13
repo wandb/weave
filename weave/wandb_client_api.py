@@ -22,14 +22,9 @@ def wandb_public_api() -> public.Api:
 
 
 def assert_wandb_authenticated() -> None:
-    authenticated = (
-        wandb_public_api().api_key is not None
-        or _thread_local_api_settings.cookies is not None
-    )
+    authenticated = wandb_public_api().api_key is not None or _thread_local_api_settings.cookies is not None
     if not authenticated:
-        raise errors.WeaveWandbAuthenticationException(
-            "Unable to log data to W&B. Please authenticate by setting WANDB_API_KEY or running `wandb init`."
-        )
+        raise errors.WeaveWandbAuthenticationException("Unable to log data to W&B. Please authenticate by setting WANDB_API_KEY or running `wandb init`.")
 
 
 def query_with_retry(
@@ -48,9 +43,7 @@ def query_with_retry(
         except exceptions.Timeout as e:
             if attempt_no == num_timeout_retries:
                 raise
-            logging.warn(
-                f'wandb GQL query timed out: "{e}", retrying (num_attempts={attempt_no + 1})'
-            )
+            logging.warn(f'wandb GQL query timed out: "{e}", retrying (num_attempts={attempt_no + 1})')
 
 
 def introspect_server_schema(num_timeout_retries: int = 0) -> GraphQLSchema:

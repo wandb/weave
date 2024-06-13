@@ -38,11 +38,7 @@ def datetimetd_sub(lhs, rhs):
     name="datetime-addms",
     input_type={
         "lhs": types.UnionType(types.Timestamp(), types.Number()),
-        "rhs": lambda input_types: types.optional(
-            types.Timestamp()
-            if types.Number().assign_type(input_types["lhs"])
-            else types.Number()
-        ),
+        "rhs": lambda input_types: types.optional(types.Timestamp() if types.Number().assign_type(input_types["lhs"]) else types.Number()),
     },
     output_type=types.optional(types.Timestamp()),
 )
@@ -56,11 +52,7 @@ def datetime_addms(lhs, rhs):
     name="datetime-add",
     input_type={
         "lhs": types.UnionType(types.Timestamp(), types.TimeDelta()),
-        "rhs": lambda input_types: types.optional(
-            types.Timestamp()
-            if types.TimeDelta().assign_type(input_types["lhs"])
-            else types.TimeDelta()
-        ),
+        "rhs": lambda input_types: types.optional(types.Timestamp() if types.TimeDelta().assign_type(input_types["lhs"]) else types.TimeDelta()),
     },
     output_type=types.optional(types.Timestamp()),
 )
@@ -116,11 +108,7 @@ def auto_format_relative_string(timestamp1, timestamp2):
     name="timedelta-mult",
     input_type={
         "lhs": types.UnionType(types.Number(), types.TimeDelta()),
-        "rhs": lambda input_types: types.optional(
-            types.TimeDelta()
-            if types.Number().assign_type(input_types["lhs"])
-            else types.Number()
-        ),
+        "rhs": lambda input_types: types.optional(types.TimeDelta() if types.Number().assign_type(input_types["lhs"]) else types.Number()),
     },
     output_type=types.optional(types.TimeDelta()),
 )
@@ -243,9 +231,7 @@ def floor(date, multiple_s: float):
 def ceil(date, multiple_s: float):
     seconds = (date.replace(tzinfo=None) - date.min).seconds
     rounding = (seconds // multiple_s) * multiple_s
-    return date + datetime.timedelta(
-        0, rounding - seconds + multiple_s, -date.microsecond
-    )
+    return date + datetime.timedelta(0, rounding - seconds + multiple_s, -date.microsecond)
 
 
 @op(
@@ -264,12 +250,8 @@ def round_month(date):
 )
 def round_week(date):
     curr_weekday = date.weekday()  # MON = 0, SUN = 6
-    prev_sunday_offset = (
-        curr_weekday + 1
-    ) % 7  # MON = 0, SUN = 6 -> SUN = 0 .. SAT = 6
-    new_date = datetime.datetime(
-        date.year, date.month, date.day, 0, 0, 0, 0, date.tzinfo
-    )
+    prev_sunday_offset = (curr_weekday + 1) % 7  # MON = 0, SUN = 6 -> SUN = 0 .. SAT = 6
+    new_date = datetime.datetime(date.year, date.month, date.day, 0, 0, 0, 0, date.tzinfo)
     new_date -= datetime.timedelta(days=prev_sunday_offset)
     return new_date
 

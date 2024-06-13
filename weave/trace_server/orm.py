@@ -77,9 +77,7 @@ class ParamBuilder:
         return {**self._params}
 
 
-Value: TypeAlias = typing.Optional[
-    typing.Union[str, float, datetime.datetime, list[str], list[float]]
-]
+Value: TypeAlias = typing.Optional[typing.Union[str, float, datetime.datetime, list[str], list[float]]]
 Row: TypeAlias = dict[str, Value]
 Rows: TypeAlias = list[Row]
 
@@ -288,14 +286,10 @@ class Select:
 
         conditions = []
         if self._project_id:
-            param_project_id = param_builder.add(
-                self._project_id, "project_id", "String"
-            )
+            param_project_id = param_builder.add(self._project_id, "project_id", "String")
             conditions = [f"project_id = {param_project_id}"]
         if self._query:
-            query_conds, fields_used = _process_query_to_conditions(
-                self._query, self.all_columns, self.table.json_cols, param_builder
-            )
+            query_conds, fields_used = _process_query_to_conditions(self._query, self.all_columns, self.table.json_cols, param_builder)
             conditions.extend(query_conds)
 
         joined = _combine_conditions(conditions, "AND")
@@ -324,7 +318,11 @@ class Select:
                 for cast, direct in options:
                     # Future refactor: this entire section should be moved into its own helper
                     # method and hoisted out of this function
-                    (inner_field, _, _,) = _transform_external_field_to_internal_field(
+                    (
+                        inner_field,
+                        _,
+                        _,
+                    ) = _transform_external_field_to_internal_field(
                         field,
                         self.all_columns,
                         self.table.json_cols,
@@ -380,10 +378,7 @@ class Insert:
         for row in self.rows:
             r: list[typing.Any] = []
             for field in given_column_names:
-                if (
-                    field in self.table.col_types
-                    and self.table.col_types[field] == "json"
-                ):
+                if field in self.table.col_types and self.table.col_types[field] == "json":
                     r.append(json.dumps(row[field]))
                 else:
                     r.append(row[field])
@@ -553,13 +548,13 @@ def _process_query_to_conditions(
 
     def process_operand(operand: tsi_query.Operand) -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
-            return pb.add(
-                operand.literal_, None, _python_value_to_ch_type(operand.literal_)
-            )
+            return pb.add(operand.literal_, None, _python_value_to_ch_type(operand.literal_))
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            (field, _, fields_used,) = _transform_external_field_to_internal_field(
-                operand.get_field_, all_columns, json_columns, None, pb
-            )
+            (
+                field,
+                _,
+                fields_used,
+            ) = _transform_external_field_to_internal_field(operand.get_field_, all_columns, json_columns, None, pb)
             raw_fields_used.update(fields_used)
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):

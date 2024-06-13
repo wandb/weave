@@ -28,9 +28,7 @@ def test_serialize(fake_wandb):
     file = av.file("test_results.table.json")
     table = file.table()
     rows = table.rows()
-    filter_fn = weave_internal.define_fn(
-        {"row": rows.type.object_type}, lambda row: row["score_Animalia"] + 100
-    )
+    filter_fn = weave_internal.define_fn({"row": rows.type.object_type}, lambda row: row["score_Animalia"] + 100)
     filtered = rows.map(filter_fn)
 
     ser = serialize.serialize([filtered])
@@ -44,11 +42,7 @@ def test_serialize_nested_function():
     filtered = rows.filter(
         weave_internal.define_fn(
             {"row": types.TypedDict({"a": types.List(types.Int())})},
-            lambda row: ops.numbers_avg(
-                row["a"].map(
-                    weave_internal.define_fn({"row": types.Int()}, lambda row: row + 1)
-                )
-            ),
+            lambda row: ops.numbers_avg(row["a"].map(weave_internal.define_fn({"row": types.Int()}, lambda row: row + 1))),
         )
     )
 
@@ -67,9 +61,7 @@ def test_op_compat():
             a_op = ops[a]
             b_op = ops[b]
 
-            if not isinstance(a_op.input_type, op_args.OpNamedArgs) or not isinstance(
-                b_op.input_type, op_args.OpNamedArgs
-            ):
+            if not isinstance(a_op.input_type, op_args.OpNamedArgs) or not isinstance(b_op.input_type, op_args.OpNamedArgs):
                 continue
 
             a_op_common_name = a_op.common_name
@@ -80,9 +72,7 @@ def test_op_compat():
 
             a_assign_has_invalid = False
             b_assign_has_invalid = False
-            for a_arg, b_arg in zip(
-                a_op.input_type.arg_types.values(), b_op.input_type.arg_types.values()
-            ):
+            for a_arg, b_arg in zip(a_op.input_type.arg_types.values(), b_op.input_type.arg_types.values()):
                 if callable(a_arg) or callable(b_arg):
                     continue
 
@@ -98,9 +88,7 @@ def test_op_compat():
                     break
 
             if not a_assign_has_invalid and not b_assign_has_invalid:
-                issues.append(
-                    f"Ops {a_op.name} and {b_op.name} are parametrically ambiguous"
-                )
+                issues.append(f"Ops {a_op.name} and {b_op.name} are parametrically ambiguous")
             elif not a_assign_has_invalid:
                 issues.append(f"Op {b_op.name} is strictly bound by op {a_op.name}")
             elif not b_assign_has_invalid:
@@ -145,9 +133,7 @@ def test_lambda_node_serialization():
     mapped_1 = arr_1.map(lambda x: x + 1)
     mapped_2 = arr_2.map(lambda x: x + 1)
 
-    [des_1, des_2] = serialize.deserialize(
-        serialize.serialize([mapped_1, mapped_2])
-    ).unwrap()
+    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2])).unwrap()
     assert des_1 is des_2
 
     # Case 2: different array, same function  - should have different deserialized mem address
@@ -156,9 +142,7 @@ def test_lambda_node_serialization():
     mapped_1 = arr_1.map(lambda x: x + 1)
     mapped_2 = arr_2.map(lambda x: x + 1)
 
-    [des_1, des_2] = serialize.deserialize(
-        serialize.serialize([mapped_1, mapped_2])
-    ).unwrap()
+    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2])).unwrap()
     assert des_1 is not des_2
 
     # Case 3: same array, different function  - should have different deserialized mem address
@@ -167,9 +151,7 @@ def test_lambda_node_serialization():
     mapped_1 = arr_1.map(lambda x: x + 1)
     mapped_2 = arr_2.map(lambda x: x + 2)
 
-    [des_1, des_2] = serialize.deserialize(
-        serialize.serialize([mapped_1, mapped_2])
-    ).unwrap()
+    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2])).unwrap()
     assert des_1 is not des_2
 
     # Case 4: different array, different function  - should have different deserialized mem address
@@ -178,7 +160,5 @@ def test_lambda_node_serialization():
     mapped_1 = arr_1.map(lambda x: x + 1)
     mapped_2 = arr_2.map(lambda x: x + 2)
 
-    [des_1, des_2] = serialize.deserialize(
-        serialize.serialize([mapped_1, mapped_2])
-    ).unwrap()
+    [des_1, des_2] = serialize.deserialize(serialize.serialize([mapped_1, mapped_2])).unwrap()
     assert des_1 is not des_2

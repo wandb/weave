@@ -16,11 +16,7 @@ pick_options = [
     (
         {"a": [{"a": 1}, {"b": 2}, {"b": 3}, {"b": "hi"}]},
         "a.*.b",
-        weave.types.List(
-            weave.types.union(
-                weave.types.Int(), weave.types.String(), weave.types.NoneType()
-            )
-        ),
+        weave.types.List(weave.types.union(weave.types.Int(), weave.types.String(), weave.types.NoneType())),
         [None, 2, 3, "hi"],
     ),
     # Complicated Case
@@ -45,9 +41,7 @@ pick_options = [
             ],
         },
         "outer.*.b.*.*.c.\\.d.*",
-        weave.types.List(
-            weave.types.List(weave.types.List(weave.types.List(weave.types.Int())))
-        ),
+        weave.types.List(weave.types.List(weave.types.List(weave.types.List(weave.types.Int())))),
         [[[[1, 2, 3]], [[11, 12, 13]]], [[[21, 22, 23]], [[31, 32, 33]]]],
     ),
 ]
@@ -70,9 +64,7 @@ def test_list_typeddict_pick(val, pick_key, exp_type, exp_val):
 
 
 awl_pick_options = pick_options.copy()
-awl_pick_options[
-    2
-] = (  # We have to modify this last one because arrow does not support sparse unions
+awl_pick_options[2] = (  # We have to modify this last one because arrow does not support sparse unions
     {"a": [{"a": 1}, {"b": 2}, {"b": 3}]},
     "a.*.b",
     weave.types.List(weave.types.union(weave.types.Int(), weave.types.NoneType())),
@@ -116,21 +108,15 @@ def test_pick_on_crazy_nested_tagged_obj():
                                                             [
                                                                 t(
                                                                     0,
-                                                                    {
-                                                                        "o_*_b_*_*_c_d_*": 0
-                                                                    },
+                                                                    {"o_*_b_*_*_c_d_*": 0},
                                                                 ),
                                                                 t(
                                                                     1,
-                                                                    {
-                                                                        "o_*_b_*_*_c_d_*": 1
-                                                                    },
+                                                                    {"o_*_b_*_*_c_d_*": 1},
                                                                 ),
                                                                 t(
                                                                     2,
-                                                                    {
-                                                                        "o_*_b_*_*_c_d_*": 2
-                                                                    },
+                                                                    {"o_*_b_*_*_c_d_*": 2},
                                                                 ),
                                                             ],
                                                             {"o_*_b_*_*_c_d": 3},
@@ -180,9 +166,7 @@ def test_pick_on_crazy_nested_tagged_obj():
             )
         ),
     )
-    weave.types.List(
-        weave.types.List(weave.types.List(weave.types.List(weave.types.Int())))
-    )
+    weave.types.List(weave.types.List(weave.types.List(weave.types.List(weave.types.Int()))))
     exp_val = [[[[0, 1, 2]]]]
 
     # Flat:

@@ -42,37 +42,27 @@ def gql_type_to_weave_type(
     gql_type: graphql.GraphQLType,
     selection_set: typing.Optional[graphql.SelectionSetNode],
 ) -> types.Type:
-    if (
-        isinstance(gql_type, (GraphQLObjectType, GraphQLInterfaceType))
-        and selection_set
-    ):
+    if isinstance(gql_type, (GraphQLObjectType, GraphQLInterfaceType)) and selection_set:
         property_types: dict[str, types.Type] = {}
         selections: list[graphql.SelectionNode] = []
 
         # Handle inline fragments (i.e., ... on Foo)
         for selection in selection_set.selections:
-            if (
-                isinstance(selection, graphql.InlineFragmentNode)
-                and selection.type_condition.name.value == gql_type.name
-            ):
+            if isinstance(selection, graphql.InlineFragmentNode) and selection.type_condition.name.value == gql_type.name:
                 selections.extend(selection.selection_set.selections)
             elif isinstance(selection, FieldNode):
                 selections.append(selection)
 
         for selection in selections:
             if not isinstance(selection, FieldNode):
-                raise ValueError(
-                    f"Selections must be fields, got {selection.__class__.__name__}"
-                )
+                raise ValueError(f"Selections must be fields, got {selection.__class__.__name__}")
             key = selection.alias.value if selection.alias else selection.name.value
             if key == "__typename":
                 # __typename does not appear explicitly in the schema, but all types have it
                 # it just returns a string, so treat that case here.
                 property_types[key] = types.Const(types.String(), gql_type.name)
             else:
-                property_types[key] = gql_type_to_weave_type(
-                    gql_type.fields[selection.name.value].type, selection.selection_set
-                )
+                property_types[key] = gql_type_to_weave_type(gql_type.fields[selection.name.value].type, selection.selection_set)
         return types.TypedDict(property_types)
 
     elif isinstance(gql_type, GraphQLList):
@@ -87,9 +77,7 @@ def gql_type_to_weave_type(
     elif isinstance(gql_type, GraphQLNonNull):
         return types.non_none(gql_type_to_weave_type(gql_type.of_type, selection_set))
     elif isinstance(gql_type, graphql.GraphQLUnionType):
-        return types.union(
-            *[gql_type_to_weave_type(t, selection_set) for t in gql_type.types]
-        )
+        return types.union(*[gql_type_to_weave_type(t, selection_set) for t in gql_type.types])
     elif isinstance(gql_type, graphql.GraphQLScalarType):
         t: types.Type
         if gql_type.name in [

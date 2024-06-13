@@ -58,7 +58,6 @@ def test_op_inferred_type():
 
 def test_op_incompatible_return_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
-
         _t = _context_state.set_loading_built_ins()
 
         try:
@@ -123,9 +122,7 @@ def test_op_callable_output_type_and_return_type_declared():
         _t = _context_state.set_loading_built_ins()
         try:
 
-            @weave.op(
-                input_type={"a": types.Int()}, output_type=lambda a: types.String()
-            )
+            @weave.op(input_type={"a": types.Int()}, output_type=lambda a: types.String())
             def op_callable_output_type_and_return_type_declared(a: int) -> str:
                 return str(a)
 
@@ -191,10 +188,7 @@ def test_op_inferred_typeddict_return():
     finally:
         _context_state.clear_loading_built_ins(_t)
 
-    assert (
-        op_test_op_inferred_typeddict_return_op.concrete_output_type
-        == types.TypedDict({"x": types.Int(), "y": types.String()})
-    )
+    assert op_test_op_inferred_typeddict_return_op.concrete_output_type == types.TypedDict({"x": types.Int(), "y": types.String()})
 
 
 def test_op_inferred_list_typeddict_return():
@@ -210,9 +204,7 @@ def test_op_inferred_list_typeddict_return():
     finally:
         _context_state.clear_loading_built_ins(_t)
 
-    assert op_inferred_list_typeddict_return.concrete_output_type == types.List(
-        types.TypedDict({"x": types.Int(), "y": types.String()})
-    )
+    assert op_inferred_list_typeddict_return.concrete_output_type == types.List(types.TypedDict({"x": types.Int(), "y": types.String()}))
 
 
 def test_op_inferred_dict_return() -> None:
@@ -226,9 +218,7 @@ def test_op_inferred_dict_return() -> None:
     finally:
         _context_state.clear_loading_built_ins(_t)
 
-    assert op_inferred_dict_return.concrete_output_type == types.Dict(
-        types.String(), types.List(types.Int())
-    )
+    assert op_inferred_dict_return.concrete_output_type == types.Dict(types.String(), types.List(types.Int()))
 
 
 def test_op_method_inferred_self():

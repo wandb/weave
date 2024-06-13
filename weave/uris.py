@@ -36,9 +36,7 @@ class WeaveURI:
 
         for candidate_class in [cls] + cls.__subclasses__():
             if candidate_class.SCHEME == scheme:
-                return candidate_class.from_parsed_uri(
-                    uri, scheme, netloc, path, params, query, fragment
-                )
+                return candidate_class.from_parsed_uri(uri, scheme, netloc, path, params, query, fragment)
         raise errors.WeaveInternalError("invalid scheme ", uri)
 
     def __str__(self) -> str:

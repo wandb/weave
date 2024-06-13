@@ -132,17 +132,11 @@ class MappedDeriveOpHandler(DeriveOpHandler):
 
     @staticmethod
     def make_derived_op(orig_op: op_def.OpDef) -> op_def.OpDef:
-        mapped_op_name = MappedDeriveOpHandler.derived_name(
-            orig_op.name
-        )  # TODO: doesn't handle fqn
+        mapped_op_name = MappedDeriveOpHandler.derived_name(orig_op.name)  # TODO: doesn't handle fqn
         named_args = orig_op.input_type.named_args()
 
-        if len(named_args) == 0 or not isinstance(
-            orig_op.input_type, op_args.OpNamedArgs
-        ):
-            raise errors.WeaveInternalError(
-                f"Cannot make mapped op for op {orig_op.name} with no first named argument."
-            )
+        if len(named_args) == 0 or not isinstance(orig_op.input_type, op_args.OpNamedArgs):
+            raise errors.WeaveInternalError(f"Cannot make mapped op for op {orig_op.name} with no first named argument.")
         first_arg = named_args[0]
         mapped_param_name = first_arg.name
 
@@ -178,38 +172,20 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 # Therefore the `inner_input_types[mapped_param_name] = replacement`
                 # line below will not work. This is a temporary fix until we can
                 # implement `merge` as a core op.
-                currently_weavifying = isinstance(
-                    input_types, graph.Node
-                ) and types.TypedDict({}).assign_type(input_types.type)
+                currently_weavifying = isinstance(input_types, graph.Node) and types.TypedDict({}).assign_type(input_types.type)
                 if currently_weavifying:
                     op_dict = registry_mem.memory_registry.get_op("dict")
                     op_dict.instance = None
-                    inner_input_types = input_types.merge(
-                        op_dict(**{mapped_param_name: replacement})
-                    )
+                    inner_input_types = input_types.merge(op_dict(**{mapped_param_name: replacement}))
                     try:
                         inner_res = orig_op.output_type(inner_input_types)
                     except errors.WeaveExpectedConstError as e:
-                        raise errors.WeaveMakeFunctionError(
-                            "function body expected const node."
-                        )
+                        raise errors.WeaveMakeFunctionError("function body expected const node.")
                     if not isinstance(inner_res, graph.Node):
-                        raise errors.WeaveMakeFunctionError(
-                            "output_type function must return a node."
-                        )
+                        raise errors.WeaveMakeFunctionError("output_type function must return a node.")
                     from .ops_primitives.list_ import make_list
 
-                    return types.List.make(
-                        {
-                            "object_type": types.UnionType.make(
-                                {
-                                    "members": make_list(
-                                        n_0=types.NoneType.make(), n_1=inner_res
-                                    )
-                                }
-                            )
-                        }
-                    )
+                    return types.List.make({"object_type": types.UnionType.make({"members": make_list(n_0=types.NoneType.make(), n_1=inner_res)})})
 
                 inner_input_types = copy.copy(input_types)
                 inner_input_types[mapped_param_name] = replacement
@@ -235,9 +211,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 # return the right thing when this is a type resolver. So
                 # we need to make those changes. Just doing this for now to
                 # get new ops parallelized correctly.
-                map_fn = weave_internal.define_fn(
-                    {"row": first_arg.type}, lambda x: orig_op(x, **new_inputs)
-                ).val
+                map_fn = weave_internal.define_fn({"row": first_arg.type}, lambda x: orig_op(x, **new_inputs)).val
                 res = execute_fast.fast_map_fn(list_, map_fn)
                 return res
 
@@ -256,9 +230,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             ):
 
                 def download_one(x):
-                    with tag_store.with_tag_store_state(
-                        tag_store_curr_node_id, tag_store_mem_map
-                    ):
+                    with tag_store.with_tag_store_state(tag_store_curr_node_id, tag_store_mem_map):
                         if x == None or types.is_optional(first_arg.type):
                             return None
                         called = orig_op(x, **new_inputs)
@@ -286,13 +258,9 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             if isinstance(orig_op.concrete_output_type, types.TypeType):
 
                 def refine_one(x) -> types.Type:
-                    with tag_store.with_tag_store_state(
-                        tag_store_curr_node_id, tag_store_mem_map
-                    ):
+                    with tag_store.with_tag_store_state(tag_store_curr_node_id, tag_store_mem_map):
                         if x != None or types.is_optional(first_arg.type):
-                            return orig_op.resolve_fn(
-                                **{mapped_param_name: x, **new_inputs}
-                            )
+                            return orig_op.resolve_fn(**{mapped_param_name: x, **new_inputs})
                         return types.NoneType()
 
                 if not list_:
@@ -311,19 +279,11 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 list_tags = tag_store.get_tags(list_)
 
             def resolve_one(x):
-                with tag_store.with_tag_store_state(
-                    tag_store_curr_node_id, tag_store_mem_map
-                ):
-                    if not (
-                        x is None or isinstance(x, box.BoxedNone)
-                    ) or types.is_optional(first_arg.type):
+                with tag_store.with_tag_store_state(tag_store_curr_node_id, tag_store_mem_map):
+                    if not (x is None or isinstance(x, box.BoxedNone)) or types.is_optional(first_arg.type):
                         return orig_op.resolve_fn(
                             **{
-                                mapped_param_name: tag_store.add_tags(
-                                    box.box(x), list_tags
-                                )
-                                if list_tags is not None
-                                else x,
+                                mapped_param_name: tag_store.add_tags(box.box(x), list_tags) if list_tags is not None else x,
                                 **new_inputs,
                             }
                         )
@@ -378,38 +338,21 @@ class MappedDeriveOpHandler(DeriveOpHandler):
     ):
         with context_state.strict_op_saving(False):
             named_args = derived_op.input_type.named_args()
-            if len(named_args) == 0 or not isinstance(
-                derived_op.input_type, op_args.OpNamedArgs
-            ):
-                raise errors.WeaveDefinitionError(
-                    f"Expected mapped op {derived_op.name} to have named first argument."
-                )
+            if len(named_args) == 0 or not isinstance(derived_op.input_type, op_args.OpNamedArgs):
+                raise errors.WeaveDefinitionError(f"Expected mapped op {derived_op.name} to have named first argument.")
             first_arg = named_args[0]
             # Check to see if the first argument is a list of UnknownType. This is how
             # we know that the type is expected to be the class type
-            first_arg_is_cls = first_arg.type == types.List(
-                types.optional(types.UnknownType())
-            )
+            first_arg_is_cls = first_arg.type == types.List(types.optional(types.UnknownType()))
             if first_arg_is_cls:
-                derived_op.input_type.arg_types[first_arg.name] = types.List(
-                    types.optional(base_weave_type())
-                )
-            registry_mem.memory_registry.rename_op(
-                derived_op.name, MappedDeriveOpHandler.derived_name(orig_op_new_name)
-            )
+                derived_op.input_type.arg_types[first_arg.name] = types.List(types.optional(base_weave_type()))
+            registry_mem.memory_registry.rename_op(derived_op.name, MappedDeriveOpHandler.derived_name(orig_op_new_name))
 
 
 def _mapped_refine_output_type(orig_op):
     refine_output_type = None
 
-    mapped_refine_op = (
-        orig_op.refine_output_type.derived_ops["mapped"]
-        if (
-            orig_op.refine_output_type is not None
-            and "mapped" in orig_op.refine_output_type.derived_ops
-        )
-        else None
-    )
+    mapped_refine_op = orig_op.refine_output_type.derived_ops["mapped"] if (orig_op.refine_output_type is not None and "mapped" in orig_op.refine_output_type.derived_ops) else None
 
     if mapped_refine_op:
 
@@ -432,9 +375,7 @@ def _mapped_refine_output_type(orig_op):
             None,
             plugins=orig_op.refine_output_type.plugins,
         )
-        unioned_mapped_type_refiner_op_def = registry_mem.memory_registry.register_op(
-            unioned_mapped_type_refiner_op
-        )
+        unioned_mapped_type_refiner_op_def = registry_mem.memory_registry.register_op(unioned_mapped_type_refiner_op)
         refine_output_type = unioned_mapped_type_refiner_op_def
     return refine_output_type
 
@@ -449,10 +390,7 @@ def handler_for_id(handler_id: str) -> type[DeriveOpHandler]:
 def derive_ops(op: op_def.OpDef):
     with context_state.strict_op_saving(False):
         for handler in DeriveOpHandler.__subclasses__():
-            if (
-                handler.should_derive_op(op)
-                and handler.handler_id not in op.derived_ops
-            ):
+            if handler.should_derive_op(op) and handler.handler_id not in op.derived_ops:
                 new_op = handler.make_derived_op(op)
                 op.derived_ops[handler.handler_id] = new_op
                 new_op.derived_from = op

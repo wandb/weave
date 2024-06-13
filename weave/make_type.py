@@ -1,6 +1,7 @@
 from . import weave_types as types
 from . import weave_internal
 
+
 # TODO: Consider if this should accept a *args, **kwargs?
 def make(cls, kwargs={}):
     args = {types.to_weavejs_typekey(k): v for k, v in kwargs.items()}

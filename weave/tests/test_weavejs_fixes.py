@@ -13,9 +13,7 @@ from .. import mappers_python
 from .. import weave_internal
 
 
-@pytest.mark.skip(
-    "calling custom ops with graph engine is broken right now. Not needed for weaveflow"
-)
+@pytest.mark.skip("calling custom ops with graph engine is broken right now. Not needed for weaveflow")
 def test_clean_opcall_str():
     _loading_builtins_token = context_state.set_loading_built_ins(False)
 

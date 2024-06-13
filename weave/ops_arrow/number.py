@@ -156,9 +156,7 @@ def number_right_sub(
 def __pow__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.power(self._arrow_data, other), types.Number(), self._artifact
-    )
+    return ArrowWeaveList(pc.power(self._arrow_data, other), types.Number(), self._artifact)
 
 
 @arrow_op(
@@ -193,9 +191,7 @@ def __eq__(self, other):
 def __gt__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.greater(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    return ArrowWeaveList(pc.greater(self._arrow_data, other), types.Boolean(), self._artifact)
 
 
 @arrow_op(
@@ -206,9 +202,7 @@ def __gt__(self, other):
 def __ge__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.greater_equal(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    return ArrowWeaveList(pc.greater_equal(self._arrow_data, other), types.Boolean(), self._artifact)
 
 
 @arrow_op(
@@ -219,9 +213,7 @@ def __ge__(self, other):
 def __lt__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.less(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    return ArrowWeaveList(pc.less(self._arrow_data, other), types.Boolean(), self._artifact)
 
 
 @arrow_op(
@@ -232,9 +224,7 @@ def __lt__(self, other):
 def __le__(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.less_equal(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    return ArrowWeaveList(pc.less_equal(self._arrow_data, other), types.Boolean(), self._artifact)
 
 
 @arrow_op(
@@ -294,9 +284,7 @@ def abs(self):
     output_type=self_type_output_type_fn,
 )
 def to_fixed(self, digits):
-    return ArrowWeaveList(
-        pc.round(self._arrow_data, int(digits)), types.Number(), self._artifact
-    )
+    return ArrowWeaveList(pc.round(self._arrow_data, int(digits)), types.Number(), self._artifact)
 
 
 @op(
@@ -400,9 +388,7 @@ def to_timestamp(self):
         data = pc.if_else(mask, adjusted_data, data)
         mask = adjustment_mask()
 
-    data_as_timestamp = (
-        pc.floor(data).cast("int64").cast(pa.timestamp("ms", tz=datetime.timezone.utc))
-    )
+    data_as_timestamp = pc.floor(data).cast("int64").cast(pa.timestamp("ms", tz=datetime.timezone.utc))
     return ArrowWeaveList(
         data_as_timestamp,
         types.Timestamp(),
@@ -416,6 +402,4 @@ def to_timestamp(self):
     output_type=ARROW_WEAVE_LIST_STRING_TYPE,
 )
 def to_string(self):
-    return ArrowWeaveList(
-        pc.cast(self._arrow_data, "string"), types.String(), self._artifact
-    )
+    return ArrowWeaveList(pc.cast(self._arrow_data, "string"), types.String(), self._artifact)

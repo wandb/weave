@@ -7,9 +7,7 @@ if typing.TYPE_CHECKING:
     from . import op_def as OpDef
 
 
-def should_force_none_result(
-    inputs: dict[str, typing.Any], op_def: "OpDef.OpDef"
-) -> bool:
+def should_force_none_result(inputs: dict[str, typing.Any], op_def: "OpDef.OpDef") -> bool:
     # Hacking... this is nullability of ops
     # We should do this as a compile pass instead of hard-coding in engine.
     # That means we need an op called like "handle_null" that takes a function
@@ -22,9 +20,7 @@ def should_force_none_result(
         return (
             len(named_args) > 0
             and (input0 is None or isinstance(input0, box.BoxedNone))
-            and not isinstance(
-                op_def.concrete_output_type, tagged_value_type.TaggedValueType
-            )
+            and not isinstance(op_def.concrete_output_type, tagged_value_type.TaggedValueType)
             and not isinstance(named_args[0].type, tagged_value_type.TaggedValueType)
             and not types.is_optional(named_args[0].type)
         )

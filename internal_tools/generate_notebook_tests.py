@@ -52,9 +52,7 @@ def main():
                 )
                 makedir(test_path)
                 cypress_notebook_path = os.path.relpath(notebook_path, integration_dir)
-                relative_notebook_path = os.path.relpath(
-                    test_dir, os.path.dirname(test_path)
-                )
+                relative_notebook_path = os.path.relpath(test_dir, os.path.dirname(test_path))
                 test_code = NOTEBOOK_TEST_TEMPLATE % (
                     relative_notebook_path,
                     cypress_notebook_path,

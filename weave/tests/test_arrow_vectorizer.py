@@ -113,18 +113,14 @@ def test_arrow_vectorizer_string_scalar_tagged(name, weave_func, expected_output
         )
     elif name == "nest-list":
         item_node = item_node[0]
-        expected_type_obj_type = types.List(
-            make_exp_tag(expected_value_type.object_type)
-        )
+        expected_type_obj_type = types.List(make_exp_tag(expected_value_type.object_type))
 
     # check that tags are propagated
     assert weave.use(tag_getter_op(item_node)) == "test1"
 
     # NOTE: This optionality is needed because some arrow ops eagerly declare
     # optional returns. See number.py and string.py for commentary on the subject.
-    assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(
-        called.type
-    )
+    assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(called.type)
 
 
 string_alnum_test_cases = [
@@ -319,16 +315,12 @@ string_vector_ops_test_cases = [
 ]
 
 
-@pytest.mark.parametrize(
-    "name,weave_func,expected_output", string_vector_ops_test_cases
-)
+@pytest.mark.parametrize("name,weave_func,expected_output", string_vector_ops_test_cases)
 def test_arrow_vectorizer_string_vector(name, weave_func, expected_output):
     l = weave.save(arrow.to_arrow(["bc", "cd", "df"]))
     l2 = weave.save(arrow.to_arrow(["cbc", "aef", "df"]))
 
-    fn = weave_internal.define_fn(
-        {"x": weave.types.String(), "y": weave.types.String()}, weave_func
-    ).val
+    fn = weave_internal.define_fn({"x": weave.types.String(), "y": weave.types.String()}, weave_func).val
 
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l, "y": l2})
@@ -373,9 +365,7 @@ def test_arrow_vectorizer_string_vector_ops_tagged(name, weave_func, expected_ou
 
     l = weave.save(awl)
     l2 = weave.save(awl2)
-    fn = weave_internal.define_fn(
-        {"x": awl.object_type, "y": awl2.object_type}, weave_func
-    ).val
+    fn = weave_internal.define_fn({"x": awl.object_type, "y": awl2.object_type}, weave_func).val
     vec_fn = arrow.vectorize(fn)
 
     called = weave_internal.call_fn(vec_fn, {"x": l, "y": l2})
@@ -469,9 +459,7 @@ string_ops_nullable_test_cases = [
     "name,weave_func,expected_output",
     string_ops_nullable_test_cases,
 )
-def test_arrow_vectorizer_string_nullable_scalar_ops_tagged(
-    name, weave_func, expected_output
-):
+def test_arrow_vectorizer_string_nullable_scalar_ops_tagged(name, weave_func, expected_output):
     expected_value_type = weave.type_of(expected_output).object_type
 
     list = ["bc", None, "df"]
@@ -510,25 +498,19 @@ def test_arrow_vectorizer_string_nullable_scalar_ops_tagged(
         expected_type_obj_type = types.TypedDict(
             {
                 **expected_value_type.property_types,
-                "a": make_exp_tag(
-                    types.optional(expected_value_type.property_types["a"])
-                ),
+                "a": make_exp_tag(types.optional(expected_value_type.property_types["a"])),
             }
         )
     elif name == "nest-list":
         item_node = item_node[0]
-        expected_type_obj_type = types.List(
-            make_exp_tag(types.optional(expected_value_type.object_type))
-        )
+        expected_type_obj_type = types.List(make_exp_tag(types.optional(expected_value_type.object_type)))
 
     # check that tags are propagated
     assert weave.use(tag_getter_op(item_node)) == "test1"
 
     # NOTE: This optionality is needed because some arrow ops eagerly declare
     # optional returns. See number.py and string.py for commentary on the subject.
-    assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(
-        called.type
-    )
+    assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(called.type)
 
 
 @pytest.mark.parametrize(
@@ -561,9 +543,7 @@ def test_arrow_vectorizer_string_nullable_scalar_ops_tagged(
         ),
     ],
 )
-def test_arrow_typeddict_nullable_merge(
-    input_datal, input_datar, name, weave_func, expected_output
-):
+def test_arrow_typeddict_nullable_merge(input_datal, input_datar, name, weave_func, expected_output):
     l = weave.save(arrow.to_arrow(input_datal))
     r = weave.save(arrow.to_arrow(input_datar))
 
@@ -578,9 +558,7 @@ def test_arrow_typeddict_nullable_merge(
     called = weave_internal.call_fn(vec_fn, {"x": l, "y": r})
     awl = weave.use(called)
     assert awl.to_pylist_raw() == expected_output
-    assert called.type == arrow.ArrowWeaveListType(
-        weave.type_of(expected_output).object_type
-    )
+    assert called.type == arrow.ArrowWeaveListType(weave.type_of(expected_output).object_type)
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
@@ -590,9 +568,7 @@ def test_arrow_typeddict_nullable_merge(
         (
             "merge-scalar-vec",
             [{"b": "c"}, {"b": "q"}],
-            lambda x: dispatch.RuntimeConstNode(
-                types.TypedDict({"c": types.Int()}), {"c": 4}
-            ).merge(x),
+            lambda x: dispatch.RuntimeConstNode(types.TypedDict({"c": types.Int()}), {"c": 4}).merge(x),
             [{"b": "c", "c": 4}, {"b": "q", "c": 4}],
         ),
         (
@@ -603,9 +579,7 @@ def test_arrow_typeddict_nullable_merge(
         ),
     ],
 )
-def test_arrow_typeddict_nullable_scalar_vector_merge(
-    input_data_vec, name, weave_func, expected_output
-):
+def test_arrow_typeddict_nullable_scalar_vector_merge(input_data_vec, name, weave_func, expected_output):
     data = weave.save(arrow.to_arrow(input_data_vec))
 
     fn = weave_internal.define_fn(
@@ -618,9 +592,7 @@ def test_arrow_typeddict_nullable_scalar_vector_merge(
     called = weave_internal.call_fn(vec_fn, {"x": data})
     awl = weave.use(called)
     assert awl.to_pylist_raw() == expected_output
-    assert called.type == arrow.ArrowWeaveListType(
-        weave.type_of(expected_output).object_type
-    )
+    assert called.type == arrow.ArrowWeaveListType(weave.type_of(expected_output).object_type)
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
@@ -644,20 +616,14 @@ nullable_pick_cases = [
 ]
 
 
-@pytest.mark.parametrize(
-    "name,input_data,weave_func,expected_output", nullable_pick_cases
-)
+@pytest.mark.parametrize("name,input_data,weave_func,expected_output", nullable_pick_cases)
 def test_arrow_typeddict_pick_nullable(input_data, name, weave_func, expected_output):
     l = weave.save(arrow.to_arrow(input_data))
-    fn = weave_internal.define_fn(
-        {"x": weave.type_of(input_data).object_type}, weave_func
-    ).val
+    fn = weave_internal.define_fn({"x": weave.type_of(input_data).object_type}, weave_func).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
     assert weave.use(called).to_pylist_raw() == expected_output
-    assert called.type == arrow.ArrowWeaveListType(
-        weave.type_of(expected_output).object_type
-    )
+    assert called.type == arrow.ArrowWeaveListType(weave.type_of(expected_output).object_type)
 
 
 @pytest.mark.parametrize(
@@ -698,15 +664,11 @@ pick_cases = [
 @pytest.mark.parametrize("name,input_data,weave_func,expected_output", pick_cases)
 def test_arrow_typeddict_pick(input_data, name, weave_func, expected_output):
     l = weave.save(arrow.to_arrow(input_data))
-    fn = weave_internal.define_fn(
-        {"x": weave.type_of(input_data).object_type}, weave_func
-    ).val
+    fn = weave_internal.define_fn({"x": weave.type_of(input_data).object_type}, weave_func).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
     assert weave.use(called).to_pylist_raw() == expected_output
-    assert called.type == arrow.ArrowWeaveListType(
-        weave.type_of(expected_output).object_type
-    )
+    assert called.type == arrow.ArrowWeaveListType(weave.type_of(expected_output).object_type)
 
 
 @pytest.mark.parametrize("name,input_data,weave_func,expected_output", pick_cases)
@@ -714,9 +676,7 @@ def test_arrow_typeddict_pick_tagged(input_data, name, weave_func, expected_outp
     # tag each dict and one of its values
     for i, elem in enumerate(input_data):
         taggable = box.box(elem)
-        input_data[i] = tag_store.add_tags(
-            taggable, {"dict_tag": f"{input_data}[{i}] = {elem}"}
-        )
+        input_data[i] = tag_store.add_tags(taggable, {"dict_tag": f"{input_data}[{i}] = {elem}"})
         input_data[i]["a"] = tag_store.add_tags(
             box.box(input_data[i]["a"]),
             {"first_level_tag": f"{input_data}[{i}]['a'] = {elem['a']}"},
@@ -728,9 +688,7 @@ def test_arrow_typeddict_pick_tagged(input_data, name, weave_func, expected_outp
             )
 
     l = weave.save(arrow.to_arrow(input_data))
-    fn = weave_internal.define_fn(
-        {"x": weave.type_of(input_data).object_type}, weave_func
-    ).val
+    fn = weave_internal.define_fn({"x": weave.type_of(input_data).object_type}, weave_func).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"x": l})
 
@@ -740,20 +698,14 @@ def test_arrow_typeddict_pick_tagged(input_data, name, weave_func, expected_outp
             property_types={
                 "dict_tag": types.String(),
                 "first_level_tag": types.String(),
-                **(
-                    {"second_level_tag": types.String()}
-                    if name == "pick-nested"
-                    else {}
-                ),
+                **({"second_level_tag": types.String()} if name == "pick-nested" else {}),
             }
         ),
         types.Float(),
     )
     assert called.type == arrow.ArrowWeaveListType(expected_output_object_type)
 
-    tag_getter_op = make_tag_getter_op.make_tag_getter_op(
-        "first_level_tag", types.String()
-    )
+    tag_getter_op = make_tag_getter_op.make_tag_getter_op("first_level_tag", types.String())
 
     for i, elem in enumerate(input_data):
         tag = f"{input_data}[{i}]['a'] = {elem['a']}"
@@ -790,9 +742,7 @@ def test_arrow_typeddict_pick_tagged(input_data, name, weave_func, expected_outp
         ),
     ],
 )
-def test_arrow_typeddict_merge(
-    input_datal, input_datar, name, weave_func, expected_output
-):
+def test_arrow_typeddict_merge(input_datal, input_datar, name, weave_func, expected_output):
     l = weave.save(arrow.to_arrow(input_datal))
     r = weave.save(arrow.to_arrow(input_datar))
     fn = weave_internal.define_fn(
@@ -806,9 +756,7 @@ def test_arrow_typeddict_merge(
     called = weave_internal.call_fn(vec_fn, {"x": l, "y": r})
     awl = weave.use(called)
     assert awl.to_pylist_raw() == expected_output
-    assert called.type == arrow.ArrowWeaveListType(
-        weave.type_of(expected_output).object_type
-    )
+    assert called.type == arrow.ArrowWeaveListType(weave.type_of(expected_output).object_type)
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
@@ -833,9 +781,7 @@ def test_arrow_typeddict_simple_merge_tagged():
     vec_fn = arrow.vectorize(fn)
     # here we call refine graph so we can have called be a RuntimeOutputNode,
     # which allows the dispatch we us in the tag getter op assert
-    called = weave_internal.refine_graph(
-        weave_internal.call_fn(vec_fn, {"x": l, "y": r})
-    )
+    called = weave_internal.refine_graph(weave_internal.call_fn(vec_fn, {"x": l, "y": r}))
     awl = weave.use(called)
     assert awl.to_pylist_notags() == expected_output
 
@@ -846,9 +792,7 @@ def test_arrow_typeddict_simple_merge_tagged():
     assert called.type == arrow.ArrowWeaveListType(
         types.TypedDict(
             {
-                "b": tagged_value_type.TaggedValueType(
-                    types.TypedDict({"tag": types.String()}), types.String()
-                ),
+                "b": tagged_value_type.TaggedValueType(types.TypedDict({"tag": types.String()}), types.String()),
                 "c": types.Int(),
             }
         )
@@ -876,9 +820,7 @@ def test_arrow_typeddict_overwrite_merge_tagged():
     vec_fn = arrow.vectorize(fn)
     # here we call refine graph so we can have called be a RuntimeOutputNode,
     # which allows the dispatch we us in the tag getter op assert
-    called = weave_internal.refine_graph(
-        weave_internal.call_fn(vec_fn, {"x": l, "y": r})
-    )
+    called = weave_internal.refine_graph(weave_internal.call_fn(vec_fn, {"x": l, "y": r}))
     awl = weave.use(called)
     assert awl.to_pylist_notags() == expected_output
 
@@ -889,9 +831,7 @@ def test_arrow_typeddict_overwrite_merge_tagged():
     assert called.type == arrow.ArrowWeaveListType(
         types.TypedDict(
             {
-                "b": tagged_value_type.TaggedValueType(
-                    types.TypedDict({"tag": types.String()}), types.String()
-                ),
+                "b": tagged_value_type.TaggedValueType(types.TypedDict({"tag": types.String()}), types.String()),
             }
         )
     )
@@ -908,9 +848,7 @@ def test_arrow_typeddict_dicts_merge_tagged():
     ]
 
     for i, elem in enumerate(input_datar):
-        input_datar[i]["c"]["a"] = tag_store.add_tags(
-            box.box(elem["c"]["a"]), {"tag": "a"}
-        )
+        input_datar[i]["c"]["a"] = tag_store.add_tags(box.box(elem["c"]["a"]), {"tag": "a"})
 
     l = weave.save(arrow.to_arrow(input_datal))
     r = weave.save(arrow.to_arrow(input_datar))
@@ -924,9 +862,7 @@ def test_arrow_typeddict_dicts_merge_tagged():
     vec_fn = arrow.vectorize(fn)
     # here we call refine graph so we can have called be a RuntimeOutputNode,
     # which allows the dispatch we us in the tag getter op assert
-    called = weave_internal.refine_graph(
-        weave_internal.call_fn(vec_fn, {"x": l, "y": r})
-    )
+    called = weave_internal.refine_graph(weave_internal.call_fn(vec_fn, {"x": l, "y": r}))
     awl = weave.use(called)
     assert awl.to_pylist_notags() == expected_output
 
@@ -938,13 +874,7 @@ def test_arrow_typeddict_dicts_merge_tagged():
         types.TypedDict(
             {
                 "b": types.String(),
-                "c": types.TypedDict(
-                    {
-                        "a": tagged_value_type.TaggedValueType(
-                            types.TypedDict({"tag": types.String()}), types.Int()
-                        )
-                    }
-                ),
+                "c": types.TypedDict({"a": tagged_value_type.TaggedValueType(types.TypedDict({"tag": types.String()}), types.Int())}),
             }
         )
     )
@@ -962,9 +892,7 @@ def test_arrow_typeddict_nested_merge_tagged():
     ]
 
     for i, elem in enumerate(input_datal):
-        input_datal[i]["a"]["c"] = tag_store.add_tags(
-            box.box(elem["a"]["c"]), {"tag": "a"}
-        )
+        input_datal[i]["a"]["c"] = tag_store.add_tags(box.box(elem["a"]["c"]), {"tag": "a"})
 
     l = weave.save(arrow.to_arrow(input_datal))
     r = weave.save(arrow.to_arrow(input_datar))
@@ -1055,9 +983,7 @@ def test_arrow_dict():
     called = weave_internal.call_fn(vec_fn, {"a": a, "b": b})
     awl = weave.use(called)
     assert awl.to_pylist_raw() == expected_output
-    assert called.type == arrow.ArrowWeaveListType(
-        weave.type_of(expected_output).object_type
-    )
+    assert called.type == arrow.ArrowWeaveListType(weave.type_of(expected_output).object_type)
     assert awl.object_type == weave.type_of(expected_output).object_type
 
 
@@ -1073,9 +999,7 @@ def test_vectorize_works_recursively_on_weavifiable_op():
     def add_one124815(x: int) -> int:
         return x + 1
 
-    weave_fn = weave_internal.define_fn(
-        {"x": weave.types.Int()}, lambda x: add_one124815(x)
-    ).val
+    weave_fn = weave_internal.define_fn({"x": weave.types.Int()}, lambda x: add_one124815(x)).val
     vectorized = arrow.vectorize(weave_fn)
     expected = vectorized.to_json()
     print("test_vectorize_works_recursively_on_weavifiable_op.expected", expected)
@@ -1106,12 +1030,8 @@ def test_vectorize_works_recursively_on_weavifiable_op():
 
 def test_vectorize_inner_lambdas():
     l = weave.save(arrow.to_arrow([[1, 2, 3], [4, 5, 6], [7, 8, 9]]))
-    inner_fn = weave_internal.define_fn(
-        {"row": l.type.object_type.object_type}, lambda row: row + 1
-    )
-    fn = weave_internal.define_fn(
-        {"row": l.type.object_type}, lambda row: row.map(inner_fn)
-    ).val
+    inner_fn = weave_internal.define_fn({"row": l.type.object_type.object_type}, lambda row: row + 1)
+    fn = weave_internal.define_fn({"row": l.type.object_type}, lambda row: row.map(inner_fn)).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": l})
     assert list(weave.use(called)) == [[2, 3, 4], [5, 6, 7], [8, 9, 10]]
@@ -1183,9 +1103,7 @@ def test_vectorized_bool_ops(name, weave_func, expected_output):
 
     # NOTE: This optionality is needed because some arrow ops eagerly declare
     # optional returns. See number.py and string.py for commentary on the subject.
-    assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(
-        called.type
-    )
+    assert arrow.ArrowWeaveListType(types.optional(expected_type_obj_type)).assign_type(called.type)
 
 
 def test_vectorize_index_simple():
@@ -1206,9 +1124,7 @@ def test_vectorize_index_out_of_bounds():
 
 def test_vectorize_index_nested():
     l = weave.save(arrow.to_arrow([[[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9]]]))
-    fn = weave_internal.define_fn(
-        {"row": l.type.object_type}, lambda row: row[0][0]
-    ).val
+    fn = weave_internal.define_fn({"row": l.type.object_type}, lambda row: row[0][0]).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": l})
     assert list(weave.use(called)) == [1, 4, 7]
@@ -1216,9 +1132,7 @@ def test_vectorize_index_nested():
 
 def test_vectorize_index_dependent():
     l = weave.save(arrow.to_arrow([[1, 1, 2, 3], [2, 4, 5, 6], [3, 7, 8, 9]]))
-    fn = weave_internal.define_fn(
-        {"row": l.type.object_type}, lambda row: row[row[0]]
-    ).val
+    fn = weave_internal.define_fn({"row": l.type.object_type}, lambda row: row[row[0]]).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": l})
     assert list(weave.use(called)) == [1, 5, 9]
@@ -1235,9 +1149,7 @@ def test_vectorize_special_pick():
             "d": 4,
         },
     )
-    fn = weave_internal.define_fn(
-        {"row": l.type.object_type}, lambda row: dict_node[row]
-    ).val
+    fn = weave_internal.define_fn({"row": l.type.object_type}, lambda row: dict_node[row]).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": l})
     assert list(weave.use(called)) == [1, None, 2, None, 3]
@@ -1248,9 +1160,7 @@ def test_vectorize_function_with_const_first_arg():
     data = ["hello", "world", "hello", "world", "hello", "world"]
     awl_node = weave.save(arrow.to_arrow(data))
     string_node = weave_internal.make_const_node(types.String(), string)
-    fn = weave_internal.define_fn(
-        {"row": types.String()}, lambda row: string_node == row
-    ).val
+    fn = weave_internal.define_fn({"row": types.String()}, lambda row: string_node == row).val
     vec_fn = arrow.vectorize(fn)
     called = weave_internal.call_fn(vec_fn, {"row": awl_node})
     assert weave.use(called).to_pylist_raw() == [True, False, True, False, True, False]
@@ -1298,25 +1208,15 @@ def test_listnumbersmax_with_tagged_inner_elements():
     data = [[{"TMax": elem} for elem in row] for row in data]
     for i in range(len(data)):
         for j in range(len(data[i])):
-            data[i][j] = tag_store.add_tags(
-                box.box(data[i][j]), {"mytag": "test" + str(i) + str(j)}
-            )
+            data[i][j] = tag_store.add_tags(box.box(data[i][j]), {"mytag": "test" + str(i) + str(j)})
     awl = arrow.to_arrow(data)
     l = weave.save(awl)
 
     mapped_list_node = list_.List._listmap(l, lambda row: row["TMax"])
 
-    assert mapped_list_node.type == types.List(
-        types.List(
-            tagged_value_type.TaggedValueType(
-                types.TypedDict({"mytag": types.String()}), types.optional(types.Int())
-            )
-        )
-    )
+    assert mapped_list_node.type == types.List(types.List(tagged_value_type.TaggedValueType(types.TypedDict({"mytag": types.String()}), types.optional(types.Int()))))
 
-    res_node = arraylist_ops.list_numbers_max(
-        convert_ops.list_to_arrow(mapped_list_node)
-    )
+    res_node = arraylist_ops.list_numbers_max(convert_ops.list_to_arrow(mapped_list_node))
 
     assert weave.use(res_node).to_pylist_tagged() == [3, 4, 6]
 
@@ -1357,9 +1257,7 @@ def test_vectorized_prop_op_gql_pick():
     awl = arrow.to_arrow(runs)
     l = weave.save(awl)
 
-    fn = weave_internal.define_fn(
-        {"x": awl.object_type}, lambda x: run_ops.run_id(x)
-    ).val
+    fn = weave_internal.define_fn({"x": awl.object_type}, lambda x: run_ops.run_id(x)).val
     vec_fn = arrow.vectorize(fn, strict=True)
     called = weave_internal.call_fn(vec_fn, {"x": l})
     assert weave.use(called).to_pylist_notags() == ["A", "B", "C"]
@@ -1380,9 +1278,7 @@ def test_vectorize_run_runtime():
     awl = arrow.to_arrow(runs)
     l = weave.save(awl)
 
-    fn = weave_internal.define_fn(
-        {"x": awl.object_type}, lambda x: run_ops.runtime(x)
-    ).val
+    fn = weave_internal.define_fn({"x": awl.object_type}, lambda x: run_ops.runtime(x)).val
 
     vec_fn = arrow.vectorize(fn, strict=True)
 

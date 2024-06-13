@@ -65,9 +65,7 @@ def test_traverse_tags():
 def test_traverse_tags_2level():
     obj_node = weave.save(_TestPlanHasObject("has", _TestPlanObject("a", 1)))
     name_add_node = obj_node._test_hasobj_obj().horse() + "hello"
-    obj_from_tag_val_node = get_hasobject_self_tag(
-        get_object_self_tag(name_add_node)
-    ).horse
+    obj_from_tag_val_node = get_hasobject_self_tag(get_object_self_tag(name_add_node)).horse
     p = stitch.stitch([obj_from_tag_val_node])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 2
@@ -92,9 +90,7 @@ def test_lambda_using_externally_defined_node():
     objs_node = weave.save([{"a": 5, "b": 6, "c": 10}, {"a": 7, "b": 8, "c": 11}])
     # Inside the lambda, we use externally defined `objs_node`. This should
     # result in all 3 calls being recorded
-    p = stitch.stitch(
-        [objs_node["b"], objs_node.filter(lambda obj: obj["a"] > objs_node[0]["b"])]
-    )
+    p = stitch.stitch([objs_node["b"], objs_node.filter(lambda obj: obj["a"] > objs_node[0]["b"])])
     obj_recorder = p.get_result(objs_node)
     calls = obj_recorder.calls
     assert len(calls) == 3
@@ -166,12 +162,8 @@ def test_shared_fn_node():
     arr_1_node = weave.ops.make_list(a=1, b=2, c=3)
     arr_2_node = weave.ops.make_list(a=10, b=20, c=30)
 
-    mapped_1_node = arr_1_node.map(
-        lambda row: weave.ops.dict_(item=row, const=indexed_node)
-    )
-    mapped_2_node = arr_2_node.map(
-        lambda row: weave.ops.dict_(item=row, const=indexed_node)
-    )
+    mapped_1_node = arr_1_node.map(lambda row: weave.ops.dict_(item=row, const=indexed_node))
+    mapped_2_node = arr_2_node.map(lambda row: weave.ops.dict_(item=row, const=indexed_node))
 
     mapped_1_item_node = mapped_1_node["item"]
     mapped_1_const_node = mapped_1_node["const"]
@@ -217,15 +209,7 @@ def test_shared_fn_node():
 def test_stitch_keytypes_override_fetch_all_columns(fake_wandb):
     fake_wandb.fake_api.add_mock(test_wb.table_mock_filtered)
     keytypes_node = weave.ops.object_keytypes(
-        run_ops.run_tag_getter_op(
-            weave.ops.project("stacey", "mendeleev")
-            .filteredRuns("{}", "-createdAt")
-            .limit(50)
-            .summary()
-            .pick("table")
-            .table()
-            .rows()
-        ).summary()
+        run_ops.run_tag_getter_op(weave.ops.project("stacey", "mendeleev").filteredRuns("{}", "-createdAt").limit(50).summary().pick("table").table().rows()).summary()
     )
 
     p = stitch.stitch([keytypes_node])
@@ -242,14 +226,8 @@ def test_stitch_overlapping_tags(fake_wandb):
         lambda a, b: {
             "project_518fa79465d8ffaeb91015dce87e092f": {
                 **fwb.project_payload,
-                "runs_261949318143369aa6c158af92afee03": {
-                    "edges": [{"node": {**fwb.run_payload, "summaryMetrics": "{}"}}]
-                },
-                "runs_30ea80144a38a5c57c80d9d7f0485166": {
-                    "edges": [
-                        {"node": {**fwb.run_payload, "summaryMetrics": '{"a": 1}'}}
-                    ]
-                },
+                "runs_261949318143369aa6c158af92afee03": {"edges": [{"node": {**fwb.run_payload, "summaryMetrics": "{}"}}]},
+                "runs_30ea80144a38a5c57c80d9d7f0485166": {"edges": [{"node": {**fwb.run_payload, "summaryMetrics": '{"a": 1}'}}]},
             }
         }
     )

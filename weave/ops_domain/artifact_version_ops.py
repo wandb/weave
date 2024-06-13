@@ -67,9 +67,7 @@ def _safe_nested_pick(obj: typing.Optional[dict], path: list[str]) -> typing.Any
     output_type=types.optional(wdt.ArtifactVersionType),
     hidden=True,
 )
-def root_artifact_version_gql_resolver(
-    gql_result, entityName, projectName, artifactTypeName, artifactVersionName
-):
+def root_artifact_version_gql_resolver(gql_result, entityName, projectName, artifactTypeName, artifactVersionName):
     project_alias = _make_alias(entityName, projectName, prefix="project")
     artifact_type_alias = _make_alias(artifactTypeName, prefix="artifactType")
     artifact_alias = _make_alias(artifactVersionName, prefix="artifact")
@@ -78,21 +76,15 @@ def root_artifact_version_gql_resolver(
     # GQL does not exist, then it returns None for that key. So, if
     # the user requests something that does not exist, then we want
     # to safely return None in such a case
-    artifact_alias_data = _safe_nested_pick(
-        gql_result, [project_alias, artifact_type_alias, artifact_alias]
-    )
+    artifact_alias_data = _safe_nested_pick(gql_result, [project_alias, artifact_type_alias, artifact_alias])
     if artifact_alias_data is not None:
         return wdt.ArtifactType.from_keys(artifact_alias_data)
     return None
 
 
 def _root_artifact_version_plugin(inputs, inner):
-    project_alias = _make_alias(
-        inputs.raw["entityName"], inputs.raw["projectName"], prefix="project"
-    )
-    artifact_type_alias = _make_alias(
-        inputs.raw["artifactTypeName"], prefix="artifactType"
-    )
+    project_alias = _make_alias(inputs.raw["entityName"], inputs.raw["projectName"], prefix="project")
+    artifact_type_alias = _make_alias(inputs.raw["artifactTypeName"], prefix="artifactType")
     artifact_alias = _make_alias(inputs.raw["artifactVersionName"], prefix="artifact")
     return f"""
         {project_alias}: project(entityName: {inputs['entityName']}, name:{inputs['projectName']}){{
@@ -108,23 +100,11 @@ def _root_artifact_version_plugin(inputs, inner):
     """
 
 
-def _gql_op_output_type_for_root_artifact_version(
-    inputs: input_provider.InputProvider, input_type: types.Type
-) -> types.Type:
-    project_alias = _make_alias(
-        inputs.raw["entityName"], inputs.raw["projectName"], prefix="project"
-    )
-    artifact_type_alias = _make_alias(
-        inputs.raw["artifactTypeName"], prefix="artifactType"
-    )
+def _gql_op_output_type_for_root_artifact_version(inputs: input_provider.InputProvider, input_type: types.Type) -> types.Type:
+    project_alias = _make_alias(inputs.raw["entityName"], inputs.raw["projectName"], prefix="project")
+    artifact_type_alias = _make_alias(inputs.raw["artifactTypeName"], prefix="artifactType")
     artifact_alias = _make_alias(inputs.raw["artifactVersionName"], prefix="artifact")
-    return types.optional(
-        wdt.ArtifactVersionType.with_keys(
-            typing.cast(typing.Any, input_type)[project_alias][artifact_type_alias][
-                artifact_alias
-            ]
-        )
-    )
+    return types.optional(wdt.ArtifactVersionType.with_keys(typing.cast(typing.Any, input_type)[project_alias][artifact_type_alias][artifact_alias]))
 
 
 @op(
@@ -143,31 +123,19 @@ def _gql_op_output_type_for_root_artifact_version(
         gql_op_output_type=_gql_op_output_type_for_root_artifact_version,
     ),
 )
-def root_artifact_version(
-    entityName, projectName, artifactTypeName, artifactVersionName
-):
-    raise errors.WeaveGQLCompileError(
-        "root-artifactVersion should not be executed directly. If you see this error, it is a bug in the Weave compiler."
-    )
+def root_artifact_version(entityName, projectName, artifactTypeName, artifactVersionName):
+    raise errors.WeaveGQLCompileError("root-artifactVersion should not be executed directly. If you see this error, it is a bug in the Weave compiler.")
 
 
 # Section 3/6: Attribute Getters
 gql_prop_op("artifactVersion-id", wdt.ArtifactVersionType, "id", types.String())
 gql_prop_op("artifactVersion-digest", wdt.ArtifactVersionType, "digest", types.String())
-gql_prop_op(
-    "artifactVersion-hash", wdt.ArtifactVersionType, "commitHash", types.String()
-)
+gql_prop_op("artifactVersion-hash", wdt.ArtifactVersionType, "commitHash", types.String())
 gql_prop_op("artifactVersion-size", wdt.ArtifactVersionType, "size", types.Int())
-gql_prop_op(
-    "artifactVersion-description", wdt.ArtifactVersionType, "description", types.Int()
-)
-gql_prop_op(
-    "artifactVersion-createdAt", wdt.ArtifactVersionType, "createdAt", types.Timestamp()
-)
+gql_prop_op("artifactVersion-description", wdt.ArtifactVersionType, "description", types.Int())
+gql_prop_op("artifactVersion-createdAt", wdt.ArtifactVersionType, "createdAt", types.Timestamp())
 
-gql_prop_op(
-    "artifactVersion-versionId", wdt.ArtifactVersionType, "versionIndex", types.Number()
-)
+gql_prop_op("artifactVersion-versionId", wdt.ArtifactVersionType, "versionIndex", types.Number())
 
 gql_prop_op(
     "artifactVersion-referenceCount",
@@ -216,9 +184,7 @@ gql_prop_op(
 def refine_metadata(
     artifactVersion: wdt.ArtifactVersion,
 ) -> types.Type:
-    return wb_util.process_run_dict_type(
-        json.loads(artifactVersion["metadata"] or "{}")
-    )
+    return wb_util.process_run_dict_type(json.loads(artifactVersion["metadata"] or "{}"))
 
 
 @op(
@@ -388,12 +354,8 @@ def artifact_version_link(
     home_sequence_name = artifactVersion["artifactSequence"]["name"]
     home_sequence_version_index = artifactVersion["versionIndex"]
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
-    project_name = artifactVersion["artifactSequence"]["defaultArtifactType"][
-        "project"
-    ]["name"]
-    entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"][
-        "entity"
-    ]["name"]
+    project_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"]["name"]
+    entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"]["entity"]["name"]
     return wdt.Link(
         f"{home_sequence_name}:v{home_sequence_version_index}",
         f"/{entity_name}/{project_name}/artifacts/{quote(type_name)}/{quote(home_sequence_name)}/v{home_sequence_version_index}",
@@ -423,9 +385,7 @@ def artifact_version_is_weave_object(
 def artifact_version_weave_type(
     artifactVersion: wdt.ArtifactVersion,
 ) -> types.Type:
-    return artifact_fs.FilesystemArtifactRef(
-        _artifact_version_to_wb_artifact(artifactVersion), "obj"
-    ).type
+    return artifact_fs.FilesystemArtifactRef(_artifact_version_to_wb_artifact(artifactVersion), "obj").type
 
 
 def _get_history_metrics(
@@ -550,21 +510,15 @@ def history_metrics(
 
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
-    entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"][
-        "entity"
-    ]["name"]
-    project_name = artifactVersion["artifactSequence"]["defaultArtifactType"][
-        "project"
-    ]["name"]
+    entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"]["entity"]["name"]
+    project_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"]["name"]
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion["artifactSequence"]["name"]
     commit_hash = artifactVersion["commitHash"]
     return artifact_wandb.WandbArtifact(
         name=home_sequence_name,
         type=type_name,
-        uri=artifact_wandb.WeaveWBArtifactURI(
-            home_sequence_name, commit_hash, entity_name, project_name
-        ),
+        uri=artifact_wandb.WeaveWBArtifactURI(home_sequence_name, commit_hash, entity_name, project_name),
     )
 
 

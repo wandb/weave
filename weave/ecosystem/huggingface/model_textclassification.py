@@ -78,7 +78,8 @@ class ClassificationResultPanel(weave.Panel):
             self.input_node,
             columns=[
                 lambda result_row: weave.panels.WeaveLink(
-                    result_row.model_name(), to=lambda input: huggingface().model(input)  # type: ignore
+                    result_row.model_name(),
+                    to=lambda input: huggingface().model(input),  # type: ignore
                 ),
                 lambda result_row: result_row.model_input,
                 lambda result_row: result_row.score(),
@@ -104,9 +105,7 @@ class FullTextClassificationPipelineOutput(hfmodel.FullPipelineOutput):
         return weave.use(self._model.id())
 
 
-FullTextClassificationPipelineOutputType.instance_classes = (
-    FullTextClassificationPipelineOutput
-)
+FullTextClassificationPipelineOutputType.instance_classes = FullTextClassificationPipelineOutput
 
 
 @weave.type()
@@ -120,9 +119,7 @@ class FullTextClassificationResultPanel(weave.Panel):
         return weave.panels.Group(
             preferHorizontal=True,
             items={
-                "input": weave.panels.LabeledItem(
-                    label="input", item=output.model_input
-                ),
+                "input": weave.panels.LabeledItem(label="input", item=output.model_input),
                 "output": weave.panels.LabeledItem(
                     label="output",
                     item=weave.panels.Plot(
@@ -153,14 +150,9 @@ class HFModelTextClassification(hfmodel.HFModel):
         output = weave.use(self.pipeline())(input)
         return FullTextClassificationPipelineOutput(self, input, output)
 
-    def _call_list(
-        self, input: typing.List[str]
-    ) -> typing.List[FullTextClassificationPipelineOutput]:
+    def _call_list(self, input: typing.List[str]) -> typing.List[FullTextClassificationPipelineOutput]:
         output = list(map(weave.use(self.pipeline()), input))
-        return [
-            FullTextClassificationPipelineOutput(self, i, o)
-            for (i, o) in zip(input, output)
-        ]
+        return [FullTextClassificationPipelineOutput(self, i, o) for (i, o) in zip(input, output)]
 
     @weave.op()
     def call_list(self, input: list[str]) -> list[FullTextClassificationPipelineOutput]:
@@ -168,9 +160,7 @@ class HFModelTextClassification(hfmodel.HFModel):
 
 
 @weave.op()
-def apply_models(
-    models: list[HFModelTextClassification], inputs: list[str]
-) -> list[ClassificationResult]:
+def apply_models(models: list[HFModelTextClassification], inputs: list[str]) -> list[ClassificationResult]:
     results = [model._call_list(inputs) for model in models]
     retval: list[ClassificationResult] = []
     for i, result in enumerate(results):

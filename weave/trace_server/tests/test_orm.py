@@ -40,14 +40,8 @@ def test_combine_conditions():
     assert _combine_conditions([], "AND") == ""
     assert _combine_conditions(["foo = 'bar'"], "AND") == "foo = 'bar'"
     assert _combine_conditions(["foo = 'bar'"], "OR") == "foo = 'bar'"
-    assert (
-        _combine_conditions(["foo = 'bar'", "bim = 12"], "AND")
-        == "((foo = 'bar') AND (bim = 12))"
-    )
-    assert (
-        _combine_conditions(["foo = 'bar'", "bim = 12"], "OR")
-        == "((foo = 'bar') OR (bim = 12))"
-    )
+    assert _combine_conditions(["foo = 'bar'", "bim = 12"], "AND") == "((foo = 'bar') AND (bim = 12))"
+    assert _combine_conditions(["foo = 'bar'", "bim = 12"], "OR") == "((foo = 'bar') OR (bim = 12))"
 
 
 def test_transform_external_field_to_internal_field():
@@ -58,26 +52,18 @@ def test_transform_external_field_to_internal_field():
     with pytest.raises(ValueError):
         _transform_external_field_to_internal_field("foo", all_columns, json_columns)
 
-    result = _transform_external_field_to_internal_field(
-        "id", all_columns, json_columns
-    )
+    result = _transform_external_field_to_internal_field("id", all_columns, json_columns)
     assert result[0] == "id"
     assert result[2] == {"id"}
-    result = _transform_external_field_to_internal_field(
-        "payload", all_columns, json_columns
-    )
+    result = _transform_external_field_to_internal_field("payload", all_columns, json_columns)
     assert result[0] == "payload_dump"
     assert result[2] == {"payload_dump"}
     pb = ParamBuilder(prefix="pb", database_type="sqlite")
-    result = _transform_external_field_to_internal_field(
-        "payload.address", all_columns, json_columns, param_builder=pb
-    )
+    result = _transform_external_field_to_internal_field("payload.address", all_columns, json_columns, param_builder=pb)
     assert result[0] == "json_extract(payload_dump, :pb_0)"
     assert result[2] == {"payload_dump"}
     pb = ParamBuilder(prefix="pb", database_type="clickhouse")
-    result = _transform_external_field_to_internal_field(
-        "payload.address", all_columns, json_columns, param_builder=pb
-    )
+    result = _transform_external_field_to_internal_field("payload.address", all_columns, json_columns, param_builder=pb)
     assert result[0] == "toString(JSON_VALUE(payload_dump, {pb_0:String}))"
     assert result[2] == {"payload_dump"}
 
@@ -91,10 +77,7 @@ def test_table_create_sql():
             Column("payload", "json", db_name="payload_dump"),
         ],
     )
-    assert (
-        table.create_sql()
-        == "CREATE TABLE IF NOT EXISTS users (\n    id TEXT,\n    creator TEXT,\n    payload_dump TEXT\n)"
-    )
+    assert table.create_sql() == "CREATE TABLE IF NOT EXISTS users (\n    id TEXT,\n    creator TEXT,\n    payload_dump TEXT\n)"
 
 
 def test_table_drop_sql():

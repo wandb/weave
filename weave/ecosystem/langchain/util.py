@@ -32,9 +32,7 @@ def safely_convert_lc_run_to_wb_span(run: Run) -> Optional["trace_tree.Span"]:
         return _convert_lc_run_to_wb_span(run)
     except Exception as e:
         if PRINT_WARNINGS:
-            logging.warn(
-                f"Skipping trace saving - unable to safely convert LangChain Run into W&B Trace due to: {e}"
-            )
+            logging.warn(f"Skipping trace saving - unable to safely convert LangChain Run into W&B Trace due to: {e}")
         return None
 
 
@@ -102,15 +100,8 @@ def _convert_llm_run_to_wb_span(run: "Run") -> "trace_tree.Span":
     base_span["results"] = [
         trace_tree.Result(
             inputs={"prompt": prompt},
-            outputs={
-                f"gen_{g_i}": gen["text"]
-                for g_i, gen in enumerate(run.outputs["generations"][ndx])
-            }
-            if (
-                run.outputs is not None
-                and len(run.outputs["generations"]) > ndx
-                and len(run.outputs["generations"][ndx]) > 0
-            )
+            outputs={f"gen_{g_i}": gen["text"] for g_i, gen in enumerate(run.outputs["generations"][ndx])}
+            if (run.outputs is not None and len(run.outputs["generations"]) > ndx and len(run.outputs["generations"][ndx]) > 0)
             else None,
         )
         for ndx, prompt in enumerate(run.inputs["prompts"] or [])
@@ -124,14 +115,8 @@ def _convert_chain_run_to_wb_span(run: "Run") -> "trace_tree.Span":
     base_span = _base_convert_run_to_wb_span(run)
 
     base_span["results"] = [trace_tree.Result(inputs=run.inputs, outputs=run.outputs)]
-    base_span["child_spans"] = [
-        _convert_lc_run_to_wb_span(child_run) for child_run in run.child_runs
-    ]
-    base_span["span_kind"] = (
-        trace_tree.SpanKind.AGENT
-        if "agent" in run.serialized.get("name").lower()
-        else trace_tree.SpanKind.CHAIN
-    )
+    base_span["child_spans"] = [_convert_lc_run_to_wb_span(child_run) for child_run in run.child_runs]
+    base_span["span_kind"] = trace_tree.SpanKind.AGENT if "agent" in run.serialized.get("name").lower() else trace_tree.SpanKind.CHAIN
 
     return trace_tree.Span(**base_span)
 
@@ -141,9 +126,7 @@ def _convert_tool_run_to_wb_span(run: "Run") -> "trace_tree.Span":
 
     base_span["attributes"]["input"] = run.inputs["input"]
     base_span["results"] = [trace_tree.Result(inputs=run.inputs, outputs=run.outputs)]
-    base_span["child_spans"] = [
-        _convert_lc_run_to_wb_span(child_run) for child_run in run.child_runs
-    ]
+    base_span["child_spans"] = [_convert_lc_run_to_wb_span(child_run) for child_run in run.child_runs]
     base_span["span_kind"] = trace_tree.SpanKind.TOOL
 
     return trace_tree.Span(**base_span)
@@ -164,9 +147,7 @@ def _base_convert_run_to_wb_span(run: "Run") -> dict:
         _name=run.serialized.get("name"),
         start_time_ms=int(run.start_time.timestamp() * 1000),
         end_time_ms=int(run.end_time.timestamp() * 1000),
-        status_code=trace_tree.StatusCode.SUCCESS
-        if run.error is None
-        else trace_tree.StatusCode.ERROR,
+        status_code=trace_tree.StatusCode.SUCCESS if run.error is None else trace_tree.StatusCode.ERROR,
         status_message=run.error,
         attributes=attributes,
     )

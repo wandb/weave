@@ -75,9 +75,7 @@ def assert_fn_vectorized(fn_node: graph.Node) -> graph.Node:
 
 
 def check_case(called: graph.Node, result_type: weave.types.Type, result: typing.Any):
-    assert result_type.assign_type(
-        called.type
-    ), f"Expected op output type: {result_type}, but got {called.type}"
+    assert result_type.assign_type(called.type), f"Expected op output type: {result_type}, but got {called.type}"
 
     # This is a way to save the final output, preserving tags.
     result_ref = weave.use(weave.ops.save_to_ref(called, None))
@@ -95,9 +93,7 @@ def check_case(called: graph.Node, result_type: weave.types.Type, result: typing
     # # TODO: this check is too loose, it should be type equality. But
     # # we currently aren't specific enough in some ops, or have mistmatches
     # # between python and arrow
-    assert result_type.assign_type(
-        actual_result_type
-    ), f"{graph_debug.node_expr_str_full(called)} produced type {actual_result_type}, but expected type {result_type}"
+    assert result_type.assign_type(actual_result_type), f"{graph_debug.node_expr_str_full(called)} produced type {actual_result_type}, but expected type {result_type}"
 
 
 def call(op_def: op_def.OpDef, args: typing.Any):
@@ -140,9 +136,7 @@ class OpTestCaseStandard(OpTestCase):
             name=self.name + [name],
             op_def=self.op_def,
             input=self.input if isinstance(input, NoValue) else input,
-            expected_type=self.expected_type
-            if isinstance(expected_type, NoValue)
-            else expected_type,
+            expected_type=self.expected_type if isinstance(expected_type, NoValue) else expected_type,
             expected=self.expected if isinstance(expected, NoValue) else expected,
         )
 
@@ -157,9 +151,7 @@ class OpTestCaseStandard(OpTestCase):
             name=self.name + [name],
             op_def=self.op_def,
             input=self.input if isinstance(input, NoValue) else input,
-            expected_type=self.expected_type
-            if isinstance(expected_type, NoValue)
-            else expected_type,
+            expected_type=self.expected_type if isinstance(expected_type, NoValue) else expected_type,
             expected=self.expected if isinstance(expected, NoValue) else expected,
         )
 
@@ -174,9 +166,7 @@ class OpTestCaseStandard(OpTestCase):
             name=self.name + [name],
             op_def=self.op_def,
             input=self.input if isinstance(input, NoValue) else input,
-            expected_type=self.expected_type
-            if isinstance(expected_type, NoValue)
-            else expected_type,
+            expected_type=self.expected_type if isinstance(expected_type, NoValue) else expected_type,
             expected=self.expected if isinstance(expected, NoValue) else expected,
         )
 
@@ -188,9 +178,7 @@ class OpTestCaseStandard(OpTestCase):
         )
 
 
-def convert_expected_to_arrow(
-    expected_type: weave.types.Type, expected: typing.Any
-) -> tuple[weave.types.Type, typing.Any]:
+def convert_expected_to_arrow(expected_type: weave.types.Type, expected: typing.Any) -> tuple[weave.types.Type, typing.Any]:
     if isinstance(expected_type, weave.types.List):
         assert isinstance(expected, list)
         arrow_type = ops_arrow.ArrowWeaveListType(expected_type.object_type)
@@ -203,12 +191,8 @@ def convert_expected_to_arrow(
         return arrow_type, arrow_list
     if isinstance(expected_type, TaggedValueType):
         assert isinstance(expected, TaggedValue)
-        expected_value_type, expected_value = convert_expected_to_arrow(
-            expected_type.value, expected.value
-        )
-        return TaggedValueType(expected_type.tag, expected_value_type), TaggedValue(
-            expected.tag, expected_value
-        )
+        expected_value_type, expected_value = convert_expected_to_arrow(expected_type.value, expected.value)
+        return TaggedValueType(expected_type.tag, expected_value_type), TaggedValue(expected.tag, expected_value)
     return expected_type, expected
 
 
@@ -224,9 +208,7 @@ class OpTestCaseVecDim0(OpTestCaseStandard):
     def check(self):
         inputs = [concrete_to_tagstore(it) for it in self.input]
         inputs[0] = ops_arrow.to_arrow(inputs[0])
-        inputs = [
-            weave.save(input) if not callable(input) else input for input in inputs
-        ]
+        inputs = [weave.save(input) if not callable(input) else input for input in inputs]
         called = getattr(inputs[0], self.op_def.simple_name)(*inputs[1:])
         called_op_name = called.from_op.name
         called_op_def = registry_mem.memory_registry.get_op(called_op_name)
@@ -234,9 +216,7 @@ class OpTestCaseVecDim0(OpTestCaseStandard):
             list(called_op_def.input_type.arg_types.values())[0],
             ops_arrow.ArrowWeaveListType,
         )
-        expected_type, expected = convert_expected_to_arrow(
-            self.expected_type, self.expected
-        )
+        expected_type, expected = convert_expected_to_arrow(self.expected_type, self.expected)
         check_case(
             called,
             result_type=expected_type,
@@ -258,14 +238,10 @@ class OpTestCaseVecDim1(OpTestCaseStandard):
         inputs[0] = [ops_arrow.to_arrow(i) for i in inputs[0]]
         if isinstance(self.input[0], TaggedValue):
             inputs[0] = concrete_to_tagstore(TaggedValue(self.input[0].tag, inputs[0]))
-        inputs = [
-            weave.save(input) if not callable(input) else input for input in inputs
-        ]
+        inputs = [weave.save(input) if not callable(input) else input for input in inputs]
         called = getattr(inputs[0], self.op_def.simple_name)(*inputs[1:])
         assert ops_arrow.ArrowWeaveListType().assign_type(called.type)
-        expected_type, expected = convert_expected_to_arrow(
-            self.expected_type, self.expected
-        )
+        expected_type, expected = convert_expected_to_arrow(self.expected_type, self.expected)
         check_case(
             called,
             result_type=expected_type,
@@ -292,28 +268,18 @@ class OpTestCaseVector(OpTestCase):
         return OpTestCaseVector(
             name=self.name + [name],
             op_def=self.op_def,
-            input_vecs=self.input_vecs
-            if isinstance(input_vecs, NoValue)
-            else input_vecs,
-            expected_object_type=self.expected_object_type
-            if isinstance(expected_object_type, NoValue)
-            else expected_object_type,
+            input_vecs=self.input_vecs if isinstance(input_vecs, NoValue) else input_vecs,
+            expected_object_type=self.expected_object_type if isinstance(expected_object_type, NoValue) else expected_object_type,
             expected=self.expected if isinstance(expected, NoValue) else expected,
         )
 
     def check(self):
-        input_vars = {
-            k: weave.type_of(v).object_type
-            for k, v in zip(self.op_def.input_type.arg_types, self.input_vecs)
-        }
+        input_vars = {k: weave.type_of(v).object_type for k, v in zip(self.op_def.input_type.arg_types, self.input_vecs)}
         op_fn = weave_internal.define_fn(input_vars, lambda *args: self.op_def(*args))
         vec_op_fn = assert_fn_vectorized(op_fn.val)
         called = weave_internal.call_fn(
             vec_op_fn,
-            {
-                k: ops_arrow.to_weave_arrow(v)
-                for k, v in zip(input_vars, self.input_vecs)
-            },
+            {k: ops_arrow.to_weave_arrow(v) for k, v in zip(input_vars, self.input_vecs)},
         )
         check_case(
             called,
@@ -348,19 +314,13 @@ class OpTestCaseBinaryVectorScalar(OpTestCase):
             vec=self.vec if isinstance(vec, NoValue) else vec,
             scalar=self.scalar if isinstance(scalar, NoValue) else scalar,
             vec_first=self.vec_first if isinstance(vec_first, NoValue) else vec_first,
-            expected_object_type=self.expected_object_type
-            if isinstance(expected_object_type, NoValue)
-            else expected_object_type,
+            expected_object_type=self.expected_object_type if isinstance(expected_object_type, NoValue) else expected_object_type,
             expected=self.expected if isinstance(expected, NoValue) else expected,
         )
 
     def check(self):
         # Check the python listmap version
-        map_fn = (
-            lambda x: self.op_def(x, self.scalar)
-            if self.vec_first
-            else self.op_def(self.scalar, x)
-        )
+        map_fn = lambda x: self.op_def(x, self.scalar) if self.vec_first else self.op_def(self.scalar, x)
         check_case(
             ops_primitives.List._listmap(self.vec, map_fn),
             result_type=weave.types.List(self.expected_object_type),
@@ -410,9 +370,7 @@ class OpTestCaseBinaryVectorVector(OpTestCase):
         assert listmap_result == vec_result.to_pylist_tagged()
 
 
-def make_standard_variants(
-    op_test_def: OpSpec, test_case: OpSpecTestCase, test_case_index: int
-) -> list[OpTestCaseStandard]:
+def make_standard_variants(op_test_def: OpSpec, test_case: OpSpecTestCase, test_case_index: int) -> list[OpTestCaseStandard]:
     op_name = op_test_def.op.name
     base = OpTestCaseStandard(
         [op_name, f"case{test_case_index}"],
@@ -430,9 +388,7 @@ def make_standard_variants(
         base_variants.append(base.variant("commutative", input=test_case.input[::-1]))
 
     # the op should handle None in any position, returning None.
-    is_null_consuming = not language_nullability.should_force_none_result(
-        {"first_arg": None}, op_test_def.op
-    )
+    is_null_consuming = not language_nullability.should_force_none_result({"first_arg": None}, op_test_def.op)
 
     if not is_null_consuming:
         inputs = list(test_case.input)
@@ -490,10 +446,7 @@ def make_standard_vector_variants(
     op_test_def: OpSpec,
 ) -> list[OpTestCaseVector]:
     op_name = op_test_def.op.name
-    input_vecs = [
-        [tc.input[i] for tc in op_test_def.test_cases]
-        for i in range(op_test_def.kind.arity)
-    ]
+    input_vecs = [[tc.input[i] for tc in op_test_def.test_cases] for i in range(op_test_def.kind.arity)]
     variants = []
 
     base_variant = OpTestCaseVector(
@@ -510,18 +463,14 @@ def make_standard_vector_variants(
     if op_test_def.kind.arity == 2:
         input_vecs_with_arg0_nones.append(input_vecs[1] * 2)
 
-    is_null_consuming = not language_nullability.should_force_none_result(
-        {"first_arg": None}, op_test_def.op
-    )
+    is_null_consuming = not language_nullability.should_force_none_result({"first_arg": None}, op_test_def.op)
 
     if not is_null_consuming:
         variants.append(
             base_variant.variant(
                 "arg0-none",
                 input_vecs=tuple(input_vecs_with_arg0_nones),
-                expected_object_type=weave.types.optional(
-                    base_variant.expected_object_type
-                ),
+                expected_object_type=weave.types.optional(base_variant.expected_object_type),
                 expected=base_variant.expected + [None] * len(input_vecs[0]),
             )
         )
@@ -529,16 +478,12 @@ def make_standard_vector_variants(
         if op_test_def.kind.arity == 2:
             input_vecs_with_arg1_nones = []
             input_vecs_with_arg1_nones.append(input_vecs[0] * 2)
-            input_vecs_with_arg1_nones.append(
-                input_vecs[1] + [None] * len(input_vecs[1])
-            )
+            input_vecs_with_arg1_nones.append(input_vecs[1] + [None] * len(input_vecs[1]))
             variants.append(
                 base_variant.variant(
                     "arg1-none",
                     input_vecs=tuple(input_vecs_with_arg1_nones),
-                    expected_object_type=weave.types.optional(
-                        base_variant.expected_object_type
-                    ),
+                    expected_object_type=weave.types.optional(base_variant.expected_object_type),
                     expected=base_variant.expected + [None] * len(input_vecs[1]),
                 )
             )
@@ -561,16 +506,12 @@ def make_binary_vectorscalar_variants(
     variants: list[OpTestCaseBinaryVectorScalar] = []
 
     key_fn = lambda x: str(x.input[scalar_index])
-    scalar_grouped = itertools.groupby(
-        sorted(op_test_def.test_cases, key=key_fn), key=key_fn
-    )
+    scalar_grouped = itertools.groupby(sorted(op_test_def.test_cases, key=key_fn), key=key_fn)
     scalar_groups: list[list[OpSpecTestCase]] = []
     for k, v in scalar_grouped:
         scalar_groups.append(list(v))
     groups_of_more_than_one = [g for g in scalar_groups if len(g) > 1]
-    assert (
-        len(groups_of_more_than_one) > 0
-    ), f"You must provide at least two test cases with the same {vector_position.upper()} for op: {op_name}"
+    assert len(groups_of_more_than_one) > 0, f"You must provide at least two test cases with the same {vector_position.upper()} for op: {op_name}"
 
     for i, tcs in enumerate(groups_of_more_than_one):
         vec = [tc.input[vec_index] for tc in tcs]
@@ -590,9 +531,7 @@ def make_binary_vectorscalar_variants(
         )
         vecgroup_variants.append(base_vec)
 
-        is_null_consuming = not language_nullability.should_force_none_result(
-            {"first_arg": None}, op_test_def.op
-        )
+        is_null_consuming = not language_nullability.should_force_none_result({"first_arg": None}, op_test_def.op)
 
         if not is_null_consuming:
             vecgroup_variants.append(
@@ -661,16 +600,12 @@ def make_op_variants(op_test_def: OpSpec):
     # (a, a) form where a is a vector
     if op_test_def.kind.arity == 2 and op_test_def.kind.uniform_input_types:
         all_lhs = [tc.input[0] for tc in op_test_def.test_cases]
-        vecvec = OpTestCaseBinaryVectorVector(
-            [op_name, "vecvec"], op_test_def.op, op_test_def.kind.arity, all_lhs
-        )
+        vecvec = OpTestCaseBinaryVectorVector([op_name, "vecvec"], op_test_def.op, op_test_def.kind.arity, all_lhs)
         variants.append(vecvec)
 
     # (vec, scalar) and (scalar, vec) variants
     if op_test_def.kind.arity == 2:
-        vec_variants = make_binary_vectorscalar_variants(
-            op_test_def, vector_position="lhs"
-        )
+        vec_variants = make_binary_vectorscalar_variants(op_test_def, vector_position="lhs")
         if op_test_def.kind.uniform_input_types:
             if op_test_def.kind.commutative:
                 for vec_variant in list(vec_variants):
@@ -679,15 +614,9 @@ def make_op_variants(op_test_def: OpSpec):
                     # returns None immediately at a very early stage.
                     # TODO: fix!
                     if vec_variant.scalar != None:
-                        variants.append(
-                            vec_variant.variant("commutative", vec_first=False)
-                        )
+                        variants.append(vec_variant.variant("commutative", vec_first=False))
             else:
-                vec_variants.extend(
-                    make_binary_vectorscalar_variants(
-                        op_test_def, vector_position="rhs"
-                    )
-                )
+                vec_variants.extend(make_binary_vectorscalar_variants(op_test_def, vector_position="rhs"))
         variants.extend(vec_variants)
 
     return variants

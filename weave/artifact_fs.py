@@ -22,9 +22,7 @@ if typing.TYPE_CHECKING:
 
 
 class FilesystemArtifactType(types.Type):
-    def save_instance(
-        self, obj: "FilesystemArtifact", artifact: "FilesystemArtifact", name: str
-    ) -> "FilesystemArtifactRef":
+    def save_instance(self, obj: "FilesystemArtifact", artifact: "FilesystemArtifact", name: str) -> "FilesystemArtifactRef":
         return FilesystemArtifactRef(obj, None)
 
 
@@ -70,9 +68,7 @@ class FilesystemArtifact(artifact_base.Artifact):
     RefClass: typing.ClassVar[typing.Type["FilesystemArtifactRef"]]
     name: str
 
-    def set(
-        self, key: str, type_: types.Type, obj: typing.Any
-    ) -> artifact_base.ArtifactRef:
+    def set(self, key: str, type_: types.Type, obj: typing.Any) -> artifact_base.ArtifactRef:
         # We should do this, but it doesn't work yet!
         # existing_ref = ref_base.get_ref(obj)
         # if isinstance(existing_ref, artifact_base.ArtifactRef):
@@ -99,24 +95,18 @@ class FilesystemArtifact(artifact_base.Artifact):
         raise NotImplementedError
 
     @contextlib.contextmanager
-    def open(
-        self, path: str, binary: bool = False
-    ) -> typing.Generator[typing.IO, None, None]:
+    def open(self, path: str, binary: bool = False) -> typing.Generator[typing.IO, None, None]:
         raise NotImplementedError
 
     @contextlib.contextmanager
-    def new_file(
-        self, path: str, binary: bool = False
-    ) -> typing.Generator[typing.IO, None, None]:
+    def new_file(self, path: str, binary: bool = False) -> typing.Generator[typing.IO, None, None]:
         raise NotImplementedError
 
     @contextlib.contextmanager
     def writeable_file_path(self, path: str) -> typing.Generator[str, None, None]:
         raise NotImplementedError
 
-    def ref_from_local_str(
-        self, s: str, type: typing.Optional["types.Type"] = None
-    ) -> "FilesystemArtifactRef":
+    def ref_from_local_str(self, s: str, type: typing.Optional["types.Type"] = None) -> "FilesystemArtifactRef":
         path, extra = ref_util.parse_local_ref_str(s)
         return self.RefClass(self, path=path, extra=extra, type=type)
 
@@ -174,11 +164,7 @@ class FilesystemArtifact(artifact_base.Artifact):
     def size(self, path: str) -> int:
         return os.path.getsize(self.path(path))
 
-    def path_info(
-        self, path: str
-    ) -> typing.Optional[
-        typing.Union["FilesystemArtifactFile", "FilesystemArtifactDir"]
-    ]:
+    def path_info(self, path: str) -> typing.Optional[typing.Union["FilesystemArtifactFile", "FilesystemArtifactDir"]]:
         res = self._path_info(path)
         if isinstance(res, FilesystemArtifactRef):
             if res.path is None:
@@ -186,13 +172,7 @@ class FilesystemArtifact(artifact_base.Artifact):
             return res.artifact.path_info(res.path)
         return res
 
-    def _path_info(
-        self, path: str
-    ) -> typing.Optional[
-        typing.Union[
-            "FilesystemArtifactFile", "FilesystemArtifactDir", "FilesystemArtifactRef"
-        ]
-    ]:
+    def _path_info(self, path: str) -> typing.Optional[typing.Union["FilesystemArtifactFile", "FilesystemArtifactDir", "FilesystemArtifactRef"]]:
         raise NotImplementedError
 
     def previous_uri(self) -> typing.Optional[str]:
@@ -204,9 +184,7 @@ class FilesystemArtifact(artifact_base.Artifact):
 
 FilesystemArtifactType.instance_classes = FilesystemArtifact
 
-_loading_artifact: contextvars.ContextVar[
-    typing.Optional[FilesystemArtifact]
-] = contextvars.ContextVar("_loading_artifact", default=None)
+_loading_artifact: contextvars.ContextVar[typing.Optional[FilesystemArtifact]] = contextvars.ContextVar("_loading_artifact", default=None)
 
 
 @contextlib.contextmanager
@@ -274,47 +252,35 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         if self.extra is not None:
             from . import types_numpy
 
-            if not types.is_list_like(ot) and isinstance(
-                ot, types_numpy.NumpyArrayType
-            ):
+            if not types.is_list_like(ot) and isinstance(ot, types_numpy.NumpyArrayType):
                 # The Numpy type implementation is not consistent with how list extra refs
                 # work!
                 # TODO: fix
                 self._type = ot
             else:
                 if len(self.extra) % 2 != 0:
-                    raise errors.WeaveInternalError(
-                        f"Cannot get type of {self} with extra {self.extra}"
-                    )
+                    raise errors.WeaveInternalError(f"Cannot get type of {self} with extra {self.extra}")
                 for i in range(0, len(self.extra), 2):
                     extra_edge_type = self.extra[i]
                     extra_edge_value = self.extra[i + 1]
                     if extra_edge_type == ref_util.DICT_KEY_EDGE_NAME:
                         if not types.is_type_like(ot, types.TypedDict({})):
-                            raise errors.WeaveInternalError(
-                                f"Cannot get type of {self} with extra {self.extra}"
-                            )
+                            raise errors.WeaveInternalError(f"Cannot get type of {self} with extra {self.extra}")
                         ot = ot.property_types[extra_edge_value]  # type: ignore
                     elif extra_edge_type == ref_util.LIST_INDEX_EDGE_NAME:
                         if not types.is_list_like(ot):
-                            raise errors.WeaveInternalError(
-                                f"Cannot get type of {self} with extra {self.extra}"
-                            )
+                            raise errors.WeaveInternalError(f"Cannot get type of {self} with extra {self.extra}")
                         ot = ot.object_type  # type: ignore
                     elif extra_edge_type == ref_util.OBJECT_ATTR_EDGE_NAME:
                         if not types.is_type_like(ot, types.ObjectType()):
-                            raise errors.WeaveInternalError(
-                                f"Cannot get type of {self} with extra {self.extra}"
-                            )
+                            raise errors.WeaveInternalError(f"Cannot get type of {self} with extra {self.extra}")
                         ot = ot.property_types()[extra_edge_value]  # type: ignore
                     elif extra_edge_type == ref_util.AWL_ROW_EDGE_NAME:
                         ot = ot.object_type  # type: ignore
                     elif extra_edge_type == ref_util.AWL_COL_EDGE_NAME:
                         ot = types.List(ot.object_type.property_types[extra_edge_value])  # type: ignore
                     else:
-                        raise errors.WeaveInternalError(
-                            f"Cannot get type of {self} with extra {self.extra}"
-                        )
+                        raise errors.WeaveInternalError(f"Cannot get type of {self} with extra {self.extra}")
                 self._type = ot
         else:
             self._type = ot
@@ -497,9 +463,7 @@ class FilesystemArtifactDir(file_base.Dir):
     dirs: dict[str, file_base.SubDir]
     files: dict[str, FilesystemArtifactFile]
 
-    def path_info(
-        self, path: str
-    ) -> typing.Union[FilesystemArtifactFile, "FilesystemArtifactDir", None]:
+    def path_info(self, path: str) -> typing.Union[FilesystemArtifactFile, "FilesystemArtifactDir", None]:
         target_path = self.fullPath
         if target_path != "" and path != "":
             target_path += "/"

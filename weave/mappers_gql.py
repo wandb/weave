@@ -51,9 +51,7 @@ class GQLUnionToUnion(UnionMapper):
                         mapper_typename = typename_type.val
                         if mapper_typename == typename:
                             return mapper.apply(obj)
-        raise errors.WeaveValueError(
-            f"Cant find a member of union {self.type} with typename {typename}"
-        )
+        raise errors.WeaveValueError(f"Cant find a member of union {self.type} with typename {typename}")
 
 
 class GQLStringToString(mappers.Mapper):

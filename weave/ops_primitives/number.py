@@ -214,9 +214,7 @@ class Number(object):
         output_type=types.Timestamp(),
     )
     def to_timestamp(val):
-        return weave_timestamp.ms_to_python_datetime(
-            weave_timestamp.unitless_int_to_inferred_ms(val)
-        )
+        return weave_timestamp.ms_to_python_datetime(weave_timestamp.unitless_int_to_inferred_ms(val))
 
     @op(
         name="number-toString",

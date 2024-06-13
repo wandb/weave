@@ -10,15 +10,11 @@ def typeddict_pick_output_type(input_types):
     if not isinstance(input_types["key"], types.Const):
         return types.union(*property_types.values())
     key = input_types["key"].val
-    output_type = _tag_aware_dict_or_list_type_for_path(
-        input_types["self"], split_escaped_string(key)
-    )
+    output_type = _tag_aware_dict_or_list_type_for_path(input_types["self"], split_escaped_string(key))
     return output_type
 
 
-def tag_aware_dict_val_for_escaped_key(
-    obj: dict, key: typing.Optional[str]
-) -> typing.Any:
+def tag_aware_dict_val_for_escaped_key(obj: dict, key: typing.Optional[str]) -> typing.Any:
     if key == None:
         return None
     return _any_val_for_path(obj, split_escaped_string(key))
@@ -58,9 +54,7 @@ def typeddict_merge_output_type(
             return types.UnknownType()
         non_null_member = types.non_none(self)
         return types.UnionType(
-            typeddict_merge_output_type(
-                {"self": typing.cast(types.TypedDict, non_null_member), "other": other}
-            ),
+            typeddict_merge_output_type({"self": typing.cast(types.TypedDict, non_null_member), "other": other}),
             types.NoneType(),
         )
     elif isinstance(self, types.NoneType):
@@ -129,12 +123,7 @@ def _dict_val_for_path(val: dict, path: list[str]) -> typing.Any:
     key = path[0]
     next_path = path[1:]
     if key == "*":
-        return tag_wrapper(
-            {
-                sub_key: _any_val_for_path(sub_val, next_path)
-                for sub_key, sub_val in val.items()
-            }
-        )
+        return tag_wrapper({sub_key: _any_val_for_path(sub_val, next_path) for sub_key, sub_val in val.items()})
     if key not in val:
         return None
     key_val = val.get(key)
@@ -163,26 +152,15 @@ def _type_tag_wrapper(
     return wrapper, inner_type
 
 
-def _tag_aware_dict_or_list_type_for_path(
-    type: types.Type, path: list[str]
-) -> types.Type:
+def _tag_aware_dict_or_list_type_for_path(type: types.Type, path: list[str]) -> types.Type:
     if isinstance(type, types.Const):
         type = type.val_type
     tag_wrapper, inner_type = _type_tag_wrapper(type)
     if len(path) == 0:
         return types.NoneType()
     if isinstance(inner_type, types.UnionType):
-        return tag_wrapper(
-            types.union(
-                *[
-                    _tag_aware_dict_or_list_type_for_path(mem_type, path)
-                    for mem_type in inner_type.members
-                ]
-            )
-        )
-    if not (
-        isinstance(inner_type, types.List) or isinstance(inner_type, types.TypedDict)
-    ):
+        return tag_wrapper(types.union(*[_tag_aware_dict_or_list_type_for_path(mem_type, path) for mem_type in inner_type.members]))
+    if not (isinstance(inner_type, types.List) or isinstance(inner_type, types.TypedDict)):
         return types.NoneType()
     key = path[0]
     next_path = path[1:]
@@ -190,13 +168,7 @@ def _tag_aware_dict_or_list_type_for_path(
         if len(next_path) == 0:
             return type
         else:
-            return tag_wrapper(
-                types.List(
-                    _tag_aware_dict_or_list_type_for_path(
-                        inner_type.object_type, next_path
-                    )
-                )
-            )
+            return tag_wrapper(types.List(_tag_aware_dict_or_list_type_for_path(inner_type.object_type, next_path)))
     elif isinstance(inner_type, types.TypedDict):
         return _dict_type_for_path(type, path)
     else:
@@ -213,14 +185,7 @@ def _dict_type_for_path(type: types.Type, path: list[str]) -> types.Type:
     key = path[0]
     next_path = path[1:]
     if key == "*":
-        return tag_wrapper(
-            types.TypedDict(
-                {
-                    sub_key: _tag_aware_dict_or_list_type_for_path(sub_val, next_path)
-                    for sub_key, sub_val in prop_types.items()
-                }
-            )
-        )
+        return tag_wrapper(types.TypedDict({sub_key: _tag_aware_dict_or_list_type_for_path(sub_val, next_path) for sub_key, sub_val in prop_types.items()}))
     if key not in prop_types:
         return types.NoneType()
     key_val = typing.cast(types.Type, prop_types.get(key))

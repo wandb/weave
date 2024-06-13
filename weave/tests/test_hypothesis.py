@@ -101,9 +101,7 @@ def obj_strategy(max_depth=3, include_float=True, include_none=True):
                 st.sampled_from(["key", "foo", "bar"]),
                 # Disable generating None values in dictionaries. Our arrow implementation
                 # automatically adds Nones for missing keys in many cases. A known issue.
-                obj_strategy(
-                    max_depth - 1, include_float=include_float, include_none=False
-                ),
+                obj_strategy(max_depth - 1, include_float=include_float, include_none=False),
                 min_size=1,
                 max_size=5,
             ),
@@ -163,9 +161,7 @@ def fix_for_compare(x1):
     elif isinstance(x1, dict):
         return {k: fix_for_compare(v) for k, v in x1.items()}
     elif dataclasses.is_dataclass(x1):
-        return x1.__class__(
-            **{k: fix_for_compare(v) for k, v in dataclasses.asdict(x1).items()}
-        )
+        return x1.__class__(**{k: fix_for_compare(v) for k, v in dataclasses.asdict(x1).items()})
     elif isinstance(x1, artifact_local.LocalArtifact):
         return (x1.name, x1.version)
     return x1
@@ -186,15 +182,11 @@ def rotate_list(l):
 
 
 def pa_equal_with_null(a1, a2):
-    null_count = pa.compute.add(
-        pa.compute.is_null(a1).cast(pa.int8()), pa.compute.is_null(a2).cast(pa.int8())
-    )
+    null_count = pa.compute.add(pa.compute.is_null(a1).cast(pa.int8()), pa.compute.is_null(a2).cast(pa.int8()))
     return pa.compute.if_else(
         pa.compute.equal(null_count, 2),
         pa.scalar(True),
-        pa.compute.if_else(
-            pa.compute.equal(null_count, 0), pa.compute.equal(a1, a2), pa.scalar(False)
-        ),
+        pa.compute.if_else(pa.compute.equal(null_count, 0), pa.compute.equal(a1, a2), pa.scalar(False)),
     )
 
 
@@ -246,18 +238,12 @@ def test_to_compare_safe(l1):
     # print("safe2_arr", safe2_arr)
     if len(safe1_arr):
         # comparing to self is true!
-        assert pa_equal_with_null(safe1_arr, safe1_arr).to_pylist() == [True] * len(
-            safe1_arr
-        )
+        assert pa_equal_with_null(safe1_arr, safe1_arr).to_pylist() == [True] * len(safe1_arr)
     if len(safe2_arr):
         # comparing to self is true!
-        assert pa_equal_with_null(safe2_arr, safe2_arr).to_pylist() == [True] * len(
-            safe2_arr
-        )
+        assert pa_equal_with_null(safe2_arr, safe2_arr).to_pylist() == [True] * len(safe2_arr)
     if len(safe1_arr) and len(safe2_arr):
-        assert pa_equal_with_null(safe1_arr, safe2_arr).to_pylist() == list(
-            compare_safe_equal(i1, i2) for i1, i2 in zip(l1, l2)
-        )
+        assert pa_equal_with_null(safe1_arr, safe2_arr).to_pylist() == list(compare_safe_equal(i1, i2) for i1, i2 in zip(l1, l2))
 
 
 @given(l=st.lists(obj_strategy()))
@@ -285,9 +271,7 @@ def test_concat(l1, l2, weave_no_cache):
     expected = ops_arrow.to_arrow(l1 + l2)
 
     # assert result.object_type == expected.object_type
-    assert fix_for_compare(result.to_pylist_tagged()) == fix_for_compare(
-        expected.to_pylist_tagged()
-    )
+    assert fix_for_compare(result.to_pylist_tagged()) == fix_for_compare(expected.to_pylist_tagged())
 
 
 # @pytest.mark.flaky(reruns=3)
@@ -304,11 +288,7 @@ def test_join2(list_lambda1, list_lambda2, leftOuter, rightOuter, weave_no_cache
     # Call your join2_impl function
     alias1 = "alias1"
     alias2 = "alias2"
-    l_result = weave.use(
-        ops_primitives.join_2(
-            l1, l2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter
-        )
-    )
+    l_result = weave.use(ops_primitives.join_2(l1, l2, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter))
     print("L1", l1)
     print("L2", l2)
     print("LEFT OUTER", leftOuter)
@@ -326,9 +306,7 @@ def test_join2(list_lambda1, list_lambda2, leftOuter, rightOuter, weave_no_cache
     )
     l_result_safe = ops_arrow.to_arrow(l_result).to_pylist_tagged()
     sorted_l_result_safe = sorted(l_result_safe, key=lambda x: json.dumps(x))
-    sorted_arr_result = sorted(
-        arr_result.to_pylist_tagged(), key=lambda x: json.dumps(x)
-    )
+    sorted_arr_result = sorted(arr_result.to_pylist_tagged(), key=lambda x: json.dumps(x))
     # print("L_RESULT_ORIG", l_result)
     # print("L_RESULT", sorted_l_result_safe)
     # print("ARR_RESULT", sorted_arr_result)

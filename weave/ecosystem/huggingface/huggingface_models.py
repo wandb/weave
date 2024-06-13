@@ -43,7 +43,8 @@ class HuggingfaceModelsPanel(weave.Panel):
             self.input_node,
             columns=[
                 lambda model_row: weave.panels.WeaveLink(
-                    model_row.id(), to=lambda input: huggingface().model(input)  # type: ignore
+                    model_row.id(),
+                    to=lambda input: huggingface().model(input),  # type: ignore
                 ),
                 lambda model_row: model_row.sha(),
                 lambda model_row: model_row.pipeline_tag(),
@@ -76,9 +77,7 @@ class HuggingfaceModelPanel(weave.Panel):
                     content=weave.panels.Group(
                         items={
                             "id": weave.panels.LabeledItem(item=model.id(), label="ID"),
-                            "pipeline_tag": weave.panels.LabeledItem(
-                                item=model.pipeline_tag(), label="Pipeline tag"
-                            ),
+                            "pipeline_tag": weave.panels.LabeledItem(item=model.pipeline_tag(), label="Pipeline tag"),
                         }
                     ),
                 ),
@@ -108,10 +107,7 @@ class HuggingFacePackage:
             return model_textclassification.HFModelTextClassificationType()
         if info.pipeline_tag == "text-generation":
             return model_textgeneration.HFModelTextGenerationType()
-        raise Exception(
-            "Huggingface model type '%s' not yet supported. Add support in ecosystem/huggingface."
-            % info.pipeline_tag
-        )
+        raise Exception("Huggingface model type '%s' not yet supported. Add support in ecosystem/huggingface." % info.pipeline_tag)
 
     @weave.op(refine_output_type=model_refine_output_type)
     def model(self, id: str) -> hfmodel.HFModel:

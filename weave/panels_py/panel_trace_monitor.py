@@ -42,9 +42,7 @@ def make_span_table(input_node: graph.Node) -> panels.Table:
     traces_table.add_column(lambda row: row["status_code"].equal("SUCCESS"), "Success")
     traces_table.add_column(lambda row: row["name"], "Span Name")
     traces_table.add_column(lambda row: row["trace_id"], "Trace ID")
-    traces_table.add_column(
-        lambda row: row["end_time_s"] - row["start_time_s"], "Latency"
-    )
+    traces_table.add_column(lambda row: row["end_time_s"] - row["start_time_s"], "Latency")
     traces_table.add_column(lambda row: row["inputs"], "Inputs", panel_def="object")
     traces_table.add_column(lambda row: row["output"], "Output", panel_def="object")
     # traces_table.add_column(
@@ -92,15 +90,11 @@ def board(
 
     grouping_fn = varbar.add(
         "grouping_fn",
-        weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: row["name"]
-        ),
+        weave_internal.define_fn({"row": input_node.type.object_type}, lambda row: row["name"]),
         hidden=True,
     )
 
-    filtered_data = varbar.add(
-        "filtered_data", trace_roots.filter(filter_fn), hidden=True
-    )
+    filtered_data = varbar.add("filtered_data", trace_roots.filter(filter_fn), hidden=True)
 
     # Setup date range variables:
     ## 1. raw_data_range is derived from raw_data
@@ -124,9 +118,7 @@ def board(
 
     ## 3. bin_range is derived from user_zoom_range and raw_data_range. This is
     ##    the range of data that will be displayed in the charts.
-    bin_range = varbar.add(
-        "bin_range", user_zoom_range.coalesce(filtered_range), hidden=True
-    )
+    bin_range = varbar.add("bin_range", user_zoom_range.coalesce(filtered_range), hidden=True)
     # Derive the windowed data to use in the plots as a function of bin_range
 
     window_data = varbar.add(
@@ -145,9 +137,7 @@ def board(
         weave.panels.FilterEditor(filter_fn, node=window_data),
     )
 
-    filtered_window_data = varbar.add(
-        "filtered_window_data", window_data.filter(filter_fn), hidden=True
-    )
+    filtered_window_data = varbar.add("filtered_window_data", window_data.filter(filter_fn), hidden=True)
 
     ### Overview tab
 
@@ -165,9 +155,7 @@ def board(
             filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            y_expr=lambda row: row.map(
-                lambda ir: ir["end_time_s"] - ir["start_time_s"]
-            ).avg(),
+            y_expr=lambda row: row.map(lambda ir: ir["end_time_s"] - ir["start_time_s"]).avg(),
             y_title="avg latency (s)",
             color_expr=lambda row: grouping_fn(row),
             color_title="Root Span Name",
@@ -189,12 +177,7 @@ def board(
             filtered_data,
             bin_domain_node=bin_range,
             x_axis_key="timestamp",
-            y_expr=lambda row: (
-                row.filter(
-                    lambda inner_row: inner_row["status_code"] == "SUCCESS"
-                ).count()
-                / row.count()
-            ),
+            y_expr=lambda row: (row.filter(lambda inner_row: inner_row["status_code"] == "SUCCESS").count() / row.count()),
             y_title="success rate",
             color_expr=lambda row: grouping_fn(row),
             color_title="Root Span Name",
@@ -208,12 +191,8 @@ def board(
         "success_distribution",
         weave.ops.dict_(
             **{
-                "success": filtered_window_data.filter(
-                    lambda row: row["status_code"] == "SUCCESS"
-                ).count(),
-                "error": filtered_window_data.filter(
-                    lambda row: row["status_code"] != "SUCCESS"
-                ).count(),
+                "success": filtered_window_data.filter(lambda row: row["status_code"] == "SUCCESS").count(),
+                "error": filtered_window_data.filter(lambda row: row["status_code"] != "SUCCESS").count(),
             }
         ),
         layout=weave.panels.GroupPanelLayout(x=18, y=0, w=6, h=6),
@@ -225,9 +204,7 @@ def board(
         layout=weave.panels.GroupPanelLayout(x=0, y=6, w=24, h=6),
     )
 
-    trace_spans = all_spans.filter(
-        lambda row: row["trace_id"] == traces_table_var.active_data()["trace_id"]
-    )
+    trace_spans = all_spans.filter(lambda row: row["trace_id"] == traces_table_var.active_data()["trace_id"])
 
     trace_viewer = panels.Trace(trace_spans)  # type: ignore
 
@@ -263,9 +240,7 @@ def board(
     return panels.Board(vars=varbar, panels=overview_tab)
 
 
-instructions_md = util.read_or_default(
-    os.path.join(os.path.dirname(__file__), "instructions", "panel_trace_monitor.md")
-)
+instructions_md = util.read_or_default(os.path.join(os.path.dirname(__file__), "instructions", "panel_trace_monitor.md"))
 
 template_registry.register(
     board_name,

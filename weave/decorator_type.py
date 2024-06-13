@@ -76,9 +76,7 @@ def type(
                 except TypeError:
                     # hmmm... Exception rewriting. Am I OK with this? Could be overly aggressive.
                     # TODO: decide if we should do this
-                    raise errors.WeaveDefinitionError(
-                        f"{target}.{field.name} is not a valid python type (a class or type)"
-                    )
+                    raise errors.WeaveDefinitionError(f"{target}.{field.name} is not a valid python type (a class or type)")
                 # if weave_type == types.UnknownType():
                 #     raise errors.WeaveDefinitionError(
                 #         f"Weave doesn't yet handle the type '{field.type}' at {target}.{field.name}"

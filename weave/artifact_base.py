@@ -37,13 +37,9 @@ class ArtifactRef(ref_base.Ref):
         super().__init__(obj=obj, type=type, extra=extra)
 
     def without_extra(self, new_type: typing.Optional[types.Type]) -> "ArtifactRef":
-        return self.__class__(
-            artifact=self.artifact, path=self.path, type=new_type, obj=None, extra=None
-        )
+        return self.__class__(artifact=self.artifact, path=self.path, type=new_type, obj=None, extra=None)
 
-    def with_extra(
-        self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
-    ) -> "ArtifactRef":
+    def with_extra(self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]) -> "ArtifactRef":
         new_extra = self.extra
         if self.extra is None:
             new_extra = []

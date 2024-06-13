@@ -68,16 +68,12 @@ def _awl_pick(array: pa.Array, path: list[str]) -> pa.Array:
             return array
         else:
             flattened_results = _awl_pick(inner_array.flatten(), next_path)
-            rolled_results = pa.ListArray.from_arrays(
-                offsets_starting_at_zero(inner_array), flattened_results
-            )
+            rolled_results = pa.ListArray.from_arrays(offsets_starting_at_zero(inner_array), flattened_results)
             return tag_wrapper(rolled_results)
     elif isinstance(inner_array, pa.StructArray):
         all_names = _struct_array_field_names(inner_array)
         if key == "*":
-            all_columns = [
-                _awl_pick(inner_array.field(name), next_path) for name in all_names
-            ]
+            all_columns = [_awl_pick(inner_array.field(name), next_path) for name in all_names]
             return tag_wrapper(pa.StructArray.from_arrays(all_columns, all_names))
         else:
             if key not in all_names:
@@ -95,17 +91,11 @@ def _awl_pick(array: pa.Array, path: list[str]) -> pa.Array:
 @arrow_op(
     name="ArrowWeaveListTypedDict-pick",
     input_type={"self": ArrowWeaveListType(types.TypedDict({})), "key": types.String()},
-    output_type=lambda input_types: ArrowWeaveListType(
-        typeddict_pick_output_type(
-            {"self": input_types["self"].object_type, "key": input_types["key"]}
-        )
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(typeddict_pick_output_type({"self": input_types["self"].object_type, "key": input_types["key"]})),
     all_args_nullable=False,
 )
 def pick(self, key):
-    object_type = typeddict_pick_output_type(
-        {"self": self.object_type, "key": types.Const(types.String(), key)}
-    )
+    object_type = typeddict_pick_output_type({"self": self.object_type, "key": types.Const(types.String(), key)})
     data = arrow_as_array(self._arrow_data)
     path = _dict_utils.split_escaped_string(key)
     result = _awl_pick(data, path)
@@ -135,17 +125,9 @@ AWLMaybeTypedDictType = ArrowWeaveListType(MaybeTypedDictType)
     name="ArrowWeaveList-_preprocessMerge",
     input_type={
         "self": types.union(AWLMaybeTypedDictType, MaybeTypedDictType),
-        "other": (
-            lambda input_types: AWLMaybeTypedDictType
-            if MaybeTypedDictType.assign_type(input_types["self"])
-            else types.union(AWLMaybeTypedDictType, MaybeTypedDictType)
-        ),
+        "other": (lambda input_types: AWLMaybeTypedDictType if MaybeTypedDictType.assign_type(input_types["self"]) else types.union(AWLMaybeTypedDictType, MaybeTypedDictType)),
     },
-    output_type=(
-        lambda input_types: input_types["self"]
-        if ArrowWeaveListType().assign_type(input_types["self"])
-        else ArrowWeaveListType(input_types["self"])
-    ),
+    output_type=(lambda input_types: input_types["self"] if ArrowWeaveListType().assign_type(input_types["self"]) else ArrowWeaveListType(input_types["self"])),
     hidden=True,
 )
 def preprocess_merge(self, other):
@@ -192,9 +174,7 @@ def merge(self, other):
 
     result = ArrowWeaveList(
         new_array,
-        _dict_utils.typeddict_merge_output_type(
-            {"self": self.object_type, "other": other.object_type}
-        ),
+        _dict_utils.typeddict_merge_output_type({"self": self.object_type, "other": other.object_type}),
         self._artifact,
     )
 
@@ -253,9 +233,7 @@ def arrow_dict_(**d):
     output_type=lambda input_types: ArrowWeaveListType(
         types.TypedDict(
             {
-                "projection": types.TypedDict(
-                    {"x": types.Number(), "y": types.Number()}
-                ),
+                "projection": types.TypedDict({"x": types.Number(), "y": types.Number()}),
                 "source": input_types["table"].object_type,
             }
         )
@@ -280,18 +258,11 @@ def awl_2d_projection(
     else:
         if inputCardinality == "single":
             path = _dict_utils.split_escaped_string(inputColumnNames[0])
-            np_array_of_embeddings = np.stack(
-                _awl_pick(data, path).to_numpy(False), axis=0
-            )
+            np_array_of_embeddings = np.stack(_awl_pick(data, path).to_numpy(False), axis=0)
         else:
-            column_data = [
-                _awl_pick(data, _dict_utils.split_escaped_string(c))
-                for c in inputColumnNames
-            ]
+            column_data = [_awl_pick(data, _dict_utils.split_escaped_string(c)) for c in inputColumnNames]
             # Filter out null columns
-            column_data = [
-                col for col in column_data if not isinstance(col, pa.NullArray)
-            ]
+            column_data = [col for col in column_data if not isinstance(col, pa.NullArray)]
             np_array_of_embeddings = np.array(column_data).T
 
         # coerce to float to turn Nones into nans
@@ -313,32 +284,21 @@ def awl_2d_projection(
         np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings)
 
         # remove 0-only columns
-        np_array_of_embeddings = np_array_of_embeddings[
-            :, ~((np_array_of_embeddings == 0).all(axis=0))
-        ]
+        np_array_of_embeddings = np_array_of_embeddings[:, ~((np_array_of_embeddings == 0).all(axis=0))]
         # If the selected data is not a 2D array, or if it has less than 2 columns, then
         # we can't perform a 2D projection. In this case, we just return a 2D array of
         # zeros.
-        if (
-            len(np_array_of_embeddings.shape) != 2
-            or np_array_of_embeddings.shape[1] < 2
-        ):
+        if len(np_array_of_embeddings.shape) != 2 or np_array_of_embeddings.shape[1] < 2:
             np_projection = default_projection()
         else:
             np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings, copy=False)
-            np_projection = projection_utils.perform_2D_projection_with_timeout(
-                np_array_of_embeddings, projectionAlgorithm, algorithmOptions
-            )
+            np_projection = projection_utils.perform_2D_projection_with_timeout(np_array_of_embeddings, projectionAlgorithm, algorithmOptions)
     x_column = np_projection[:, 0]
     y_column = np_projection[:, 1]
 
-    projection_column = pa.StructArray.from_arrays(
-        [pa.array(x_column), pa.array(y_column)], ["x", "y"]
-    )
+    projection_column = pa.StructArray.from_arrays([pa.array(x_column), pa.array(y_column)], ["x", "y"])
 
-    projection_column = pa.StructArray.from_arrays(
-        [projection_column, source_column], ["projection", "source"]
-    )
+    projection_column = pa.StructArray.from_arrays([projection_column, source_column], ["projection", "source"])
 
     return ArrowWeaveList(
         projection_column,
@@ -369,9 +329,7 @@ def awl_2d_projection(
     output_type=lambda input_types: ArrowWeaveListType(
         types.TypedDict(
             {
-                "projection": types.TypedDict(
-                    {"x": types.Number(), "y": types.Number()}
-                ),
+                "projection": types.TypedDict({"x": types.Number(), "y": types.Number()}),
                 "source": input_types["table"].object_type,
             }
         )
@@ -396,46 +354,28 @@ def awl_projection_2d(
     else:
         if inputCardinality == "single":
             path = _dict_utils.split_escaped_string(inputColumnNames[0])
-            np_array_of_embeddings = np.stack(
-                _awl_pick(data, path).to_numpy(False), axis=0
-            )
+            np_array_of_embeddings = np.stack(_awl_pick(data, path).to_numpy(False), axis=0)
         else:
-            column_data = [
-                _awl_pick(data, _dict_utils.split_escaped_string(c))
-                for c in inputColumnNames
-            ]
+            column_data = [_awl_pick(data, _dict_utils.split_escaped_string(c)) for c in inputColumnNames]
             # Filter out null columns
-            column_data = [
-                col for col in column_data if not isinstance(col, pa.NullArray)
-            ]
+            column_data = [col for col in column_data if not isinstance(col, pa.NullArray)]
             np_array_of_embeddings = np.array(column_data).T
         # remove 0-only columns
-        np_array_of_embeddings = np_array_of_embeddings[
-            :, ~(np_array_of_embeddings.sum(axis=0) == 0)
-        ]
+        np_array_of_embeddings = np_array_of_embeddings[:, ~(np_array_of_embeddings.sum(axis=0) == 0)]
         # If the selected data is not a 2D array, or if it has less than 2 columns, then
         # we can't perform a 2D projection. In this case, we just return a 2D array of
         # zeros.
-        if (
-            len(np_array_of_embeddings.shape) != 2
-            or np_array_of_embeddings.shape[1] < 2
-        ):
+        if len(np_array_of_embeddings.shape) != 2 or np_array_of_embeddings.shape[1] < 2:
             np_projection = default_projection()
         else:
             np_array_of_embeddings = np.nan_to_num(np_array_of_embeddings, copy=False)
-            np_projection = projection_utils.perform_2D_projection_with_timeout(
-                np_array_of_embeddings, projectionAlgorithm, algorithmOptions
-            )
+            np_projection = projection_utils.perform_2D_projection_with_timeout(np_array_of_embeddings, projectionAlgorithm, algorithmOptions)
     x_column = np_projection[:, 0]
     y_column = np_projection[:, 1]
 
-    projection_column = pa.StructArray.from_arrays(
-        [pa.array(x_column), pa.array(y_column)], ["x", "y"]
-    )
+    projection_column = pa.StructArray.from_arrays([pa.array(x_column), pa.array(y_column)], ["x", "y"])
 
-    projection_column = pa.StructArray.from_arrays(
-        [projection_column, source_column], ["projection", "source"]
-    )
+    projection_column = pa.StructArray.from_arrays([projection_column, source_column], ["projection", "source"])
 
     return ArrowWeaveList(
         projection_column,
@@ -461,9 +401,7 @@ def awl_projection_2d(
 )
 def keys(self):
     keys = list(self.object_type.property_types.keys())
-    return convert.to_arrow(
-        [keys] * len(self), types.List(types.List(types.String())), self._artifact
-    )
+    return convert.to_arrow([keys] * len(self), types.List(types.List(types.String())), self._artifact)
 
 
 @op(
@@ -491,9 +429,7 @@ def _with_column_type(cur_type: types.Type, key: str, new_col_type: types.Type):
         return _with_column_type(
             cur_type,
             path[0],
-            _with_column_type(
-                property_types[path[0]], ".".join(path[1:]), new_col_type
-            ),
+            _with_column_type(property_types[path[0]], ".".join(path[1:]), new_col_type),
         )
 
     col_names = list(property_types.keys())

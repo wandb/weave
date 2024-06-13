@@ -46,9 +46,7 @@ def unflatten_structs_in_flattened_table(table: pa.Table) -> pa.Table:
     [ {a: {b: {c: 1, d: 4}, e: 7}}, {a: {b: {c: 2, d: 5}, e: 8}}, {a: {b: {c: 3, d: 6}, e: 9}} ]
     """
 
-    def recursively_build_nested_struct_array(
-        columns: dict[str, pa.Array]
-    ) -> pa.StructArray:
+    def recursively_build_nested_struct_array(columns: dict[str, pa.Array]) -> pa.StructArray:
         result: NestedTableColumns = defaultdict(lambda: {})
         for colname in columns:
             spl_colname = colname.split(FLATTEN_DELIMITER)
@@ -72,9 +70,7 @@ def unflatten_structs_in_flattened_table(table: pa.Table) -> pa.Table:
 
         return pa.StructArray.from_arrays(arrays, names)
 
-    recurse_input = {
-        colname: table[colname].combine_chunks() for colname in table.column_names
-    }
+    recurse_input = {colname: table[colname].combine_chunks() for colname in table.column_names}
 
     sa = recursively_build_nested_struct_array(recurse_input)
 
@@ -88,15 +84,11 @@ def unflatten_structs_in_flattened_table(table: pa.Table) -> pa.Table:
     return pa.Table.from_arrays(chunked_arrays, names=names)
 
 
-def _recursively_flatten_structs_in_array(
-    arr: pa.Array, prefix: str, _stack_depth=0
-) -> dict[str, pa.Array]:
+def _recursively_flatten_structs_in_array(arr: pa.Array, prefix: str, _stack_depth=0) -> dict[str, pa.Array]:
     if pa.types.is_struct(arr.type):
         result: dict[str, pa.Array] = {}
         for field in arr.type:
-            new_prefix = (
-                prefix + (FLATTEN_DELIMITER if _stack_depth > 0 else "") + field.name
-            )
+            new_prefix = prefix + (FLATTEN_DELIMITER if _stack_depth > 0 else "") + field.name
             result.update(
                 _recursively_flatten_structs_in_array(
                     arr.field(field.name),
@@ -122,9 +114,7 @@ def unzip_struct_array(arr: pa.ChunkedArray) -> pa.Table:
             types.Any(),
         ),
     },
-    output_type=lambda input_types: ArrowWeaveListType(
-        input_types["map_fn"].output_type
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(input_types["map_fn"].output_type),
 )
 def map(self, map_fn):
     res = _apply_fn_node_with_tag_pushdown(self, map_fn)
@@ -132,19 +122,13 @@ def map(self, map_fn):
 
 
 def _map_each_function_type(input_types: dict[str, types.Type]) -> types.Type:
-    base_op_fn_type = primitive_list._map_each_function_type(
-        {"arr": input_types["self"]}
-    )
-    base_op_fn_type.input_types["self"] = ArrowWeaveListType(
-        typing.cast(types.List, input_types["self"]).object_type
-    )
+    base_op_fn_type = primitive_list._map_each_function_type({"arr": input_types["self"]})
+    base_op_fn_type.input_types["self"] = ArrowWeaveListType(typing.cast(types.List, input_types["self"]).object_type)
     return base_op_fn_type
 
 
 def _map_each_output_type(input_types: dict[str, types.Type]):
-    base_output_type = primitive_list._map_each_output_type(
-        {"arr": input_types["self"], "mapFn": input_types["map_fn"]}
-    )
+    base_output_type = primitive_list._map_each_output_type({"arr": input_types["self"], "mapFn": input_types["map_fn"]})
     return ArrowWeaveListType(base_output_type.object_type)
 
 
@@ -157,9 +141,7 @@ def _map_each(self: ArrowWeaveList, fn):
         offsets = offsets_starting_at_zero(as_array)
         flattened = as_array.flatten()
         if isinstance(self.object_type, tagged_value_type.TaggedValueType):
-            new_object_type = typing.cast(
-                types.List, self.object_type.value
-            ).object_type
+            new_object_type = typing.cast(types.List, self.object_type.value).object_type
         else:
             new_object_type = typing.cast(types.List, self.object_type).object_type
 
@@ -204,9 +186,7 @@ def _impute_nones_for_sort(awl: ArrowWeaveList) -> ArrowWeaveList:
     the fact that arrow does not handle missing values in a table when sorting, it just
     moves them all to the end of the list."""
 
-    def impute_nones(
-        arrow_list: ArrowWeaveList, path: PathType
-    ) -> typing.Optional[ArrowWeaveList]:
+    def impute_nones(arrow_list: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
         # this does not work for unions in arrow < 12
         if not types.is_optional(arrow_list.object_type):
             return None
@@ -223,34 +203,22 @@ def _impute_nones_for_sort(awl: ArrowWeaveList) -> ArrowWeaveList:
                     types.Int(),
                     awl._artifact,
                 )
-            if pa.types.is_struct(arrow_list._arrow_data.type) or pa.types.is_list(
-                arrow_list._arrow_data.type
-            ):
-                raise NotImplementedError(
-                    "Imputing nulls for a struct or a list is not implemented"
-                )
+            if pa.types.is_struct(arrow_list._arrow_data.type) or pa.types.is_list(arrow_list._arrow_data.type):
+                raise NotImplementedError("Imputing nulls for a struct or a list is not implemented")
 
             if pa.types.is_string(arrow_list._arrow_data.type):
                 replacement = pa.repeat("", num_null)
-                new_data = pa.compute.replace_with_mask(
-                    arrow_list._arrow_data, mask, replacement
-                )
+                new_data = pa.compute.replace_with_mask(arrow_list._arrow_data, mask, replacement)
             elif pa.types.is_floating(arrow_list._arrow_data.type):
                 min = pa.compute.min(arrow_list._arrow_data).as_py()
-                replacement = pa.repeat(
-                    min - 1.0, num_null
-                )  # greater than all other elements
+                replacement = pa.repeat(min - 1.0, num_null)  # greater than all other elements
             elif pa.types.is_integer(arrow_list._arrow_data.type):
                 min = pa.compute.min(arrow_list._arrow_data).as_py()
                 replacement = pa.repeat(min - 1, num_null)
             else:
-                raise NotImplementedError(
-                    f"Imputing nulls for type {arrow_list._arrow_data.type} is not implemented"
-                )
+                raise NotImplementedError(f"Imputing nulls for type {arrow_list._arrow_data.type} is not implemented")
 
-            new_data = pa.compute.replace_with_mask(
-                arrow_list._arrow_data, mask, replacement
-            )
+            new_data = pa.compute.replace_with_mask(arrow_list._arrow_data, mask, replacement)
             return ArrowWeaveList(
                 new_data,
                 types.non_none(arrow_list.object_type),
@@ -262,14 +230,10 @@ def _impute_nones_for_sort(awl: ArrowWeaveList) -> ArrowWeaveList:
     return awl.map_column(impute_nones)
 
 
-def _sort_values_list_array_to_table(
-    sort_values: ArrowWeaveList, col_dirs: list[str]
-) -> pa.Table:
+def _sort_values_list_array_to_table(sort_values: ArrowWeaveList, col_dirs: list[str]) -> pa.Table:
     flattened = sort_values._arrow_data_asarray_no_tags().flatten()
 
-    columns = (
-        []
-    )  # this is intended to be a pylist and will be small since it is number of sort fields
+    columns = []  # this is intended to be a pylist and will be small since it is number of sort fields
     col_len = len(sort_values._arrow_data)
     dir_len = len(col_dirs)
     col_names = [str(i) for i in range(dir_len)]
@@ -298,15 +262,10 @@ def _sort_values_list_array_to_table(
     return pa.Table.from_arrays(columns, names=col_names)
 
 
-def _arrow_sort_values_to_indices(
-    sort_values: pa.Table, col_dirs: list[str]
-) -> pa.Array:
+def _arrow_sort_values_to_indices(sort_values: pa.Table, col_dirs: list[str]) -> pa.Array:
     col_names = sort_values.column_names
 
-    order = [
-        (col_name, "ascending" if dir_name == "asc" else "descending")
-        for col_name, dir_name in zip(col_names, col_dirs)
-    ]
+    order = [(col_name, "ascending" if dir_name == "asc" else "descending") for col_name, dir_name in zip(col_names, col_dirs)]
 
     return pc.sort_indices(sort_values, order, null_placement="at_end")
 
@@ -335,9 +294,7 @@ def sort(self, comp_fn, col_dirs):
         # handle unions.
 
         if pa.types.is_union(column.type):
-            if pa.compute.all(
-                pa.compute.equal(column.type_codes, column.type_codes[0])
-            ).as_py():
+            if pa.compute.all(pa.compute.equal(column.type_codes, column.type_codes[0])).as_py():
                 column = column.field(column.type_codes[0].as_py())
             else:
                 # have to break out here. we need to convert to a string but
@@ -357,9 +314,7 @@ def sort(self, comp_fn, col_dirs):
         sort_values = sort_values.set_column(i, column_name, column._arrow_data)
 
     indices = _arrow_sort_values_to_indices(sort_values, col_dirs)
-    return ArrowWeaveList(
-        pc.take(self._arrow_data, indices), self.object_type, self._artifact
-    )
+    return ArrowWeaveList(pc.take(self._arrow_data, indices), self.object_type, self._artifact)
 
 
 @op(
@@ -384,9 +339,7 @@ def filter(self, filter_fn):
     )
 
 
-def awl_group_by_result_object_type(
-    object_type: types.Type, _key: types.Type
-) -> tagged_value_type.TaggedValueType:
+def awl_group_by_result_object_type(object_type: types.Type, _key: types.Type) -> tagged_value_type.TaggedValueType:
     return tagged_value_type.TaggedValueType(
         types.TypedDict(
             {
@@ -397,9 +350,7 @@ def awl_group_by_result_object_type(
     )
 
 
-def awl_group_by_result_type(
-    object_type: types.Type, key_type: types.Type
-) -> "ArrowWeaveListType":
+def awl_group_by_result_type(object_type: types.Type, key_type: types.Type) -> "ArrowWeaveListType":
     return ArrowWeaveListType(awl_group_by_result_object_type(object_type, key_type))
 
 
@@ -407,13 +358,9 @@ def awl_group_by_result_type(
     name="ArrowWeaveList-groupby",
     input_type={
         "self": ArrowWeaveListType(),
-        "group_by_fn": lambda input_types: types.Function(
-            {"row": input_types["self"].object_type}, types.Any()
-        ),
+        "group_by_fn": lambda input_types: types.Function({"row": input_types["self"].object_type}, types.Any()),
     },
-    output_type=lambda input_types: awl_group_by_result_type(
-        input_types["self"].object_type, input_types["group_by_fn"].output_type
-    ),
+    output_type=lambda input_types: awl_group_by_result_type(input_types["self"].object_type, input_types["group_by_fn"].output_type),
 )
 def groupby(self, group_by_fn):
     table = self._arrow_data
@@ -441,9 +388,7 @@ def groupby(self, group_by_fn):
     # TODO: investigate this as we optimize the arrow implementation
     group_table_combined = group_table_chunked_unzipped.combine_chunks()
 
-    group_table_combined_indexed = group_table_combined.append_column(
-        "_index", pa.array(np.arange(len(group_table_combined)))
-    )
+    group_table_combined_indexed = group_table_combined.append_column("_index", pa.array(np.arange(len(group_table_combined))))
     awl_grouped = group_table_combined_indexed.group_by(group_cols)
     awl_grouped_agg = awl_grouped.aggregate([("_index", "list")])
     awl_grouped_agg_struct = unflatten_structs_in_flattened_table(awl_grouped_agg)
@@ -454,18 +399,10 @@ def groupby(self, group_by_fn):
     values = arrow_as_array(table).take(flattened_indexes)
     offsets = np.cumsum(np.concatenate(([0], val_lengths)))
     grouped_results = pa.ListArray.from_arrays(offsets, values)
-    grouped_awl = ArrowWeaveList(
-        grouped_results, ArrowWeaveListType(self.object_type), self._artifact
-    )
-    effective_group_key_indexes = flattened_indexes.take(
-        pa.array(offsets.tolist()[:-1]).cast(pa.int64())
-    )
-    effective_group_keys = arrow_as_array(unsafe_group_table_awl._arrow_data).take(
-        effective_group_key_indexes
-    )
-    nested_effective_group_keys = pa.StructArray.from_arrays(
-        [effective_group_keys], names=["groupKey"]
-    )
+    grouped_awl = ArrowWeaveList(grouped_results, ArrowWeaveListType(self.object_type), self._artifact)
+    effective_group_key_indexes = flattened_indexes.take(pa.array(offsets.tolist()[:-1]).cast(pa.int64()))
+    effective_group_keys = arrow_as_array(unsafe_group_table_awl._arrow_data).take(effective_group_key_indexes)
+    nested_effective_group_keys = pa.StructArray.from_arrays([effective_group_keys], names=["groupKey"])
 
     return arrow_tags.awl_add_arrow_tags(
         grouped_awl,
@@ -477,9 +414,7 @@ def groupby(self, group_by_fn):
 @op(
     name="ArrowWeaveList-dropna",
     input_type={"self": ArrowWeaveListType()},
-    output_type=lambda input_types: ArrowWeaveListType(
-        types.non_none(input_types["self"].object_type)
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(types.non_none(input_types["self"].object_type)),
 )
 def dropna(self):
     res = pc.drop_null(self._arrow_data)
@@ -507,9 +442,7 @@ def index(
 
 @op(name="ArrowWeaveList-offset", output_type=lambda input_types: input_types["self"])
 def offset(self: ArrowWeaveList, offset: int):
-    return ArrowWeaveList(
-        self._arrow_data.slice(offset), self.object_type, self._artifact
-    )
+    return ArrowWeaveList(self._arrow_data.slice(offset), self.object_type, self._artifact)
 
 
 @op(name="ArrowWeaveList-limit", output_type=lambda input_types: input_types["self"])
@@ -535,9 +468,7 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
     for column in list_columns:
         value_lengths = table[column].combine_chunks().value_lengths()
         if not pc.equal(value_lengths, value_lengths_0):
-            raise ValueError(
-                f"Cannot explode table with list columns of different shapes: {value_lengths} != {value_lengths_0}"
-            )
+            raise ValueError(f"Cannot explode table with list columns of different shapes: {value_lengths} != {value_lengths_0}")
         if pc.any(pc.is_null(table[column])).as_py():
             # Occurs if we have an optional<list> column. Due to the way flatten works, any rows where the
             # list is null will be dropped. So we need to put the null inside a list, which causes flatten
@@ -576,12 +507,7 @@ def explode_table(table: pa.Table, list_columns: list[str]) -> pa.Table:
     input_type={"self": ArrowWeaveListType(types.TypedDict({}))},
     output_type=lambda input_types: ArrowWeaveListType(
         types.TypedDict(
-            {
-                k: v
-                if not (types.is_list_like(v) or isinstance(v, ArrowWeaveListType))
-                else v.object_type
-                for (k, v) in input_types["self"].object_type.property_types.items()
-            }
+            {k: v if not (types.is_list_like(v) or isinstance(v, ArrowWeaveListType)) else v.object_type for (k, v) in input_types["self"].object_type.property_types.items()}
         )
     ),
 )
@@ -601,9 +527,7 @@ def unnest(self):
         return self
 
     if isinstance(self._arrow_data, pa.StructArray):
-        rb = pa.RecordBatch.from_struct_array(
-            self._arrow_data
-        )  # this pivots to columnar layout
+        rb = pa.RecordBatch.from_struct_array(self._arrow_data)  # this pivots to columnar layout
         arrow_obj = pa.Table.from_batches([rb])
     else:
         arrow_obj = self._arrow_data
@@ -612,9 +536,7 @@ def unnest(self):
     tag_col_name_map = {}
     for col in list_cols:
         col_data = arrow_obj.column(col).combine_chunks()
-        if isinstance(
-            self.object_type.property_types[col], tagged_value_type.TaggedValueType
-        ):
+        if isinstance(self.object_type.property_types[col], tagged_value_type.TaggedValueType):
             tag_col_name = f"{col}__tag__"
             tag_col_name_map[col] = tag_col_name
 
@@ -634,12 +556,8 @@ def unnest(self):
             val_col = exploded_table.column(col).combine_chunks()
             tag_col = exploded_table.column(tag_col_name).combine_chunks()
             combined_col = arrow_tags.direct_add_arrow_tags(val_col, tag_col)
-            exploded_table = exploded_table.remove_column(
-                exploded_table.column_names.index(tag_col_name)
-            )
-            exploded_table = exploded_table.remove_column(
-                exploded_table.column_names.index(col)
-            )
+            exploded_table = exploded_table.remove_column(exploded_table.column_names.index(tag_col_name))
+            exploded_table = exploded_table.remove_column(exploded_table.column_names.index(col))
             exploded_table = exploded_table.append_column(col, combined_col)
 
     return ArrowWeaveList(
@@ -655,16 +573,12 @@ def _concat_output_type(input_types: typing.Dict[str, types.List]) -> types.Type
 
     if isinstance(inner_type, types.UnionType):
         if not all(types.is_list_like(t) for t in inner_type.members):
-            raise ValueError(
-                "opConcat: expected all members of inner type to be list-like"
-            )
+            raise ValueError("opConcat: expected all members of inner type to be list-like")
 
         new_union_members = [
             typing.cast(
                 ArrowWeaveListType,
-                tagged_value_type_helpers.push_down_tags_from_container_type_to_element_type(
-                    t
-                ),
+                tagged_value_type_helpers.push_down_tags_from_container_type_to_element_type(t),
             ).object_type
             for t in inner_type.members
         ]
@@ -679,26 +593,16 @@ def _concat_output_type(input_types: typing.Dict[str, types.List]) -> types.Type
     elif isinstance(inner_type, tagged_value_type.TaggedValueType):
         inner_type_value = inner_type.value
         inner_type_tag = inner_type.tag
-        inner_type_value_inner_type = typing.cast(
-            ArrowWeaveListType, inner_type_value
-        ).object_type
+        inner_type_value_inner_type = typing.cast(ArrowWeaveListType, inner_type_value).object_type
 
-        return ArrowWeaveListType(
-            tagged_value_type.TaggedValueType(
-                inner_type_tag, inner_type_value_inner_type
-            )
-        )
+        return ArrowWeaveListType(tagged_value_type.TaggedValueType(inner_type_tag, inner_type_value_inner_type))
 
     return inner_type
 
 
 @op(
     name="ArrowWeaveList-concat",
-    input_type={
-        "arr": types.List(
-            types.union(types.NoneType(), ArrowWeaveListType(types.Any()))
-        )
-    },
+    input_type={"arr": types.List(types.union(types.NoneType(), ArrowWeaveListType(types.Any())))},
     output_type=_concat_output_type,
 )
 def concat(arr):
@@ -738,9 +642,7 @@ def concat(arr):
 
 
 def awl_object_type_with_index(object_type):
-    return tagged_value_type.TaggedValueType(
-        types.TypedDict({"indexCheckpoint": types.Int()}), object_type
-    )
+    return tagged_value_type.TaggedValueType(types.TypedDict({"indexCheckpoint": types.Int()}), object_type)
 
 
 def arrow_weave_list_createindexcheckpoint_output_type(input_type):
@@ -783,10 +685,7 @@ def arrow_list_(**e):
 
     # Use our ArrowWeaveList concat implementation. Its guaranteed to
     # work for all possible AWL types.
-    awls = [
-        ArrowWeaveList(arr, object_type, None)
-        for arr, object_type in zip(res.arrays, res.prop_types.values())
-    ]
+    awls = [ArrowWeaveList(arr, object_type, None) for arr, object_type in zip(res.arrays, res.prop_types.values())]
     result_values = awls[0]
     for next_awl in awls[1:]:
         result_values = result_values.concat(next_awl)
@@ -800,9 +699,7 @@ def arrow_list_(**e):
         for row_ndx in range(res.max_len):
             take_ndxs.extend([row_ndx + i * res.max_len for i in range(len(e))])
         values = concatted.take(pa.array(take_ndxs))
-    offsets = pa.array(
-        [i * len(e) for i in range(res.max_len)] + [res.max_len * len(e)]
-    )
+    offsets = pa.array([i * len(e) for i in range(res.max_len)] + [res.max_len * len(e)])
     return ArrowWeaveList(
         pa.ListArray.from_arrays(offsets, values),
         types.List(result_values.object_type),
@@ -835,9 +732,7 @@ def vectorized_arrow_pick(self, key):
     if isinstance(key, list):
         return [self.get(k, None) if k != None else None for k in key]
     de = arrow_as_array(key._arrow_data_asarray_no_tags()).dictionary_encode()
-    new_dictionary = pa.array(
-        [self.get(key, None) for key in de.dictionary.to_pylist()]
-    )
+    new_dictionary = pa.array([self.get(key, None) for key in de.dictionary.to_pylist()])
     new_indices = de.indices
     new_array = pa.DictionaryArray.from_arrays(new_indices, new_dictionary)
     result = new_array.dictionary_decode()
@@ -906,9 +801,7 @@ def flatten_return_object_type(object_type):
 
 
 def flatten_return_type(input_types):
-    return ArrowWeaveListType(
-        flatten_return_object_type(input_types["arr"].object_type)
-    )
+    return ArrowWeaveListType(flatten_return_object_type(input_types["arr"].object_type))
 
 
 @op(
@@ -921,10 +814,7 @@ def flatten(arr):
     #   - handle N levels instead of 1
 
     arrow_data = arr._arrow_data
-    if is_list_arrowweavelist(arr) or (
-        is_taggedvalue_arrowweavelist(arr)
-        and is_list_arrowweavelist(arr.tagged_value_value())
-    ):
+    if is_list_arrowweavelist(arr) or (is_taggedvalue_arrowweavelist(arr) and is_list_arrowweavelist(arr.tagged_value_value())):
         # unwrap tags
 
         tags = None
@@ -946,9 +836,7 @@ def flatten(arr):
         if tags is not None:
             list_parent_indices = pc.list_parent_indices(values)
             flattened_tags = tags.take(list_parent_indices)
-            flattened_values = arrow_tags.direct_add_arrow_tags(
-                flattened_values, flattened_tags
-            )
+            flattened_values = arrow_tags.direct_add_arrow_tags(flattened_values, flattened_tags)
 
         arrow_data = flattened_values
 

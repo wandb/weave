@@ -15,30 +15,18 @@ value_fns: list[typing.Any] = [
     lambda steps: np.exp(steps * 0.0001),
     lambda steps: np.exp(-steps * 0.0001) * 1000,  # Simulate decreasing loss
     lambda steps: 1 - np.exp(-steps * 0.0001),  # Simulate increasing accuracy
-    lambda steps: np.power(steps, -0.5)
-    * 1000,  # Simulate decreasing loss with power-law decay
+    lambda steps: np.power(steps, -0.5) * 1000,  # Simulate decreasing loss with power-law decay
     lambda steps: np.tanh(steps * 0.0001),  # Simulate a metric converging to a value
-    lambda steps: np.arctan(
-        steps * 0.0001
-    ),  # Simulate a metric converging to a value with a different curve
+    lambda steps: np.arctan(steps * 0.0001),  # Simulate a metric converging to a value with a different curve
     lambda steps: np.piecewise(
         steps,
         [steps < len(steps) / 2, steps >= len(steps) / 2],
         [lambda steps: steps * 0.001, lambda steps: 1 - np.exp(-steps * 0.0001)],
     ),  # Simulate a two-stage training process
-    lambda steps: np.sin(steps * 0.001)
-    * np.exp(-steps * 0.0001),  # Sinusoidal oscillations with exponential decay
-    lambda steps: (np.cos(steps * 0.001) + 1)
-    * 0.5
-    * (1 - np.exp(-steps * 0.0001)),  # Oscillations converging to increasing accuracy
-    lambda steps: np.log(steps + 1)
-    * (
-        1 - np.exp(-steps * 0.0001)
-    ),  # Logarithmic growth modulated by increasing accuracy
-    lambda steps: np.random.random()
-    * (
-        1 - np.exp(-steps * 0.0001)
-    ),  # Random constant value modulated by increasing accuracy
+    lambda steps: np.sin(steps * 0.001) * np.exp(-steps * 0.0001),  # Sinusoidal oscillations with exponential decay
+    lambda steps: (np.cos(steps * 0.001) + 1) * 0.5 * (1 - np.exp(-steps * 0.0001)),  # Oscillations converging to increasing accuracy
+    lambda steps: np.log(steps + 1) * (1 - np.exp(-steps * 0.0001)),  # Logarithmic growth modulated by increasing accuracy
+    lambda steps: np.random.random() * (1 - np.exp(-steps * 0.0001)),  # Random constant value modulated by increasing accuracy
 ]
 
 
@@ -46,9 +34,7 @@ def random_metrics_template(n_metrics: int) -> list[int]:
     return [random.randrange(0, len(value_fns)) for _ in range(n_metrics)]
 
 
-def random_metrics(
-    n: int = 100000, n_metrics: int = 100, template: typing.Optional[list[int]] = None
-) -> ArrowWeaveList:
+def random_metrics(n: int = 100000, n_metrics: int = 100, template: typing.Optional[list[int]] = None) -> ArrowWeaveList:
     # gpt-4 helped here.
 
     steps = np.arange(0, n, 1)
@@ -72,13 +58,10 @@ def random_metrics(
         elif noise_type == "normal":
             noise = np.random.normal(scale=noise_fraction, size=n)
         elif noise_type == "triangular":
-            noise = np.random.triangular(
-                left=-noise_fraction, mode=0, right=noise_fraction, size=n
-            )
+            noise = np.random.triangular(left=-noise_fraction, mode=0, right=noise_fraction, size=n)
 
         # Apply an optional filter to the noise to simulate more natural variations
         if random.random() < 0.5:
-
             nyquist = 0.5 * 1
             low = random.uniform(0.01, 0.1) / nyquist
             high = random.uniform(0.1, 0.5) / nyquist
@@ -102,9 +85,7 @@ def random_runs(n_runs: int, n_steps: int, n_metrics: int) -> ArrowWeaveList:
             ["a", "b"],
         )
         run_id = util.rand_string_n(8)
-        run = pa.StructArray.from_arrays(
-            [[run_id], config_array, hist_array], ["id", "config", "history"]
-        )
+        run = pa.StructArray.from_arrays([[run_id], config_array, hist_array], ["id", "config", "history"])
         runs.append(run)
     runs_array = pa.concat_arrays(runs)
     return ArrowWeaveList(runs_array)

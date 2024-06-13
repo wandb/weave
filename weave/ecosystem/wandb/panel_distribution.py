@@ -14,16 +14,10 @@ class DistributionConfig:
     # represented in the config as Const(FunctionType(...), Node).
     # We should make a better type to represent this, so it can be
     # distinguished from an expression like bin_size.
-    value_fn: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
-    label_fn: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
+    value_fn: weave.Node[typing.Any] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
+    label_fn: weave.Node[typing.Any] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
     # This is an expression. It will be stored in the config as Node.
-    bin_size: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
-    )
+    bin_size: weave.Node[typing.Any] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
 
 
 # The interface for constructing this Panel from Python
@@ -39,10 +33,12 @@ class Distribution(weave.Panel):
         unnested = weave.ops.unnest(input_node)
         return DistributionConfig(
             value_fn=weave_internal.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item  # type: ignore
+                {"item": unnested.type.object_type},
+                lambda item: item,  # type: ignore
             ),
             label_fn=weave_internal.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item  # type: ignore
+                {"item": unnested.type.object_type},
+                lambda item: item,  # type: ignore
             ),
             # Would be nice to call this weave.expr
             bin_size=panel_util.make_node(10),  # type: ignore
@@ -80,9 +76,7 @@ class Distribution(weave.Panel):
         input_node = self.input_node
         config = typing.cast(DistributionConfig, self.config)
 
-        if not weave.types.union(
-            weave.types.NoneType(), weave.types.String(), weave.types.Float()
-        ).assign_type(
+        if not weave.types.union(weave.types.NoneType(), weave.types.String(), weave.types.Float()).assign_type(
             config.value_fn.type.output_type  # type: ignore
         ):
             # TODO: need a nicer way to return error states
@@ -99,13 +93,9 @@ class Distribution(weave.Panel):
             if value_fn_output_type == weave.types.String():
                 group_items["value"] = config.value_fn(item)
             else:
-                group_items["value"] = (
-                    round(config.value_fn(item) / bin_size) * bin_size
-                )
+                group_items["value"] = round(config.value_fn(item) / bin_size) * bin_size
 
-            if not weave.types.optional(weave.types.String()).assign_type(
-                label_fn_output_type
-            ):
+            if not weave.types.optional(weave.types.String()).assign_type(label_fn_output_type):
                 group_items["label"] = "no_label"
             else:
                 group_items["label"] = config.label_fn(item)
@@ -125,9 +115,7 @@ class Distribution(weave.Panel):
 
 # PanelPlot version... This is used by a test.
 @weave.op()
-def distribution_panel_plot_render(
-    input_node: weave.Node[list[typing.Any]], config: DistributionConfig
-) -> weave.panels.Plot:
+def distribution_panel_plot_render(input_node: weave.Node[list[typing.Any]], config: DistributionConfig) -> weave.panels.Plot:
     unnested = weave.ops.unnest(input_node)
     bin_size = weave.ops.execute(config.bin_size)
 

@@ -14,14 +14,10 @@ class _ValueOrErrorInterface(typing.Generic[ValueType]):
     def unwrap(self) -> ValueType:
         raise NotImplementedError
 
-    def transform_and_catch(
-        self, fn: typing.Callable[[ValueType], ValueType2]
-    ) -> "_ValueOrErrorInterface[ValueType2]":
+    def transform_and_catch(self, fn: typing.Callable[[ValueType], ValueType2]) -> "_ValueOrErrorInterface[ValueType2]":
         raise NotImplementedError
 
-    def apply_and_catch(
-        self, fn: typing.Callable[[ValueType], typing.Any]
-    ) -> "_ValueOrErrorInterface[ValueType]":
+    def apply_and_catch(self, fn: typing.Callable[[ValueType], typing.Any]) -> "_ValueOrErrorInterface[ValueType]":
         raise NotImplementedError
 
 
@@ -32,17 +28,13 @@ class Value(_ValueOrErrorInterface[ValueType]):
     def unwrap(self) -> ValueType:
         return self._value
 
-    def transform_and_catch(
-        self, fn: typing.Callable[[ValueType], ValueType2]
-    ) -> "ValueOrError[ValueType2]":
+    def transform_and_catch(self, fn: typing.Callable[[ValueType], ValueType2]) -> "ValueOrError[ValueType2]":
         try:
             return Value(fn(self._value))
         except Exception as e:
             return Error(e)
 
-    def apply_and_catch(
-        self, fn: typing.Callable[[ValueType], typing.Any]
-    ) -> "ValueOrError[ValueType]":
+    def apply_and_catch(self, fn: typing.Callable[[ValueType], typing.Any]) -> "ValueOrError[ValueType]":
         try:
             fn(self._value)
             return self
@@ -61,14 +53,10 @@ class Error(_ValueOrErrorInterface[typing.Any]):
     def unwrap(self) -> typing.Any:
         raise self._error
 
-    def transform_and_catch(
-        self, fn: typing.Callable[[typing.Any], typing.Any]
-    ) -> "ValueOrError[typing.Any]":
+    def transform_and_catch(self, fn: typing.Callable[[typing.Any], typing.Any]) -> "ValueOrError[typing.Any]":
         return self
 
-    def apply_and_catch(
-        self, fn: typing.Callable[[typing.Any], typing.Any]
-    ) -> "ValueOrError[typing.Any]":
+    def apply_and_catch(self, fn: typing.Callable[[typing.Any], typing.Any]) -> "ValueOrError[typing.Any]":
         return self
 
 
@@ -83,27 +71,19 @@ class ValueOrErrors(typing.Generic[ValueType]):
     def from_values(cls, values: list[ValueType]) -> "ValueOrErrors[ValueType]":
         return ValueOrErrors([Value(i) for i in values])
 
-    def safe_map(
-        self, fn: typing.Callable[[ValueType], ValueType2]
-    ) -> "ValueOrErrors[ValueType2]":
+    def safe_map(self, fn: typing.Callable[[ValueType], ValueType2]) -> "ValueOrErrors[ValueType2]":
         return ValueOrErrors([i.transform_and_catch(fn) for i in self._items])
 
     def raw_map(
         self,
         fn: typing.Callable[[ValueType], ValueOrError[ValueType2]],
     ) -> "ValueOrErrors[ValueType2]":
-        return ValueOrErrors(
-            [fn(i._value) if isinstance(i, Value) else i for i in self._items]
-        )
+        return ValueOrErrors([fn(i._value) if isinstance(i, Value) else i for i in self._items])
 
-    def safe_apply(
-        self, fn: typing.Callable[[ValueType], typing.Any]
-    ) -> "ValueOrErrors[ValueType]":
+    def safe_apply(self, fn: typing.Callable[[ValueType], typing.Any]) -> "ValueOrErrors[ValueType]":
         return ValueOrErrors([i.apply_and_catch(fn) for i in self._items])
 
-    def batch_map(
-        self, fn: typing.Callable[[list[ValueType]], "ValueOrErrors[ValueType2]"]
-    ) -> "ValueOrErrors[ValueType2]":
+    def batch_map(self, fn: typing.Callable[[list[ValueType]], "ValueOrErrors[ValueType2]"]) -> "ValueOrErrors[ValueType2]":
         valid_inputs = [i._value for i in self._items if isinstance(i, Value)]
         valid_results = fn(valid_inputs)
         valid_index = 0
@@ -116,9 +96,7 @@ class ValueOrErrors(typing.Generic[ValueType]):
                 valid_index += 1
         return ValueOrErrors(res)
 
-    def zip(
-        self, other: "ValueOrErrors[ValueType2]"
-    ) -> "ValueOrErrors[typing.Tuple[ValueType, ValueType2]]":
+    def zip(self, other: "ValueOrErrors[ValueType2]") -> "ValueOrErrors[typing.Tuple[ValueType, ValueType2]]":
         res: list[ValueOrError[typing.Tuple[ValueType, ValueType2]]] = []
         for i, j in zip(self._items, other._items):
             if isinstance(i, Error):

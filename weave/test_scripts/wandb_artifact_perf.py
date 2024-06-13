@@ -54,9 +54,7 @@ async def gql_test() -> None:
             )
             for p in paths
         ]
-        result_paths = await async_map.map_with_parallel_workers(
-            uris, file_man.ensure_file, max_parallel=200
-        )
+        result_paths = await async_map.map_with_parallel_workers(uris, file_man.ensure_file, max_parallel=200)
     total_time = time.time() - start_time
     total_size = 0
 
@@ -65,9 +63,7 @@ async def gql_test() -> None:
         if path is None:
             raise Exception("Got none path")
         total_size += await fs.getsize(path)
-    print(
-        f"Downloaded {total_size} bytes in {total_time}s. {total_size / (1024**2) / total_time} MB/s"
-    )
+    print(f"Downloaded {total_size} bytes in {total_time}s. {total_size / (1024**2) / total_time} MB/s")
 
     profile.dump_stats("/tmp/profile.prof")
 

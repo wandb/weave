@@ -22,9 +22,7 @@ def single_distribution(input_node: weave.Node[list[float]]) -> weave.panels.Plo
 
 @weave.type()
 class AdderConfig:
-    operand: weave.Node[int] = dataclasses.field(
-        default_factory=lambda: weave.graph.ConstNode(weave.types.Int(), 10)
-    )
+    operand: weave.Node[int] = dataclasses.field(default_factory=lambda: weave.graph.ConstNode(weave.types.Int(), 10))
 
 
 def adder_set_default_config(config, new_config):
@@ -40,16 +38,12 @@ def adder_default_config(config: typing.Optional[AdderConfig]) -> AdderConfig:
 
 
 @weave.op()
-def adder_config(
-    input_node: weave.Node[int], config: AdderConfig
-) -> weave.panels.LabeledItem:
+def adder_config(input_node: weave.Node[int], config: AdderConfig) -> weave.panels.LabeledItem:
     input_val = typing.cast(int, input_node)
     config = adder_default_config(config)
     return weave.panels.LabeledItem(
         label="operand",
-        item=weave.panels.Slider(
-            config=weave.panels.SliderConfig(weave.ops.execute(config.operand))
-        ),
+        item=weave.panels.Slider(config=weave.panels.SliderConfig(weave.ops.execute(config.operand))),
     )
 
 

@@ -49,9 +49,7 @@ class SlackChannelPanel(weave.Panel):
             title=channel.channel_name,
             subtitle="Slack channel",
             content=[
-                weave.panels.CardTab(
-                    name="Messages", content=SlackMessagesPanel(channel.messages())
-                ),
+                weave.panels.CardTab(name="Messages", content=SlackMessagesPanel(channel.messages())),
             ],
         )
 
@@ -68,8 +66,6 @@ class SlackPanel(weave.Panel):
             title="Slack export data",
             subtitle="",
             content=[
-                weave.panels.CardTab(
-                    name="Channels", content=SlackChannelsPanel(s.channels())
-                ),
+                weave.panels.CardTab(name="Channels", content=SlackChannelsPanel(s.channels())),
             ],
         )

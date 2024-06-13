@@ -74,9 +74,7 @@ class ObjectRef(RefWithExtra):
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
         if gc is None:
-            init_client = init_weave(
-                f"{self.entity}/{self.project}", ensure_project_exists=False
-            )
+            init_client = init_weave(f"{self.entity}/{self.project}", ensure_project_exists=False)
             try:
                 res = init_client.client.get(self)
             finally:
@@ -94,10 +92,7 @@ class ObjectRef(RefWithExtra):
             return False
         if len(self.extra) <= len(potential_ancestor.extra):
             return False
-        return all(
-            self.extra[i] == potential_ancestor.extra[i]
-            for i in range(len(potential_ancestor.extra))
-        )
+        return all(self.extra[i] == potential_ancestor.extra[i] for i in range(len(potential_ancestor.extra)))
 
 
 @dataclasses.dataclass

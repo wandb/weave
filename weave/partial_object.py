@@ -78,11 +78,7 @@ class PartialObjectType(types.Type):
         self.keys = keys
 
     def _assign_type_inner(self, other_type: types.Type) -> bool:
-        return (
-            isinstance(other_type, PartialObjectType)
-            and self.keyless_weave_type_class == other_type.keyless_weave_type_class
-            and self.keys == other_type.keys
-        )
+        return isinstance(other_type, PartialObjectType) and self.keyless_weave_type_class == other_type.keyless_weave_type_class and self.keys == other_type.keys
 
     def _is_assignable_to(self, other_type: types.Type) -> typing.Optional[bool]:
         if other_type.__class__ is self.keyless_weave_type_class:
@@ -117,10 +113,7 @@ class PartialObjectType(types.Type):
 
     def __eq__(self, other: typing.Any) -> bool:
         if isinstance(other, PartialObjectType):
-            return (
-                self.keyless_weave_type_class == other.keyless_weave_type_class
-                and self.keys == other.keys
-            )
+            return self.keyless_weave_type_class == other.keyless_weave_type_class and self.keys == other.keys
         return False
 
     @classmethod
@@ -128,22 +121,16 @@ class PartialObjectType(types.Type):
         property_types = {}
         for key, type_ in d["keys"].items():
             property_types[key] = types.TypeRegistry.type_from_dict(type_)
-        keyless_weave_type_class = types.TypeRegistry.type_from_dict(
-            d["keyless_weave_type_class"]
-        ).__class__
+        keyless_weave_type_class = types.TypeRegistry.type_from_dict(d["keyless_weave_type_class"]).__class__
 
         return cls(keyless_weave_type_class, property_types)
 
-    def save_instance(
-        self, obj: PartialObject, artifact: artifact_fs.FilesystemArtifact, name: str
-    ) -> None:
+    def save_instance(self, obj: PartialObject, artifact: artifact_fs.FilesystemArtifact, name: str) -> None:
         from . import mappers_python
 
         serializer = mappers_python.map_to_python(self, artifact)
         result = serializer.apply(obj)
-        with artifact.new_file(
-            f"{name}.{self.keyless_weave_type_class.__name__}WithKeys.json"
-        ) as f:
+        with artifact.new_file(f"{name}.{self.keyless_weave_type_class.__name__}WithKeys.json") as f:
             json.dump(result, f, allow_nan=False)
 
     def load_instance(
@@ -154,9 +141,7 @@ class PartialObjectType(types.Type):
     ) -> PartialObject:
         from . import mappers_python
 
-        with artifact.open(
-            f"{name}.{self.keyless_weave_type_class.__name__}WithKeys.json"
-        ) as f:
+        with artifact.open(f"{name}.{self.keyless_weave_type_class.__name__}WithKeys.json") as f:
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
         mapped_result = mapper.apply(result)
@@ -168,7 +153,5 @@ class PartialObjectType(types.Type):
         return obj.keys
 
     def instance_from_dict(self, d: dict[str, typing.Any]) -> PartialObject:
-        instance_class = typing.cast(
-            typing.Type[PartialObject], self.keyless_weave_type_class.instance_class
-        )
+        instance_class = typing.cast(typing.Type[PartialObject], self.keyless_weave_type_class.instance_class)
         return instance_class.from_keys(d)

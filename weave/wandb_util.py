@@ -56,12 +56,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     # Special Types
     #
     elif old_type_name == "union":
-        return types.union(
-            *(
-                _convert_type(old_type)
-                for old_type in old_type["params"]["allowed_types"]
-            )
-        )
+        return types.union(*(_convert_type(old_type) for old_type in old_type["params"]["allowed_types"]))
     elif old_type_name == "const":
         val = old_type["params"]["val"]
         # if old_type["params"]["is_set"]:
@@ -72,12 +67,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     # Container Types
     #
     elif old_type_name == "typedDict" or old_type_name == "dictionary":
-        return types.TypedDict(
-            {
-                prop_name: _convert_type(old_type)
-                for prop_name, old_type in old_type["params"]["type_map"].items()
-            }
-        )
+        return types.TypedDict({prop_name: _convert_type(old_type) for prop_name, old_type in old_type["params"]["type_map"].items()})
     elif old_type_name == "list":
         return types.List(_convert_type(old_type["params"]["element_type"]))
     #
@@ -93,10 +83,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     #     and old_type.get("params", {}).get("class_name") == "Timestamp"
     # ):
     #     return types.Timestamp()
-    elif (
-        old_type_name == "pythonObject"
-        and old_type.get("params", {}).get("class_name") == "datetime64"
-    ):
+    elif old_type_name == "pythonObject" and old_type.get("params", {}).get("class_name") == "datetime64":
         # This is a bit unfortunate. Weave0 interprets this as a number, then calls
         # something like `number-toTimestamp` on it. In the future, this should return
         # timestamp, but for now we'll just return number. Once we convert to Weave1,
@@ -116,11 +103,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     #
     # Media Types
     #
-    elif (
-        old_type_name == "image-file"
-        or old_type_name == "wandb.Image"
-        or (is_python_object_type and old_type["params"].get("class_name") == "Image")
-    ):
+    elif old_type_name == "image-file" or old_type_name == "wandb.Image" or (is_python_object_type and old_type["params"].get("class_name") == "Image"):
         if "params" not in old_type or "class_map" not in old_type["params"]:
             # This is legacy and fixed in `_patch_legacy_image_file_types``
             return ops.LegacyImageArtifactFileRefType()  # type: ignore
@@ -151,25 +134,15 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
             maskLayersType,
             classMapType,
         )
-    elif old_type_name == "audio-file" or (
-        is_python_object_type and old_type["params"].get("class_name") == "Audio"
-    ):
+    elif old_type_name == "audio-file" or (is_python_object_type and old_type["params"].get("class_name") == "Audio"):
         return ops.AudioArtifactFileRef.WeaveType()  # type: ignore
-    elif old_type_name == "html-file" or (
-        is_python_object_type and old_type["params"].get("class_name") == "Html"
-    ):
+    elif old_type_name == "html-file" or (is_python_object_type and old_type["params"].get("class_name") == "Html"):
         return ops.HtmlArtifactFileRef.WeaveType()  # type: ignore
-    elif old_type_name == "bokeh-file" or (
-        is_python_object_type and old_type["params"].get("class_name") == "Bokeh"
-    ):
+    elif old_type_name == "bokeh-file" or (is_python_object_type and old_type["params"].get("class_name") == "Bokeh"):
         return ops.BokehArtifactFileRef.WeaveType()  # type: ignore
-    elif old_type_name == "video-file" or (
-        is_python_object_type and old_type["params"].get("class_name") == "Video"
-    ):
+    elif old_type_name == "video-file" or (is_python_object_type and old_type["params"].get("class_name") == "Video"):
         return ops.VideoArtifactFileRef.WeaveType()  # type: ignore
-    elif old_type_name == "object3D-file" or (
-        is_python_object_type and old_type["params"].get("class_name") == "Object3D"
-    ):
+    elif old_type_name == "object3D-file" or (is_python_object_type and old_type["params"].get("class_name") == "Object3D"):
         return ops.Object3DArtifactFileRef.WeaveType()  # type: ignore
     elif old_type_name == "classesId" or old_type_name == "wandb.Classes_id":
         # Question: Should we be converting this to a ClassesId type? Maybe a union of const numbers?
@@ -204,6 +177,4 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     #
     elif is_python_object_type:
         return types.UnknownType()
-    raise errors.WeaveInternalError(
-        "converting old Weave type not yet implemented: %s" % type(old_type)
-    )
+    raise errors.WeaveInternalError("converting old Weave type not yet implemented: %s" % type(old_type))

@@ -16,9 +16,7 @@ def test_map_dag_produces_same_len():
     c = a + 4
     d = b + c
 
-    assert id(d.from_op.inputs["lhs"].from_op.inputs["lhs"]) == id(
-        d.from_op.inputs["rhs"].from_op.inputs["lhs"]
-    )
+    assert id(d.from_op.inputs["lhs"].from_op.inputs["lhs"]) == id(d.from_op.inputs["rhs"].from_op.inputs["lhs"])
 
     assert graph.count(d) == 6
 
@@ -28,9 +26,7 @@ def test_map_dag_produces_same_len():
         return node
 
     mapped_d = graph.map_nodes_top_level([d], replace_a)[0]
-    assert id(mapped_d.from_op.inputs["lhs"].from_op.inputs["lhs"]) == id(
-        mapped_d.from_op.inputs["rhs"].from_op.inputs["lhs"]
-    )
+    assert id(mapped_d.from_op.inputs["lhs"].from_op.inputs["lhs"]) == id(mapped_d.from_op.inputs["rhs"].from_op.inputs["lhs"])
     assert graph.count(mapped_d) == 6
 
 

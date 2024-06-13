@@ -11,9 +11,7 @@ def filter_body(r: Any) -> Any:
     return r
 
 
-def flatten_calls(
-    calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
-) -> list:
+def flatten_calls(calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0) -> list:
     def children_of_parent_id(id: Optional[str]) -> list[tsi.CallSchema]:
         return [call for call in calls if call.parent_id == id]
 
@@ -80,9 +78,7 @@ def fake_api_key() -> Generator[None, None, None]:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_llamaindex_quickstart(
-    client: weave.weave_client.WeaveClient, fake_api_key: None
-) -> None:
+def test_llamaindex_quickstart(client: weave.weave_client.WeaveClient, fake_api_key: None) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
     from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 
@@ -103,9 +99,7 @@ def test_llamaindex_quickstart(
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
-async def test_llamaindex_quickstart_async(
-    client: weave.weave_client.WeaveClient, fake_api_key: None
-) -> None:
+async def test_llamaindex_quickstart_async(client: weave.weave_client.WeaveClient, fake_api_key: None) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
     from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 

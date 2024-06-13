@@ -17,12 +17,7 @@ def recursively_encode_pyarrow_strings_as_dictionaries(array: pa.Array) -> pa.Ar
         if array.type.num_fields == 0:
             return array
         return pa.StructArray.from_arrays(
-            [
-                recursively_encode_pyarrow_strings_as_dictionaries(
-                    array.field(field.name)
-                )
-                for field in array.type
-            ],
+            [recursively_encode_pyarrow_strings_as_dictionaries(array.field(field.name)) for field in array.type],
             [field.name for field in array.type],
             mask=pa.compute.invert(array.is_valid()),
         )
@@ -38,9 +33,7 @@ def recursively_encode_pyarrow_strings_as_dictionaries(array: pa.Array) -> pa.Ar
         return array
 
 
-def direct_add_arrow_tags(
-    data: typing.Union[pa.Table, pa.Array], arrow_tags: pa.StructArray
-):
+def direct_add_arrow_tags(data: typing.Union[pa.Table, pa.Array], arrow_tags: pa.StructArray):
     arrow_tags = recursively_encode_pyarrow_strings_as_dictionaries(arrow_tags)
     current_tags = None
     if isinstance(data, pa.Table):
@@ -87,25 +80,17 @@ def direct_add_arrow_tags(
     return pa.StructArray.from_arrays([tag_array, new_value], ["_tag", "_value"])
 
 
-def tag_arrow_array_elements_with_single_tag_dict(
-    array: pa.Array, py_tags: dict
-) -> pa.StructArray:
+def tag_arrow_array_elements_with_single_tag_dict(array: pa.Array, py_tags: dict) -> pa.StructArray:
     tag_no_dictionary = convert.to_arrow([py_tags])._arrow_data
-    tag_maybe_dictionary_encoded = recursively_encode_pyarrow_strings_as_dictionaries(
-        tag_no_dictionary
-    )
+    tag_maybe_dictionary_encoded = recursively_encode_pyarrow_strings_as_dictionaries(tag_no_dictionary)
     tags = pa.repeat(tag_maybe_dictionary_encoded[0], len(array))
     return direct_add_arrow_tags(array, tags)
 
 
-def awl_add_arrow_tags(
-    l: "ArrowWeaveList", arrow_tags: pa.StructArray, tag_type: types.Type
-):
+def awl_add_arrow_tags(l: "ArrowWeaveList", arrow_tags: pa.StructArray, tag_type: types.Type):
     data = l._arrow_data
     new_value = direct_add_arrow_tags(data, arrow_tags)
-    new_object_type = process_opdef_output_type.op_make_type_tagged_resolver(
-        l.object_type, tag_type
-    )
+    new_object_type = process_opdef_output_type.op_make_type_tagged_resolver(l.object_type, tag_type)
     from .list_ import ArrowWeaveList
 
     res: ArrowWeaveList = ArrowWeaveList(new_value, new_object_type, l._artifact)
@@ -114,13 +99,9 @@ def awl_add_arrow_tags(
     return res
 
 
-def tag_awl_list_elements_with_single_tag_dict(
-    awl: "ArrowWeaveList", py_tags: dict
-) -> "ArrowWeaveList":
+def tag_awl_list_elements_with_single_tag_dict(awl: "ArrowWeaveList", py_tags: dict) -> "ArrowWeaveList":
     tag_type = types.TypeRegistry.type_of(py_tags)
-    tag_array = tag_arrow_array_elements_with_single_tag_dict(
-        awl._arrow_data, py_tags
-    ).field("_tag")
+    tag_array = tag_arrow_array_elements_with_single_tag_dict(awl._arrow_data, py_tags).field("_tag")
     return awl_add_arrow_tags(awl, tag_array, tag_type)
 
 

@@ -44,9 +44,7 @@ def weave_class(weave_type: type[types.Type]):
 
                         for derived_handler_id, op in member.derived_ops.items():
                             handler = derive_op.handler_for_id(derived_handler_id)
-                            handler.handle_class_decorator_update(
-                                op, weave_type, new_name
-                            )
+                            handler.handle_class_decorator_update(op, weave_type, new_name)
                     else:
                         opdef.op_def.name = new_name
 

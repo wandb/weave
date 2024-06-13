@@ -78,9 +78,7 @@ def cache_mode() -> CacheMode:
     for mode in CacheMode:
         if mode.value == env_mode:
             return mode
-    raise errors.WeaveConfigurationError(
-        f"WEAVE_CACHE_MODE must be one of {list(CacheMode)}"
-    )
+    raise errors.WeaveConfigurationError(f"WEAVE_CACHE_MODE must be one of {list(CacheMode)}")
 
 
 # represents the number of days to re-use the weave cache before switching to a new directory
@@ -157,9 +155,7 @@ def wandb_frontend_base_url() -> str:
 def weave_filesystem_dir() -> str:
     # WEAVE_LOCAL_ARTIFACT_DIR should be renamed to WEAVE_FILESYSTEM_DIR
     # TODO
-    return os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join(
-        "/tmp", "weave", "fs"
-    )
+    return os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR") or os.path.join("/tmp", "weave", "fs")
 
 
 def enable_touch_on_read() -> bool:
@@ -181,9 +177,7 @@ def weave_wandb_gql_headers() -> typing.Dict[str, str]:
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
-            raise errors.WeaveConfigurationError(
-                "WEAVE_WANDB_GQL_HEADERS should be a json string"
-            )
+            raise errors.WeaveConfigurationError("WEAVE_WANDB_GQL_HEADERS should be a json string")
     return {}
 
 
@@ -191,14 +185,10 @@ def weave_wandb_cookie() -> typing.Optional[str]:
     cookie = os.environ.get("WEAVE_WANDB_COOKIE")
     if cookie:
         if is_public():
-            raise errors.WeaveConfigurationError(
-                "WEAVE_WANDB_COOKIE should not be set in public mode."
-            )
+            raise errors.WeaveConfigurationError("WEAVE_WANDB_COOKIE should not be set in public mode.")
         for netrc_file in ("~/.netrc", "~/_netrc"):
             if os.path.exists(os.path.expanduser(netrc_file)):
-                raise errors.WeaveConfigurationError(
-                    f"Please delete {netrc_file} while using WEAVE_WANDB_COOKIE to avoid using your credentials"
-                )
+                raise errors.WeaveConfigurationError(f"Please delete {netrc_file} while using WEAVE_WANDB_COOKIE to avoid using your credentials")
     return cookie
 
 
@@ -209,9 +199,7 @@ def stack_dump_sighandler_enabled() -> bool:
 def _wandb_api_key_via_env() -> typing.Optional[str]:
     api_key = os.environ.get("WANDB_API_KEY")
     if api_key and is_public():
-        raise errors.WeaveConfigurationError(
-            "WANDB_API_KEY should not be set in public mode."
-        )
+        raise errors.WeaveConfigurationError("WANDB_API_KEY should not be set in public mode.")
     return api_key
 
 
@@ -225,9 +213,7 @@ def _wandb_api_key_via_netrc() -> typing.Optional[str]:
     if res:
         user, account, api_key = res
     if api_key and is_public():
-        raise errors.WeaveConfigurationError(
-            "~/.netrc should not be set in public mode."
-        )
+        raise errors.WeaveConfigurationError("~/.netrc should not be set in public mode.")
     return api_key
 
 
@@ -235,9 +221,7 @@ def weave_wandb_api_key() -> typing.Optional[str]:
     env_api_key = _wandb_api_key_via_env()
     netrc_api_key = _wandb_api_key_via_netrc()
     if env_api_key and netrc_api_key:
-        raise errors.WeaveConfigurationError(
-            "WANDB_API_KEY should not be set in both ~/.netrc and the environment."
-        )
+        raise errors.WeaveConfigurationError("WANDB_API_KEY should not be set in both ~/.netrc and the environment.")
     return env_api_key or netrc_api_key
 
 
@@ -253,9 +237,7 @@ def num_gql_timeout_retries() -> int:
 
 
 def usage_analytics_enabled() -> bool:
-    return _env_as_bool(WANDB_ERROR_REPORTING, default="True") and _env_as_bool(
-        WEAVE_USAGE_ANALYTICS, default="True"
-    )
+    return _env_as_bool(WANDB_ERROR_REPORTING, default="True") and _env_as_bool(WEAVE_USAGE_ANALYTICS, default="True")
 
 
 def gql_schema_path() -> typing.Optional[str]:

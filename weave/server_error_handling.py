@@ -17,7 +17,6 @@ This module provides utilities for handling errors in the Weave server. It provi
     because we have different libraries under the hood that produce different exception classes.
 """
 
-
 from contextlib import contextmanager
 import logging
 import typing
@@ -33,9 +32,7 @@ from . import util
 
 class WeaveInternalHttpException(werkzeug_exceptions.HTTPException):
     @classmethod
-    def from_code(
-        cls, code: typing.Optional[int] = None, description: typing.Optional[str] = None
-    ) -> "WeaveInternalHttpException":
+    def from_code(cls, code: typing.Optional[int] = None, description: typing.Optional[str] = None) -> "WeaveInternalHttpException":
         if code is None:
             code = 500
         if description is None:
@@ -55,9 +52,7 @@ def client_safe_http_exceptions_as_werkzeug() -> typing.Generator[None, None, No
             raise
         # If the exception is a errors.WeaveBadRequest, then send up the 400
         # code. This is the one case we want to pass along 400s
-        if code in _client_safe_code_allowlist or (
-            isinstance(e, errors.WeaveBadRequest) and code == 400
-        ):
+        if code in _client_safe_code_allowlist or (isinstance(e, errors.WeaveBadRequest) and code == 400):
             werkzeug_exceptions.abort(code)
         else:
             # Here, we mask the original exception with a generic 500 error.
@@ -95,9 +90,7 @@ def _extract_code_from_request_lib_request_exception(
             return e.response.status_code
     elif isinstance(e, requests.exceptions.ReadTimeout):
         # Convert internal read timeout to 502 (Bad Gateway)
-        util.capture_exception_with_sentry_if_available(
-            e, ("requests.exceptions.ReadTimeout",)
-        )
+        util.capture_exception_with_sentry_if_available(e, ("requests.exceptions.ReadTimeout",))
         logging.warning("Converting requests.exceptions.ReadTimeout to 502")
         return 502
     return None

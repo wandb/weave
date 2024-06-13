@@ -137,9 +137,7 @@ class AsyncChatCompletions:
     def __init__(self, base_create: Callable) -> None:
         self._base_create = base_create
 
-    async def create(
-        self, *args: Any, **kwargs: Any
-    ) -> Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]:
+    async def create(self, *args: Any, **kwargs: Any) -> Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]:
         if kwargs.get("stream", False):
             return await self._streaming_create(*args, **kwargs)
         return await self._create(*args, **kwargs)
@@ -151,9 +149,7 @@ class AsyncChatCompletions:
             finish_run(result.model_dump(exclude_unset=True))
         return result
 
-    async def _streaming_create(
-        self, *args: Any, **kwargs: Any
-    ) -> AsyncStream[ChatCompletionChunk]:
+    async def _streaming_create(self, *args: Any, **kwargs: Any) -> AsyncStream[ChatCompletionChunk]:
         from weave.flow.chat_util import OpenAIStream
 
         named_args = bind_params(old_async_create, *args, **kwargs)
@@ -176,9 +172,7 @@ class ChatCompletions:
     def __init__(self, base_create: Callable) -> None:
         self._base_create = base_create
 
-    def create(
-        self, *args: Any, **kwargs: Any
-    ) -> Union[ChatCompletion, Stream[ChatCompletionChunk]]:
+    def create(self, *args: Any, **kwargs: Any) -> Union[ChatCompletion, Stream[ChatCompletionChunk]]:
         if kwargs.get("stream", False):
             result = self._streaming_create(*args, **kwargs)
             return result
@@ -191,16 +185,13 @@ class ChatCompletions:
             finish_run(result.model_dump(exclude_unset=True))
         return result
 
-    def _streaming_create(
-        self, *args: Any, **kwargs: Any
-    ) -> Stream[ChatCompletionChunk]:
+    def _streaming_create(self, *args: Any, **kwargs: Any) -> Stream[ChatCompletionChunk]:
         named_args = bind_params(old_create, *args, **kwargs)
         messages = to_python(named_args["messages"])
         if not isinstance(messages, list):
             raise ValueError("messages must be a list")
 
         with log_run(create_op, named_args) as finish_run:
-
             base_stream = self._base_create(*args, **kwargs)
             stream = WeaveStream(
                 base_stream=base_stream,
@@ -221,19 +212,13 @@ def patch() -> None:
 
             hooks = ChatCompletions(old_create)
             async_hooks = AsyncChatCompletions(old_async_create)
-            openai.resources.chat.completions.Completions.create = (
-                partialmethod_with_self(hooks.create)
-            )
-            openai.resources.chat.completions.AsyncCompletions.create = (
-                partialmethod_with_self(async_hooks.create)
-            )
+            openai.resources.chat.completions.Completions.create = partialmethod_with_self(hooks.create)
+            openai.resources.chat.completions.AsyncCompletions.create = partialmethod_with_self(async_hooks.create)
         else:
             error("No graph client found, not patching OpenAI completions")
 
     if version.parse(openai.__version__) < version.parse("1.0.0"):
-        error(
-            f"this integration requires openai>=1.0.0 (got {openai.__version__}).  Please upgrade and try again"
-        )
+        error(f"this integration requires openai>=1.0.0 (got {openai.__version__}).  Please upgrade and try again")
         return
 
     try:
@@ -253,9 +238,7 @@ def unpatch() -> None:
 
 # TODO: centralize
 @contextmanager
-def log_run(
-    call_name: typing.Union[str, Op], inputs: dict[str, Any]
-) -> Iterator[Callable]:
+def log_run(call_name: typing.Union[str, Op], inputs: dict[str, Any]) -> Iterator[Callable]:
     client = graph_client_context.require_graph_client()
     parent_run = run_context.get_current_run()
     # TODO: client should not need refs passed in.

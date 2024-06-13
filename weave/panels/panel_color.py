@@ -15,6 +15,4 @@ class ColorConfig:
 @weave.type()
 class Color(panel.Panel):
     id = "Color"
-    config: typing.Optional[ColorConfig] = dataclasses.field(
-        default_factory=lambda: None
-    )
+    config: typing.Optional[ColorConfig] = dataclasses.field(default_factory=lambda: None)

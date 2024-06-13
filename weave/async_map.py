@@ -34,9 +34,7 @@ async def map_with_parallel_workers(
     resps: list[TaskOutputType] = [None] * len(items)  # type: ignore
     workers = []
     for i in range(max_parallel):
-        workers.append(
-            asyncio.create_task(map_parallel_worker(task, req_queue, resp_queue))
-        )
+        workers.append(asyncio.create_task(map_parallel_worker(task, req_queue, resp_queue)))
     for i, item in enumerate(items):
         await req_queue.put((i, item))
 
@@ -73,9 +71,7 @@ async def map_with_n_live_tasks(
     while next_item_index < len(items) or running > 0:
         if running < max_parallel and next_item_index < len(items):
             item = items[next_item_index]
-            asyncio.create_task(
-                map_n_live_task_worker(task, next_item_index, item, resp_queue)
-            )
+            asyncio.create_task(map_n_live_task_worker(task, next_item_index, item, resp_queue))
             next_item_index += 1
             if next_item_index % 100 == 0:
                 print("next_item_index", next_item_index, "running", running)

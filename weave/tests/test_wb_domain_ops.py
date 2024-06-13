@@ -23,9 +23,7 @@ result of executing such graph. One example is probivided below
 
 def assert_gql_str_equal(gql_doc, exp_str):
     stripped_exp = graphql.language.print_ast(graphql.language.parse(exp_str))
-    stripped_got = graphql.language.print_ast(
-        graphql.language.parse(gql_doc.loc.source.body)
-    )
+    stripped_got = graphql.language.print_ast(graphql.language.parse(gql_doc.loc.source.body))
     assert stripped_got == stripped_exp
 
 
@@ -119,9 +117,7 @@ def test_root_project_concat(fake_wandb):
             }
         }
     )
-    summary = (
-        ops.make_list(a=runs_node_1, b=runs_node_2).concat().limit(50).summary()["loss"]
-    )
+    summary = ops.make_list(a=runs_node_1, b=runs_node_2).concat().limit(50).summary()["loss"]
     log = fake_wandb.fake_api.execute_log()
     assert len(log) == 1
     # The first request is to refineSummary, so we request summaryMetrics
@@ -156,9 +152,7 @@ def test_root_project_concat(fake_wandb):
                 weave.types.TypedDict(
                     property_types={
                         "run": tagged_value_type.TaggedValueType(
-                            weave.types.TypedDict(
-                                property_types={"project": wb_domain_types.ProjectType}
-                            ),
+                            weave.types.TypedDict(property_types={"project": wb_domain_types.ProjectType}),
                             wb_domain_types.RunType,
                         )
                     }
@@ -416,26 +410,9 @@ def test_multi_root_merging(fake_wandb, cache_mode_minimal):
 def test_two_level_summary(fake_wandb):
     def _mocked_query(query, ndx):
         run_selections = (
-            query["gql"]
-            .definitions[0]
-            .selection_set.selections[0]
-            .selection_set.selections[2]
-            .selection_set.selections[0]
-            .selection_set.selections[0]
-            .selection_set.selections
+            query["gql"].definitions[0].selection_set.selections[0].selection_set.selections[2].selection_set.selections[0].selection_set.selections[0].selection_set.selections
         )
-        assert (
-            len(
-                list(
-                    f
-                    for f in run_selections
-                    if f.name.value == "summaryMetrics"
-                    and f.alias
-                    and f.alias.value == "summaryMetricsSubset"
-                )
-            )
-            == 1
-        )
+        assert len(list(f for f in run_selections if f.name.value == "summaryMetrics" and f.alias and f.alias.value == "summaryMetricsSubset")) == 1
         return {
             "project_8d1592567720841659de23c02c97d594": {
                 **fwb.project_payload,
@@ -462,12 +439,7 @@ def test_two_level_summary(fake_wandb):
         }
 
     fake_wandb.fake_api.add_mock(_mocked_query)
-    n = (
-        ops.project("e_0", "p_0")
-        .runs()
-        .filter(lambda r: r.summary()["a"] == 1)
-        .summary()["b"]
-    )
+    n = ops.project("e_0", "p_0").runs().filter(lambda r: r.summary()["a"] == 1).summary()["b"]
     assert weave.use(n) == ["x"]
 
 
@@ -484,18 +456,7 @@ def test_escaped_gql_query(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ix: response)
 
     key = "Tables/NMS_0\\.45_IOU_0\\.5"
-    node = (
-        ops.project("e_0", "p_0")
-        .filteredRuns("{}", "-createdAt")
-        .limit(1)
-        .summary()[key]
-        .table()
-        .rows()
-        .dropna()
-        .concat()
-        .createIndexCheckpointTag()
-        .index(6)["label"]
-    )
+    node = ops.project("e_0", "p_0").filteredRuns("{}", "-createdAt").limit(1).summary()[key].table().rows().dropna().concat().createIndexCheckpointTag().index(6)["label"]
 
     log = fake_wandb.fake_api.execute_log()
     assert_gql_str_equal(
@@ -540,9 +501,7 @@ def test_escaped_gql_query(fake_wandb):
 
 
 def test_null_propagation_through_nonnull_gql_ops(fake_wandb):
-    fake_wandb.fake_api.add_mock(
-        lambda q, ix: {"project_8d1592567720841659de23c02c97d594": None}
-    )
+    fake_wandb.fake_api.add_mock(lambda q, ix: {"project_8d1592567720841659de23c02c97d594": None})
 
     # this should fail?
     node = ops.project("e_0", "p_0").run("r_0").name()

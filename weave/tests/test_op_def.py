@@ -43,11 +43,7 @@ def identity(obj: typing.Any):
     return obj
 
 
-@weave.op(
-    output_type=lambda input_types: weave.types.List.make(
-        {"object_type": input_types["obj"]}
-    )
-)
+@weave.op(output_type=lambda input_types: weave.types.List.make({"object_type": input_types["obj"]}))
 def wrap(obj: typing.Any):
     return [obj]
 

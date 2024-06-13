@@ -25,11 +25,7 @@ def assert_date_string(
 
 @pytest.mark.parametrize(
     "multiplier,unit,num_ms",
-    [
-        (m, u, nms)
-        for m in [1, 1.5, 3, 5.3432, 8.00000000007]
-        for u, nms in date.AUTO_FORMAT_UNITS_AND_NUM_MS
-    ],
+    [(m, u, nms) for m in [1, 1.5, 3, 5.3432, 8.00000000007] for u, nms in date.AUTO_FORMAT_UNITS_AND_NUM_MS],
 )
 def test_relative_string_autoformat(multiplier, unit, num_ms):
     ts1 = datetime.datetime.now()

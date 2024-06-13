@@ -30,9 +30,7 @@ def spacy(text: str) -> spacy_lib.tokens.doc.Doc:
 def spacy_doc_dep_to_html(spacy_doc: spacy_lib.tokens.doc.Doc) -> weave.ops.Html:
     from spacy import displacy
 
-    html = displacy.render(
-        list(spacy_doc.sents), style="dep", jupyter=False, options={"compact": True}
-    )
+    html = displacy.render(list(spacy_doc.sents), style="dep", jupyter=False, options={"compact": True})
     return weave.ops.Html(html)
 
 

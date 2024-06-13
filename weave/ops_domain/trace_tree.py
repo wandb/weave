@@ -56,9 +56,7 @@ def _setattr_with_typeguard(obj: typing.Any, key: str, value: typing.Any) -> Non
         typeguard.check_type(value, hints[key])
     except typeguard.TypeCheckError as e:
         # warn
-        logging.warning(
-            f"Setting attribute {key} of {obj} to {value} failed typeguard check: {e}. Replacing with None."
-        )
+        logging.warning(f"Setting attribute {key} of {obj} to {value} failed typeguard check: {e}. Replacing with None.")
         value = None
 
     setattr(obj, key, value)
@@ -74,12 +72,8 @@ class Span:
     status_message: typing.Optional[str] = None
     attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
     # results is not standard and not representation by OpenTelemetry
-    results: typing.Optional[typing.List[typing.Optional[Result]]] = dataclasses.field(
-        default_factory=lambda: None
-    )
-    child_spans: typing.Optional[typing.List[dict]] = dataclasses.field(
-        default_factory=lambda: None
-    )
+    results: typing.Optional[typing.List[typing.Optional[Result]]] = dataclasses.field(default_factory=lambda: None)
+    child_spans: typing.Optional[typing.List[dict]] = dataclasses.field(default_factory=lambda: None)
     span_kind: typing.Optional[str] = dataclasses.field(default_factory=lambda: None)
 
     def get_child_spans(self) -> typing.List["Span"]:
@@ -94,11 +88,7 @@ class Span:
                 _setattr_with_typeguard(
                     root_span,
                     key,
-                    (
-                        [Result(**r) if r is not None else None for r in results]
-                        if results is not None
-                        else None
-                    ),
+                    ([Result(**r) if r is not None else None for r in results] if results is not None else None),
                 )
             else:
                 _setattr_with_typeguard(root_span, key, dump_dict[key])
@@ -158,30 +148,13 @@ def standarize_result_inputs(result: typing.Optional[Result]) -> typing.Dict[str
 
 
 def get_trace_input_str(span: Span) -> str:
-    return "\n\n".join(
-        [
-            "\n\n".join(
-                [
-                    f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in standarize_result_inputs(result).items()
-                ]
-            )
-            for ndx, result in enumerate(span.results or [])
-        ]
-    )
+    return "\n\n".join(["\n\n".join([f"**{ndx}.{eKey}:** {eValue}" for eKey, eValue in standarize_result_inputs(result).items()]) for ndx, result in enumerate(span.results or [])])
 
 
 def get_trace_output_str(span: Span) -> str:
     return "\n\n".join(
         [
-            "\n\n".join(
-                [
-                    f"**{ndx}.{eKey}:** {eValue}"
-                    for eKey, eValue in (
-                        (result.outputs or {}) if result is not None else {}
-                    ).items()
-                ]
-            )
+            "\n\n".join([f"**{ndx}.{eKey}:** {eValue}" for eKey, eValue in ((result.outputs or {}) if result is not None else {}).items()])
             for ndx, result in enumerate(span.results or [])
         ]
     )
@@ -200,9 +173,7 @@ def get_chain_repr(span: Span) -> str:
 @weave.type(__override_name="wb_trace_tree")  # type: ignore
 class WBTraceTree:
     root_span_dumps: str  # Span
-    model_dict_dumps: typing.Optional[
-        str
-    ] = None  # typing.Optional[typing.Dict[str, typing.Any]]
+    model_dict_dumps: typing.Optional[str] = None  # typing.Optional[typing.Dict[str, typing.Any]]
     model_hash: typing.Optional[str] = None
 
     @weave.op()
@@ -236,10 +207,7 @@ class WBTraceTree:
 
 
 def span_dict_to_wb_span(span_dict: dict) -> WBSpan:
-    child_spans = [
-        span_dict_to_wb_span(child_dict)
-        for child_dict in (span_dict.get("child_spans") or [])
-    ]
+    child_spans = [span_dict_to_wb_span(child_dict) for child_dict in (span_dict.get("child_spans") or [])]
     return WBSpan(
         span_id=span_dict.get("span_id"),
         name=span_dict.get("name"),
@@ -303,9 +271,7 @@ def create_id_from_seed(seed: str) -> str:
     return str(uuid.UUID(m.hexdigest()))
 
 
-@weave.op(
-    name="wb_trace_tree-convertToSpans", refine_output_type=refine_convert_output_type
-)
+@weave.op(name="wb_trace_tree-convertToSpans", refine_output_type=refine_convert_output_type)
 def convert_to_spans(
     tree: WBTraceTree,
 ) -> typing.List[TraceSpanDictWithTimestamp]:
@@ -316,11 +282,7 @@ def convert_to_spans(
     if wb_span.span_id is None:
         wb_span.span_id = create_id_from_seed(tree.root_span_dumps)
 
-    spans: typing.List[
-        TraceSpanDictWithTimestamp
-    ] = stream_data_interfaces.wb_span_to_weave_spans(
-        wb_span, None, None
-    )  # type: ignore
+    spans: typing.List[TraceSpanDictWithTimestamp] = stream_data_interfaces.wb_span_to_weave_spans(wb_span, None, None)  # type: ignore
     if len(spans) > 0:
         spans[0]["attributes"] = spans[0]["attributes"] or {}
         spans[0]["attributes"]["model"] = {  # type: ignore

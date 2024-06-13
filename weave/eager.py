@@ -9,12 +9,8 @@ from . import weave_types as types
 WeaveIterObjectType = typing.TypeVar("WeaveIterObjectType")
 
 
-class WeaveIter(
-    typing.Sequence[WeaveIterObjectType], typing.Generic[WeaveIterObjectType]
-):
-    def __init__(
-        self, node: graph.Node, cls: typing.Optional[type[WeaveIterObjectType]] = None
-    ) -> None:
+class WeaveIter(typing.Sequence[WeaveIterObjectType], typing.Generic[WeaveIterObjectType]):
+    def __init__(self, node: graph.Node, cls: typing.Optional[type[WeaveIterObjectType]] = None) -> None:
         self.cls = cls
         self.node = node
 
@@ -30,16 +26,12 @@ class WeaveIter(
             return count
 
     @typing.overload
-    def __getitem__(self, index: int) -> WeaveIterObjectType:
-        ...
+    def __getitem__(self, index: int) -> WeaveIterObjectType: ...
 
     @typing.overload
-    def __getitem__(self, index: slice) -> "WeaveIter[WeaveIterObjectType]":
-        ...
+    def __getitem__(self, index: slice) -> "WeaveIter[WeaveIterObjectType]": ...
 
-    def __getitem__(
-        self, index: typing.Union[int, slice]
-    ) -> typing.Union[WeaveIterObjectType, "WeaveIter[WeaveIterObjectType]"]:
+    def __getitem__(self, index: typing.Union[int, slice]) -> typing.Union[WeaveIterObjectType, "WeaveIter[WeaveIterObjectType]"]:
         if isinstance(index, int):
             with context_state.lazy_execution():
                 indexed_node = self.select_node[index]  # type: ignore

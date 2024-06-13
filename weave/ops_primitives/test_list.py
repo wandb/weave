@@ -69,9 +69,7 @@ def test_sequence1():
             weave_internal.define_fn(
                 {
                     "row": tagged_value_type.TaggedValueType(
-                        types.TypedDict(
-                            {"groupKey": types.TypedDict({"y": types.String()})}
-                        ),
+                        types.TypedDict({"groupKey": types.TypedDict({"y": types.String()})}),
                         res.type.object_type,
                     )
                 },
@@ -89,11 +87,7 @@ def test_nested_functions():
     rows = weave.save([{"a": [1, 2]}])
     map_fn = weave_internal.define_fn(
         {"row": types.TypedDict({"a": types.List(types.Int())})},
-        lambda row: number.numbers_avg(
-            row["a"].map(
-                weave_internal.define_fn({"row": types.Int()}, lambda row: row + 1)
-            )
-        ),
+        lambda row: number.numbers_avg(row["a"].map(weave_internal.define_fn({"row": types.Int()}, lambda row: row + 1))),
     )
     mapped = rows.map(map_fn)
     assert weave.use(mapped) == [2.5]
@@ -242,9 +236,7 @@ def test_lookup():
     with pytest.raises(errors.WeaveDispatchError):
         l.lookup(0)
 
-    l = weave.save(
-        [runs.Run("a", "cool-op", output=25), runs.Run("b", "cool-op", output=26)]
-    )
+    l = weave.save([runs.Run("a", "cool-op", output=25), runs.Run("b", "cool-op", output=26)])
     assert weave.use(l.lookup(0)) == None
     assert weave.use(l.lookup("a")) == runs.Run("a", "cool-op", output=25)
 
@@ -257,11 +249,7 @@ def test_lookup():
 def test_cross_product():
     obj = weave.save({"a": ["x", "y", "z"], "b": [1, 2, 3]})
     cp = list_.cross_product(obj)
-    assert cp.type == weave.types.List(
-        object_type=weave.types.TypedDict(
-            property_types={"a": weave.types.String(), "b": weave.types.Int()}
-        )
-    )
+    assert cp.type == weave.types.List(object_type=weave.types.TypedDict(property_types={"a": weave.types.String(), "b": weave.types.Int()}))
     assert weave.use(cp) == [
         {"a": "x", "b": 1},
         {"a": "x", "b": 2},

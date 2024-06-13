@@ -43,9 +43,7 @@ tracer = engine_trace.tracer()
 )
 def refine_history3_type(run: wdt.Run) -> types.Type:
     # TODO: Consider merging `_unflatten_history_object_type` into the main path
-    return ArrowWeaveListType(
-        _unflatten_history_object_type(history_op_common.refine_history_type(run))
-    )
+    return ArrowWeaveListType(_unflatten_history_object_type(history_op_common.refine_history_type(run)))
 
 
 @op(
@@ -53,9 +51,7 @@ def refine_history3_type(run: wdt.Run) -> types.Type:
     plugins=wb_gql_op_plugin(lambda inputs, inner: "historyKeys"),
     hidden=True,
 )
-def refine_history3_with_columns_type(
-    run: wdt.Run, history_cols: list[str]
-) -> types.Type:
+def refine_history3_with_columns_type(run: wdt.Run, history_cols: list[str]) -> types.Type:
     # TODO: Consider merging `_unflatten_history_object_type` into the main path
     return ArrowWeaveListType(
         _unflatten_history_object_type(
@@ -75,9 +71,7 @@ def refine_history3_with_columns_type(
     hidden=True,
 )
 def history3_with_columns(run: wdt.Run, history_cols: list[str]):
-    return _get_history3(
-        run, history_op_common.get_full_columns_prefixed(run, history_cols)
-    )
+    return _get_history3(run, history_op_common.get_full_columns_prefixed(run, history_cols))
 
 
 @op(
@@ -94,9 +88,7 @@ def history3(run: wdt.Run):
 
 @dataclasses.dataclass
 class PathTree:
-    children: typing.Dict[PathItemType, "PathTree"] = dataclasses.field(
-        default_factory=dict
-    )
+    children: typing.Dict[PathItemType, "PathTree"] = dataclasses.field(default_factory=dict)
     data: typing.Optional[typing.Any] = None
 
 
@@ -160,13 +152,8 @@ def _fast_history3_concat(
     all_converted_awls = []
     for awl in all_awls:
 
-        def _convert_cols(
-            awl: ArrowWeaveList, path: PathType
-        ) -> typing.Optional[ArrowWeaveList]:
-            if (
-                isinstance(awl.object_type, types.TypedDict)
-                and "_val" in awl.object_type.property_types
-            ):
+        def _convert_cols(awl: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
+            if isinstance(awl.object_type, types.TypedDict) and "_val" in awl.object_type.property_types:
                 # There are only two kinds of types that look like a _type, _val
                 # struct: Timestamp and Ref. Happily, we can distinguish them by
                 # looking at the type of the _val field
@@ -187,9 +174,7 @@ def _fast_history3_concat(
                         awl._artifact,
                     )
                 else:
-                    raise errors.WeaveWBHistoryTranslationError(
-                        f"Encountered unexpected type for _val: {type(awl._arrow_data.field('_val'))}"
-                    )
+                    raise errors.WeaveWBHistoryTranslationError(f"Encountered unexpected type for _val: {type(awl._arrow_data.field('_val'))}")
             return None
 
         awl = awl.map_column(fn=lambda x, y: x, pre_fn=_convert_cols)
@@ -198,9 +183,7 @@ def _fast_history3_concat(
     return history_op_common.concat_awls(all_converted_awls)
 
 
-def _check_fast_history3_concat_type(
-    orig_expected_type: types.Type, fast_path_type: types.Type, depth: int = 0
-) -> str:
+def _check_fast_history3_concat_type(orig_expected_type: types.Type, fast_path_type: types.Type, depth: int = 0) -> str:
     # Check if the output type of fast_history3_concat matches the expected type we get from
     # history type refinement.
 
@@ -208,48 +191,32 @@ def _check_fast_history3_concat_type(
 
     # Returns True if match
 
-    if isinstance(orig_expected_type, types.UnionType) or isinstance(
-        fast_path_type, types.UnionType
-    ):
+    if isinstance(orig_expected_type, types.UnionType) or isinstance(fast_path_type, types.UnionType):
         # The new type may have nullable where the old didn't. Allow this, by just considering
         # both non_null types.
         orig_nullable, orig_non_null = types.split_none(orig_expected_type)
         fast_path_nullable, fast_non_null = types.split_none(fast_path_type)
         if orig_nullable or fast_path_nullable:
-            return _check_fast_history3_concat_type(
-                orig_non_null, fast_non_null, depth=depth
-            )
+            return _check_fast_history3_concat_type(orig_non_null, fast_non_null, depth=depth)
 
-    if isinstance(orig_expected_type, types.TypedDict) and isinstance(
-        fast_path_type, types.TypedDict
-    ):
+    if isinstance(orig_expected_type, types.TypedDict) and isinstance(fast_path_type, types.TypedDict):
         result = ""
-        for k in set(orig_expected_type.property_types.keys()).union(
-            fast_path_type.property_types.keys()
-        ):
+        for k in set(orig_expected_type.property_types.keys()).union(fast_path_type.property_types.keys()):
             sub_result = _check_fast_history3_concat_type(
                 orig_expected_type.property_types[k],
                 fast_path_type.property_types.get(k, types.NoneType()),
                 depth=depth + 1,
             )
             if sub_result:
-                result += (
-                    "  " * depth + f"TypedDict property {k} mismatch:\n" + sub_result
-                )
+                result += "  " * depth + f"TypedDict property {k} mismatch:\n" + sub_result
         return result
-    elif isinstance(orig_expected_type, types.List) and isinstance(
-        fast_path_type, types.List
-    ):
-        result = _check_fast_history3_concat_type(
-            orig_expected_type.object_type, fast_path_type.object_type, depth=depth + 1
-        )
+    elif isinstance(orig_expected_type, types.List) and isinstance(fast_path_type, types.List):
+        result = _check_fast_history3_concat_type(orig_expected_type.object_type, fast_path_type.object_type, depth=depth + 1)
         if result:
             return "  " * depth + "List object type mismatch:\n" + result
         return ""
 
-    elif isinstance(orig_expected_type, types.UnionType) and isinstance(
-        fast_path_type, types.UnionType
-    ):
+    elif isinstance(orig_expected_type, types.UnionType) and isinstance(fast_path_type, types.UnionType):
         result = ""
 
         # Unions can be out of order, so we check each orig member against
@@ -261,22 +228,15 @@ def _check_fast_history3_concat_type(
             orig_member = orig_expected_type.members[i]
             for j in range(len(fast_path_type.members)):
                 fast_member = fast_path_type.members[j]
-                sub_result = _check_fast_history3_concat_type(
-                    orig_member, fast_member, depth=depth + 1
-                )
+                sub_result = _check_fast_history3_concat_type(orig_member, fast_member, depth=depth + 1)
                 if not sub_result:
                     # A match, go to next orig member
                     break
             else:
                 # no remaining fast path member matched the orig member
-                result += (
-                    "  " * depth
-                    + f"Union type member mismatch, original_member: {orig_member} not found in remaining fast_path members\n"
-                )
+                result += "  " * depth + f"Union type member mismatch, original_member: {orig_member} not found in remaining fast_path members\n"
         return result
-    elif isinstance(orig_expected_type, types.RefType) and isinstance(
-        fast_path_type, types.RefType
-    ):
+    elif isinstance(orig_expected_type, types.RefType) and isinstance(fast_path_type, types.RefType):
         # The original type may have a full object_type, while in the fast path
         # we always return UnknownType as the object_type. This is expected.
         # So we just don't check object_type here.
@@ -296,9 +256,7 @@ def _check_fast_history3_concat_type(
             fast_path_str = str(fast_path_type)
             if len(fast_path_str) > 50:
                 fast_path_str = fast_path_str[:50] + "..."
-            return (
-                "  " * depth + f"Expected {orig_expected_str} but got {fast_path_str}\n"
-            )
+            return "  " * depth + f"Expected {orig_expected_str} but got {fast_path_str}\n"
         return ""
 
 
@@ -330,19 +288,13 @@ def _get_history3(run: wdt.Run, columns=None):
     raw_live_data = _get_live_data_from_run(run, columns=columns)
 
     # 3.a: Raw-load each parquet file
-    raw_history_awl_tables = _read_raw_history_awl_tables(
-        run, columns=columns, artifact=artifact
-    )
+    raw_history_awl_tables = _read_raw_history_awl_tables(run, columns=columns, artifact=artifact)
 
     # 3.b: Collapse unions
-    union_collapsed_awl_tables = [
-        _collapse_unions(awl) for awl in raw_history_awl_tables
-    ]
+    union_collapsed_awl_tables = [_collapse_unions(awl) for awl in raw_history_awl_tables]
 
     # 4. Process all the data
-    raw_history_pa_tables = [
-        history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
-    ]
+    raw_history_pa_tables = [history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables]
 
     # 5 Now we concat the converted liveset and parquet files
     use_fast_path = _use_fast_path(flattened_object_type)
@@ -351,16 +303,12 @@ def _get_history3(run: wdt.Run, columns=None):
         if len(concatted_awl) == 0:
             return convert.to_arrow([], types.List(final_type), artifact=artifact)
         if not isinstance(concatted_awl.object_type, types.TypedDict):
-            raise errors.WeaveWBHistoryTranslationError(
-                f"Expected fast_path object_type to be TypedDict, got {concatted_awl.object_type}"
-            )
+            raise errors.WeaveWBHistoryTranslationError(f"Expected fast_path object_type to be TypedDict, got {concatted_awl.object_type}")
 
         # Need to get a new final_type, since we don't rely on the flattend_object_type
         # in the fast path.
         new_final_type = _unflatten_history_object_type(concatted_awl.object_type)
-        type_mismatch_reason = _check_fast_history3_concat_type(
-            final_type, new_final_type
-        )
+        type_mismatch_reason = _check_fast_history3_concat_type(final_type, new_final_type)
         if type_mismatch_reason:
             # Leaving this in to fire if we get an unexpected type from the fast
             # path. It's probably actually ok if this happens, and we could remove
@@ -403,21 +351,14 @@ def _get_history3(run: wdt.Run, columns=None):
         concatted_awl = history_op_common.concat_awls(
             [
                 live_data_awl,
-                *{
-                    ArrowWeaveList(
-                        table, object_type=flattened_object_type, artifact=artifact
-                    )
-                    for table in processed_history_pa_tables
-                },
+                *{ArrowWeaveList(table, object_type=flattened_object_type, artifact=artifact) for table in processed_history_pa_tables},
             ]
         )
 
         if len(concatted_awl) == 0:
             return convert.to_arrow([], types.List(final_type), artifact=artifact)
 
-    sorted_table = history_op_common.sort_history_pa_table(
-        history_op_common.awl_to_pa_table(concatted_awl)
-    )
+    sorted_table = history_op_common.sort_history_pa_table(history_op_common.awl_to_pa_table(concatted_awl))
 
     # 6. Finally, unflatten the columns
     final_array = _unflatten_pa_table(sorted_table)
@@ -426,9 +367,7 @@ def _get_history3(run: wdt.Run, columns=None):
     reason = weave_arrow_type_check(final_type, final_array)
 
     if reason != None:
-        raise errors.WeaveWBHistoryTranslationError(
-            f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}"
-        )
+        raise errors.WeaveWBHistoryTranslationError(f"Failed to effectively convert column of Gorilla Parquet History to expected history type: {reason}")
     return ArrowWeaveList(
         final_array,
         final_type,
@@ -443,37 +382,18 @@ def _construct_live_data_awl(
     num_rows: int,
     artifact: artifact_mem.MemArtifact,
 ) -> ArrowWeaveList:
-    live_columns_to_data = [
-        {k: v[i] for k, v in live_columns.items()} for i in range(num_rows)
-    ]
+    live_columns_to_data = [{k: v[i] for k, v in live_columns.items()} for i in range(num_rows)]
 
-    live_columns_already_mapped_to_data = [
-        {k: v[i] for k, v in live_columns_already_mapped.items()}
-        for i in range(num_rows)
-    ]
+    live_columns_already_mapped_to_data = [{k: v[i] for k, v in live_columns_already_mapped.items()} for i in range(num_rows)]
 
     partial_live_data_awl = convert.to_arrow(
         live_columns_to_data,
-        types.List(
-            types.TypedDict(
-                {
-                    k: v
-                    for k, v in flattened_object_type.property_types.items()
-                    if k in live_columns
-                }
-            )
-        ),
+        types.List(types.TypedDict({k: v for k, v in flattened_object_type.property_types.items() if k in live_columns})),
         artifact=artifact,
     )
     partial_live_data_already_mapped_awl = convert.to_arrow_from_list_and_artifact(
         live_columns_already_mapped_to_data,
-        types.TypedDict(
-            {
-                k: v
-                for k, v in flattened_object_type.property_types.items()
-                if k in live_columns_already_mapped
-            }
-        ),
+        types.TypedDict({k: v for k, v in flattened_object_type.property_types.items() if k in live_columns_already_mapped}),
         artifact=artifact,
         py_objs_already_mapped=True,
     )
@@ -484,13 +404,9 @@ def _construct_live_data_awl(
         field_names.append(field.name)
         field_arrays.append(partial_live_data_awl._arrow_data.field(field_ndx))
 
-    for field_ndx, field in enumerate(
-        partial_live_data_already_mapped_awl._arrow_data.type
-    ):
+    for field_ndx, field in enumerate(partial_live_data_already_mapped_awl._arrow_data.type):
         field_names.append(field.name)
-        field_arrays.append(
-            partial_live_data_already_mapped_awl._arrow_data.field(field_ndx)
-        )
+        field_arrays.append(partial_live_data_already_mapped_awl._arrow_data.field(field_ndx))
 
     return ArrowWeaveList(
         pa.StructArray.from_arrays(field_arrays, field_names),
@@ -503,24 +419,16 @@ def _pa_table_has_column(pa_table: pa.Table, col_name: str) -> bool:
     return col_name in pa_table.column_names
 
 
-def _create_empty_column(
-    table: pa.Table, col_type: types.Type, artifact: artifact_base.Artifact
-) -> pa.Array:
-    return convert.to_arrow(
-        [None] * len(table), types.List(col_type), artifact=artifact
-    )._arrow_data
+def _create_empty_column(table: pa.Table, col_type: types.Type, artifact: artifact_base.Artifact) -> pa.Array:
+    return convert.to_arrow([None] * len(table), types.List(col_type), artifact=artifact)._arrow_data
 
 
-def _update_pa_table_column(
-    table: pa.Table, col_name: str, arrow_col: pa.Array
-) -> pa.Table:
+def _update_pa_table_column(table: pa.Table, col_name: str, arrow_col: pa.Array) -> pa.Table:
     fields = [field.name for field in table.schema]
     return table.set_column(fields.index(col_name), col_name, arrow_col)
 
 
-def _new_pa_table_column(
-    table: pa.Table, col_name: str, arrow_col: pa.Array
-) -> pa.Table:
+def _new_pa_table_column(table: pa.Table, col_name: str, arrow_col: pa.Array) -> pa.Table:
     return table.append_column(col_name, arrow_col)
 
 
@@ -556,24 +464,18 @@ def _process_all_columns(
             # legacy image files
             pass
         if _column_type_requires_in_memory_transformation(col_type):
-            _non_vectorized_warning(
-                f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}"
-            )
+            _non_vectorized_warning(f"Encountered a history column requiring non-vectorized, in-memory processing: {col_name}: {col_type}")
             processed_live_column = _process_column_in_memory(raw_live_column, run_path)
             live_columns[col_name] = processed_live_column
 
             for table_ndx, table in enumerate(processed_history_pa_tables):
                 if not _pa_table_has_column(table, col_name):
-                    new_table = _new_pa_table_column(
-                        table, col_name, _create_empty_column(table, col_type, artifact)
-                    )
+                    new_table = _new_pa_table_column(table, col_name, _create_empty_column(table, col_type, artifact))
                 else:
                     new_table = _update_pa_table_column(
                         table,
                         col_name,
-                        _process_history_column_in_memory(
-                            table[col_name], col_type, run_path, artifact
-                        ),
+                        _process_history_column_in_memory(table[col_name], col_type, run_path, artifact),
                     )
                 processed_history_pa_tables[table_ndx] = new_table
 
@@ -587,9 +489,7 @@ def _process_all_columns(
 
             for table_ndx, table in enumerate(processed_history_pa_tables):
                 if not _pa_table_has_column(table, col_name):
-                    new_table = _new_pa_table_column(
-                        table, col_name, _create_empty_column(table, col_type, artifact)
-                    )
+                    new_table = _new_pa_table_column(table, col_name, _create_empty_column(table, col_type, artifact))
                 else:
                     new_col = _drop_types_from_encoded_types(
                         ArrowWeaveList(
@@ -600,9 +500,7 @@ def _process_all_columns(
                     )
                     arrow_col = new_col._arrow_data
                     if types.Timestamp().assign_type(types.non_none(col_type)):
-                        arrow_col = arrow_col.cast("int64").cast(
-                            pa.timestamp("ms", tz="UTC")
-                        )
+                        arrow_col = arrow_col.cast("int64").cast(pa.timestamp("ms", tz="UTC"))
                     new_table = _update_pa_table_column(table, col_name, arrow_col)
                 processed_history_pa_tables[table_ndx] = new_table
 
@@ -628,19 +526,13 @@ def _build_array_from_tree(tree: PathTree) -> pa.Array:
             else:
                 mask = pa.compute.and_(mask, child_is_null)
 
-        children_struct = pa.StructArray.from_arrays(
-            children_data.values(), children_data.keys(), mask=mask
-        )
+        children_struct = pa.StructArray.from_arrays(children_data.values(), children_data.keys(), mask=mask)
         children_struct_array = [children_struct]
     children_arrays = [*(tree.data or []), *children_struct_array]
     if len(children_arrays) == 0:
-        raise errors.WeaveWBHistoryTranslationError(
-            "Cannot build array from empty tree"
-        )
+        raise errors.WeaveWBHistoryTranslationError("Cannot build array from empty tree")
 
-    children_arrays_nonnull = [
-        x for x in children_arrays if not isinstance(x, pa.NullArray)
-    ]
+    children_arrays_nonnull = [x for x in children_arrays if not isinstance(x, pa.NullArray)]
     if not children_arrays_nonnull:
         children_arrays = [children_arrays[0]]
     else:
@@ -665,18 +557,14 @@ def _unflatten_pa_table(array: pa.Table) -> pa.StructArray:
                 target.children[part] = PathTree(data=[])
             target = target.children[part]
         if not isinstance(target.data, list):
-            raise errors.WeaveWBHistoryTranslationError(
-                f"Encountered unexpected data in PathTree: {type(target.data)}"
-            )
+            raise errors.WeaveWBHistoryTranslationError(f"Encountered unexpected data in PathTree: {type(target.data)}")
         target.data.append(array[col_name].combine_chunks())
 
     # Recursively resolve the tree
     return _build_array_from_tree(new_tree)
 
 
-def _union_collapse_mapper(
-    awl: ArrowWeaveList, path: PathType
-) -> typing.Optional[ArrowWeaveList]:
+def _union_collapse_mapper(awl: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
     object_type = types.non_none(awl.object_type)
     if types.TypedDict({}).assign_type(object_type):
         object_type = typing.cast(types.TypedDict, object_type)
@@ -694,14 +582,9 @@ def _union_collapse_mapper(
 
             union_arr = _union_from_column_data(
                 num_rows,
-                [
-                    arrow_data.field(arrow_columns.index(col_name))
-                    for col_name in columns
-                ],
+                [arrow_data.field(arrow_columns.index(col_name)) for col_name in columns],
             )
-            return ArrowWeaveList(
-                union_arr, types.union(*weave_type_members), awl._artifact
-            )
+            return ArrowWeaveList(union_arr, types.union(*weave_type_members), awl._artifact)
 
     return None
 
@@ -772,13 +655,9 @@ def _collapse_unions(awl: ArrowWeaveList) -> ArrowWeaveList:
     return awl.map_column(_union_collapse_mapper)
 
 
-def _drop_types_mapper(
-    awl: ArrowWeaveList, path: PathType
-) -> typing.Optional[ArrowWeaveList]:
+def _drop_types_mapper(awl: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
     object_type = types.non_none(awl.object_type)
-    if types.TypedDict(
-        {"_type": types.optional(types.String()), "_val": types.Any()}
-    ).assign_type(object_type):
+    if types.TypedDict({"_type": types.optional(types.String()), "_val": types.Any()}).assign_type(object_type):
         return awl.column("_val")
     return None
 
@@ -792,10 +671,7 @@ def _get_live_data_from_run(run: wdt.Run, columns=None):
     if columns is None:
         return raw_live_data
     column_set = set(columns)
-    return [
-        {k: v for k, v in row.items() if k in column_set}
-        for row in gql_json_cache.use_json(raw_live_data)
-    ]
+    return [{k: v for k, v in row.items() if k in column_set} for row in gql_json_cache.use_json(raw_live_data)]
 
 
 def _extract_column_from_live_data(live_data: list[dict], column_name: str):
@@ -806,19 +682,14 @@ def _process_column_in_memory(live_column: list, run_path: wb_util.RunPath) -> l
     return [_process_live_object_in_memory(item, run_path) for item in live_column]
 
 
-def _process_live_object_in_memory(
-    live_data: typing.Any, run_path: wb_util.RunPath
-) -> typing.Any:
+def _process_live_object_in_memory(live_data: typing.Any, run_path: wb_util.RunPath) -> typing.Any:
     if isinstance(live_data, list):
         return [_process_live_object_in_memory(cell, run_path) for cell in live_data]
     if isinstance(live_data, dict):
         if live_data.get("_type") != None:
             return wb_util._process_run_dict_item(live_data, run_path)
         else:
-            return {
-                key: _process_live_object_in_memory(val, run_path)
-                for key, val in live_data.items()
-            }
+            return {key: _process_live_object_in_memory(val, run_path) for key, val in live_data.items()}
     return live_data
 
 
@@ -850,9 +721,7 @@ def _read_raw_history_awl_tables(
         local_path = io.ensure_file_downloaded(url)
         if local_path is not None:
             path = io.fs.path(local_path)
-            awl = history_op_common.awl_from_local_parquet_path(
-                path, None, columns=columns, artifact=artifact
-            )
+            awl = history_op_common.awl_from_local_parquet_path(path, None, columns=columns, artifact=artifact)
             awl = awl.map_column(_parse_bytes_mapper)
             tables.append(awl)
     return tables
@@ -864,25 +733,16 @@ def _parse_bytes_to_json(bytes: bytes):
     return json.loads(bytes.decode("utf-8"))
 
 
-def _parse_bytes_mapper(
-    awl: ArrowWeaveList, path: PathType
-) -> typing.Optional[ArrowWeaveList]:
+def _parse_bytes_mapper(awl: ArrowWeaveList, path: PathType) -> typing.Optional[ArrowWeaveList]:
     obj_type = types.non_none(awl.object_type)
     if types.Bytes().assign_type(obj_type):
         if len(awl._arrow_data) == awl._arrow_data.null_count:
             return make_vec_none(len(awl._arrow_data))
-        _non_vectorized_warning(
-            f"Encountered bytes in column {path}, requires in-memory processing"
-        )
-        data = [
-            _parse_bytes_to_json(row) if row is not None else None
-            for row in awl._arrow_data.to_pylist()
-        ]
+        _non_vectorized_warning(f"Encountered bytes in column {path}, requires in-memory processing")
+        data = [_parse_bytes_to_json(row) if row is not None else None for row in awl._arrow_data.to_pylist()]
         wb_type = types.TypeRegistry.type_of(data)
         if not hasattr(wb_type, "object_type"):
-            raise errors.WeaveWBHistoryTranslationError(
-                f"Expected type with object_type attribute, got {wb_type}"
-            )
+            raise errors.WeaveWBHistoryTranslationError(f"Expected type with object_type attribute, got {wb_type}")
         wb_type = typing.cast(types.List, wb_type)
         return convert.to_arrow_from_list_and_artifact(
             data,
@@ -934,9 +794,7 @@ def _column_type_requires_in_memory_transformation_recursive(col_type: types.Typ
     elif isinstance(non_none_type, _weave_types_requiring_in_memory_transformation):
         return True
     elif isinstance(non_none_type, types.List):
-        return _column_type_requires_in_memory_transformation_recursive(
-            non_none_type.object_type
-        )
+        return _column_type_requires_in_memory_transformation_recursive(non_none_type.object_type)
     elif isinstance(non_none_type, types.TypedDict):
         for k, v in non_none_type.property_types.items():
             if _column_type_requires_in_memory_transformation_recursive(v):
@@ -955,9 +813,7 @@ def _column_contains_legacy_media_image_recursive(col_type: types.Type):
     elif isinstance(non_none_type, wbmedia.ImageArtifactFileRefType):
         return True
     elif isinstance(non_none_type, types.List):
-        return _column_type_requires_in_memory_transformation_recursive(
-            non_none_type.object_type
-        )
+        return _column_type_requires_in_memory_transformation_recursive(non_none_type.object_type)
     elif isinstance(non_none_type, types.TypedDict):
         for k, v in non_none_type.property_types.items():
             if _column_type_requires_in_memory_transformation_recursive(v):
@@ -1002,10 +858,7 @@ def _reconstruct_original_live_data_cell(live_data: typing.Any) -> typing.Any:
     if isinstance(live_data, dict):
         if wandb_stream_table.is_weave_encoded_history_cell(live_data):
             return live_data["_val"]
-        return {
-            key: _reconstruct_original_live_data_cell(val)
-            for key, val in live_data.items()
-        }
+        return {key: _reconstruct_original_live_data_cell(val) for key, val in live_data.items()}
     return live_data
 
 

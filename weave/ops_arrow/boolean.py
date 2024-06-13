@@ -100,18 +100,14 @@ def _cond_output_type(input_type):
     result_typed_dict = input_type["results"]
     if isinstance(result_typed_dict, ArrowWeaveListType):
         result_typed_dict = result_typed_dict.object_type
-    return ArrowWeaveListType(
-        types.optional(types.union(*result_typed_dict.property_types.values()))
-    )
+    return ArrowWeaveListType(types.optional(types.union(*result_typed_dict.property_types.values())))
 
 
 @arrow_op(
     name="ArrowWeaveList-cond",
     input_type={
         "cases": ArrowWeaveListType(types.TypedDict()),
-        "results": types.union(
-            ArrowWeaveListType(types.TypedDict()), types.TypedDict()
-        ),
+        "results": types.union(ArrowWeaveListType(types.TypedDict()), types.TypedDict()),
     },
     output_type=_cond_output_type,
 )
@@ -138,7 +134,5 @@ def awl_cond(cases, results):
         result_values = [pa.scalar(v) for v in results.values()]
         result_typed_dict = types.TypeRegistry.type_of(results)
     result_array = pc.case_when(cases._arrow_data, *result_values)
-    result_object_type = types.optional(
-        types.union(*result_typed_dict.property_types.values())
-    )
+    result_object_type = types.optional(types.union(*result_typed_dict.property_types.values()))
     return ArrowWeaveList(result_array, result_object_type, cases._artifact)

@@ -30,7 +30,8 @@ from .op import Op
 
 def type_code(type_: Any) -> str:
     if isinstance(type_, py_types.GenericAlias) or isinstance(
-        type_, typing._GenericAlias  # type: ignore
+        type_,
+        typing._GenericAlias,  # type: ignore
     ):
         args = ", ".join(type_code(t) for t in type_.__args__)
         if type_.__origin__ == list or type_.__origin__ == collections.abc.Sequence:
@@ -144,9 +145,7 @@ class ExternalVariableFinder(ast.NodeVisitor):
         # TODO: we don't capture python version, but builtins can change from version to version!
         if isinstance(node.ctx, ast.Store):
             self.scope_stack[-1].add(node.id)
-        elif isinstance(node.ctx, ast.Load) and not any(
-            node.id in scope for scope in self.scope_stack
-        ):
+        elif isinstance(node.ctx, ast.Load) and not any(node.id in scope for scope in self.scope_stack):
             self.external_vars[node.id] = True
 
 
@@ -222,9 +221,7 @@ def get_code_deps(
     """
     warnings: list[str] = []
     if depth > 20:
-        warnings = [
-            "Recursion depth exceeded in get_code_deps, this may indicate circular depenencies, which are not yet handled."
-        ]
+        warnings = ["Recursion depth exceeded in get_code_deps, this may indicate circular depenencies, which are not yet handled."]
         return {"import_code": [], "code": [], "warnings": warnings}
 
     source = textwrap.dedent(inspect.getsource(fn))
@@ -256,9 +253,7 @@ def get_code_deps(
             if getattr(builtins, var_name, None):
                 # Its a builtin, carry on
                 continue
-            warnings.append(
-                f'Could not resolve var "{var_name}" declared in body of fn {fn}. This op will not be reloadable, but calls to it will be tracked'
-            )
+            warnings.append(f'Could not resolve var "{var_name}" declared in body of fn {fn}. This op will not be reloadable, but calls to it will be tracked')
         elif isinstance(var_value, py_types.ModuleType):
             import_line = f"import {var_value.__name__}"
             if var_value.__name__ != var_name:
@@ -286,24 +281,16 @@ def get_code_deps(
                     pass
 
                 if isinstance(var_value, Op):
-                    warnings.append(
-                        f"Cross-module op dependencies are not yet serializable {var_value}"
-                    )
+                    warnings.append(f"Cross-module op dependencies are not yet serializable {var_value}")
                 else:
-                    import_line = (
-                        f"from {var_value.__module__} import {var_value.__name__}"
-                    )
+                    import_line = f"from {var_value.__module__} import {var_value.__name__}"
                     if var_value.__name__ != var_name:
                         import_line += f"as {var_name}"
 
                     import_code.append(import_line)
 
         else:
-            if (
-                hasattr(var_value, "__name__")
-                and hasattr(var_value, "__module__")
-                and var_value.__module__ != fn.__module__
-            ):
+            if hasattr(var_value, "__name__") and hasattr(var_value, "__module__") and var_value.__module__ != fn.__module__:
                 import_line = f"from {var_value.__module__} import {var_value.__name__}"
                 if var_value.__name__ != var_name:
                     import_line += f"as {var_name}"
@@ -312,25 +299,13 @@ def get_code_deps(
                 try:
                     # This relies on old Weave type mechanism.
                     # TODO: Update to use new Weave trace serialization mechanism.
-                    json_val = storage.to_json_with_refs(
-                        var_value, artifact, path=[var_name]
-                    )
+                    json_val = storage.to_json_with_refs(var_value, artifact, path=[var_name])
                 except (errors.WeaveTypeError, errors.WeaveSerializeError) as e:
-                    warnings.append(
-                        f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
-                    )
+                    warnings.append(f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}")
                 else:
-                    code_paragraph = (
-                        f"{var_name} = "
-                        + json.dumps(json_val, cls=RefJSONEncoder, indent=4)
-                        + "\n"
-                    )
-                    code_paragraph = code_paragraph.replace(
-                        f'"{RefJSONEncoder.SPECIAL_REF_TOKEN}', ""
-                    )
-                    code_paragraph = code_paragraph.replace(
-                        f'{RefJSONEncoder.SPECIAL_REF_TOKEN}"', ""
-                    )
+                    code_paragraph = f"{var_name} = " + json.dumps(json_val, cls=RefJSONEncoder, indent=4) + "\n"
+                    code_paragraph = code_paragraph.replace(f'"{RefJSONEncoder.SPECIAL_REF_TOKEN}', "")
+                    code_paragraph = code_paragraph.replace(f'{RefJSONEncoder.SPECIAL_REF_TOKEN}"', "")
                     code.append(code_paragraph)
     return {"import_code": import_code, "code": code, "warnings": warnings}
 
@@ -374,9 +349,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
     return deduped
 
 
-def save_instance(
-    obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
-) -> None:
+def save_instance(obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str) -> None:
     result = get_code_deps(obj.resolve_fn, artifact)
     import_code = result["import_code"]
     code = result["code"]
@@ -426,9 +399,7 @@ def load_instance(
     art_and_version_dir = module_path[: -(1 + len(file_name))]
     art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
     module_dir = art_dir
-    import_name = (
-        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
-    )
+    import_name = version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
 
     sys.path.insert(0, os.path.abspath(module_dir))
     with context_state.no_op_register():
@@ -454,9 +425,7 @@ def load_instance(
     # so we resort to looking at the source ast.
     last_op_function = find_last_weave_op_function(inspect.getsource(mod))
     if last_op_function is None:
-        print(
-            f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}"
-        )
+        print(f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}")
         return None
 
     od: "Op" = getattr(mod, last_op_function.name)

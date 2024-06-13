@@ -32,9 +32,7 @@ def _to_compare_safe_call(node: graph.OutputNode) -> graph.OutputNode:
     return node
 
 
-def _eq_null_consumer_helper(
-    lhs: pa.Array, rhs: typing.Union[pa.Array, pa.Scalar]
-) -> typing.Tuple[pa.Array, pa.Array]:
+def _eq_null_consumer_helper(lhs: pa.Array, rhs: typing.Union[pa.Array, pa.Scalar]) -> typing.Tuple[pa.Array, pa.Array]:
     # consume nulls
 
     self_is_null = pc.is_null(lhs)

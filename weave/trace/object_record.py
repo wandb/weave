@@ -74,9 +74,7 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
 
 # This is an exact copy of the getmembers function from the inspect module
 # with the addition of handling exceptions when calling getattr, with an on_error handler
-def getmembers(
-    object: Any, predicate: Any = None, on_error: Any = None
-) -> list[tuple[str, Any]]:
+def getmembers(object: Any, predicate: Any = None, on_error: Any = None) -> list[tuple[str, Any]]:
     """Return all members of an object as (name, value) pairs sorted by name.
     Optionally, only return members that satisfy a given predicate."""
     if isclass(object):

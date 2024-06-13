@@ -41,21 +41,11 @@ def filter_fn_to_sql_filter(table, filter_fn_node):
     elif isinstance(filter_fn_node, graph.OutputNode):
         op_name = graph.op_full_name(filter_fn_node.from_op)
         if op_name == "number-greater":
-            return filter_fn_to_sql_filter(
-                table, filter_fn_node.from_op.inputs["lhs"]
-            ) > filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["rhs"])
+            return filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["lhs"]) > filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["rhs"])
         elif op_name == "pick":
-            return filter_fn_to_sql_filter(
-                table, filter_fn_node.from_op.inputs["obj"]
-            ).columns[
-                filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["key"])
-            ]
+            return filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["obj"]).columns[filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["key"])]
         elif op_name == "typedDict-pick":
-            return filter_fn_to_sql_filter(
-                table, filter_fn_node.from_op.inputs["self"]
-            ).columns[
-                filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["key"])
-            ]
+            return filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["self"]).columns[filter_fn_to_sql_filter(table, filter_fn_node.from_op.inputs["key"])]
         raise Exception("unhandled op name", op_name)
     elif isinstance(filter_fn_node, graph.VarNode):
         if filter_fn_node.name == "row":
@@ -191,9 +181,7 @@ class SqlTable:
 
     @op(
         input_type={
-            "map_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
+            "map_fn": lambda input_types: types.Function({"row": input_types["self"].object_type}, types.Any()),
         },
         output_type=lambda input_types: types.List(input_types["self"].object_type),
     )
@@ -202,9 +190,7 @@ class SqlTable:
 
     @op(
         input_type={
-            "filterFn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
+            "filterFn": lambda input_types: types.Function({"row": input_types["self"].object_type}, types.Any()),
         },
         output_type=lambda input_types: input_types["self"],
     )
@@ -215,9 +201,7 @@ class SqlTable:
 
     @op(
         input_type={
-            "group_by_fn": lambda input_types: types.Function(
-                {"row": input_types["self"].object_type}, types.Any()
-            ),
+            "group_by_fn": lambda input_types: types.Function({"row": input_types["self"].object_type}, types.Any()),
         },
         output_type=lambda input_types: types.List(
             tagged_value_type.TaggedValueType(

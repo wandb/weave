@@ -38,9 +38,7 @@ class SymbolPatcher(Patcher):
     _make_new_value: Callable
     _original_value: Any = None
 
-    def __init__(
-        self, get_base_symbol: Callable, attribute_name: str, make_new_value: Callable
-    ) -> None:
+    def __init__(self, get_base_symbol: Callable, attribute_name: str, make_new_value: Callable) -> None:
         self._get_base_symbol = get_base_symbol
         self._attribute_name = attribute_name
         self._make_new_value = make_new_value

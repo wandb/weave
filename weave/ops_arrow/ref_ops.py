@@ -34,13 +34,9 @@ def ref_equal(self, other):
             other = other._arrow_data
         else:
             # Otherwise... this shouldn't happen I think?
-            raise ValueError(
-                f"Cannot compare ArrowWeaveListRef to {type(other)}: {other}"
-            )
+            raise ValueError(f"Cannot compare ArrowWeaveListRef to {type(other)}: {other}")
     other = str(other_ref)
-    self_ = self.map_column(
-        lambda col, path: ArrowWeaveList(col._arrow_data, types.String())
-    )
+    self_ = self.map_column(lambda col, path: ArrowWeaveList(col._arrow_data, types.String()))
     # self_arrow_data = pc.cast(self._arrow_data, pa.string())
     result = util.equal(self_._arrow_data, other)
     return ArrowWeaveList(result, types.Boolean(), self._artifact)
@@ -54,6 +50,4 @@ def ref_equal(self, other):
     output_type=ArrowWeaveListType(types.optional(types.String())),
 )
 def ref_to_uri(self):
-    return self.map_column(
-        lambda col, path: ArrowWeaveList(col._arrow_data, types.String())
-    )
+    return self.map_column(lambda col, path: ArrowWeaveList(col._arrow_data, types.String()))

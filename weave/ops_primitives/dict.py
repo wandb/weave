@@ -32,9 +32,7 @@ from ..language_features.tagging import tagged_value_type
 def is_const_union_of_type(type_, of_type):
     if not isinstance(type_, types.UnionType):
         return False
-    return all(
-        isinstance(m, types.Const) and m.val_type == of_type for m in type_.members
-    )
+    return all(isinstance(m, types.Const) and m.val_type == of_type for m in type_.members)
 
 
 # TODO: in this PR, this was important for making scenario compare work.
@@ -84,34 +82,21 @@ class TypedDict:
     def pick(self, key):
         return tag_aware_dict_val_for_escaped_key(self, key)
 
-    @op(
-        output_type=lambda input_type: types.List(
-            types.union(
-                *(
-                    types.Const(types.String(), k)
-                    for k in input_type["self"].property_types.keys()
-                )
-            )
-        )
-    )
+    @op(output_type=lambda input_type: types.List(types.union(*(types.Const(types.String(), k) for k in input_type["self"].property_types.keys()))))
     def keys(self):
         return list(self.keys())
 
     @op(
         name="merge",
         input_type={"lhs": types.TypedDict({}), "rhs": types.TypedDict({})},
-        output_type=lambda input_types: types.TypedDict(
-            {**input_types["lhs"].property_types, **input_types["rhs"].property_types}
-        ),
+        output_type=lambda input_types: types.TypedDict({**input_types["lhs"].property_types, **input_types["rhs"].property_types}),
     )
     def merge(lhs, rhs):
         return {**lhs, **rhs}
 
     @op(
         name="typedDict-values",
-        output_type=lambda input_types: types.List(
-            types.union(*input_types["self"].property_types.values())
-        ),
+        output_type=lambda input_types: types.List(types.union(*input_types["self"].property_types.values())),
     )
     def values(self):
         return self.values()

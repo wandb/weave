@@ -19,9 +19,7 @@ class ClickHouseTraceServerMigrator:
         self.ch_client = ch_client
         self._initialize_migration_db()
 
-    def apply_migrations(
-        self, target_db: str, target_version: typing.Optional[int] = None
-    ) -> None:
+    def apply_migrations(self, target_db: str, target_version: typing.Optional[int] = None) -> None:
         status = self._get_migration_status(target_db)
         logger.info(f"""`{target_db}` migration status: {status}""")
         if status["partially_applied_version"]:
@@ -30,9 +28,7 @@ class ClickHouseTraceServerMigrator:
             )
             return
         migration_map = self._get_migrations()
-        migrations_to_apply = self._determine_migrations_to_apply(
-            status["curr_version"], migration_map, target_version
-        )
+        migrations_to_apply = self._determine_migrations_to_apply(status["curr_version"], migration_map, target_version)
         if len(migrations_to_apply) == 0:
             logger.info(f"No migrations to apply to `{target_db}`")
             return
@@ -120,9 +116,7 @@ class ClickHouseTraceServerMigrator:
             raise Exception("No migrations found")
 
         if max_version != len(migration_map):
-            raise Exception(
-                f"Invalid migration versioning. Expected {max_version} migrations but found {len(migration_map)}"
-            )
+            raise Exception(f"Invalid migration versioning. Expected {max_version} migrations but found {len(migration_map)}")
 
         for version in range(1, max_version + 1):
             if version not in migration_map:
@@ -162,9 +156,7 @@ class ClickHouseTraceServerMigrator:
 
         return []
 
-    def _apply_migration(
-        self, target_db: str, target_version: int, migration_file: str
-    ) -> None:
+    def _apply_migration(self, target_db: str, target_version: int, migration_file: str) -> None:
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_file_path = os.path.join(migration_dir, migration_file)

@@ -32,9 +32,7 @@ def test_column():
         ]
     )
     col_b = awl.column("b")
-    assert col_b.object_type == tagged_value_type.TaggedValueType(
-        weave.types.TypedDict({"a": weave.types.Int()}), weave.types.Int()
-    )
+    assert col_b.object_type == tagged_value_type.TaggedValueType(weave.types.TypedDict({"a": weave.types.Int()}), weave.types.Int())
     expected = [
         TaggedValue({"a": 5}, 6),
         TaggedValue({"a": 9}, 10),
@@ -50,9 +48,7 @@ def test_apply():
         ]
     )
     res = awl.apply(lambda row: (row["b"] + row["c"]) * 2)
-    assert res.object_type == tagged_value_type.TaggedValueType(
-        weave.types.TypedDict({"a": weave.types.Int()}), weave.types.Number()
-    )
+    assert res.object_type == tagged_value_type.TaggedValueType(weave.types.TypedDict({"a": weave.types.Int()}), weave.types.Number())
     assert from_awl(res) == [
         TaggedValue({"a": 5}, 26),
         TaggedValue({"a": 9}, 44),
@@ -62,9 +58,7 @@ def test_apply():
 def test_join2():
     l1 = to_awl([{"a": 5, "b": 6}, {"a": 7, "b": 8}])
     l2 = to_awl([{"a": 5, "b": 9}, {"a": 10, "b": 14}])
-    res = l1.join2(
-        l2, lambda row: row["a"], lambda row: row["a"], leftOuter=True, rightOuter=True
-    )
+    res = l1.join2(l2, lambda row: row["a"], lambda row: row["a"], leftOuter=True, rightOuter=True)
     assert from_awl(res) == [
         TaggedValue({"joinObj": 5}, {"a1": {"a": 5, "b": 6}, "a2": {"a": 5, "b": 9}}),
         TaggedValue({"joinObj": 7}, {"a1": {"a": 7, "b": 8}, "a2": None}),
@@ -76,9 +70,7 @@ def test_join2():
 def test_join2_different_types():
     l1 = to_awl([{"a": {"x": 5}, "b": 6}, {"a": {"x": 5}, "b": 8}])
     l2 = to_awl([{"a": {"x": 6, "j": 9}, "b": 9}, {"a": {"x": 6, "y": 7}, "b": 14}])
-    res = l1.join2(
-        l2, lambda row: row["a"], lambda row: row["a"], leftOuter=True, rightOuter=True
-    )
+    res = l1.join2(l2, lambda row: row["a"], lambda row: row["a"], leftOuter=True, rightOuter=True)
     assert from_awl(res) == [
         TaggedValue({"joinObj": 5}, {"a1": {"a": 5, "b": 6}, "a2": {"a": 5, "b": 9}}),
         TaggedValue({"joinObj": 7}, {"a1": {"a": 7, "b": 8}, "a2": None}),
@@ -97,9 +89,7 @@ def test_tagged_awl_sum():
     )
     awl = to_arrow(
         data,
-        wb_type=types.List(
-            object_type=types.List(object_type=types.UnionType(tagtype, types.Int()))
-        ),
+        wb_type=types.List(object_type=types.List(object_type=types.UnionType(tagtype, types.Int()))),
     )
 
     node = weave.save(awl)

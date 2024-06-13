@@ -26,13 +26,7 @@ def test_gql_compilation_with_keys():
         }
     )
 
-    run_edges_type = types.TypedDict(
-        property_types={
-            "edges": types.List(
-                object_type=types.TypedDict(property_types={"node": run_type_keys})
-            )
-        }
-    )
+    run_edges_type = types.TypedDict(property_types={"edges": types.List(object_type=types.TypedDict(property_types={"node": run_type_keys}))})
 
     expected = TaggedValueType(
         types.TypedDict(
@@ -48,9 +42,7 @@ def test_gql_compilation_with_keys():
         ),
         types.List(
             TaggedValueType(
-                types.TypedDict(
-                    {"run": wdt.RunType.with_keys(run_type_keys.property_types)}
-                ),
+                types.TypedDict({"run": wdt.RunType.with_keys(run_type_keys.property_types)}),
                 types.String(),
             )
         ),
@@ -68,13 +60,7 @@ def test_gql_compilation_root_op_custom_key_fn():
         {
             "id": types.String(),
             "name": types.String(),
-            "runs_c1233b7003317090ab5e2a75db4ad965": types.TypedDict(
-                {
-                    "edges": types.List(
-                        types.TypedDict({"node": types.TypedDict(run_type.keys)})
-                    )
-                }
-            ),
+            "runs_c1233b7003317090ab5e2a75db4ad965": types.TypedDict({"edges": types.List(types.TypedDict({"node": types.TypedDict(run_type.keys)}))}),
         }
     )
 
@@ -252,9 +238,7 @@ def test_last_membership():
                 )
             }
         ),
-        types.optional(
-            wdt.ArtifactCollectionMembershipType.with_keys({"id": types.String()})
-        ),
+        types.optional(wdt.ArtifactCollectionMembershipType.with_keys({"id": types.String()})),
     )
 
     assert compiled_node.type == expected
@@ -320,11 +304,7 @@ def test_mapped_last_membership():
                 )
             }
         ),
-        types.List(
-            types.optional(
-                wdt.ArtifactCollectionMembershipType.with_keys({"id": types.String()})
-            )
-        ),
+        types.List(types.optional(wdt.ArtifactCollectionMembershipType.with_keys({"id": types.String()}))),
     )
 
     assert compiled_node.type == expected
@@ -533,9 +513,7 @@ def test_gql_connection_op():
                                                                                                 "propertyTypes": {
                                                                                                     "node": {
                                                                                                         "type": "typedDict",
-                                                                                                        "propertyTypes": {
-                                                                                                            "id": "string"
-                                                                                                        },
+                                                                                                        "propertyTypes": {"id": "string"},
                                                                                                     }
                                                                                                 },
                                                                                             },
@@ -616,18 +594,10 @@ def test_early_termination_of_gql_key_propagation(fake_wandb):
     # Test that keys are restored when converting a literal to a
     # constnode and calling type_of on it.
     names_node = ops.project_ops.name(projects)
-    names_node = compile.compile([names_node])[
-        0
-    ]  # Compile for dispatch to use the correct operation.
+    names_node = compile.compile([names_node])[0]  # Compile for dispatch to use the correct operation.
     assert names_node.type == types.List(
         TaggedValueType(
-            types.TypedDict(
-                {
-                    "project": wdt.ProjectType.with_keys(
-                        {"id": types.String(), "name": types.String()}
-                    )
-                }
-            ),
+            types.TypedDict({"project": wdt.ProjectType.with_keys({"id": types.String(), "name": types.String()})}),
             types.String(),
         )
     )
@@ -644,9 +614,7 @@ def test_early_termination_of_gql_key_propagation(fake_wandb):
 
 
 def test_root_artifact_version_gql_propagation():
-    node = ops.artifact_version_ops.root_artifact_version(
-        "stacey", "mendeleev", "test_res_1fwmcd3q", "v0"
-    )
+    node = ops.artifact_version_ops.root_artifact_version("stacey", "mendeleev", "test_res_1fwmcd3q", "v0")
     compiled_node = compile.compile([node])[0]
 
     expected = types.optional(wdt.ArtifactVersionType.with_keys({"id": types.String()}))

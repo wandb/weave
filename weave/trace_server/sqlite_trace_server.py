@@ -50,9 +50,7 @@ class NotFoundError(Exception):
     pass
 
 
-_conn_cursor: contextvars.ContextVar[
-    Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
-] = contextvars.ContextVar("conn_cursor", default=None)
+_conn_cursor: contextvars.ContextVar[Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]] = contextvars.ContextVar("conn_cursor", default=None)
 
 
 def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
@@ -184,9 +182,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.started_at.isoformat(),
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
-                    json.dumps(
-                        extract_refs_from_values(list(req.start.inputs.values()))
-                    ),
+                    json.dumps(extract_refs_from_values(list(req.start.inputs.values()))),
                     req.start.wb_user_id,
                     req.start.wb_run_id,
                 ),
@@ -218,9 +214,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.end.ended_at.isoformat(),
                     req.end.exception,
                     json.dumps(req.end.output),
-                    json.dumps(
-                        extract_refs_from_values(list(parsable_output.values()))
-                    ),
+                    json.dumps(extract_refs_from_values(list(parsable_output.values()))),
                     json.dumps(req.end.summary),
                     req.end.id,
                 ),
@@ -336,9 +330,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if isinstance(operand, tsi_query.LiteralOperation):
                     return json.dumps(operand.literal_)
                 elif isinstance(operand, tsi_query.GetFieldOperator):
-                    field = _transform_external_calls_field_to_internal_calls_field(
-                        operand.get_field_, None
-                    )
+                    field = _transform_external_calls_field_to_internal_calls_field(operand.get_field_, None)
                     return field
                 elif isinstance(operand, tsi_query.ConvertOperation):
                     field = process_operand(operand.convert_.input)
@@ -381,9 +373,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if conditions_part:
             query += f" AND {conditions_part}"
 
-        order_by = (
-            None if not req.sort_by else [(s.field, s.direction) for s in req.sort_by]
-        )
+        order_by = None if not req.sort_by else [(s.field, s.direction) for s in req.sort_by]
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
@@ -483,9 +473,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(
-                ", ".join("?" * len(req.call_ids))
-            )
+            """.format(", ".join("?" * len(req.call_ids)))
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -497,9 +485,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(
-                ", ".join("?" * len(all_ids))
-            )
+            """.format(", ".join("?" * len(all_ids)))
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()
@@ -692,18 +678,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     if isinstance(val, str) and val.startswith("weave://"):
                         table_ref = refs.parse_uri(val)
                         if not isinstance(table_ref, refs.TableRef):
-                            raise ValueError(
-                                "invalid data layout encountered, expected TableRef when resolving id"
-                            )
+                            raise ValueError("invalid data layout encountered, expected TableRef when resolving id")
                         row = self._table_row_read(
                             project_id=f"{table_ref.entity}/{table_ref.project}",
                             row_digest=arg,
                         )
                         val = row.val
                     else:
-                        raise ValueError(
-                            "invalid data layout encountered, expected TableRef when resolving id"
-                        )
+                        raise ValueError("invalid data layout encountered, expected TableRef when resolving id")
                 else:
                     raise ValueError(f"Unknown ref type: {extra[extra_index]}")
             return val
@@ -719,9 +701,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if req.feedback_type == "wandb.reaction.1":
             em = req.payload["emoji"]
             if emoji.emoji_count(em) != 1:
-                raise InvalidRequest(
-                    "Value of emoji key in payload must be exactly one emoji"
-                )
+                raise InvalidRequest("Value of emoji key in payload must be exactly one emoji")
             req.payload["alias"] = emoji.demojize(em)
             detoned = detone_emojis(em)
             req.payload["detoned"] = detoned
@@ -851,9 +831,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             (project_id, digest),
         )
         query_result = cursor.fetchall()
-        return [
-            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1])) for r in query_result
-        ]
+        return [tsi.TableRowSchema(digest=r[0], val=json.loads(r[1])) for r in query_result]
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -868,9 +846,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         query_result = cursor.fetchone()
         if query_result is None:
             raise NotFoundError(f"Row {row_digest} not found")
-        return tsi.TableRowSchema(
-            digest=query_result[0], val=json.loads(query_result[1])
-        )
+        return tsi.TableRowSchema(digest=query_result[0], val=json.loads(query_result[1]))
 
     def _select_objs_query(
         self,
@@ -881,8 +857,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
         cursor.execute(
-            """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
-            + pred,
+            """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """ + pred,
             (project_id,),
         )
         query_result = cursor.fetchall()
@@ -995,14 +970,6 @@ def _transform_external_calls_field_to_internal_calls_field(
                 sql_type = "TEXT"
             else:
                 raise ValueError(f"Unknown cast: {cast}")
-        field = (
-            "CAST(json_extract("
-            + json.dumps(field)
-            + ", '"
-            + json_path
-            + "') AS "
-            + sql_type
-            + ")"
-        )
+        field = "CAST(json_extract(" + json.dumps(field) + ", '" + json_path + "') AS " + sql_type + ")"
 
     return field

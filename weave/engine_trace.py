@@ -82,9 +82,7 @@ class DummyTrace:
         return None
 
 
-_weave_trace_span: contextvars.ContextVar[
-    typing.Optional["WeaveTraceSpan"]
-] = contextvars.ContextVar("_weave_trace_span", default=None)
+_weave_trace_span: contextvars.ContextVar[typing.Optional["WeaveTraceSpan"]] = contextvars.ContextVar("_weave_trace_span", default=None)
 
 
 _weave_trace_stream = None
@@ -248,9 +246,7 @@ class WeaveWriter:
     def __init__(self, orig_writer):
         self._orig_writer = orig_writer
         self._queue = multiprocessing.Queue()
-        self._proc = multiprocessing.Process(
-            target=send_proc, args=(self._queue,), daemon=True
-        )
+        self._proc = multiprocessing.Process(target=send_proc, args=(self._queue,), daemon=True)
 
     def recreate(self):
         return WeaveWriter(self._orig_writer.recreate())
@@ -288,11 +284,7 @@ def patch_ddtrace_set_tag():
         def set_tag(self, key, unredacted_val=None, redacted_val=None):
             if redacted_val is not None and environment.disable_weave_pii():
                 old_set_tag(self, key, redacted_val)
-            elif (
-                unredacted_val is not None
-                and not environment.disable_weave_pii()
-                or "_dd." in key
-            ):
+            elif unredacted_val is not None and not environment.disable_weave_pii() or "_dd." in key:
                 old_set_tag(self, key, unredacted_val)
 
         # Log metric if flag is off or if flag is on and redacted

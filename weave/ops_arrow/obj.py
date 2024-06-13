@@ -11,11 +11,7 @@ from ..arrow.list_ import ArrowWeaveList, ArrowWeaveListType
         "self": ArrowWeaveListType(types.Any()),
         "name": types.String(),
     },
-    output_type=lambda input_types: ArrowWeaveListType(
-        primitives_obj.getattr_output_type(
-            {"self": input_types["self"].object_type, "name": input_types["name"]}
-        )
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(primitives_obj.getattr_output_type({"self": input_types["self"].object_type, "name": input_types["name"]})),
     all_args_nullable=False,
 )
 def arrow_getattr(self, name):

@@ -13,9 +13,7 @@ PanelType = typing.TypeVar("PanelType")
 
 @weave.type()
 class EachConfig:
-    pbConfig: PanelBankSectionConfig = dataclasses.field(
-        default_factory=default_panel_bank_flow_section_config
-    )
+    pbConfig: PanelBankSectionConfig = dataclasses.field(default_factory=default_panel_bank_flow_section_config)
     panel: PanelType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 
 
@@ -23,9 +21,7 @@ class EachConfig:
 class Each(panel.Panel):
     id = "Each"
     input_node: graph.Node[list[typing.Any]]
-    config: typing.Optional[EachConfig] = dataclasses.field(
-        default_factory=lambda: None
-    )
+    config: typing.Optional[EachConfig] = dataclasses.field(default_factory=lambda: None)
 
     def item_var(self):
         return graph.VarNode(self.input_node.type.object_type, "item")

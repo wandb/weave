@@ -17,6 +17,4 @@ class FunctionEditorConfig(typing.Generic[ExpressionType]):
 @weave.type()
 class FunctionEditor(panel.Panel):
     id = "FunctionEditor"
-    config: FunctionEditorConfig = dataclasses.field(
-        default_factory=FunctionEditorConfig
-    )
+    config: FunctionEditorConfig = dataclasses.field(default_factory=FunctionEditorConfig)

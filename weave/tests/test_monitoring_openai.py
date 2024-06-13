@@ -23,11 +23,7 @@ from weave.wandb_interface.wandb_stream_table import StreamTable
 
 @pytest.fixture
 def chat_completion_request_message():
-    return [
-        ChatCompletionRequestMessage(
-            content="Tell me a joke", role="system", function_call=None, tool_calls=None
-        )
-    ]
+    return [ChatCompletionRequestMessage(content="Tell me a joke", role="system", function_call=None, tool_calls=None)]
 
 
 @pytest.fixture
@@ -55,9 +51,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content="Why", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content="Why", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -70,9 +64,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content=" don", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content=" don", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -85,9 +77,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content="'t", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content="'t", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -118,9 +108,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content=" trust", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content=" trust", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -133,9 +121,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content=" atoms", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content=" atoms", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -148,9 +134,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content="?\n\n", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content="?\n\n", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -181,9 +165,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content=" they", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content=" they", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -196,9 +178,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content=" make", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content=" make", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -211,9 +191,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content=" up", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content=" up", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -244,9 +222,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content="!", function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content="!", function_call=None, role=None, tool_calls=None),
                     finish_reason=None,
                     index=0,
                 )
@@ -259,9 +235,7 @@ def streaming_chat_completion_messages():
             id="chatcmpl-blank",
             choices=[
                 ChunkChoice(
-                    delta=ChoiceDelta(
-                        content=None, function_call=None, role=None, tool_calls=None
-                    ),
+                    delta=ChoiceDelta(content=None, function_call=None, role=None, tool_calls=None),
                     finish_reason="stop",
                     index=0,
                 )
@@ -357,9 +331,7 @@ def openai_client():
 
 @pytest.fixture
 def streaming_client(openai_client, streaming_chat_completion_messages):
-    openai_client.chat.completions.create.return_value = iter(
-        streaming_chat_completion_messages
-    )
+    openai_client.chat.completions.create.return_value = iter(streaming_chat_completion_messages)
     return openai_client
 
 
@@ -450,9 +422,7 @@ def test_log_to_span_basic(
     project = "openai"
     entity = user_by_api_key_in_env.username
 
-    streamtable = make_stream_table(
-        stream_name, project_name=project, entity_name=entity
-    )
+    streamtable = make_stream_table(stream_name, project_name=project, entity_name=entity)
     chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_create)
     create_input = dict(
         model="gpt-3.5-turbo",
@@ -479,9 +449,7 @@ def test_log_to_span_streaming(
     reassembled_chat_completion_message,
     client,
 ):
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
-        mocked_streaming_create
-    )
+    chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_streaming_create)
     create_input = dict(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": "Tell me a joke"}],
@@ -510,9 +478,7 @@ async def test_log_to_span_async_streaming(
     reassembled_chat_completion_message,
     client,
 ):
-    chat_completions = weave.monitoring.openai.openai.AsyncChatCompletions(
-        mocked_async_streaming_create
-    )
+    chat_completions = weave.monitoring.openai.openai.AsyncChatCompletions(mocked_async_streaming_create)
     create_input = dict(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": "Tell me a joke"}],

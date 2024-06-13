@@ -247,12 +247,8 @@ join_all = OpSpec(
                     weave.types.TypedDict({"joinObj": weave.types.Int()}),
                     weave.types.TypedDict(
                         {
-                            "a": weave.types.List(
-                                weave.types.optional(weave.types.Int())
-                            ),
-                            "b": weave.types.List(
-                                weave.types.optional(weave.types.Int())
-                            ),
+                            "a": weave.types.List(weave.types.optional(weave.types.Int())),
+                            "b": weave.types.List(weave.types.optional(weave.types.Int())),
                         }
                     ),
                 )
@@ -268,17 +264,13 @@ join_all = OpSpec(
                 lambda x: x["a"],
                 False,
             ),
-            expected=[
-                TaggedValue({"joinObj": 5}, {"a": [5, 5], "b": [6, {"j": 12, "k": 13}]})
-            ],
+            expected=[TaggedValue({"joinObj": 5}, {"a": [5, 5], "b": [6, {"j": 12, "k": 13}]})],
             expected_type=weave.types.List(
                 tagged_value_type.TaggedValueType(
                     weave.types.TypedDict({"joinObj": weave.types.Int()}),
                     weave.types.TypedDict(
                         {
-                            "a": weave.types.List(
-                                weave.types.optional(weave.types.Int())
-                            ),
+                            "a": weave.types.List(weave.types.optional(weave.types.Int())),
                             "b": weave.types.List(
                                 weave.types.optional(
                                     weave.types.UnionType(
@@ -342,9 +334,7 @@ number_to_timestamp = OpSpec(
         # Negative Time
         OpSpecTestCase(
             input=(-1677098489000,),
-            expected=datetime.datetime.fromtimestamp(
-                -1677098489, datetime.timezone.utc
-            ),
+            expected=datetime.datetime.fromtimestamp(-1677098489, datetime.timezone.utc),
             expected_type=weave.types.Timestamp(),
         ),
         # Small Value
@@ -356,41 +346,31 @@ number_to_timestamp = OpSpec(
         # Large Value
         OpSpecTestCase(
             input=(PY_DATETIME_MAX_MS,),
-            expected=datetime.datetime.fromtimestamp(
-                PY_DATETIME_MAX_MS / 1000, datetime.timezone.utc
-            ),
+            expected=datetime.datetime.fromtimestamp(PY_DATETIME_MAX_MS / 1000, datetime.timezone.utc),
             expected_type=weave.types.Timestamp(),
         ),
         # Large Value (in nanoseconds)
         OpSpecTestCase(
             input=(PY_DATETIME_MAX_MS + 12345,),
-            expected=datetime.datetime.fromtimestamp(
-                ((PY_DATETIME_MAX_MS + 12345) // 1000) / 1000, datetime.timezone.utc
-            ),
+            expected=datetime.datetime.fromtimestamp(((PY_DATETIME_MAX_MS + 12345) // 1000) / 1000, datetime.timezone.utc),
             expected_type=weave.types.Timestamp(),
         ),
         # Large Negative Value
         OpSpecTestCase(
             input=(PY_DATETIME_MIN_MS,),
-            expected=datetime.datetime.fromtimestamp(
-                PY_DATETIME_MIN_MS / 1000, datetime.timezone.utc
-            ),
+            expected=datetime.datetime.fromtimestamp(PY_DATETIME_MIN_MS / 1000, datetime.timezone.utc),
             expected_type=weave.types.Timestamp(),
         ),
         # Large Negative Value (in nano seconds)
         OpSpecTestCase(
             input=(PY_DATETIME_MIN_MS - 12345,),
-            expected=datetime.datetime.fromtimestamp(
-                ((PY_DATETIME_MIN_MS - 12345) // 1000) / 1000, datetime.timezone.utc
-            ),
+            expected=datetime.datetime.fromtimestamp(((PY_DATETIME_MIN_MS - 12345) // 1000) / 1000, datetime.timezone.utc),
             expected_type=weave.types.Timestamp(),
         ),
         # Float Value (Drops Fractional Part)
         OpSpecTestCase(
             input=(1677098489215.025,),
-            expected=datetime.datetime.fromtimestamp(
-                1677098489.215, datetime.timezone.utc
-            ),
+            expected=datetime.datetime.fromtimestamp(1677098489.215, datetime.timezone.utc),
             expected_type=weave.types.Timestamp(),
         ),
     ],

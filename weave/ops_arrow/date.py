@@ -85,9 +85,7 @@ def ceil(self, multiple_s: float):
 def le(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.less(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    return ArrowWeaveList(pc.less(self._arrow_data, other), types.Boolean(), self._artifact)
 
 
 @arrow_op(
@@ -98,9 +96,7 @@ def le(self, other):
 def lt(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.less_equal(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    return ArrowWeaveList(pc.less_equal(self._arrow_data, other), types.Boolean(), self._artifact)
 
 
 @arrow_op(
@@ -111,9 +107,7 @@ def lt(self, other):
 def gt(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.greater(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    return ArrowWeaveList(pc.greater(self._arrow_data, other), types.Boolean(), self._artifact)
 
 
 @arrow_op(
@@ -124,9 +118,7 @@ def gt(self, other):
 def ge(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.greater_equal(self._arrow_data, other), types.Boolean(), self._artifact
-    )
+    return ArrowWeaveList(pc.greater_equal(self._arrow_data, other), types.Boolean(), self._artifact)
 
 
 @op(
@@ -160,9 +152,7 @@ def timestamp_max(self):
 def sub(self, other):
     if isinstance(other, ArrowWeaveList):
         other = other._arrow_data
-    return ArrowWeaveList(
-        pc.subtract(self._arrow_data, other), types.TimeDelta(), self._artifact
-    )
+    return ArrowWeaveList(pc.subtract(self._arrow_data, other), types.TimeDelta(), self._artifact)
 
 
 @arrow_op(

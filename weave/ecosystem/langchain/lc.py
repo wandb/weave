@@ -350,9 +350,7 @@ class RetrievalQAType(BaseRetrievalQAType):
 class FAISSType(VectorStoreType):
     instance_classes = FAISS
 
-    def save_instance(
-        self, obj: FAISS, artifact, name
-    ) -> typing.Union[list[str], artifact_base.ArtifactRef, None]:
+    def save_instance(self, obj: FAISS, artifact, name) -> typing.Union[list[str], artifact_base.ArtifactRef, None]:
         # Langchain is inefficient, it resaves all the documents.
         # But in weave we've probably already saved them, so we'd prefer to just store a ref.
         # TODO: replace with weave implementation
@@ -401,9 +399,7 @@ class FaissOps:
         for i, embedding in enumerate(embeddings):
             result.append(
                 {
-                    "document": vector_store.docstore.search(
-                        vector_store.index_to_docstore_id[i]
-                    ),
+                    "document": vector_store.docstore.search(vector_store.index_to_docstore_id[i]),
                     "embedding": embedding.tolist(),
                     "cluster": str(cluster_ids[i][0]),
                 }
@@ -442,18 +438,12 @@ def llm_chain(llm: BaseLanguageModel, prompt: BasePromptTemplate) -> LLMChain:
 
 
 @weave.op(render_info={"type": "function"})
-def hypothetical_document_embedder(
-    base_embeddings: Embeddings, llm_chain: LLMChain
-) -> HypotheticalDocumentEmbedder:
-    return HypotheticalDocumentEmbedder(
-        base_embeddings=base_embeddings, llm_chain=llm_chain
-    )
+def hypothetical_document_embedder(base_embeddings: Embeddings, llm_chain: LLMChain) -> HypotheticalDocumentEmbedder:
+    return HypotheticalDocumentEmbedder(base_embeddings=base_embeddings, llm_chain=llm_chain)
 
 
 @weave.op(render_info={"type": "function"})
-def retrieval_qa_from_chain_type(
-    language_model: BaseLanguageModel, chain_type: str, retriever: VectorStore
-) -> RetrievalQA:
+def retrieval_qa_from_chain_type(language_model: BaseLanguageModel, chain_type: str, retriever: VectorStore) -> RetrievalQA:
     retriever = retriever.as_retriever()
     return RetrievalQA.from_chain_type(
         llm=language_model,

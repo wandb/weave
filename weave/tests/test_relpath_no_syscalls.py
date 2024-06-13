@@ -50,10 +50,5 @@ from ..util import relpath_no_syscalls
         ("././file.txt", "./", "/home/user", "file.txt"),
     ],
 )
-def test_relpath_no_syscalls(
-    target_path, start_path, current_working_directory, expected
-):
-    assert (
-        relpath_no_syscalls(target_path, start_path, current_working_directory)
-        == expected
-    )
+def test_relpath_no_syscalls(target_path, start_path, current_working_directory, expected):
+    assert relpath_no_syscalls(target_path, start_path, current_working_directory) == expected

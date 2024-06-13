@@ -23,9 +23,7 @@ def _arrowweavelistlist_listindex_output_type(input_types):
 @arrow_op(
     name="ArrowWeaveListList-listindex",
     input_type={
-        "self": ArrowWeaveListType(
-            types.optional(types.UnionType(types.List(), ArrowWeaveListType()))
-        ),
+        "self": ArrowWeaveListType(types.optional(types.UnionType(types.List(), ArrowWeaveListType()))),
         "index": types.optional(
             types.UnionType(
                 types.Int(),
@@ -34,9 +32,7 @@ def _arrowweavelistlist_listindex_output_type(input_types):
             )
         ),
     },
-    output_type=lambda input_types: ArrowWeaveListType(
-        _arrowweavelistlist_listindex_output_type(input_types)
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(_arrowweavelistlist_listindex_output_type(input_types)),
 )
 def listindex(self, index):
     a = arrow_as_array(self._arrow_data)
@@ -81,9 +77,7 @@ def _list_op_output_object_type(input_types):
     return self_type_without_tags.object_type.object_type
 
 
-def list_dim_downresolver(
-    self: ArrowWeaveList, arrow_operation_name: str, output_object_type=None
-):
+def list_dim_downresolver(self: ArrowWeaveList, arrow_operation_name: str, output_object_type=None):
     without_tags = self.without_tags()
     a = arrow_as_array(without_tags._arrow_data)
 
@@ -104,13 +98,9 @@ def list_dim_downresolver(
     non_0len = pa.compute.not_equal(start_indexes, end_indexes)
     t = pa.Table.from_arrays([a.value_parent_indices(), values], ["keys", "values"])
     g = t.group_by("keys")
-    non_0len_agged = g.aggregate([("values", arrow_operation_name)])[
-        f"values_{arrow_operation_name}"
-    ]
+    non_0len_agged = g.aggregate([("values", arrow_operation_name)])[f"values_{arrow_operation_name}"]
     nulls = pa.nulls(len(a), type=non_0len_agged.type)
-    result = pa.compute.replace_with_mask(
-        nulls, non_0len, non_0len_agged.combine_chunks()
-    )
+    result = pa.compute.replace_with_mask(nulls, non_0len, non_0len_agged.combine_chunks())
 
     return ArrowWeaveList(
         result,
@@ -149,9 +139,7 @@ def list_numbers_count(self):
             )
         ),
     },
-    output_type=lambda input_types: ArrowWeaveListType(
-        _list_op_output_object_type(input_types)
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(_list_op_output_object_type(input_types)),
 )
 def list_numbers_max(self):
     return list_dim_downresolver(self, "max")
@@ -169,9 +157,7 @@ def list_numbers_max(self):
             )
         ),
     },
-    output_type=lambda input_types: ArrowWeaveListType(
-        _list_op_output_object_type(input_types)
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(_list_op_output_object_type(input_types)),
 )
 def list_numbers_min(self):
     return list_dim_downresolver(self, "min")
@@ -189,9 +175,7 @@ def list_numbers_min(self):
             )
         ),
     },
-    output_type=lambda input_types: ArrowWeaveListType(
-        _list_op_output_object_type(input_types)
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(_list_op_output_object_type(input_types)),
 )
 def list_numbers_sum(self):
     return list_dim_downresolver(self, "sum")
@@ -209,9 +193,7 @@ def list_numbers_sum(self):
             )
         ),
     },
-    output_type=lambda input_types: ArrowWeaveListType(
-        _list_op_output_object_type(input_types)
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(_list_op_output_object_type(input_types)),
 )
 def list_numbers_avg(self):
     return list_dim_downresolver(self, "mean")
@@ -263,11 +245,7 @@ def compare_sublists(array1: pa.ListArray, array2: pa.ListArray) -> pa.Array:
 )
 def list_equal(self, other):
     return ArrowWeaveList(
-        pa.array(
-            compare_sublists(
-                self.without_tags()._arrow_data, other.without_tags()._arrow_data
-            )
-        ),
+        pa.array(compare_sublists(self.without_tags()._arrow_data, other.without_tags()._arrow_data)),
         types.Boolean(),
         self._artifact,
     )
@@ -303,9 +281,7 @@ def list_not_equal(self, other):
     )
 
 
-def _vectorized_dropna_object_type(
-    outer_object_type: typing.Union[types.List, ArrowWeaveListType, types.UnionType]
-) -> types.Type:
+def _vectorized_dropna_object_type(outer_object_type: typing.Union[types.List, ArrowWeaveListType, types.UnionType]) -> types.Type:
     outer_is_optional = types.is_optional(outer_object_type)
     if outer_is_optional:
         container_type = types.non_none(outer_object_type)
@@ -315,9 +291,7 @@ def _vectorized_dropna_object_type(
         typing.Union[typing.Type[ArrowWeaveListType], typing.Type[types.List]],
         container_type.__class__,
     )
-    element_type = typing.cast(
-        typing.Union[types.List, ArrowWeaveListType], container_type
-    ).object_type
+    element_type = typing.cast(typing.Union[types.List, ArrowWeaveListType], container_type).object_type
 
     ret_type = container_class(types.non_none(element_type))
     if outer_is_optional:
@@ -330,9 +304,7 @@ def _vectorized_dropna_object_type(
     input_type={
         "self": ArrowWeaveListType(types.List()),
     },
-    output_type=lambda input_types: ArrowWeaveListType(
-        _vectorized_dropna_object_type(input_types["self"].object_type)
-    ),
+    output_type=lambda input_types: ArrowWeaveListType(_vectorized_dropna_object_type(input_types["self"].object_type)),
 )
 def dropna(self):
     a = arrow_as_array(self._arrow_data)
@@ -343,16 +315,12 @@ def dropna(self):
     start_indexes = a.offsets[:-1]
     end_indexes = a.offsets[1:]
     flattened = a.flatten()
-    non_null = pa.compute.cast(
-        pa.compute.invert(pa.compute.is_null(flattened)), a.offsets.type
-    )
+    non_null = pa.compute.cast(pa.compute.invert(pa.compute.is_null(flattened)), a.offsets.type)
     new_data = pa.compute.drop_null(flattened)
     cumulative_non_null_counts = pa.compute.cumulative_sum(non_null)
     new_offsets = cumulative_non_null_counts.take(pa.compute.subtract(end_indexes, 1))
     new_offsets = pa.concat_arrays([start_indexes[:1], new_offsets])
-    unflattened = pa.ListArray.from_arrays(
-        new_offsets, new_data, mask=pa.compute.is_null(a)
-    )
+    unflattened = pa.ListArray.from_arrays(new_offsets, new_data, mask=pa.compute.is_null(a))
 
     return ArrowWeaveList(
         unflattened,

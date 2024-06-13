@@ -41,10 +41,7 @@ project = gql_root_op(
     hidden=True,
 )
 def root_all_projects_gql_resolver(gql_result):
-    return [
-        wdt.Project.from_keys(project["node"])
-        for project in gql_result["instance"]["projects_500"]["edges"]
-    ]
+    return [wdt.Project.from_keys(project["node"]) for project in gql_result["instance"]["projects_500"]["edges"]]
 
 
 @op(
@@ -66,15 +63,11 @@ def root_all_projects_gql_resolver(gql_result):
     """,
         is_root=True,
         root_resolver=root_all_projects_gql_resolver,
-        gql_op_output_type=make_root_op_gql_op_output_type(
-            "projects_500", lambda inputs: "", wdt.ProjectType
-        ),
+        gql_op_output_type=make_root_op_gql_op_output_type("projects_500", lambda inputs: "", wdt.ProjectType),
     ),
 )
 def root_all_projects():
-    raise errors.WeaveGQLCompileError(
-        "root-allProjects should not be executed directly. If you see this error, it is a bug in the Weave compiler."
-    )
+    raise errors.WeaveGQLCompileError("root-allProjects should not be executed directly. If you see this error, it is a bug in the Weave compiler.")
 
 
 # Section 3/6: Attribute Getters
@@ -211,16 +204,10 @@ def link(project: wdt.Project) -> wdt.Link:
     return wdt.Link(project["name"], f"{project['entity']['name']}/{project['name']}")
 
 
-def _project_artifacts_gql_op_output_type(
-    inputs: input_provider.InputProvider, input_type: types.Type
-) -> types.Type:
+def _project_artifacts_gql_op_output_type(inputs: input_provider.InputProvider, input_type: types.Type) -> types.Type:
     return types.List(
         wdt.ArtifactCollectionType.with_keys(
-            typing.cast(typing.Any, input_type)
-            .keys["artifactTypes_100"]["edges"]
-            .object_type["node"]["artifactCollections_100"]["edges"]
-            .object_type["node"]
-            .property_types
+            typing.cast(typing.Any, input_type).keys["artifactTypes_100"]["edges"].object_type["node"]["artifactCollections_100"]["edges"].object_type["node"].property_types
         )
     )
 
@@ -252,8 +239,4 @@ def _project_artifacts_gql_op_output_type(
 def artifacts(
     project: wdt.Project,
 ):
-    return [
-        wdt.ArtifactCollection.from_keys(edge["node"])
-        for typeEdge in project["artifactTypes_100"]["edges"]
-        for edge in typeEdge["node"]["artifactCollections_100"]["edges"]
-    ]
+    return [wdt.ArtifactCollection.from_keys(edge["node"]) for typeEdge in project["artifactTypes_100"]["edges"] for edge in typeEdge["node"]["artifactCollections_100"]["edges"]]

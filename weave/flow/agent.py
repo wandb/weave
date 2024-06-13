@@ -72,9 +72,7 @@ class Agent(Object):
         # instead of mixing in some pydantic objects.
         new_messages.append(response_message.model_dump(exclude_none=True))
         if response_message.tool_calls:
-            new_messages.extend(
-                perform_tool_calls(self.tools, response_message.tool_calls)
-            )
+            new_messages.extend(perform_tool_calls(self.tools, response_message.tool_calls))
 
         # TODO: doesn't really belong here.
         # find distance from end to last system message in state.history

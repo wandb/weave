@@ -10,9 +10,7 @@ import typing
 from weave.trace_server.trace_server_interface import ObjReadReq, FileContentReadReq
 
 
-@pytest.mark.skip(
-    "weave.versions no longer supported, but there are other ways to do this now..."
-)
+@pytest.mark.skip("weave.versions no longer supported, but there are other ways to do this now...")
 def test_op_versioning_saveload(client):
     @weave.op()
     def versioned_op(a: int, b: int) -> int:
@@ -53,11 +51,7 @@ def get_saved_code(client, ref):
         )
     )
     files = resp.obj.val["files"]
-    file_read_resp = client.server.file_content_read(
-        FileContentReadReq(
-            project_id=ref.entity + "/" + ref.project, digest=files["obj.py"]
-        )
-    )
+    file_read_resp = client.server.file_content_read(FileContentReadReq(project_id=ref.entity + "/" + ref.project, digest=files["obj.py"]))
     return file_read_resp.content.decode()
 
 

@@ -26,9 +26,7 @@ def op_add_tag(obj_node: graph.Node, tags: dict[str, str]):
         ),
     )
     def custom_tagger(obj):
-        return tag_store.add_tags(
-            box.box(obj), {f"_ct_{k}": v for k, v in tags.items()}
-        )
+        return tag_store.add_tags(box.box(obj), {f"_ct_{k}": v for k, v in tags.items()})
 
     _context_state.clear_loading_built_ins(_loading_builtins_token)
 

@@ -76,22 +76,16 @@ class WandbArtifactManifest:
 
     @property
     def storage_layout(self):
-        return self._storage_policy_config.get(
-            "storageLayout", WandbArtifactManifest.StorageLayout.V1
-        )
+        return self._storage_policy_config.get("storageLayout", WandbArtifactManifest.StorageLayout.V1)
 
-    def get_entry_by_path(
-        self, path: str
-    ) -> typing.Optional[WandbArtifactManifestEntry]:
+    def get_entry_by_path(self, path: str) -> typing.Optional[WandbArtifactManifestEntry]:
         return self._manifest_json["contents"].get(path)
 
     def get_paths_in_directory(self, path: str) -> typing.List[str]:
         if path == "":
             return list(self._manifest_json["contents"].keys())
         dir_path = path + "/"
-        return [
-            k for k in self._manifest_json["contents"].keys() if k.startswith(dir_path)
-        ]
+        return [k for k in self._manifest_json["contents"].keys() if k.startswith(dir_path)]
 
 
 # TODO: Get rid of this, we have the new wandb api service! But this
@@ -103,9 +97,7 @@ def get_wandb_read_artifact(path: str):
         try:
             return wandb_client_api.wandb_public_api().artifact(path)
         except wandb_client_api.WandbCommError:
-            raise errors.WeaveArtifactVersionNotFound(
-                f"Could not find artifact with path {path} in W&B"
-            )
+            raise errors.WeaveArtifactVersionNotFound(f"Could not find artifact with path {path} in W&B")
 
 
 def is_valid_version_index(version_index: str) -> bool:
@@ -166,9 +158,7 @@ def _convert_client_id_to_server_id(art_id: str) -> str:
     return b64_to_hex_id(res["clientIDMapping"]["serverID"])
 
 
-def _collection_and_alias_id_mapping_to_uri(
-    client_collection_id: str, alias_name: str
-) -> ReadClientArtifactURIResult:
+def _collection_and_alias_id_mapping_to_uri(client_collection_id: str, alias_name: str) -> ReadClientArtifactURIResult:
     is_deleted = False
     query = """
     query ArtifactVersionFromIdAlias(
@@ -226,9 +216,7 @@ def _collection_and_alias_id_mapping_to_uri(
             # never uploaded, so the client id doesn't exist in the W&B server.
 
             collection = None
-            logging.warn(
-                f"Artifact collection with client id {client_collection_id} not present in W&B server."
-            )
+            logging.warn(f"Artifact collection with client id {client_collection_id} not present in W&B server.")
 
         else:
             raise e
@@ -238,9 +226,7 @@ def _collection_and_alias_id_mapping_to_uri(
     if collection is None:
         # Note: deleted collections are still returned by the API (with state=DELETED)
         # So a missing collection is a real error (unless it was never uploaded)
-        raise errors.WeaveArtifactCollectionNotFound(
-            f"Could not find artifact collection with client id {client_collection_id}"
-        )
+        raise errors.WeaveArtifactCollectionNotFound(f"Could not find artifact collection with client id {client_collection_id}")
     elif collection["state"] != "READY":  # state is either "DELETED" or "READY"
         # This is a deleted artifact, but we still have a record of it.
         is_deleted = True
@@ -259,13 +245,8 @@ def _collection_and_alias_id_mapping_to_uri(
         # `latest` a "calculated" alias, which would solve this issue on
         # gorilla's side, but were unable to reach an actionable conclusion.
         # This is a simple workaround that solves for these cases.
-        if (
-            alias_name == "latest"
-            and len(res["artifactCollection"]["artifactMemberships"]["edges"]) > 0
-        ):
-            commit_hash = res["artifactCollection"]["artifactMemberships"]["edges"][0][
-                "node"
-            ]["commitHash"]
+        if alias_name == "latest" and len(res["artifactCollection"]["artifactMemberships"]["edges"]) > 0:
+            commit_hash = res["artifactCollection"]["artifactMemberships"]["edges"][0]["node"]["commitHash"]
         else:
             is_deleted = True
             # If the membership is deleted, then we will not be able to get the commit hash.
@@ -333,12 +314,8 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
     if artifact is None:
         # Note: deleted versions are still returned by the API (with state=DELETED)
         # So a missing artifact is a real error.
-        raise errors.WeaveArtifactVersionNotFound(
-            f"Could not find artifact version with server id {server_id}"
-        )
-    elif (
-        artifact["state"] != "COMMITTED"
-    ):  # state is either "DELETED" or "PENDING" or "COMMITTED"
+        raise errors.WeaveArtifactVersionNotFound(f"Could not find artifact version with server id {server_id}")
+    elif artifact["state"] != "COMMITTED":  # state is either "DELETED" or "PENDING" or "COMMITTED"
         # This is a deleted artifact, but we still have a record of it
         is_deleted = True
 
@@ -347,9 +324,7 @@ def _version_server_id_to_uri(server_id: str) -> ReadClientArtifactURIResult:
     if collection is None:
         # Note: deleted collections are still returned by the API (with state=DELETED)
         # So a missing collection is a real error.
-        raise errors.WeaveArtifactCollectionNotFound(
-            f"Could not find artifact sequence for artifact version with server id {server_id}"
-        )
+        raise errors.WeaveArtifactCollectionNotFound(f"Could not find artifact sequence for artifact version with server id {server_id}")
     elif collection["state"] != "READY":  # state is either "DELETED" or "READY"
         # This is a deleted artifact, but we still have a record of it
         is_deleted = True
@@ -380,9 +355,7 @@ def get_wandb_read_client_artifact_uri(art_id: str) -> ReadClientArtifactURIResu
             return _version_server_id_to_uri(server_id)
         elif _art_id_is_client_collection_and_alias_id_mapping(art_id):
             client_collection_id, alias_name = art_id.split(":")
-            return _collection_and_alias_id_mapping_to_uri(
-                client_collection_id, alias_name
-            )
+            return _collection_and_alias_id_mapping_to_uri(client_collection_id, alias_name)
         else:
             return _version_server_id_to_uri(art_id)
 
@@ -394,9 +367,7 @@ def get_wandb_read_client_artifact(art_id: str) -> typing.Optional["WandbArtifac
         res = get_wandb_read_client_artifact_uri(art_id)
         if res.is_deleted:
             return None
-        return WandbArtifact(
-            res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri
-        )
+        return WandbArtifact(res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri)
 
 
 class WandbArtifactType(artifact_fs.FilesystemArtifactType):
@@ -409,9 +380,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         self,
         name,
         type=None,
-        uri: typing.Optional[
-            typing.Union["WeaveWBArtifactURI", "WeaveWBLoggedArtifactURI"]
-        ] = None,
+        uri: typing.Optional[typing.Union["WeaveWBArtifactURI", "WeaveWBLoggedArtifactURI"]] = None,
     ):
         from . import io_service
 
@@ -428,9 +397,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         self._resolved_read_artifact_uri: typing.Optional["WeaveWBArtifactURI"] = None
         self._read_artifact = None
         if not uri:
-            self._writeable_artifact = Artifact(
-                name, "op_def" if type is None else type
-            )
+            self._writeable_artifact = Artifact(name, "op_def" if type is None else type)
         else:
             # load an existing artifact, this should be read only,
             # TODO: we could technically support writable artifacts by creating a new version?
@@ -464,9 +431,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             self._unresolved_read_artifact_or_client_uri,
             (WeaveWBLoggedArtifactURI, WeaveWBArtifactURI),
         ):
-            self._resolved_read_artifact_uri = (
-                self._unresolved_read_artifact_or_client_uri.resolved_artifact_uri
-            )
+            self._resolved_read_artifact_uri = self._unresolved_read_artifact_or_client_uri.resolved_artifact_uri
         return self._resolved_read_artifact_uri
 
     @property
@@ -527,9 +492,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     @property
     def commit_hash(self) -> str:
         if not self.is_saved:
-            raise errors.WeaveInternalError(
-                "cannot get commit hash of an unsaved artifact"
-            )
+            raise errors.WeaveInternalError("cannot get commit hash of an unsaved artifact")
         resolved_uri = self._read_artifact_uri
         if resolved_uri is None:
             raise errors.WeaveInternalError("cannot resolve commit hash of artifact")
@@ -540,10 +503,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     @property
     def is_saved(self) -> bool:
-        return (
-            self._unresolved_read_artifact_or_client_uri is not None
-            or self._read_artifact is not None
-        )
+        return self._unresolved_read_artifact_or_client_uri is not None or self._read_artifact is not None
 
     @property
     def version(self):
@@ -565,9 +525,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     def direct_url(self, path: str) -> typing.Optional[str]:
         if self._read_artifact_uri is None:
-            raise errors.WeaveInternalError(
-                'cannot get direct url for unsaved artifact"'
-            )
+            raise errors.WeaveInternalError('cannot get direct url for unsaved artifact"')
         uri = self._read_artifact_uri.with_path(path)
         return self.io_service.direct_url(uri)
 
@@ -693,9 +651,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
     def _manifest(self) -> typing.Optional[WandbArtifactManifest]:
         if self._read_artifact_uri is None:
-            raise errors.WeaveInternalError(
-                'cannot get path info for unsaved artifact"'
-            )
+            raise errors.WeaveInternalError('cannot get path info for unsaved artifact"')
         return self.io_service.manifest(self._read_artifact_uri)
 
     def digest(self, path: str) -> typing.Optional[str]:
@@ -751,9 +707,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         cwd = os.getcwd()
         for entry_path in dir_paths:
             entry = manifest.get_entry_by_path(entry_path)
-            path_size = (
-                entry["size"] if entry is not None and entry["size"] is not None else 0
-            )
+            path_size = entry["size"] if entry is not None and entry["size"] is not None else 0
             total_size += path_size
 
             # this used to be os.path.relpath but that called os.getcwd() every time
@@ -787,9 +741,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             return None
         for dir_name, dir_ in sub_dirs.items():
             dir_.size = sub_dir_sizes[dir_name]
-        return artifact_fs.FilesystemArtifactDir(
-            self, path, total_size, sub_dirs, files
-        )
+        return artifact_fs.FilesystemArtifactDir(self, path, total_size, sub_dirs, files)
 
     def _get_file_paths(self) -> list[str]:
         manifest = self._manifest()
@@ -801,10 +753,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def metadata(self) -> artifact_fs.ArtifactMetadata:
         mutable_metadata = {}
         readonly_metadata = {}
-        if (
-            hasattr(self, "_writeable_artifact")
-            and self._writeable_artifact is not None
-        ):
+        if hasattr(self, "_writeable_artifact") and self._writeable_artifact is not None:
             mutable_metadata = self._writeable_artifact.metadata
         if self.is_saved:
             readonly_metadata = self._saved_artifact.metadata
@@ -824,9 +773,7 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
     @classmethod
     def from_uri(cls, uri: uris.WeaveURI) -> "WandbArtifactRef":
         if not isinstance(uri, (WeaveWBArtifactURI, WeaveWBLoggedArtifactURI)):
-            raise errors.WeaveInternalError(
-                f"Invalid URI class passed to WandbArtifactRef.from_uri: {type(uri)}"
-            )
+            raise errors.WeaveInternalError(f"Invalid URI class passed to WandbArtifactRef.from_uri: {type(uri)}")
         # TODO: potentially need to pass full entity/project/name instead
         return cls(
             WandbArtifact(uri.name, uri=uri),
@@ -1060,9 +1007,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
     @classmethod
     def parse(cls, uri: str) -> "WeaveWBLoggedArtifactURI":
         scheme, netloc, path, params, query_s, fragment = parse.urlparse(uri)
-        return cls.from_parsed_uri(
-            uri, scheme, netloc, path, params, parse.parse_qs(query_s), fragment
-        )
+        return cls.from_parsed_uri(uri, scheme, netloc, path, params, parse.parse_qs(query_s), fragment)
 
     def to_ref(self) -> WandbArtifactRef:
         return WandbArtifactRef.from_uri(self)
@@ -1087,9 +1032,7 @@ class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
             return self.artifact._path_info(path_or_paths)
         elif isinstance(path_or_paths, list):
             return FilesystemArtifactFileIterator(self.artifact, path_or_paths)
-        raise errors.WeaveInternalError(
-            "Invalid key in FilesystemArtifactFileIterator __getItem__"
-        )
+        raise errors.WeaveInternalError("Invalid key in FilesystemArtifactFileIterator __getItem__")
 
     def __len__(self) -> int:
         return len(self.data)

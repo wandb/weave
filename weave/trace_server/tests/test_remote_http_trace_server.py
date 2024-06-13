@@ -20,8 +20,7 @@ def generate_start(id) -> tsi.StartedCallSchemaForInsert:
         op_name="test_name",
         trace_id="test_trace_id",
         parent_id="test_parent_id",
-        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
-        - datetime.timedelta(seconds=1),
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=1),
         attributes={"a": 5},
         inputs={"b": 5},
     )
@@ -36,9 +35,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
     def test_ok(self, mock_post):
         call_id = generate_id()
         mock_post.return_value = requests.Response()
-        mock_post.return_value.json = lambda: dict(
-            tsi.CallStartRes(id=call_id, trace_id="test_trace_id")
-        )
+        mock_post.return_value.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
         mock_post.return_value.status_code = 200
         start = generate_start(call_id)
         self.server.call_start(tsi.CallStartReq(start=start))
@@ -48,9 +45,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
     def test_400_500_no_retry(self, mock_post):
         call_id = generate_id()
         resp1 = requests.Response()
-        resp1.json = lambda: dict(
-            tsi.CallStartRes(id=call_id, trace_id="test_trace_id")
-        )
+        resp1.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
         resp1.status_code = 400
 
         resp2 = requests.Response()
@@ -89,9 +84,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         resp4.status_code = 429
 
         resp5 = requests.Response()
-        resp5.json = lambda: dict(
-            tsi.CallStartRes(id=call_id, trace_id="test_trace_id")
-        )
+        resp5.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
         resp5.status_code = 200
 
         mock_post.side_effect = [resp1, resp2, resp3, resp4, resp5]
@@ -103,9 +96,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         call_id = generate_id()
 
         resp2 = requests.Response()
-        resp2.json = lambda: dict(
-            tsi.CallStartRes(id=call_id, trace_id="test_trace_id")
-        )
+        resp2.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
         resp2.status_code = 200
 
         mock_post.side_effect = [

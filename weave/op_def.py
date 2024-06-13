@@ -38,9 +38,7 @@ if typing.TYPE_CHECKING:
     from . import weave_client
 
 
-_no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "_no_refine", default=False
-)
+_no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar("_no_refine", default=False)
 
 
 def refine_enabled() -> bool:
@@ -61,9 +59,7 @@ def common_name(name: str) -> str:
 
 
 # TODO: Move to weave_types after moving TaggedValueType into weave_types
-def map_type(
-    t: types.Type, map_fn: typing.Callable[[types.Type], types.Type]
-) -> types.Type:
+def map_type(t: types.Type, map_fn: typing.Callable[[types.Type], types.Type]) -> types.Type:
     if isinstance(t, types.NoneType):
         pass
     elif isinstance(t, types.Const):
@@ -71,15 +67,11 @@ def map_type(
     elif isinstance(t, types.UnionType):
         t = types.union(*(map_type(m, map_fn) for m in t.members))
     elif isinstance(t, types.TypedDict):
-        t = types.TypedDict(
-            {k: map_type(v, map_fn) for k, v in t.property_types.items()}
-        )
+        t = types.TypedDict({k: map_type(v, map_fn) for k, v in t.property_types.items()})
     elif isinstance(t, tagged_value_type.TaggedValueType):
         mapped_tag = map_type(t.tag, map_fn)
         if not isinstance(mapped_tag, types.TypedDict):
-            raise errors.WeaveTypeError(
-                f"TaggedValueType tag must be a TypedDict, got {mapped_tag}"
-            )
+            raise errors.WeaveTypeError(f"TaggedValueType tag must be a TypedDict, got {mapped_tag}")
         t = tagged_value_type.TaggedValueType(mapped_tag, map_type(t.value, map_fn))
     elif hasattr(t, "object_type"):
         t = t.__class__(object_type=map_type(t.object_type, map_fn))  # type: ignore
@@ -94,16 +86,8 @@ def normalize_type(t: types.Type) -> types.Type:
     # This produces equivalent types, but normalized in the way Weave0 expects.
     def _norm(t):
         # Distribute TaggedValueType over UnionType
-        if isinstance(t, tagged_value_type.TaggedValueType) and isinstance(
-            t.value, types.UnionType
-        ):
-            return types.union(
-                *[
-                    tagged_value_type.TaggedValueType(t.tag, m)
-                    for m in t.value.members
-                    if not isinstance(m, types.NoneType)
-                ]
-            )
+        if isinstance(t, tagged_value_type.TaggedValueType) and isinstance(t.value, types.UnionType):
+            return types.union(*[tagged_value_type.TaggedValueType(t.tag, m) for m in t.value.members if not isinstance(m, types.NoneType)])
 
     return map_type(t, _norm)
 
@@ -111,9 +95,7 @@ def normalize_type(t: types.Type) -> types.Type:
 def _full_output_type(
     params: dict[str, types.Type],
     op_input0_type: types.Type,
-    op_output_type: typing.Union[
-        types.Type, typing.Callable[[typing.Dict[str, types.Type]], types.Type]
-    ],
+    op_output_type: typing.Union[types.Type, typing.Callable[[typing.Dict[str, types.Type]], types.Type]],
     param0_is_const: bool,
     param0_const_val: typing.Any,
 ) -> types.Type:
@@ -135,9 +117,7 @@ def _full_output_type(
             param0_is_const=True,
             param0_const_val=param0_type.val,
         )
-    if not isinstance(op_input0_type, types.Function) and isinstance(
-        param0_type, types.Function
-    ):
+    if not isinstance(op_input0_type, types.Function) and isinstance(param0_type, types.Function):
         return _full_output_type(
             {**params, param0_name: param0_type.output_type},
             op_input0_type,
@@ -145,9 +125,7 @@ def _full_output_type(
             param0_is_const=param0_is_const,
             param0_const_val=param0_const_val,
         )
-    elif not isinstance(
-        op_input0_type, tagged_value_type.TaggedValueType
-    ) and isinstance(param0_type, tagged_value_type.TaggedValueType):
+    elif not isinstance(op_input0_type, tagged_value_type.TaggedValueType) and isinstance(param0_type, tagged_value_type.TaggedValueType):
         return tagged_value_type.TaggedValueType(
             param0_type.tag,
             _full_output_type(
@@ -171,16 +149,12 @@ def _full_output_type(
                 for m in param0_type.members
             )
         )
-    elif not op_input0_type.assign_type(types.NoneType()) and isinstance(
-        param0_type, types.NoneType
-    ):
+    elif not op_input0_type.assign_type(types.NoneType()) and isinstance(param0_type, types.NoneType):
         return types.NoneType()
 
     if callable(op_output_type):
         if param0_is_const:
-            return op_output_type(
-                {**params, param0_name: types.Const(param0_type, param0_const_val)}
-            )
+            return op_output_type({**params, param0_name: types.Const(param0_type, param0_const_val)})
         return op_output_type(params)
     return op_output_type
 
@@ -188,9 +162,7 @@ def _full_output_type(
 def full_output_type(
     params: dict[str, types.Type],
     op_input0_type: types.Type,
-    op_output_type: typing.Union[
-        types.Type, typing.Callable[[typing.Dict[str, types.Type]], types.Type]
-    ],
+    op_output_type: typing.Union[types.Type, typing.Callable[[typing.Dict[str, types.Type]], types.Type]],
 ) -> types.Type:
     return _full_output_type(params, op_input0_type, op_output_type, False, None)
 
@@ -267,11 +239,7 @@ class OpDef:
         self.hidden = hidden
         self.pure = pure
         self.mutation = mutation
-        self.is_builtin = (
-            is_builtin
-            if is_builtin is not None
-            else context_state.get_loading_built_ins()
-        )
+        self.is_builtin = is_builtin if is_builtin is not None else context_state.get_loading_built_ins()
         self.version = None
         self.location = None
         self.instance = None
@@ -309,9 +277,7 @@ class OpDef:
                 new_input_type[k] = types.Const(n.type, n.val)
             else:
                 new_input_type[k] = n.type
-        new_input_type = language_autocall.update_input_types(
-            self.input_type, new_input_type
-        )
+        new_input_type = language_autocall.update_input_types(self.input_type, new_input_type)
         return self.output_type(new_input_type)
 
     def is_gql_root_resolver(self):
@@ -347,13 +313,7 @@ class OpDef:
         #                 % (arg_name, [v.name for v in graph_vars])
         #             )
 
-        if (
-            refine_enabled()
-            and _self.refine_output_type
-            and not any(
-                graph.expr_vars(arg_node) for arg_node in refine_params.values()
-            )
-        ):
+        if refine_enabled() and _self.refine_output_type and not any(graph.expr_vars(arg_node) for arg_node in refine_params.values()):
             called_refine_output_type = _self.refine_output_type(**refine_params)
             tracer = engine_trace.tracer()  # type: ignore
             with tracer.trace("refine.%s" % _self.uri):
@@ -369,11 +329,7 @@ class OpDef:
 
             final_output_type = storage.deref(final_output_type)
 
-            final_output_type = (
-                process_opdef_output_type.process_opdef_refined_output_type(
-                    final_output_type, bound_params, _self
-                )
-            )
+            final_output_type = process_opdef_output_type.process_opdef_refined_output_type(final_output_type, bound_params, _self)
         else:
             final_output_type = _self.unrefined_output_type_for_params(bound_params)
         from . import dispatch
@@ -381,11 +337,7 @@ class OpDef:
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)
 
     def eager_call(_self, *args, **kwargs):
-        if (
-            _self.name == "get"
-            or _self.name == "root-project"
-            or any(isinstance(n, graph.Node) for n in args)
-        ) or (any(isinstance(n, graph.Node) for n in kwargs.values())):
+        if (_self.name == "get" or _self.name == "root-project" or any(isinstance(n, graph.Node) for n in args)) or (any(isinstance(n, graph.Node) for n in kwargs.values())):
             output_node = _self.lazy_call(*args, **kwargs)
             return output_node
 
@@ -395,9 +347,7 @@ class OpDef:
             return op_execute.execute_op(_self, params.arguments)
 
     def resolve_fn(__self, *args, **kwargs):
-        return process_opdef_resolve_fn.process_opdef_resolve_fn(
-            __self, __self.raw_resolve_fn, args, kwargs
-        )
+        return process_opdef_resolve_fn.process_opdef_resolve_fn(__self, __self.raw_resolve_fn, args, kwargs)
 
     @property
     def output_type(
@@ -433,14 +383,10 @@ class OpDef:
                     else:
                         result_type = self.raw_output_type(input_type)
                     if opdef_util.should_tag_op_def_outputs(self):
-                        return tagged_value_type.TaggedValueType(
-                            types.TypedDict({param0_name: param0_type}), result_type
-                        )
+                        return tagged_value_type.TaggedValueType(types.TypedDict({param0_name: param0_type}), result_type)
                     return result_type
 
-                final = full_output_type(
-                    input_type, first_input_type, auto_tagging_output_type
-                )
+                final = full_output_type(input_type, first_input_type, auto_tagging_output_type)
 
                 return final
 
@@ -462,9 +408,7 @@ class OpDef:
     @name.setter
     def name(self, name: str):
         if name.count("-") > 1:
-            raise errors.WeaveDefinitionError(
-                "Op names must have at most one hyphen. Got: %s" % name
-            )
+            raise errors.WeaveDefinitionError("Op names must have at most one hyphen. Got: %s" % name)
         self._name = name
 
     @property
@@ -482,11 +426,7 @@ class OpDef:
     @property
     def is_async(self):
         ot = self.concrete_output_type
-        return (
-            not callable(self.raw_output_type)
-            and isinstance(ot, types.Function)
-            and isinstance(ot.output_type, types.RunType)
-        )
+        return not callable(self.raw_output_type) and isinstance(ot, types.Function) and isinstance(ot.output_type, types.RunType)
 
     def to_dict(self):
         output_type = self.raw_output_type
@@ -500,9 +440,7 @@ class OpDef:
             else:
                 # no refine and we have a callable output type. This
                 # can't be used by js at the moment.
-                raise errors.WeaveSerializeError(
-                    "op not serializable for weavejs: %s" % self.name
-                )
+                raise errors.WeaveSerializeError("op not serializable for weavejs: %s" % self.name)
 
             # TODO: Consider removing the ability for an output_type to
             # be a function - they all must be Types or ConstNodes. Probably
@@ -548,9 +486,7 @@ class OpDef:
     def __repr__(self):
         return "<OpDef: %s %s>" % (self.name, self.version)
 
-    def bind_params(
-        self, args: list[typing.Any], kwargs: dict[str, typing.Any]
-    ) -> collections.OrderedDict[str, graph.Node]:
+    def bind_params(self, args: list[typing.Any], kwargs: dict[str, typing.Any]) -> collections.OrderedDict[str, graph.Node]:
         sig = pyfunc_type_util.get_signature(self.raw_resolve_fn)
         bound_params = sig.bind(*args, **kwargs)
         bound_params_with_constants = collections.OrderedDict()
@@ -568,25 +504,16 @@ class OpDef:
                     bound_params_with_constants[sub_k] = sub_v
             else:
                 if not isinstance(self.input_type, op_args.OpNamedArgs):
-                    raise errors.WeaveDefinitionError(
-                        f"Error binding params to {self.uri} - found named params in signature, but op does not have named param args"
-                    )
+                    raise errors.WeaveDefinitionError(f"Error binding params to {self.uri} - found named params in signature, but op does not have named param args")
                 param_input_type = self.input_type.arg_types[k]
                 if callable(param_input_type):
-                    already_bound_types = {
-                        k: n.type for k, n in bound_params_with_constants.items()
-                    }
-                    already_bound_types = language_autocall.update_input_types(
-                        self.input_type, already_bound_types
-                    )
+                    already_bound_types = {k: n.type for k, n in bound_params_with_constants.items()}
+                    already_bound_types = language_autocall.update_input_types(self.input_type, already_bound_types)
                     param_input_type = param_input_type(already_bound_types)
                 if not isinstance(v, graph.Node):
                     if callable(v):
                         if not isinstance(param_input_type, types.Function):
-                            raise errors.WeaveInternalError(
-                                "callable passed as argument, but type is not Function. Op: %s"
-                                % self.uri
-                            )
+                            raise errors.WeaveInternalError("callable passed as argument, but type is not Function. Op: %s" % self.uri)
 
                         # Allow passing in functions with fewer arguments then the op
                         # declares. E.g. for List.map I pass either of these:
@@ -594,17 +521,13 @@ class OpDef:
                         #    lambda row: ...
                         inner_sig = inspect.signature(v)
                         vars = {}
-                        for name in list(param_input_type.input_types.keys())[
-                            : len(inner_sig.parameters)
-                        ]:
+                        for name in list(param_input_type.input_types.keys())[: len(inner_sig.parameters)]:
                             vars[name] = param_input_type.input_types[name]
 
                         v = weave_internal.define_fn(vars, v)
                     else:
                         # TODO: should type-check v here.
-                        v = weave_internal.make_const_node(
-                            types.TypeRegistry.type_of(v), v
-                        )
+                        v = weave_internal.make_const_node(types.TypeRegistry.type_of(v), v)
                 bound_params_with_constants[k] = v
         return bound_params_with_constants
 
@@ -643,14 +566,7 @@ def callable_output_type_to_dict(input_type, output_type, op_name):
         return types.Any().to_dict()
     try:
         # TODO: Make this transformation more sophisticated once the type hierarchy is settled
-        arg_types = {
-            "input_types": types.TypedDict(
-                {
-                    k: types.TypeRegistry.type_of(t)
-                    for k, t in input_type.arg_types.items()
-                }
-            )
-        }
+        arg_types = {"input_types": types.TypedDict({k: types.TypeRegistry.type_of(t) for k, t in input_type.arg_types.items()})}
         return fixup_node(weave_internal.define_fn(arg_types, output_type)).to_json()
     except errors.WeaveMakeFunctionError as e:
         # print(f"Failed to transform op {op_name}: Invalid output type function")

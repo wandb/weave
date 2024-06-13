@@ -30,7 +30,6 @@ context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_compute_points():
-
     xs = [{"x": float(i)} for i in range(2)]
     points = _test_compute_points_compute_points(xs, 1)
     with context.local_http_client():

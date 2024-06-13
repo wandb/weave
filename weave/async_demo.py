@@ -93,11 +93,7 @@ AsyncDemoTrainResultType.instance_class = AsyncDemoTrainResult
     render_info={"type": "function"},
     name="demo-train",
     input_type={
-        "dataset": weave.types.List(
-            weave.types.TypedDict(
-                {"prompt": weave.types.String(), "completion": weave.types.String()}
-            )
-        ),
+        "dataset": weave.types.List(weave.types.TypedDict({"prompt": weave.types.String(), "completion": weave.types.String()})),
     },
     output_type=weave.types.Function(
         output_type=weave.types.RunType(

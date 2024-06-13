@@ -35,9 +35,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         self.temp_read_dir = None
 
     @contextlib.contextmanager
-    def new_file(
-        self, path: str, binary: bool = False
-    ) -> Iterator[Union[io.StringIO, io.BytesIO]]:
+    def new_file(self, path: str, binary: bool = False) -> Iterator[Union[io.StringIO, io.BytesIO]]:
         f: Union[io.StringIO, io.BytesIO]
         if binary:
             f = io.BytesIO()
@@ -52,17 +50,13 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         return True
 
     @contextlib.contextmanager
-    def open(
-        self, path: str, binary: bool = False
-    ) -> Iterator[Union[io.StringIO, io.BytesIO]]:
+    def open(self, path: str, binary: bool = False) -> Iterator[Union[io.StringIO, io.BytesIO]]:
         f: Union[io.StringIO, io.BytesIO]
         try:
             if binary:
                 val = self.path_contents[path]
                 if not isinstance(val, bytes):
-                    raise ValueError(
-                        f"Expected binary file, but got string for path {path}"
-                    )
+                    raise ValueError(f"Expected binary file, but got string for path {path}")
                 f = io.BytesIO(val)
             else:
                 val = self.path_contents[path]
@@ -150,9 +144,7 @@ def decode_custom_obj(
         wc = require_graph_client()
         load_instance_op = wc.get(ref)
         if load_instance_op == None:  # == to check for None or BoxedNone
-            raise ValueError(
-                f"Failed to load op needed to decoded object of type {weave_type}. See logs above for more information."
-            )
+            raise ValueError(f"Failed to load op needed to decoded object of type {weave_type}. See logs above for more information.")
 
     if load_instance_op is None:
         serializer = get_serializer_by_id(weave_type["type"])

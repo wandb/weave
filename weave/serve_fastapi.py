@@ -26,18 +26,14 @@ from weave.trace.vals import TraceObject
 from weave.trace import op
 from weave.trace.refs import ObjectRef, OpRef
 
-key_cache: cache.LruTimeWindowCache[
-    str, typing.Optional[bool]
-] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
+key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
 api: Optional[WandbApiAsync] = None
 
 
 def wandb_auth(
     entity: str,
-) -> typing.Callable[
-    [typing.Optional[str]], typing.Coroutine[typing.Any, typing.Any, bool]
-]:
+) -> typing.Callable[[typing.Optional[str]], typing.Coroutine[typing.Any, typing.Any, bool]]:
     async def auth_inner(key: Annotated[Optional[str], Depends(api_key)]) -> bool:
         global api
         if api is None:
@@ -69,9 +65,7 @@ def api_key(
             )
         ),
     ],
-    x_wandb_api_key: Annotated[
-        Optional[str], Header(description="Optional W&B API Key")
-    ] = None,
+    x_wandb_api_key: Annotated[Optional[str], Header(description="Optional W&B API Key")] = None,
 ) -> Optional[str]:
     if x_wandb_api_key:
         return x_wandb_api_key
@@ -95,10 +89,7 @@ def object_method_app(
 
     if method_name is None:
         if len(op_attrs) > 1:
-            raise ValueError(
-                "Multiple ops found on object (%s), must specify method_name argument"
-                % ", ".join(op_attrs)
-            )
+            raise ValueError("Multiple ops found on object (%s), must specify method_name argument" % ", ".join(op_attrs))
         method_name = next(iter(op_attrs))
 
     bound_method_op = typing.cast(op.Op, getattr(obj, method_name))
@@ -106,13 +97,9 @@ def object_method_app(
         raise ValueError(f"Expected an op, got {bound_method_op}")
 
     try:
-        bound_method_op_args = pyfunc_type_util.determine_input_type(
-            bound_method_op.resolve_fn
-        )
+        bound_method_op_args = pyfunc_type_util.determine_input_type(bound_method_op.resolve_fn)
     except errors.WeaveDefinitionError as e:
-        raise ValueError(
-            f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
-        )
+        raise ValueError(f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}")
     if not isinstance(bound_method_op_args, op_args.OpNamedArgs):
         raise ValueError("predict op must have named args")
 

@@ -26,10 +26,7 @@ from .. import errors
     hidden=True,
 )
 def root_all_artifacts_gql_resolver(gql_result):
-    return [
-        wdt.ArtifactCollection.from_keys(artifact_collection["node"])
-        for artifact_collection in gql_result["instance"]["artifacts_500"]["edges"]
-    ]
+    return [wdt.ArtifactCollection.from_keys(artifact_collection["node"]) for artifact_collection in gql_result["instance"]["artifacts_500"]["edges"]]
 
 
 @op(
@@ -51,15 +48,11 @@ def root_all_artifacts_gql_resolver(gql_result):
     """,
         is_root=True,
         root_resolver=root_all_artifacts_gql_resolver,
-        gql_op_output_type=make_root_op_gql_op_output_type(
-            "artifacts_500", lambda inputs: "", wdt.ArtifactCollectionType
-        ),
+        gql_op_output_type=make_root_op_gql_op_output_type("artifacts_500", lambda inputs: "", wdt.ArtifactCollectionType),
     ),
 )
 def root_all_artifacts():
-    raise errors.WeaveGQLCompileError(
-        "root-allArtifacts should not be executed directly. If you see this error, it is a bug in the Weave compiler."
-    )
+    raise errors.WeaveGQLCompileError("root-allArtifacts should not be executed directly. If you see this error, it is a bug in the Weave compiler.")
 
 
 # Section 3/6: Attribute Getters
@@ -163,12 +156,7 @@ def is_portfolio(artifact: wdt.ArtifactCollection) -> bool:
             }}
         """,
         gql_op_output_type=lambda inputs, input_type: types.optional(
-            wdt.ArtifactCollectionMembershipType.with_keys(
-                typing.cast(typing.Any, input_type)
-                .keys["artifactMemberships_first_1"]["edges"]
-                .object_type["node"]
-                .property_types
-            )
+            wdt.ArtifactCollectionMembershipType.with_keys(typing.cast(typing.Any, input_type).keys["artifactMemberships_first_1"]["edges"].object_type["node"].property_types)
         ),
     ),
 )
