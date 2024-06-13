@@ -59,6 +59,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         self._internal_trace_server = internal_trace_server
         self._id_converter = id_converter
 
+    def __getattr__(self, name):
+        return getattr(self._internal_trace_server, name)
+
     def _apply(self, method: Callable[[A], B], req: A) -> B:
         req_conv = universal_ext_to_int_ref_converter(
             req, self._id_converter.convert_ext_to_int_project_id
