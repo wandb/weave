@@ -28,7 +28,7 @@ classify = dspy.Predict("sentence -> sentiment")
 classify(sentence="it's a charming and often affecting journey.")
 ```
 
-[![dspy_trace.png](imgs/dspy_trace.png)](https://wandb.ai/geekyrakshit/dspy-project/weave/calls)
+[![dspy_trace.png](imgs/dspy/dspy_trace.png)](https://wandb.ai/geekyrakshit/dspy-project/weave/calls)
 
 
 ## Track your own ops
@@ -85,7 +85,7 @@ teleprompter = BootstrapFewShot(metric=validate_context_and_answer)
 compiled_rag = teleprompter.compile(RAG(), trainset=trainset)
 ```
 
-| [![dspy_without_weave_op.png](imgs/dspy_without_weave_op.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fcalls%2F8f643d8d-5b97-4494-b98f-ffc28bd8bf46) | [![dspy_with_weave_op.png](imgs/dspy_with_weave_op.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fcalls%2F76dfb9bc-12e6-421b-b9dd-f10916494a27%3Fpath%3Dvalidate_context_and_answer*0%26tracetree%3D1) |
+| [![dspy_without_weave_op.png](imgs/dspy/dspy_without_weave_op.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fcalls%2F8f643d8d-5b97-4494-b98f-ffc28bd8bf46) | [![dspy_with_weave_op.png](imgs/dspy/dspy_with_weave_op.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fcalls%2F76dfb9bc-12e6-421b-b9dd-f10916494a27%3Fpath%3Dvalidate_context_and_answer*0%26tracetree%3D1) |
 |---|---|
 | Not tracing the metric function | Tracing the metric function using `@weave.op()` |
 
@@ -98,7 +98,7 @@ In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/c
 
 In the example below, you can experiment with `WeaveModel`. Every time you change one of these, you'll get a new _version_ of `WeaveModel`.
 
-| [![dspy_weave_model_v1.png](imgs/dspy_weave_model_v1.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FKq8TSGXULeiFmLaXJsJkueJd7RQqEX9R7XpGpg7xC2Q%3F%26) | [![dspy_weave_model_v2.png](imgs/dspy_weave_model_v2.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FsxYxUemiZYVOPCUU2ziMJhk3rvw2QEz7iNqEfXLBqfI%3F%26) |
+| [![dspy_weave_model_v1.png](imgs/dspy/dspy_weave_model_v1.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FKq8TSGXULeiFmLaXJsJkueJd7RQqEX9R7XpGpg7xC2Q%3F%26) | [![dspy_weave_model_v2.png](imgs/dspy/dspy_weave_model_v2.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FsxYxUemiZYVOPCUU2ziMJhk3rvw2QEz7iNqEfXLBqfI%3F%26) |
 |---|---|
 | Version 1 of the `WeaveModel` | Version 2 of the `WeaveModel` |
 
@@ -106,7 +106,7 @@ In the example below, you can experiment with `WeaveModel`. Every time you chang
 
 Given a weave reference any WeaveModel object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it.
 
-| [![dspy_weave_model_serve.png](imgs/dspy_weave_model_serve.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FsxYxUemiZYVOPCUU2ziMJhk3rvw2QEz7iNqEfXLBqfI%3F%26) |
+| [![dspy_weave_model_serve.png](imgs/dspy/dspy_weave_model_serve.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FsxYxUemiZYVOPCUU2ziMJhk3rvw2QEz7iNqEfXLBqfI%3F%26) |
 |---|
 | You can find the weave reference of any WeaveModel by navigating to the model and copying it from the UI. |
 
