@@ -296,7 +296,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> t.Iterator[tsi.CallSchema]:
         return self._generic_stream_request(
-            "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
+            "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
         )
 
     def calls_query_stats(
