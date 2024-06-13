@@ -64,9 +64,9 @@ class TimeSeriesConfig:
     max_x: weave.Node[typing.Any] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    label: weave.Node[typing.Optional[typing.Union[str, weave.types.InvalidPy]]] = (
-        dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
-    )
+    label: weave.Node[
+        typing.Optional[typing.Union[str, weave.types.InvalidPy]]
+    ] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
     mark: weave.Node[str] = dataclasses.field(
         default_factory=lambda: weave.graph.ConstNode(weave.types.String(), "bar")
     )

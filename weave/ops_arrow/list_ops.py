@@ -268,7 +268,9 @@ def _sort_values_list_array_to_table(
 ) -> pa.Table:
     flattened = sort_values._arrow_data_asarray_no_tags().flatten()
 
-    columns = []  # this is intended to be a pylist and will be small since it is number of sort fields
+    columns = (
+        []
+    )  # this is intended to be a pylist and will be small since it is number of sort fields
     col_len = len(sort_values._arrow_data)
     dir_len = len(col_dirs)
     col_names = [str(i) for i in range(dir_len)]

@@ -473,9 +473,9 @@ def weave_arrow_type_check(
     return None
 
 
-_awl_invalid_reason: contextvars.ContextVar[typing.Optional[str]] = (
-    contextvars.ContextVar("_awl_invalid_reason", default=None)
-)
+_awl_invalid_reason: contextvars.ContextVar[
+    typing.Optional[str]
+] = contextvars.ContextVar("_awl_invalid_reason", default=None)
 
 
 @contextlib.contextmanager
