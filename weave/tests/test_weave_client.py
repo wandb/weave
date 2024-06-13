@@ -246,20 +246,6 @@ def test_calls_query(client):
 
 
 def test_calls_delete(client):
-    # patch post auth methods with wb_user_id
-    original_calls_delete = client.server.calls_delete
-
-    def patched_delete(req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        post_auth_req = tsi.CallsDeleteReq(
-            project_id=req.project_id,
-            call_ids=req.call_ids,
-            wb_user_id="test-user-id",
-        )
-        return original_calls_delete(post_auth_req)
-
-    # Patch calls_delete with our fake middlewear
-    client.server.calls_delete = patched_delete
-
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
     _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
@@ -290,20 +276,6 @@ def test_calls_delete(client):
 
 
 def test_calls_delete_cascade(client):
-    # patch post auth methods with wb_user_id
-    original_calls_delete = client.server.calls_delete
-
-    def patched_delete(req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        post_auth_req = tsi.CallsDeleteReq(
-            project_id=req.project_id,
-            call_ids=req.call_ids,
-            wb_user_id="test-user-id",
-        )
-        return original_calls_delete(post_auth_req)
-
-    # Patch calls_delete with our fake middlewear
-    client.server.calls_delete = patched_delete
-
     # run an evaluation, then delete the evaluation and its children
     @weave.op()
     async def model_predict(input) -> str:
@@ -337,21 +309,6 @@ def test_calls_delete_cascade(client):
 
 
 def test_call_display_name(client):
-    # patch post auth methods with wb_user_id
-    original_call_update = client.server.call_update
-
-    def patched_update(req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        post_auth_req = tsi.CallUpdateReqForInsert(
-            project_id=req.project_id,
-            call_id=req.call_id,
-            display_name=req.display_name,
-            wb_user_id="test-user-id",
-        )
-        return original_call_update(post_auth_req)
-
-    # Patch call_update with our fake middlewear
-    client.server.call_update = patched_update
-
     call0 = client.create_call("x", {"a": 5, "b": 10})
 
     # Rename using the client method
@@ -811,7 +768,6 @@ def test_op_query(client):
     assert len(res) == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_noextra(client):
     ref = client.save_object([1, 2, 3], "my-list")
     ref2 = client.save_object({"a": [3, 4, 5]}, "my-obj")
@@ -821,7 +777,6 @@ def test_refs_read_batch_noextra(client):
     assert res.vals[1] == {"a": [3, 4, 5]}
 
 
-@pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_with_extra(client):
     saved = client.save([{"a": 5}, {"a": 6}], "my-list")
     ref1 = saved[0]["a"].ref
@@ -832,7 +787,6 @@ def test_refs_read_batch_with_extra(client):
     assert res.vals[1] == {"a": 6}
 
 
-@pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_dataset_rows(client):
     saved = client.save(weave.Dataset(rows=[{"a": 5}, {"a": 6}]), "my-dataset")
     ref1 = saved.rows[0]["a"].ref
