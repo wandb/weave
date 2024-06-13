@@ -89,12 +89,12 @@ anthropic_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "Messages.create",
-            create_wrapper(name="Messages.create"),
+            create_wrapper(name="anthropic.Messages.create"),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "AsyncMessages.create",
-            create_wrapper(name="AsyncMessages.create"),
+            create_wrapper(name="anthropic.AsyncMessages.create"),
         ),
     ]
 )
