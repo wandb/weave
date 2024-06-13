@@ -148,6 +148,14 @@ type AppendRefMutation = {
 
 export type RefMutation = SetRefMutation | AppendRefMutation;
 
+export type FeedbackKey = {
+  entity: string;
+  project: string;
+  weaveRef: string;
+  // If true, do a prefix search on weaveRef instead of an exact match
+  includeExtra?: boolean;
+};
+
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
@@ -207,6 +215,7 @@ export type WFDataModelHooksInterface = {
     digest: string,
     opts?: {skip?: boolean}
   ) => Loadable<string>;
+  useFeedback: (key: FeedbackKey | null) => LoadableWithError<any[] | null>;
   derived: {
     useChildCallsForCompare: (
       entity: string,
