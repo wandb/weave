@@ -1,13 +1,13 @@
 import abc
 import datetime
 import typing
+from typing import Protocol
+
 from pydantic import BaseModel, Field
 
 from .interface.query import Query
 
-WB_USER_ID_DESCRIPTION = (
-    "Do not set directly. Server will automatically populate this field."
-)
+WB_USER_ID_DESCRIPTION = "Do not set directly. Server will automatically populate this field."
 
 
 class CallSchema(BaseModel):
@@ -365,9 +365,7 @@ class Feedback(FeedbackCreateReq):
 
 class FeedbackQueryReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
-    fields: typing.Optional[list[str]] = Field(
-        default=None, examples=[["id", "feedback_type", "payload.note"]]
-    )
+    fields: typing.Optional[list[str]] = Field(default=None, examples=[["id", "feedback_type", "payload.note"]])
     query: typing.Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
@@ -410,96 +408,34 @@ class FileContentReadRes(BaseModel):
     content: bytes
 
 
-class TraceServerInterface:
-    def ensure_project_exists(self, entity: str, project: str) -> None:
-        pass
-
+class TraceServerInterface(Protocol):
+    def ensure_project_exists(self, entity: str, project: str) -> None: ...
     # Call API
-    @abc.abstractmethod
-    def call_start(self, req: CallStartReq) -> CallStartRes:
-        ...
-
-    @abc.abstractmethod
-    def call_end(self, req: CallEndReq) -> CallEndRes:
-        ...
-
-    @abc.abstractmethod
-    def call_read(self, req: CallReadReq) -> CallReadRes:
-        ...
-
-    @abc.abstractmethod
-    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
-        ...
-
-    @abc.abstractmethod
-    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
-        ...
-
-    @abc.abstractmethod
-    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
-        ...
-
-    @abc.abstractmethod
-    def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
-        ...
+    def call_start(self, req: CallStartReq) -> CallStartRes: ...
+    def call_end(self, req: CallEndReq) -> CallEndRes: ...
+    def call_read(self, req: CallReadReq) -> CallReadRes: ...
+    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
+    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
 
     # Op API
-    @abc.abstractmethod
-    def op_create(self, req: OpCreateReq) -> OpCreateRes:
-        ...
-
-    @abc.abstractmethod
-    def op_read(self, req: OpReadReq) -> OpReadRes:
-        ...
-
-    @abc.abstractmethod
-    def ops_query(self, req: OpQueryReq) -> OpQueryRes:
-        ...
+    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
+    def op_read(self, req: OpReadReq) -> OpReadRes: ...
+    def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
     # Obj API
-    @abc.abstractmethod
-    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
-        ...
-
-    @abc.abstractmethod
-    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
-        ...
-
-    @abc.abstractmethod
-    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
-        ...
-
-    @abc.abstractmethod
-    def table_create(self, req: TableCreateReq) -> TableCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def table_query(self, req: TableQueryReq) -> TableQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def file_create(self, req: FileCreateReq) -> FileCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
-        raise NotImplementedError()
+    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
+    def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
+    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+    def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+    def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
+    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
+    def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
+    def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
+    def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
+    def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
+    def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
 
 
 # These symbols are used in the WB Trace Server and it is not safe
