@@ -20,7 +20,7 @@ try:
 except ImportError:
     import_failed = True
 
-from typing import Any, Dict, Generator, List, Optional, Union
+from typing import Any, Dict, Generator, List, Optional
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
@@ -125,8 +125,7 @@ if not import_failed:
             wv_parent_run = (
                 self._call_map.get(lc_parent_run_id) if lc_parent_run_id else None
             )
-
-            create_call_fn = self.gc.create_call
+            use_stack = True
             if wv_parent_run is not None:
                 parent_run = wv_parent_run
             else:
@@ -152,23 +151,25 @@ if not import_failed:
                         # run_id is none, when would this NOT be none? The answer: when Langchain
                         # is called inside of another op (like Evaluations!)
                         if wv_current_run.parent_id is None:
-                            create_call_fn = self.gc.create_call_outside_execution
+                            use_stack = False
                         else:
                             # Note: this is implemented as a network call - it would be much nice
                             # to refactor `create_call` such that it could accept a parent_id instead
                             # of an entire Parent object.
                             parent_run = self.gc.call(wv_current_run.parent_id)
 
-            call = create_call_fn(
+            call = self.gc.create_call(
                 # Make sure to add the run name once the UI issue is figured out
                 f"langchain.{run.run_type.capitalize()}.{run_name}",
-                parent_run,
-                run_dict["inputs"],
+                inputs=run_dict["inputs"],
+                parent=parent_run,
                 attributes={
                     "lc_id": str(run.id),
                     "parent_run_id": lc_parent_run_id,
                     "lc_name": run.name,
                 },
+                display_name=f"langchain.{run.run_type.capitalize()}.{run.name}",
+                use_stack=use_stack,
             )
 
             # Add the call to the call map.
@@ -180,7 +181,6 @@ if not import_failed:
             run_id = str(run.id)
             if run_id in self._call_map:
                 # Finish the call.
-                parent_id = run.parent_run_id
                 call = self._call_map.pop(run_id)
                 run_dict = _run_to_dict(run, as_input=False)
                 self.gc.finish_call(call, run_dict)
