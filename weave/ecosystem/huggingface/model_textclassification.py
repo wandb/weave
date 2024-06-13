@@ -1,11 +1,10 @@
-import typing
 import dataclasses
+import typing
+
 import transformers
 
 import weave
-
-from . import hfmodel
-
+from weave.ecosystem.huggingface import hfmodel
 
 # We have to forward-declare the Weave types to avoid circular reference
 # issues that weave.type() can't resolve yet.
@@ -72,13 +71,14 @@ class ClassificationResultPanel(weave.Panel):
 
     @weave.op()
     def render(self) -> weave.panels.Table:
-        from .huggingface_models import huggingface
+        from weave.ecosystem.huggingface.huggingface_models import huggingface
 
         return weave.panels.Table(
             self.input_node,
             columns=[
                 lambda result_row: weave.panels.WeaveLink(
-                    result_row.model_name(), to=lambda input: huggingface().model(input)  # type: ignore
+                    result_row.model_name(),
+                    to=lambda input: huggingface().model(input),  # type: ignore
                 ),
                 lambda result_row: result_row.model_input,
                 lambda result_row: result_row.score(),

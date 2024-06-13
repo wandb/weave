@@ -1,1 +1,1 @@
-from . import pydoc
+from weave.ecosystem.py import pydoc

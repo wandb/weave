@@ -1,52 +1,51 @@
 import dataclasses
-import typing
 import json
 import time
+import typing
 
-import weave
-from weave import artifact_base
-from weave.artifact_fs import FilesystemArtifact
-from weave.weave_types import Type
-
-from langchain.vectorstores import VectorStore, FAISS
-from langchain.vectorstores.base import VectorStoreRetriever
+import faiss
+from langchain.base_language import BaseLanguageModel
+from langchain.callbacks.tracers.base import BaseTracer
+from langchain.callbacks.tracers.schemas import Run
+from langchain.chains import HypotheticalDocumentEmbedder, RetrievalQA
+from langchain.chains.base import Chain
 from langchain.chains.combine_documents.base import BaseCombineDocumentsChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
+from langchain.chains.llm import LLMChain
+from langchain.chains.retrieval_qa.base import BaseRetrievalQA
+from langchain.chat_models import ChatAnthropic, ChatOpenAI
+from langchain.chat_models.base import BaseChatModel
 from langchain.docstore.document import Document
 from langchain.embeddings.base import Embeddings
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.llms import OpenAI
-from langchain.chat_models.base import BaseChatModel
-from langchain.chat_models import ChatOpenAI
-from langchain.chat_models import ChatAnthropic
-from langchain.chains import HypotheticalDocumentEmbedder
-from langchain.chains.llm import LLMChain
 from langchain.llms.base import BaseLLM
 from langchain.llms.openai import BaseOpenAI
-from langchain.callbacks.tracers.base import BaseTracer
-from langchain.chains import RetrievalQA
-from langchain.chains.base import Chain
-from langchain.chains.retrieval_qa.base import BaseRetrievalQA
-from langchain.base_language import BaseLanguageModel
-from langchain.schema import BaseRetriever
+from langchain.prompts import (
+    BaseChatPromptTemplate,
+    BasePromptTemplate,
+    ChatPromptTemplate,
+    PromptTemplate,
+)
 from langchain.prompts.base import StringPromptTemplate
-from langchain.prompts import PromptTemplate, BasePromptTemplate
-from langchain.prompts import BaseChatPromptTemplate, ChatPromptTemplate
 from langchain.prompts.chat import (
+    AIMessagePromptTemplate,
     BaseMessagePromptTemplate,
     BaseStringMessagePromptTemplate,
     ChatMessagePromptTemplate,
     HumanMessagePromptTemplate,
-    AIMessagePromptTemplate,
     SystemMessagePromptTemplate,
 )
-from langchain.callbacks.tracers.schemas import Run
+from langchain.schema import BaseRetriever
+from langchain.vectorstores import FAISS, VectorStore
+from langchain.vectorstores.base import VectorStoreRetriever
 
-from ...ops_domain import trace_tree
-from ... import storage
-from . import util
-
-import faiss
+import weave
+from weave import artifact_base, storage
+from weave.artifact_fs import FilesystemArtifact
+from weave.ecosystem.langchain import util
+from weave.ops_domain import trace_tree
+from weave.weave_types import Type
 
 
 class WeaveTracer(BaseTracer):

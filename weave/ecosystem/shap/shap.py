@@ -3,18 +3,18 @@ import warnings
 
 warnings.filterwarnings("ignore", message=".*The 'nopython' keyword.*")
 
-import shap
+import pickle
 import random
 import typing
-import xgboost
-import pickle
-import numpy as np
 
 import matplotlib.pyplot as plt
-import weave
+import numpy as np
+import shap
+import xgboost
 
-from .. import huggingface as hf
-from .. import xgboost as weave_xgb
+import weave
+from weave.ecosystem import huggingface as hf
+from weave.ecosystem import xgboost as weave_xgb
 
 
 @weave.op(

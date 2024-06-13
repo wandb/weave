@@ -3,10 +3,8 @@ import inspect
 import typing
 
 import weave
-
-from ... import weave_internal
-
-from . import weave_plotly
+from weave import weave_internal
+from weave.ecosystem.wandb import weave_plotly
 
 
 @weave.type()
@@ -35,13 +33,16 @@ class Scatter(weave.Panel):
         unnested = weave.ops.unnest(input_node)
         return ScatterConfig(
             x_fn=weave_internal.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item  # type: ignore
+                {"item": unnested.type.object_type},
+                lambda item: item,  # type: ignore
             ),
             y_fn=weave_internal.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item  # type: ignore
+                {"item": unnested.type.object_type},
+                lambda item: item,  # type: ignore
             ),
             label_fn=weave_internal.define_fn(
-                {"item": unnested.type.object_type}, lambda item: item  # type: ignore
+                {"item": unnested.type.object_type},
+                lambda item: item,  # type: ignore
             ),
         )
 
@@ -85,7 +86,11 @@ class Scatter(weave.Panel):
             )
         else:
             plot_data = unnested.map(
-                lambda item: weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item), label=config.label_fn(item))  # type: ignore
+                lambda item: weave.ops.dict_(
+                    x=config.x_fn(item),
+                    y=config.y_fn(item),
+                    label=config.label_fn(item),
+                )  # type: ignore
             )
         fig = weave_plotly.plotly_scatter(plot_data)
         return weave_plotly.PanelPlotly(fig)

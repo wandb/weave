@@ -1,17 +1,16 @@
 from __future__ import annotations
+
+import typing
+
+import hdbscan
+import pyarrow as pa
 from typing_extensions import (
     NotRequired,
     TypedDict,
 )
 
-import typing
 import weave
-
-import pyarrow as pa
-
-from ... import ops_arrow
-
-import hdbscan
+from weave import ops_arrow
 
 
 class HDBSCANOptions(TypedDict):

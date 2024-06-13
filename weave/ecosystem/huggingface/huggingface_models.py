@@ -1,16 +1,18 @@
 import dataclasses
 import pickle
-import huggingface_hub
-import transformers
-import torch
 import typing
 
-import weave
-from .. import pytorch
+import huggingface_hub
+import torch
+import transformers
 
-from . import hfmodel
-from . import model_textclassification
-from . import model_textgeneration
+import weave
+from weave.ecosystem import pytorch
+from weave.ecosystem.huggingface import (
+    hfmodel,
+    model_textclassification,
+    model_textgeneration,
+)
 
 
 def full_model_info_to_hfmodel(
@@ -43,7 +45,8 @@ class HuggingfaceModelsPanel(weave.Panel):
             self.input_node,
             columns=[
                 lambda model_row: weave.panels.WeaveLink(
-                    model_row.id(), to=lambda input: huggingface().model(input)  # type: ignore
+                    model_row.id(),
+                    to=lambda input: huggingface().model(input),  # type: ignore
                 ),
                 lambda model_row: model_row.sha(),
                 lambda model_row: model_row.pipeline_tag(),

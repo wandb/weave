@@ -1,2 +1,2 @@
-from .slack import *
-from .panels import *
+from weave.ecosystem.slack.panels import *
+from weave.ecosystem.slack.slack import *

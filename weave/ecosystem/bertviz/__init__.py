@@ -1,1 +1,1 @@
-from .panels import *
+from weave.ecosystem.bertviz.panels import *

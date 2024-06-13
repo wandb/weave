@@ -1,15 +1,14 @@
-import typing
-import huggingface_hub
 import dataclasses
 import pickle
+import typing
+
+import huggingface_hub
 import torch
-import weave
-from ... import op_def_type
-
-
 import transformers
 
-from .. import pytorch
+import weave
+from weave import op_def_type
+from weave.ecosystem import pytorch
 
 
 # This tells Weave how to serialize BaseModelOutput

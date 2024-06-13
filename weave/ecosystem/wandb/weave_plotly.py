@@ -1,16 +1,15 @@
-import datetime
-
 import dataclasses
+import datetime
 import io
-import plotly
-import weave
 import typing
-import plotly.express as px
+
 import pandas as pd
+import plotly
+import plotly.express as px
 from plotly import graph_objs as go
 
-from ... import weave_internal
-from ... import infer_types
+import weave
+from weave import infer_types, weave_internal
 
 
 class PlotlyType(weave.types.Type):
@@ -178,7 +177,7 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
 
 @weave.op()
 def plotly_scatter(data: list[ScatterData]) -> plotly.graph_objs.Figure:
-    from ... import storage
+    from weave import storage
 
     data = storage.to_weavejs(data)
     color = None
@@ -206,7 +205,7 @@ def plotly_geo(data: list[GeoData]) -> plotly.graph_objs.Figure:
             lat=de["lat"],
             mode="markers",
             # text=de["Map label"],  # str(de["Magnitude"]) + " " + de["Date"],
-            marker_color=de["color"]  # , colors[df["Type"][0]]
+            marker_color=de["color"],  # , colors[df["Type"][0]]
             # showlegend=True,
             # marker=dict(
             #     color=de["Magnitude"], size=15, opacity=0.9, colorscale="Sunset"

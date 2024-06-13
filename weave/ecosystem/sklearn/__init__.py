@@ -1,1 +1,1 @@
-from .datasets import *
+from weave.ecosystem.sklearn.datasets import *

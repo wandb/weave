@@ -9,12 +9,11 @@ These functions are used by the `WandbTracer` to extract and save the relevant i
 """
 
 import logging
-
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from langchain.callbacks.tracers.schemas import Run, RunTypeEnum
 
-from ...ops_domain import trace_tree
+from weave.ops_domain import trace_tree
 
 if TYPE_CHECKING:
     from langchain.chains.base import Chain

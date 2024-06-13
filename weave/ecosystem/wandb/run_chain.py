@@ -1,12 +1,9 @@
-import weave
 import json
 import typing
 
-from ... import ops_arrow
-from ... import op_def
-from ... import compile
-
-from . import gql_artifact_dag
+import weave
+from weave import compile, op_def, ops_arrow
+from weave.ecosystem.wandb import gql_artifact_dag
 
 
 @weave.type()

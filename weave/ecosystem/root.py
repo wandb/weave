@@ -1,12 +1,9 @@
 import typing
-from .. import api as weave
+
+from weave import api as weave
 
 # TODO: Fix, these should be available from weave
-from .. import ops
-from .. import op_def
-from .. import panels
-from .. import panel
-from weave import context_state
+from weave import context_state, op_def, ops, panel, panels
 
 loading_builtins_token = context_state.set_loading_built_ins()
 
@@ -25,7 +22,7 @@ Click the links in the sidebar to get started.
 """
 )
 
-from .. import registry_mem
+from weave import registry_mem
 
 op_org_name = registry_mem.memory_registry.get_op("user-name")
 
@@ -66,7 +63,7 @@ class Ecosystem:
 # objects.
 @weave.op(name="op-ecosystem", render_info={"type": "function"})
 def ecosystem() -> Ecosystem:
-    from .. import registry_mem
+    from weave import registry_mem
 
     return Ecosystem(
         _orgs=[],
@@ -114,7 +111,8 @@ class EcosystemPanel(panel.Panel):
                         ),
                         columns=[
                             lambda org_name: panels.WeaveLink(
-                                org_name, lambda org_name: ops.entity(org_name)  # type: ignore
+                                org_name,
+                                lambda org_name: ops.entity(org_name),  # type: ignore
                             )  # type: ignore
                         ],
                     ),  # type: ignore
@@ -144,7 +142,8 @@ class EcosystemPanel(panel.Panel):
                     ),
                 ),
                 panels.CardTab(
-                    name="Models", content=panels.Table(ecosystem.models())  # type: ignore
+                    name="Models",
+                    content=panels.Table(ecosystem.models()),  # type: ignore
                 ),
                 panels.CardTab(
                     name="Ops",

@@ -1,7 +1,6 @@
 import gql
 
-from ... import wandb_api
-
+from weave import wandb_api
 
 ARTIFACT_LINEAGE_QUERY = gql.gql(
     """

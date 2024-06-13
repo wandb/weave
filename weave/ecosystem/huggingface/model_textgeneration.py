@@ -1,11 +1,10 @@
-import typing
 import dataclasses
+import typing
+
 import transformers
 
 import weave
-
-from . import hfmodel
-
+from weave.ecosystem.huggingface import hfmodel
 
 # We have to forward-declare the Weave types to avoid circular reference
 # issues that weave.type() can't resolve yet.

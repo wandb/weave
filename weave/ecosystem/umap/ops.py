@@ -1,16 +1,17 @@
 from __future__ import annotations
+
+import threading
+import typing
+import warnings
+
+import pyarrow as pa
 from typing_extensions import (
     NotRequired,
     TypedDict,
 )
-import warnings
-import threading
-import typing
+
 import weave
-import pyarrow as pa
-
-
-from ... import ops_arrow
+from weave import ops_arrow
 
 UMAP_LIB = None
 

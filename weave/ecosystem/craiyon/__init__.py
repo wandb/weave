@@ -1,1 +1,1 @@
-from .ops import *
+from weave.ecosystem.craiyon.ops import *

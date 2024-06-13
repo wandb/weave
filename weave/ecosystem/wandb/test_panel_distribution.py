@@ -1,8 +1,8 @@
 import random
-import weave
 
-from ... import weave_internal
-from . import panel_distribution
+import weave
+from weave import weave_internal
+from weave.ecosystem.wandb import panel_distribution
 
 
 def test_flow():

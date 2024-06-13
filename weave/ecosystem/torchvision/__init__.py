@@ -1,1 +1,1 @@
-from .datasets import *
+from weave.ecosystem.torchvision.datasets import *

@@ -1,1 +1,1 @@
-from .model import *
+from weave.ecosystem.pytorch.model import *

@@ -3,10 +3,9 @@ import typing
 
 import weave
 from weave import weave_internal
+from weave.ecosystem.wandb import weave_plotly
+from weave.language_features.tagging import tagged_value_type
 from weave.panel_util import make_node
-
-from . import weave_plotly
-from ...language_features.tagging import tagged_value_type
 
 TIME_SERIES_BIN_SIZES_SEC = [
     # TODO: will need more steps along here for smooth zooming.
@@ -65,9 +64,9 @@ class TimeSeriesConfig:
     max_x: weave.Node[typing.Any] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    label: weave.Node[
-        typing.Optional[typing.Union[str, weave.types.InvalidPy]]
-    ] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
+    label: weave.Node[typing.Optional[typing.Union[str, weave.types.InvalidPy]]] = (
+        dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
+    )
     mark: weave.Node[str] = dataclasses.field(
         default_factory=lambda: weave.graph.ConstNode(weave.types.String(), "bar")
     )
@@ -329,7 +328,8 @@ class TimeSeries(weave.Panel):
         binned = (
             unnested.filter(
                 lambda item: weave.ops.Boolean.bool_and(
-                    config.x(item) <= max_x, config.x(item) >= min_x  # type: ignore
+                    config.x(item) <= max_x,
+                    config.x(item) >= min_x,  # type: ignore
                 )
             )
             .groupby(lambda item: bin_fn(item))

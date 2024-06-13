@@ -1,17 +1,14 @@
 import dataclasses
+import typing
+
 import torch
-from torch import nn
-from torch import optim
+from torch import nn, optim
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-import typing
 import weave
-
-from . import pytorch
-
 from weave import context_state as _context
-
+from weave.ecosystem import pytorch
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
