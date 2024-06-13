@@ -1,6 +1,6 @@
-from . import tagging_op_logic
-from ... import weave_types as types
-from ... import decorator_op
+from weave import decorator_op
+from weave import weave_types as types
+from weave.language_features.tagging import tagging_op_logic
 
 
 @decorator_op.op(

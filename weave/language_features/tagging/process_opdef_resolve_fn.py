@@ -6,24 +6,25 @@ the result of the op_def's resolve_fn.
 """
 
 import typing
-import typing_extensions
+
 import pyarrow as pa
+import typing_extensions
 from pyarrow import compute as pc
 
-from .tagged_value_type import TaggedValueType
-from ... import box
-from ... import weave_types as types
-from . import tag_store
-from ...arrow.arrow_tags import awl_add_arrow_tags
-from ...arrow.list_ import ArrowWeaveList
-from .opdef_util import (
+from weave import box
+from weave import weave_types as types
+from weave.arrow.arrow_tags import awl_add_arrow_tags
+from weave.arrow.list_ import ArrowWeaveList
+from weave.language_features.tagging import tag_store
+from weave.language_features.tagging.opdef_util import (
     get_first_arg,
     should_flow_tags,
     should_tag_op_def_outputs,
 )
+from weave.language_features.tagging.tagged_value_type import TaggedValueType
 
 if typing.TYPE_CHECKING:
-    from ... import op_def as OpDef
+    from weave import op_def as OpDef
 
 
 def _is_tagged_value(val: types.Type) -> typing_extensions.TypeGuard[TaggedValueType]:
@@ -37,7 +38,7 @@ def _is_optional_tagged_value(
 
 
 def _strip_tags(val: typing.Any) -> typing.Any:
-    from ...ops_arrow import ArrowWeaveList
+    from weave.ops_arrow import ArrowWeaveList
 
     if isinstance(val, ArrowWeaveList):
         if _is_tagged_value(val.object_type):

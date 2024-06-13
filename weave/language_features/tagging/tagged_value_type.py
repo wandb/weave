@@ -26,21 +26,16 @@ drop tags.
 """
 
 import dataclasses
+import functools
 import json
 import typing
-import functools
 
-from ... import box
-from ... import weave_types as types
-from ... import mappers_python
-from ... import errors
-from ... import mappers
-
-from . import tag_store
+from weave import box, errors, mappers, mappers_python
+from weave import weave_types as types
+from weave.language_features.tagging import tag_store
 
 if typing.TYPE_CHECKING:
-    from ... import artifact_base
-    from ... import artifact_fs
+    from weave import artifact_base, artifact_fs
 
 
 def flatten_tag_type_to_typed_dict(tag_type: types.Type) -> types.TypedDict:
@@ -146,7 +141,9 @@ def flatten_tag_type_to_typed_dict(tag_type: types.Type) -> types.TypedDict:
         base_type = types.TypedDict({})
         for member in tag_type.members:
             if not isinstance(member, types.NoneType):
-                base_type = types.merge_types(base_type, flatten_tag_type_to_typed_dict(member))  # type: ignore
+                base_type = types.merge_types(
+                    base_type, flatten_tag_type_to_typed_dict(member)
+                )  # type: ignore
         return base_type
 
     # Finally, if the tag_type is a TaggedValue, then we want to merge the tag

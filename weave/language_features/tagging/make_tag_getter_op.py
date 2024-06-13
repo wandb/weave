@@ -1,13 +1,12 @@
 import typing
 
-from ... import weave_types as types
-from ... import decorator_op
-from . import tagged_value_type
-from . import tag_store
-from ... import context_state as _context_state
+from weave import context_state as _context_state
+from weave import decorator_op
+from weave import weave_types as types
+from weave.language_features.tagging import tag_store, tagged_value_type
 
 if typing.TYPE_CHECKING:
-    from ... import op_def as OpDef
+    from weave import op_def as OpDef
 
 
 def make_tag_getter_op(
@@ -27,7 +26,7 @@ def make_tag_getter_op(
     Returns:
         The op.
     """
-    from ...arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+    from weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 
     _loading_builtins_token = _context_state.set_loading_built_ins()
 

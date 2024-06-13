@@ -14,21 +14,16 @@ The primary user-facing functions are:
 * `find_tag` - used to recursively lookup the tag for a given object
 
 """
-import logging
+
 import contextvars
-from contextlib import contextmanager
+import logging
 import typing
 import weakref
-
-
-from ... import box
-from ... import weave_types as types
-from ... import errors
-
-
-from ... import engine_trace
-
 from collections import defaultdict
+from contextlib import contextmanager
+
+from weave import box, engine_trace, errors
+from weave import weave_types as types
 
 statsd = engine_trace.statsd()  # type: ignore
 

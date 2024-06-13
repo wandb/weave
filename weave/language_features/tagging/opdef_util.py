@@ -1,10 +1,10 @@
 import typing
 
-from ... import weave_types as types
-from . import tagged_value_type
+from weave import weave_types as types
+from weave.language_features.tagging import tagged_value_type
 
 if typing.TYPE_CHECKING:
-    from ... import op_def as OpDef
+    from weave import op_def as OpDef
 
 
 # Determines if the op_def should ftag the output with the input. Currently, this is true
