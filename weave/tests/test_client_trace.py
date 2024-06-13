@@ -710,8 +710,12 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
+def client_is_sql_lite(client):
+    return isinstance(client.server._internal_trace_server, SqliteTraceServer)
+
+
 def test_trace_call_filter(client):
-    is_sql_lite = isinstance(client.server, SqliteTraceServer)
+    is_sql_lite = client_is_sql_lite(client)
 
     @weave.op()
     def basic_op(in_val: dict, delay) -> dict:

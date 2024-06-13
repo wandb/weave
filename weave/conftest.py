@@ -367,6 +367,8 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
     server: tsi.TraceServerInterface
+    entity = "shawn"
+    project = "test-project"
     if weave_server_flag == "sqlite":
         sql_lite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
@@ -374,7 +376,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         sql_lite_server.drop_tables()
         sql_lite_server.setup_tables()
         server = TestOnlyUserInjectingExternalTraceServer(
-            sql_lite_server, DummyIdConverter(), "wb-test-user"
+            sql_lite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
@@ -384,7 +386,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
         server = TestOnlyUserInjectingExternalTraceServer(
-            ch_server, DummyIdConverter(), "wb-test-user"
+            ch_server, DummyIdConverter(), entity
         )
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
@@ -395,7 +397,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = weave_client.WeaveClient("shawn", "test-project", server)
+        client = weave_client.WeaveClient(entity, project, server)
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
