@@ -1,42 +1,43 @@
-import typing
-import contextvars
 import contextlib
-import inspect
-import typing_extensions
+import contextvars
 import dataclasses
+import inspect
+import textwrap
+import typing
+
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
-import textwrap
+import typing_extensions
 
-
-from .. import context_state
-from .. import ref_base
-from .. import weave_types as types
-from .. import box
-from .. import weave_internal
-from .. import op_def_type
-from .. import op_def
-from .. import _dict_utils
-from .. import errors
-from .. import graph
-from ..language_features.tagging import (
-    tagged_value_type,
+from weave import (
+    _dict_utils,
+    artifact_base,
+    box,
+    context_state,
+    debug_types,
+    errors,
+    graph,
+    node_ref,
+    op_def,
+    op_def_type,
+    ref_base,
+    ref_util,
+    weave_internal,
 )
-from .. import artifact_base
-from .. import node_ref
-from ..language_features.tagging import tag_store
-from .. import ref_util
-
-from .arrow import (
-    safe_is_null,
+from weave import weave_types as types
+from weave.arrow.arrow import (
     ArrowWeaveListType,
+    arrow_as_array,
+    arrow_zip,
     offsets_starting_at_zero,
     pretty_print_arrow_type,
-    arrow_zip,
-    arrow_as_array,
+    safe_is_null,
 )
-from .. import debug_types
+from weave.language_features.tagging import (
+    tag_store,
+    tagged_value_type,
+)
 
 
 def reverse_dict(d: dict) -> dict:
@@ -472,9 +473,9 @@ def weave_arrow_type_check(
     return None
 
 
-_awl_invalid_reason: contextvars.ContextVar[
-    typing.Optional[str]
-] = contextvars.ContextVar("_awl_invalid_reason", default=None)
+_awl_invalid_reason: contextvars.ContextVar[typing.Optional[str]] = (
+    contextvars.ContextVar("_awl_invalid_reason", default=None)
+)
 
 
 @contextlib.contextmanager
@@ -493,7 +494,7 @@ ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
 
 
 def dict_of_columns_to_awl(d: dict[str, typing.Any]) -> "ArrowWeaveList":
-    from . import constructors
+    from weave.arrow import constructors
 
     cols = {}
     for k, v in d.items():
@@ -521,8 +522,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         artifact: typing.Optional[artifact_base.Artifact] = None,
         invalid_reason=None,
     ) -> None:
-        from . import constructors
-        from . import convert
+        from weave.arrow import constructors, convert
 
         # Do not dictionary decode this array! That will break performance.
         # Note we combine chunks here, to make the internal interface easy
@@ -610,7 +610,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if not isinstance(other, ArrowWeaveList):
             raise TypeError(f"Expected list or ArrowWeaveList, got {type(other)}")
 
-        from . import concat
+        from weave.arrow import concat
 
         return concat.concatenate(self, other)
 
@@ -901,7 +901,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                                 type_codes,
                                 pa.scalar(i, pa.int8()),
                             )
-                            from . import concat
+                            from weave.arrow import concat
 
                             members[i] = concat.concatenate(member_i, member_j)
                             members[j] = None
@@ -1499,12 +1499,12 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
     ):
         fn = self._make_lambda_node(fn)
-        from ..ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
+        from weave.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
 
         return _apply_fn_node_with_tag_pushdown(self, fn)  # type: ignore
 
     def concat(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
-        from . import concat
+        from weave.arrow import concat
 
         return concat.concatenate(self, other)
 
@@ -1518,7 +1518,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         leftOuter: bool = False,
         rightOuter: bool = False,
     ):
-        from ..ops_arrow import list_join
+        from weave.ops_arrow import list_join
 
         join1Fn = self._make_lambda_node(join1Fn)
         join2Fn = other._make_lambda_node(join2Fn)
@@ -1657,14 +1657,16 @@ def make_vec_taggedvalue(
         mask=is_null_mask,
     )
     return ArrowWeaveList(
-        arr, tagged_value_type.TaggedValueType(types.TypedDict(tag_types), value_type), None  # type: ignore
+        arr,
+        tagged_value_type.TaggedValueType(types.TypedDict(tag_types), value_type),
+        None,  # type: ignore
     )
 
 
 def awl_zip(*arrs: ArrowWeaveList) -> ArrowWeaveList:
     if not arrs:
         raise ValueError("Cannot zip empty list")
-    from . import convert
+    from weave.arrow import convert
 
     arrs = convert.unify_types(*arrs)
     zipped = arrow_zip(*[a._arrow_data for a in arrs])

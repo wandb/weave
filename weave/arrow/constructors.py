@@ -1,17 +1,14 @@
 import dataclasses
-import pyarrow as pa
 import typing
 
-from .. import artifact_base
-from .. import weave_types as types
-from .. import box
-from ..language_features.tagging import tag_store, tagged_value_type
-from .. import errors
+import pyarrow as pa
 
-from .arrow import arrow_as_array, ArrowWeaveListType
-from .list_ import ArrowWeaveList
-from . import arrow_tags
-from . import convert
+from weave import artifact_base, box, errors
+from weave import weave_types as types
+from weave.arrow import arrow_tags, convert
+from weave.arrow.arrow import ArrowWeaveListType, arrow_as_array
+from weave.arrow.list_ import ArrowWeaveList
+from weave.language_features.tagging import tag_store, tagged_value_type
 
 
 def repeat(value: typing.Any, count: int) -> pa.Array:
@@ -65,7 +62,7 @@ def vectorized_input_types(input_types: dict[str, types.Type]) -> dict[str, type
 
 
 def vectorized_container_constructor_preprocessor(
-    input_dict: dict[str, typing.Any]
+    input_dict: dict[str, typing.Any],
 ) -> VectorizedContainerConstructorResults:
     if len(input_dict) == 0:
         return VectorizedContainerConstructorResults([], {}, 0, None)

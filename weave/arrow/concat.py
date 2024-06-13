@@ -5,32 +5,32 @@
 # make use of concat to do so.
 
 
-import typing
 import dataclasses
+import typing
+
 import numpy as np
 import pyarrow as pa
 from pyarrow import compute as pc
 
-from .. import weave_types as types
-from ..language_features.tagging import tagged_value_type
-
-from .. import errors
-from .list_ import (
+from weave import errors
+from weave import weave_types as types
+from weave.arrow.list_ import (
     ArrowWeaveList,
     ArrowWeaveListGeneric,
-    is_typedict_arrowweavelist,
-    is_object_arrowweavelist,
-    is_taggedvalue_arrowweavelist,
     is_list_arrowweavelist,
+    is_object_arrowweavelist,
     is_ref_arrowweavelist,
-    unsafe_awl_construction,
-    offsets_starting_at_zero,
+    is_taggedvalue_arrowweavelist,
+    is_typedict_arrowweavelist,
     make_vec_none,
+    offsets_starting_at_zero,
+    unsafe_awl_construction,
 )
+from weave.language_features.tagging import tagged_value_type
 
 DEBUG = False
 
-from .. import engine_trace
+from weave import engine_trace
 
 tracer = engine_trace.tracer()
 
@@ -175,7 +175,7 @@ def _concatenate_taggedvalues(
 
 
 def convert_null_array_to_list(
-    array: typing.Union[pa.ListArray, pa.NullArray]
+    array: typing.Union[pa.ListArray, pa.NullArray],
 ) -> pa.ListArray:
     if isinstance(array, pa.NullArray):
         return pc.cast(array, pa.list_(pa.null()))

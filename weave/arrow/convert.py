@@ -1,25 +1,24 @@
-import pyarrow as pa
-import pyarrow.compute as pc
 import typing
 
+import pyarrow as pa
+import pyarrow.compute as pc
 
-from .. import artifact_base
-from .. import weave_types as types
-from .. import box
-from .. import mappers_arrow
-from ..language_features.tagging import tag_store, tagged_value_type
-from .. import artifact_mem
-from .. import errors
-from .. import arrow_util
-from .. import api
-from .. import weave_internal
-
-
-from .arrow import (
+from weave import (
+    api,
+    arrow_util,
+    artifact_base,
+    artifact_mem,
+    box,
+    errors,
+    mappers_arrow,
+    weave_internal,
+)
+from weave import weave_types as types
+from weave.arrow.arrow import (
     ArrowWeaveListType,
 )
-from .list_ import ArrowWeaveList, PathType, unsafe_awl_construction
-
+from weave.arrow.list_ import ArrowWeaveList, PathType, unsafe_awl_construction
+from weave.language_features.tagging import tag_store, tagged_value_type
 
 # Hmm... this doesn't work on ObjectType, which contains a Union of Struct...
 # We need that because our ImageFileArtifactRefType has a union of structs
@@ -506,7 +505,7 @@ def simple_to_string(arr: pa.Array):
 
 def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
     """Converts any ArrowWeaveList to simple type that pa.compute.equal can compare."""
-    from ..ops_domain.wbmedia import ArtifactAssetType
+    from weave.ops_domain.wbmedia import ArtifactAssetType
 
     # Returns a number of string arrow weave list, possibly with Nones
     def _to_compare_safe(

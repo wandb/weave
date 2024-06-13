@@ -1,19 +1,18 @@
 import dataclasses
 import json
-import pyarrow as pa
-import numpy as np
-from pyarrow import compute as pc
-import pyarrow.parquet as pq
-import pyarrow.feather as pf
-import typing
 import textwrap
+import typing
+
+import numpy as np
+import pyarrow as pa
+import pyarrow.feather as pf
+import pyarrow.parquet as pq
+from pyarrow import compute as pc
 
 py_type = type
 
-from .. import partial_object
-from .. import weave_types as types
-from .. import errors
-from .. import artifact_fs
+from weave import artifact_fs, errors, partial_object
+from weave import weave_types as types
 
 
 def arrow_type_to_weave_type(pa_type: pa.DataType) -> types.Type:
@@ -184,7 +183,7 @@ class ArrowWeaveListType(types.Type):
             )
 
         # v1 AWL format
-        # from . import convert
+        # from weave.arrow import convert
 
         # parquet_friendly = convert.to_parquet_friendly(obj)
         # table = pa.table({"arr": parquet_friendly._arrow_data})
@@ -223,7 +222,7 @@ class ArrowWeaveListType(types.Type):
         with artifact.open(f"{name}.ArrowWeaveList.type.json") as f:
             object_type = json.load(f)
             object_type = types.TypeRegistry.type_from_dict(object_type)
-        from . import list_
+        from weave.arrow import list_
 
         if "_weave_awl_format" not in artifact.metadata:
             # v1 AWL format
@@ -232,7 +231,7 @@ class ArrowWeaveListType(types.Type):
             arr = table["arr"].combine_chunks()
             with list_.unsafe_awl_construction("load_from_parquet"):
                 l = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
-                from . import convert
+                from weave.arrow import convert
 
                 res = convert.from_parquet_friendly(l)
         elif artifact.metadata["_weave_awl_format"] == 2:
@@ -366,7 +365,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
 
 
 def _object_type_has_props(object_type):
-    from ..language_features.tagging import tagged_value_type
+    from weave.language_features.tagging import tagged_value_type
 
     return (
         isinstance(object_type, types.TypedDict)
@@ -376,7 +375,7 @@ def _object_type_has_props(object_type):
 
 
 def _object_type_prop_types(object_type):
-    from ..language_features.tagging import tagged_value_type
+    from weave.language_features.tagging import tagged_value_type
 
     if isinstance(object_type, tagged_value_type.TaggedValueType):
         return {
