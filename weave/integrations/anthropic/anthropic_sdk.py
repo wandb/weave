@@ -61,9 +61,6 @@ def anthropic_accumulator(
     return acc
 
 
-# TODO: Add accumulator for beta.messages for tool usage
-
-
 # Unlike other integrations, streaming is based on input flag
 def should_use_accumulator(inputs: typing.Dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
