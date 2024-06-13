@@ -101,3 +101,17 @@ In the example below, you can experiment with `WeaveModel`. Every time you chang
 | [![dspy_weave_model_v1.png](imgs/dspy_weave_model_v1.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FKq8TSGXULeiFmLaXJsJkueJd7RQqEX9R7XpGpg7xC2Q%3F%26) | [![dspy_weave_model_v2.png](imgs/dspy_weave_model_v2.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FsxYxUemiZYVOPCUU2ziMJhk3rvw2QEz7iNqEfXLBqfI%3F%26) |
 |---|---|
 | Version 1 of the `WeaveModel` | Version 2 of the `WeaveModel` |
+
+### Serving a Weave Model
+
+Given a weave reference any WeaveModel object, you can spin up a fastapi server and [serve](https://wandb.github.io/weave/guides/tools/serve) it.
+
+| [![dspy_weave_model_serve.png](imgs/dspy_weave_model_serve.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FsxYxUemiZYVOPCUU2ziMJhk3rvw2QEz7iNqEfXLBqfI%3F%26) |
+|---|
+| You can find the weave reference of any WeaveModel by navigating to the model and copying it from the UI. |
+
+You can serve your model by using the following command in the terminal:
+
+```shell
+weave serve weave:///your_entity/project-name/YourModel:<hash>
+```
