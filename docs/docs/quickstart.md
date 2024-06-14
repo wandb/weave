@@ -5,7 +5,7 @@ hide_table_of_contents: true
 
 # Quickstart: Track inputs & outputs of LLM calls
 
-Follow these steps to track your first call or <a target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 ## 1. Install Python library.
 ```python
