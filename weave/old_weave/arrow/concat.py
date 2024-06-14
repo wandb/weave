@@ -14,7 +14,8 @@ from pyarrow import compute as pc
 
 from weave import errors
 from weave import weave_types as types
-from weave.arrow.list_ import (
+from weave.language_features.tagging import tagged_value_type
+from weave.old_weave.arrow.list_ import (
     ArrowWeaveList,
     ArrowWeaveListGeneric,
     is_list_arrowweavelist,
@@ -26,7 +27,6 @@ from weave.arrow.list_ import (
     offsets_starting_at_zero,
     unsafe_awl_construction,
 )
-from weave.language_features.tagging import tagged_value_type
 
 DEBUG = False
 

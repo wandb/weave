@@ -1,46 +1,40 @@
 import datetime
-import pytest
-import itertools
 import hashlib
-import pyarrow as pa
+import itertools
 import string
+
+import pyarrow as pa
+import pytest
 from PIL import Image
 
+from weave.old_weave.arrow import constructors
+from weave.old_weave.arrow.arrow_tags import (
+    recursively_encode_pyarrow_strings_as_dictionaries,
+)
 from weave.tests import list_arrow_test_helpers as lath
 
-from ..tests import weavejs_ops
-
-
-from .. import box
-from .. import errors
-from .. import storage
-from ..ops_domain import project_ops
 from .. import api as weave
-from .. import ops
-from .. import weave_types as types
-from .. import weave_internal
-from .. import context_state
-from .. import graph
-from ..ops_primitives import list_, make_list
-from .. import mappers_arrow
-from ..op_def import map_type
-
-from ..arrow import constructors
-
-
-from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
-
-
-from ..tests import tag_test_util as ttu
-from ..tests import test_wb
+from .. import (
+    box,
+    context_state,
+    errors,
+    graph,
+    mappers_arrow,
+    ops,
+    storage,
+    weave_internal,
+)
 
 # If you're thinking of import vectorize here, don't! Put your
 # tests in test_arrow_vectorizer.py instead
 from .. import ops_arrow as arrow
-from ..arrow.arrow_tags import (
-    recursively_encode_pyarrow_strings_as_dictionaries,
-)
-
+from .. import weave_types as types
+from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
+from ..op_def import map_type
+from ..ops_domain import project_ops
+from ..ops_primitives import list_, make_list
+from ..tests import tag_test_util as ttu
+from ..tests import test_wb, weavejs_ops
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 # T in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation

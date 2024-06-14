@@ -13,8 +13,6 @@ from pyarrow import compute as pc
 
 from weave import box
 from weave import weave_types as types
-from weave.arrow.arrow_tags import awl_add_arrow_tags
-from weave.arrow.list_ import ArrowWeaveList
 from weave.language_features.tagging import tag_store
 from weave.language_features.tagging.opdef_util import (
     get_first_arg,
@@ -22,6 +20,8 @@ from weave.language_features.tagging.opdef_util import (
     should_tag_op_def_outputs,
 )
 from weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.old_weave.arrow.arrow_tags import awl_add_arrow_tags
+from weave.old_weave.arrow.list_ import ArrowWeaveList
 
 if typing.TYPE_CHECKING:
     from weave import op_def as OpDef

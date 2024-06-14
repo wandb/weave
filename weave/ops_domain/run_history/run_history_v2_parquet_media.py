@@ -9,9 +9,9 @@ import pyarrow as pa
 from weave import artifact_mem, engine_trace, gql_json_cache
 from weave import weave_types as types
 from weave.api import op, use
-from weave.arrow import convert
-from weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.old_weave.arrow import convert
+from weave.old_weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.ops_arrow.list_ops import concat
 from weave.ops_domain import wb_domain_types as wdt
 from weave.ops_domain import wb_util, wbmedia

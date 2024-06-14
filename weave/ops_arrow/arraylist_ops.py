@@ -4,10 +4,10 @@ import pyarrow as pa
 from pyarrow import compute as pc
 
 from weave import weave_types as types
-from weave.arrow.arrow import ArrowWeaveListType, arrow_as_array
-from weave.arrow.list_ import ArrowWeaveList
 from weave.decorator_arrow_op import arrow_op
 from weave.language_features.tagging import tagged_value_type
+from weave.old_weave.arrow.arrow import ArrowWeaveListType, arrow_as_array
+from weave.old_weave.arrow.list_ import ArrowWeaveList
 
 
 def _arrowweavelistlist_listindex_output_type(input_types):

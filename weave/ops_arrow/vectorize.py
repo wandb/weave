@@ -19,10 +19,10 @@ from weave import (
 )
 from weave import weave_types as types
 from weave.api import op, use
-from weave.arrow import convert
-from weave.arrow.arrow import ArrowWeaveListType
-from weave.arrow.arrow_tags import pushdown_list_tags
-from weave.arrow.list_ import ArrowWeaveList
+from weave.old_weave.arrow import convert
+from weave.old_weave.arrow.arrow import ArrowWeaveListType
+from weave.old_weave.arrow.arrow_tags import pushdown_list_tags
+from weave.old_weave.arrow.list_ import ArrowWeaveList
 from weave.ops_arrow import arraylist_ops, convert_ops
 from weave.ops_arrow.dict import preprocess_merge
 from weave.ops_primitives.dict import dict_

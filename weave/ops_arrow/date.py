@@ -6,8 +6,8 @@ import pyarrow.compute as pc
 from weave import timestamp as weave_timestamp
 from weave import weave_types as types
 from weave.api import op
-from weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.decorator_arrow_op import arrow_op
+from weave.old_weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.ops_arrow import util
 
 ARROW_WEAVE_LIST_TIMESTAMP_TYPE = ArrowWeaveListType(types.Timestamp())

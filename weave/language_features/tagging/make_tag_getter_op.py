@@ -26,7 +26,7 @@ def make_tag_getter_op(
     Returns:
         The op.
     """
-    from weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+    from weave.old_weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 
     _loading_builtins_token = _context_state.set_loading_built_ins()
 

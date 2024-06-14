@@ -183,7 +183,7 @@ class ArrowWeaveListType(types.Type):
             )
 
         # v1 AWL format
-        # from weave.arrow import convert
+        # from weave.old_weave.arrow import convert
 
         # parquet_friendly = convert.to_parquet_friendly(obj)
         # table = pa.table({"arr": parquet_friendly._arrow_data})
@@ -222,7 +222,7 @@ class ArrowWeaveListType(types.Type):
         with artifact.open(f"{name}.ArrowWeaveList.type.json") as f:
             object_type = json.load(f)
             object_type = types.TypeRegistry.type_from_dict(object_type)
-        from weave.arrow import list_
+        from weave.old_weave.arrow import list_
 
         if "_weave_awl_format" not in artifact.metadata:
             # v1 AWL format
@@ -231,7 +231,7 @@ class ArrowWeaveListType(types.Type):
             arr = table["arr"].combine_chunks()
             with list_.unsafe_awl_construction("load_from_parquet"):
                 l = self.instance_class(arr, object_type=object_type, artifact=artifact)  # type: ignore
-                from weave.arrow import convert
+                from weave.old_weave.arrow import convert
 
                 res = convert.from_parquet_friendly(l)
         elif artifact.metadata["_weave_awl_format"] == 2:

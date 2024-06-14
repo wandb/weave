@@ -1,38 +1,35 @@
-import re
+import contextlib
+import contextvars
+import logging
 import random
+import re
 import typing
 
-import logging
-import contextvars
-import contextlib
-
-
-from . import value_or_error
-from . import debug_compile
-
-
-from . import serialize
-from . import box
-from . import compile_domain
-from . import op_args
+from . import (
+    box,
+    compile_domain,
+    compile_table,
+    debug_compile,
+    dispatch,
+    engine_trace,
+    errors,
+    gql_op_plugin,
+    gql_to_weave,
+    graph,
+    graph_debug,
+    input_provider,
+    op_args,
+    partial_object,
+    propagate_gql_keys,
+    registry_mem,
+    serialize,
+    stitch,
+    value_or_error,
+    weave_internal,
+)
 from . import weave_types as types
-from . import graph
-from . import registry_mem
-from . import dispatch
-from . import graph_debug
-from . import stitch
-from . import compile_table
-from . import weave_internal
-from . import engine_trace
-from . import errors
-from . import propagate_gql_keys
-from . import input_provider
-from . import partial_object
-from . import gql_to_weave
-from . import gql_op_plugin
-from .op_def import OpDef
-
 from .language_features.tagging import tagged_value_type_helpers
+from .op_def import OpDef
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -271,7 +268,8 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
                     node.type, "ArrowWeaveListTypedDict-columnNames", {"self": awl_node}
                 )
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "flatten":
-        from .arrow.arrow import ArrowWeaveListType
+        from weave.old_weave.arrow.arrow import ArrowWeaveListType
+
         from .ops_arrow.list_ops import _concat_output_type
 
         # The operation of flattening a lists of arrow weave lists is exactly equal to the far
@@ -286,7 +284,8 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
                 {"arr": arr_node},
             )
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "concat":
-        from .arrow.arrow import ArrowWeaveListType
+        from weave.old_weave.arrow.arrow import ArrowWeaveListType
+
         from .ops_arrow.list_ops import flatten_return_type
 
         # The operation of concat on a awl of lists is exactly equal to the far

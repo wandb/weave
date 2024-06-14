@@ -5,19 +5,19 @@ import pyarrow as pa
 
 from weave import _dict_utils
 from weave import weave_types as types
-from weave.arrow import convert
-from weave.arrow.arrow import arrow_as_array, offsets_starting_at_zero
-from weave.arrow.arrow_tags import direct_add_arrow_tags
-from weave.arrow.constructors import (
-    vectorized_container_constructor_preprocessor,
-    vectorized_input_types,
-)
-from weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.decorator_arrow_op import arrow_op
 from weave.decorator_op import op
 from weave.language_features.tagging import (
     process_opdef_output_type,
 )
+from weave.old_weave.arrow import convert
+from weave.old_weave.arrow.arrow import arrow_as_array, offsets_starting_at_zero
+from weave.old_weave.arrow.arrow_tags import direct_add_arrow_tags
+from weave.old_weave.arrow.constructors import (
+    vectorized_container_constructor_preprocessor,
+    vectorized_input_types,
+)
+from weave.old_weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.op_args import OpVarArgs
 from weave.ops_primitives import projection_utils
 

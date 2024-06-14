@@ -59,7 +59,7 @@ from .context import (
 
 from .panel import Panel
 
-from .arrow.list_ import ArrowWeaveList as WeaveList
+from weave.old_weave.arrow.list_ import ArrowWeaveList as WeaveList
 from .table import Table
 
 

@@ -26,17 +26,17 @@ from weave import (
     weave_internal,
 )
 from weave import weave_types as types
-from weave.arrow.arrow import (
+from weave.language_features.tagging import (
+    tag_store,
+    tagged_value_type,
+)
+from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
     arrow_as_array,
     arrow_zip,
     offsets_starting_at_zero,
     pretty_print_arrow_type,
     safe_is_null,
-)
-from weave.language_features.tagging import (
-    tag_store,
-    tagged_value_type,
 )
 
 
@@ -494,7 +494,7 @@ ArrowWeaveListObjectTypeVar = typing.TypeVar("ArrowWeaveListObjectTypeVar")
 
 
 def dict_of_columns_to_awl(d: dict[str, typing.Any]) -> "ArrowWeaveList":
-    from weave.arrow import constructors
+    from weave.old_weave.arrow import constructors
 
     cols = {}
     for k, v in d.items():
@@ -522,7 +522,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         artifact: typing.Optional[artifact_base.Artifact] = None,
         invalid_reason=None,
     ) -> None:
-        from weave.arrow import constructors, convert
+        from weave.old_weave.arrow import constructors, convert
 
         # Do not dictionary decode this array! That will break performance.
         # Note we combine chunks here, to make the internal interface easy
@@ -610,7 +610,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if not isinstance(other, ArrowWeaveList):
             raise TypeError(f"Expected list or ArrowWeaveList, got {type(other)}")
 
-        from weave.arrow import concat
+        from weave.old_weave.arrow import concat
 
         return concat.concatenate(self, other)
 
@@ -901,7 +901,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                                 type_codes,
                                 pa.scalar(i, pa.int8()),
                             )
-                            from weave.arrow import concat
+                            from weave.old_weave.arrow import concat
 
                             members[i] = concat.concatenate(member_i, member_j)
                             members[j] = None
@@ -1504,7 +1504,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return _apply_fn_node_with_tag_pushdown(self, fn)  # type: ignore
 
     def concat(self, other: "ArrowWeaveList") -> "ArrowWeaveList":
-        from weave.arrow import concat
+        from weave.old_weave.arrow import concat
 
         return concat.concatenate(self, other)
 
@@ -1666,7 +1666,7 @@ def make_vec_taggedvalue(
 def awl_zip(*arrs: ArrowWeaveList) -> ArrowWeaveList:
     if not arrs:
         raise ValueError("Cannot zip empty list")
-    from weave.arrow import convert
+    from weave.old_weave.arrow import convert
 
     arrs = convert.unify_types(*arrs)
     zipped = arrow_zip(*[a._arrow_data for a in arrs])

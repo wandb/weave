@@ -391,7 +391,7 @@ def flatten_return_type(input_types):
 
 
 def _flatten(l):
-    from weave.arrow.arrow_tags import pushdown_list_tags
+    from weave.old_weave.arrow.arrow_tags import pushdown_list_tags
     from weave.ops_arrow import ArrowWeaveList
 
     if isinstance(l, list):

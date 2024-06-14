@@ -5,10 +5,10 @@ import pyarrow as pa
 
 from weave import artifact_base, box, errors
 from weave import weave_types as types
-from weave.arrow import arrow_tags, convert
-from weave.arrow.arrow import ArrowWeaveListType, arrow_as_array
-from weave.arrow.list_ import ArrowWeaveList
 from weave.language_features.tagging import tag_store, tagged_value_type
+from weave.old_weave.arrow import arrow_tags, convert
+from weave.old_weave.arrow.arrow import ArrowWeaveListType, arrow_as_array
+from weave.old_weave.arrow.list_ import ArrowWeaveList
 
 
 def repeat(value: typing.Any, count: int) -> pa.Array:

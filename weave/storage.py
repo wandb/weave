@@ -1,27 +1,28 @@
+import contextlib
+import contextvars
+import datetime
+import functools
+import json
 import os
+import pathlib
 import re
 import typing
-import datetime
-import pathlib
-import functools
-import contextvars
-import contextlib
-import json
 
-from . import errors
-from . import ref_base
-from . import artifact_base
-from . import artifact_mem
-from . import artifact_fs
-from . import artifact_local
-from . import artifact_wandb
+from . import (
+    artifact_base,
+    artifact_fs,
+    artifact_local,
+    artifact_mem,
+    artifact_wandb,
+    box,
+    errors,
+    graph,
+    graph_client_context,
+    mappers_python,
+    ref_base,
+    timestamp,
+)
 from . import weave_types as types
-from . import mappers_python
-from . import box
-from . import errors
-from . import graph
-from . import graph_client_context
-from . import timestamp
 
 Ref = ref_base.Ref
 
@@ -508,7 +509,7 @@ def convert_timestamps_to_epoch_ms(obj: typing.Any) -> typing.Any:
 
 
 def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
-    from .arrow import list_ as arrow_list
+    from weave.old_weave.arrow import list_ as arrow_list
 
     obj = box.unbox(obj)
     if isinstance(obj, (str, int, float, bool, type(None))):

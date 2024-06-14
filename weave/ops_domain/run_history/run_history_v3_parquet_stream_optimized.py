@@ -16,8 +16,9 @@ from weave import (
 )
 from weave import weave_types as types
 from weave.api import op
-from weave.arrow import convert
-from weave.arrow.list_ import (
+from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.old_weave.arrow import convert
+from weave.old_weave.arrow.list_ import (
     ArrowWeaveList,
     ArrowWeaveListType,
     PathItemType,
@@ -25,7 +26,6 @@ from weave.arrow.list_ import (
     make_vec_none,
     weave_arrow_type_check,
 )
-from weave.gql_op_plugin import wb_gql_op_plugin
 from weave.op_def import map_type
 from weave.ops_domain import trace_tree, wb_util, wbmedia
 from weave.ops_domain import wb_domain_types as wdt

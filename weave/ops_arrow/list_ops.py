@@ -10,28 +10,28 @@ import pyarrow.compute as pc
 from weave import op_args, op_def
 from weave import weave_types as types
 from weave.api import op, type_of
-from weave.arrow import arrow_tags, convert
-from weave.arrow.arrow import (
-    ArrowWeaveListType,
-    arrow_as_array,
-    offsets_starting_at_zero,
-)
-from weave.arrow.concat import concatenate_all
-from weave.arrow.constructors import (
-    vectorized_container_constructor_preprocessor,
-    vectorized_input_types,
-)
-from weave.arrow.convert import to_compare_safe
-from weave.arrow.list_ import (
-    ArrowWeaveList,
-    PathType,
-    is_list_arrowweavelist,
-    is_taggedvalue_arrowweavelist,
-)
 from weave.decorator_arrow_op import arrow_op
 from weave.language_features.tagging import (
     tagged_value_type,
     tagged_value_type_helpers,
+)
+from weave.old_weave.arrow import arrow_tags, convert
+from weave.old_weave.arrow.arrow import (
+    ArrowWeaveListType,
+    arrow_as_array,
+    offsets_starting_at_zero,
+)
+from weave.old_weave.arrow.concat import concatenate_all
+from weave.old_weave.arrow.constructors import (
+    vectorized_container_constructor_preprocessor,
+    vectorized_input_types,
+)
+from weave.old_weave.arrow.convert import to_compare_safe
+from weave.old_weave.arrow.list_ import (
+    ArrowWeaveList,
+    PathType,
+    is_list_arrowweavelist,
+    is_taggedvalue_arrowweavelist,
 )
 from weave.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
 from weave.ops_primitives import list_ as primitive_list
