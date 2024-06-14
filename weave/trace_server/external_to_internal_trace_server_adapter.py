@@ -137,8 +137,8 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             call.project_id = original_project_id
             if call.wb_run_id is not None:
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
-            if res.call.wb_user_id is not None:
-                res.call.wb_user_id = self._idc.int_to_ext_user_id(res.call.wb_user_id)
+            if call.wb_user_id is not None:
+                call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
         return res
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
