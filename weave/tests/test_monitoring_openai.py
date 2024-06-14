@@ -18,7 +18,7 @@ from weave.old_weave.monitoring.openai.models import *
 from weave.old_weave.monitoring.openai.models import Context
 from weave.old_weave.monitoring.openai.openai import patch, unpatch
 from weave.old_weave.monitoring.openai.util import Context
-from weave.wandb_interface.wandb_stream_table import StreamTable
+from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
 
 
 @pytest.fixture

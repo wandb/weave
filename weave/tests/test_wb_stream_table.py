@@ -1,13 +1,12 @@
 import time
-import pytest
-import weave
-from weave import weave_types
-from weave.wandb_interface.wandb_stream_table import StreamTable
+
 import numpy as np
+import pytest
 from PIL import Image
 
-from weave import execute, context, gql_json_cache
-from weave import wandb_api
+import weave
+from weave import context, execute, gql_json_cache, wandb_api, weave_types
+from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
 
 
 def make_stream_table(*args, **kwargs):

@@ -2,21 +2,20 @@ import datetime
 import json
 import os
 import time
-import datetime
 
+import numpy as np
 import pytest
+from PIL import Image
+
 import weave
+from weave.old_weave.wandb_interface import wandb_stream_table
 from weave.ops_domain.run_history.context import (
     error_on_non_vectorized_history_transform,
 )
 from weave.ops_domain.run_history.history_op_common import _without_tags
-from .. import context_state as _context
-from PIL import Image
-import numpy as np
-
 from weave.wandb_client_api import wandb_gql_query
-from weave.wandb_interface import wandb_stream_table
 
+from .. import context_state as _context
 
 HISTORY_OP_NAME = "history3"
 

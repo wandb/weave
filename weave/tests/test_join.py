@@ -1,6 +1,6 @@
 import weave
 from weave import ops_arrow
-from weave.wandb_interface.wandb_stream_table import StreamTable
+from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
 
 
 def make_stream_table(*args, **kwargs):

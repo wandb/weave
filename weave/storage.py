@@ -27,7 +27,7 @@ from . import weave_types as types
 Ref = ref_base.Ref
 
 if typing.TYPE_CHECKING:
-    from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+    from weave.old_weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
 
 def split_path_dotfile(path, dotfile_name):

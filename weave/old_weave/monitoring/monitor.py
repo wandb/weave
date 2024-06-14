@@ -19,8 +19,8 @@ from weave import (
     run_streamtable_span,
     stream_data_interfaces,
 )
+from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
 from weave.trace import context as trace_context
-from weave.wandb_interface.wandb_stream_table import StreamTable
 
 logger = logging.getLogger(__name__)
 

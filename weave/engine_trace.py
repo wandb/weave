@@ -9,18 +9,16 @@
 #   None: DummyTrace that does nothing
 
 
-import os
-import typing
 import contextvars
-import multiprocessing
-import logging
-import time
-import json
 import dataclasses
+import json
+import logging
+import multiprocessing
+import os
+import time
+import typing
 
-from . import environment
-from . import logs
-from . import stream_data_interfaces
+from . import environment, logs, stream_data_interfaces
 
 
 # Thanks co-pilot!
@@ -93,7 +91,7 @@ _weave_trace_stream = None
 def weave_trace_stream():
     global _weave_trace_stream
     if _weave_trace_stream is None:
-        from weave.wandb_interface.wandb_stream_table import StreamTable
+        from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
 
         _weave_trace_stream = StreamTable(os.getenv("WEAVE_TRACE_STREAM"))
     return _weave_trace_stream
@@ -274,8 +272,9 @@ class WeaveWriter:
 
 
 def patch_ddtrace_set_tag():
-    from ddtrace import span as ddtrace_span
     from inspect import signature
+
+    from ddtrace import span as ddtrace_span
 
     set_tag_signature = signature(ddtrace_span.Span.set_tag)
 

@@ -8,9 +8,9 @@ from weave.artifact_wandb import (
     WandbArtifact,
     WeaveWBLoggedArtifactURI,
 )
+from weave.old_weave.wandb_interface import wandb_stream_table
 from weave.ops_domain.run_history import history_op_common
 from weave.runfiles_wandb import WandbRunFiles, WeaveWBRunFilesURI
-from weave.wandb_interface import wandb_stream_table
 
 
 @dataclass

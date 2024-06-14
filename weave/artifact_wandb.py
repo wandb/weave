@@ -26,13 +26,13 @@ from . import filesystem
 from . import memo
 from . import eager
 from . import graph_client_context
-from .wandb_interface import wandb_artifact_pusher
+from weave.old_weave.wandb_interface import wandb_artifact_pusher
 from . import engine_trace
 
 from urllib import parse
 
 if typing.TYPE_CHECKING:
-    from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+    from weave.old_weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
     from .run_streamtable_span import RunStreamTableSpan
 
 
