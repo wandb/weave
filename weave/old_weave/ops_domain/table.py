@@ -19,7 +19,7 @@ from weave import (
 from weave import timestamp as weave_timestamp
 from weave import weave_types as types
 from weave.api import op, weave_class
-from weave.ops_domain import trace_tree, wbmedia
+from weave.old_weave.ops_domain import trace_tree, wbmedia
 
 
 @dataclasses.dataclass(frozen=True)

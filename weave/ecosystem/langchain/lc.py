@@ -44,7 +44,7 @@ import weave
 from weave import artifact_base, storage
 from weave.artifact_fs import FilesystemArtifact
 from weave.ecosystem.langchain import util
-from weave.ops_domain import trace_tree
+from weave.old_weave.ops_domain import trace_tree
 from weave.weave_types import Type
 
 

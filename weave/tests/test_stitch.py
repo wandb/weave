@@ -5,9 +5,9 @@ import pytest
 import weave
 from weave import context_state as _context
 from weave.old_weave.language_features.tagging import make_tag_getter_op
+from weave.old_weave.ops_domain import run_ops
 
 from .. import compile_domain, compile_table, stitch, weave_internal
-from ..ops_domain import run_ops
 from . import fixture_fakewandb as fwb
 from . import test_wb
 

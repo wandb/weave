@@ -105,7 +105,7 @@ def span_count(span):
 
 class WeaveTraceSpan:
     def __init__(self, name):
-        from .ops_domain import trace_tree
+        from .old_weave.ops_domain import trace_tree
 
         self.log_indent_token = None
         self._token = None
@@ -131,7 +131,7 @@ class WeaveTraceSpan:
         self.span.end_time_ms = int(time.time() * 1000)
         _weave_trace_span.reset(self._token)
 
-        from .ops_domain import trace_tree
+        from .old_weave.ops_domain import trace_tree
 
         tt = trace_tree.WBTraceTree(json.dumps(dataclasses.asdict(self.span)))
         tags = self.attributes.get("tags", {})

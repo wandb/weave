@@ -8,11 +8,11 @@ import pytest
 from PIL import Image
 
 import weave
-from weave.old_weave.wandb_interface import wandb_stream_table
-from weave.ops_domain.run_history.context import (
+from weave.old_weave.ops_domain.run_history.context import (
     error_on_non_vectorized_history_transform,
 )
-from weave.ops_domain.run_history.history_op_common import _without_tags
+from weave.old_weave.ops_domain.run_history.history_op_common import _without_tags
+from weave.old_weave.wandb_interface import wandb_stream_table
 from weave.wandb_client_api import wandb_gql_query
 
 from .. import context_state as _context

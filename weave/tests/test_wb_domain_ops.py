@@ -5,11 +5,11 @@ import wandb
 
 import weave
 from weave.old_weave.language_features.tagging import tagged_value_type
+from weave.old_weave.ops_domain import wb_domain_types
 from weave.old_weave.ops_primitives import _dict_utils
 
 from .. import ops as ops
 from .. import registry_mem
-from ..ops_domain import wb_domain_types
 from . import fixture_fakewandb as fwb
 
 """

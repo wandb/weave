@@ -1,9 +1,10 @@
 import numpy as np
+
+from weave.old_weave.ops_domain import table
+
+from .. import artifact_fs, artifact_wandb
 from .. import types_numpy as numpy_types
 from .. import weave_types as types
-from ..ops_domain import table
-from .. import artifact_wandb
-from .. import artifact_fs
 
 
 def test_construct_numpy_type():

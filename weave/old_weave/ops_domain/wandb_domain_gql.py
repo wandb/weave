@@ -9,8 +9,8 @@ from weave.api import op
 from weave.decorator_arrow_op import arrow_op
 from weave.gql_op_plugin import wb_gql_op_plugin
 from weave.input_provider import InputProvider
+from weave.old_weave.ops_domain import wb_domain_types
 from weave.ops_arrow import ArrowWeaveList, ArrowWeaveListType
-from weave.ops_domain import wb_domain_types
 
 """
 This file contains utilities for constructing GQL ops (used by all the ops in

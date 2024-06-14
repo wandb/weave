@@ -5,10 +5,10 @@ import pytest
 import weave
 import weave.weave_types
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.old_weave.ops_domain import wbmedia
 
 from .. import _dict_utils, errors, runs
 from .. import weave_types as types
-from ..ops_domain import wbmedia
 
 
 def test_typeof_string():
@@ -704,7 +704,7 @@ def test_deserializes_single_member_union():
 
 
 def test_wbrun_not_assignable_to_weave_run():
-    from ..ops_domain import wb_domain_types
+    from weave.old_weave.ops_domain import wb_domain_types
 
     assert not weave.types.optional(wb_domain_types.Run().WeaveType()).assign_type(
         weave.types.RunType(

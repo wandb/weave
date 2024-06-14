@@ -42,7 +42,7 @@ DEBUG_COMPILE = False
 def _dispatch_error_is_client_error(
     op_name: str, input_types: dict[str, types.Type]
 ) -> bool:
-    from .ops_domain import wbmedia
+    from weave.old_weave.ops_domain import wbmedia
 
     if op_name in set(
         (

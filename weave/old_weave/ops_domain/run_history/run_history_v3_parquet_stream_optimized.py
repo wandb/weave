@@ -26,15 +26,15 @@ from weave.old_weave.arrow.list_ import (
     make_vec_none,
     weave_arrow_type_check,
 )
-from weave.old_weave.wandb_interface import wandb_stream_table
-from weave.op_def import map_type
-from weave.ops_domain import trace_tree, wb_util, wbmedia
-from weave.ops_domain import wb_domain_types as wdt
-from weave.ops_domain.run_history import history_op_common
-from weave.ops_domain.run_history.context import (
+from weave.old_weave.ops_domain import trace_tree, wb_util, wbmedia
+from weave.old_weave.ops_domain import wb_domain_types as wdt
+from weave.old_weave.ops_domain.run_history import history_op_common
+from weave.old_weave.ops_domain.run_history.context import (
     get_error_on_non_vectorized_history_transform,
 )
-from weave.ops_domain.table import _patch_legacy_image_file_types
+from weave.old_weave.ops_domain.table import _patch_legacy_image_file_types
+from weave.old_weave.wandb_interface import wandb_stream_table
+from weave.op_def import map_type
 
 tracer = engine_trace.tracer()
 

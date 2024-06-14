@@ -6,9 +6,9 @@ from weave import engine_trace, gql_json_cache
 from weave import weave_types as types
 from weave.api import op
 from weave.gql_op_plugin import wb_gql_op_plugin
-from weave.ops_domain import wb_domain_types as wdt
-from weave.ops_domain import wb_util
-from weave.ops_domain.run_history import history_op_common
+from weave.old_weave.ops_domain import wb_domain_types as wdt
+from weave.old_weave.ops_domain import wb_util
+from weave.old_weave.ops_domain.run_history import history_op_common
 
 tracer = engine_trace.tracer()
 

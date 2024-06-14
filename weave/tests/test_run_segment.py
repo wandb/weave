@@ -1,19 +1,16 @@
-import pytest
+import typing
 from itertools import chain
 
-import weave
-from ..ops_domain.run_segment import RunSegment
-from ..ops_arrow import ArrowWeaveList, arrow_as_array
-from .. import ops
-from .. import storage
-from .. import api
-from .. import weave_types as types
-
-import pyarrow as pa
-import typing
 import numpy as np
+import pyarrow as pa
+import pytest
 
-from .. import weave_internal
+import weave
+from weave.old_weave.ops_domain.run_segment import RunSegment
+
+from .. import api, ops, storage, weave_internal
+from .. import weave_types as types
+from ..ops_arrow import ArrowWeaveList, arrow_as_array
 
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 

@@ -4,8 +4,8 @@ from weave.gql_op_plugin import wb_gql_op_plugin
 from weave.old_weave.language_features.tagging.make_tag_getter_op import (
     make_tag_getter_op,
 )
-from weave.ops_domain import wb_domain_types as wdt
-from weave.ops_domain.wandb_domain_gql import (
+from weave.old_weave.ops_domain import wb_domain_types as wdt
+from weave.old_weave.ops_domain.wandb_domain_gql import (
     gql_connection_op,
     gql_direct_edge_op,
     gql_prop_op,

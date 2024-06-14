@@ -45,17 +45,17 @@ from weave.input_provider import InputAndStitchProvider
 from weave.old_weave.language_features.tagging.make_tag_getter_op import (
     make_tag_getter_op,
 )
-from weave.ops_domain import wb_domain_types as wdt
-from weave.ops_domain import wb_util
+from weave.old_weave.ops_domain import wb_domain_types as wdt
+from weave.old_weave.ops_domain import wb_util
 
 # Important to re-export ops
-from weave.ops_domain.run_history import (
+from weave.old_weave.ops_domain.run_history import (
     history_op_common,
     run_history_v1_legacy_ops,
     run_history_v2_parquet_media,
     run_history_v3_parquet_stream_optimized,
 )
-from weave.ops_domain.wandb_domain_gql import (
+from weave.old_weave.ops_domain.wandb_domain_gql import (
     _make_alias,
     gql_connection_op,
     gql_direct_edge_op,

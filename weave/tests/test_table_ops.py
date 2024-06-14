@@ -1,18 +1,13 @@
 import os
-import pytest
 import time
 
-from .. import api as weave
-from .. import weave_types as types
-from .. import ops
-from .. import storage
-from .. import context
-from .. import context_state
-from .. import weave_internal
-from .. import graph
-from .. import box
-from ..ops_domain import table as table_ops
+import pytest
 
+from weave.old_weave.ops_domain import table as table_ops
+
+from .. import api as weave
+from .. import box, context, context_state, graph, ops, storage, weave_internal
+from .. import weave_types as types
 from . import weavejs_ops
 
 TABLE_TYPES = ["list", "pandas", "sql"]

@@ -509,7 +509,7 @@ def simple_to_string(arr: pa.Array):
 
 def to_compare_safe(awl: ArrowWeaveList) -> ArrowWeaveList:
     """Converts any ArrowWeaveList to simple type that pa.compute.equal can compare."""
-    from weave.ops_domain.wbmedia import ArtifactAssetType
+    from weave.old_weave.ops_domain.wbmedia import ArtifactAssetType
 
     # Returns a number of string arrow weave list, possibly with Nones
     def _to_compare_safe(

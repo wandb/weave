@@ -2,7 +2,7 @@ from weave import compile, op_def, weave_types
 from weave.api import op
 from weave.old_weave.arrow.arrow import ArrowWeaveListType
 from weave.old_weave.core_types import StreamTableType
-from weave.ops_domain.project_ops import project
+from weave.old_weave.ops_domain.project_ops import project
 
 
 def _get_history_node(stream_table: StreamTableType):
