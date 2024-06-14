@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import pyarrow as pa
 
 from weave.old_weave.arrow import arrow
+from weave.old_weave.language_features.tagging import tagged_value_type
 
 from . import (
     arrow_util,
@@ -20,7 +21,6 @@ from . import (
 )
 from . import mappers_python_def as mappers_python
 from . import weave_types as types
-from .language_features.tagging import tagged_value_type
 
 _in_tagging_context = contextvars.ContextVar("in_tagging_context", default=False)
 

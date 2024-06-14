@@ -7,11 +7,11 @@ import typing
 
 from weave import graph, registry_mem
 from weave import weave_types as types
-from weave.language_features.tagging.opdef_util import (
+from weave.old_weave.language_features.tagging.opdef_util import (
     should_flow_tags,
     should_tag_op_def_outputs,
 )
-from weave.language_features.tagging.tagging_op_logic import (
+from weave.old_weave.language_features.tagging.tagging_op_logic import (
     op_get_tag_type_resolver,
     op_make_type_key_tag_resolver,
     op_make_type_tagged_resolver,

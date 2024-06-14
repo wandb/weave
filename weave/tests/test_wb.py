@@ -1,37 +1,28 @@
-import pytest
+import cProfile
+import json
 import re
-from weave import stitch
-import numpy as np
 
+import numpy as np
+import pytest
+import wandb
+
+from weave import stitch
+from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
 from .. import api as weave
+from .. import artifact_fs, artifact_wandb, compile, graph, uris
 from .. import ops as ops
-from .. import uris
-from .. import artifact_wandb
-
-from . import weavejs_ops
-import json
-from . import fixture_fakewandb as fwb
-from .. import graph
-from .. import artifact_fs
-from ..ops_domain import wb_domain_types as wdt
-from ..ops_domain import artifact_membership_ops as amo
-from ..ops_arrow import ArrowWeaveListType
-from ..ops_primitives import list_, dict_
-from .. import weave_types as types
-from ..ops_primitives.file import _as_w0_dict_
-from ..ops_domain import wbmedia
-
 from .. import ops_arrow as arrow
-import cProfile
-from ..language_features.tagging.tagged_value_type import TaggedValueType
-from ..ops_domain import table
-from ..ops_domain import wb_util
-import wandb
-
-from .. import compile
-
+from .. import weave_types as types
+from ..ops_arrow import ArrowWeaveListType
+from ..ops_domain import artifact_membership_ops as amo
+from ..ops_domain import table, wb_util, wbmedia
+from ..ops_domain import wb_domain_types as wdt
+from ..ops_primitives import dict_, list_
+from ..ops_primitives.file import _as_w0_dict_
+from . import fixture_fakewandb as fwb
+from . import weavejs_ops
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {

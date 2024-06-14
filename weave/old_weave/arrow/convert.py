@@ -14,7 +14,6 @@ from weave import (
     weave_internal,
 )
 from weave import weave_types as types
-from weave.language_features.tagging import tag_store, tagged_value_type
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
 )
@@ -23,6 +22,7 @@ from weave.old_weave.arrow.list_ import (
     PathType,
     unsafe_awl_construction,
 )
+from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
 
 # Hmm... this doesn't work on ObjectType, which contains a Union of Struct...
 # We need that because our ImageFileArtifactRefType has a union of structs

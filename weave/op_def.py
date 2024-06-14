@@ -1,41 +1,41 @@
 import collections
-import copy
-import contextvars
 import contextlib
-import typing
-from typing import Sequence, Iterator
+import contextvars
+import copy
 import inspect
+import typing
+from typing import Iterator, Sequence
 
-from weave.weavejs_fixes import fixup_node
-
-from . import errors
-from . import op_args
-from . import context_state
-from . import weave_types as types
-from . import uris
-from . import graph
-from . import weave_internal
-from . import pyfunc_type_util
-from . import engine_trace
-from . import memo
-from . import op_execute
-from . import object_context
-from .run import Run
-from . import graph_client_context
-
-from .language_features.tagging import (
+from weave.old_weave.language_features.tagging import (
     opdef_util,
-    process_opdef_resolve_fn,
     process_opdef_output_type,
+    process_opdef_resolve_fn,
     tagged_value_type,
 )
-from . import language_autocall
-from . import op_def_type
+from weave.weavejs_fixes import fixup_node
 
+from . import (
+    context_state,
+    engine_trace,
+    errors,
+    graph,
+    graph_client_context,
+    language_autocall,
+    memo,
+    object_context,
+    op_args,
+    op_def_type,
+    op_execute,
+    pyfunc_type_util,
+    uris,
+    weave_internal,
+)
+from . import weave_types as types
+from .run import Run
 
 if typing.TYPE_CHECKING:
-    from .run_streamtable_span import RunStreamTableSpan
     from . import weave_client
+    from .run_streamtable_span import RunStreamTableSpan
 
 
 _no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(

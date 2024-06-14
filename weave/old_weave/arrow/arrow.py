@@ -365,7 +365,7 @@ def rewrite_weavelist_refs(arrow_data, object_type, source_artifact, target_arti
 
 
 def _object_type_has_props(object_type):
-    from weave.language_features.tagging import tagged_value_type
+    from weave.old_weave.language_features.tagging import tagged_value_type
 
     return (
         isinstance(object_type, types.TypedDict)
@@ -375,7 +375,7 @@ def _object_type_has_props(object_type):
 
 
 def _object_type_prop_types(object_type):
-    from weave.language_features.tagging import tagged_value_type
+    from weave.old_weave.language_features.tagging import tagged_value_type
 
     if isinstance(object_type, tagged_value_type.TaggedValueType):
         return {

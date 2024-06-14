@@ -1,12 +1,13 @@
 import dataclasses
+
 import pytest
-from ..language_features.tagging.tagged_value_type import TaggedValueType
+
 import weave
 import weave.weave_types
-from .. import errors
+from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
+
+from .. import _dict_utils, errors, runs
 from .. import weave_types as types
-from .. import runs
-from .. import _dict_utils
 from ..ops_domain import wbmedia
 
 

@@ -1,37 +1,36 @@
 from __future__ import print_function
+
 import dataclasses
-
-import typing
 import logging
-
-from flask import current_app
-from werkzeug.serving import make_server
 import multiprocessing
+import pprint
 import threading
 import time
-import requests
 import traceback
-import time
-import pprint
+import typing
 
+import requests
+from flask import current_app
+from werkzeug.serving import make_server
 
-from weave.language_features.tagging.tag_store import isolated_tagging_context
-from . import value_or_error
+from weave.old_weave.language_features.tagging import tag_store
+from weave.old_weave.language_features.tagging.tag_store import isolated_tagging_context
 
-from . import cache
-from . import execute
-from . import serialize
-from . import storage
-from . import context
-from . import weave_types
-from . import engine_trace
-from . import logs
-from . import wandb_api
-from . import util
-from . import graph
-from .language_features.tagging import tag_store
-from . import gql_json_cache
-
+from . import (
+    cache,
+    context,
+    engine_trace,
+    execute,
+    gql_json_cache,
+    graph,
+    logs,
+    serialize,
+    storage,
+    util,
+    value_or_error,
+    wandb_api,
+    weave_types,
+)
 
 # A function to monkeypatch the request post method
 # def patch_request_post():
@@ -121,9 +120,7 @@ class SubprocessServer(multiprocessing.Process):
         self.resp_queue = resp_queue
 
     def run(self):
-        from weave import ops
-        from weave import panels
-        from weave import panels_py
+        from weave import ops, panels, panels_py
 
         while True:
             req = self.req_queue.get()

@@ -1,7 +1,7 @@
 import typing
 
 from weave import weave_types as types
-from weave.language_features.tagging import tagged_value_type
+from weave.old_weave.language_features.tagging import tagged_value_type
 
 if typing.TYPE_CHECKING:
     from weave import op_def as OpDef

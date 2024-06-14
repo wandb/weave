@@ -1,26 +1,21 @@
-import typing
-from typing import Iterable, Sequence, Optional
-import weakref
+import functools
 import hashlib
 import json
-import functools
+import typing
+import weakref
+from typing import Iterable, Optional, Sequence
 
-from . import uris
-from . import box
-from . import errors
-from . import graph_client_context
+from weave.old_weave.language_features.tagging import tag_store
+
+from . import box, context_state, errors, graph_client_context, object_context, uris
 from . import weave_types as types
-from . import object_context
-from . import context_state
-from .language_features.tagging import tag_store
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
+    from . import run, weave_client
     from . import weave_types as types
-    from . import run
-    from . import weave_client
 
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:

@@ -6,24 +6,23 @@ import copy
 import inspect
 import typing
 
+from weave.old_weave.language_features.tagging import tag_store
 
+from . import (
+    box,
+    context_state,
+    errors,
+    execute_fast,
+    graph,
+    op_args,
+    op_def,
+    op_policy,
+    parallelism,
+    registry_mem,
+    storage,
+    weave_internal,
+)
 from . import weave_types as types
-from . import op_args
-from . import registry_mem
-from . import op_def
-from . import errors
-from . import graph
-from . import box
-from . import weave_internal
-from . import box
-from . import storage
-from . import weave_internal
-from . import execute_fast
-from . import op_policy
-from . import parallelism
-from . import context_state
-
-from .language_features.tagging import tag_store
 
 USE_PARALLEL_DOWNLOAD = True
 USE_PARALLEL_REFINE = True

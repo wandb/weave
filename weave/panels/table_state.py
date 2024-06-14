@@ -8,7 +8,7 @@ import string
 import typing
 
 from weave import decorator_type, graph, ops, panel, weave_internal, weave_types
-from weave.language_features.tagging import tagged_value_type
+from weave.old_weave.language_features.tagging import tagged_value_type
 
 
 @decorator_type.type()

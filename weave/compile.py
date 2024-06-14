@@ -5,6 +5,8 @@ import random
 import re
 import typing
 
+from weave.old_weave.language_features.tagging import tagged_value_type_helpers
+
 from . import (
     box,
     compile_domain,
@@ -28,7 +30,6 @@ from . import (
     weave_internal,
 )
 from . import weave_types as types
-from .language_features.tagging import tagged_value_type_helpers
 from .op_def import OpDef
 
 # These call_* functions must match the actual op implementations.

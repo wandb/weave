@@ -11,6 +11,11 @@ from weave.old_weave.arrow import constructors
 from weave.old_weave.arrow.arrow_tags import (
     recursively_encode_pyarrow_strings_as_dictionaries,
 )
+from weave.old_weave.language_features.tagging import (
+    make_tag_getter_op,
+    tag_store,
+    tagged_value_type,
+)
 from weave.tests import list_arrow_test_helpers as lath
 
 from .. import api as weave
@@ -29,7 +34,6 @@ from .. import (
 # tests in test_arrow_vectorizer.py instead
 from .. import ops_arrow as arrow
 from .. import weave_types as types
-from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
 from ..op_def import map_type
 from ..ops_domain import project_ops
 from ..ops_primitives import list_, make_list

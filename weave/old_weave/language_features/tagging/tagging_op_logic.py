@@ -1,5 +1,5 @@
 from weave import weave_types as types
-from weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 
 
 def op_get_tag_type_resolver(obj_type: types.Type) -> types.Type:

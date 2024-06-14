@@ -1,54 +1,52 @@
-import logging
 import contextlib
 import contextvars
-from collections.abc import Mapping
 import itertools
+import logging
 import pprint
-import time
 import threading
-import typing
+import time
 import traceback
+import typing
+from collections.abc import Mapping
+
+from weave.old_weave.language_features.tagging import (
+    opdef_util,
+    process_opdef_resolve_fn,
+    tag_store,
+)
 
 # Configuration
-from . import wandb_api
-
 # Libraries
-from . import engine_trace
-from . import errors
-from . import context
-from . import memo
-from . import environment
-from . import value_or_error
-
 # Planner/Compiler
-from . import compile
-from . import forward_graph
-from . import graph
-from . import graph_debug
-from .language_features.tagging import tag_store
-from . import weave_types as types
-from . import box
-
 # Ops
-from . import registry_mem
-from . import op_def
-from .language_features.tagging import process_opdef_resolve_fn
-from .language_features.tagging import opdef_util
-
 # Trace / cache
-from . import op_policy
-from . import trace_local
-from . import ref_base
-from . import object_context
-from . import memo
-from . import context_state
-from . import op_execute
-
 # Language Features
-from . import eager
-from . import language_nullability
-
-from . import parallelism
+from . import (
+    box,
+    compile,
+    context,
+    context_state,
+    eager,
+    engine_trace,
+    environment,
+    errors,
+    forward_graph,
+    graph,
+    graph_debug,
+    language_nullability,
+    memo,
+    object_context,
+    op_def,
+    op_execute,
+    op_policy,
+    parallelism,
+    ref_base,
+    registry_mem,
+    trace_local,
+    value_or_error,
+    wandb_api,
+)
+from . import weave_types as types
 
 if typing.TYPE_CHECKING:
     from .graph_client import GraphClient

@@ -6,7 +6,7 @@ import typing
 
 from weave import api as weave
 from weave import artifact_fs, engine_trace, errors, file_base, types
-from weave.language_features.tagging.tag_store import isolated_tagging_context
+from weave.old_weave.language_features.tagging.tag_store import isolated_tagging_context
 from weave.ops_primitives import html, markdown
 
 

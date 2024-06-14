@@ -11,10 +11,6 @@ from weave import op_args, op_def
 from weave import weave_types as types
 from weave.api import op, type_of
 from weave.decorator_arrow_op import arrow_op
-from weave.language_features.tagging import (
-    tagged_value_type,
-    tagged_value_type_helpers,
-)
 from weave.old_weave.arrow import arrow_tags, convert
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
@@ -32,6 +28,10 @@ from weave.old_weave.arrow.list_ import (
     PathType,
     is_list_arrowweavelist,
     is_taggedvalue_arrowweavelist,
+)
+from weave.old_weave.language_features.tagging import (
+    tagged_value_type,
+    tagged_value_type_helpers,
 )
 from weave.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
 from weave.ops_primitives import list_ as primitive_list

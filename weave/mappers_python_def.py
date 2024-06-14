@@ -4,20 +4,23 @@ import inspect
 import math
 import typing
 
-from . import mappers
-from . import storage
-from . import ref_base
-from . import mappers_weave
-from . import weave_types as types
-from . import errors
-from . import box
-from . import mappers_python
-from . import val_const
-from . import artifact_fs
-from . import graph_client_context
+from weave.old_weave.language_features.tagging import tagged_value_type
+
+from . import (
+    artifact_fs,
+    box,
+    errors,
+    graph_client_context,
+    mappers,
+    mappers_python,
+    mappers_weave,
+    ref_base,
+    storage,
+    val_const,
+)
 from . import timestamp as weave_timestamp
-from .language_features.tagging import tagged_value_type
-from .partial_object import PartialObjectType, PartialObject
+from . import weave_types as types
+from .partial_object import PartialObject, PartialObjectType
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):

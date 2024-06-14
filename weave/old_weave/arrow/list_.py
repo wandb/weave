@@ -26,10 +26,6 @@ from weave import (
     weave_internal,
 )
 from weave import weave_types as types
-from weave.language_features.tagging import (
-    tag_store,
-    tagged_value_type,
-)
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
     arrow_as_array,
@@ -37,6 +33,10 @@ from weave.old_weave.arrow.arrow import (
     offsets_starting_at_zero,
     pretty_print_arrow_type,
     safe_is_null,
+)
+from weave.old_weave.language_features.tagging import (
+    tag_store,
+    tagged_value_type,
 )
 
 

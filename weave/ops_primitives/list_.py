@@ -12,7 +12,7 @@ from weave._dict_utils import tag_aware_dict_val_for_escaped_key
 from weave.decorator_class import weave_class
 from weave.decorator_op import op
 from weave.graph import Node
-from weave.language_features.tagging import (
+from weave.old_weave.language_features.tagging import (
     tag_store,
     tagged_value_type,
     tagged_value_type_helpers,

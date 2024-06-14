@@ -1,18 +1,15 @@
-import weave
 import typing
+
 import pytest
 
-from .. import stitch
-
-from ..language_features.tagging import make_tag_getter_op
-from .. import compile_table
-from .. import compile_domain
+import weave
 from weave import context_state as _context
-from .. import weave_internal
-from . import test_wb
+from weave.old_weave.language_features.tagging import make_tag_getter_op
+
+from .. import compile_domain, compile_table, stitch, weave_internal
 from ..ops_domain import run_ops
 from . import fixture_fakewandb as fwb
-
+from . import test_wb
 
 _loading_builtins_token = _context.set_loading_built_ins()
 

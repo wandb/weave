@@ -5,9 +5,9 @@
 import dataclasses
 import typing
 
-from .. import box
+from weave.old_weave.language_features.tagging import tag_store
 
-from ..language_features.tagging import tag_store
+from .. import box
 
 
 @dataclasses.dataclass

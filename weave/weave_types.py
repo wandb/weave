@@ -1,27 +1,21 @@
+import contextvars
 import dataclasses
 import datetime
-import typing
-import inspect
 import functools
-import keyword
-import contextvars
+import inspect
 import json
-import pydantic
+import keyword
+import typing
 from collections.abc import Iterable
 
+import pydantic
 
-from . import box
-from . import context_state
-from . import errors
-from . import mappers_python
+from . import box, context_state, errors, mappers_python, object_type_ref_util
 from . import timestamp as weave_timestamp
-from . import object_type_ref_util
-
 
 if typing.TYPE_CHECKING:
+    from . import artifact_base, weave_inspector
     from .artifact_fs import FilesystemArtifact
-    from . import artifact_base
-    from . import weave_inspector
 
 
 def to_weavejs_typekey(k: str) -> str:
@@ -1571,7 +1565,7 @@ def merge_types(a: Type, b: Type) -> Type:
     This implementation must match list.concat implementations (which is the only
     way to extend a list in Weave). Ie list.concat(list[a], [b]) -> list[merge_types(a, b)]
     """
-    from .language_features.tagging import tagged_value_type
+    from weave.old_weave.language_features.tagging import tagged_value_type
 
     if a == b:
         return a

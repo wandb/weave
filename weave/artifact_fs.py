@@ -1,21 +1,15 @@
 import contextlib
 import contextvars
 import dataclasses
-import typing
-import json
 import datetime
+import json
 import os
+import typing
 
-from . import artifact_base
-from . import ref_base
-from . import ref_util
+from weave.old_weave.language_features.tagging import tag_store
+
+from . import artifact_base, errors, file_base, object_context, ref_base, ref_util, uris
 from . import weave_types as types
-from . import uris
-from . import errors
-from . import file_base
-from . import object_context
-
-from .language_features.tagging import tag_store
 
 if typing.TYPE_CHECKING:
     from . import graph

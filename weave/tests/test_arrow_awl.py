@@ -5,9 +5,9 @@ import pytest
 import weave
 import weave.weave_types as types
 from weave.old_weave.arrow.convert import to_arrow
+from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
 
 from .. import box, ops_arrow
-from ..language_features.tagging import tag_store, tagged_value_type
 from .concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,

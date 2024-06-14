@@ -7,7 +7,6 @@ import pyarrow.compute as pc
 from weave import engine_trace, graph
 from weave import weave_types as types
 from weave.api import op
-from weave.language_features.tagging import tagged_value_type
 from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
@@ -20,6 +19,7 @@ from weave.old_weave.arrow.list_ import (
     make_vec_dict,
     make_vec_taggedvalue,
 )
+from weave.old_weave.language_features.tagging import tagged_value_type
 from weave.ops_primitives import list_ as primitive_list
 
 tracer = engine_trace.tracer()  # type: ignore

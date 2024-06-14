@@ -1,12 +1,7 @@
-from . import op_def
-from . import graph
-from . import weave_types as types
-from . import registry_mem
-from . import partial_object
-from . import input_provider
-from . import gql_op_plugin
-
 import typing
+
+from . import gql_op_plugin, graph, input_provider, op_def, partial_object, registry_mem
+from . import weave_types as types
 
 
 def _propagate_gql_keys_for_node(
@@ -17,10 +12,10 @@ def _propagate_gql_keys_for_node(
 ) -> types.Type:
     # Mutates node
     # TODO: see if this can be done without mutations
-    from .language_features.tagging import (
-        tagged_value_type_helpers,
-        tagged_value_type,
+    from weave.old_weave.language_features.tagging import (
         opdef_util,
+        tagged_value_type,
+        tagged_value_type_helpers,
     )
 
     input_types = node.from_op.input_types

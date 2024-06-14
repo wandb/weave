@@ -1,15 +1,12 @@
+from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
+
+from .. import api as weave
+from .. import compile
 from .. import ops as ops
 from .. import weave_types as types
 from ..ops_domain import wb_domain_types as wdt
-
 from ..ops_domain.project_ops import root_all_projects
 from ..ops_domain.report_ops import root_all_reports
-
-from .. import compile
-from ..language_features.tagging.tagged_value_type import TaggedValueType
-
-from .. import api as weave
-
 from .test_wb import table_mock1_no_display_name
 
 

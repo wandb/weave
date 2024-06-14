@@ -11,7 +11,7 @@ import pyarrow.parquet as pq
 from weave import box, errors, file_base, graph, mappers_python
 from weave import weave_types as types
 from weave.api import op, weave_class
-from weave.language_features.tagging import tag_store, tagged_value_type
+from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
 from weave.ops_primitives import list_
 
 

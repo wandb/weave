@@ -4,7 +4,7 @@ from weave import weave_types as types
 from weave._dict_utils import typeddict_pick_output_type
 from weave.decorator_class import weave_class
 from weave.decorator_op import op
-from weave.language_features.tagging import tagged_value_type
+from weave.old_weave.language_features.tagging import tagged_value_type
 from weave.op_args import OpVarArgs
 from weave.ops_primitives._dict_utils import tag_aware_dict_val_for_escaped_key
 

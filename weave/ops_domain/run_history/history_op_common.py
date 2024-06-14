@@ -23,9 +23,9 @@ from weave import weave_types as types
 from weave.api import use
 from weave.compile_domain import InputAndStitchProvider
 from weave.compile_table import KeyTree
-from weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.mappers_arrow import map_to_arrow
 from weave.old_weave.arrow.concat import concatenate_all
+from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.ops_arrow import ArrowWeaveList
 from weave.ops_arrow.list_ops import concat
 from weave.ops_domain import table, wb_util

@@ -4,9 +4,12 @@ import pyarrow as pa
 from pyarrow import compute as pc
 
 from weave import weave_types as types
-from weave.language_features.tagging import process_opdef_output_type, tag_store
 from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.arrow import offsets_starting_at_zero
+from weave.old_weave.language_features.tagging import (
+    process_opdef_output_type,
+    tag_store,
+)
 
 if typing.TYPE_CHECKING:
     from list_ import ArrowWeaveList  # type: ignore[import]

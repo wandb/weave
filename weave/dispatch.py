@@ -1,22 +1,15 @@
 """Functions for determining which op is being called."""
-from dataclasses import dataclass
 import functools
+import json
 import logging
 import typing
-import json
+from dataclasses import dataclass
 
-from .language_features.tagging.is_tag_getter import is_tag_getter
-from .language_features.tagging.tagged_value_type import TaggedValueType
+from weave.old_weave.language_features.tagging.is_tag_getter import is_tag_getter
+from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 
+from . import errors, graph, memo, op_args, op_def, pyfunc_type_util, registry_mem, util
 from . import weave_types as types
-from . import op_def
-from . import op_args
-from . import registry_mem
-from . import graph
-from . import errors
-from . import pyfunc_type_util
-from . import util
-from . import memo
 
 
 # I originally wrote this thinking that we could always choose the more specific

@@ -1,19 +1,22 @@
+import itertools
+
+import numpy as np
 import pytest
 
 from weave import weave_internal
-from .. import api as weave
-from .. import ops_arrow as arrow
-from ..ops_primitives import list_, dict_
-from . import list_arrow_test_helpers as lath
-import numpy as np
-import pytest
-from ..tests import tag_test_util as ttu
-from .. import ops
-import itertools
-
 from weave import weave_types as types
-from ..language_features.tagging import tag_store, make_tag_getter_op, tagged_value_type
-from .. import box
+from weave.old_weave.language_features.tagging import (
+    make_tag_getter_op,
+    tag_store,
+    tagged_value_type,
+)
+
+from .. import api as weave
+from .. import box, ops
+from .. import ops_arrow as arrow
+from ..ops_primitives import dict_, list_
+from ..tests import tag_test_util as ttu
+from . import list_arrow_test_helpers as lath
 
 
 def filter_fn(row) -> bool:

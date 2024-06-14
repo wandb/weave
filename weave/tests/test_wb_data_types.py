@@ -1,30 +1,27 @@
+import datetime
+import os
 import time
+
+import numpy as np
 import pytest
 import wandb
+from bokeh.plotting import figure
+from wandb import Artifact
 from wandb import data_types as wb_data_types
-import numpy as np
+from wandb.sdk.artifacts.artifact_state import ArtifactState
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
-from weave.language_features.tagging.tagged_value_type import TaggedValueType
+import weave
+from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.wandb_client_api import wandb_gql_query
 
-from ..ops_primitives import file
-from ..ops_domain.wbmedia import ImageArtifactFileRefType
-
-from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
 from .. import artifact_fs
-
-from .fixture_fakewandb import FakeApi
-
-from ..wandb_util import weave0_type_json_to_weave1_type
-import weave
 from .. import weave_types as types
-import datetime
-from bokeh.plotting import figure
-import os
-
-from wandb import Artifact
-from wandb.sdk.artifacts.artifact_state import ArtifactState
+from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
+from ..ops_domain.wbmedia import ImageArtifactFileRefType
+from ..ops_primitives import file
+from ..wandb_util import weave0_type_json_to_weave1_type
+from .fixture_fakewandb import FakeApi
 
 
 class RandomClass:
