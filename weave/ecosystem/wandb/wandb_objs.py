@@ -35,17 +35,17 @@ Ghostwrite is a tool for writing. Our mission is to increase human creativity.
 @weave.op()
 def fakewandbmodel_render(
     model_node: weave.Node[FakeWandbModel],
-) -> weave.panels.Card:
+) -> weave.old_weave.panels.Card:
     model = typing.cast(FakeWandbModel, model_node)
-    return weave.panels.Card(
+    return weave.old_weave.panels.Card(
         title=model.name,
         subtitle="",
         content=[
-            weave.panels.CardTab(
+            weave.old_weave.panels.CardTab(
                 name="Description",
-                content=weave.panels.PanelMarkdown(GHOSTWRITE_MD),  # type: ignore
+                content=weave.old_weave.panels.PanelMarkdown(GHOSTWRITE_MD),  # type: ignore
             ),
-            weave.panels.CardTab(
+            weave.old_weave.panels.CardTab(
                 name="Predictions",
                 content=weave.ops.project("shawn", "ghostwrite-test1")
                 .runs()
@@ -62,18 +62,18 @@ def fakewandbmodel_render(
 @weave.op()
 def entity_render(
     entity_node: weave.Node[wb_domain_types.Entity],
-) -> weave.panels.Card:
+) -> weave.old_weave.panels.Card:
     entity = typing.cast(wb_domain_types.Entity, entity_node)
-    return weave.panels.Card(
+    return weave.old_weave.panels.Card(
         title=entity_name_op(entity),
         subtitle="",
         content=[
-            weave.panels.CardTab(
+            weave.old_weave.panels.CardTab(
                 name="Projects",
-                content=weave.panels.Table(
+                content=weave.old_weave.panels.Table(
                     entity.projects(),  # type: ignore
                     columns=[
-                        lambda project: weave.panels.WeaveLink(
+                        lambda project: weave.old_weave.panels.WeaveLink(
                             project_name_op(project),
                             vars={
                                 "entity_name": entity_name_op(project.entity()),
@@ -86,15 +86,15 @@ def entity_render(
                     ],
                 ),
             ),
-            weave.panels.CardTab(
+            weave.old_weave.panels.CardTab(
                 name="Registered Models",
-                content=weave.panels.Table(
+                content=weave.old_weave.panels.Table(
                     weave.save(
                         ["ghostwrite", "credit card predictor", "stopsigns3"],
                         name="model_list",
                     ),
                     columns=[
-                        lambda model_name: weave.panels.WeaveLink(
+                        lambda model_name: weave.old_weave.panels.WeaveLink(
                             model_name,
                             vars={
                                 "entity_name": entity_name_op(entity),
@@ -116,11 +116,11 @@ class ProjectRunsTable(weave.Panel):
     input_node: weave.Node[list[wb_domain_types.Run]]
 
     @weave.op()
-    def render(self) -> weave.panels.Table:
-        return weave.panels.Table(
+    def render(self) -> weave.old_weave.panels.Table:
+        return weave.old_weave.panels.Table(
             self.input_node,
             columns=[
-                lambda run: weave.panels.WeaveLink(
+                lambda run: weave.old_weave.panels.WeaveLink(
                     run.id(),
                     vars={
                         "entity_name": entity_name_op(run.project().entity()),
@@ -143,21 +143,21 @@ class ProjectArtifactsTable(weave.Panel):
     input_node: weave.Node[list[wb_domain_types.ArtifactCollection]]
 
     @weave.op()
-    def render(self) -> weave.panels.Table:
+    def render(self) -> weave.old_weave.panels.Table:
         # This breaks if there is a variable in the node
         # types_names = weave.use(artifacts._get_op("type")().name().unique())
-        # return weave.panels.Card(
+        # return weave.old_weave.panels.Card(
         #     title="Artifacts",
         #     subtitle="",
         #     content=[
-        #         weave.panels.CardTab(name=type_name, content=[type_name])
+        #         weave.old_weave.panels.CardTab(name=type_name, content=[type_name])
         #         for type_name in types_names
         #     ],
         # )
-        return weave.panels.Table(
+        return weave.old_weave.panels.Table(
             self.input_node,
             columns=[
-                lambda artifact: weave.panels.WeaveLink(
+                lambda artifact: weave.old_weave.panels.WeaveLink(
                     artifact._get_op("name")(),
                     vars={
                         "entity_name": entity_name_op(artifact.project().entity()),

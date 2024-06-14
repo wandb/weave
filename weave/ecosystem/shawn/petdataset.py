@@ -1,6 +1,7 @@
-import PIL
 import os
 import typing
+
+import PIL
 
 import weave
 
@@ -70,8 +71,8 @@ class PetDatasetPanel(weave.Panel):
     input_node: weave.Node[list[OxfordIIITPetDatasetItem]]
 
     @weave.op()
-    def render(self) -> weave.panels.Table:
-        return weave.panels.Table(
+    def render(self) -> weave.old_weave.panels.Table:
+        return weave.old_weave.panels.Table(
             self.input_node,
             columns=[
                 lambda item: item["id"],

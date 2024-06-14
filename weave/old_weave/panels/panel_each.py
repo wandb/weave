@@ -3,8 +3,8 @@ import typing
 
 import weave
 from weave import graph, panel
-from weave.panels.bank import default_panel_bank_flow_section_config
-from weave.panels.panel_group import PanelBankSectionConfig
+from weave.old_weave.panels.bank import default_panel_bank_flow_section_config
+from weave.old_weave.panels.panel_group import PanelBankSectionConfig
 
 PanelType = typing.TypeVar("PanelType")
 

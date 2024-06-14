@@ -49,19 +49,19 @@ class Distribution(weave.Panel):
         )
 
     @weave.op()
-    def render_config(self) -> weave.panels.Group:
+    def render_config(self) -> weave.old_weave.panels.Group:
         config = typing.cast(DistributionConfig, self.config)
-        return weave.panels.Group(
+        return weave.old_weave.panels.Group(
             items={
-                "value_fn": weave.panels.LabeledItem(
+                "value_fn": weave.old_weave.panels.LabeledItem(
                     label="value",
-                    item=weave.panels.FunctionEditor(config.value_fn),
+                    item=weave.old_weave.panels.FunctionEditor(config.value_fn),
                 ),
-                "label_fn": weave.panels.LabeledItem(
+                "label_fn": weave.old_weave.panels.LabeledItem(
                     label="label",
-                    item=weave.panels.FunctionEditor(config.label_fn),
+                    item=weave.old_weave.panels.FunctionEditor(config.label_fn),
                 ),
-                "bin_size": weave.panels.LabeledItem(
+                "bin_size": weave.old_weave.panels.LabeledItem(
                     label="bin_size",
                     # Must execute here because bin_size is an expression.
                     # Editor panels take the actual type they edit (in this
@@ -69,7 +69,7 @@ class Distribution(weave.Panel):
                     # const node directly in the config, or if the expression
                     # refers to variables, the edit will be routed to the appropriate
                     # owner.
-                    item=weave.panels.Slider(config.bin_size.execute()),  # type: ignore
+                    item=weave.old_weave.panels.Slider(config.bin_size.execute()),  # type: ignore
                 ),
             }
         )
@@ -86,7 +86,7 @@ class Distribution(weave.Panel):
             config.value_fn.type.output_type  # type: ignore
         ):
             # TODO: need a nicer way to return error states
-            return weave.panels.PanelString("Invalid value_fn")  # type: ignore
+            return weave.old_weave.panels.PanelString("Invalid value_fn")  # type: ignore
         # We always unnest, so that we can compare across groups of items
         # easily. (the Distribution notebook)
         unnested = weave.ops.unnest(input_node)
@@ -127,7 +127,7 @@ class Distribution(weave.Panel):
 @weave.op()
 def distribution_panel_plot_render(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
-) -> weave.panels.Plot:
+) -> weave.old_weave.panels.Plot:
     unnested = weave.ops.unnest(input_node)
     bin_size = weave.ops.execute(config.bin_size)
 
@@ -156,7 +156,7 @@ def distribution_panel_plot_render(
         )
     )
 
-    return weave.panels.Plot(
+    return weave.old_weave.panels.Plot(
         binned,
         x=lambda row: row["value"],
         y=lambda row: row["count"],

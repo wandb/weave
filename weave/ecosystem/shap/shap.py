@@ -87,5 +87,5 @@ class ShapPlotText(weave.Panel):
     input_node: weave.Node[shap.Explanation]
 
     @weave.op()
-    def render(self) -> weave.panels.PanelHtml:
-        return weave.panels.PanelHtml(shap_plot_text(self.input_node))
+    def render(self) -> weave.old_weave.panels.PanelHtml:
+        return weave.old_weave.panels.PanelHtml(shap_plot_text(self.input_node))

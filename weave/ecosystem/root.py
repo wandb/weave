@@ -3,7 +3,8 @@ import typing
 from weave import api as weave
 
 # TODO: Fix, these should be available from weave
-from weave import context_state, op_def, ops, panel, panels
+from weave import context_state, op_def, ops, panel
+from weave.old_weave import panels
 
 loading_builtins_token = context_state.set_loading_built_ins()
 

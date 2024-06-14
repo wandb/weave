@@ -70,13 +70,13 @@ class ClassificationResultPanel(weave.Panel):
     input_node: weave.Node[list[ClassificationResult]]
 
     @weave.op()
-    def render(self) -> weave.panels.Table:
+    def render(self) -> weave.old_weave.panels.Table:
         from weave.ecosystem.huggingface.huggingface_models import huggingface
 
-        return weave.panels.Table(
+        return weave.old_weave.panels.Table(
             self.input_node,
             columns=[
-                lambda result_row: weave.panels.WeaveLink(
+                lambda result_row: weave.old_weave.panels.WeaveLink(
                     result_row.model_name(),
                     to=lambda input: huggingface().model(input),  # type: ignore
                 ),
@@ -115,17 +115,17 @@ class FullTextClassificationResultPanel(weave.Panel):
     input_node: weave.Node[FullTextClassificationPipelineOutput]
 
     @weave.op()
-    def render(self) -> weave.panels.Group:
+    def render(self) -> weave.old_weave.panels.Group:
         output = typing.cast(FullTextClassificationPipelineOutput, self.input_node)
-        return weave.panels.Group(
+        return weave.old_weave.panels.Group(
             preferHorizontal=True,
             items={
-                "input": weave.panels.LabeledItem(
+                "input": weave.old_weave.panels.LabeledItem(
                     label="input", item=output.model_input
                 ),
-                "output": weave.panels.LabeledItem(
+                "output": weave.old_weave.panels.LabeledItem(
                     label="output",
-                    item=weave.panels.Plot(
+                    item=weave.old_weave.panels.Plot(
                         input_node=typing.cast(weave.Node, output.model_output),
                         x=lambda class_score: class_score["score"],
                         y=lambda class_score: class_score["label"],

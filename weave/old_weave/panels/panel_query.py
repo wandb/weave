@@ -3,7 +3,7 @@ import typing
 
 import weave
 from weave import graph, panel, weave_internal
-from weave.panels import table_state
+from weave.old_weave.panels import table_state
 
 
 @weave.type()

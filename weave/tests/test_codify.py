@@ -1,8 +1,8 @@
 import black
 import pytest
-import weave
 
-from weave import panels
+import weave
+from weave.old_weave import panels
 
 # IMPORTANT: Do not import other symbols inside of weave
 # so that we ensure the produced code only relies on the weave symbol.
@@ -19,7 +19,7 @@ from weave import panels
         ),
         (
             panels.Group(),
-            "weave.panels.panel_group.Group()",
+            "weave.old_weave.panels.panel_group.Group()",
         ),
         (
             lambda: panels.Table(
@@ -32,7 +32,7 @@ from weave import panels
                     )
                 )
             ),
-            lambda: """weave.panels.panel_table.Table(
+            lambda: """weave.old_weave.panels.panel_table.Table(
             weave.ops_arrow.list_range.range(1, 100, 1,).map(
                 lambda row: weave.ops_primitives.dict.dict_(
                     x=row,
@@ -52,7 +52,7 @@ from weave import panels
                     )
                 )
             ),
-            lambda: """weave.panels.panel_plot.Plot(
+            lambda: """weave.old_weave.panels.panel_plot.Plot(
             weave.ops_arrow.list_range.range(1, 100, 1,).map(
                 lambda row: weave.ops_primitives.dict.dict_(
                     x=row,
@@ -99,26 +99,26 @@ from weave import panels
                     ),
                 }
             ),
-            lambda: """weave.panels.panel_group.Group(
+            lambda: """weave.old_weave.panels.panel_group.Group(
     items={
-        "table": weave.panels.panel_table.Table(
+        "table": weave.old_weave.panels.panel_table.Table(
             weave.ops_arrow.list_range.range(1, 100, 1,),
             columns=[
                 lambda row: row,
                 lambda row: row.powBinary(2,),
             ],
         ),
-        "all_rows": lambda table: weave.panels.panel_plot.Plot(
+        "all_rows": lambda table: weave.old_weave.panels.panel_plot.Plot(
             table.all_rows(),
             x=lambda row: row["c_0"],
             y=lambda row: row["c_1"],
         ),
-        "derived": lambda table, all_rows: weave.panels.panel_group.Group(
+        "derived": lambda table, all_rows: weave.old_weave.panels.panel_group.Group(
             layoutMode="horizontal",
             items={
-                "rows": weave.panels.panel_group.Group(
+                "rows": weave.old_weave.panels.panel_group.Group(
                     items={
-                        "pinned_rows": weave.panels.panel_plot.Plot(
+                        "pinned_rows": weave.old_weave.panels.panel_plot.Plot(
                             table.pinned_rows(),
                             x=lambda row: row["c_0"],
                             y=lambda row: row["c_1"],
@@ -126,7 +126,7 @@ from weave import panels
                         "active_row": lambda pinned_rows: table.active_row(),
                     },
                 ),
-                "data": lambda rows: weave.panels.panel_group.Group(
+                "data": lambda rows: weave.old_weave.panels.panel_group.Group(
                     items={
                         "pinned_data": table.pinned_data(),
                         "active_data": lambda pinned_data: table.active_data(),
@@ -166,16 +166,16 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
                 ),
             }
         ),
-        '''weave.panels.panel_group.Group(
+        '''weave.old_weave.panels.panel_group.Group(
         items={
-            "plot": weave.panels.panel_plot.Plot(
+            "plot": weave.old_weave.panels.panel_plot.Plot(
                 weave.ops.local_path("'''
         + cereal_csv
         + """",).readcsv(),
                 x=lambda row: row["protein"],
                 y=lambda row: row["calories"],
             ),
-            "table": lambda plot: weave.panels.panel_table.Table(
+            "table": lambda plot: weave.old_weave.panels.panel_table.Table(
                 plot.selected_rows(),
                 columns=[
                     lambda row: row["c_0"],
@@ -195,7 +195,7 @@ def test_plot_case(cereal_csv, consistent_table_col_ids):
             x=lambda row: row["protein"],
             y=lambda row: row["calories"],
         ),
-        f"""weave.panels.panel_plot.Plot(
+        f"""weave.old_weave.panels.panel_plot.Plot(
     weave.ops.local_path('{cereal_csv}',).readcsv(),
     x=lambda row: row["protein"],
     y=lambda row: row["calories"],
@@ -212,7 +212,7 @@ def test_table_case(cereal_csv, consistent_table_col_ids):
                 lambda row: row["calories"],
             ],
         ),
-        f"""weave.panels.panel_table.Table(
+        f"""weave.old_weave.panels.panel_table.Table(
     weave.ops.local_path('{cereal_csv}',).readcsv(),
     columns=[
         lambda row: row["protein"],

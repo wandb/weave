@@ -4,15 +4,15 @@
 #   - Doesn't use the much faster ArrowWeaveList
 #   - The patterns here aren't final. Prefer the style used in huggingface/models
 
-from typing import TypeVar
 import typing
-import weave
-from weave import infer_types
-from weave import panels
-import PIL.Image
+from typing import TypeVar
 
+import PIL.Image
 from torchvision import datasets
 
+import weave
+from weave import infer_types
+from weave.old_weave import panels
 
 ExampleType = TypeVar("ExampleType")
 

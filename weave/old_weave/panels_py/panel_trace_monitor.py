@@ -4,12 +4,12 @@ import weave
 from weave import dispatch, graph, util, weave_internal
 from weave import weave_internal as internal
 from weave import weave_types as types
+from weave.old_weave.panels import panel_board, panel_group, panel_trace
+from weave.old_weave.panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
 from weave.old_weave.panels_py import panel_autoboard
 from weave.old_weave.panels_py.generator_templates import template_registry
-from weave.panels import panel_board, panel_group, panel_trace
-from weave.panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
 
-panels = weave.panels
+panels = weave.old_weave.panels
 ops = weave.ops
 
 
@@ -113,7 +113,9 @@ def board(
     ## 2.b: Setup a date picker to set the user_zoom_range
     varbar.add(
         "time_range",
-        weave.panels.DateRange(user_zoom_range, domain=trace_roots[timestamp_col_name]),
+        weave.old_weave.panels.DateRange(
+            user_zoom_range, domain=trace_roots[timestamp_col_name]
+        ),
     )
 
     ## 3. bin_range is derived from user_zoom_range and raw_data_range. This is
@@ -136,7 +138,7 @@ def board(
 
     filters = varbar.add(
         "filters",
-        weave.panels.FilterEditor(filter_fn, node=window_data),
+        weave.old_weave.panels.FilterEditor(filter_fn, node=window_data),
     )
 
     filtered_window_data = varbar.add(
@@ -145,7 +147,7 @@ def board(
 
     ### Overview tab
 
-    overview_tab = weave.panels.Group(
+    overview_tab = weave.old_weave.panels.Group(
         layoutMode="grid",
         showExpressions=True,
         enableAddPanel=True,
@@ -168,13 +170,13 @@ def board(
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave.panels.GroupPanelLayout(x=0, y=0, w=6, h=6),
+        layout=weave.old_weave.panels.GroupPanelLayout(x=0, y=0, w=6, h=6),
     )
 
     overview_tab.add(
         "latency_distribution",
         filtered_window_data.map(lambda row: row["end_time_s"] - row["start_time_s"]),
-        layout=weave.panels.GroupPanelLayout(x=6, y=0, w=6, h=6),
+        layout=weave.old_weave.panels.GroupPanelLayout(x=6, y=0, w=6, h=6),
     )
 
     overview_tab.add(
@@ -195,7 +197,7 @@ def board(
             x_domain=user_zoom_range,
             n_bins=50,
         ),
-        layout=weave.panels.GroupPanelLayout(x=12, y=0, w=6, h=6),
+        layout=weave.old_weave.panels.GroupPanelLayout(x=12, y=0, w=6, h=6),
     )
 
     overview_tab.add(
@@ -210,13 +212,13 @@ def board(
                 ).count(),
             }
         ),
-        layout=weave.panels.GroupPanelLayout(x=18, y=0, w=6, h=6),
+        layout=weave.old_weave.panels.GroupPanelLayout(x=18, y=0, w=6, h=6),
     )
 
     traces_table_var = overview_tab.add(
         "traces_table",
         make_span_table(filtered_window_data),
-        layout=weave.panels.GroupPanelLayout(x=0, y=6, w=24, h=6),
+        layout=weave.old_weave.panels.GroupPanelLayout(x=0, y=6, w=24, h=6),
     )
 
     trace_spans = all_spans.filter(
@@ -228,13 +230,13 @@ def board(
     trace_viewer_var = overview_tab.add(
         "trace_viewer",
         trace_viewer,
-        layout=weave.panels.GroupPanelLayout(x=0, y=12, w=16, h=6),
+        layout=weave.old_weave.panels.GroupPanelLayout(x=0, y=12, w=16, h=6),
     )
 
     selected_trace_model = overview_tab.add(
         "selected_trace_model",
         TraceSpanModelPanel(traces_table_var.active_data()),
-        layout=weave.panels.GroupPanelLayout(x=0, y=18, w=16, h=6),
+        layout=weave.old_weave.panels.GroupPanelLayout(x=0, y=18, w=16, h=6),
     )
 
     active_span = trace_viewer_var.active_span()
@@ -242,7 +244,7 @@ def board(
     selected_span_details = overview_tab.add(
         "selected_span_details",
         TraceSpanPanel(active_span),
-        layout=weave.panels.GroupPanelLayout(x=16, y=12, w=8, h=12),
+        layout=weave.old_weave.panels.GroupPanelLayout(x=16, y=12, w=8, h=12),
     )
 
     similar_spans = all_spans.filter(lambda row: row["name"] == active_span["name"])
@@ -251,7 +253,7 @@ def board(
     similar_spans_table_var = overview_tab.add(
         "similar_spans_table",
         similar_spans_table,
-        layout=weave.panels.GroupPanelLayout(x=0, y=22, w=24, h=6),
+        layout=weave.old_weave.panels.GroupPanelLayout(x=0, y=22, w=24, h=6),
     )
 
     return panels.Board(vars=varbar, panels=overview_tab)

@@ -1,6 +1,8 @@
-import weave
-import requests
 import typing
+
+import requests
+
+import weave
 
 
 @weave.type()
@@ -17,8 +19,8 @@ class SlurmJob:
 @weave.op()
 def jobs_render(
     jobs: weave.Node[list[SlurmJob]],
-) -> weave.panels.Table:
-    return weave.panels.Table(
+) -> weave.old_weave.panels.Table:
+    return weave.old_weave.panels.Table(
         jobs,
         columns=[
             lambda job: job.job_id,
@@ -41,8 +43,8 @@ class SlurmNode:
 @weave.op()
 def nodes_render(
     nodes: weave.Node[list[SlurmNode]],
-) -> weave.panels.Table:
-    return weave.panels.Table(
+) -> weave.old_weave.panels.Table:
+    return weave.old_weave.panels.Table(
         nodes,
         columns=[
             lambda node: node.node_name,
@@ -94,27 +96,27 @@ def slurm(restapi_url: str) -> Slurm:
 @weave.op()
 def slurm_render(
     slurm_node: weave.Node[Slurm],
-) -> weave.panels.Card:
+) -> weave.old_weave.panels.Card:
     slurm = typing.cast(Slurm, slurm_node)
-    return weave.panels.Card(
+    return weave.old_weave.panels.Card(
         title="slurm",
         subtitle="",
         content=[
-            weave.panels.CardTab(
+            weave.old_weave.panels.CardTab(
                 name="Overview",
-                content=weave.panels.Group(
+                content=weave.old_weave.panels.Group(
                     prefer_horizontal=True,
                     items=[
-                        weave.panels.LabeledItem(
+                        weave.old_weave.panels.LabeledItem(
                             item=slurm.jobs().count(), label="Total jobs"
                         ),
-                        weave.panels.LabeledItem(
+                        weave.old_weave.panels.LabeledItem(
                             item=slurm.nodes().count(), label="Total nodes"
                         ),
                     ],
                 ),
             ),
-            weave.panels.CardTab(name="Nodes", content=slurm.nodes()),
-            weave.panels.CardTab(name="Jobs", content=slurm.jobs()),
+            weave.old_weave.panels.CardTab(name="Nodes", content=slurm.nodes()),
+            weave.old_weave.panels.CardTab(name="Jobs", content=slurm.jobs()),
         ],
     )

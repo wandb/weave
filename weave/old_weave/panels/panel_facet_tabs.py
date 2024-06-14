@@ -3,7 +3,7 @@ import typing
 
 import weave
 from weave import graph, panel
-from weave.panels.panel_group import PanelBankSectionConfig
+from weave.old_weave.panels.panel_group import PanelBankSectionConfig
 
 RenderType = typing.TypeVar("RenderType")
 

@@ -13,8 +13,11 @@ from weave import (
     panel_util,
     weave_internal,
 )
-from weave.panels.bank import default_panel_bank_flow_section_config, flow_layout
-from weave.panels.panel_group_panel_info import PanelInfo
+from weave.old_weave.panels.bank import (
+    default_panel_bank_flow_section_config,
+    flow_layout,
+)
+from weave.old_weave.panels.panel_group_panel_info import PanelInfo
 
 ItemsType = typing.TypeVar("ItemsType")
 
@@ -333,7 +336,7 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             param_str = (
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
-        return f"""weave.panels.panel_group.Group({input_node_str} {param_str})"""
+        return f"""weave.old_weave.panels.panel_group.Group({input_node_str} {param_str})"""
 
     # @property
     # def config(self):

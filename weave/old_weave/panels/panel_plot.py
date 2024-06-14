@@ -6,9 +6,9 @@ import typing
 import weave
 from weave import codifiable_value_mixin, codify, errors, graph, panel, weave_internal
 from weave import weave_types as types
+from weave.old_weave.panels import panel_table, table_state
 from weave.ops_primitives import boolean, list_
 from weave.ops_primitives import dict as dict_
-from weave.panels import panel_table, table_state
 
 
 @weave.type()
@@ -695,7 +695,7 @@ class Plot(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             param_str = (
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
-        return f"""weave.panels.panel_plot.Plot({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
+        return f"""weave.old_weave.panels.panel_plot.Plot({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
 
 def make_set_all_series(dim_name: str) -> typing.Callable[[Plot, typing.Any], None]:

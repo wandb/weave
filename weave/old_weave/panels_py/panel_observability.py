@@ -1,10 +1,10 @@
 import weave
 from weave import weave_internal
 from weave import weave_types as types
+from weave.old_weave.panels import panel_board
 from weave.old_weave.panels_py.generator_templates import template_registry
-from weave.panels import panel_board
 
-panels = weave.panels
+panels = weave.old_weave.panels
 
 BOARD_INPUT_WEAVE_TYPE = types.List(
     types.TypedDict(
@@ -78,7 +78,7 @@ def observability(
 
     now = weave.ops.datetime_now()
 
-    dashboard = weave.panels.Group(
+    dashboard = weave.old_weave.panels.Group(
         layoutMode="grid",
         showExpressions=False,
         enableAddPanel=False,

@@ -4,8 +4,8 @@ import typing
 import weave
 from weave import codifiable_value_mixin, codify, panel, weave_internal
 from weave.graph import ConstNode, Node, OutputNode, VoidNode
-from weave.panels import table_state
-from weave.panels.panel_query import Query
+from weave.old_weave.panels import table_state
+from weave.old_weave.panels.panel_query import Query
 
 
 @weave.type("tablePanelConfig")
@@ -127,7 +127,7 @@ class Table(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             param_str = (
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
-        return f"""weave.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
+        return f"""weave.old_weave.panels.panel_table.Table({codify.object_to_code_no_format(self.input_node)}, {param_str})"""
 
     def add_column(
         self,

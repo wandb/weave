@@ -40,11 +40,13 @@ board_name = "py_board-" + BOARD_ID
 )
 def board(
     input_node,
-) -> weave.panels.Group:
+) -> weave.old_weave.panels.Group:
     # Define your VarBar variables here
     control_items = [
-        weave.panels.GroupPanel(internal.const("Example Custom Board"), id="title"),
-        weave.panels.GroupPanel(input_node, id="data"),
+        weave.old_weave.panels.GroupPanel(
+            internal.const("Example Custom Board"), id="title"
+        ),
+        weave.old_weave.panels.GroupPanel(input_node, id="data"),
     ]
 
     title_var = internal.make_var_node(input_node.type, "title")
@@ -52,8 +54,8 @@ def board(
 
     # Define your panels here
     panels = [
-        weave.panels.BoardPanel(title_var, id="title_panel"),
-        weave.panels.BoardPanel(data_var, id="table"),
+        weave.old_weave.panels.BoardPanel(title_var, id="title_panel"),
+        weave.old_weave.panels.BoardPanel(data_var, id="table"),
     ]
 
     # Example of using the input type to modify the board:
@@ -61,13 +63,13 @@ def board(
     for column_name, column_type in input_node.type.object_type.property_types.items():
         if types.optional(types.Number()).assign_type(column_type):
             panels.append(
-                weave.panels.BoardPanel(
+                weave.old_weave.panels.BoardPanel(
                     data_var[column_name],  # type: ignore
                     id=column_name + "_distribution",
                 )
             )
 
-    return weave.panels.Board(vars=control_items, panels=panels)
+    return weave.old_weave.panels.Board(vars=control_items, panels=panels)
 
 
 template_registry.register(

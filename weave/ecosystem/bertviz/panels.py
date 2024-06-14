@@ -37,14 +37,14 @@ class BertvizHeadView(weave.Panel):
     input_node: weave.Node[huggingface.ModelOutputAttention]
 
     @weave.op()
-    def render(self) -> weave.panels.PanelHtml:
+    def render(self) -> weave.old_weave.panels.PanelHtml:
         # This is a lazy call! It doesn't execute anything
         html = head_view(self.input_node)
 
         # We add the lazy call as input to the returned Html panel. Nothing has been
         # computed so far. The UI's Html panel will perform a useNodeValue operation on its
         # input node. Only then will the head_view function finally be called.
-        return weave.panels.PanelHtml(html)
+        return weave.old_weave.panels.PanelHtml(html)
 
 
 @weave.op()
@@ -71,6 +71,6 @@ class BertvizModelView(weave.Panel):
     input_node: weave.Node[huggingface.ModelOutputAttention]
 
     @weave.op()
-    def model_view_panel_render(self) -> weave.panels.PanelHtml:
+    def model_view_panel_render(self) -> weave.old_weave.panels.PanelHtml:
         html = model_view(self.input_node)
-        return weave.panels.PanelHtml(html)
+        return weave.old_weave.panels.PanelHtml(html)

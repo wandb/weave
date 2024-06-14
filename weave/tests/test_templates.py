@@ -1,10 +1,12 @@
 import typing
 
-import weave
-from ..old_weave.panels_py import generator_templates
 import wandb
+
+import weave
 from weave.wandb_interface.wandb_stream_table import StreamTable
+
 from .. import context_state as _context
+from ..old_weave.panels_py import generator_templates
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -32,17 +34,17 @@ board_input_type = weave.types.List(
 def dummy_board(
     input_node,
     config: typing.Optional[DummyBoardConfig] = None,
-) -> weave.panels.Group:
+) -> weave.old_weave.panels.Group:
     assert board_input_type.assign_type(input_node.type)
 
     control_items = [
-        weave.panels.GroupPanel(
+        weave.old_weave.panels.GroupPanel(
             input_node,
             id="data",
         ),
     ]
 
-    return weave.panels.Board(vars=control_items, panels=[])
+    return weave.old_weave.panels.Board(vars=control_items, panels=[])
 
 
 generator_templates.template_registry.register(
@@ -75,7 +77,7 @@ def _assert_valid_node_raw(node):
     output_group = weave.use(dummy_node)
 
     # Assert the out template is successfully generated
-    assert isinstance(output_group, weave.panels.Group)
+    assert isinstance(output_group, weave.old_weave.panels.Group)
 
     data_node = output_group.config.items["sidebar"].config.items["data"]
 

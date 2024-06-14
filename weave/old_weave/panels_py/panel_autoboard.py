@@ -27,8 +27,8 @@ import typing
 
 import weave
 from weave import util, weave_internal
+from weave.old_weave.panels import panel_plot
 from weave.old_weave.panels_py.generator_templates import template_registry
-from weave.panels import panel_plot
 
 
 @weave.type()
@@ -83,7 +83,7 @@ def timeseries(
         # TODO: should be midpoint
         x = lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins))["start"]
 
-    return weave.panels.Plot(
+    return weave.old_weave.panels.Plot(
         input_node,
         x=x,
         x_title=x_title,
@@ -112,7 +112,7 @@ def timeseries_avg_line(
         bin_fn = weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
-    return weave.panels.Plot(
+    return weave.old_weave.panels.Plot(
         input_node,
         x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, 100))["start"],
         x_title=x_axis_key,
@@ -144,7 +144,7 @@ def timeseries_sum_bar(
         bin_fn = weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
-    return weave.panels.Plot(
+    return weave.old_weave.panels.Plot(
         input_node,
         x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins)),
         x_title=x_title,
@@ -175,7 +175,7 @@ def timeseries_count_bar(
         bin_fn = weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
-    return weave.panels.Plot(
+    return weave.old_weave.panels.Plot(
         input_node,
         x=lambda row: row[x_axis_key].bin(bin_fn(bin_domain_node, n_bins)),
         x_title=x_title,
@@ -191,7 +191,7 @@ def categorical_dist(
     input_node: weave.Node[list[typing.Any]],
     key: str,
 ) -> weave.Panel:
-    return weave.panels.Plot(
+    return weave.old_weave.panels.Plot(
         input_node,
         y=lambda row: row[key],
         x=lambda row: row.count(),
@@ -316,47 +316,47 @@ def auto_panels(
             panel = categorical_dist(window_data_node, key)
             categorical_panels.append(panel)
 
-    metrics = weave.panels.Group(
-        layoutMode=weave.panels.GroupLayoutFlow(2, 3),
+    metrics = weave.old_weave.panels.Group(
+        layoutMode=weave.old_weave.panels.GroupLayoutFlow(2, 3),
         items={"panel%s" % i: panel for i, panel in enumerate(metric_panels)},
     )
-    categoricals = weave.panels.Group(
-        layoutMode=weave.panels.GroupLayoutFlow(2, 3),
+    categoricals = weave.old_weave.panels.Group(
+        layoutMode=weave.old_weave.panels.GroupLayoutFlow(2, 3),
         items={"panel%s" % i: panel for i, panel in enumerate(categorical_panels)},
     )
     control_items = [
-        weave.panels.GroupPanel(
+        weave.old_weave.panels.GroupPanel(
             input_node,
             id="data",
         ),
         # TODO: We need a filter editor. Can start with a filter expression
         # editor and make it more user-friendly later
-        weave.panels.GroupPanel(
+        weave.old_weave.panels.GroupPanel(
             lambda data: weave.ops.make_list(
                 a=data[x_axis].min(), b=data[x_axis].max()
             ),
             id="data_range",
             hidden=True,
         ),
-        weave.panels.GroupPanel(None, id="zoom_range", hidden=True),
-        weave.panels.GroupPanel(
+        weave.old_weave.panels.GroupPanel(None, id="zoom_range", hidden=True),
+        weave.old_weave.panels.GroupPanel(
             lambda zoom_range, data_range: zoom_range.coalesce(data_range),
             id="bin_range",
             hidden=True,
         ),
-        weave.panels.GroupPanel(
-            lambda data, zoom_range: weave.panels.DateRange(
+        weave.old_weave.panels.GroupPanel(
+            lambda data, zoom_range: weave.old_weave.panels.DateRange(
                 zoom_range, domain=data[x_axis]
             ),
             id="date_picker",
         ),
         # TODO: groupby should really be a Dropdown / multi-select instead
         # of an expression
-        weave.panels.GroupPanel(
+        weave.old_weave.panels.GroupPanel(
             groupby,
             id="groupby",
         ),
-        weave.panels.GroupPanel(
+        weave.old_weave.panels.GroupPanel(
             lambda data, bin_range: data.filter(
                 lambda row: weave.ops.Boolean.bool_and(
                     row[x_axis] >= bin_range[0], row[x_axis] < bin_range[1]
@@ -368,21 +368,21 @@ def auto_panels(
     ]
 
     panels = [
-        weave.panels.BoardPanel(
+        weave.old_weave.panels.BoardPanel(
             metrics,
             id="metrics",
-            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12),
+            layout=weave.old_weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12),
         ),
-        weave.panels.BoardPanel(
+        weave.old_weave.panels.BoardPanel(
             categoricals,
             id="categoricals",
-            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12),
+            layout=weave.old_weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12),
         ),
     ]
     if "step" not in x_axis:
         panels.insert(
             0,
-            weave.panels.BoardPanel(
+            weave.old_weave.panels.BoardPanel(
                 timeseries_count_bar(
                     data_node,
                     time_domain_node,
@@ -392,18 +392,20 @@ def auto_panels(
                     150,
                 ),
                 id="volume",
-                layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
+                layout=weave.old_weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
             ),
         )
 
     panels.append(
-        weave.panels.BoardPanel(
+        weave.old_weave.panels.BoardPanel(
             window_data_node,
             id="table",
-            layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
+            layout=weave.old_weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
         ),
     )
-    return weave.panels.Board(vars=control_items, panels=panels, editable=False)
+    return weave.old_weave.panels.Board(
+        vars=control_items, panels=panels, editable=False
+    )
 
 
 # The interface for constructing this Panel from Python
@@ -414,7 +416,7 @@ class AutoBoard(weave.Panel):
     config: typing.Optional[AutoBoardConfig] = None
 
     @weave.op()  # type: ignore
-    def render(self) -> weave.panels.Group:
+    def render(self) -> weave.old_weave.panels.Group:
         return auto_panels(self.input_node, self.config)  # type: ignore
 
 
@@ -425,7 +427,7 @@ class AutoBoard(weave.Panel):
 def seed_autoboard(
     input_node: weave.Node[typing.Any],
     config: typing.Optional[AutoBoardConfig] = None,
-) -> weave.panels.Group:
+) -> weave.old_weave.panels.Group:
     return auto_panels(input_node, config)  # type: ignore
 
 

@@ -1,6 +1,8 @@
-import weave
-import spacy as spacy_lib
 import pickle
+
+import spacy as spacy_lib
+
+import weave
 
 
 class SpacyDocType(weave.types.Type):
@@ -50,18 +52,18 @@ class SpacyDocPanel(weave.Panel):
     input_node: weave.Node[spacy_lib.tokens.doc.Doc]
 
     @weave.op()
-    def render(self) -> weave.panels.Card:
-        return weave.panels.Card(
+    def render(self) -> weave.old_weave.panels.Card:
+        return weave.old_weave.panels.Card(
             title="Spacy Visualization",
             subtitle="",
             content=[
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Dependencies",
-                    content=weave.panels.PanelHtml(spacy_doc_dep_to_html(self.input_node)),  # type: ignore
+                    content=weave.old_weave.panels.PanelHtml(spacy_doc_dep_to_html(self.input_node)),  # type: ignore
                 ),
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Named Entities",
-                    content=weave.panels.PanelHtml(spacy_doc_ent_to_html(self.input_node)),  # type: ignore
+                    content=weave.old_weave.panels.PanelHtml(spacy_doc_ent_to_html(self.input_node)),  # type: ignore
                 ),
             ],
         )

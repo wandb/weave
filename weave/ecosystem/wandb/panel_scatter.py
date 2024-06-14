@@ -48,18 +48,19 @@ class Scatter(weave.Panel):
 
     # The config render op. This renders the config editor.
     @weave.op()
-    def render_config(self) -> weave.panels.Group:
+    def render_config(self) -> weave.old_weave.panels.Group:
         config = typing.cast(ScatterConfig, self.config)
-        return weave.panels.Group(
+        return weave.old_weave.panels.Group(
             items={
-                "x_fn": weave.panels.LabeledItem(
-                    label="x", item=weave.panels.FunctionEditor(config.x_fn)
+                "x_fn": weave.old_weave.panels.LabeledItem(
+                    label="x", item=weave.old_weave.panels.FunctionEditor(config.x_fn)
                 ),
-                "y_fn": weave.panels.LabeledItem(
-                    label="y", item=weave.panels.FunctionEditor(config.y_fn)
+                "y_fn": weave.old_weave.panels.LabeledItem(
+                    label="y", item=weave.old_weave.panels.FunctionEditor(config.y_fn)
                 ),
-                "label_fn": weave.panels.LabeledItem(
-                    label="label", item=weave.panels.FunctionEditor(config.label_fn)
+                "label_fn": weave.old_weave.panels.LabeledItem(
+                    label="label",
+                    item=weave.old_weave.panels.FunctionEditor(config.label_fn),
                 ),
             }
         )
@@ -79,7 +80,7 @@ class Scatter(weave.Panel):
                 config.label_fn.type
             )
         ):
-            return weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
+            return weave.old_weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
         if config.label_fn.type == weave.types.Invalid():
             plot_data = unnested.map(
                 lambda item: weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore

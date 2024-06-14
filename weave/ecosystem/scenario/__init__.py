@@ -1,5 +1,6 @@
-import weave
 import typing
+
+import weave
 from weave import val_const
 
 
@@ -24,7 +25,7 @@ class MetricsBankPanel(weave.Panel):
     input_node: weave.Node[MetricsBankInput]
 
     @weave.op()
-    def render(self) -> weave.panels.Each:
+    def render(self) -> weave.old_weave.panels.Each:
         input = typing.cast(MetricsBankInput, self.input_node)
 
         baseline = input["baseline"]
@@ -43,12 +44,12 @@ class MetricsBankPanel(weave.Panel):
         metrics = weave.ops.difference(joined_keys, [val_const.const("scenario_id")])
 
         # TODO: broken
-        return weave.panels.Each(
+        return weave.old_weave.panels.Each(
             metrics,
-            render=lambda metric_name: weave.panels.Group(
+            render=lambda metric_name: weave.old_weave.panels.Group(
                 items={
                     "title": metric_name,
-                    "plot": weave.panels.Plot(
+                    "plot": weave.old_weave.panels.Plot(
                         joined,
                         # TODO: bring this back
                         # title=metric_name,

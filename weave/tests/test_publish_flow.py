@@ -12,8 +12,8 @@ from weave.artifact_wandb import (
     WeaveWBArtifactURI,
     likely_commit_hash,
 )
+from weave.old_weave import panels
 from weave.uris import WeaveURI
-from weave import panels
 
 
 def test_publish_values(user_by_api_key_in_env):

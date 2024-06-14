@@ -1,10 +1,11 @@
 ## Just used for testing for now. Not intended for use by users.
 import math
 import typing
+
 import weave
+from weave.old_weave import panels
 
 from .. import context_state as _context_state
-from weave import panels
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 

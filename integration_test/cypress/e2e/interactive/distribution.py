@@ -1,7 +1,8 @@
 import random
+
 import weave
+from weave.old_weave import panels
 from weave.show import show_url
-from weave import panels
 
 # Weave package now defaults to eager mode, but lazy mode required for this example notebook for now.
 weave.use_lazy_execution()
@@ -34,7 +35,7 @@ panel = panels.Board(
     {},
     [
         panels.BoardPanel(
-            panel, layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12)
+            panel, layout=weave.old_weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12)
         )
     ],
 )

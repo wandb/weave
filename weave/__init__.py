@@ -1,7 +1,7 @@
 import sys
 
 # We track what modules were loaded before importing weave, so we can ensure
-# that someone doesn't introduce auto-importing loading weave.ops or weave.panels
+# that someone doesn't introduce auto-importing loading weave.ops or weave.old_weave.panels
 # (because they are slow to import and have more dependencies, and they are part of
 # the engine and UI layers which should be kept separate from the core layer).
 pre_init_modules = set(sys.modules.keys())
@@ -40,19 +40,19 @@ from weave.flow.eval import Evaluation, Scorer
 from weave.flow.agent import Agent, AgentState
 
 # See the comment above pre_init_modules above. This is check to ensure we don't accidentally
-# introduce loading weave.ops or weave.panels when importing weave.
+# introduce loading weave.ops or weave.old_weave.panels when importing weave.
 newly_added_modules = set(sys.modules.keys()) - pre_init_modules
 ops_modules = []
 panels_modules = []
 for module_name in newly_added_modules:
     if module_name.startswith("weave.ops"):
         ops_modules.append(module_name)
-    if module_name.startswith("weave.panels"):
+    if module_name.startswith("weave.old_weave.panels"):
         panels_modules.append(module_name)
 if ops_modules or panels_modules:
     all_invalid_modules = ops_modules + panels_modules
     invalid_submodules = set([".".join(m.split(".")[:2]) for m in all_invalid_modules])
     raise errors.WeaveInternalError(
-        "importing weave should not import weave.ops or weave.panels, but the following modules were imported: "
+        "importing weave should not import weave.ops or weave.old_weave.panels, but the following modules were imported: "
         + ", ".join(invalid_submodules)
     )

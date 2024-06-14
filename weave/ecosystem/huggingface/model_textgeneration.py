@@ -50,15 +50,15 @@ class FullTextGenerationPanel(weave.Panel):
     input_node: weave.Node[FullTextGenerationPipelineOutput]
 
     @weave.op()
-    def render(self) -> weave.panels.Group:
+    def render(self) -> weave.old_weave.panels.Group:
         output = typing.cast(FullTextGenerationPipelineOutput, self.input_node)
-        return weave.panels.Group(
+        return weave.old_weave.panels.Group(
             preferHorizontal=True,
             items={
-                "input": weave.panels.LabeledItem(
+                "input": weave.old_weave.panels.LabeledItem(
                     label="input", item=output.model_input
                 ),
-                "output": weave.panels.LabeledItem(
+                "output": weave.old_weave.panels.LabeledItem(
                     label="output", item=output.model_output
                 ),
             },

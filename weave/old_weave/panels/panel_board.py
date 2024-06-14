@@ -3,7 +3,7 @@ import typing
 
 import weave
 from weave import panel, weave_internal
-from weave.panels import panel_group
+from weave.old_weave.panels import panel_group
 
 
 @dataclasses.dataclass
@@ -50,7 +50,7 @@ def varbar(editable=True, items=None) -> panel_group.Group:
 
 
 def main() -> panel_group.Group:
-    return weave.panels.Group(
+    return weave.old_weave.panels.Group(
         layoutMode="grid",
         showExpressions=True,
         enableAddPanel=True,
@@ -64,11 +64,11 @@ def Board(
 ):
     showExpressions = True if editable else "titleBar"
     vb = vars
-    if not isinstance(vb, weave.panels.Group):
+    if not isinstance(vb, weave.old_weave.panels.Group):
         vb = varbar(editable=editable, items=vars)
 
     main = panels
-    if not isinstance(panels, weave.panels.Group):
+    if not isinstance(panels, weave.old_weave.panels.Group):
         main_items = {}
         main_panel_layouts: list[panel_group.LayedOutPanel] = []
         for i, p in enumerate(panels):

@@ -237,29 +237,32 @@ class TimeSeries(weave.Panel):
 
     # The config render op. This renders the config editor.
     @weave.op()
-    def render_config(self) -> weave.panels.Group:
+    def render_config(self) -> weave.old_weave.panels.Group:
         input_node = self.input_node
         config = typing.cast(TimeSeriesConfig, self.config)
-        return weave.panels.Group(
+        return weave.old_weave.panels.Group(
             items={
-                "x": weave.panels.LabeledItem(
-                    label="x", item=weave.panels.FunctionEditor(config.x)
+                "x": weave.old_weave.panels.LabeledItem(
+                    label="x", item=weave.old_weave.panels.FunctionEditor(config.x)
                 ),
-                "label": weave.panels.LabeledItem(
-                    label="label", item=weave.panels.FunctionEditor(config.label)
+                "label": weave.old_weave.panels.LabeledItem(
+                    label="label",
+                    item=weave.old_weave.panels.FunctionEditor(config.label),
                 ),
-                "min_x": weave.panels.LabeledItem(
-                    label="min_x", item=weave.panels.FunctionEditor(config.min_x)
+                "min_x": weave.old_weave.panels.LabeledItem(
+                    label="min_x",
+                    item=weave.old_weave.panels.FunctionEditor(config.min_x),
                 ),
-                "max_x": weave.panels.LabeledItem(
-                    label="max_x", item=weave.panels.FunctionEditor(config.max_x)
+                "max_x": weave.old_weave.panels.LabeledItem(
+                    label="max_x",
+                    item=weave.old_weave.panels.FunctionEditor(config.max_x),
                 ),
-                "agg": weave.panels.LabeledItem(
-                    label="agg", item=weave.panels.FunctionEditor(config.agg)
+                "agg": weave.old_weave.panels.LabeledItem(
+                    label="agg", item=weave.old_weave.panels.FunctionEditor(config.agg)
                 ),
-                "mark": weave.panels.LabeledItem(
+                "mark": weave.old_weave.panels.LabeledItem(
                     label="mark",
-                    item=weave.panels.ObjectPicker(
+                    item=weave.old_weave.panels.ObjectPicker(
                         weave_internal.make_const_node(
                             weave.types.List(weave.types.String()),
                             [
@@ -268,7 +271,9 @@ class TimeSeries(weave.Panel):
                                 "point",
                             ],
                         ),
-                        config=weave.panels.ObjectPickerConfig(choice=config.mark),
+                        config=weave.old_weave.panels.ObjectPickerConfig(
+                            choice=config.mark
+                        ),
                     ),
                 ),
             }
@@ -289,7 +294,7 @@ class TimeSeries(weave.Panel):
         if not weave.types.optional(weave.types.Timestamp()).assign_type(
             min_x.type
         ) or not weave.types.optional(weave.types.Timestamp()).assign_type(max_x.type):
-            return weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
+            return weave.old_weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
 
         exact_bin_size = ((max_x - min_x) / N_BINS).totalSeconds()  # type: ignore
         bin_size_index = TIME_SERIES_BIN_SIZES_SEC_NODE.map(  # type: ignore

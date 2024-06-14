@@ -7,9 +7,10 @@ Improvements we could make:
 - Access attributes with getattr instead of declaring named methods.
 """
 
-import weave
-import types
 import inspect
+import types
+
+import weave
 
 
 class PyModule(weave.types.Type):
@@ -135,34 +136,34 @@ class ModulePanel(weave.Panel):
     input_node: weave.Node[types.ModuleType]
 
     @weave.op()
-    def render(self) -> weave.panels.Card:
+    def render(self) -> weave.old_weave.panels.Card:
         module = self.input_node
-        return weave.panels.Card(
+        return weave.old_weave.panels.Card(
             title=module.module_name(),  # type: ignore
             subtitle="python module",
             content=[
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Description",
-                    content=weave.panels.PanelMarkdown(module.module_doc()),  # type: ignore
+                    content=weave.old_weave.panels.PanelMarkdown(module.module_doc()),  # type: ignore
                 ),
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Classes",
-                    content=weave.panels.Table(
+                    content=weave.old_weave.panels.Table(
                         module.module_classes(),  # type: ignore
                         columns=[
-                            lambda c: weave.panels.WeaveLink(
+                            lambda c: weave.old_weave.panels.WeaveLink(
                                 c.class_name(),
                                 to=lambda inp: module.module_class(inp),  # type: ignore
                             )
                         ],
                     ),
                 ),
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Functions",
-                    content=weave.panels.Table(
+                    content=weave.old_weave.panels.Table(
                         module.module_functions(),  # type: ignore
                         columns=[
-                            lambda c: weave.panels.WeaveLink(
+                            lambda c: weave.old_weave.panels.WeaveLink(
                                 c.function_name(),
                                 to=lambda inp: module.module_function(inp),  # type: ignore
                             )
@@ -179,22 +180,22 @@ class ClassPanel(weave.Panel):
     input_node: weave.Node[type]
 
     @weave.op()
-    def render(self) -> weave.panels.Card:
+    def render(self) -> weave.old_weave.panels.Card:
         cls = self.input_node
-        return weave.panels.Card(
+        return weave.old_weave.panels.Card(
             title=cls.class_name(),  # type: ignore
             subtitle="python class",
             content=[
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Description",
-                    content=weave.panels.PanelMarkdown(cls.pyclass_doc()),  # type: ignore
+                    content=weave.old_weave.panels.PanelMarkdown(cls.pyclass_doc()),  # type: ignore
                 ),
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Methods",
-                    content=weave.panels.Table(
+                    content=weave.old_weave.panels.Table(
                         cls.class_methods(),  # type: ignore
                         columns=[
-                            lambda m: weave.panels.WeaveLink(
+                            lambda m: weave.old_weave.panels.WeaveLink(
                                 m.function_name(),
                                 to=lambda inp: cls.class_method(inp),  # type: ignore
                             )
@@ -211,15 +212,15 @@ class FunctionPanel(weave.Panel):
     input_node: weave.Node[types.FunctionType]
 
     @weave.op()
-    def render(self) -> weave.panels.Card:
+    def render(self) -> weave.old_weave.panels.Card:
         func = self.input_node
-        return weave.panels.Card(
+        return weave.old_weave.panels.Card(
             title=func.function_name(),  # type: ignore
             subtitle="python function",
             content=[
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Description",
-                    content=weave.panels.PanelMarkdown(func.function_doc()),  # type: ignore
+                    content=weave.old_weave.panels.PanelMarkdown(func.function_doc()),  # type: ignore
                 ),
             ],
         )

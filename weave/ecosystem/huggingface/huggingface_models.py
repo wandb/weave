@@ -40,11 +40,11 @@ class HuggingfaceModelsPanel(weave.Panel):
     input_node: weave.Node[list[hfmodel.HFModel]]
 
     @weave.op()
-    def render(self) -> weave.panels.Table:
-        return weave.panels.Table(
+    def render(self) -> weave.old_weave.panels.Table:
+        return weave.old_weave.panels.Table(
             self.input_node,
             columns=[
-                lambda model_row: weave.panels.WeaveLink(
+                lambda model_row: weave.old_weave.panels.WeaveLink(
                     model_row.id(),
                     to=lambda input: huggingface().model(input),  # type: ignore
                 ),
@@ -64,22 +64,24 @@ class HuggingfaceModelPanel(weave.Panel):
     input_node: weave.Node[hfmodel.HFModel]
 
     @weave.op(pure=False)
-    def render(self) -> weave.panels.Card:
+    def render(self) -> weave.old_weave.panels.Card:
         model = typing.cast(hfmodel.HFModel, self.input_node)
-        return weave.panels.Card(
+        return weave.old_weave.panels.Card(
             title=model.id(),
             subtitle="HuggingFace Hub Model",
             content=[
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Model Card",
-                    content=weave.panels.PanelMarkdown(model.readme()),  # type: ignore
+                    content=weave.old_weave.panels.PanelMarkdown(model.readme()),  # type: ignore
                 ),
-                weave.panels.CardTab(
+                weave.old_weave.panels.CardTab(
                     name="Metadata",
-                    content=weave.panels.Group(
+                    content=weave.old_weave.panels.Group(
                         items={
-                            "id": weave.panels.LabeledItem(item=model.id(), label="ID"),
-                            "pipeline_tag": weave.panels.LabeledItem(
+                            "id": weave.old_weave.panels.LabeledItem(
+                                item=model.id(), label="ID"
+                            ),
+                            "pipeline_tag": weave.old_weave.panels.LabeledItem(
                                 item=model.pipeline_tag(), label="Pipeline tag"
                             ),
                         }
@@ -87,9 +89,9 @@ class HuggingfaceModelPanel(weave.Panel):
                 ),
                 # Broke in panel refactor. Don't have concrete op name available here so
                 # can't get the right type for the output.
-                # weave.panels.CardTab(
+                # weave.old_weave.panels.CardTab(
                 #     name="Inference Logs",
-                #     content=weave.panels.Table(
+                #     content=weave.old_weave.panels.Table(
                 #         weave.ops.used_by(model, model.call.op_name()),
                 #         columns=[
                 #             lambda run: run.output.model_input,
@@ -139,12 +141,12 @@ class HuggingfacePackagePanel(weave.Panel):
     input_node: weave.Node[HuggingFacePackage]
 
     @weave.op()
-    def render(self) -> weave.panels.Card:
+    def render(self) -> weave.old_weave.panels.Card:
         pack = typing.cast(HuggingFacePackage, self.input_node)  # type: ignore
-        return weave.panels.Card(
+        return weave.old_weave.panels.Card(
             title="Huggingface Package",
             subtitle="Browse Models and Datasets",
             content=[
-                weave.panels.CardTab(name="Models", content=pack.models()),  # type: ignore
+                weave.old_weave.panels.CardTab(name="Models", content=pack.models()),  # type: ignore
             ],
         )

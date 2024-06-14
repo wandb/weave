@@ -86,27 +86,27 @@ def geo(
 @weave.op(name="Geo_config")
 def geo_config(
     input_node: weave.Node[list[typing.Any]], config: GeoConfig
-) -> weave.panels.Group:
+) -> weave.old_weave.panels.Group:
     unnested = weave.ops.unnest(input_node)
     config = geo_default_config(config, unnested)
-    return weave.panels.Group(
+    return weave.old_weave.panels.Group(
         items={
-            "x_fn": weave.panels.LabeledItem(
+            "x_fn": weave.old_weave.panels.LabeledItem(
                 label="x",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.x_fn)
+                item=weave.old_weave.panels.FunctionEditor(
+                    config=weave.old_weave.panels.FunctionEditorConfig(config.x_fn)
                 ),
             ),
-            "y_fn": weave.panels.LabeledItem(
+            "y_fn": weave.old_weave.panels.LabeledItem(
                 label="y",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.y_fn)
+                item=weave.old_weave.panels.FunctionEditor(
+                    config=weave.old_weave.panels.FunctionEditorConfig(config.y_fn)
                 ),
             ),
-            "color_fn": weave.panels.LabeledItem(
+            "color_fn": weave.old_weave.panels.LabeledItem(
                 label="color",
-                item=weave.panels.FunctionEditor(
-                    config=weave.panels.FunctionEditorConfig(config.color_fn)
+                item=weave.old_weave.panels.FunctionEditor(
+                    config=weave.old_weave.panels.FunctionEditorConfig(config.color_fn)
                 ),
             ),
         }
