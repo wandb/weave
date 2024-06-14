@@ -1092,6 +1092,12 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         return WandbArtifactRef.from_uri(self)
 
 
+# This URI class allows us to build an artifact's uri without being dependent on its
+# entity or project name. It is specifically relevant for the org registries use case
+# where a team's artifact can be 'published' to a registry for users from other teams
+# to view and use.
+# When an artifact is created with an id-uri, it allows us to query the artifact's manifest and
+# files just using the artifactID.
 @dataclasses.dataclass
 class WeaveWBArtifactByIDURI(uris.WeaveURI):
     SCHEME = "wandb-artifact-by-id"

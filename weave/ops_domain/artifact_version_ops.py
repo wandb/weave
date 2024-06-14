@@ -549,9 +549,9 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     # to a collection in an org-registry, such that they're readable by all users in the organization.
     # However, since not all org users belong to the same team, viewing the published artifact's files
     # cannot depend on its source artifact's entity.
-    # In the case where the viewing user doesn't
-    # have access to an artifact's project/entity, such that the artifact has been linked to a
-    # collection in an org-registry, we use WeaveWBArtifactByIDURI which allows us to query the
+    # In the case where the viewer doesn't have access to an artifact's project/entity,
+    # but is trying to view the artifact's files via the collection it was linked to, i.e a collection in an
+    # org-registry, we use WeaveWBArtifactByIDURI as the URI which allows us to query the
     # artifact's manifest and hence, files, using just its ID.
     artifact_id = artifactVersion["id"]
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
