@@ -1,9 +1,11 @@
+import datetime
 import typing
+
 import dateutil
 import dateutil.parser
-from ..api import op, type
-from .. import weave_types as types
-import datetime
+
+from weave import weave_types as types
+from weave.api import op, type
 
 
 @op(

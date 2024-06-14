@@ -1,17 +1,15 @@
-import threading
-import multiprocessing
-
-import queue
-import numpy as np
-from .. import errors
-from .. import environment
-from .. import context_state
-import typing
 import logging
+import multiprocessing
+import queue
+import threading
+import typing
 import warnings
 
-from sklearn.manifold import TSNE
+import numpy as np
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+
+from weave import context_state, environment, errors
 
 umap_lib = {}
 

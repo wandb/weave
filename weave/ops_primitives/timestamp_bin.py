@@ -1,11 +1,9 @@
-from ..api import op, use
-from ..weave_types import Function, TimestampBinType
-from .. import weave_types as types
-from .. import graph
-from .. import weave_internal
-from .dict import dict_
-
-from ..weave_internal import define_fn, call_fn, make_const_node
+from weave import graph, weave_internal
+from weave import weave_types as types
+from weave.api import op, use
+from weave.ops_primitives.dict import dict_
+from weave.weave_internal import call_fn, define_fn, make_const_node
+from weave.weave_types import Function, TimestampBinType
 
 NICE_BIN_SIZES_SEC = [
     # TODO: will need more steps along here for smooth zooming.

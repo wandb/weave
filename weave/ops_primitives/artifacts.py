@@ -3,12 +3,9 @@ import os
 import pathlib
 import typing
 
-from .. import ref_base
-
-from ..artifact_local import WORKING_DIR_PREFIX, LocalArtifact
-from . import types
-from ..api import op
-from .. import artifact_fs
+from weave import artifact_fs, ref_base, types
+from weave.api import op
+from weave.artifact_local import WORKING_DIR_PREFIX, LocalArtifact
 
 
 @op(name="FilesystemArtifact-fileRefineType", hidden=True)

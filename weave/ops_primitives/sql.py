@@ -1,14 +1,12 @@
 import copy
-import math
 import functools
+import math
 
-from ..api import op, weave_class
-from .. import decorator_type
-from .. import weave_types as types
-from . import list_
-from . import graph
-
-from ..language_features.tagging import tagged_value_type
+from weave import decorator_type
+from weave import weave_types as types
+from weave.api import op, weave_class
+from weave.language_features.tagging import tagged_value_type
+from weave.ops_primitives import graph, list_
 
 try:
     import sqlalchemy

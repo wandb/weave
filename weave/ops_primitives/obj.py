@@ -1,8 +1,8 @@
 import typing
 
-from .. import codify
-from ..api import op, weave_class
-from .. import weave_types as types
+from weave import codify
+from weave import weave_types as types
+from weave.api import op, weave_class
 
 
 # This matches the output type logic of the frontend

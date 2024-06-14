@@ -1,29 +1,24 @@
-import numpy as np
-import pandas as pd
-import json
+import functools
 import itertools
+import json
 import typing
 
-from . import projection_utils
+import numpy as np
+import pandas as pd
 
-from .._dict_utils import tag_aware_dict_val_for_escaped_key
-from .. import box
-from .. import weave_types as types
-from ..graph import Node
-from ..decorator_op import op
-from ..decorator_class import weave_class
-from ..op_args import OpVarArgs
-from .. import errors
-from .. import execute_fast
-from .. import storage
-from ..language_features.tagging import (
+from weave import box, errors, execute_fast, storage
+from weave import weave_types as types
+from weave._dict_utils import tag_aware_dict_val_for_escaped_key
+from weave.decorator_class import weave_class
+from weave.decorator_op import op
+from weave.graph import Node
+from weave.language_features.tagging import (
     tag_store,
     tagged_value_type,
     tagged_value_type_helpers,
 )
-
-
-import functools
+from weave.op_args import OpVarArgs
+from weave.ops_primitives import projection_utils
 
 
 def getitem_output_type(input_types, list_type=types.List):
@@ -396,8 +391,8 @@ def flatten_return_type(input_types):
 
 
 def _flatten(l):
-    from ..ops_arrow import ArrowWeaveList
-    from ..arrow.arrow_tags import pushdown_list_tags
+    from weave.arrow.arrow_tags import pushdown_list_tags
+    from weave.ops_arrow import ArrowWeaveList
 
     if isinstance(l, list):
         tags = None

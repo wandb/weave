@@ -1,8 +1,9 @@
-import pytest
 import numpy as np
+import pytest
 from PIL import Image
-from .. import storage
-from . import api as weave
+
+from weave import storage
+from weave.ops_primitives import api as weave
 
 
 def test_image():

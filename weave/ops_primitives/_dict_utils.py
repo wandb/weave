@@ -1,8 +1,8 @@
 import typing
-from .. import weave_types as types
-from .. import errors
-from ..language_features.tagging import tag_store, tagged_value_type
-from .. import box
+
+from weave import box, errors
+from weave import weave_types as types
+from weave.language_features.tagging import tag_store, tagged_value_type
 
 
 def typeddict_pick_output_type(input_types):

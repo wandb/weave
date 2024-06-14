@@ -1,21 +1,18 @@
 import dataclasses
 import json
 import math
-import pandas
+
+import numpy
 import numpy as np
+import pandas
 import pyarrow as pa
 import pyarrow.parquet as pq
-import numpy
 
-from ..api import op, weave_class
-from .. import box
-from .. import weave_types as types
-from . import list_
-from .. import mappers_python
-from .. import graph
-from .. import errors
-from .. import file_base
-from ..language_features.tagging import tag_store, tagged_value_type
+from weave import box, errors, file_base, graph, mappers_python
+from weave import weave_types as types
+from weave.api import op, weave_class
+from weave.language_features.tagging import tag_store, tagged_value_type
+from weave.ops_primitives import list_
 
 
 # Hack hack hack

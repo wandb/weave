@@ -1,7 +1,8 @@
-from .. import api as weave
-from .. import weave_types as types
-from . import pandas_ as op_pandas
 import pandas as pd
+
+from weave import api as weave
+from weave import weave_types as types
+from weave.ops_primitives import pandas_ as op_pandas
 
 
 def test_save_dataframe():

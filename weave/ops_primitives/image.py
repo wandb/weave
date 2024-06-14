@@ -1,11 +1,12 @@
+import binascii
 import dataclasses
 import io
+
 import PIL
 import PIL.Image
-import binascii
 
-from .. import api as weave
-from .. import weave_types as types
+from weave import api as weave
+from weave import weave_types as types
 
 
 class ImageType(types.Type):

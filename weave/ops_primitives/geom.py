@@ -1,5 +1,6 @@
-from . import api as weave
 from PIL import Image
+
+from weave import api as weave
 
 
 @weave.type()

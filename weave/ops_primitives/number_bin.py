@@ -1,13 +1,12 @@
 import math
 
-from ..api import op, use
-from ..weave_types import Function, NumberBinType
-from .. import weave_types as types
-from .. import graph
-from .dict import dict_
-from . import date
-
-from ..weave_internal import define_fn, call_fn, make_const_node
+from weave import graph
+from weave import weave_types as types
+from weave.api import op, use
+from weave.ops_primitives import date
+from weave.ops_primitives.dict import dict_
+from weave.weave_internal import call_fn, define_fn, make_const_node
+from weave.weave_types import Function, NumberBinType
 
 
 @op(

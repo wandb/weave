@@ -1,8 +1,8 @@
 import json
 import typing
 
-from .. import api as weave
-from .. import file_base
+from weave import api as weave
+from weave import file_base
 
 
 def load_jsonl(jsonlfile):

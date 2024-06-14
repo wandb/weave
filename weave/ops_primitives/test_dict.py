@@ -1,6 +1,6 @@
 import weave
-from .. import weave_internal
-from ..language_features.tagging import tagged_value_type
+from weave import weave_internal
+from weave.language_features.tagging import tagged_value_type
 
 
 def test_keys_type():

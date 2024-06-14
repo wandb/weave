@@ -1,5 +1,5 @@
-from ..decorator_op import op
-from ..version import VERSION
+from weave.decorator_op import op
+from weave.version import VERSION
 
 
 @op(

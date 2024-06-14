@@ -1,11 +1,12 @@
-import typing
-import random
 import math
+import random
+import typing
 
-from ..api import op, weave_class
-from .. import weave_types as types
 import numpy as np
-from .. import timestamp as weave_timestamp
+
+from weave import timestamp as weave_timestamp
+from weave import weave_types as types
+from weave.api import op, weave_class
 
 binary_number_op_input_type = {
     "lhs": types.Number(),

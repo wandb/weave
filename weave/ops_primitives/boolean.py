@@ -1,8 +1,9 @@
 import typing
-from ..api import op, weave_class
-from .. import weave_types as types
-from .. import dispatch
-from .dict import dict_
+
+from weave import dispatch
+from weave import weave_types as types
+from weave.api import op, weave_class
+from weave.ops_primitives.dict import dict_
 
 
 @weave_class(weave_type=types.Boolean)

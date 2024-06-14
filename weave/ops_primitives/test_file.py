@@ -1,6 +1,5 @@
 import weave
-
-from . import file_local
+from weave.ops_primitives import file_local
 
 
 def test_file_browsing():

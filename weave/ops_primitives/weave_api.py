@@ -1,24 +1,26 @@
 import dataclasses
-import typing
 import time
+import typing
 
+from weave import (
+    artifact_fs,
+    artifact_local,
+    artifact_wandb,
+    compile,
+    errors,
+    graph,
+    object_context,
+    ref_base,
+    registry_mem,
+    runs,
+    storage,
+    trace_legacy,
+    uris,
+    weave_internal,
+)
+from weave import weave_types as types
+from weave.api import mutation, op, weave_class
 from weave.graph import Node
-from ..api import op, weave_class, mutation
-from .. import weave_types as types
-from .. import errors
-from .. import storage
-from .. import registry_mem
-from .. import weave_internal
-from .. import trace_legacy
-from .. import ref_base
-from .. import uris
-from .. import graph
-from .. import artifact_local
-from .. import compile
-from .. import runs
-from .. import artifact_fs
-from .. import artifact_wandb
-from .. import object_context
 
 
 @weave_class(weave_type=types.RefType)

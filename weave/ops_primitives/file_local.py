@@ -1,10 +1,9 @@
 import os
 import typing
 
-from ..api import op
-from .. import weave_types as types
-from .. import file_local
-from .. import environment
+from weave import environment, file_local
+from weave import weave_types as types
+from weave.api import op
 
 
 @op(name="LocalFile-directUrl")

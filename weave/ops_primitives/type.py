@@ -1,7 +1,8 @@
 import typing
-from ..api import op
-from .. import errors
-from .. import weave_types as types
+
+from weave import errors
+from weave import weave_types as types
+from weave.api import op
 
 
 @op(

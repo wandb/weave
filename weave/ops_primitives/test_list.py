@@ -1,17 +1,15 @@
 import pytest
 
-from .. import api as weave
-from .. import weave_types as types
-from .. import box
-from . import list_
-from . import dict
-from . import number
-from . import runs
-from . import errors
-from .. import weave_internal
-from ..tests import weavejs_ops
-from ..tests import geom
-from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
+from weave import api as weave
+from weave import box, weave_internal
+from weave import weave_types as types
+from weave.language_features.tagging import (
+    make_tag_getter_op,
+    tag_store,
+    tagged_value_type,
+)
+from weave.ops_primitives import dict, errors, list_, number, runs
+from weave.tests import geom, weavejs_ops
 
 
 def test_unnest():

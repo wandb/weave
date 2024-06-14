@@ -1,9 +1,11 @@
-import typing
-from ..api import op, weave_class
-from .. import weave_types as types
-import re
 import json
+import re
+import typing
+
 import numpy as np
+
+from weave import weave_types as types
+from weave.api import op, weave_class
 
 
 @op(name="root-string")
