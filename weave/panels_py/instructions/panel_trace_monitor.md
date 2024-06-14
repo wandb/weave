@@ -9,6 +9,7 @@ To analyze Trace data, log `TraceSpanDict`s to a StreamTable. This can be achiev
 > Already using [W&B Tracer](https://docs.wandb.ai/guides/prompts)? Stay tuned: you soon will be able to load these traces in this dashboard!
 
 ## Getting Started
+
 To use any of the methods outlined above, we first install `weave` into our environment
 
 ```python
@@ -24,7 +25,7 @@ pip install weave
 If you are already using `Langchain`, simply create a tracer and add it as a callback to your next call:
 
 ```python
-from weave.monitoring.langchain import WeaveTracer
+from weave.old_weave.monitoring.langchain import WeaveTracer
 
 tracer = WeaveTracer(f"{WB_ENTITY}/{WB_PROJECT}/{WB_STREAM}")
 llm.run(question, callbacks=[tracer])
@@ -37,7 +38,7 @@ llm.run(question, callbacks=[tracer])
 If you have existing code, the Trace decorator (and related utilities) allows you to instrument and log in a variety of formats. For example:
 
 ```python
-from weave.monitoring import init_monitor
+from weave.old_weave.monitoring import init_monitor
 
 mon = init_monitor(f"{WB_ENTITY}/{WB_PROJECT}/{WB_STREAM}")
 
@@ -54,7 +55,7 @@ def adder(a, b):
 Finally, if you want to manually log span data, you can do so as well by logging directly to a StreamTable:
 
 ```python
-from weave.monitoring import StreamTable
+from weave.old_weave.monitoring import StreamTable
 from weave.stream_data_interfaces import TraceSpanDict
 
 st = StreamTable(f"{WB_ENTITY}/{WB_PROJECT}/{WB_STREAM}")
@@ -76,6 +77,7 @@ st.log(TraceSpanDict(
 ```
 
 ## Analyze Data
+
 Once you've logged your data, use the browser on your left to find your table. From there, choose a template to get started!
 
 ![](https://raw.githubusercontent.com/wandb/weave/master/docs/assets/traces_debug_board.png)

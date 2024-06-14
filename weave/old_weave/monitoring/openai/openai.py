@@ -12,9 +12,9 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from packaging import version
 
 from weave import graph_client_context, run_context
-from weave.monitoring.monitor import _get_global_monitor
-from weave.monitoring.openai.models import *
-from weave.monitoring.openai.util import *
+from weave.old_weave.monitoring.monitor import _get_global_monitor
+from weave.old_weave.monitoring.openai.models import *
+from weave.old_weave.monitoring.openai.util import *
 from weave.trace.op import Op
 
 old_create = openai.resources.chat.completions.Completions.create

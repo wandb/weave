@@ -633,7 +633,7 @@ def append(
 @op(mutation=True, name="stream_table-log")
 def stream_table_log(self: graph.Node, val: typing.Any) -> typing.Any:
     st_obj = weave_internal.use(self)
-    from weave.monitoring import StreamTable
+    from weave.old_weave.monitoring import StreamTable
 
     if not isinstance(st_obj, StreamTable):
         raise errors.WeaveInternalError(

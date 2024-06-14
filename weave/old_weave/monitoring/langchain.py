@@ -4,15 +4,15 @@ import json
 import typing
 
 import wandb
-from wandb.sdk.data_types import trace_tree
-
-from weave.monitoring import StreamTable
-from weave import stream_data_interfaces
+from langchain.callbacks.tracers import wandb as LCW
 
 # We should move this logic into our built-in langchain integration
 from langchain.callbacks.tracers.base import BaseTracer
 from langchain.callbacks.tracers.schemas import Run
-from langchain.callbacks.tracers import wandb as LCW
+from wandb.sdk.data_types import trace_tree
+
+from weave import stream_data_interfaces
+from weave.old_weave.monitoring import StreamTable
 
 
 def _hash_id(s: str) -> str:

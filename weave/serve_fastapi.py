@@ -17,7 +17,7 @@ from . import weave_pydantic
 from . import cache
 from . import errors
 from . import pyfunc_type_util
-from .monitoring import monitor
+from .old_weave.monitoring import monitor
 from .wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
 
 from .artifact_wandb import WandbArtifactRef

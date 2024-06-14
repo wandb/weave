@@ -12,12 +12,12 @@ from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
 from openai.types.completion_usage import CompletionUsage
 
 import weave
-from weave.monitoring import init_monitor
-from weave.monitoring.openai import util
-from weave.monitoring.openai.models import *
-from weave.monitoring.openai.models import Context
-from weave.monitoring.openai.openai import patch, unpatch
-from weave.monitoring.openai.util import Context
+from weave.old_weave.monitoring import init_monitor
+from weave.old_weave.monitoring.openai import util
+from weave.old_weave.monitoring.openai.models import *
+from weave.old_weave.monitoring.openai.models import Context
+from weave.old_weave.monitoring.openai.openai import patch, unpatch
+from weave.old_weave.monitoring.openai.util import Context
 from weave.wandb_interface.wandb_stream_table import StreamTable
 
 
@@ -453,7 +453,9 @@ def test_log_to_span_basic(
     streamtable = make_stream_table(
         stream_name, project_name=project, entity_name=entity
     )
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_create)
+    chat_completions = weave.old_weave.monitoring.openai.openai.ChatCompletions(
+        mocked_create
+    )
     create_input = dict(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": "Tell me a joke"}],
@@ -479,7 +481,7 @@ def test_log_to_span_streaming(
     reassembled_chat_completion_message,
     client,
 ):
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
+    chat_completions = weave.old_weave.monitoring.openai.openai.ChatCompletions(
         mocked_streaming_create
     )
     create_input = dict(
@@ -510,7 +512,7 @@ async def test_log_to_span_async_streaming(
     reassembled_chat_completion_message,
     client,
 ):
-    chat_completions = weave.monitoring.openai.openai.AsyncChatCompletions(
+    chat_completions = weave.old_weave.monitoring.openai.openai.AsyncChatCompletions(
         mocked_async_streaming_create
     )
     create_input = dict(
