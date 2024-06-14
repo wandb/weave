@@ -27,7 +27,7 @@ from weave import (
     wandb_api,
     weave_types,
 )
-from weave.core_types.stream_table_type import StreamTableType
+from weave.old_weave.core_types.stream_table_type import StreamTableType
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
 if typing.TYPE_CHECKING:
