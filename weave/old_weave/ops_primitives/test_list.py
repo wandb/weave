@@ -8,7 +8,7 @@ from weave.old_weave.language_features.tagging import (
     tag_store,
     tagged_value_type,
 )
-from weave.ops_primitives import dict, errors, list_, number, runs
+from weave.old_weave.ops_primitives import dict, errors, list_, number, runs
 from weave.tests import geom, weavejs_ops
 
 

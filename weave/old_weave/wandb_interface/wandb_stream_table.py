@@ -201,8 +201,8 @@ class _StreamTableSync:
             self._log_row(row)
 
     def rows(self) -> graph.Node:
+        from weave.old_weave.ops_primitives import weave_api
         from weave.ops_domain import stream_table_ops
-        from weave.ops_primitives import weave_api
 
         if self._weave_stream_table_ref is None:
             raise errors.WeaveInternalError("ref is None after ensure")

@@ -1,5 +1,6 @@
+from weave.old_weave.ops_primitives import list_
+
 from .. import api as weave
-from ..ops_primitives import list_
 from .. import ops_arrow as arrow
 
 

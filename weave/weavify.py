@@ -1,12 +1,8 @@
 import dataclasses
 import typing
 
-from . import val_const
-from . import op_args
-from . import graph
-from . import errors
+from . import errors, graph, op_args, val_const, weave_internal
 from . import weave_types as types
-from . import weave_internal
 
 if typing.TYPE_CHECKING:
     from . import op_def
@@ -84,7 +80,7 @@ def op_to_weave_fn(opdef: "op_def.OpDef") -> graph.Node:
 
 
 def weavify_object(obj: typing.Any) -> graph.Node:
-    from .ops_primitives import make_list, dict_
+    from weave.old_weave.ops_primitives import dict_, make_list
 
     if isinstance(obj, graph.Node):
         return obj

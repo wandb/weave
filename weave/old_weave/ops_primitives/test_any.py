@@ -4,7 +4,7 @@ import pytest
 
 from weave import api as weave
 from weave import box
-from weave.ops_primitives import any
+from weave.old_weave.ops_primitives import any
 
 cases: list[typing.Tuple[typing.Any, bool]] = [
     (1, False),

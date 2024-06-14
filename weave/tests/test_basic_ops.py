@@ -1,10 +1,8 @@
+from weave.old_weave.ops_primitives import number
+from weave.old_weave.ops_primitives.string import *
+
 from .. import api as weave
-from .. import box
-from .. import ops
-from ..ops_primitives import number
-from ..ops_primitives.string import *
-
-
+from .. import box, ops
 from ..weave_internal import make_const_node
 
 

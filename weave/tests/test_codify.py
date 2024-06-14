@@ -24,9 +24,9 @@ from weave.old_weave import panels
         (
             lambda: panels.Table(
                 weave.ops.range(1, 100, 1).map(
-                    lambda row: weave.ops_primitives.dict.dict_(
+                    lambda row: weave.old_weave.ops_primitives.dict.dict_(
                         x=row,
-                        y=weave.ops_primitives.list_.make_list(
+                        y=weave.old_weave.ops_primitives.list_.make_list(
                             a=row,
                         ),
                     )
@@ -34,9 +34,9 @@ from weave.old_weave import panels
             ),
             lambda: """weave.old_weave.panels.panel_table.Table(
             weave.ops_arrow.list_range.range(1, 100, 1,).map(
-                lambda row: weave.ops_primitives.dict.dict_(
+                lambda row: weave.old_weave.ops_primitives.dict.dict_(
                     x=row,
-                    y=weave.ops_primitives.list_.make_list(
+                    y=weave.old_weave.ops_primitives.list_.make_list(
                         a=row,
                     ),
                 ),
@@ -46,7 +46,7 @@ from weave.old_weave import panels
         (
             lambda: panels.Plot(
                 weave.ops.range(1, 100, 1).map(
-                    lambda row: weave.ops_primitives.dict.dict_(
+                    lambda row: weave.old_weave.ops_primitives.dict.dict_(
                         x=row,
                         y=row**2,
                     )
@@ -54,7 +54,7 @@ from weave.old_weave import panels
             ),
             lambda: """weave.old_weave.panels.panel_plot.Plot(
             weave.ops_arrow.list_range.range(1, 100, 1,).map(
-                lambda row: weave.ops_primitives.dict.dict_(
+                lambda row: weave.old_weave.ops_primitives.dict.dict_(
                     x=row,
                     y=row.powBinary(2,),
                 ),

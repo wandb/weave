@@ -8,6 +8,8 @@ import wandb
 
 from weave import stitch
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.old_weave.ops_primitives import dict_, list_
+from weave.old_weave.ops_primitives.file import _as_w0_dict_
 from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
 from .. import api as weave
@@ -19,8 +21,6 @@ from ..ops_arrow import ArrowWeaveListType
 from ..ops_domain import artifact_membership_ops as amo
 from ..ops_domain import table, wb_util, wbmedia
 from ..ops_domain import wb_domain_types as wdt
-from ..ops_primitives import dict_, list_
-from ..ops_primitives.file import _as_w0_dict_
 from . import fixture_fakewandb as fwb
 from . import weavejs_ops
 

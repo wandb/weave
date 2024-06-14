@@ -23,9 +23,9 @@ from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.arrow import ArrowWeaveListType
 from weave.old_weave.arrow.arrow_tags import pushdown_list_tags
 from weave.old_weave.arrow.list_ import ArrowWeaveList
+from weave.old_weave.ops_primitives.dict import dict_
 from weave.ops_arrow import arraylist_ops, convert_ops
 from weave.ops_arrow.dict import preprocess_merge
-from weave.ops_primitives.dict import dict_
 
 
 class VectorizeError(errors.WeaveBaseError):

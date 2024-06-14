@@ -23,7 +23,6 @@ from .. import (
     language_nullability,
     op_def,
     ops_arrow,
-    ops_primitives,
     registry_mem,
     storage,
     weave_internal,
@@ -34,6 +33,7 @@ from .concrete_tagged_value import (
     concrete_to_tagstore,
 )
 from .op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
+from weave.old_weave import ops_primitives
 
 
 def assert_equal_with_tags(node: graph.Node, v: typing.Any, expected: typing.Any):

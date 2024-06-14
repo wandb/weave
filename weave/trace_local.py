@@ -1,19 +1,21 @@
+import dataclasses
 import hashlib
+import json
+import random
 import typing
 from typing import Mapping
-import json
-import dataclasses
-import random
 
-from . import storage
-from . import ref_base
-from . import op_def
+from . import (
+    artifact_local,
+    graph,
+    op_def,
+    op_policy,
+    ref_base,
+    runs,
+    storage,
+    weave_internal,
+)
 from . import weave_types as types
-from . import runs
-from . import graph
-from . import artifact_local
-from . import weave_internal
-from . import op_policy
 
 
 @dataclasses.dataclass
@@ -125,7 +127,7 @@ class TraceLocal:
         return res
 
     def save_run(self, run: runs.Run):
-        from .ops_primitives import weave_api
+        from weave.old_weave.ops_primitives import weave_api
 
         run_key = RunKey(run.op_name, run.id)
         if self._should_save_to_table(run_key):

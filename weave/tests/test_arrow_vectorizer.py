@@ -10,6 +10,7 @@ from weave.old_weave.language_features.tagging import (
     tag_store,
     tagged_value_type,
 )
+from weave.old_weave.ops_primitives import Boolean, Number, date, dict_, list_
 
 from .. import api as weave
 from .. import box, dispatch, errors, ops, weave_internal
@@ -18,7 +19,6 @@ from .. import weave_types as types
 from ..ops_arrow import arraylist_ops, convert_ops, util
 from ..ops_domain import run_ops
 from ..ops_domain import wb_domain_types as wdt
-from ..ops_primitives import Boolean, Number, date, dict_, list_
 
 string_ops_test_cases = [
     ("eq-scalar", lambda x: x == "bc", [True, False, False]),

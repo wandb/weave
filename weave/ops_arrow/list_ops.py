@@ -33,8 +33,8 @@ from weave.old_weave.language_features.tagging import (
     tagged_value_type,
     tagged_value_type_helpers,
 )
+from weave.old_weave.ops_primitives import list_ as primitive_list
 from weave.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
-from weave.ops_primitives import list_ as primitive_list
 
 FLATTEN_DELIMITER = "➡️"
 

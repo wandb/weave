@@ -13,13 +13,13 @@ from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
 import weave
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.old_weave.ops_primitives import file
 from weave.wandb_client_api import wandb_gql_query
 
 from .. import artifact_fs
 from .. import weave_types as types
 from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
 from ..ops_domain.wbmedia import ImageArtifactFileRefType
-from ..ops_primitives import file
 from ..wandb_util import weave0_type_json_to_weave1_type
 from .fixture_fakewandb import FakeApi
 

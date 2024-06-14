@@ -196,7 +196,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         raise errors.WeaveMakeFunctionError(
                             "output_type function must return a node."
                         )
-                    from .ops_primitives.list_ import make_list
+                    from weave.old_weave.ops_primitives.list_ import make_list
 
                     return types.List.make(
                         {

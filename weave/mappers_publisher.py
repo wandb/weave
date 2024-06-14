@@ -8,7 +8,7 @@ from weave.node_ref import ref_to_node
 from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
 from weave.uris import WeaveURI
 
-# from .ops_primitives import weave_api
+# from weave.old_weave.ops_primitives import weave_api
 from . import artifact_local, errors, mappers, mappers_python_def, ref_base
 from . import weave_types as types
 
@@ -117,7 +117,7 @@ map_to_python_remote = mappers.make_mapper(map_to_python_remote_)
 
 
 def _node_publish_mapper(node: graph.Node) -> typing.Optional[graph.Node]:
-    from .ops_primitives import weave_api
+    from weave.old_weave.ops_primitives import weave_api
 
     if _node_is_op_get(node):
         node = typing.cast(graph.OutputNode, node)

@@ -2,7 +2,7 @@ import pandas as pd
 
 from weave import api as weave
 from weave import weave_types as types
-from weave.ops_primitives import pandas_ as op_pandas
+from weave.old_weave.ops_primitives import pandas_ as op_pandas
 
 
 def test_save_dataframe():

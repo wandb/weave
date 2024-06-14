@@ -10,11 +10,11 @@ from weave.old_weave.language_features.tagging import (
     tag_store,
     tagged_value_type,
 )
+from weave.old_weave.ops_primitives import dict_, list_
 
 from .. import api as weave
 from .. import box, ops
 from .. import ops_arrow as arrow
-from ..ops_primitives import dict_, list_
 from ..tests import tag_test_util as ttu
 from . import list_arrow_test_helpers as lath
 

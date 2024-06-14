@@ -1,8 +1,7 @@
-import typing
 import copy
+import typing
 
-from . import graph
-from . import ref_base
+from . import graph, ref_base
 from . import weave_types as types
 
 # Notes for the future:
@@ -89,7 +88,7 @@ def ref_to_node(ref: ref_base.Ref) -> typing.Optional[graph.Node]:
     ref = copy.copy(ref)
     ref.extra = []
 
-    from weave.ops_primitives import get
+    from weave.old_weave.ops_primitives import get
 
     node = get(str(ref))
     for str_key in extra:

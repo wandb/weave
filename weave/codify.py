@@ -3,10 +3,10 @@ import contextvars
 import dataclasses
 import inspect
 import typing
+
 import black
 
-
-from . import graph, registry_mem, codifiable_value_mixin, storage, weave_types
+from . import codifiable_value_mixin, graph, registry_mem, storage, weave_types
 
 
 # User-facing Apis
@@ -167,7 +167,7 @@ def _otc_using_storage_fallback(obj: typing.Any) -> str:
 
 # Hack:
 def _module_name_corrections(qualified_name: str) -> str:
-    if qualified_name == "weave.ops_primitives.file_local":
+    if qualified_name == "weave.old_weave.ops_primitives.file_local":
         return "weave.ops"
     elif qualified_name.startswith("weave.decorator_class"):
         raise ValueError("Decorator classes are not supported.")
@@ -223,7 +223,7 @@ def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
             )
             if len(node.from_op.inputs) > 0:
                 args += ","
-            return f"weave.ops_primitives.dict.dict_({args})"
+            return f"weave.old_weave.ops_primitives.dict.dict_({args})"
         elif node.from_op.name == "list":
             args = ",".join(
                 [
@@ -233,7 +233,7 @@ def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
             )
             if len(node.from_op.inputs) > 0:
                 args += ","
-            return f"weave.ops_primitives.list_.make_list({args})"
+            return f"weave.old_weave.ops_primitives.list_.make_list({args})"
 
         is_root = len(inputs) == 0 or not isinstance(
             inputs[0], (graph.OutputNode, graph.VarNode)

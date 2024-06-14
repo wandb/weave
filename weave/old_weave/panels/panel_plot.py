@@ -6,9 +6,9 @@ import typing
 import weave
 from weave import codifiable_value_mixin, codify, errors, graph, panel, weave_internal
 from weave import weave_types as types
+from weave.old_weave.ops_primitives import boolean, list_
+from weave.old_weave.ops_primitives import dict as dict_
 from weave.old_weave.panels import panel_table, table_state
-from weave.ops_primitives import boolean, list_
-from weave.ops_primitives import dict as dict_
 
 
 @weave.type()

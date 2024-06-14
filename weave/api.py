@@ -64,7 +64,7 @@ from .table import Table
 
 
 def save(node_or_obj, name=None):
-    from .ops_primitives.weave_api import save, get
+    from weave.old_weave.ops_primitives.weave_api import save, get
 
     if isinstance(node_or_obj, _graph.Node):
         return save(node_or_obj, name=name)

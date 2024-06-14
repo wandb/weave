@@ -84,7 +84,7 @@ class FilesystemArtifact(artifact_base.Artifact):
         return self.ref_from_local_str(key, type_).get()
 
     def as_node(self) -> "graph.Node":
-        from .ops_primitives.weave_api import get as op_get
+        from weave.old_weave.ops_primitives.weave_api import get as op_get
 
         return op_get(str(self))
 

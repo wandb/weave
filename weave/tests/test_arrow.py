@@ -16,6 +16,7 @@ from weave.old_weave.language_features.tagging import (
     tag_store,
     tagged_value_type,
 )
+from weave.old_weave.ops_primitives import list_, make_list
 from weave.tests import list_arrow_test_helpers as lath
 
 from .. import api as weave
@@ -36,7 +37,6 @@ from .. import ops_arrow as arrow
 from .. import weave_types as types
 from ..op_def import map_type
 from ..ops_domain import project_ops
-from ..ops_primitives import list_, make_list
 from ..tests import tag_test_util as ttu
 from ..tests import test_wb, weavejs_ops
 

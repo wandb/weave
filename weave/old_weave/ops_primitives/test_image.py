@@ -3,7 +3,7 @@ import pytest
 from PIL import Image
 
 from weave import storage
-from weave.ops_primitives import api as weave
+from weave.old_weave.ops_primitives import api as weave
 
 
 def test_image():

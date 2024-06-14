@@ -8,10 +8,10 @@ from weave.old_weave.language_features.tagging import (
     tagged_value_type,
     tagged_value_type_helpers,
 )
+from weave.old_weave.ops_primitives import dict as dict_ops
+from weave.old_weave.ops_primitives import list_ as list_ops
 from weave.ops_domain.run_ops import run_tag_getter_op
 from weave.ops_domain.wb_domain_types import ProjectType, Run, RunType
-from weave.ops_primitives import dict as dict_ops
-from weave.ops_primitives import list_ as list_ops
 
 from .. import box, weave_internal
 from .. import weave_types as types

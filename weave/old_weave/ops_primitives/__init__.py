@@ -1,4 +1,4 @@
-from .. import context_state as _context_state
+from weave import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
@@ -28,7 +28,7 @@ from .image import *
 from .html import *
 from .markdown import *
 from .op_def import *
-from ..old_weave.language_features.tagging.tagging_ops import *
+from weave.old_weave.language_features.tagging.tagging_ops import *
 from .list_tag_getters import *
 from .geom import *
 from .server import *

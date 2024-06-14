@@ -6,7 +6,7 @@ from weave import decorator_type
 from weave import weave_types as types
 from weave.api import op, weave_class
 from weave.old_weave.language_features.tagging import tagged_value_type
-from weave.ops_primitives import graph, list_
+from weave.old_weave.ops_primitives import graph, list_
 
 try:
     import sqlalchemy

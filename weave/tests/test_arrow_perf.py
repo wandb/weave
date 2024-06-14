@@ -1,10 +1,12 @@
 # These are performance tests. If they start to flake we can come up
 # with a better way to run them.
-import pytest
-import weave
 import time
+
+import pytest
+
+import weave
 from weave import ops_arrow
-from weave import ops_primitives
+from weave.old_weave import ops_primitives
 
 
 @pytest.mark.skip(reason="Performance test")

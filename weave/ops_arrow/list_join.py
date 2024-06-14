@@ -20,7 +20,7 @@ from weave.old_weave.arrow.list_ import (
     make_vec_taggedvalue,
 )
 from weave.old_weave.language_features.tagging import tagged_value_type
-from weave.ops_primitives import list_ as primitive_list
+from weave.old_weave.ops_primitives import list_ as primitive_list
 
 tracer = engine_trace.tracer()  # type: ignore
 

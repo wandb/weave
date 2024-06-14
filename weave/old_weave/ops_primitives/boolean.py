@@ -3,7 +3,7 @@ import typing
 from weave import dispatch
 from weave import weave_types as types
 from weave.api import op, weave_class
-from weave.ops_primitives.dict import dict_
+from weave.old_weave.ops_primitives.dict import dict_
 
 
 @weave_class(weave_type=types.Boolean)

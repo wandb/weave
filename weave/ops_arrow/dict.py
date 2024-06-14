@@ -18,8 +18,8 @@ from weave.old_weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.old_weave.language_features.tagging import (
     process_opdef_output_type,
 )
+from weave.old_weave.ops_primitives import projection_utils
 from weave.op_args import OpVarArgs
-from weave.ops_primitives import projection_utils
 
 
 def typeddict_pick_output_type(input_types):
