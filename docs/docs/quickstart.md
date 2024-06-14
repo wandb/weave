@@ -21,7 +21,7 @@ Weave requires Python 3.9+.
 - Call `weave.init('project-name')` to start logging
 - Add the `@weave.op()` decorator to the functions you want to track
 
-In this example, we're using openai so you will need to [add an openai API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
+In this example, we're using OpenAI, so you will need to first [provide an OpenAI API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
 
 ```python
 # highlight-next-line

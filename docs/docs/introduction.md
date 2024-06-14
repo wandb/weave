@@ -27,7 +27,7 @@ You can use Weave to:
 
 ## Key concepts
 
-Weave's **core types** layer contains everything you need for organizing Generative AI projects, with built-in lineage, tracking, and reproducibility.
+Weave's [Core types](/guides/core-types/) layer contains everything you need for organizing Generative AI projects, with built-in lineage, tracking, and reproducibility.
 
   - **[Datasets](/guides/core-types/datasets)**: Version, store, and share rich tabular data.
   - **[Models](/guides/core-types/models)**: Version, store, and share parameterized functions.
@@ -40,11 +40,11 @@ Weave's **tracking** layer brings immutable tracing and versioning to your progr
   - **[Ops](/guides/tracking/ops)**: Versioned, reproducible functions, with automatic tracing.
   - **[Tracing](/guides/tracking/tracing)**: Automatic organization of function calls and data lineage.
 
-Weave's **ecosystem** is batteries included for other libraries, systems, and best practices.
+Weave's **ecosystem** is batteries-included for other libraries, systems, and best practices.
 
-  - **[OpenAI](/guides/ecosystem/openai)**: automatic tracking for openai api calls
-  - [soon] Langchain auto-logging
-  - [soon] llama-index auto-logging
+  - **[OpenAI](/guides/ecosystem/openai)**: automatic tracking for OpenAI API calls
+  - [Soon] LangChain auto-logging
+  - [Soon] LlamaIndex auto-logging
 
 Weave's **tools** layer contains utilities for making use of Weave objects.
   

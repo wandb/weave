@@ -43,7 +43,7 @@ weave:///<entity>/<project>/object/<object_name>:<object_version>
 - _object_name_: object name
 - _object_version_: either a version hash, a string like v0, v1..., or an alias like ":latest". All objects have the ":latest" alias.
 
-Refs can be constructed with a few different styles
+Refs can be constructed in a few different styles:
 
 - `weave.ref(<name>)`: requires `weave.init(<project>)` to have been called. Refers to the ":latest" version
 - `weave.ref(<name>:<version>)`: requires `weave.init(<project>)` to have been called.
