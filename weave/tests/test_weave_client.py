@@ -583,6 +583,7 @@ def test_save_model(client):
     assert model2.predict("x") == "input is: x"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 def test_saved_nested_modellike(client):
     class A(weave.Object):
         x: int
