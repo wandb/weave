@@ -1,18 +1,17 @@
 import typing
 import urllib
 
-from ..gql_op_plugin import wb_gql_op_plugin
-from ..api import op
-from .. import weave_types as types
-from . import wb_domain_types as wdt
-from .wandb_domain_gql import (
-    gql_prop_op,
-    gql_direct_edge_op,
+from weave import errors
+from weave import weave_types as types
+from weave.api import op
+from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.ops_domain import wb_domain_types as wdt
+from weave.ops_domain.wandb_domain_gql import (
     gql_connection_op,
+    gql_direct_edge_op,
+    gql_prop_op,
     make_root_op_gql_op_output_type,
 )
-
-from .. import errors
 
 # Section 1/6: Tag Getters
 # None

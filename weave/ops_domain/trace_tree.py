@@ -1,22 +1,20 @@
-from enum import Enum
-import json
-import logging
-import typing
 import dataclasses
 import datetime
 import hashlib
+import json
+import logging
+import typing
 import uuid
+from enum import Enum
 
 import typeguard
-
-from .. import stream_data_interfaces
-from wandb.sdk.data_types.trace_tree import Span as WBSpan
 from wandb.sdk.data_types.trace_tree import Result as WBSpanResult
-from .. import weave_types as types
-from ..decorator_op import op
-from .. import op_def
+from wandb.sdk.data_types.trace_tree import Span as WBSpan
 
-from .. import api as weave
+from weave import api as weave
+from weave import op_def, stream_data_interfaces
+from weave import weave_types as types
+from weave.decorator_op import op
 
 
 class StatusCode:

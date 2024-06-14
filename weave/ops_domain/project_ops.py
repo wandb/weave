@@ -1,20 +1,19 @@
-import typing
 import json
-from ..gql_op_plugin import wb_gql_op_plugin
-from ..api import op
-from . import wb_domain_types as wdt
-from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
-from .wandb_domain_gql import (
-    gql_prop_op,
-    gql_direct_edge_op,
+import typing
+
+from weave import errors, input_provider
+from weave import weave_types as types
+from weave.api import op
+from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.language_features.tagging.make_tag_getter_op import make_tag_getter_op
+from weave.ops_domain import wb_domain_types as wdt
+from weave.ops_domain.wandb_domain_gql import (
     gql_connection_op,
+    gql_direct_edge_op,
+    gql_prop_op,
     gql_root_op,
     make_root_op_gql_op_output_type,
 )
-
-from .. import weave_types as types
-from .. import errors
-from .. import input_provider
 
 # Section 1/6: Tag Getters
 get_project_tag = make_tag_getter_op("project", wdt.ProjectType, op_name="tag-project")

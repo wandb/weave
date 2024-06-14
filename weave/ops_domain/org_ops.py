@@ -1,11 +1,11 @@
-from . import wb_domain_types as wdt
-from .wandb_domain_gql import (
+from weave import weave_types as types
+from weave.ops_domain import wb_domain_types as wdt
+from weave.ops_domain.wandb_domain_gql import (
+    gql_connection_op,
     gql_direct_edge_op,
     gql_prop_op,
-    gql_connection_op,
     gql_root_op,
 )
-from .. import weave_types as types
 
 # Section 1/6: Tag Getters
 #

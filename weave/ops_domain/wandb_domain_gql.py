@@ -1,24 +1,16 @@
-import typing
-from ..api import op
-from ..gql_op_plugin import wb_gql_op_plugin
-from .. import weave_types
-from inspect import signature, Parameter
-from . import wb_domain_types
-from .. import errors
-from ..ops_arrow import ArrowWeaveListType, ArrowWeaveList
-from ..decorator_arrow_op import arrow_op
-from .. import op_def
-from .. import partial_object
-from ..input_provider import InputProvider
 import hashlib
-
-from .. import gql_op_plugin
-
-
-from ..input_provider import InputProvider
-
+import typing
+from inspect import Parameter, signature
 
 import pyarrow as pa
+
+from weave import errors, gql_op_plugin, op_def, partial_object, weave_types
+from weave.api import op
+from weave.decorator_arrow_op import arrow_op
+from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.input_provider import InputProvider
+from weave.ops_arrow import ArrowWeaveList, ArrowWeaveListType
+from weave.ops_domain import wb_domain_types
 
 """
 This file contains utilities for constructing GQL ops (used by all the ops in

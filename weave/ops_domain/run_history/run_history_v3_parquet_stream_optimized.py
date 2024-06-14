@@ -2,36 +2,39 @@ import dataclasses
 import json
 import logging
 import typing
+
 import pyarrow as pa
 
-
-from ... import artifact_fs
-from .context import get_error_on_non_vectorized_history_transform
-from ...gql_op_plugin import wb_gql_op_plugin
-from ...api import op
-from ... import weave_types as types
-from .. import trace_tree, wb_domain_types as wdt
-from ... import artifact_mem
-from .. import wb_util
-from ...arrow.list_ import ArrowWeaveList
-from ...arrow.list_ import ArrowWeaveListType
-from ...arrow import convert
-from ...op_def import map_type
-from ... import engine_trace
-from ... import errors
-from ...wandb_interface import wandb_stream_table
-from . import history_op_common
-from ... import artifact_base, io_service
-from .. import wbmedia
-from ...ops_domain.table import _patch_legacy_image_file_types
-from ...arrow.list_ import (
-    weave_arrow_type_check,
-    PathType,
-    PathItemType,
-    make_vec_none,
+from weave import (
+    artifact_base,
+    artifact_fs,
+    artifact_mem,
+    engine_trace,
+    errors,
+    gql_json_cache,
+    io_service,
 )
-from ... import gql_json_cache
-
+from weave import weave_types as types
+from weave.api import op
+from weave.arrow import convert
+from weave.arrow.list_ import (
+    ArrowWeaveList,
+    ArrowWeaveListType,
+    PathItemType,
+    PathType,
+    make_vec_none,
+    weave_arrow_type_check,
+)
+from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.op_def import map_type
+from weave.ops_domain import trace_tree, wb_util, wbmedia
+from weave.ops_domain import wb_domain_types as wdt
+from weave.ops_domain.run_history import history_op_common
+from weave.ops_domain.run_history.context import (
+    get_error_on_non_vectorized_history_transform,
+)
+from weave.ops_domain.table import _patch_legacy_image_file_types
+from weave.wandb_interface import wandb_stream_table
 
 tracer = engine_trace.tracer()
 

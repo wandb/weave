@@ -37,31 +37,28 @@
 import json
 import typing
 
-
-from .. import compile_table
-from ..input_provider import InputAndStitchProvider
-from ..gql_op_plugin import wb_gql_op_plugin
-from ..api import op
-from .. import weave_types as types
-from . import wb_domain_types as wdt
-from ..language_features.tagging.make_tag_getter_op import make_tag_getter_op
-from .wandb_domain_gql import (
-    gql_prop_op,
-    gql_direct_edge_op,
-    gql_connection_op,
-    _make_alias,
-)
-
-
-from . import wb_util
-from .. import engine_trace
-from .run_history import history_op_common
-
+from weave import compile_table, engine_trace
+from weave import weave_types as types
+from weave.api import op
+from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.input_provider import InputAndStitchProvider
+from weave.language_features.tagging.make_tag_getter_op import make_tag_getter_op
+from weave.ops_domain import wb_domain_types as wdt
+from weave.ops_domain import wb_util
 
 # Important to re-export ops
-from .run_history import run_history_v1_legacy_ops
-from .run_history import run_history_v2_parquet_media
-from .run_history import run_history_v3_parquet_stream_optimized
+from weave.ops_domain.run_history import (
+    history_op_common,
+    run_history_v1_legacy_ops,
+    run_history_v2_parquet_media,
+    run_history_v3_parquet_stream_optimized,
+)
+from weave.ops_domain.wandb_domain_gql import (
+    _make_alias,
+    gql_connection_op,
+    gql_direct_edge_op,
+    gql_prop_op,
+)
 
 tracer = engine_trace.tracer()
 

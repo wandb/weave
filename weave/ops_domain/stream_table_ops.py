@@ -1,10 +1,8 @@
-from weave import weave_types
-from ..arrow.arrow import ArrowWeaveListType
-from ..core_types import StreamTableType
-from ..api import op
-from .project_ops import project
-from .. import compile
-from .. import op_def
+from weave import compile, op_def, weave_types
+from weave.api import op
+from weave.arrow.arrow import ArrowWeaveListType
+from weave.core_types import StreamTableType
+from weave.ops_domain.project_ops import project
 
 
 def _get_history_node(stream_table: StreamTableType):

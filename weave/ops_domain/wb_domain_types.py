@@ -1,11 +1,11 @@
 import typing
-from .. import weave_types as types
-from ..decorator_type import type as weave_type
-from ..partial_object import (
+
+from weave import weave_types as types
+from weave.decorator_type import type as weave_type
+from weave.partial_object import (
     PartialObject,
     PartialObjectTypeGeneratorType,
 )
-
 
 """
 This file contains all the "W&B Domain Types". Each domain type should

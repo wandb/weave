@@ -1,24 +1,16 @@
 import typing
+from dataclasses import dataclass
 from urllib import parse
 
-
-from .. import weave_types as types
-from .. import decorator_type
-from ..wandb_interface import wandb_stream_table
-
-
-from .run_history import history_op_common
-from .. import artifact_fs
-
-from dataclasses import dataclass
-
-
-from ..artifact_wandb import (
+from weave import artifact_fs, decorator_type
+from weave import weave_types as types
+from weave.artifact_wandb import (
     WandbArtifact,
     WeaveWBLoggedArtifactURI,
 )
-
-from ..runfiles_wandb import WeaveWBRunFilesURI, WandbRunFiles
+from weave.ops_domain.run_history import history_op_common
+from weave.runfiles_wandb import WandbRunFiles, WeaveWBRunFilesURI
+from weave.wandb_interface import wandb_stream_table
 
 
 @dataclass
@@ -104,7 +96,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             return _filesystem_artifact_file_from_artifact_path(val["artifact_path"])
 
         if val["_type"] == "image-file" and run_path is not None:
-            from . import ImageArtifactFileRef
+            from weave.ops_domain import ImageArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
             return ImageArtifactFileRef(
@@ -118,7 +110,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 # masks=val.get("masks", {}),
             )
         if val["_type"] == "audio-file" and run_path is not None:
-            from . import AudioArtifactFileRef
+            from weave.ops_domain import AudioArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
             return AudioArtifactFileRef(  # type: ignore
@@ -127,7 +119,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 sha256=val["sha256"],
             )
         if val["_type"] == "bokeh-file" and run_path is not None:
-            from . import BokehArtifactFileRef
+            from weave.ops_domain import BokehArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
             return BokehArtifactFileRef(  # type: ignore
@@ -136,7 +128,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 sha256=val["sha256"],
             )
         if val["_type"] == "video-file" and run_path is not None:
-            from . import VideoArtifactFileRef
+            from weave.ops_domain import VideoArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
             return VideoArtifactFileRef(  # type: ignore
@@ -145,7 +137,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 sha256=val["sha256"],
             )
         if val["_type"] == "object3D-file" and run_path is not None:
-            from . import Object3DArtifactFileRef
+            from weave.ops_domain import Object3DArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
             return Object3DArtifactFileRef(  # type: ignore
@@ -154,7 +146,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 sha256=val["sha256"],
             )
         if val["_type"] == "molecule-file" and run_path is not None:
-            from . import MoleculeArtifactFileRef
+            from weave.ops_domain import MoleculeArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
             return MoleculeArtifactFileRef(  # type: ignore
@@ -163,7 +155,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 sha256=val["sha256"],
             )
         if val["_type"] == "html-file" and run_path is not None:
-            from . import HtmlArtifactFileRef
+            from weave.ops_domain import HtmlArtifactFileRef
 
             fs_artifact_file = _filesystem_runfiles_from_run_path(run_path, val["path"])
             return HtmlArtifactFileRef(  # type: ignore
@@ -173,7 +165,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             )
 
         if val["_type"] == "images/separated" and run_path is not None:
-            from . import ImageArtifactFileRef
+            from weave.ops_domain import ImageArtifactFileRef
 
             image_list: list[ImageArtifactFileRef] = []
 
@@ -192,7 +184,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
 
             return image_list
         if val["_type"] == "wb_trace_tree":
-            from .trace_tree import WBTraceTree
+            from weave.ops_domain.trace_tree import WBTraceTree
 
             return WBTraceTree(
                 root_span_dumps=val.get("root_span_dumps"),  # type: ignore

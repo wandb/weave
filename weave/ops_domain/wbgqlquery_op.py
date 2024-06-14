@@ -1,16 +1,12 @@
 import logging
 import typing
 
-from .. import weave_types as types
-from ..api import op
-from . import wb_domain_types as wdt
-from ..wandb_client_api import wandb_gql_query
-from ..language_features.tagging import tagged_value_type
-from .. import engine_trace
-from .. import errors
-from .. import environment
-from .. import mappers_gql
-from .. import partial_object
+from weave import engine_trace, environment, errors, mappers_gql, partial_object
+from weave import weave_types as types
+from weave.api import op
+from weave.language_features.tagging import tagged_value_type
+from weave.ops_domain import wb_domain_types as wdt
+from weave.wandb_client_api import wandb_gql_query
 
 
 def _wbgqlquery_output_type(input_types: dict[str, types.Type]) -> types.Type:

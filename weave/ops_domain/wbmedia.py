@@ -1,18 +1,13 @@
 # Implements backward compatibility for existing W&B Media types.
 
 import dataclasses
-import typing
 import json
+import typing
 
-from ..language_features.tagging.tag_store import isolated_tagging_context
-from .. import types
-from .. import errors
-from .. import api as weave
-from .. import artifact_fs
-from .. import file_base
-from .. import engine_trace
-from ..ops_primitives import html
-from ..ops_primitives import markdown
+from weave import api as weave
+from weave import artifact_fs, engine_trace, errors, file_base, types
+from weave.language_features.tagging.tag_store import isolated_tagging_context
+from weave.ops_primitives import html, markdown
 
 
 class LegacyImageArtifactFileRef:

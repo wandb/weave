@@ -1,25 +1,25 @@
+import asyncio
 import dataclasses
-import json
 import datetime
+import json
 import logging
 import typing
-import asyncio
 
-
-from ..api import op, weave_class
-from .. import ops_arrow
-from .. import weave_types as types
-from .. import artifact_fs
-from .. import artifact_wandb
-from .. import errors
-from .. import wandb_util
-from .. import weave_internal
-from .. import engine_trace
-from . import wbmedia
-from .. import timestamp as weave_timestamp
-from .. import io_service
-from .. import util
-from ..ops_domain import trace_tree
+from weave import (
+    artifact_fs,
+    artifact_wandb,
+    engine_trace,
+    errors,
+    io_service,
+    ops_arrow,
+    util,
+    wandb_util,
+    weave_internal,
+)
+from weave import timestamp as weave_timestamp
+from weave import weave_types as types
+from weave.api import op, weave_class
+from weave.ops_domain import trace_tree, wbmedia
 
 
 @dataclasses.dataclass(frozen=True)

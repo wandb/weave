@@ -1,26 +1,19 @@
 import json
-
-from ..gql_op_plugin import wb_gql_op_plugin
-from ..api import op
-from .. import errors
-from .. import weave_types as types
-from . import wb_domain_types as wdt
-
-from .wandb_domain_gql import (
-    gql_prop_op,
-    gql_direct_edge_op,
-    gql_connection_op,
-    _make_alias,
-)
-
-
 import typing
-from . import wb_util
 from urllib.parse import quote
-from .. import artifact_fs
-from .. import artifact_wandb
-from .. import input_provider
 
+from weave import artifact_fs, artifact_wandb, errors, input_provider
+from weave import weave_types as types
+from weave.api import op
+from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.ops_domain import wb_domain_types as wdt
+from weave.ops_domain import wb_util
+from weave.ops_domain.wandb_domain_gql import (
+    _make_alias,
+    gql_connection_op,
+    gql_direct_edge_op,
+    gql_prop_op,
+)
 
 static_art_file_gql = """
             commitHash
@@ -432,10 +425,10 @@ def artifact_version_weave_type(
 def _get_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
 ) -> dict[str, typing.Any]:
-    from ..compile import enable_compile
-    from weave.graph import OutputNode, ConstNode
-    from . import wb_domain_types
-    from .. import weave_internal
+    from weave import weave_internal
+    from weave.compile import enable_compile
+    from weave.graph import ConstNode, OutputNode
+    from weave.ops_domain import wb_domain_types
 
     created_by = artifactVersion["createdBy"]
     if created_by == None or created_by["__typename"] != "Run":
