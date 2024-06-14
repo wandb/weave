@@ -80,7 +80,10 @@ class Op:
         client.save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
         run = client.create_call(
-            self, parent_run, inputs_with_defaults, attributes=attributes
+            self,
+            inputs_with_defaults,
+            parent_run,
+            attributes=attributes,
         )
 
         has_finished = False

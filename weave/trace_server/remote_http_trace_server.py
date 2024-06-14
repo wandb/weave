@@ -69,23 +69,23 @@ def _is_retryable_exception(e: Exception) -> bool:
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
     logger.info(
-        {
-            "event": "retry_attempt",
+        "retry_attempt",
+        extra={
             "fn": retry_state.fn,
             "attempt_number": retry_state.attempt_number,
             "exception": str(retry_state.outcome.exception()),
-        }
+        },
     )
 
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
     logger.info(
-        {
-            "event": "retry_failed",
+        "retry_failed",
+        extra={
             "fn": retry_state.fn,
             "attempt_number": retry_state.attempt_number,
             "exception": str(retry_state.outcome.exception()),
-        }
+        },
     )
     return retry_state.outcome.result()
 
@@ -103,8 +103,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self._auth: t.Optional[t.Tuple[str, str]] = None
 
     def ensure_project_exists(self, entity: str, project: str) -> None:
-        # TODO: This should happen in the wandb backend, not here, and its slow
-        # (hundres of ms)
+        # TODO: This should happen in the wandb backend, not here, and it's slow
+        # (hundreds of ms)
         project_creator.ensure_project_exists(entity, project)
 
     @classmethod
@@ -169,15 +169,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         retry_error_callback=_log_failure,
         reraise=True,
     )
-    def _generic_request(
+    def _generic_request_executor(
         self,
         url: str,
         req: BaseModel,
-        req_model: t.Type[BaseModel],
-        res_model: t.Type[BaseModel],
-    ) -> BaseModel:
-        if isinstance(req, dict):
-            req = req_model.model_validate(req)
+        stream: bool = False,
+    ) -> requests.Response:
+
         r = requests.post(
             self.trace_server_url + url,
             # `by_alias` is required since we have Mongo-style properties in the
@@ -186,6 +184,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             # not valid for the `model_validate` step.
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
+            stream=stream,
         )
         if r.status_code == 413 and "obj/create" in url:
             raise requests.HTTPError(
@@ -202,7 +201,34 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 response=r,
             )
         r.raise_for_status()
+
+        return r
+
+    def _generic_request(
+        self,
+        url: str,
+        req: BaseModel,
+        req_model: t.Type[BaseModel],
+        res_model: t.Type[BaseModel],
+    ) -> BaseModel:
+        if isinstance(req, dict):
+            req = req_model.model_validate(req)
+        r = self._generic_request_executor(url, req)
         return res_model.model_validate(r.json())
+
+    def _generic_stream_request(
+        self,
+        url: str,
+        req: BaseModel,
+        req_model: t.Type[BaseModel],
+        res_model: t.Type[BaseModel],
+    ) -> t.Iterator[BaseModel]:
+        if isinstance(req, dict):
+            req = req_model.model_validate(req)
+        r = self._generic_request_executor(url, req, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield res_model.model_validate(json.loads(line))
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
@@ -268,6 +294,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
         )
 
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> t.Iterator[tsi.CallSchema]:
+        return self._generic_stream_request(
+            "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
+        )
+
     def calls_query_stats(
         self, req: t.Union[tsi.CallsQueryStatsReq, t.Dict[str, t.Any]]
     ) -> tsi.CallsQueryStatsRes:
@@ -280,6 +311,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallsDeleteRes:
         return self._generic_request(
             "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
+        )
+
+    def call_update(
+        self, req: t.Union[tsi.CallUpdateReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallUpdateRes:
+        return self._generic_request(
+            "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
         )
 
     # Op API
@@ -383,3 +421,24 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         bytes.writelines(r.iter_content())
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
+
+    def feedback_create(
+        self, req: t.Union[tsi.FeedbackCreateReq, t.Dict[str, t.Any]]
+    ) -> tsi.FeedbackCreateRes:
+        return self._generic_request(
+            "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
+        )
+
+    def feedback_query(
+        self, req: t.Union[tsi.FeedbackQueryReq, t.Dict[str, t.Any]]
+    ) -> tsi.FeedbackQueryRes:
+        return self._generic_request(
+            "/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes
+        )
+
+    def feedback_purge(
+        self, req: t.Union[tsi.FeedbackPurgeReq, t.Dict[str, t.Any]]
+    ) -> tsi.FeedbackPurgeRes:
+        return self._generic_request(
+            "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
+        )

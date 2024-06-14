@@ -31,19 +31,29 @@ import typing
 import hashlib
 import dataclasses
 import logging
+from zoneinfo import ZoneInfo
 
+import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult, StreamContext
 from clickhouse_connect.driver.summary import QuerySummary
 
 import clickhouse_connect
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
-from .errors import RequestTooLarge
+from .errors import InvalidRequest, RequestTooLarge
+from .emoji_util import detone_emojis
+from .feedback import (
+    TABLE_FEEDBACK,
+    validate_feedback_create_req,
+    validate_feedback_purge_req,
+)
+from .orm import Table, Column, ParamBuilder, Row
 
 from .trace_server_interface_util import (
+    assert_non_null_wb_user_id,
     extract_refs_from_values,
     generate_id,
     str_digest,
@@ -56,6 +66,7 @@ from .interface import query as tsi_query
 from . import refs_internal
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -80,6 +91,7 @@ class CallStartCHInsertable(BaseModel):
     inputs_dump: str
     input_refs: typing.List[str]
     output_refs: typing.List[str] = []  # sadly, this is required
+    display_name: typing.Optional[str] = None
 
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
@@ -99,16 +111,33 @@ class CallEndCHInsertable(BaseModel):
 class CallDeleteCHInsertable(BaseModel):
     project_id: str
     id: str
-    deleted_at: datetime.datetime
-    wb_user_id: typing.Optional[str]
+    wb_user_id: str
 
-    # boo
+    deleted_at: datetime.datetime
+
+    # required types
+    input_refs: typing.List[str] = []
+    output_refs: typing.List[str] = []
+
+
+class CallUpdateCHInsertable(BaseModel):
+    project_id: str
+    id: str
+    wb_user_id: str
+
+    # update types
+    display_name: typing.Optional[str] = None
+
+    # required types
     input_refs: typing.List[str] = []
     output_refs: typing.List[str] = []
 
 
 CallCHInsertable = typing.Union[
-    CallStartCHInsertable, CallEndCHInsertable, CallDeleteCHInsertable
+    CallStartCHInsertable,
+    CallEndCHInsertable,
+    CallDeleteCHInsertable,
+    CallUpdateCHInsertable,
 ]
 
 
@@ -120,6 +149,7 @@ class SelectableCHCallSchema(BaseModel):
     id: str
 
     op_name: str
+    display_name: typing.Optional[str] = None
 
     trace_id: str
     parent_id: typing.Optional[str] = None
@@ -146,6 +176,7 @@ all_call_insert_columns = list(
     CallStartCHInsertable.model_fields.keys()
     | CallEndCHInsertable.model_fields.keys()
     | CallDeleteCHInsertable.model_fields.keys()
+    | CallUpdateCHInsertable.model_fields.keys()
 )
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
@@ -154,6 +185,13 @@ all_call_json_columns = ("inputs", "output", "attributes", "summary")
 
 # Let's just make everything required for now ... can optimize when we implement column selection
 required_call_columns = list(set(all_call_select_columns) - set([]))
+
+
+# Columns in the calls_merged table with special aggregation functions:
+call_select_raw_columns = ["id", "project_id"]  # no aggregation
+call_select_arrays_columns = ["input_refs", "output_refs"]  # array_concat_agg
+call_select_argmax_columns = ["display_name"]  # argMaxMerge
+# all others use `any`
 
 
 class ObjCHInsertable(BaseModel):
@@ -360,6 +398,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
             raise RequestTooLarge(
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
@@ -404,13 +443,35 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             for call_id in all_descendants
         ]
-        self._flush_immediately = False
-        for insertable in insertables:
-            self._insert_call(insertable)
-        self._flush_calls()
-        self._flush_immediately = True
+
+        with self.call_batch():
+            for insertable in insertables:
+                self._insert_call(insertable)
 
         return tsi.CallsDeleteRes()
+
+    def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
+        valid_update_fields = ["display_name"]
+        for field in valid_update_fields:
+            if getattr(req, field, None) is not None:
+                return
+
+        raise ValueError(
+            f"One of [{', '.join(valid_update_fields)}] is required for call update"
+        )
+
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        assert_non_null_wb_user_id(req)
+        self._ensure_valid_update_field(req)
+        renamed_insertable = CallUpdateCHInsertable(
+            project_id=req.project_id,
+            id=req.call_id,
+            wb_user_id=req.wb_user_id,
+            display_name=req.display_name,
+        )
+        self._insert_call(renamed_insertable)
+
+        return tsi.CallUpdateRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -903,6 +964,77 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise ValueError("Missing chunks")
         return tsi.FileContentReadRes(content=b"".join(chunks))
 
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        assert_non_null_wb_user_id(req)
+        validate_feedback_create_req(req)
+
+        # Augment emoji with alias.
+        res_payload = {}
+        if req.feedback_type == "wandb.reaction.1":
+            em = req.payload["emoji"]
+            if emoji.emoji_count(em) != 1:
+                raise InvalidRequest(
+                    "Value of emoji key in payload must be exactly one emoji"
+                )
+            req.payload["alias"] = emoji.demojize(em)
+            detoned = detone_emojis(em)
+            req.payload["detoned"] = detoned
+            req.payload["detoned_alias"] = emoji.demojize(detoned)
+            res_payload = req.payload
+
+        feedback_id = generate_id()
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
+        # TODO: Any validation on weave_ref?
+        payload = _dict_value_to_dump(req.payload)
+        MAX_PAYLOAD = 1024
+        if len(payload) > MAX_PAYLOAD:
+            raise InvalidRequest("Feedback payload too large")
+        row: Row = {
+            "id": feedback_id,
+            "project_id": req.project_id,
+            "weave_ref": req.weave_ref,
+            "wb_user_id": req.wb_user_id,
+            "creator": req.creator,
+            "feedback_type": req.feedback_type,
+            "payload": req.payload,
+            "created_at": created_at,
+        }
+        prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
+        self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+        return tsi.FeedbackCreateRes(
+            id=feedback_id,
+            created_at=created_at,
+            wb_user_id=req.wb_user_id,
+            payload=res_payload,
+        )
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        query = TABLE_FEEDBACK.select()
+        query = query.project_id(req.project_id)
+        query = query.fields(req.fields)
+        query = query.where(req.query)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        prepared = query.prepare(database_type="clickhouse")
+        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        result = TABLE_FEEDBACK.tuples_to_rows(
+            query_result.result_rows, prepared.fields
+        )
+        return tsi.FeedbackQueryRes(result=result)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        # TODO: Instead of passing conditions to DELETE FROM,
+        #       should we select matching ids, and then DELETE FROM WHERE id IN (...)?
+        #       This would allow us to return the number of rows deleted, and complain
+        #       if too many things would be deleted.
+        validate_feedback_purge_req(req)
+        query = TABLE_FEEDBACK.purge()
+        query = query.project_id(req.project_id)
+        query = query.where(req.query)
+        prepared = query.prepare(database_type="clickhouse")
+        self.ch_client.query(prepared.sql, prepared.parameters)
+        return tsi.FeedbackPurgeRes()
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
@@ -1012,18 +1144,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ), f"Invalid columns: {columns}"
         merged_cols = []
         for col in columns:
-            if col in ["project_id", "id"]:
+            if col in call_select_raw_columns:
                 merged_cols.append(f"{col} AS {col}")
-            elif col in ["input_refs", "output_refs"]:
+            elif col in call_select_arrays_columns:
                 merged_cols.append(f"array_concat_agg({col}) AS {col}")
+            elif col in call_select_argmax_columns:
+                merged_cols.append(f"argMaxMerge({col}) AS {col}")
             else:
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
 
-        if not having_conditions:
-            having_conditions = ["1 = 1"]
-
-        having_conditions_part = _combine_conditions(having_conditions, "AND")
+        having_conditions_part = None
+        if having_conditions:
+            having_conditions_part = _combine_conditions(having_conditions, "AND")
 
         where_conditions_part = _make_calls_where_condition_from_event_conditions(
             start_event_conditions=start_event_conditions,
@@ -1031,7 +1164,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         order_by_part = "ORDER BY started_at ASC"
+        order_by_events = set(["START"])
         if order_by is not None:
+            order_by_events = set([])
             order_parts = []
             for field, direction in order_by:
                 assert direction in [
@@ -1053,6 +1188,42 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     ]
                 else:
                     options = [(field, direction)]
+
+                start_fields = (
+                    "project_id",
+                    "id",
+                    "trace_id",
+                    "parent_id",
+                    "op_name",
+                    "started_at",
+                    "attributes",
+                    "inputs",
+                    "input_refs",
+                    "wb_user_id",
+                    "wb_run_id",
+                )
+                end_fields = (
+                    "ended_at",
+                    "exception",
+                    "summary",
+                    "output",
+                    "output_refs",
+                )
+
+                if (
+                    field in start_fields
+                    or field.startswith("inputs.")
+                    or field.startswith("attributes.")
+                ):
+                    order_by_events.add("START")
+                elif (
+                    field in end_fields
+                    or field.startswith("output.")
+                    or field.startswith("summary.")
+                ):
+                    order_by_events.add("END")
+                else:
+                    raise ValueError(f"Invalid order_by field: {field}")
 
                 # For each option, build the order by term
                 for cast, direct in options:
@@ -1082,18 +1253,56 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit_part = "LIMIT {limit: Int64}"
             parameters["limit"] = limit
 
-        query_str = f"""
-            SELECT {select_columns_part}
-            FROM calls_merged
-            WHERE project_id = {{project_id: String}}
-                AND {where_conditions_part}
-            GROUP BY project_id, id
-            HAVING deleted_at IS NULL AND
-                {having_conditions_part}
-            {order_by_part}
-            {limit_part}
-            {offset_part}
-        """
+        if having_conditions_part or len(order_by_events) != 1:
+            if having_conditions_part is None:
+                having_conditions_part == "1 = 1"
+            query_str = f"""
+                SELECT {select_columns_part}
+                FROM calls_merged
+                WHERE project_id = {{project_id: String}}
+                    AND {where_conditions_part}
+                GROUP BY project_id, id
+                HAVING {having_conditions_part}
+                {order_by_part}
+                {limit_part}
+                {offset_part}
+            """
+        else:
+            # FAST PATH!!
+            #
+            # Here we have an opportunity to optimize the query by using a subquery to
+            # filter out the rows before the group by. This is because the group by
+            # is expensive and we can avoid it if we can filter out rows before it.
+            # This is a common pattern in SQL optimization.
+            if "START" in order_by_events:
+                order_by_side = "AND isNotNull(started_at)"
+            elif "END" in order_by_events:
+                order_by_side = "AND isNotNull(ended_at)"
+            else:
+                raise ValueError("Invalid order_by_events")
+
+            where_conditions_part = f"""(
+                calls_merged.id IN (
+                    SELECT id from calls_merged WHERE (
+                        project_id = {{project_id: String}}
+                            AND
+                        {where_conditions_part}
+                    )
+                    {order_by_side}
+                    {order_by_part}
+                    {limit_part}
+                    {offset_part}
+                )
+            )"""
+            query_str = f"""
+                SELECT {select_columns_part}
+                FROM calls_merged
+                WHERE project_id = {{project_id: String}}
+                    AND {where_conditions_part}
+                GROUP BY project_id, id
+                {order_by_part}
+            """
+
         raw_res = self._query_stream(
             query_str,
             parameters,
@@ -1292,12 +1501,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if isinstance(stream.source, QueryResult):
                 summary = stream.source.summary
             logger.info(
-                {
-                    "event": "clickhouse_stream_query",
+                "clickhouse_stream_query",
+                extra={
                     "query": query,
                     "parameters": parameters,
                     "summary": summary,
-                }
+                },
             )
             for row in stream:
                 yield row
@@ -1314,12 +1523,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             query, parameters=parameters, column_formats=column_formats, use_none=True
         )
         logger.info(
-            {
-                "event": "clickhouse_query",
+            "clickhouse_query",
+            extra={
                 "query": query,
                 "parameters": parameters,
                 "summary": res.summary,
-            }
+            },
         )
         return res
 
@@ -1421,6 +1630,10 @@ def _raw_call_dict_to_ch_call(
     return SelectableCHCallSchema.model_validate(call)
 
 
+def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
+    return val if val != "" else None
+
+
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1437,6 +1650,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
+        display_name=_empty_str_to_none(ch_call.display_name),
     )
 
 
@@ -1457,6 +1671,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
+        display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
     )
 
 
@@ -1493,6 +1708,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
         wb_user_id=start_call.wb_user_id,
+        display_name=start_call.display_name,
     )
 
 
@@ -1588,7 +1804,9 @@ def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
 def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
-    combined = f" {operator} ".join([f"({c})" for c in conditions])
+    if len(conditions) == 1:
+        return conditions[0]
+    combined = f" {operator} ".join(f"({c})" for c in conditions)
     return f"({combined})"
 
 
@@ -1619,43 +1837,6 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
-
-
-param_builder_count = 0
-
-
-class ParamBuilder:
-    """ParamBuilder helps with the construction of parameterized clickhouse queries.
-    It is used in a number of functions/routines that build queries to ensure that
-    the queries are parameterized and safe from injection attacks. Specifically, a caller
-    would use it as follows:
-
-    ```
-    pb = ParamBuilder()
-    param_name = pb.add_param("some_value")
-    query = f"SELECT * FROM some_table WHERE some_column = {{{param_name}:String}}"
-    parameters = pb.get_params()
-    # Execute the query with the parameters
-    ```
-
-    With queries that have many construction phases, it is recommended to use the
-    same ParamBuilder instance to ensure that the parameter names are unique across
-    the query.
-    """
-
-    def __init__(self, prefix: typing.Optional[str] = None):
-        global param_builder_count
-        param_builder_count += 1
-        self._params: typing.Dict[str, typing.Any] = {}
-        self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
-
-    def add_param(self, param_value: typing.Any) -> str:
-        param_name = self._prefix + str(len(self._params))
-        self._params[param_name] = param_value
-        return param_name
-
-    def get_params(self) -> typing.Dict[str, typing.Any]:
-        return {**self._params}
 
 
 def _python_value_to_ch_type(value: typing.Any) -> str:
@@ -2004,8 +2185,14 @@ def _make_calls_where_condition_from_event_conditions(
             f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
         )
 
-    where_conditions_part = "(1 = 1)"
-    if event_conds:
-        where_conditions_part = _combine_conditions(event_conds, "AND")
+    # Exclude deleted calls
+    conds = _combine_conditions(
+        ["project_id = {project_id: String}", "isNotNull(deleted_at)"], "AND"
+    )
+    event_conds.append(
+        f"calls_merged.id NOT IN (SELECT id FROM calls_merged WHERE {conds})"
+    )
+
+    where_conditions_part = _combine_conditions(event_conds, "AND")
 
     return where_conditions_part
