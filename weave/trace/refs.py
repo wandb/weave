@@ -123,7 +123,10 @@ class CallRef(RefWithExtra):
         return u
 
 
-def parse_uri(uri: str) -> Union[ObjectRef, TableRef, CallRef]:
+AnyRef = Union[ObjectRef, TableRef, CallRef]
+
+
+def parse_uri(uri: str) -> AnyRef:
     if not uri.startswith("weave:///"):
         raise ValueError(f"Invalid URI: {uri}")
     path = uri[len("weave:///") :]

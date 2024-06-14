@@ -1,167 +1,195 @@
-import json
-from datetime import datetime
-from typing import Any, Collection, Iterable, Iterator, Optional
+"""Classes for working with feedback on a project or ref level."""
 
-from rich.console import Console
+import json
+from typing import Any, Iterable, Iterator, Optional
+
 from rich.table import Table
 
 from . import graph_client_context
 from . import util
 from weave import rich_pydantic_util
+from weave.refs import Refs
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
+from weave.trace.rich_container import AbstractRichContainer
 from weave.trace.refs import parse_uri
 
 
-class Feedbacks:
-    """A collection of feedback items with display utilities."""
+class Feedbacks(AbstractRichContainer[tsi.Feedback]):
+    """A collection of Feedback objects with utilities."""
 
-    items: list[tsi.Feedback]
+    show_refs: bool
 
-    def __init__(self, items: Iterable[tsi.Feedback]) -> None:
-        self.items = list(items)
+    def __init__(
+        self, show_refs: bool, feedbacks: Optional[Iterable[tsi.Feedback]] = None
+    ) -> None:
+        super().__init__("Feedback", feedbacks)
+        self.show_refs = show_refs
 
-    def __getitem__(self, index: int) -> tsi.Feedback:
-        return self.items[index]
+    def refs(self) -> Refs:
+        """Return the unique refs associated with these feedbacks."""
+        uris = list(set(feedback.weave_ref for feedback in self.items))
+        return Refs(uris)
 
-    def __iter__(self) -> Iterator[tsi.Feedback]:
-        return iter(self.items)
-
-    def __len__(self) -> int:
-        return len(self.items)
-
-    def as_rich_table(self, include_ref: bool = True) -> Table:
-        table = Table(show_header=True, header_style="bold cyan")
-        if include_ref:
+    def _add_table_columns(self, table: Table) -> None:
+        if self.show_refs:
             table.add_column("Ref", overflow="fold")
         table.add_column("Type", justify="center")
         table.add_column("Feedback", overflow="fold")
         table.add_column("Created")
         table.add_column("ID", overflow="fold")
         table.add_column("Creator")
-        for feedback in self.items:
-            typ = feedback.feedback_type
-            display_type = typ
-            if typ == "wandb.reaction.1":
-                display_type = "reaction"
-                if util.is_notebook():
-                    # TODO: Emojis mess up table alignment in Jupyter 😢
-                    #       maybe there is something else we could do here?
-                    content = feedback.payload["alias"]
-                else:
-                    content = feedback.payload["emoji"]
-            elif typ == "wandb.note.1":
-                display_type = "note"
-                content = feedback.payload["note"]
+
+    def _item_to_row(self, item: tsi.Feedback) -> list:
+        feedback = item
+
+        typ = feedback.feedback_type
+        display_type = typ
+        if typ == "wandb.reaction.1":
+            display_type = "reaction"
+            if util.is_notebook():
+                # TODO: Emojis mess up table alignment in Jupyter 😢
+                #       maybe there is something else we could do here?
+                content = feedback.payload["alias"]
             else:
-                content = json.dumps(feedback.payload, indent=2)
+                content = feedback.payload["emoji"]
+        elif typ == "wandb.note.1":
+            display_type = "note"
+            content = feedback.payload["note"]
+        else:
+            content = json.dumps(feedback.payload, indent=2)
 
-            # TODO: Prettier relative time display?
-            created_at = str(feedback.created_at.replace(tzinfo=None))
+        # TODO: Prettier relative time display?
+        created_at = str(feedback.created_at.replace(tzinfo=None))
 
-            creator = feedback.wb_user_id
-            if feedback.creator is not None:
-                creator = f"{feedback.creator} ({creator})"
+        creator = feedback.wb_user_id
+        if feedback.creator is not None:
+            creator = f"{feedback.creator} ({creator})"
 
-            row = [
-                display_type,
-                content,
-                created_at,
-                feedback.id,
-                creator,
-            ]
-            if include_ref:
-                row.insert(0, feedback.weave_ref)
-            table.add_row(*row)
-        return table
+        row = [
+            display_type,
+            content,
+            created_at,
+            feedback.id,
+            creator,
+        ]
+        if self.show_refs:
+            row.insert(0, feedback.weave_ref)
+        return row
+
+
+class FeedbackQuery:
+    """Lazy-loading object for fetching feedback from the server."""
+
+    entity: str
+    project: str
+
+    show_refs: bool
+    _query: tsi.Query
+    offset: Optional[int]
+    limit: Optional[int]
+
+    feedbacks: Optional[Feedbacks]
+
+    def __init__(
+        self,
+        entity: str,
+        project: str,
+        query: Query,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None,
+        show_refs: bool = False,
+    ):
+        self.client = graph_client_context.require_graph_client()
+        self.entity = entity
+        self.project = project
+
+        self.show_refs = show_refs
+        self._query = query
+        self.offset = offset
+        self.limit = limit
+
+        self.feedbacks = None
+
+    def __iter__(self) -> Iterator[tsi.Feedback]:
+        yield from self.execute()
+
+    def refresh(self) -> Feedbacks:
+        sort_by = [
+            {
+                "field": "created_at",
+                "direction": "asc",
+            },
+        ]
+        req = tsi.FeedbackQueryReq(
+            project_id=f"{self.entity}/{self.project}",
+            query=self._query,
+            sort_by=sort_by,
+            offset=self.offset,
+            limit=self.limit,
+        )
+        response = self.client.server.feedback_query(req)
+        # Response is dicts because API allows user to specify fields, but we don't
+        # expose that in this Python API.
+        return Feedbacks(self.show_refs, (tsi.Feedback(**r) for r in response.result))
+
+    def execute(self) -> Feedbacks:
+        if self.feedbacks is not None:
+            return self.feedbacks
+        self.feedbacks = self.refresh()
+        return self.feedbacks
+
+    def refs(self) -> Refs:
+        return self.execute().refs()
 
     def _repr_pretty_(self, p: Any, cycle: bool) -> None:
         """Show a nicely formatted table in ipython."""
         if cycle:
-            p.text("Feedbacks(...)")
-        elif len(self) == 1:
-            p.text(rich_pydantic_util.model_to_str(self.items[0]))
+            p.text("FeedbackQuery(...)")
         else:
-            table = self.as_rich_table()
-            p.text(rich_pydantic_util.table_to_str(table))
+            self.execute()
+            assert self.feedbacks is not None
+            if len(self.feedbacks) == 1:
+                p.text(rich_pydantic_util.model_to_str(self.feedbacks[0]))
+            else:
+                table = self.feedbacks.as_rich_table()
+                p.text(rich_pydantic_util.table_to_str(table))
 
 
-class RefFeedback:
+class RefFeedbackQuery(FeedbackQuery):
     """Object for interacting with feedback associated with a particular ref."""
 
     weave_ref: str
-    project_id: str
-    items: Optional[list[tsi.Feedback]] = None
 
     def __init__(self, ref: str) -> None:
-        self.weave_ref = ref
         parsed_ref = parse_uri(ref)
-        self.project_id = f"{parsed_ref.entity}/{parsed_ref.project}"
-        self.client = graph_client_context.require_graph_client()
-
-    def _maybe_fetch(self) -> None:
-        if self.items is None:
-            self.refresh()
-
-    def refresh(self) -> None:
-        self.items = self._query()
-
-    def __getitem__(self, index: int) -> tsi.Feedback:
-        self._maybe_fetch()
-        assert self.items is not None
-        return self.items[index]
-
-    def __iter__(self) -> Iterator[tsi.Feedback]:
-        self._maybe_fetch()
-        assert self.items is not None
-        return iter(self.items)
-
-    def __len__(self) -> int:
-        self._maybe_fetch()
-        assert self.items is not None
-        return len(self.items)
-
-    def add(
-        self,
-        feedback_type: str,
-        payload: Optional[dict[str, Any]] = None,
-        creator: Optional[str] = None,
-        **kwargs: dict[str, Any],
-    ) -> str:
-        """Add feedback to the ref.
-
-        feedback_type: A string identifying the type of feedback. The "wandb." prefix is reserved.
-        creator: The name to display for the originator of the feedback.
-        """
-        if feedback_type.startswith("wandb."):
-            raise ValueError('Feedback type cannot start with "wandb."')
-        feedback = {}
-        feedback.update(payload or {})
-        feedback.update(kwargs)
-        return self._add(feedback_type, feedback, creator)
+        query = {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "weave_ref"},
+                    {"$literal": ref},
+                ],
+            }
+        }
+        super().__init__(
+            entity=parsed_ref.entity,
+            project=parsed_ref.project,
+            query=Query(**query),
+        )
+        self.weave_ref = ref
 
     def _add(
         self, feedback_type: str, payload: dict[str, Any], creator: Optional[str]
     ) -> str:
-        self._maybe_fetch()
-        assert self.items is not None
         freq = tsi.FeedbackCreateReq(
-            project_id=self.project_id,
+            project_id=f"{self.entity}/{self.project}",
             weave_ref=self.weave_ref,
             feedback_type=feedback_type,
             payload=payload,
             creator=creator,
         )
         response = self.client.server.feedback_create(freq)
-
-        # Add to internal items so we don't have to refresh
-        feedback = tsi.Feedback(
-            **freq.dict(),
-            id=response.id,
-            created_at=response.created_at,
-            wb_user_id=response.wb_user_id,
-        )
-        self.items.append(feedback)
+        self.feedbacks = None  # Clear cache
         return response.id
 
     def add_reaction(self, emoji: str, creator: Optional[str] = None) -> str:
@@ -182,60 +210,21 @@ class RefFeedback:
             creator=creator,
         )
 
-    # TODO: Consider exposing more flexible query options.
-    def query(self, limit: Optional[int] = None) -> Feedbacks:
-        return Feedbacks(self._query(limit))
-
-    def _query(self, limit: Optional[int] = None) -> list[tsi.Feedback]:
+    def purge(self, feedback_id: str) -> None:
+        # TODO: For safety we should also specify the weave_ref here
+        #       But we need to loosen up the query restrictions in the
+        #       backend to support that first.
         query = {
             "$expr": {
                 "$eq": [
-                    {"$getField": "weave_ref"},
-                    {"$literal": self.weave_ref},
+                    {"$getField": "id"},
+                    {"$literal": feedback_id},
                 ],
             }
         }
-        sort_by = [
-            {
-                "field": "created_at",
-                "direction": "asc",
-            },
-        ]
-        req = tsi.FeedbackQueryReq(
-            project_id=self.project_id,
-            query=query,
-            sort_by=sort_by,
-            limit=limit,
-        )
-        response = self.client.server.feedback_query(req)
-        # Response is dicts because API allows user to specify fields, but we don't
-        # expose that in this Python API.
-        return list(tsi.Feedback(**r) for r in response.result)
-
-    def purge(self, feedback_id: str) -> None:
         req = tsi.FeedbackPurgeReq(
-            project_id=self.project_id,
-            query=Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "id"},
-                            {"$literal": feedback_id},
-                        ],
-                    }
-                }
-            ),
+            project_id=f"{self.entity}/{self.project}",
+            query=Query(**query),
         )
         self.client.server.feedback_purge(req)
-        if self.items:
-            self.items = [f for f in self.items if f.id != feedback_id]
-
-    def _repr_pretty_(self, p: Any, cycle: bool) -> None:
-        """Show a nicely formatted table in ipython."""
-        if cycle:
-            p.text("RefFeedback(...)")
-        else:
-            self._maybe_fetch()
-            assert self.items is not None
-            table = Feedbacks(self.items).as_rich_table(include_ref=False)
-            p.text(rich_pydantic_util.table_to_str(table))
+        self.feedbacks = None  # Clear cache

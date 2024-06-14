@@ -10,7 +10,7 @@ import datetime
 from requests import HTTPError
 
 from weave.exception import exception_to_json_str
-from weave.feedback import RefFeedback, Feedbacks
+from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
 from weave import trace_sentry, urls
 from weave import run_context
@@ -152,10 +152,10 @@ class Call:
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
-    _feedback: Optional[RefFeedback] = None
+    _feedback: Optional[RefFeedbackQuery] = None
 
     @property
-    def feedback(self) -> RefFeedback:
+    def feedback(self) -> RefFeedbackQuery:
         if not self.id:
             raise ValueError("Can't get feedback for call without ID")
         if self._feedback is None:
@@ -164,7 +164,7 @@ class Call:
                 raise ValueError(f"Invalid project_id: {self.project_id}")
             entity, project = project_parts
             weave_ref = CallRef(entity, project, self.id)
-            self._feedback = RefFeedback(weave_ref.uri())
+            self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
 
     @property
@@ -650,8 +650,8 @@ class WeaveClient:
         reaction: Optional[str] = None,
         offset: int = 0,
         limit: int = 100,
-    ) -> Feedbacks:
-        """Query for feedback.
+    ) -> FeedbackQuery:
+        """Query project for feedback.
 
         Examples:
             # Fetch a specific feedback object.
@@ -669,7 +669,7 @@ class WeaveClient:
             limit: The maximum number of feedback objects to fetch.
 
         Returns:
-            A collection of Feedback objects.
+            A FeedbackQuery object.
         """
         expr: dict[str, Any] = {
             "$eq": [
@@ -707,15 +707,14 @@ class WeaveClient:
             }
         rewritten_query = Query(**{"$expr": expr})
 
-        response = self.server.feedback_query(
-            FeedbackQueryReq(
-                project_id=self._project_id(),
-                query=rewritten_query,
-                offset=offset,
-                limit=limit,
-            )
+        return FeedbackQuery(
+            entity=self.entity,
+            project=self.project,
+            query=rewritten_query,
+            offset=offset,
+            limit=limit,
+            show_refs=True,
         )
-        return Feedbacks(Feedback(**r) for r in response.result)
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
