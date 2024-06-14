@@ -28,13 +28,13 @@ class IdConverter:
     def int_to_ext_run_id(self, run_id: str) -> str:
         raise NotImplementedError()
 
-    # @abc.abstractmethod
-    # def ext_to_int_user_id(self, user_id: str) -> str:
-    #     raise NotImplementedError()
+    @abc.abstractmethod
+    def ext_to_int_user_id(self, user_id: str) -> str:
+        raise NotImplementedError()
 
-    # @abc.abstractmethod
-    # def int_to_ext_user_id(self, user_id: str) -> str:
-    #     raise NotImplementedError()
+    @abc.abstractmethod
+    def int_to_ext_user_id(self, user_id: str) -> str:
+        raise NotImplementedError()
 
 
 A = TypeVar("A")
@@ -93,6 +93,8 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
         if req.start.wb_run_id is not None:
             req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
+        if req.start.wb_user_id is not None:
+            req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
         return self._ref_apply(self._internal_trace_server.call_start, req)
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
@@ -108,6 +110,8 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         res.call.project_id = original_project_id
         if res.call.wb_run_id is not None:
             res.call.wb_run_id = self._idc.int_to_ext_run_id(res.call.wb_run_id)
+        if res.call.wb_user_id is not None:
+            res.call.wb_user_id = self._idc.int_to_ext_user_id(res.call.wb_user_id)
         return res
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
@@ -119,7 +123,13 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                     self._idc.ext_to_int_run_id(run_id)
                     for run_id in req.filter.wb_run_ids
                 ]
-            # TODO: How do we correctly process the query filters?
+            # TODO: How do we correctly process run_id for the query filters?
+            if req.filter.wb_user_ids is not None:
+                req.filter.wb_user_ids = [
+                    self._idc.ext_to_int_user_id(user_id)
+                    for user_id in req.filter.wb_user_ids
+                ]
+            # TODO: How do we correctly process user_id for the query filters?
         res = self._ref_apply(self._internal_trace_server.calls_query, req)
         for call in res.calls:
             if call.project_id != req.project_id:
@@ -127,6 +137,8 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             call.project_id = original_project_id
             if call.wb_run_id is not None:
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
+            if res.call.wb_user_id is not None:
+                res.call.wb_user_id = self._idc.int_to_ext_user_id(res.call.wb_user_id)
         return res
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
@@ -139,6 +151,12 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                     for run_id in req.filter.wb_run_ids
                 ]
             # TODO: How do we correctly process the query filters?
+            if req.filter.wb_user_ids is not None:
+                req.filter.wb_user_ids = [
+                    self._idc.ext_to_int_user_id(user_id)
+                    for user_id in req.filter.wb_user_ids
+                ]
+            # TODO: How do we correctly process user_id for the query filters?
         res = self._stream_ref_apply(
             self._internal_trace_server.calls_query_stream, req
         )
@@ -148,10 +166,14 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             call.project_id = original_project_id
             if call.wb_run_id is not None:
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
+            if call.wb_user_id is not None:
+                call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
             yield call
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.int_to_ext_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.calls_delete, req)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
@@ -163,10 +185,18 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                     for run_id in req.filter.wb_run_ids
                 ]
             # TODO: How do we correctly process the query filters?
+            if req.filter.wb_user_ids is not None:
+                req.filter.wb_user_ids = [
+                    self._idc.ext_to_int_user_id(user_id)
+                    for user_id in req.filter.wb_user_ids
+                ]
+            # TODO: How do we correctly process user_id for the query filters?
         return self._ref_apply(self._internal_trace_server.calls_query_stats, req)
 
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.int_to_ext_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.call_update, req)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
@@ -238,17 +268,31 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.feedback_create, req)
+        original_user_id = req.wb_user_id
+        if original_user_id is None:
+            raise ValueError("wb_user_id cannot be None")
+        req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
+        res = self._ref_apply(self._internal_trace_server.feedback_create, req)
+        if res.wb_user_id != req.wb_user_id:
+            raise ValueError("Internal Error - User Mismatch")
+        res.wb_user_id = original_user_id
+        return res
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        # TODO: How to handle wb_user_id and wb_run_id in the query filters?
         res = self._ref_apply(self._internal_trace_server.feedback_query, req)
         for feedback in res.result:
             if "project_id" in feedback:
                 if feedback["project_id"] != req.project_id:
                     raise ValueError("Internal Error - Project Mismatch")
                 feedback["project_id"] = original_project_id
+            if "wb_user_id" in feedback:
+                if feedback["wb_user_id"] is not None:
+                    feedback["wb_user_id"] = self._idc.int_to_ext_user_id(
+                        feedback["wb_user_id"]
+                    )
         return res
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
