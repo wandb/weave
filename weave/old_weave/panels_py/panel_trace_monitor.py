@@ -4,10 +4,10 @@ import weave
 from weave import dispatch, graph, util, weave_internal
 from weave import weave_internal as internal
 from weave import weave_types as types
+from weave.old_weave.panels_py import panel_autoboard
+from weave.old_weave.panels_py.generator_templates import template_registry
 from weave.panels import panel_board, panel_group, panel_trace
 from weave.panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
-from weave.panels_py import panel_autoboard
-from weave.panels_py.generator_templates import template_registry
 
 panels = weave.panels
 ops = weave.ops

@@ -27,8 +27,8 @@ import typing
 
 import weave
 from weave import util, weave_internal
+from weave.old_weave.panels_py.generator_templates import template_registry
 from weave.panels import panel_plot
-from weave.panels_py.generator_templates import template_registry
 
 
 @weave.type()

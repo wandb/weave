@@ -110,7 +110,8 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
-    from weave import ops, panels, panels_py
+    from weave import ops, panels
+    from weave.old_weave import panels_py
 
     # Attempt to import MVP ecosystem modules
     try:

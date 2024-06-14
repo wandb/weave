@@ -1,7 +1,7 @@
 import typing
 
 import weave
-from ..panels_py import generator_templates
+from ..old_weave.panels_py import generator_templates
 import wandb
 from weave.wandb_interface.wandb_stream_table import StreamTable
 from .. import context_state as _context
