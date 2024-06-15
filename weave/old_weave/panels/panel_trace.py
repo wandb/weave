@@ -62,4 +62,4 @@ class Trace(panel.Panel):
 )
 def active_span(self: Trace):
     index = 0 if self.config is None else self.config.selectedSpanIndex
-    return weave.ops_arrow.list_ops.index(self.input_node, index)
+    return weave.old_weave.ops_arrow.list_ops.index(self.input_node, index)

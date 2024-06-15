@@ -5,20 +5,20 @@ import pyarrow as pa
 import pytest
 from pyarrow import compute as pc
 
+from weave.old_weave import ops_arrow as arrow
 from weave.old_weave.language_features.tagging import (
     make_tag_getter_op,
     tag_store,
     tagged_value_type,
 )
+from weave.old_weave.ops_arrow import arraylist_ops, convert_ops, util
 from weave.old_weave.ops_domain import run_ops
 from weave.old_weave.ops_domain import wb_domain_types as wdt
 from weave.old_weave.ops_primitives import Boolean, Number, date, dict_, list_
 
 from .. import api as weave
 from .. import box, dispatch, errors, ops, weave_internal
-from .. import ops_arrow as arrow
 from .. import weave_types as types
-from ..ops_arrow import arraylist_ops, convert_ops, util
 
 string_ops_test_cases = [
     ("eq-scalar", lambda x: x == "bc", [True, False, False]),

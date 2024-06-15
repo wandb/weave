@@ -443,7 +443,7 @@ def is_run_op(op_call: graph.Op):
 
 
 def get_bytes_read_to_arrow(node: graph.Node, result: typing.Any) -> int:
-    from .ops_arrow import ArrowWeaveList
+    from .old_weave.ops_arrow import ArrowWeaveList
 
     # deref if we have a ref
     result = ref_base.deref(result)

@@ -271,7 +271,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "flatten":
         from weave.old_weave.arrow.arrow import ArrowWeaveListType
 
-        from .ops_arrow.list_ops import _concat_output_type
+        from .old_weave.ops_arrow.list_ops import _concat_output_type
 
         # The operation of flattening a lists of arrow weave lists is exactly equal to the far
         # more efficient, vectorized concat operation. If this is the case, use it!.
@@ -287,7 +287,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "concat":
         from weave.old_weave.arrow.arrow import ArrowWeaveListType
 
-        from .ops_arrow.list_ops import flatten_return_type
+        from .old_weave.ops_arrow.list_ops import flatten_return_type
 
         # The operation of concat on a awl of lists is exactly equal to the far
         # more efficient, vectorized flatten operation. If this is the case, use it!.

@@ -10,7 +10,7 @@ from typing_extensions import (
 )
 
 import weave
-from weave import ops_arrow
+from weave.old_weave import ops_arrow
 
 
 class HDBSCANOptions(TypedDict):

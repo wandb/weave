@@ -11,7 +11,6 @@ from weave import (
     engine_trace,
     errors,
     io_service,
-    ops_arrow,
     util,
     wandb_util,
     weave_internal,
@@ -20,6 +19,7 @@ from weave import timestamp as weave_timestamp
 from weave import weave_types as types
 from weave.api import op, weave_class
 from weave.old_weave.ops_domain import trace_tree, wbmedia
+from weave.old_weave import ops_arrow
 
 
 @dataclasses.dataclass(frozen=True)

@@ -1,14 +1,12 @@
 import pytest
 from PIL import Image
 
-
-from .. import context_state as _context
-
-from . import geom
+from weave.old_weave import ops_arrow
 
 from .. import api as weave
-from .. import ops_arrow
+from .. import context_state as _context
 from .. import errors
+from . import geom
 
 
 def test_mapped_method_on_custom_type():

@@ -6,9 +6,9 @@ import wandb
 import weave
 from weave.old_weave.language_features.tagging import make_tag_getter_op
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.old_weave.ops_arrow.list_ops import filter
 from weave.old_weave.ops_domain import wbmedia
 from weave.old_weave.ops_domain.wandb_domain_gql import _make_alias
-from weave.ops_arrow.list_ops import filter
 from weave.weave_internal import make_const_node
 
 

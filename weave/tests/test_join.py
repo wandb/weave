@@ -1,5 +1,5 @@
 import weave
-from weave import ops_arrow
+from weave.old_weave import ops_arrow
 from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
 
 

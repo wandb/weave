@@ -38,7 +38,7 @@ def _is_optional_tagged_value(
 
 
 def _strip_tags(val: typing.Any) -> typing.Any:
-    from weave.ops_arrow import ArrowWeaveList
+    from weave.old_weave.ops_arrow import ArrowWeaveList
 
     if isinstance(val, ArrowWeaveList):
         if _is_tagged_value(val.object_type):

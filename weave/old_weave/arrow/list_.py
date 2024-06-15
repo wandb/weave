@@ -1499,7 +1499,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
     ):
         fn = self._make_lambda_node(fn)
-        from weave.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
+        from weave.old_weave.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
 
         return _apply_fn_node_with_tag_pushdown(self, fn)  # type: ignore
 
@@ -1518,7 +1518,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         leftOuter: bool = False,
         rightOuter: bool = False,
     ):
-        from weave.ops_arrow import list_join
+        from weave.old_weave.ops_arrow import list_join
 
         join1Fn = self._make_lambda_node(join1Fn)
         join2Fn = other._make_lambda_node(join2Fn)

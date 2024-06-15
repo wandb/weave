@@ -33,7 +33,7 @@ from weave.old_weave import panels
                 )
             ),
             lambda: """weave.old_weave.panels.panel_table.Table(
-            weave.ops_arrow.list_range.range(1, 100, 1,).map(
+            weave.old_weave.ops_arrow.list_range.range(1, 100, 1,).map(
                 lambda row: weave.old_weave.ops_primitives.dict.dict_(
                     x=row,
                     y=weave.old_weave.ops_primitives.list_.make_list(
@@ -53,7 +53,7 @@ from weave.old_weave import panels
                 )
             ),
             lambda: """weave.old_weave.panels.panel_plot.Plot(
-            weave.ops_arrow.list_range.range(1, 100, 1,).map(
+            weave.old_weave.ops_arrow.list_range.range(1, 100, 1,).map(
                 lambda row: weave.old_weave.ops_primitives.dict.dict_(
                     x=row,
                     y=row.powBinary(2,),
@@ -102,7 +102,7 @@ from weave.old_weave import panels
             lambda: """weave.old_weave.panels.panel_group.Group(
     items={
         "table": weave.old_weave.panels.panel_table.Table(
-            weave.ops_arrow.list_range.range(1, 100, 1,),
+            weave.old_weave.ops_arrow.list_range.range(1, 100, 1,),
             columns=[
                 lambda row: row,
                 lambda row: row.powBinary(2,),

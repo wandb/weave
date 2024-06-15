@@ -5,8 +5,7 @@ import time
 import pytest
 
 import weave
-from weave import ops_arrow
-from weave.old_weave import ops_primitives
+from weave.old_weave import ops_arrow, ops_primitives
 
 
 @pytest.mark.skip(reason="Performance test")

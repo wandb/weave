@@ -1,5 +1,5 @@
 import weave
-from weave import ops_arrow
+from weave.old_weave import ops_arrow
 
 
 def test_cond_basic():

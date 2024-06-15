@@ -6,11 +6,11 @@ import pyarrow as pa
 import pytest
 
 import weave
+from weave.old_weave.ops_arrow import ArrowWeaveList, arrow_as_array
 from weave.old_weave.ops_domain.run_segment import RunSegment
 
 from .. import api, ops, storage, weave_internal
 from .. import weave_types as types
-from ..ops_arrow import ArrowWeaveList, arrow_as_array
 
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 

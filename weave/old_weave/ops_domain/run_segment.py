@@ -7,7 +7,7 @@ from weave import context_state as _context
 from weave import weave_types as types
 from weave.api import Node, get, use
 from weave.old_weave import panels
-from weave.ops_arrow import ArrowWeaveList, ArrowWeaveListType
+from weave.old_weave.ops_arrow import ArrowWeaveList, ArrowWeaveListType
 
 _loading_builtins_token = _context.set_loading_built_ins()
 

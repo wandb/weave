@@ -7,6 +7,9 @@ import pyarrow as pa
 import pytest
 from PIL import Image
 
+# If you're thinking of import vectorize here, don't! Put your
+# tests in test_arrow_vectorizer.py instead
+from weave.old_weave import ops_arrow as arrow
 from weave.old_weave.arrow import constructors
 from weave.old_weave.arrow.arrow_tags import (
     recursively_encode_pyarrow_strings_as_dictionaries,
@@ -31,10 +34,6 @@ from .. import (
     storage,
     weave_internal,
 )
-
-# If you're thinking of import vectorize here, don't! Put your
-# tests in test_arrow_vectorizer.py instead
-from .. import ops_arrow as arrow
 from .. import weave_types as types
 from ..op_def import map_type
 from ..tests import tag_test_util as ttu
@@ -1315,7 +1314,7 @@ def test_stddev():
 
 
 def test_join_all_struct_val():
-    from weave import ops_arrow
+    from weave.old_weave import ops_arrow
 
     t1 = arrow.to_arrow([{"a": 5, "b": {"c": 6}}])
     t2 = arrow.to_arrow([{"a": 9, "b": {"c": 10}}, {"a": 5, "b": {"c": 11}}])

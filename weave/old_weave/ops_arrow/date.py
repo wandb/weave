@@ -8,7 +8,7 @@ from weave import weave_types as types
 from weave.api import op
 from weave.decorator_arrow_op import arrow_op
 from weave.old_weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
-from weave.ops_arrow import util
+from weave.old_weave.ops_arrow import util
 
 ARROW_WEAVE_LIST_TIMESTAMP_TYPE = ArrowWeaveListType(types.Timestamp())
 ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())
