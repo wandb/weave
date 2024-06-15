@@ -3,9 +3,9 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
+from weave.old_weave import arrow_util
 from weave import (
     api,
-    arrow_util,
     artifact_base,
     artifact_mem,
     box,
