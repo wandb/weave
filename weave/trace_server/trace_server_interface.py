@@ -417,57 +417,61 @@ class TraceServerInterface:
     # Call API
     @abc.abstractmethod
     def call_start(self, req: CallStartReq) -> CallStartRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def call_end(self, req: CallEndReq) -> CallEndRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def call_read(self, req: CallReadReq) -> CallReadRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
-        ...
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def calls_query_stream(self, req: CallsQueryReq) -> typing.Iterator[CallSchema]:
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
-        ...
+        raise NotImplementedError()
 
     # Op API
     @abc.abstractmethod
     def op_create(self, req: OpCreateReq) -> OpCreateRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def op_read(self, req: OpReadReq) -> OpReadRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
-        ...
+        raise NotImplementedError()
 
     # Obj API
     @abc.abstractmethod
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def obj_read(self, req: ObjReadReq) -> ObjReadRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def table_create(self, req: TableCreateReq) -> TableCreateRes:
