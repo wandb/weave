@@ -647,6 +647,7 @@ class WeaveClient:
     def feedback(
         self,
         query: Optional[Union[Query, str]] = None,
+        *,
         reaction: Optional[str] = None,
         offset: int = 0,
         limit: int = 100,

@@ -11,7 +11,7 @@ from weave import rich_pydantic_util
 from weave.refs import Refs
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
-from weave.trace.rich_container import AbstractRichContainer
+from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import parse_uri
 
 
@@ -28,7 +28,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
 
     def refs(self) -> Refs:
         """Return the unique refs associated with these feedbacks."""
-        uris = list(set(feedback.weave_ref for feedback in self.items))
+        uris = list(dict.fromkeys(feedback.weave_ref for feedback in self.items))
         return Refs(uris)
 
     def _add_table_columns(self, table: Table) -> None:
@@ -113,6 +113,12 @@ class FeedbackQuery:
 
     def __iter__(self) -> Iterator[tsi.Feedback]:
         yield from self.execute()
+
+    def __getitem__(self, index: int) -> tsi.Feedback:
+        return self.execute()[index]
+
+    def __len__(self) -> int:
+        return len(self.execute())
 
     def refresh(self) -> Feedbacks:
         sort_by = [
