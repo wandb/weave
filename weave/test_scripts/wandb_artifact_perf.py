@@ -20,7 +20,7 @@ from .. import weave_http
 from weave.old_weave import artifact_wandb
 from .. import wandb_file_manager
 from .. import io_service
-from .. import async_map
+from weave.old_weave import async_map
 
 tracer = engine_trace.tracer()  # type: ignore
 

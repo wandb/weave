@@ -1,7 +1,7 @@
 from .. import api
 from .. import storage
 from .. import ops
-from .. import async_demo
+from weave.old_weave import async_demo
 import pytest
 from .. import runs
 

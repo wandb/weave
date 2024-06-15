@@ -6,35 +6,36 @@
 # traces in local development.
 # TODO: Fix
 
-import time
-import atexit
-import queue
-import uuid
 import asyncio
-import dataclasses
-import typing
+import atexit
 import contextlib
-import aioprocessing
-import multiprocessing
+import dataclasses
 import logging
-import traceback
+import multiprocessing
+import queue
 import threading
+import time
+import traceback
+import typing
+import uuid
+from typing import Any, Callable, Dict, Iterator, TypeVar
 
+import aioprocessing
 
-from weave.old_weave import artifact_wandb
-from . import cache
-from . import errors
-from . import engine_trace
-from . import filesystem
-from . import weave_http
-from . import wandb_api
-from . import wandb_file_manager
-from . import server_error_handling
-from . import async_queue
-from . import context_state
-from . import uris
-from typing import Any, Callable, Dict, TypeVar, Iterator
+from weave.old_weave import artifact_wandb, async_queue
 
+from . import (
+    cache,
+    context_state,
+    engine_trace,
+    errors,
+    filesystem,
+    server_error_handling,
+    uris,
+    wandb_api,
+    wandb_file_manager,
+    weave_http,
+)
 
 tracer = engine_trace.tracer()  # type: ignore
 statsd = engine_trace.statsd()  # type: ignore

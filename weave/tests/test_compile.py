@@ -7,8 +7,8 @@ from weave.old_weave.ops_arrow import to_arrow
 from weave.old_weave.ops_arrow.vectorize import raise_on_python_bailout
 from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
 from weave.weave_internal import const, define_fn, make_const_node
-
-from .. import async_demo, compile, graph
+from weave.old_weave import async_demo
+from .. import compile, graph
 from .. import weave_types as types
 from ..api import use
 
