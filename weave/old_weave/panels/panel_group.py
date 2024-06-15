@@ -3,9 +3,8 @@ import dataclasses
 import typing
 
 import weave
+from weave.old_weave import codifiable_value_mixin, codify
 from weave import (
-    codifiable_value_mixin,
-    codify,
     dispatch,
     errors,
     graph,

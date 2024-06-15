@@ -1,7 +1,5 @@
 {
-  "include": [
-    "weave/",
-  ],
+  "include": ["weave/"],
   "exclude": [
     "genpydocs.py",
     "docker_build.py",
@@ -21,7 +19,7 @@
     "weave/box.py",
     "weave/cli.py",
     "weave/client_interface.py",
-    "weave/codify.py",
+    "weave.old_weave.codify.py",
     "weave/compile_domain.py",
     "weave/conftest.py",
     "weave/context.py",
@@ -97,5 +95,5 @@
   "reportFunctionMemberAccess": true,
   "reportIncompatibleMethodOverride": true,
   "reportIncompatibleVariableOverride": true,
-  "reportOverlappingOverload": true,
+  "reportOverlappingOverload": true
 }

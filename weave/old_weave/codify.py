@@ -6,7 +6,9 @@ import typing
 
 import black
 
-from . import codifiable_value_mixin, graph, registry_mem, storage, weave_types
+from weave import graph, registry_mem, storage, weave_types
+
+from . import codifiable_value_mixin
 
 
 # User-facing Apis
@@ -94,7 +96,7 @@ def _try_otc_using_codifiable_mixin(obj: typing.Any) -> typing.Optional[str]:
 #         assert weave_types.type_name_to_type(obj_type.name)() == obj_type
 #         d = obj_type.instance_to_dict(obj)
 #         obj_type_name = obj_type.name
-#         return f"""weave.codify.load_type({obj_type_name}, {d})"""
+#         return f"""weave.old_weave.codify.load_type({obj_type_name}, {d})"""
 #     return None
 
 
@@ -159,7 +161,7 @@ def _try_otc_using_dataclasses(obj: typing.Any) -> typing.Optional[str]:
 
 
 def _otc_using_storage_fallback(obj: typing.Any) -> str:
-    return f"""weave.codify.load({storage.to_python(obj)})"""
+    return f"""weave.old_weave.codify.load({storage.to_python(obj)})"""
 
 
 # Helpers

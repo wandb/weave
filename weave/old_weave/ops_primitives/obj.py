@@ -1,6 +1,6 @@
 import typing
 
-from weave import codify
+from weave.old_weave import codify
 from weave import weave_types as types
 from weave.api import op, weave_class
 

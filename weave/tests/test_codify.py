@@ -223,7 +223,7 @@ def test_table_case(cereal_csv, consistent_table_col_ids):
 
 
 def _test_object_codification(panel, code=None):
-    panel_code = weave.codify.object_to_code(panel)
+    panel_code = weave.old_weave.codify.object_to_code(panel)
 
     generated_panel = eval(panel_code)
 
