@@ -1,38 +1,39 @@
-import re
 import contextlib
 import dataclasses
-import os
 import functools
+import logging
+import os
+import re
 import tempfile
 import typing
-import requests
-import logging
+from urllib import parse
 
+import requests
 from wandb import Artifact
 from wandb.apis.public import api as wb_public
-from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
+from wandb.sdk.lib.hashutil import b64_to_hex_id, hex_to_b64_id
 
-from . import urls
-from . import uris
-from . import util
-from . import errors
-from . import wandb_client_api
-from . import file_base
-from . import file_util
-
-from . import weave_types as types
-from . import artifact_fs
-from . import filesystem
-from . import memo
-from . import eager
-from . import graph_client_context
+from weave import (
+    eager,
+    engine_trace,
+    errors,
+    file_base,
+    file_util,
+    filesystem,
+    graph_client_context,
+    memo,
+    uris,
+    urls,
+    util,
+    wandb_client_api,
+)
+from weave import weave_types as types
+from weave.old_weave import artifact_fs
 from weave.old_weave.wandb_interface import wandb_artifact_pusher
-from . import engine_trace
-
-from urllib import parse
 
 if typing.TYPE_CHECKING:
     from weave.old_weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+
     from .run_streamtable_span import RunStreamTableSpan
 
 
@@ -417,7 +418,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             ]
         ] = None,
     ):
-        from . import io_service
+        from weave import io_service
 
         self.io_service = io_service.get_sync_client()
         self.name = name

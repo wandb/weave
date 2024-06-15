@@ -8,12 +8,14 @@ import pathlib
 import re
 import typing
 
-from . import (
+from weave.old_weave import (
     artifact_base,
     artifact_fs,
     artifact_local,
     artifact_mem,
     artifact_wandb,
+)
+from . import (
     box,
     errors,
     graph,

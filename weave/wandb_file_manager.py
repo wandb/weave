@@ -6,23 +6,16 @@ import datetime
 import json
 import typing
 import urllib
+from urllib import parse
+
 from aiohttp import BasicAuth
 from requests.auth import HTTPBasicAuth
-
 from wandb.sdk.lib import hashutil
 
+from weave.old_weave import artifact_wandb
 
-from . import artifact_wandb
-from . import errors
-from . import engine_trace
-from . import filesystem
-from . import weave_http
-from . import wandb_api
+from . import cache, engine_trace, errors, filesystem, wandb_api, weave_http
 from . import environment as weave_env
-from . import cache
-
-
-from urllib import parse
 
 tracer = engine_trace.tracer()  # type: ignore
 

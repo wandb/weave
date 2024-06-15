@@ -8,9 +8,8 @@ import pyarrow as pa
 from weave.old_weave.arrow import arrow
 from weave.old_weave.language_features.tagging import tagged_value_type
 
-from weave.old_weave import arrow_util
+from weave.old_weave import arrow_util, artifact_base
 from . import (
-    artifact_base,
     box,
     errors,
     mappers,

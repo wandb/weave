@@ -4,15 +4,19 @@ import pytest
 
 import weave
 from weave import storage
-from weave.artifact_fs import BranchPointType, FilesystemArtifactRef
-from weave.artifact_local import LocalArtifact, LocalArtifactRef, WeaveLocalArtifactURI
-from weave.artifact_wandb import (
+from weave.old_weave import panels
+from weave.old_weave.artifact_fs import BranchPointType, FilesystemArtifactRef
+from weave.old_weave.artifact_local import (
+    LocalArtifact,
+    LocalArtifactRef,
+    WeaveLocalArtifactURI,
+)
+from weave.old_weave.artifact_wandb import (
     WandbArtifact,
     WandbArtifactRef,
     WeaveWBArtifactURI,
     likely_commit_hash,
 )
-from weave.old_weave import panels
 from weave.uris import WeaveURI
 
 

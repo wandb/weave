@@ -1,17 +1,19 @@
-import click
 import os
+import sys
 import time
 import typing
-import sys
+
+import click
+
 from weave import __version__
+from weave.old_weave import artifact_wandb
+from weave.trace.refs import ObjectRef, parse_uri
+
+from . import api
+from .deploy import gcp as google
 
 # from .model_server import app
 from .urls import BROWSE3_PATH
-from . import api
-from . import artifact_wandb
-from .deploy import gcp as google
-
-from weave.trace.refs import parse_uri, ObjectRef
 
 # TODO: does this work?
 os.environ["PYTHONUNBUFFERED"] = "1"

@@ -14,8 +14,9 @@ from . import box, context_state, errors, mappers_python, object_type_ref_util
 from . import timestamp as weave_timestamp
 
 if typing.TYPE_CHECKING:
-    from . import artifact_base, weave_inspector
-    from .artifact_fs import FilesystemArtifact
+    from . import weave_inspector
+    from weave.old_weave import artifact_base
+    from weave.old_weave.artifact_fs import FilesystemArtifact
 
 
 def to_weavejs_typekey(k: str) -> str:
@@ -1413,7 +1414,7 @@ class LocalArtifactRefType(FilesystemArtifactRefType):
 @dataclasses.dataclass(frozen=True)
 class WandbArtifactRefType(FilesystemArtifactRefType):
     def load_instance(self, artifact, name, extra=None):
-        from . import artifact_wandb
+        from weave.old_weave import artifact_wandb
 
         return artifact_wandb.WandbArtifactRef(artifact, name)
 

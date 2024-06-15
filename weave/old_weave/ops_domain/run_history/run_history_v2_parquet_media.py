@@ -5,8 +5,8 @@
 import json
 
 import pyarrow as pa
-
-from weave import artifact_mem, engine_trace, gql_json_cache
+from weave.old_weave import artifact_mem
+from weave import engine_trace, gql_json_cache
 from weave import weave_types as types
 from weave.api import op, use
 from weave.gql_op_plugin import wb_gql_op_plugin

@@ -1,8 +1,8 @@
 import numpy as np
 
+from weave.old_weave import artifact_fs, artifact_wandb
 from weave.old_weave.ops_domain import table
 
-from .. import artifact_fs, artifact_wandb
 from .. import types_numpy as numpy_types
 from .. import weave_types as types
 

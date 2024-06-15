@@ -3,8 +3,8 @@ import pytest
 from .. import environment
 from .. import wandb_api
 from .. import errors
-from .. import artifact_fs
-from .. import artifact_local
+from weave.old_weave import artifact_fs
+from weave.old_weave import artifact_local
 from .. import storage
 import weave
 

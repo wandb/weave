@@ -35,7 +35,7 @@ from weave import weave_types as types
 from weave.old_weave.language_features.tagging import tag_store
 
 if typing.TYPE_CHECKING:
-    from weave import artifact_base, artifact_fs
+    from weave.old_weave import artifact_base, artifact_fs
 
 
 def flatten_tag_type_to_typed_dict(tag_type: types.Type) -> types.TypedDict:

@@ -6,13 +6,13 @@ import json
 import os
 import typing
 
+from weave import errors, file_base, object_context, ref_base, ref_util, uris
+from weave import weave_types as types
+from weave.old_weave import artifact_base
 from weave.old_weave.language_features.tagging import tag_store
 
-from . import artifact_base, errors, file_base, object_context, ref_base, ref_util, uris
-from . import weave_types as types
-
 if typing.TYPE_CHECKING:
-    from . import graph
+    from weave import graph
 
 
 class FilesystemArtifactType(types.Type):
@@ -266,7 +266,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
 
         ot = self._outer_type
         if self.extra is not None:
-            from . import types_numpy
+            from weave import types_numpy
 
             if not types.is_list_like(ot) and isinstance(
                 ot, types_numpy.NumpyArrayType
@@ -450,7 +450,7 @@ class FilesystemArtifactFile(file_base.File):
         return self.artifact.size(self.path)
 
     def digest(self) -> typing.Optional[str]:
-        from weave.artifact_wandb import WandbArtifact
+        from weave.old_weave.artifact_wandb import WandbArtifact
 
         if isinstance(self.artifact, WandbArtifact):
             # we can get the digest from the manifest (much faster)

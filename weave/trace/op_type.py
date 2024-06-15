@@ -17,7 +17,7 @@ from .. import context_state
 from .. import errors
 from .. import environment
 from .. import storage
-from .. import artifact_fs
+from weave.old_weave import artifact_fs
 
 from . import serializer
 

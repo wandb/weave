@@ -20,7 +20,7 @@ from . import pyfunc_type_util
 from .old_weave.monitoring import monitor
 from .wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
 
-from .artifact_wandb import WandbArtifactRef
+from weave.old_weave.artifact_wandb import WandbArtifactRef
 
 from weave.trace.vals import TraceObject
 from weave.trace import op

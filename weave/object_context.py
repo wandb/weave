@@ -5,9 +5,8 @@
 #
 # Its experimental for now.
 
-import contextvars
-import typing
 import contextlib
+import contextvars
 import dataclasses
 import typing
 from typing import Any
@@ -15,9 +14,8 @@ from typing import Any
 if typing.TYPE_CHECKING:
     from . import ref_base
 
+from . import box, uris
 from . import weave_types as types
-from . import box
-from . import uris
 
 
 @dataclasses.dataclass
@@ -93,7 +91,7 @@ class ObjectContext:
                 self.objects[target_uri].mutations.append(mutation)
 
     def finish_mutation(self, target_uri: str) -> None:
-        from . import artifact_fs, artifact_local, artifact_wandb
+        from weave.old_weave import artifact_fs, artifact_local, artifact_wandb
 
         target_record = self.objects.get(target_uri)
         if target_record is None:
@@ -118,7 +116,7 @@ class ObjectContext:
         if target_branch is None:
             raise ValueError("No branch to finish mutation on")
 
-        from weave import artifact_wandb
+        from weave.old_weave import artifact_wandb
 
         # Hack: if the target branch looks like a commit hash, then we
         # don't want to use it as a branch - this is the case that we are

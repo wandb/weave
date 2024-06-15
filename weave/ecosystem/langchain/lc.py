@@ -41,9 +41,10 @@ from langchain.vectorstores import FAISS, VectorStore
 from langchain.vectorstores.base import VectorStoreRetriever
 
 import weave
-from weave import artifact_base, storage
-from weave.artifact_fs import FilesystemArtifact
+from weave import storage
 from weave.ecosystem.langchain import util
+from weave.old_weave import artifact_base
+from weave.old_weave.artifact_fs import FilesystemArtifact
 from weave.old_weave.ops_domain import trace_tree
 from weave.weave_types import Type
 

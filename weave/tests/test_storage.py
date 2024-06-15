@@ -10,7 +10,8 @@ import wandb
 from weave.old_weave.arrow import list_ as arrow
 
 from .. import api as weave
-from .. import artifact_mem, artifact_wandb, mappers_python, storage
+from weave.old_weave import artifact_mem, artifact_wandb
+from .. import mappers_python, storage
 from .. import weave_types as types
 from ..weave_internal import make_const_node
 from ..weavejs_fixes import recursively_unwrap_unions

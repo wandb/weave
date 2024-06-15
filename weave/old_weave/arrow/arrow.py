@@ -11,7 +11,8 @@ from pyarrow import compute as pc
 
 py_type = type
 
-from weave import artifact_fs, errors, partial_object
+from weave.old_weave import artifact_fs
+from weave import errors, partial_object
 from weave import weave_types as types
 
 

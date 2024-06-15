@@ -1,25 +1,17 @@
 import contextlib
 import dataclasses
 import hashlib
-import os
 import json
-import typing
-import shutil
-from datetime import datetime
+import os
 import pathlib
+import shutil
 import tempfile
+import typing
+from datetime import datetime
 
-from . import uris
-from . import util
-from . import errors
-
-from . import weave_types as types
-from . import artifact_wandb
-from . import artifact_fs
-from . import file_base
-from . import file_util
-from . import filesystem
-from . import environment
+from weave import environment, errors, file_base, file_util, filesystem, uris, util
+from weave import weave_types as types
+from weave.old_weave import artifact_fs, artifact_wandb
 
 WORKING_DIR_PREFIX = "__working__"
 

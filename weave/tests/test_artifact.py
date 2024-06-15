@@ -3,7 +3,8 @@ import pytest
 import weave
 from weave.old_weave import ops_arrow as arrow
 
-from .. import artifact_fs, artifact_local, storage
+from .. import storage
+from weave.old_weave import artifact_fs, artifact_local
 
 
 def test_artifact():

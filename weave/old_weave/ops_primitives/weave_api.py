@@ -1,11 +1,12 @@
 import dataclasses
 import time
 import typing
-
-from weave import (
+from weave.old_weave import (
     artifact_fs,
     artifact_local,
     artifact_wandb,
+)
+from weave import (
     compile,
     errors,
     graph,

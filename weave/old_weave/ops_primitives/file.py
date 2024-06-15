@@ -4,8 +4,8 @@ import typing
 from weave import errors, file_base, wandb_file_manager
 from weave import weave_types as types
 from weave.api import op
-from weave.artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
-from weave.artifact_wandb import WandbArtifact, WandbArtifactManifest
+from weave.old_weave.artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
+from weave.old_weave.artifact_wandb import WandbArtifact, WandbArtifactManifest
 
 
 @op(name="dir-pathReturnType", hidden=True)

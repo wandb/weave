@@ -17,9 +17,9 @@ from weave.old_weave.ops_domain.wbmedia import ImageArtifactFileRefType
 from weave.old_weave.ops_primitives import file
 from weave.wandb_client_api import wandb_gql_query
 
-from .. import artifact_fs
+from weave.old_weave import artifact_fs
 from .. import weave_types as types
-from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI
+from weave.old_weave.artifact_wandb import WandbArtifact, WeaveWBArtifactURI
 from ..wandb_util import weave0_type_json_to_weave1_type
 from .fixture_fakewandb import FakeApi
 

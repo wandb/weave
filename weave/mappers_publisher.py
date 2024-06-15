@@ -3,13 +3,22 @@ import dataclasses
 import typing
 
 from weave import box, context, graph, storage, weave_internal
-from weave.artifact_wandb import likely_commit_hash
 from weave.node_ref import ref_to_node
+
+# from weave.old_weave.ops_primitives import weave_api
+from weave.old_weave import (
+    artifact_local,
+)
+from weave import (
+    errors,
+    mappers,
+    mappers_python_def,
+    ref_base,
+)
+from weave.old_weave.artifact_wandb import likely_commit_hash
 from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
 from weave.uris import WeaveURI
 
-# from weave.old_weave.ops_primitives import weave_api
-from . import artifact_local, errors, mappers, mappers_python_def, ref_base
 from . import weave_types as types
 
 

@@ -5,7 +5,7 @@ from weave.old_weave.wandb_interface.wandb_artifact_pusher import (
     write_artifact_to_wandb,
 )
 
-from .. import artifact_local, artifact_wandb
+from weave.old_weave import artifact_local, artifact_wandb
 
 
 def without_keys(d, keys):

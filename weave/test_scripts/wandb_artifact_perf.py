@@ -17,7 +17,7 @@ from .. import engine_trace
 from .. import wandb_api
 from .. import filesystem
 from .. import weave_http
-from .. import artifact_wandb
+from weave.old_weave import artifact_wandb
 from .. import wandb_file_manager
 from .. import io_service
 from .. import async_map

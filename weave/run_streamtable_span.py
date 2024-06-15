@@ -1,12 +1,11 @@
 import typing
 from typing import Iterable
 
-from .run import Run
-from . import uris
-from . import artifact_wandb
-from . import stream_data_interfaces
-from . import graph_client_context
+from weave.old_weave import artifact_wandb
+
+from . import graph_client_context, stream_data_interfaces, uris
 from .eager import WeaveIter
+from .run import Run
 
 
 class RunStreamTableSpan:

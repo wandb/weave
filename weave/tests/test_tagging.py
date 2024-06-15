@@ -1,7 +1,7 @@
 import pytest
 
 import weave
-from weave.artifact_fs import FilesystemArtifactFileType
+from weave.old_weave.artifact_fs import FilesystemArtifactFileType
 from weave.old_weave.language_features.tagging import (
     make_tag_getter_op,
     tag_store,

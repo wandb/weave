@@ -14,9 +14,8 @@ import uuid
 from wandb.sdk.lib.ipython import _get_python_type
 from wandb.sdk.lib.paths import LogicalPath
 from wandb.sdk.lib.printer import get_printer
-
+from weave.old_weave import artifact_base
 from weave import (
-    artifact_base,
     box,
     environment,
     errors,

@@ -1,7 +1,7 @@
 import pytest
 import shutil
 from .. import api as weave
-from .. import artifact_fs
+from weave.old_weave import artifact_fs
 from .. import op_def
 from .. import derive_op
 import numpy as np

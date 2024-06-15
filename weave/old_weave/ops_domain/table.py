@@ -4,10 +4,11 @@ import datetime
 import json
 import logging
 import typing
-
-from weave import (
+from weave.old_weave import (
     artifact_fs,
     artifact_wandb,
+)
+from weave import (
     engine_trace,
     errors,
     io_service,

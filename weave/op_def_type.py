@@ -1,27 +1,20 @@
-from _ast import AsyncFunctionDef, ExceptHandler
-import collections
-import textwrap
-import json
-import inspect
-import types as py_types
-import typing
-import os
-import sys
 import ast
 import builtins
+import collections
+import inspect
+import json
+import os
+import sys
+import textwrap
+import types as py_types
+import typing
+from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any
 
-from . import artifact_local
-from . import errors
-from . import context_state
-from . import weave_types as types
-from . import registry_mem
-from . import errors
-from . import environment
-from . import storage
-from . import artifact_fs
+from weave.old_weave import artifact_fs, artifact_local
 
-from . import infer_types
+from . import context_state, environment, errors, infer_types, registry_mem, storage
+from . import weave_types as types
 
 if typing.TYPE_CHECKING:
     from .op_def import OpDef
@@ -446,7 +439,7 @@ class OpDefType(types.Type):
         except FileNotFoundError:
             pass
 
-        from . import artifact_wandb
+        from weave.old_weave import artifact_wandb
 
         is_wandb_artifact = False
         if isinstance(artifact, artifact_wandb.WandbArtifact):

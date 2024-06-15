@@ -3,7 +3,7 @@ import typing
 from dataclasses import dataclass, field
 
 from . import weave_types as types
-from . import artifact_fs
+from weave.old_weave import artifact_fs
 
 
 T = typing.TypeVar("T", bound="PartialObject")

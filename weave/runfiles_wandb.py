@@ -1,21 +1,16 @@
 import contextlib
 import dataclasses
 import os
+import pathlib
 import random
 import shutil
-import pathlib
 import typing
 
-from . import uris
-from . import errors
-from . import wandb_client_api
-from . import memo
+from weave.old_weave import artifact_fs
 
-from . import file_util
 from . import environment as weave_env
+from . import errors, file_util, filesystem, memo, uris, wandb_client_api
 from . import weave_types as types
-from . import artifact_fs
-from . import filesystem
 
 if typing.TYPE_CHECKING:
     from wandb.apis.public import Run as WBRun

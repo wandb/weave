@@ -8,7 +8,8 @@ import typing
 from weave import wandb_api
 from weave import util
 from .tag_test_util import op_add_tag
-from ..artifact_wandb import (
+
+from weave.old_weave.artifact_wandb import (
     WandbArtifact,
     WeaveWBArtifactURI,
     WandbArtifactManifest,

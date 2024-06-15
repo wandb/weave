@@ -2,10 +2,11 @@ import json
 import typing
 from urllib.parse import quote
 
-from weave import artifact_fs, artifact_wandb, errors, input_provider
 from weave import weave_types as types
 from weave.api import op
 from weave.gql_op_plugin import wb_gql_op_plugin
+from weave import errors, input_provider
+from weave.old_weave import artifact_fs, artifact_wandb
 from weave.old_weave.ops_domain import wb_domain_types as wdt
 from weave.old_weave.ops_domain import wb_util
 from weave.old_weave.ops_domain.wandb_domain_gql import (

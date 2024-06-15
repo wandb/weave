@@ -5,9 +5,8 @@ import math
 import typing
 
 from weave.old_weave.language_features.tagging import tagged_value_type
-
+from weave.old_weave import artifact_fs
 from . import (
-    artifact_fs,
     box,
     errors,
     graph_client_context,

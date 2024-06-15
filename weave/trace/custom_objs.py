@@ -3,7 +3,7 @@ import io
 import os
 import tempfile
 from typing import Any, Dict, Optional, Union, Mapping, Iterator, Generator
-from weave import artifact_fs
+from weave.old_weave import artifact_fs
 from weave.trace.op import Op, op
 from weave.trace.serializer import get_serializer_for_obj, get_serializer_by_id
 from weave.trace.refs import parse_uri, ObjectRef
@@ -140,7 +140,7 @@ def decode_custom_obj(
     encoded_path_contents: Mapping[str, Union[str, bytes]],
     load_instance_op_uri: Optional[str],
 ) -> Any:
-    from .. import artifact_fs
+    from weave.old_weave import artifact_fs
 
     load_instance_op = None
     if load_instance_op_uri is not None:

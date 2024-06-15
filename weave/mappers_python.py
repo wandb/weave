@@ -4,7 +4,7 @@ import typing
 
 if typing.TYPE_CHECKING:
     from . import mappers
-    from . import artifact_base
+    from weave.old_weave import artifact_base
     from . import weave_types
 
 

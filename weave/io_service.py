@@ -21,7 +21,7 @@ import traceback
 import threading
 
 
-from . import artifact_wandb
+from weave.old_weave import artifact_wandb
 from . import cache
 from . import errors
 from . import engine_trace

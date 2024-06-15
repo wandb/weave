@@ -4,10 +4,11 @@ import typing
 import pyarrow as pa
 from pyarrow import parquet as pq
 
-from weave import (
-    _dict_utils,
+from weave.old_weave import (
     artifact_base,
     artifact_fs,
+)
+from weave import (
     compile,
     compile_table,
     engine_trace,
@@ -24,6 +25,7 @@ from weave.api import use
 from weave.compile_domain import InputAndStitchProvider
 from weave.compile_table import KeyTree
 from weave.mappers_arrow import map_to_arrow
+from weave import _dict_utils
 from weave.old_weave.arrow.concat import concatenate_all
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.old_weave.ops_arrow import ArrowWeaveList

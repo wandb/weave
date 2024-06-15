@@ -18,7 +18,8 @@ from weave.old_weave.ops_primitives.file import _as_w0_dict_
 from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
 from .. import api as weave
-from .. import artifact_fs, artifact_wandb, compile, graph, uris
+from .. import compile, graph, uris
+from weave.old_weave import artifact_fs, artifact_wandb
 from .. import ops as ops
 from .. import weave_types as types
 from . import fixture_fakewandb as fwb

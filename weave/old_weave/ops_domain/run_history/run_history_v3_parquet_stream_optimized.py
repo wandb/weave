@@ -5,10 +5,12 @@ import typing
 
 import pyarrow as pa
 
-from weave import (
+from weave.old_weave import (
     artifact_base,
     artifact_fs,
     artifact_mem,
+)
+from weave import (
     engine_trace,
     errors,
     gql_json_cache,

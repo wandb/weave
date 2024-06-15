@@ -44,7 +44,8 @@ from hypothesis import strategies as st
 from hypothesis.strategies import composite
 
 import weave
-from weave import artifact_local, storage
+from weave import storage
+from weave.old_weave import artifact_local
 from weave.old_weave.arrow import convert
 from weave.old_weave.language_features.tagging import tag_store
 from weave.old_weave import ops_primitives

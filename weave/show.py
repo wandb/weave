@@ -6,9 +6,8 @@ import typing
 import urllib
 
 from IPython.display import IFrame, display
-
+from weave.old_weave import artifact_fs
 from . import (
-    artifact_fs,
     context,
     errors,
     graph,

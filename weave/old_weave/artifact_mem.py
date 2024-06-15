@@ -1,9 +1,9 @@
 import typing
 
 from . import artifact_base
-from . import weave_types as types
-from . import errors
-from . import ref_base
+from weave import weave_types as types
+from weave import errors
+from weave import ref_base
 
 
 class MemArtifact(artifact_base.Artifact):

@@ -1,7 +1,7 @@
 import typing
 
-from weave import artifact_fs
 from weave.api import op
+from weave.old_weave import artifact_fs
 
 
 @op(name="FilesystemArtifactFile-directUrl")
