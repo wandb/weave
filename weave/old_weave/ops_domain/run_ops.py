@@ -36,12 +36,13 @@
 
 import json
 import typing
-from weave.old_weave import compile_table
+
 from weave import engine_trace
 from weave import weave_types as types
 from weave.api import op
-from weave.gql_op_plugin import wb_gql_op_plugin
 from weave.input_provider import InputAndStitchProvider
+from weave.old_weave import compile_table
+from weave.old_weave.gql_op_plugin import wb_gql_op_plugin
 from weave.old_weave.language_features.tagging.make_tag_getter_op import (
     make_tag_getter_op,
 )

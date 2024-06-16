@@ -3,22 +3,23 @@
 # This depends on having a GraphQL schema available, which is currently loaded from a file. The load
 # happens when this file is imported and used throughout the duration of the program.
 
-from graphql import (
-    parse,
-    get_operation_root_type,
-    GraphQLObjectType,
-    GraphQLList,
-    GraphQLNonNull,
-    GraphQLInterfaceType,
-    FieldNode,
-    OperationDefinitionNode,
-)
-import graphql
 import typing
 
-from . import errors
-from . import weave_types as types
-from . import gql_schema
+import graphql
+from graphql import (
+    FieldNode,
+    GraphQLInterfaceType,
+    GraphQLList,
+    GraphQLNonNull,
+    GraphQLObjectType,
+    OperationDefinitionNode,
+    get_operation_root_type,
+    parse,
+)
+
+from weave import errors
+from weave import weave_types as types
+from weave.old_weave import gql_schema
 
 
 def get_outermost_alias(query_str: str) -> str:

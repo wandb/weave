@@ -5,20 +5,19 @@ import typing
 
 import pyarrow as pa
 
-from weave.old_weave import (
-    artifact_base,
-    artifact_fs,
-    artifact_mem,
-)
 from weave import (
     engine_trace,
     errors,
-    gql_json_cache,
     io_service,
 )
 from weave import weave_types as types
 from weave.api import op
-from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.old_weave import (
+    artifact_base,
+    artifact_fs,
+    artifact_mem,
+    gql_json_cache,
+)
 from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.list_ import (
     ArrowWeaveList,
@@ -28,6 +27,7 @@ from weave.old_weave.arrow.list_ import (
     make_vec_none,
     weave_arrow_type_check,
 )
+from weave.old_weave.gql_op_plugin import wb_gql_op_plugin
 from weave.old_weave.ops_domain import trace_tree, wb_util, wbmedia
 from weave.old_weave.ops_domain import wb_domain_types as wdt
 from weave.old_weave.ops_domain.run_history import history_op_common

@@ -2,7 +2,7 @@ import json
 
 from weave import weave_types as types
 from weave.api import op
-from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.old_weave.gql_op_plugin import wb_gql_op_plugin
 from weave.old_weave.language_features.tagging.make_tag_getter_op import (
     make_tag_getter_op,
 )

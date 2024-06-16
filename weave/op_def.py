@@ -315,7 +315,7 @@ class OpDef:
         return self.output_type(new_input_type)
 
     def is_gql_root_resolver(self):
-        from . import gql_op_plugin
+        from weave.old_weave import gql_op_plugin
 
         return self in gql_op_plugin._ROOT_RESOLVERS
 

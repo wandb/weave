@@ -5,13 +5,14 @@
 import json
 
 import pyarrow as pa
-from weave.old_weave import artifact_mem
-from weave import engine_trace, gql_json_cache
+
+from weave import engine_trace
 from weave import weave_types as types
 from weave.api import op, use
-from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.old_weave import artifact_mem, gql_json_cache
 from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave.old_weave.gql_op_plugin import wb_gql_op_plugin
 from weave.old_weave.ops_arrow.list_ops import concat
 from weave.old_weave.ops_domain import wb_domain_types as wdt
 from weave.old_weave.ops_domain import wb_util, wbmedia

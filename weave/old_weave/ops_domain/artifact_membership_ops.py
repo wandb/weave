@@ -2,7 +2,7 @@ import urllib
 
 from weave import weave_types as types
 from weave.api import op
-from weave.gql_op_plugin import wb_gql_op_plugin
+from weave.old_weave.gql_op_plugin import wb_gql_op_plugin
 from weave.old_weave.ops_domain import wb_domain_types as wdt
 from weave.old_weave.ops_domain.wandb_domain_gql import (
     gql_direct_edge_op,

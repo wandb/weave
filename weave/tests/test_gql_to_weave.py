@@ -1,5 +1,5 @@
-from .. import gql_to_weave
-from .. import weave_types as types
+from weave import weave_types as types
+from weave.old_weave import gql_to_weave
 
 
 def test_simple_query():

@@ -15,7 +15,7 @@ from weave import (
 from weave import weave_types as types
 
 if typing.TYPE_CHECKING:
-    from weave.gql_op_plugin import GqlOpPlugin
+    from weave.old_weave.gql_op_plugin import GqlOpPlugin
 
 
 # Important usability note

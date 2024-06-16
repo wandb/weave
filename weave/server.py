@@ -13,6 +13,7 @@ import requests
 from flask import current_app
 from werkzeug.serving import make_server
 
+from weave.old_weave import gql_json_cache
 from weave.old_weave.language_features.tagging import tag_store
 from weave.old_weave.language_features.tagging.tag_store import isolated_tagging_context
 
@@ -21,7 +22,6 @@ from . import (
     context,
     engine_trace,
     execute,
-    gql_json_cache,
     graph,
     logs,
     serialize,
@@ -121,7 +121,7 @@ class SubprocessServer(multiprocessing.Process):
 
     def run(self):
         from weave import ops
-        from weave.old_weave import panels_py, panels
+        from weave.old_weave import panels, panels_py
 
         while True:
             req = self.req_queue.get()
