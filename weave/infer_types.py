@@ -5,11 +5,12 @@ Functions for inferring Weave Types from Python types.
 import collections
 import types
 import typing
+
 import typing_extensions
 
-from . import weave_types
-from . import errors
-from . import graph
+from weave.old_weave import graph
+
+from . import errors, weave_types
 
 
 class TypedDictLike:

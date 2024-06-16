@@ -2,10 +2,10 @@ import typing
 
 import graphql
 
-from weave import errors, graph, op_args, registry_mem, stitch
+from weave import errors, op_args, registry_mem, stitch
 from weave import weave_types as types
 from weave.input_provider import InputAndStitchProvider
-from weave.old_weave import gql_op_plugin, gql_to_weave
+from weave.old_weave import gql_op_plugin, gql_to_weave, graph
 
 if typing.TYPE_CHECKING:
     from weave import op_def

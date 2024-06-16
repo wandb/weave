@@ -17,15 +17,8 @@ from weave.old_weave.language_features.tagging import make_tag_getter_op
 from weave.old_weave.language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
-
-from .. import (
-    graph,
-    graph_debug,
-    op_def,
-    registry_mem,
-    storage,
-    weave_internal,
-)
+from weave.old_weave import graph, graph_debug
+from .. import op_def, registry_mem, storage, weave_internal
 from .concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,

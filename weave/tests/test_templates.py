@@ -83,7 +83,7 @@ def _assert_valid_node_raw(node):
 
     # assert that the node sent to the generator is the same as the node that is used
     # Note: this is a heuristic, but probably close enough
-    assert isinstance(data_node, weave.graph.OutputNode)
+    assert isinstance(data_node, weave.old_weave.graph.OutputNode)
     assert data_node.from_op.name == node.from_op.name
     assert str(data_node) == str(node)
 

@@ -1,6 +1,7 @@
-from .. import node_ref
+from weave.old_weave import graph
+
 from .. import api as weave
-from .. import graph
+from .. import node_ref
 
 
 def test_node_to_ref():

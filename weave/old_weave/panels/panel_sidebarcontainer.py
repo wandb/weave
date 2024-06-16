@@ -1,4 +1,4 @@
-from weave import graph
+from weave.old_weave import graph
 from weave.old_weave.panels import panel
 
 

@@ -10,8 +10,6 @@ from weave import (
     dispatch,
     engine_trace,
     errors,
-    graph,
-    graph_debug,
     input_provider,
     op_args,
     partial_object,
@@ -29,6 +27,8 @@ from weave.old_weave import (
     debug_compile,
     gql_op_plugin,
     gql_to_weave,
+    graph,
+    graph_debug,
 )
 from weave.old_weave.language_features.tagging import tagged_value_type_helpers
 from weave.op_def import OpDef

@@ -1,11 +1,12 @@
 import pytest
 
 import weave
+from weave.old_weave import graph
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.old_weave.ops_domain import wb_domain_types
 
 from .. import context_state as _context
-from .. import graph, weave_internal
+from .. import weave_internal
 from ..dispatch import _dispatch_first_arg, _resolve_op_ambiguity
 
 _loading_builtins_token = _context.set_loading_built_ins()
@@ -72,7 +73,7 @@ def test_pick_map():
 
 
 def test_json_pick_map():
-    res = weave.graph.OutputNode.from_json(
+    res = weave.old_weave.graph.OutputNode.from_json(
         {
             "nodeType": "output",
             "type": {"type": "list", "objectType": "number"},

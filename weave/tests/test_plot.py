@@ -5,9 +5,10 @@ import pytest
 
 import weave
 from weave import weave_types as types
+from weave.old_weave import graph
 from weave.old_weave.panels.panel_plot import Plot, PlotConstants, Series
 
-from .. import graph, storage
+from .. import storage
 from .test_run_segment import create_experiment
 
 

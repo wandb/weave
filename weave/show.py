@@ -7,12 +7,11 @@ import urllib
 
 from IPython.display import IFrame, display
 
-from weave.old_weave import artifact_fs, panel
+from weave.old_weave import artifact_fs, graph, panel
 
 from . import (
     context,
     errors,
-    graph,
     node_ref,
     ops,
     ref_base,

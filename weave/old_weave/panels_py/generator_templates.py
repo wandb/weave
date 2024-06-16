@@ -18,8 +18,8 @@ However, this current implementation is simple and easy to refactor.
 import dataclasses
 import typing
 
-from weave import graph, registry_mem, weave_types
-from weave.old_weave import decorator_op
+from weave import registry_mem, weave_types
+from weave.old_weave import decorator_op, graph
 
 
 @dataclasses.dataclass

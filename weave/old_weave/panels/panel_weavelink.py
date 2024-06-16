@@ -2,14 +2,14 @@ import dataclasses
 import typing
 
 import weave
-from weave import graph, ops, weave_internal
-from weave.old_weave import panel, panel_util
+from weave import ops, weave_internal
+from weave.old_weave import graph, panel, panel_util
 
 
 @weave.type()
 class WeaveLinkConfig:
     to: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     vars: typing.Dict[str, graph.Node] = dataclasses.field(default_factory=dict)
 

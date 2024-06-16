@@ -106,7 +106,8 @@ import typing
 
 import tabulate
 
-from . import graph
+from weave.old_weave import graph
+
 from . import weave_types as types
 from .partial_object import PartialObjectType
 

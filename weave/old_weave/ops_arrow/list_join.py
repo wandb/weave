@@ -4,9 +4,10 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave import engine_trace, graph
+from weave import engine_trace
 from weave import weave_types as types
 from weave.api import op
+from weave.old_weave import graph
 from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,

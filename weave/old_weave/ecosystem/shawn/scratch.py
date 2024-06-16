@@ -23,7 +23,7 @@ def single_distribution(
 @weave.type()
 class AdderConfig:
     operand: weave.Node[int] = dataclasses.field(
-        default_factory=lambda: weave.graph.ConstNode(weave.types.Int(), 10)
+        default_factory=lambda: weave.old_weave.graph.ConstNode(weave.types.Int(), 10)
     )
 
 

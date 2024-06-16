@@ -2,8 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave import graph
-from weave.old_weave import panel
+from weave.old_weave import graph, panel
 from weave.old_weave.panels.panel_group import PanelBankSectionConfig
 
 RenderType = typing.TypeVar("RenderType")
@@ -12,7 +11,7 @@ RenderType = typing.TypeVar("RenderType")
 @weave.type()
 class FacetTabsConfig(typing.Generic[RenderType]):
     tab: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     panel: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 

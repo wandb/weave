@@ -1,8 +1,8 @@
 import math
 
-from weave import graph
 from weave import weave_types as types
 from weave.api import op, use
+from weave.old_weave import graph
 from weave.old_weave.ops_primitives import date
 from weave.old_weave.ops_primitives.dict import dict_
 from weave.weave_internal import call_fn, define_fn, make_const_node

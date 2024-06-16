@@ -2,8 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave import graph, weave_internal
-from weave.old_weave import panel
+from weave import weave_internal
+from weave.old_weave import graph, panel
 from weave.old_weave.panels import table_state
 
 
@@ -18,7 +18,7 @@ EditorType = typing.TypeVar("EditorType")
 @weave.type()
 class QueryCondition:
     expression: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     editor: EditorType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 

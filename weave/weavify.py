@@ -1,7 +1,9 @@
 import dataclasses
 import typing
 
-from . import errors, graph, op_args, val_const, weave_internal
+from weave.old_weave import graph
+
+from . import errors, op_args, val_const, weave_internal
 from . import weave_types as types
 
 if typing.TYPE_CHECKING:

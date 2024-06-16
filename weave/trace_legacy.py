@@ -1,9 +1,9 @@
 import os
 import typing
 
-from weave.old_weave import artifact_local, runs
+from weave.old_weave import artifact_local, graph, runs
 
-from . import errors, graph, ref_base
+from . import errors, ref_base
 from . import weave_types as types
 
 

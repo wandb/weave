@@ -10,7 +10,7 @@ import random
 from . import value_or_error
 
 
-from . import graph
+from weave.old_weave import graph
 from . import weave_types as types
 from . import errors
 from . import weave_internal

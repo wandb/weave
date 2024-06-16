@@ -12,13 +12,13 @@ from weave.old_weave.ecosystem.wandb import weave_plotly
 @weave.type()
 class GeoConfig:
     x_fn: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     y_fn: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     color_fn: weave.Node[float] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
 
 

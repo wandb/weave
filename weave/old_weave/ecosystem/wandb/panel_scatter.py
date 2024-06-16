@@ -10,13 +10,13 @@ from weave.old_weave.ecosystem.wandb import weave_plotly
 @weave.type()
 class ScatterConfig:
     x_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     y_fn: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     label_fn: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
 
 

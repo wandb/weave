@@ -1359,7 +1359,7 @@ class Function(Type):
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             # TODO: no circular imports!
-            from . import graph
+            from weave.old_weave import graph
 
             return graph.Node.node_from_json(json.load(f))
 

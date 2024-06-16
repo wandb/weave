@@ -1,6 +1,7 @@
-from weave import graph, weave_internal
+from weave import weave_internal
 from weave import weave_types as types
 from weave.api import op, use
+from weave.old_weave import graph
 from weave.old_weave.ops_primitives.dict import dict_
 from weave.weave_internal import call_fn, define_fn, make_const_node
 from weave.weave_types import Function, TimestampBinType

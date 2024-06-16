@@ -7,8 +7,8 @@ from typing import Iterable, Optional, Sequence
 
 from weave.old_weave.language_features.tagging import tag_store
 
-from weave.old_weave import object_context
-from . import box, context_state, errors, graph_client_context, uris
+from weave.old_weave import object_context, graph_client_context
+from . import box, context_state, errors, uris
 from . import weave_types as types
 
 # We store Refs here if we can't attach them directly to the object

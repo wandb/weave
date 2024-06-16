@@ -2,9 +2,9 @@ import dataclasses
 import typing
 
 import weave
-from weave import graph, weave_internal
+from weave import weave_internal
 from weave import weave_types as types
-from weave.old_weave import panel, panel_util
+from weave.old_weave import graph, panel, panel_util
 from weave.old_weave.arrow import list_
 from weave.old_weave.panels import table_state
 
@@ -38,10 +38,10 @@ class FacetConfig:
         default_factory=lambda: None
     )
     xAxisLabel: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     yAxisLabel: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
 
 

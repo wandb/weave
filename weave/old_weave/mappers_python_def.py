@@ -4,10 +4,16 @@ import inspect
 import math
 import typing
 
-from weave import box, errors, graph_client_context, ref_base, storage, val_const
+from weave import box, errors, ref_base, storage, val_const
 from weave import timestamp as weave_timestamp
 from weave import weave_types as types
-from weave.old_weave import artifact_fs, mappers, mappers_python, mappers_weave
+from weave.old_weave import (
+    artifact_fs,
+    graph_client_context,
+    mappers,
+    mappers_python,
+    mappers_weave,
+)
 from weave.old_weave.language_features.tagging import tagged_value_type
 from weave.partial_object import PartialObject, PartialObjectType
 

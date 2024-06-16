@@ -1,8 +1,6 @@
 import typing
 
-from weave.old_weave import decorator_op
-
-from .. import graph, graph_debug
+from weave.old_weave import decorator_op, graph, graph_debug
 
 
 class RowType(typing.TypedDict):

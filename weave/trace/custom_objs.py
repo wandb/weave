@@ -7,7 +7,7 @@ from weave.old_weave import artifact_fs
 from weave.trace.op import Op, op
 from weave.trace.serializer import get_serializer_for_obj, get_serializer_by_id
 from weave.trace.refs import parse_uri, ObjectRef
-from weave.graph_client_context import require_graph_client
+from weave.old_weave.graph_client_context import require_graph_client
 from weave.trace_server.trace_server_interface_util import (
     encode_bytes_as_b64,
     decode_b64_to_bytes,

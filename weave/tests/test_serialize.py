@@ -1,9 +1,10 @@
 import pytest
 
 import weave
+from weave.old_weave import graph
 from weave.old_weave.ops_primitives import list_
 
-from .. import api, graph, op_args, ops, registry_mem, serialize, weave_internal
+from .. import api, op_args, ops, registry_mem, serialize, weave_internal
 from .. import weave_types as types
 from ..weave_internal import make_const_node
 from . import fixture_fakewandb as fwb

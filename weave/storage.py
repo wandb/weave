@@ -14,10 +14,12 @@ from weave.old_weave import (
     artifact_local,
     artifact_mem,
     artifact_wandb,
+    graph,
+    graph_client_context,
     mappers_python,
 )
 
-from . import box, errors, graph, graph_client_context, ref_base, timestamp
+from . import box, errors, ref_base, timestamp
 from . import weave_types as types
 
 Ref = ref_base.Ref

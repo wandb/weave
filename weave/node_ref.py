@@ -1,7 +1,9 @@
 import copy
 import typing
 
-from . import graph, ref_base
+from weave.old_weave import graph
+
+from . import ref_base
 from . import weave_types as types
 
 # Notes for the future:

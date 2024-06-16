@@ -14,14 +14,14 @@ class DistributionConfig:
     # We should make a better type to represent this, so it can be
     # distinguished from an expression like bin_size.
     value_fn: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     label_fn: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     # This is an expression. It will be stored in the config as Node.
     bin_size: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
 
 

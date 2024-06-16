@@ -19,8 +19,6 @@ from . import (
     context_state,
     engine_trace,
     errors,
-    graph,
-    graph_client_context,
     memo,
     op_args,
     op_def_type,
@@ -29,6 +27,7 @@ from . import (
     uris,
     weave_internal,
 )
+from weave.old_weave import graph, graph_client_context
 from . import weave_types as types
 from weave.old_weave.run import Run
 

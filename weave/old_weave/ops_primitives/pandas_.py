@@ -8,10 +8,10 @@ import pandas
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from weave import box, errors, graph
+from weave import box, errors
 from weave import weave_types as types
 from weave.api import op, weave_class
-from weave.old_weave import file_base, mappers_python
+from weave.old_weave import file_base, graph, mappers_python
 from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
 from weave.old_weave.ops_primitives import list_
 

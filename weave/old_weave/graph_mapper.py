@@ -1,8 +1,7 @@
-from weave.old_weave import mappers
+from weave import node_ref, ref_base
+from weave import weave_types as types
+from weave.old_weave import graph, mappers
 from weave.old_weave import mappers_python_def as mappers_python
-
-from . import graph, node_ref, ref_base
-from . import weave_types as types
 
 
 class FunctionToPyFunction(mappers.Mapper):

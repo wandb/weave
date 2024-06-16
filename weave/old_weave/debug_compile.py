@@ -1,4 +1,5 @@
-from weave import graph, types
+from weave import types
+from weave.old_weave import graph
 
 from . import debug_types
 

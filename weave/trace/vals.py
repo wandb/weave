@@ -21,7 +21,7 @@ from weave.table import Table
 from weave.trace.serialize import from_json
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.graph_client_context import get_graph_client
+from weave.old_weave.graph_client_context import get_graph_client
 from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     _TableRowFilter,

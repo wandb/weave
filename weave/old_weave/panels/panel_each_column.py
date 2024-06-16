@@ -2,8 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave import graph
-from weave.old_weave import panel
+from weave.old_weave import graph, panel
 from weave.old_weave.panels.panel_group import PanelBankSectionConfig
 
 RenderType = typing.TypeVar("RenderType")

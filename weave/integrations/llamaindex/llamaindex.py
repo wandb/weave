@@ -1,6 +1,6 @@
+from weave.old_weave import graph_client_context
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
-from weave import graph_client_context
 
 TRANSFORM_EMBEDDINGS = False
 ALLOWED_ROOT_EVENT_TYPES = ("query",)

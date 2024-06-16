@@ -3,8 +3,8 @@ import dataclasses
 import typing
 
 import weave
-from weave import dispatch, errors, graph, weave_internal
-from weave.old_weave import codifiable_value_mixin, codify, panel, panel_util
+from weave import dispatch, errors, weave_internal
+from weave.old_weave import codifiable_value_mixin, codify, graph, panel, panel_util
 from weave.old_weave.panels.bank import (
     default_panel_bank_flow_section_config,
     flow_layout,

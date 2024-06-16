@@ -1,11 +1,11 @@
+import collections
 import contextlib
 import contextvars
-import collections
 import typing
 
-from . import graph
-from . import errors
+from weave.old_weave import graph
 
+from . import errors
 
 ExecutableNode = typing.Union[graph.OutputNode, graph.ConstNode]
 

@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 from weave.old_weave.language_features.tagging.is_tag_getter import is_tag_getter
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
-
-from . import errors, graph, memo, op_args, op_def, pyfunc_type_util, registry_mem, util
+from weave.old_weave import graph
+from . import errors, memo, op_args, op_def, pyfunc_type_util, registry_mem, util
 from . import weave_types as types
 
 

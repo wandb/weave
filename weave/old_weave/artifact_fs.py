@@ -12,7 +12,7 @@ from weave.old_weave import artifact_base, file_base, object_context
 from weave.old_weave.language_features.tagging import tag_store
 
 if typing.TYPE_CHECKING:
-    from weave import graph
+    from weave.old_weave import graph
 
 
 class FilesystemArtifactType(types.Type):

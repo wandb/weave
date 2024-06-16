@@ -15,7 +15,6 @@ from weave import (
     box,
     context_state,
     errors,
-    graph,
     node_ref,
     op_def,
     op_def_type,
@@ -24,7 +23,7 @@ from weave import (
     weave_internal,
 )
 from weave import weave_types as types
-from weave.old_weave import artifact_base, debug_types
+from weave.old_weave import artifact_base, debug_types, graph
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
     arrow_as_array,

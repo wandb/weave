@@ -1,9 +1,9 @@
 import typing
-from . import graph
+
+from weave.old_weave import client_interface, graph
+
+from . import context_state, errors
 from . import weave_types as types
-from . import context_state
-from . import errors
-from weave.old_weave import client_interface
 
 
 def dereference_variables(

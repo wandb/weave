@@ -18,8 +18,6 @@ from weave import (
     environment,
     errors,
     forward_graph,
-    graph,
-    graph_debug,
     memo,
     op_def,
     op_execute,
@@ -31,7 +29,7 @@ from weave import (
     value_or_error,
     wandb_api,
 )
-from weave.old_weave import object_context
+from weave import weave_types as types
 
 # Configuration
 # Libraries
@@ -39,17 +37,21 @@ from weave.old_weave import object_context
 # Ops
 # Trace / cache
 # Language Features
-from weave.old_weave import compile, language_nullability
+from weave.old_weave import (
+    compile,
+    graph,
+    graph_debug,
+    language_nullability,
+    object_context,
+)
 from weave.old_weave.language_features.tagging import (
     opdef_util,
     process_opdef_resolve_fn,
     tag_store,
 )
 
-from weave import weave_types as types
-
 if typing.TYPE_CHECKING:
-    from weave.graph_client import GraphClient
+    from weave.old_weave.graph_client import GraphClient
 
 TRACE_LOCAL = trace_local.TraceLocal()
 

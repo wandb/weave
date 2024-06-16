@@ -2,8 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave import graph, weave_internal
-from weave.old_weave import panel
+from weave import weave_internal
+from weave.old_weave import graph, panel
 
 
 @weave.type()
@@ -27,7 +27,7 @@ class SelectEditor(panel.Panel):
             self.config = SelectEditorConfig()
         if "choices" in options:
             self.config.choices = options["choices"]
-        if isinstance(self.input_node, weave.graph.VoidNode):
+        if isinstance(self.input_node, weave.old_weave.graph.VoidNode):
             # TODO: not string!
             self.input_node = weave_internal.const(
                 [], weave.types.List(self.config.choices.type.object_type)

@@ -3,8 +3,8 @@ import typing
 import pyarrow as pa
 from pyarrow import compute as pc
 
-from weave import graph
 from weave import weave_types as types
+from weave.old_weave import graph
 
 
 # Reimplementation of Weave0 `toSafeCall` which

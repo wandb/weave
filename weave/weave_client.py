@@ -22,7 +22,7 @@ from weave.trace.object_record import (
     pydantic_asdict_one_level,
 )
 from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
-from weave import graph_client_context
+from weave.old_weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
     CallUpdateReq,
     CallsDeleteReq,

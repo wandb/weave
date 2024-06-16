@@ -3,8 +3,8 @@ import typing
 
 import weave
 from weave import weave_internal
-from weave.graph import ConstNode, Node, OutputNode, VoidNode
 from weave.old_weave import codifiable_value_mixin, codify, panel
+from weave.old_weave.graph import ConstNode, Node, OutputNode, VoidNode
 from weave.old_weave.panels import table_state
 from weave.old_weave.panels.panel_query import Query
 
@@ -20,7 +20,7 @@ class TableConfig:
 
 class ColumnDef(typing.TypedDict):
     columnName: str
-    columnSelectFunction: weave.graph.Node
+    columnSelectFunction: weave.old_weave.graph.Node
 
 
 @dataclasses.dataclass

@@ -53,25 +53,27 @@ mark_weave_type = weave.types.UnionType(
 @weave.type()
 class TimeSeriesConfig:
     x: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     agg: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     min_x: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     max_x: weave.Node[typing.Any] = dataclasses.field(
-        default_factory=lambda: weave.graph.VoidNode()
+        default_factory=lambda: weave.old_weave.graph.VoidNode()
     )
     label: weave.Node[
         typing.Optional[typing.Union[str, weave.types.InvalidPy]]
-    ] = dataclasses.field(default_factory=lambda: weave.graph.VoidNode())
+    ] = dataclasses.field(default_factory=lambda: weave.old_weave.graph.VoidNode())
     mark: weave.Node[str] = dataclasses.field(
-        default_factory=lambda: weave.graph.ConstNode(weave.types.String(), "bar")
+        default_factory=lambda: weave.old_weave.graph.ConstNode(
+            weave.types.String(), "bar"
+        )
     )
     axis_labels: weave.Node[dict[str, str]] = dataclasses.field(
-        default_factory=lambda: weave.graph.ConstNode(
+        default_factory=lambda: weave.old_weave.graph.ConstNode(
             weave.types.Dict(weave.types.String(), weave.types.String()),
             {},
         )
@@ -81,7 +83,7 @@ class TimeSeriesConfig:
 def first_column_of_type(
     node_type: weave.types.Type,
     desired_type: weave.types.Type,
-) -> typing.Tuple[weave.graph.ConstNode, weave.graph.ConstNode]:
+) -> typing.Tuple[weave.old_weave.graph.ConstNode, weave.old_weave.graph.ConstNode]:
     if isinstance(node_type, tagged_value_type.TaggedValueType):
         node_type = node_type.value
     if weave.types.List().assign_type(node_type):
@@ -117,8 +119,8 @@ def first_column_of_type(
                         {"item": object_type}, lambda item: item[key]
                     )
         # return weave_internal.define_fn(
-        #     {"input_node": node_type}, weave.graph.VoidNode()
-        # ), weave_internal.define_fn({"item": object_type}, lambda _: weave.graph.VoidNode())
+        #     {"input_node": node_type}, weave.old_weave.graph.VoidNode()
+        # ), weave_internal.define_fn({"item": object_type}, lambda _: weave.old_weave.graph.VoidNode())
     raise ValueError(
         f"Can't extract column with type {desired_type} from node of type {node_type}"
     )
@@ -166,7 +168,7 @@ class TimeSeries(weave.Panel):
             for attr in ["x", "min_x", "max_x", "label", "mark", "agg", "axis_labels"]:
                 if attr in options:
                     value = options[attr]
-                    if not isinstance(value, weave.graph.Node):
+                    if not isinstance(value, weave.old_weave.graph.Node):
                         if attr in ["min_x", "max_x", "mark", "axis_labels"]:
                             value = make_node(value)
                         if attr in ["min_x", "max_x"]:
@@ -184,7 +186,7 @@ class TimeSeries(weave.Panel):
                 else:
                     value = weave_internal.define_fn(
                         {"item": unnested.type.object_type},
-                        lambda item: weave.graph.VoidNode(),
+                        lambda item: weave.old_weave.graph.VoidNode(),
                     )
                 setattr(self.config, attr, value)
 

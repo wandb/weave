@@ -996,7 +996,7 @@ def _replace_uri_version(uri: str, new_version: str) -> str:
     return uri.replace(_get_uri_version(uri), new_version)
 
 
-def _get_uri_from_get_node(node: weave.graph.Node) -> str:
+def _get_uri_from_get_node(node: weave.old_weave.graph.Node) -> str:
     return node.from_op.inputs["uri"].val  # type: ignore
 
 

@@ -1,9 +1,10 @@
 import os
 
 import weave
-from weave import dispatch, graph, util, weave_internal
+from weave import dispatch, util, weave_internal
 from weave import weave_internal as internal
 from weave import weave_types as types
+from weave.old_weave import graph
 from weave.old_weave.panels import panel_board, panel_group, panel_trace
 from weave.old_weave.panels.panel_trace_span import TraceSpanModelPanel, TraceSpanPanel
 from weave.old_weave.panels_py import panel_autoboard

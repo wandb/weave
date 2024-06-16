@@ -28,7 +28,7 @@ class Slider(panel.Panel):
 
     def __post_init__(self, *args):
         super().__post_init__(*args)
-        if isinstance(self.input_node, weave.graph.VoidNode):
+        if isinstance(self.input_node, weave.old_weave.graph.VoidNode):
             self.__dict__["input_node"] = weave_internal.const(0)
 
     @weave.op()

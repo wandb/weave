@@ -2,13 +2,10 @@ import functools
 import json
 import typing
 
-from . import errors
-from . import weave_types
-from . import uris
-from . import storage
+from weave import errors, storage, uris, weave_types
 
 if typing.TYPE_CHECKING:
-    from . import weave_inspector
+    from weave import weave_inspector
 
 
 T = typing.TypeVar("T")
@@ -41,7 +38,7 @@ class Node(typing.Generic[T]):
     def _inspect(self) -> "weave_inspector.NodeInspector":
         """Only intended to be used by developers to help debug the graph."""
         # Circular import, so we do it here.
-        from . import weave_inspector
+        from weave import weave_inspector
 
         return weave_inspector.NodeInspector(self)
 
@@ -189,7 +186,7 @@ class ConstNode(Node):
 
     @classmethod
     def from_json(cls, obj: dict) -> "ConstNode":
-        from . import dispatch
+        from weave import dispatch
 
         val = obj["val"]
         if isinstance(val, dict) and "nodeType" in val:
@@ -241,7 +238,7 @@ def op_full_name(op: Op) -> str:
 
 
 def node_expr_str(node: Node) -> str:
-    from . import partial_object
+    from weave import partial_object
 
     if isinstance(node, OutputNode):
         param_names = list(node.from_op.inputs.keys())

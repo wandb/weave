@@ -12,11 +12,11 @@ import threading
 
 from . import urls
 
-from . import graph as _graph
-from .graph import Node
+from weave.old_weave import graph as _graph
+from weave.old_weave.graph import Node
 
 # If this is not imported, serialization of Weave Nodes is incorrect!
-from . import graph_mapper as _graph_mapper
+from weave.old_weave import graph_mapper as _graph_mapper
 
 from . import storage as _storage
 from . import ref_base as _ref_base
@@ -33,7 +33,7 @@ from . import context_state as _context_state
 from weave.old_weave import run as _run
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
-from . import graph_client_context as _graph_client_context
+from weave.old_weave import graph_client_context as _graph_client_context
 from weave.trace import context as trace_context
 from .trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.refs import ObjectRef
