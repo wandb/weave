@@ -6,13 +6,13 @@ import copy
 import inspect
 import typing
 
+from weave.old_weave import execute_fast
 from weave.old_weave.language_features.tagging import tag_store
 
 from . import (
     box,
     context_state,
     errors,
-    execute_fast,
     graph,
     op_args,
     op_def,

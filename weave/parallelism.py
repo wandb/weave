@@ -3,13 +3,12 @@ import contextvars
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Generator, Iterator, Optional, TypeVar
 
-from weave.old_weave import run_context
+from weave.old_weave import execute, run_context
 
 from . import (
     cache,
     context,
     context_state,
-    execute,
     forward_graph,
     graph_client_context,
     memo,

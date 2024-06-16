@@ -734,7 +734,7 @@ def _apply_fn_node(awl: ArrowWeaveList, fn: graph.OutputNode) -> ArrowWeaveList:
         )
         return convert.to_arrow([], types.List(fn.type), artifact=awl._artifact)
 
-    from weave import execute_fast
+    from weave.old_weave import execute_fast
 
     fn = execute_fast._resolve_static_branches(fn)
     logging.info("Vectorizing. Static branch resolution complete.: %s", debug_str)

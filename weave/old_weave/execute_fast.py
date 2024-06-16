@@ -4,7 +4,7 @@ from weave import op_policy
 from weave.old_weave import compile, language_nullability
 from weave.old_weave.language_features.tagging import tag_store
 
-from . import (
+from weave import (
     box,
     engine_trace,
     errors,
@@ -14,7 +14,7 @@ from . import (
     registry_mem,
     weave_internal,
 )
-from . import weave_types as types
+from weave import weave_types as types
 
 # from . import object_context
 

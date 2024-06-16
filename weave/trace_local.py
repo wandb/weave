@@ -121,7 +121,7 @@ class TraceLocal:
         return self._single_run(run_key)
 
     def get_run_val(self, run_key: RunKey) -> typing.Optional[runs.Run]:
-        from . import execute_fast
+        from weave.old_weave import execute_fast
 
         res = execute_fast._execute_fn_no_engine(None, None, self.get_run(run_key))
         return res

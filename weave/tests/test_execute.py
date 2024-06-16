@@ -5,7 +5,7 @@ from .. import api
 from .. import weave_types as types
 from .. import weave_internal
 from .. import ops
-from .. import execute
+from weave.old_weave import execute
 from .. import environment
 from . import test_wb
 import pytest

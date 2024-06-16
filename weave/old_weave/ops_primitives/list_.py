@@ -6,10 +6,11 @@ import typing
 import numpy as np
 import pandas as pd
 
-from weave import box, errors, execute_fast, storage
+from weave import box, errors, storage
 from weave import weave_types as types
 from weave._dict_utils import tag_aware_dict_val_for_escaped_key
 from weave.graph import Node
+from weave.old_weave import execute_fast
 from weave.old_weave.decorator_class import weave_class
 from weave.old_weave.decorator_op import op
 from weave.old_weave.language_features.tagging import (
