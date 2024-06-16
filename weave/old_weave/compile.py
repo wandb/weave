@@ -6,11 +6,12 @@ import re
 import typing
 
 from weave.old_weave.language_features.tagging import tagged_value_type_helpers
-
-from . import (
-    box,
+from weave.old_weave import (
     compile_domain,
     compile_table,
+)
+from weave import (
+    box,
     debug_compile,
     dispatch,
     engine_trace,
@@ -29,8 +30,8 @@ from . import (
     value_or_error,
     weave_internal,
 )
-from . import weave_types as types
-from .op_def import OpDef
+from weave import weave_types as types
+from weave.op_def import OpDef
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since
@@ -271,7 +272,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "flatten":
         from weave.old_weave.arrow.arrow import ArrowWeaveListType
 
-        from .old_weave.ops_arrow.list_ops import _concat_output_type
+        from .ops_arrow.list_ops import _concat_output_type
 
         # The operation of flattening a lists of arrow weave lists is exactly equal to the far
         # more efficient, vectorized concat operation. If this is the case, use it!.
@@ -287,7 +288,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "concat":
         from weave.old_weave.arrow.arrow import ArrowWeaveListType
 
-        from .old_weave.ops_arrow.list_ops import flatten_return_type
+        from .ops_arrow.list_ops import flatten_return_type
 
         # The operation of concat on a awl of lists is exactly equal to the far
         # more efficient, vectorized flatten operation. If this is the case, use it!.
@@ -488,7 +489,7 @@ def compile_dedupe(
     nodes: dict[str, graph.Node] = {}
 
     def _dedupe(node: graph.Node) -> graph.Node:
-        from . import serialize
+        from weave import serialize
 
         node_id = serialize.node_id(node)
         if node_id in nodes:

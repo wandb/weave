@@ -1,10 +1,9 @@
 import logging
 
 from weave.old_weave.language_features.tagging import tag_store
-
+from weave.old_weave import compile
 from . import (
     box,
-    compile,
     engine_trace,
     errors,
     forward_graph,

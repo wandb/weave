@@ -36,8 +36,8 @@
 
 import json
 import typing
-
-from weave import compile_table, engine_trace
+from weave.old_weave import compile_table
+from weave import engine_trace
 from weave import weave_types as types
 from weave.api import op
 from weave.gql_op_plugin import wb_gql_op_plugin

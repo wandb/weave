@@ -651,7 +651,7 @@ def raise_on_python_bailout():
 def _call_and_ensure_awl(
     awl: ArrowWeaveList, called: graph.OutputNode
 ) -> ArrowWeaveList:
-    from weave import compile
+    from weave.old_weave import compile
 
     with compile.disable_compile():
         res = use(called)

@@ -2,8 +2,8 @@
 
 import typing
 
-from . import errors
-from . import stitch
+from weave import errors
+from weave import stitch
 
 
 KeyTree = typing.Dict[str, "KeyTree"]  # type:ignore
@@ -21,7 +21,7 @@ def tree_merge(a: KeyTree, b: KeyTree) -> None:
 
 def get_projection(obj: stitch.ObjectRecorder) -> KeyTree:
     """Given an object returned by stitch, return a tree of all accessed columns."""
-    from . import _dict_utils
+    from weave import _dict_utils
 
     cols: KeyTree = {}
     all_keys = False

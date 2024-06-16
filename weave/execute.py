@@ -21,9 +21,9 @@ from weave.old_weave.language_features.tagging import (
 # Ops
 # Trace / cache
 # Language Features
-from . import (
+from weave.old_weave import compile
+from weave import (
     box,
-    compile,
     context,
     context_state,
     eager,

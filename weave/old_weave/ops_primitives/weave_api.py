@@ -6,8 +6,8 @@ from weave.old_weave import (
     artifact_local,
     artifact_wandb,
 )
+from weave.old_weave import compile
 from weave import (
-    compile,
     errors,
     graph,
     object_context,

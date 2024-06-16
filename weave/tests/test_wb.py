@@ -16,9 +16,9 @@ from weave.old_weave.ops_domain import wb_domain_types as wdt
 from weave.old_weave.ops_primitives import dict_, list_
 from weave.old_weave.ops_primitives.file import _as_w0_dict_
 from weave.tests.test_wb_domain_ops import assert_gql_str_equal
-
 from .. import api as weave
-from .. import compile, graph, uris
+from weave.old_weave import compile
+from .. import graph, uris
 from weave.old_weave import artifact_fs, artifact_wandb
 from .. import ops as ops
 from .. import weave_types as types

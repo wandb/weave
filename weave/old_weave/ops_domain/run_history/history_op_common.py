@@ -8,9 +8,8 @@ from weave.old_weave import (
     artifact_base,
     artifact_fs,
 )
+from weave.old_weave import compile, compile_table
 from weave import (
-    compile,
-    compile_table,
     engine_trace,
     errors,
     gql_json_cache,
@@ -22,8 +21,8 @@ from weave import (
 )
 from weave import weave_types as types
 from weave.api import use
-from weave.compile_domain import InputAndStitchProvider
-from weave.compile_table import KeyTree
+from weave.old_weave.compile_domain import InputAndStitchProvider
+from weave.old_weave.compile_table import KeyTree
 from weave.mappers_arrow import map_to_arrow
 from weave import _dict_utils
 from weave.old_weave.arrow.concat import concatenate_all

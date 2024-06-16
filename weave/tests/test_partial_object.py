@@ -4,7 +4,7 @@ from weave.old_weave.ops_domain.project_ops import root_all_projects
 from weave.old_weave.ops_domain.report_ops import root_all_reports
 
 from .. import api as weave
-from .. import compile
+from weave.old_weave import compile
 from .. import ops as ops
 from .. import weave_types as types
 from .test_wb import table_mock1_no_display_name
