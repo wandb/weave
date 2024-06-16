@@ -30,8 +30,9 @@ import functools
 import json
 import typing
 
-from weave import box, errors, mappers, mappers_python
+from weave import box, errors
 from weave import weave_types as types
+from weave.old_weave import mappers, mappers_python
 from weave.old_weave.language_features.tagging import tag_store
 
 if typing.TYPE_CHECKING:

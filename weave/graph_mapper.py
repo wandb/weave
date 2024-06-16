@@ -1,8 +1,7 @@
-from . import graph
-from . import mappers
-from . import ref_base
-from . import mappers_python_def as mappers_python
-from . import node_ref
+from weave.old_weave import mappers
+from weave.old_weave import mappers_python_def as mappers_python
+
+from . import graph, node_ref, ref_base
 from . import weave_types as types
 
 

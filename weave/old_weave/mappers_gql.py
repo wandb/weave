@@ -1,9 +1,11 @@
 import json
 
-from weave.old_weave import gql_json_cache
+from weave import errors
+from weave import weave_types as types
+from weave.old_weave import gql_json_cache, mappers
+from weave.old_weave.mappers_weave import UnionMapper
+from weave.partial_object import PartialObjectType
 
-from . import errors, mappers
-from . import weave_types as types
 from .mappers_python_def import (
     BoolToPyBool,
     DictToPyDict,
@@ -14,8 +16,6 @@ from .mappers_python_def import (
     PyFloatToFloat,
     TypedDictToPyDict,
 )
-from .mappers_weave import UnionMapper
-from .partial_object import PartialObjectType
 
 
 class GQLTypedDictToTypedDict(TypedDictToPyDict):

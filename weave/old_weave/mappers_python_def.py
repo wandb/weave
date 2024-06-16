@@ -4,22 +4,12 @@ import inspect
 import math
 import typing
 
+from weave import box, errors, graph_client_context, ref_base, storage, val_const
+from weave import timestamp as weave_timestamp
+from weave import weave_types as types
+from weave.old_weave import artifact_fs, mappers, mappers_python, mappers_weave
 from weave.old_weave.language_features.tagging import tagged_value_type
-from weave.old_weave import artifact_fs
-from . import (
-    box,
-    errors,
-    graph_client_context,
-    mappers,
-    mappers_python,
-    mappers_weave,
-    ref_base,
-    storage,
-    val_const,
-)
-from . import timestamp as weave_timestamp
-from . import weave_types as types
-from .partial_object import PartialObject, PartialObjectType
+from weave.partial_object import PartialObject, PartialObjectType
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -61,7 +51,7 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
-        from .op_def_type import OpDefType
+        from weave.op_def_type import OpDefType
 
         # Only add keys that are accepted by the constructor.
         # This is used for Panels where we have an Class-level id attribute
@@ -333,7 +323,7 @@ class DefaultToPy(mappers.Mapper):
         self._use_stable_refs = use_stable_refs
 
     def apply(self, obj):
-        from . import op_def
+        from weave import op_def
 
         try:
             return self.type.instance_to_dict(obj)

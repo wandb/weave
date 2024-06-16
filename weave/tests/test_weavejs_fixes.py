@@ -1,16 +1,11 @@
 import os
+
 import pytest
 
+from weave.old_weave import mappers_python
+
+from .. import api, context_state, ops, weave_internal, weavejs_fixes
 from .. import weave_types as types
-from .. import weavejs_fixes
-
-from .. import ops
-from .. import api
-from .. import context_state
-
-from .. import mappers_python
-
-from .. import weave_internal
 
 
 @pytest.mark.skip(

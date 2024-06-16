@@ -1,9 +1,8 @@
 import typing
 
 if typing.TYPE_CHECKING:
+    from weave import weave_types as types
     from weave.old_weave import artifact_local
-
-    from . import weave_types as types
 
 
 class Mapper:

@@ -5,21 +5,12 @@ from contextlib import contextmanager
 
 import pyarrow as pa
 
+from weave import box, errors, node_ref, partial_object, ref_base
+from weave import weave_types as types
+from weave.old_weave import arrow_util, artifact_base, mappers, mappers_weave
+from weave.old_weave import mappers_python_def as mappers_python
 from weave.old_weave.arrow import arrow
 from weave.old_weave.language_features.tagging import tagged_value_type
-
-from weave.old_weave import arrow_util, artifact_base
-from . import (
-    box,
-    errors,
-    mappers,
-    mappers_weave,
-    node_ref,
-    partial_object,
-    ref_base,
-)
-from . import mappers_python_def as mappers_python
-from . import weave_types as types
 
 _in_tagging_context = contextvars.ContextVar("in_tagging_context", default=False)
 

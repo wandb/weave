@@ -18,7 +18,7 @@ from .api import *
 
 from .errors import *
 
-from . import mappers_python_def
+from weave.old_weave import mappers_python_def
 
 from . import wandb_api as _wandb_api
 

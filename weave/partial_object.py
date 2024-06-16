@@ -2,9 +2,9 @@ import json
 import typing
 from dataclasses import dataclass, field
 
-from . import weave_types as types
 from weave.old_weave import artifact_fs
 
+from . import weave_types as types
 
 T = typing.TypeVar("T", bound="PartialObject")
 
@@ -137,7 +137,7 @@ class PartialObjectType(types.Type):
     def save_instance(
         self, obj: PartialObject, artifact: artifact_fs.FilesystemArtifact, name: str
     ) -> None:
-        from . import mappers_python
+        from weave.old_weave import mappers_python
 
         serializer = mappers_python.map_to_python(self, artifact)
         result = serializer.apply(obj)
@@ -152,7 +152,7 @@ class PartialObjectType(types.Type):
         name: str,
         extra: typing.Optional[list] = None,
     ) -> PartialObject:
-        from . import mappers_python
+        from weave.old_weave import mappers_python
 
         with artifact.open(
             f"{name}.{self.keyless_weave_type_class.__name__}WithKeys.json"

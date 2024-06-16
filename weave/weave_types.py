@@ -10,13 +10,16 @@ from collections.abc import Iterable
 
 import pydantic
 
-from . import box, context_state, errors, mappers_python, object_type_ref_util
+from weave.old_weave import mappers_python
+
+from . import box, context_state, errors, object_type_ref_util
 from . import timestamp as weave_timestamp
 
 if typing.TYPE_CHECKING:
-    from . import weave_inspector
     from weave.old_weave import artifact_base
     from weave.old_weave.artifact_fs import FilesystemArtifact
+
+    from . import weave_inspector
 
 
 def to_weavejs_typekey(k: str) -> str:

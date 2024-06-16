@@ -14,16 +14,10 @@ from weave.old_weave import (
     artifact_local,
     artifact_mem,
     artifact_wandb,
-)
-from . import (
-    box,
-    errors,
-    graph,
-    graph_client_context,
     mappers_python,
-    ref_base,
-    timestamp,
 )
+
+from . import box, errors, graph, graph_client_context, ref_base, timestamp
 from . import weave_types as types
 
 Ref = ref_base.Ref
@@ -65,7 +59,7 @@ def _get_weave_type_with_refs(obj: typing.Any):
 def _ensure_object_components_are_published(
     obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
-    from weave.mappers_publisher import map_to_python_remote
+    from weave.old_weave.mappers_publisher import map_to_python_remote
 
     mapper = map_to_python_remote(wb_type, artifact)
     return mapper.apply(obj)
