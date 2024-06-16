@@ -9,10 +9,10 @@ from . import (
     cache,
     context,
     context_state,
-    forward_graph,
     memo,
     wandb_api,
 )
+from .old_weave import forward_graph
 
 # Must be power of 2
 MAX_PARALLELISM = 16

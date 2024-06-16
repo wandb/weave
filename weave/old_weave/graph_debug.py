@@ -2,9 +2,8 @@ import itertools
 import textwrap
 import typing
 
-from weave import forward_graph
 from weave import weave_types as types
-from weave.old_weave import graph
+from weave.old_weave import forward_graph, graph
 
 
 class _CombinedConstVal:

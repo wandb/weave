@@ -4,14 +4,13 @@ from weave import (
     box,
     engine_trace,
     errors,
-    forward_graph,
     op_policy,
     ref_base,
     registry_mem,
     weave_internal,
 )
 from weave import weave_types as types
-from weave.old_weave import compile, graph, language_nullability
+from weave.old_weave import compile, forward_graph, graph, language_nullability
 from weave.old_weave.language_features.tagging import tag_store
 
 # from . import object_context

@@ -5,7 +5,7 @@ import typing
 
 from weave.old_weave import graph
 
-from . import errors
+from .. import errors
 
 ExecutableNode = typing.Union[graph.OutputNode, graph.ConstNode]
 

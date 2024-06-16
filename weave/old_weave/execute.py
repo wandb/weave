@@ -17,7 +17,6 @@ from weave import (
     engine_trace,
     environment,
     errors,
-    forward_graph,
     memo,
     op_def,
     op_execute,
@@ -39,6 +38,7 @@ from weave import weave_types as types
 # Language Features
 from weave.old_weave import (
     compile,
+    forward_graph,
     graph,
     graph_debug,
     language_nullability,
