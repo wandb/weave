@@ -5,11 +5,7 @@ import typing
 
 import pyarrow as pa
 
-from weave import (
-    engine_trace,
-    errors,
-    io_service,
-)
+from weave import engine_trace, errors
 from weave import weave_types as types
 from weave.api import op
 from weave.old_weave import (
@@ -17,6 +13,7 @@ from weave.old_weave import (
     artifact_fs,
     artifact_mem,
     gql_json_cache,
+    io_service,
 )
 from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.list_ import (

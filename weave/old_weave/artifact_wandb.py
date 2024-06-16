@@ -420,7 +420,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             ]
         ] = None,
     ):
-        from weave import io_service
+        from weave.old_weave import io_service
 
         self.io_service = io_service.get_sync_client()
         self.name = name

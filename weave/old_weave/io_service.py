@@ -22,14 +22,7 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 
 import aioprocessing
 
-from weave.old_weave import (
-    artifact_wandb,
-    async_queue,
-    wandb_api,
-    wandb_file_manager,
-)
-
-from . import (
+from weave import (
     cache,
     context_state,
     engine_trace,
@@ -38,6 +31,12 @@ from . import (
     server_error_handling,
     uris,
     weave_http,
+)
+from weave.old_weave import (
+    artifact_wandb,
+    async_queue,
+    wandb_api,
+    wandb_file_manager,
 )
 
 tracer = engine_trace.tracer()  # type: ignore

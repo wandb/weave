@@ -13,9 +13,15 @@ import asyncio
 import cProfile
 import time
 
-from weave.old_weave import artifact_wandb, async_map, wandb_api, wandb_file_manager
+from weave.old_weave import (
+    artifact_wandb,
+    async_map,
+    io_service,
+    wandb_api,
+    wandb_file_manager,
+)
 
-from .. import engine_trace, filesystem, io_service, weave_http
+from .. import engine_trace, filesystem, weave_http
 
 tracer = engine_trace.tracer()  # type: ignore
 
