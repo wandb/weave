@@ -111,11 +111,11 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 def import_ecosystem():
     from weave import ops
-    from weave.old_weave import panels_py, panels
+    from weave.old_weave import panels, panels_py
 
     # Attempt to import MVP ecosystem modules
     try:
-        from weave.ecosystem import langchain, replicate
+        from weave.old_weave.ecosystem import langchain, replicate
     except ImportError:
         pass
 
@@ -128,7 +128,7 @@ def import_ecosystem():
         # except (ImportError, OSError, wandb.Error):
         #     print("Error: Couldn't import faiss module for Weaveflow.")
         try:
-            from weave.ecosystem import all
+            from weave.old_weave.ecosystem import all
         except (ImportError, OSError, wandb.Error):
             pass
 

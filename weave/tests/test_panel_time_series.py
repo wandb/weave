@@ -1,7 +1,9 @@
 import time
-import weave
+
 import wandb
-from weave.ecosystem.wandb.panel_time_series import TimeSeries
+
+import weave
+from weave.old_weave.ecosystem.wandb.panel_time_series import TimeSeries
 
 
 def test_panel_timeseries(user_by_api_key_in_env):
