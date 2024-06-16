@@ -4,7 +4,7 @@ import typing
 import dataclasses
 
 if typing.TYPE_CHECKING:
-    from . import client_interface
+    from weave.old_weave import client_interface
     from . import server_interface
     from . import uris
     from .graph_client import GraphClient

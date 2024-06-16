@@ -13,6 +13,7 @@ from flask.testing import FlaskClient
 
 import weave
 from weave import weave_init
+from weave.legacy import client as client_legacy
 from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context
 from weave.trace_server import (
     clickhouse_trace_server_batched,
@@ -25,7 +26,6 @@ from weave.trace_server import (
 )
 
 from . import autopatch, context_state, environment, io_service, logs, serialize
-from . import client as client_legacy
 from .tests import fixture_fakewandb
 from .tests.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *

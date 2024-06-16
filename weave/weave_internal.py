@@ -3,7 +3,7 @@ from . import graph
 from . import weave_types as types
 from . import context_state
 from . import errors
-from . import client_interface
+from weave.old_weave import client_interface
 
 
 def dereference_variables(

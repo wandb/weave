@@ -4,12 +4,10 @@ import os
 import typing
 from urllib.parse import urlparse
 
-from weave.client_interface import ClientInterface
+from weave.old_weave import client
+from weave.old_weave.client_interface import ClientInterface
 
-from . import urls
-from . import util
-from . import client
-from . import context_state
+from . import context_state, urls, util
 
 
 @contextlib.contextmanager
