@@ -1,5 +1,5 @@
 import weave
-from weave import panel
+from weave.old_weave import panel
 
 # TODO: This id conflicts with the histogram type! Panel types
 # should automatically have Panel in the name but they don't at the moment.

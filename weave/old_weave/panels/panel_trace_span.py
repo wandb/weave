@@ -1,5 +1,5 @@
 import weave
-from weave import panel
+from weave.old_weave import panel
 
 
 @weave.type("traceSpanPanel")

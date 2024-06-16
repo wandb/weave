@@ -27,7 +27,7 @@ def test_publish_values(user_by_api_key_in_env):
 
 
 def test_publish_panel(user_by_api_key_in_env):
-    from .. import panel_util
+    from weave.old_weave import panel_util
 
     table_obj = panels.Table(
         panel_util.make_node(

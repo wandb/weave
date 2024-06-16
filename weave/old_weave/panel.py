@@ -1,14 +1,12 @@
 import dataclasses
-from tarfile import DEFAULT_FORMAT
-import typing
 import inspect
-from . import api as weave
-from . import graph
-from . import storage
-from . import weave_types as types
-from . import weave_internal
-from . import panel_util
-from . import errors
+import typing
+from tarfile import DEFAULT_FORMAT
+
+from weave import api as weave
+from weave import errors, graph, storage, weave_internal
+from weave import weave_types as types
+from weave.old_weave import panel_util
 
 
 def run_variable_lambdas(
@@ -159,6 +157,6 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
         }
 
     def _ipython_display_(self):
-        from . import show
+        from weave import show
 
         show.show(self)

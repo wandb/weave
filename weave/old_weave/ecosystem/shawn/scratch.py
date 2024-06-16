@@ -2,7 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave import panel, panel_util
+from weave.old_weave import panel, panel_util
 
 
 @weave.op()

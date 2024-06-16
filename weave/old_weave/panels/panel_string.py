@@ -2,7 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave import panel
+from weave.old_weave import panel
 
 ModeOption = typing.Literal["plaintext", "markdown", "diff"]
 

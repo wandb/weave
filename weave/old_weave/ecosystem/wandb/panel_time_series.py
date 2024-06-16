@@ -5,7 +5,7 @@ import weave
 from weave import weave_internal
 from weave.old_weave.ecosystem.wandb import weave_plotly
 from weave.old_weave.language_features.tagging import tagged_value_type
-from weave.panel_util import make_node
+from weave.old_weave.panel_util import make_node
 
 TIME_SERIES_BIN_SIZES_SEC = [
     # TODO: will need more steps along here for smooth zooming.

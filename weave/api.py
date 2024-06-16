@@ -57,7 +57,7 @@ from .context import (
     use_lazy_execution,
 )
 
-from .panel import Panel
+from weave.old_weave.panel import Panel
 
 from weave.old_weave.arrow.list_ import ArrowWeaveList as WeaveList
 from .table import Table

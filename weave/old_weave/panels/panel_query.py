@@ -2,7 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave import graph, panel, weave_internal
+from weave import graph, weave_internal
+from weave.old_weave import panel
 from weave.old_weave.panels import table_state
 
 

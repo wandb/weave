@@ -2,7 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave import graph, panel, panel_util
+from weave import graph
+from weave.old_weave import panel, panel_util
 
 CardContentType = typing.TypeVar("CardContentType")
 

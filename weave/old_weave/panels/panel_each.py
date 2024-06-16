@@ -2,7 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave import graph, panel
+from weave import graph
+from weave.old_weave import panel
 from weave.old_weave.panels.bank import default_panel_bank_flow_section_config
 from weave.old_weave.panels.panel_group import PanelBankSectionConfig
 

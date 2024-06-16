@@ -10,6 +10,7 @@ from this list and defined manually.
 
 import dataclasses
 import typing
+
 import weave
 
 
@@ -71,7 +72,7 @@ type_cache = []
 
 
 def define_panel(p: LPanel):
-    class DummyClass(weave.panel.Panel):
+    class DummyClass(weave.old_weave.panel.Panel):
         id = p.panel_id
 
     type_cache.append(DummyClass)

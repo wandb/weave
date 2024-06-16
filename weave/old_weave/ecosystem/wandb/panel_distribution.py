@@ -2,7 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave import panel_util, weave_internal
+from weave import weave_internal
+from weave.old_weave import panel_util
 from weave.old_weave.ecosystem.wandb import weave_plotly
 
 

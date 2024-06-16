@@ -65,6 +65,6 @@ from weave.old_weave.panels.panel_trace import Trace
 
 # navigation
 from weave.old_weave.panels.panel_weavelink import WeaveLink
-from weave.panel import Panel
+from weave.old_weave.panel import Panel
 
 _context_state.clear_loading_built_ins(_loading_builtins_token)
