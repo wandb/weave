@@ -4,9 +4,9 @@ import pyarrow as pa
 from pyarrow import compute as pc
 
 from weave import weave_types as types
-from weave.decorator_arrow_op import arrow_op
 from weave.old_weave.arrow.arrow import ArrowWeaveListType, arrow_as_array
 from weave.old_weave.arrow.list_ import ArrowWeaveList
+from weave.old_weave.decorator_arrow_op import arrow_op
 from weave.old_weave.language_features.tagging import tagged_value_type
 
 

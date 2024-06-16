@@ -1,23 +1,28 @@
-from typing import Callable, Any, Mapping, Optional
-import inspect
 import functools
+import inspect
 import typing
-from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine, Dict
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Coroutine,
+    Dict,
+    Mapping,
+    Optional,
+    TypeVar,
+)
+
 from typing_extensions import ParamSpec
 
+from weave import box, context_state, graph_client_context, run_context
+from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
-from weave.trace.context import call_attributes
-from weave import graph_client_context
-from weave import run_context
-from weave import box
-
-from weave import context_state
 
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
-    from weave.weave_client import Call, WeaveClient, CallsIter
+    from weave.weave_client import Call, CallsIter, WeaveClient
 
 
 def print_call_link(call: "Call") -> None:
@@ -194,7 +199,7 @@ R = TypeVar("R")
 # The decorator!
 def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
     if context_state.get_loading_built_ins():
-        from weave.decorator_op import op
+        from weave.old_weave.decorator_op import op
 
         return op(*args, **kwargs)
 

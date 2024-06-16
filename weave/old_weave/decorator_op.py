@@ -1,17 +1,18 @@
 import functools
 import typing
-from typing import TypeVar, Callable, Optional
+from typing import Callable, Optional, TypeVar
+
 from typing_extensions import ParamSpec
 
-
-from . import registry_mem
-from . import op_def
-from . import op_args
-
-from . import derive_op
-from . import context_state
-from . import weave_types as types
-from . import pyfunc_type_util
+from weave import (
+    context_state,
+    derive_op,
+    op_args,
+    op_def,
+    pyfunc_type_util,
+    registry_mem,
+)
+from weave import weave_types as types
 
 if typing.TYPE_CHECKING:
     from weave.gql_op_plugin import GqlOpPlugin
@@ -110,7 +111,7 @@ def op(
             mutation=mutation,
         )
         if weavify:
-            from .weavify import op_to_weave_fn
+            from weave.weavify import op_to_weave_fn
 
             op.weave_fn = op_to_weave_fn(op)
 

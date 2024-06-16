@@ -1,4 +1,4 @@
-from weave import decorator_type
+from weave.old_weave import decorator_type
 
 
 @decorator_type.type(

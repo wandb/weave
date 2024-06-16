@@ -1,10 +1,10 @@
 import typing
 
+from weave import op_def
+from weave import weave_types as types
 from weave.old_weave.arrow.arrow import ArrowWeaveListType
 from weave.old_weave.language_features.tagging import tagged_value_type
 
-from . import op_def
-from . import weave_types as types
 from .decorator_op import op
 
 TypeCallable = typing.Callable[..., types.Type]

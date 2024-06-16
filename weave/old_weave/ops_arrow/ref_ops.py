@@ -2,9 +2,9 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from weave import weave_types as types
-from weave.decorator_arrow_op import arrow_op
-from weave.decorator_op import op
 from weave.old_weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave.old_weave.decorator_arrow_op import arrow_op
+from weave.old_weave.decorator_op import op
 from weave.old_weave.ops_arrow import util
 
 nullable_binary_input_type = {

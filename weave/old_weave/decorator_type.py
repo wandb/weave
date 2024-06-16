@@ -1,14 +1,10 @@
+import dataclasses
 import inspect
 import typing
-import dataclasses
 
-
-from . import weave_types as types
-from . import infer_types
-from . import decorator_class
-from . import errors
-from . import context_state
-from . import object_type_ref_util
+from weave import context_state, errors, infer_types, object_type_ref_util
+from weave import weave_types as types
+from weave.old_weave import decorator_class
 
 _py_type = type
 
@@ -97,8 +93,7 @@ def type(
         # and deserialize them along with the data attached to the object
         if relocatable:
             for name, member in inspect.getmembers(target):
-                from . import op_def
-                from . import op_def_type
+                from weave import op_def, op_def_type
 
                 if isinstance(member, op_def.BoundOpDef):
                     static_property_types[name] = op_def_type.OpDefType()

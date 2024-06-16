@@ -45,7 +45,7 @@ from . import weave_types as types
 from . import types_numpy as _types_numpy
 
 from . import errors
-from .decorators import weave_class, mutation, type
+from weave.old_weave.decorators import weave_class, mutation, type
 from weave.trace.op import op
 
 from weave.trace.op import Op

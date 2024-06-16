@@ -10,7 +10,6 @@ import pyarrow.compute as pc
 from weave import op_args, op_def
 from weave import weave_types as types
 from weave.api import op, type_of
-from weave.decorator_arrow_op import arrow_op
 from weave.old_weave.arrow import arrow_tags, convert
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
@@ -29,6 +28,7 @@ from weave.old_weave.arrow.list_ import (
     is_list_arrowweavelist,
     is_taggedvalue_arrowweavelist,
 )
+from weave.old_weave.decorator_arrow_op import arrow_op
 from weave.old_weave.language_features.tagging import (
     tagged_value_type,
     tagged_value_type_helpers,

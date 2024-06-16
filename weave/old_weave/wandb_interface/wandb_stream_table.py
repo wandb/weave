@@ -14,7 +14,7 @@ import uuid
 from wandb.sdk.lib.ipython import _get_python_type
 from wandb.sdk.lib.paths import LogicalPath
 from wandb.sdk.lib.printer import get_printer
-from weave.old_weave import artifact_base
+
 from weave import (
     box,
     environment,
@@ -26,6 +26,7 @@ from weave import (
     wandb_api,
     weave_types,
 )
+from weave.old_weave import artifact_base
 from weave.old_weave.core_types.stream_table_type import StreamTableType
 from weave.old_weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
@@ -165,7 +166,7 @@ class _StreamTableSync:
         print_url = False
         if not hasattr(self, "_weave_stream_table"):
             print_url = True
-            self._weave_stream_table = StreamTableType(
+            self._weave_stream_table = StreamTableType(  # type: ignore
                 table_name=self._table_name,
                 project_name=self._project_name,
                 entity_name=self._entity_name,

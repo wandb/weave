@@ -6,9 +6,9 @@ import pyarrow as pa
 
 from weave import errors, gql_op_plugin, op_def, partial_object, weave_types
 from weave.api import op
-from weave.decorator_arrow_op import arrow_op
 from weave.gql_op_plugin import wb_gql_op_plugin
 from weave.input_provider import InputProvider
+from weave.old_weave.decorator_arrow_op import arrow_op
 from weave.old_weave.ops_arrow import ArrowWeaveList, ArrowWeaveListType
 from weave.old_weave.ops_domain import wb_domain_types
 

@@ -1,5 +1,5 @@
 from weave import weave_types as types
-from weave.decorator_op import op
+from weave.old_weave.decorator_op import op
 
 
 @op(

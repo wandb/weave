@@ -5,9 +5,9 @@ import pyarrow.compute as pc
 
 from weave import weave_types as types
 from weave.api import op
-from weave.decorator_arrow_op import arrow_op
 from weave.old_weave.arrow.arrow import ArrowWeaveListType, offsets_starting_at_zero
 from weave.old_weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave.old_weave.decorator_arrow_op import arrow_op
 from weave.old_weave.ops_arrow import util
 
 ARROW_WEAVE_LIST_STRING_TYPE = ArrowWeaveListType(types.String())

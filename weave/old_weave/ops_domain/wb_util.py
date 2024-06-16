@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from urllib import parse
 
 from weave import weave_types as types
-from weave.old_weave import artifact_fs
-from weave import decorator_type
+from weave.old_weave import artifact_fs, decorator_type
 from weave.old_weave.artifact_wandb import (
     WandbArtifact,
     WeaveWBLoggedArtifactURI,

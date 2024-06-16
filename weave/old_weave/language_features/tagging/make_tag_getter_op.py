@@ -1,8 +1,8 @@
 import typing
 
 from weave import context_state as _context_state
-from weave import decorator_op
 from weave import weave_types as types
+from weave.old_weave import decorator_op
 from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
 
 if typing.TYPE_CHECKING:
