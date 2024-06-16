@@ -31,11 +31,11 @@ from . import (
     weave_internal,
 )
 from . import weave_types as types
-from .run import Run
+from weave.old_weave.run import Run
 
 if typing.TYPE_CHECKING:
     from . import weave_client
-    from .run_streamtable_span import RunStreamTableSpan
+    from weave.old_weave.run_streamtable_span import RunStreamTableSpan
 
 
 _no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(

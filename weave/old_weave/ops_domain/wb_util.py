@@ -10,7 +10,7 @@ from weave.old_weave.artifact_wandb import (
 )
 from weave.old_weave.ops_domain.run_history import history_op_common
 from weave.old_weave.wandb_interface import wandb_stream_table
-from weave.runfiles_wandb import WandbRunFiles, WeaveWBRunFilesURI
+from weave.old_weave.runfiles_wandb import WandbRunFiles, WeaveWBRunFilesURI
 
 
 @dataclass

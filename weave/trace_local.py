@@ -5,13 +5,13 @@ import random
 import typing
 from typing import Mapping
 
-from weave.old_weave import artifact_local
+from weave.old_weave import artifact_local, runs
+
 from . import (
     graph,
     op_def,
     op_policy,
     ref_base,
-    runs,
     storage,
     weave_internal,
 )

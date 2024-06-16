@@ -30,7 +30,7 @@ from . import util as _util
 
 from . import context as _context
 from . import context_state as _context_state
-from . import run as _run
+from weave.old_weave import run as _run
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
 from . import graph_client_context as _graph_client_context

@@ -14,7 +14,8 @@ from . import weave_types as types
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
-    from . import run, weave_client
+    from weave.old_weave import run
+    from . import weave_client
     from . import weave_types as types
 
 

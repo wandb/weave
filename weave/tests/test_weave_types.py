@@ -4,10 +4,11 @@ import pytest
 
 import weave
 import weave.weave_types
+from weave.old_weave import runs
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.old_weave.ops_domain import wbmedia
 
-from .. import _dict_utils, errors, runs
+from .. import _dict_utils, errors
 from .. import weave_types as types
 
 

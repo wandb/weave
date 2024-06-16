@@ -11,14 +11,8 @@ import sys
 import typing
 import uuid
 
-from weave import (
-    errors,
-    graph,
-    graph_client_context,
-    run_context,
-    run_streamtable_span,
-    stream_data_interfaces,
-)
+from weave import errors, graph, graph_client_context, stream_data_interfaces
+from weave.old_weave import run_context, run_streamtable_span
 from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
 from weave.trace import context as trace_context
 

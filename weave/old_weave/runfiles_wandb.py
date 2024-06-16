@@ -8,9 +8,9 @@ import typing
 
 from weave.old_weave import artifact_fs, file_util
 
-from . import environment as weave_env
-from . import errors, filesystem, memo, uris, wandb_client_api
-from . import weave_types as types
+from weave import environment as weave_env
+from weave import errors, filesystem, memo, uris, wandb_client_api
+from weave import weave_types as types
 
 if typing.TYPE_CHECKING:
     from wandb.apis.public import Run as WBRun

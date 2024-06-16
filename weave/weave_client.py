@@ -13,7 +13,7 @@ from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
 from weave import trace_sentry, urls
-from weave import run_context
+from weave.old_weave import run_context
 from weave.trace.op import Op
 from weave.trace.object_record import (
     ObjectRecord,

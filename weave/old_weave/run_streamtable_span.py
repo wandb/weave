@@ -3,9 +3,9 @@ from typing import Iterable
 
 from weave.old_weave import artifact_wandb
 
-from . import graph_client_context, stream_data_interfaces, uris
-from .eager import WeaveIter
-from .run import Run
+from weave import graph_client_context, stream_data_interfaces, uris
+from weave.eager import WeaveIter
+from weave.old_weave.run import Run
 
 
 class RunStreamTableSpan:
