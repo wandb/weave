@@ -6,7 +6,7 @@ import inspect
 import typing
 from typing import Iterator, Sequence
 
-from weave.old_weave import language_autocall
+from weave.old_weave import language_autocall, object_context
 from weave.old_weave.language_features.tagging import (
     opdef_util,
     process_opdef_output_type,
@@ -22,7 +22,6 @@ from . import (
     graph,
     graph_client_context,
     memo,
-    object_context,
     op_args,
     op_def_type,
     op_execute,
@@ -291,7 +290,7 @@ class OpDef:
             # convert arguments to Const nodes. There is no type checking.
             # May need to fix this, but the patterns in test_mutation2 work
             # now.
-            from . import object_context
+            from weave.old_weave import object_context
 
             with object_context.object_context():
                 return _self.resolve_fn(*args, **kwargs)

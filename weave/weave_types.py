@@ -10,9 +10,9 @@ from collections.abc import Iterable
 
 import pydantic
 
-from weave.old_weave import mappers_python
+from weave.old_weave import mappers_python, object_type_ref_util
 
-from . import box, context_state, errors, object_type_ref_util
+from . import box, context_state, errors
 from . import timestamp as weave_timestamp
 
 if typing.TYPE_CHECKING:

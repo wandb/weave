@@ -12,10 +12,10 @@ import typing
 from typing import Any
 
 if typing.TYPE_CHECKING:
-    from . import ref_base
+    from weave import ref_base
 
-from . import box, uris
-from . import weave_types as types
+from weave import box, uris
+from weave import weave_types as types
 
 
 @dataclasses.dataclass

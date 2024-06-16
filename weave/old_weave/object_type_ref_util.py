@@ -1,7 +1,7 @@
 import typing
 
-from . import context_state
-from . import ref_util
+from weave import context_state
+from weave import ref_util
 
 
 def make_object_getattribute(

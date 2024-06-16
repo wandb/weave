@@ -21,7 +21,6 @@ from weave import (
     graph,
     graph_debug,
     memo,
-    object_context,
     op_def,
     op_execute,
     op_policy,
@@ -32,6 +31,7 @@ from weave import (
     value_or_error,
     wandb_api,
 )
+from weave.old_weave import object_context
 
 # Configuration
 # Libraries

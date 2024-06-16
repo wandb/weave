@@ -2,7 +2,8 @@ import dataclasses
 import inspect
 import typing
 
-from weave import context_state, errors, infer_types, object_type_ref_util
+from weave import context_state, errors, infer_types
+from weave.old_weave import object_type_ref_util
 from weave import weave_types as types
 from weave.old_weave import decorator_class
 

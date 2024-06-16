@@ -6,11 +6,10 @@ from weave.old_weave import (
     artifact_local,
     artifact_wandb,
 )
-from weave.old_weave import compile, runs
+from weave.old_weave import compile, runs, object_context
 from weave import (
     errors,
     graph,
-    object_context,
     ref_base,
     registry_mem,
     storage,
