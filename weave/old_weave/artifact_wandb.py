@@ -17,8 +17,6 @@ from weave import (
     eager,
     engine_trace,
     errors,
-    file_base,
-    file_util,
     filesystem,
     graph_client_context,
     memo,
@@ -28,7 +26,7 @@ from weave import (
     wandb_client_api,
 )
 from weave import weave_types as types
-from weave.old_weave import artifact_fs
+from weave.old_weave import artifact_fs, file_base, file_util
 from weave.old_weave.wandb_interface import wandb_artifact_pusher
 
 if typing.TYPE_CHECKING:

@@ -2,7 +2,7 @@ import json
 import typing
 
 from weave import api as weave
-from weave import file_base
+from weave.old_weave import file_base
 
 
 def load_jsonl(jsonlfile):

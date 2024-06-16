@@ -2,7 +2,7 @@ import contextlib
 import dataclasses
 import typing
 
-from . import weave_types as types
+from weave import weave_types as types
 
 TRACE_EXT = "trace.json"
 

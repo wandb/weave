@@ -6,10 +6,10 @@ import random
 import shutil
 import typing
 
-from weave.old_weave import artifact_fs
+from weave.old_weave import artifact_fs, file_util
 
 from . import environment as weave_env
-from . import errors, file_util, filesystem, memo, uris, wandb_client_api
+from . import errors, filesystem, memo, uris, wandb_client_api
 from . import weave_types as types
 
 if typing.TYPE_CHECKING:

@@ -4,7 +4,7 @@ import pyarrow as pa
 import pyarrow.csv as pa_csv
 
 from weave import api as weave
-from weave import file_base
+from weave.old_weave import file_base
 
 
 def sniff_dialect(path: str) -> type[csv.Dialect]:

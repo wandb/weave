@@ -1,9 +1,10 @@
 import json
 import typing
 
-from weave import errors, file_base, wandb_file_manager
+from weave import errors, wandb_file_manager
 from weave import weave_types as types
 from weave.api import op
+from weave.old_weave import file_base
 from weave.old_weave.artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
 from weave.old_weave.artifact_wandb import WandbArtifact, WandbArtifactManifest
 

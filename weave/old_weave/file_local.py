@@ -2,9 +2,9 @@ import contextlib
 import os
 import typing
 
-from . import file_base
-from . import file_util
-from . import weave_types as types
+from weave import weave_types as types
+
+from . import file_base, file_util
 
 
 class LocalFileType(file_base.FileBaseType):
