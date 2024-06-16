@@ -28,7 +28,7 @@ class InitializedClient:
 
 
 def get_username() -> typing.Optional[str]:
-    from . import wandb_api
+    from weave.old_weave import wandb_api
 
     api = wandb_api.get_wandb_api_sync()
     try:
@@ -38,7 +38,7 @@ def get_username() -> typing.Optional[str]:
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from . import wandb_api
+    from weave.old_weave import wandb_api
 
     fields = project_name.split("/")
     if len(fields) == 1:
@@ -86,7 +86,7 @@ def init_weave(
         else:
             _current_inited_client.reset()
 
-    from . import wandb_api
+    from weave.old_weave import wandb_api
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.

@@ -1,20 +1,18 @@
 # This is deprecated in favor of the new wandb_api.py module.
 # TODO: remove uses of this and delete.
 
-from wandb.apis import public
-from wandb.apis.public.api import gql
-from wandb.sdk.internal.internal_api import _thread_local_api_settings
 import logging
 import typing
 
-from wandb.errors import CommError as WandbCommError
-
-from . import errors
-
 import graphql
 from graphql import GraphQLSchema
-
 from requests import exceptions
+from wandb.apis import public
+from wandb.apis.public.api import gql
+from wandb.errors import CommError as WandbCommError
+from wandb.sdk.internal.internal_api import _thread_local_api_settings
+
+from weave import errors
 
 
 def wandb_public_api() -> public.Api:

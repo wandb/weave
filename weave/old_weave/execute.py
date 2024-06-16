@@ -26,7 +26,6 @@ from weave import (
     registry_mem,
     trace_local,
     value_or_error,
-    wandb_api,
 )
 from weave import weave_types as types
 
@@ -43,6 +42,7 @@ from weave.old_weave import (
     graph_debug,
     language_nullability,
     object_context,
+    wandb_api,
 )
 from weave.old_weave.language_features.tagging import (
     opdef_util,

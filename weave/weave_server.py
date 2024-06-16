@@ -24,7 +24,7 @@ from flask import (
 )
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
-from weave.old_weave import graph
+
 from weave import (
     context_state,
     engine_trace,
@@ -37,9 +37,9 @@ from weave import (
     storage,
     util,
     value_or_error,
-    wandb_api,
     weavejs_fixes,
 )
+from weave.old_weave import graph, wandb_api
 from weave.old_weave.language_features.tagging import tag_store
 from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
 

@@ -1,12 +1,9 @@
 import pytest
 
-from .. import environment
-from .. import wandb_api
-from .. import errors
-from weave.old_weave import artifact_fs
-from weave.old_weave import artifact_local
-from .. import storage
 import weave
+from weave.old_weave import artifact_fs, artifact_local, wandb_api
+
+from .. import environment, errors, storage
 
 
 @pytest.fixture()

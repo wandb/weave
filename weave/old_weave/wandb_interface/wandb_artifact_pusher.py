@@ -5,7 +5,8 @@ import wandb
 from wandb import Artifact
 from wandb.apis.public import api as wb_public
 
-from weave import engine_trace, wandb_client_api
+from weave import engine_trace
+from weave.old_weave import wandb_client_api
 from weave.old_weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
 

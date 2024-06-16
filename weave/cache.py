@@ -10,7 +10,7 @@ from . import context_state
 from . import engine_trace
 from . import environment
 from . import errors
-from . import wandb_api
+from weave.old_weave import wandb_api
 
 statsd = engine_trace.statsd()  # type: ignore
 logger = logging.getLogger("root")

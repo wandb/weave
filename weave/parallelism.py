@@ -3,16 +3,15 @@ import contextvars
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Generator, Iterator, Optional, TypeVar
 
-from weave.old_weave import execute, graph_client_context, run_context
-
-from . import (
-    cache,
-    context,
-    context_state,
-    memo,
+from weave.old_weave import (
+    execute,
+    forward_graph,
+    graph_client_context,
+    run_context,
     wandb_api,
 )
-from .old_weave import forward_graph
+
+from . import cache, context, context_state, memo
 
 # Must be power of 2
 MAX_PARALLELISM = 16

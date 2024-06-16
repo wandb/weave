@@ -21,7 +21,7 @@ from weave.old_weave import graph_mapper as _graph_mapper
 from . import storage as _storage
 from . import ref_base as _ref_base
 from weave.old_weave import artifact_wandb as _artifact_wandb
-from . import wandb_api as _wandb_api
+from weave.old_weave import wandb_api as _wandb_api
 
 from . import weave_internal as _weave_internal
 from . import errors as _errors

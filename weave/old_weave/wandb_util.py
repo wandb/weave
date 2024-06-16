@@ -1,9 +1,8 @@
 import typing
 
+from weave import errors, ops
+from weave import weave_types as types
 from weave.old_weave import ops_domain
-
-from . import errors, ops
-from . import weave_types as types
 
 
 class Weave0TypeJson(typing.TypedDict):

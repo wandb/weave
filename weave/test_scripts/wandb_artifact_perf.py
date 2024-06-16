@@ -10,17 +10,12 @@
 # Run from repo root with: `python -m weave.test_scripts.wandb_artifact_perf`
 
 import asyncio
-import time
 import cProfile
+import time
 
-from .. import engine_trace
-from .. import wandb_api
-from .. import filesystem
-from .. import weave_http
-from weave.old_weave import artifact_wandb
-from .. import wandb_file_manager
-from .. import io_service
-from weave.old_weave import async_map
+from weave.old_weave import artifact_wandb, async_map, wandb_api, wandb_file_manager
+
+from .. import engine_trace, filesystem, io_service, weave_http
 
 tracer = engine_trace.tracer()  # type: ignore
 

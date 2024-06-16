@@ -4,23 +4,18 @@ import datetime
 import json
 import logging
 import typing
-from weave.old_weave import (
-    artifact_fs,
-    artifact_wandb,
-)
-from weave import (
-    engine_trace,
-    errors,
-    io_service,
-    util,
-    wandb_util,
-    weave_internal,
-)
+
+from weave import engine_trace, errors, io_service, util, weave_internal
 from weave import timestamp as weave_timestamp
 from weave import weave_types as types
 from weave.api import op, weave_class
+from weave.old_weave import (
+    artifact_fs,
+    artifact_wandb,
+    ops_arrow,
+    wandb_util,
+)
 from weave.old_weave.ops_domain import trace_tree, wbmedia
-from weave.old_weave import ops_arrow
 
 
 @dataclasses.dataclass(frozen=True)

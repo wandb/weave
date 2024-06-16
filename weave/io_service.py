@@ -22,7 +22,12 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 
 import aioprocessing
 
-from weave.old_weave import artifact_wandb, async_queue
+from weave.old_weave import (
+    artifact_wandb,
+    async_queue,
+    wandb_api,
+    wandb_file_manager,
+)
 
 from . import (
     cache,
@@ -32,8 +37,6 @@ from . import (
     filesystem,
     server_error_handling,
     uris,
-    wandb_api,
-    wandb_file_manager,
     weave_http,
 )
 

@@ -1,25 +1,25 @@
+import contextlib
 import dataclasses
 import os
 import platform
 import secrets
 import string
 import subprocess
-
 import time
 import unittest.mock
 import urllib.parse
+from typing import Any, Generator, Literal, Optional, Union
 
-from typing import Any, Generator, Optional, Union, Literal
-
+import filelock
 import pytest
 import requests
 import wandb
 
-from weave.wandb_api import from_environment, wandb_api_context, WandbApiContext
-import contextlib
-import os
-
-import filelock
+from weave.old_weave.wandb_api import (
+    WandbApiContext,
+    from_environment,
+    wandb_api_context,
+)
 
 
 # The following code snippet was copied from:

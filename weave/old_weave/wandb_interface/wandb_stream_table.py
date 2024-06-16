@@ -15,15 +15,8 @@ from wandb.sdk.lib.ipython import _get_python_type
 from wandb.sdk.lib.paths import LogicalPath
 from wandb.sdk.lib.printer import get_printer
 
-from weave import (
-    box,
-    environment,
-    errors,
-    storage,
-    wandb_api,
-    weave_types,
-)
-from weave.old_weave import artifact_base, file_util, graph, runfiles_wandb
+from weave import box, environment, errors, storage, weave_types
+from weave.old_weave import artifact_base, file_util, graph, runfiles_wandb, wandb_api
 from weave.old_weave.core_types.stream_table_type import StreamTableType
 from weave.old_weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 

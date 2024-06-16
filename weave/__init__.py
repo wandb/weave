@@ -20,7 +20,7 @@ from .errors import *
 
 from weave.old_weave import mappers_python_def
 
-from . import wandb_api as _wandb_api
+from weave.old_weave import wandb_api as _wandb_api
 
 from . import version
 

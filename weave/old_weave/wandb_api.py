@@ -2,25 +2,24 @@
 # Weave interactions with the Weave API should go through this
 # module.
 
-import os
-import typing
-import graphql
-import gql
-import aiohttp
 import contextlib
 import contextvars
+import os
+import typing
 
+import aiohttp
+import gql
+import graphql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 
-from . import engine_trace
-from . import environment as weave_env
-from . import wandb_client_api
-from . import errors
+from weave import engine_trace, errors
+from weave import environment as weave_env
 
 # Importing at the top-level namespace so other files can import from here.
-from .context_state import WandbApiContext, _wandb_api_context
+from weave.context_state import WandbApiContext, _wandb_api_context
+from weave.old_weave import wandb_client_api
 
 tracer = engine_trace.tracer()  # type: ignore
 

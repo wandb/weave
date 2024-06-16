@@ -22,10 +22,15 @@ from weave import (
     uris,
     urls,
     util,
-    wandb_client_api,
 )
 from weave import weave_types as types
-from weave.old_weave import artifact_fs, file_base, file_util, graph_client_context
+from weave.old_weave import (
+    artifact_fs,
+    file_base,
+    file_util,
+    graph_client_context,
+    wandb_client_api,
+)
 from weave.old_weave.wandb_interface import wandb_artifact_pusher
 
 if typing.TYPE_CHECKING:

@@ -1,10 +1,10 @@
+import os
+
 import pytest
 
 import weave
-import os
-
 import weave.context_state
-import weave.wandb_api
+import weave.old_weave.wandb_api
 import weave.weave_init
 
 
