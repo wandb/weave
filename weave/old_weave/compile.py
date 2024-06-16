@@ -7,7 +7,6 @@ import typing
 
 from weave import (
     box,
-    dispatch,
     engine_trace,
     errors,
     input_provider,
@@ -25,6 +24,7 @@ from weave.old_weave import (
     compile_domain,
     compile_table,
     debug_compile,
+    dispatch,
     gql_op_plugin,
     gql_to_weave,
     graph,

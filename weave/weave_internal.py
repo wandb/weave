@@ -85,14 +85,14 @@ def use(
 
 def make_var_node(type_: types.Type, name: str) -> graph.VarNode:
     # Circular import. TODO: fix
-    from . import dispatch
+    from weave.old_weave import dispatch
 
     return dispatch.RuntimeVarNode(type_, name)
 
 
 def make_const_node(type_: types.Type, val: typing.Any) -> graph.ConstNode:
     # Circular import. TODO: fix
-    from . import dispatch
+    from weave.old_weave import dispatch
 
     return dispatch.RuntimeConstNode(type_, val)
 
@@ -116,7 +116,7 @@ def make_output_node(
     type_: types.Type, op_name: str, op_params: dict[str, graph.Node]
 ) -> graph.OutputNode:
     # Circular import. TODO: fix
-    from . import dispatch
+    from weave.old_weave import dispatch
 
     return dispatch.RuntimeOutputNode(type_, op_name, op_params)
 
@@ -178,6 +178,6 @@ def manual_call(
 
     You can produce incorrect nodes this way. Use with caution.
     """
-    from . import dispatch
+    from weave.old_weave import dispatch
 
     return dispatch.RuntimeOutputNode(output_type, op_name, inputs)

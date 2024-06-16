@@ -2,9 +2,10 @@ import os
 import typing
 
 import weave
-from weave import dispatch, util, weave_internal
+from weave import util, weave_internal
 from weave import weave_internal as internal
 from weave import weave_types as types
+from weave.old_weave import dispatch
 from weave.old_weave.panels import panel_board, panel_group
 from weave.old_weave.panels_py import panel_autoboard
 from weave.old_weave.panels_py.generator_templates import template_registry

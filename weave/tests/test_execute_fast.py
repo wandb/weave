@@ -1,9 +1,9 @@
 import weave
+from weave.old_weave import dispatch
 
 from .. import weave_internal
 from .. import weave_types as types
 from . import weavejs_ops
-from weave import dispatch
 
 
 def test_nested_weavejs_call():

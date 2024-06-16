@@ -7,7 +7,6 @@ import numpy as np
 import pyarrow as pa
 
 from weave import (
-    dispatch,
     errors,
     op_args,
     op_def,
@@ -17,7 +16,7 @@ from weave import (
 )
 from weave import weave_types as types
 from weave.api import op, use
-from weave.old_weave import graph, graph_debug
+from weave.old_weave import dispatch, graph, graph_debug
 from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.arrow import ArrowWeaveListType
 from weave.old_weave.arrow.arrow_tags import pushdown_list_tags

@@ -186,7 +186,7 @@ class ConstNode(Node):
 
     @classmethod
     def from_json(cls, obj: dict) -> "ConstNode":
-        from weave import dispatch
+        from weave.old_weave import dispatch
 
         val = obj["val"]
         if isinstance(val, dict) and "nodeType" in val:

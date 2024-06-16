@@ -2,8 +2,8 @@ import pytest
 import wandb
 
 import weave
-from weave.dispatch import RuntimeOutputNode
 from weave.old_weave import async_demo, compile, graph
+from weave.old_weave.dispatch import RuntimeOutputNode
 from weave.old_weave.ops_arrow import to_arrow
 from weave.old_weave.ops_arrow.vectorize import raise_on_python_bailout
 from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable

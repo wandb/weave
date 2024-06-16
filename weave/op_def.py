@@ -374,7 +374,7 @@ class OpDef:
             )
         else:
             final_output_type = _self.unrefined_output_type_for_params(bound_params)
-        from . import dispatch
+        from weave.old_weave import dispatch
 
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)
 
