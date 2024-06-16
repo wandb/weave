@@ -15,8 +15,8 @@
 
 import typing
 
-from . import weave_types as types
-from . import op_args
+from weave import op_args
+from weave import weave_types as types
 
 
 def update_input_types(

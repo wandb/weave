@@ -1,15 +1,15 @@
 import logging
 
+from weave import op_policy
+from weave.old_weave import compile, language_nullability
 from weave.old_weave.language_features.tagging import tag_store
-from weave.old_weave import compile
+
 from . import (
     box,
     engine_trace,
     errors,
     forward_graph,
     graph,
-    language_nullability,
-    op_policy,
     ref_base,
     registry_mem,
     weave_internal,

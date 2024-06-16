@@ -1,12 +1,11 @@
 import typing
 
+from weave import box
+from weave import weave_types as types
 from weave.old_weave.language_features.tagging import tagged_value_type
 
-from . import box
-from . import weave_types as types
-
 if typing.TYPE_CHECKING:
-    from . import op_def as OpDef
+    from weave import op_def as OpDef
 
 
 def should_force_none_result(

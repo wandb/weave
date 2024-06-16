@@ -12,6 +12,7 @@ import typing
 import pytest
 
 import weave
+from weave.old_weave import language_nullability, ops_arrow, ops_primitives
 from weave.old_weave.language_features.tagging import make_tag_getter_op
 from weave.old_weave.language_features.tagging.tagged_value_type import (
     TaggedValueType,
@@ -20,7 +21,6 @@ from weave.old_weave.language_features.tagging.tagged_value_type import (
 from .. import (
     graph,
     graph_debug,
-    language_nullability,
     op_def,
     registry_mem,
     storage,
@@ -32,7 +32,6 @@ from .concrete_tagged_value import (
     concrete_to_tagstore,
 )
 from .op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
-from weave.old_weave import ops_primitives, ops_arrow
 
 
 def assert_equal_with_tags(node: graph.Node, v: typing.Any, expected: typing.Any):

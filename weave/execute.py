@@ -9,19 +9,6 @@ import traceback
 import typing
 from collections.abc import Mapping
 
-from weave.old_weave.language_features.tagging import (
-    opdef_util,
-    process_opdef_resolve_fn,
-    tag_store,
-)
-
-# Configuration
-# Libraries
-# Planner/Compiler
-# Ops
-# Trace / cache
-# Language Features
-from weave.old_weave import compile
 from weave import (
     box,
     context,
@@ -33,7 +20,6 @@ from weave import (
     forward_graph,
     graph,
     graph_debug,
-    language_nullability,
     memo,
     object_context,
     op_def,
@@ -46,6 +32,20 @@ from weave import (
     value_or_error,
     wandb_api,
 )
+
+# Configuration
+# Libraries
+# Planner/Compiler
+# Ops
+# Trace / cache
+# Language Features
+from weave.old_weave import compile, language_nullability
+from weave.old_weave.language_features.tagging import (
+    opdef_util,
+    process_opdef_resolve_fn,
+    tag_store,
+)
+
 from . import weave_types as types
 
 if typing.TYPE_CHECKING:

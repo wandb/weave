@@ -6,6 +6,7 @@ import inspect
 import typing
 from typing import Iterator, Sequence
 
+from weave.old_weave import language_autocall
 from weave.old_weave.language_features.tagging import (
     opdef_util,
     process_opdef_output_type,
@@ -20,7 +21,6 @@ from . import (
     errors,
     graph,
     graph_client_context,
-    language_autocall,
     memo,
     object_context,
     op_args,
