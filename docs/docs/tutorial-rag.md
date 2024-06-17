@@ -3,14 +3,14 @@ sidebar_position: 3
 hide_table_of_contents: true
 ---
 
-# Example: Model-Based Evaluation of RAG applications
+# Tutorial: Model-Based Evaluation of RAG applications
 
 Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases. 
 
 In this example, we'll show an example that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
 We'll also show how to evaluate it using an LLM judge.
 
-## Build a knowledge base
+## 1. Build a knowledge base
 
 First, we compute the embeddings for our articles. You would typically do this once with your articles and put the embeddings & metadata in a database, but here we're doing it every time we run our script for simplicity.
 
@@ -47,7 +47,7 @@ def docs_to_embeddings(docs: list) -> list:
 article_embeddings = docs_to_embeddings(articles) # Note: you would typically do this once with your articles and put the embeddings & metadata in a database
 ```
 
-## Create a RAG app
+## 2. Create a RAG app
 
 Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.op()` decorator and we create our `Model` class. We call `weave.init('rag-qa')` to begin tracking all the inputs and outputs of our functions for later inspection.
 
@@ -113,7 +113,7 @@ model = RAGModel(
 model.predict("What significant result was reported about Zealand Pharma's obesity trial?")
 ```
 
-## Evaluating with an LLM Judge
+## 3. Evaluating with an LLM Judge
 
 When there aren't simple ways to evaluate your application, one approach is to use an LLM to evaluate aspects of it. Here is an example of using an LLM judge to try to measure the context precision by prompting it to verify if the context was useful in arriving at the given answer. This prompt was augmented from the popular [RAGAS framework](https://docs.ragas.io/). 
 
@@ -256,7 +256,7 @@ To use this as a scorer, you would initialize it and pass it to `scorers` argume
 evaluation = weave.Evaluation(dataset=questions, scorers=[CorrectnessLLMJudge()])
 ```
 
-# Pulling it all together
+## 4. Pulling it all together
 
 To get the same result for your RAG apps:
 - Wrap LLM calls & retrieval step functions with `weave.op()`
@@ -407,7 +407,11 @@ evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_scor
 asyncio.run(evaluation.evaluate(model))
 ```
 
-# Conclusion
+## Conclusion
 
 We've learned how to build observability into different steps of our applications, like the retrieval step in this example.
 We've also learned how to build more complex scoring functions, like an LLM judge, for doing automatic evaluation of application responses.
+
+## What's next?
+
+Learn more about Weave's core types [Quickstart](/guides/core-types).

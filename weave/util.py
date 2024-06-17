@@ -116,7 +116,7 @@ def is_colab():
     return True
 
 
-def is_notebook():
+def is_notebook() -> bool:
     if is_colab():
         return True
     try:
