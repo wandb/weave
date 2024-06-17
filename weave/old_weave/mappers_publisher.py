@@ -18,7 +18,7 @@ from weave.old_weave import (
 )
 from weave.old_weave.artifact_wandb import likely_commit_hash
 from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
-from weave.uris import WeaveURI
+from weave.old_weave.uris import WeaveURI
 
 
 class RefToPyRef(mappers.Mapper):

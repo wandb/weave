@@ -19,7 +19,6 @@ from weave import (
     errors,
     filesystem,
     memo,
-    uris,
     urls,
     util,
 )
@@ -29,6 +28,7 @@ from weave.old_weave import (
     file_base,
     file_util,
     graph_client_context,
+    uris,
     wandb_client_api,
 )
 from weave.old_weave.wandb_interface import wandb_artifact_pusher

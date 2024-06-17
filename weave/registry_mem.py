@@ -1,13 +1,12 @@
 import datetime
 import typing
 
-from weave.old_weave import context_state, op_aliases, op_args
+from weave import errors, storage, weave_types
+from weave.old_weave import context_state, op_aliases, op_args, uris
 from weave.old_weave.op_args import OpNamedArgs
 
-from . import errors, storage, uris, weave_types
-
 if typing.TYPE_CHECKING:
-    from .op_def import OpDef
+    from weave.old_weave.op_def import OpDef
 
 
 class Registry:

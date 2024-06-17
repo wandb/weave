@@ -13,9 +13,8 @@ from typing import Any
 
 if typing.TYPE_CHECKING:
     from weave import ref_base
-from weave import uris
 from weave import weave_types as types
-from weave.old_weave import box
+from weave.old_weave import box, uris
 
 
 @dataclasses.dataclass

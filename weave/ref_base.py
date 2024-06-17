@@ -8,8 +8,9 @@ from typing import Iterable, Optional, Sequence
 from weave.old_weave import box, context_state, graph_client_context, object_context
 from weave.old_weave.language_features.tagging import tag_store
 
-from . import errors, uris
+from . import errors
 from . import weave_types as types
+from .old_weave import uris
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()

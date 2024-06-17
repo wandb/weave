@@ -2,7 +2,8 @@ import functools
 import json
 import typing
 
-from weave import errors, storage, uris, weave_types
+from weave import errors, storage, weave_types
+from weave.old_weave import uris
 
 if typing.TYPE_CHECKING:
     from weave import weave_inspector

@@ -2,11 +2,11 @@ import typing
 
 import pytest
 
-from weave.old_weave import context_state, graph
+from weave import api as weave
+from weave import storage, types, weave_internal
+from weave.old_weave import context_state, graph, uris
 from weave.old_weave import context_state as _context_state
 
-from .. import api as weave
-from .. import storage, types, uris, weave_internal
 from . import test_helpers
 
 _loading_builtins_token = _context_state.set_loading_built_ins()

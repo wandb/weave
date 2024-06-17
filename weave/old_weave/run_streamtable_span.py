@@ -1,9 +1,9 @@
 import typing
 from typing import Iterable
 
-from weave import stream_data_interfaces, uris
+from weave import stream_data_interfaces
 from weave.eager import WeaveIter
-from weave.old_weave import artifact_wandb, graph_client_context
+from weave.old_weave import artifact_wandb, graph_client_context, uris
 from weave.old_weave.run import Run
 
 

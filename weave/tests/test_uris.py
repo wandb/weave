@@ -1,5 +1,6 @@
 import pytest
-from .. import uris
+
+from weave.old_weave import uris
 from weave.old_weave.artifact_wandb import WeaveWBArtifactURI
 
 URIS = [

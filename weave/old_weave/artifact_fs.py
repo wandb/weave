@@ -6,9 +6,9 @@ import json
 import os
 import typing
 
-from weave import errors, ref_base, ref_util, uris
+from weave import errors, ref_base, ref_util
 from weave import weave_types as types
-from weave.old_weave import artifact_base, file_base, object_context
+from weave.old_weave import artifact_base, file_base, object_context, uris
 from weave.old_weave.language_features.tagging import tag_store
 
 if typing.TYPE_CHECKING:

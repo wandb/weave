@@ -1,7 +1,8 @@
 import weave
 from weave import ref_base
+from weave.old_weave import uris
 
-from .. import uris, weave_internal
+from .. import weave_internal
 
 
 def test_mutation_set_direct_call():
@@ -129,7 +130,7 @@ def test_artifact_history_local_from_hash():
     for i in range(num_versions):
         art.append(i + 1)
 
-    hash_uri = weave.uris.WeaveURI.parse(uri).to_ref().artifact.uri
+    hash_uri = weave.old_weave.uris.WeaveURI.parse(uri).to_ref().artifact.uri
     assert "main" not in hash_uri
 
     total_list = list(range(num_versions + 1))

@@ -11,7 +11,6 @@ from weave import (
     errors,
     memo,
     pyfunc_type_util,
-    uris,
     weave_internal,
 )
 from weave import weave_types as types
@@ -24,6 +23,7 @@ from weave.old_weave import (
     op_args,
     op_def_type,
     op_execute,
+    uris,
 )
 from weave.old_weave.language_features.tagging import (
     opdef_util,
