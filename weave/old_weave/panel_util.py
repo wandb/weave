@@ -6,7 +6,7 @@ from weave.old_weave import graph, panel
 
 def make_node(v: typing.Any) -> graph.Node:
     """Business logic for how values passed to panels are converted to json."""
-    from weave import ops
+    from weave.old_weave import ops
 
     if isinstance(v, graph.Node):
         return v

@@ -7,7 +7,7 @@ import weave
 @weave.op(
     name="shap-ca_housing_dataset",
     render_info={"type": "function"},
-    output_type=weave.ops.DataFrameType(weave.types.TypedDict({})),
+    output_type=weave.old_weave.ops.DataFrameType(weave.types.TypedDict({})),
 )
 def ca_housing_dataset(seed: int):
     housing = fetch_california_housing(as_frame=True)

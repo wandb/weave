@@ -1,6 +1,5 @@
 import weave
-from weave import ops
-from weave.old_weave import graph, panel, panel_util
+from weave.old_weave import graph, ops, panel, panel_util
 
 
 @weave.type()

@@ -1,13 +1,13 @@
 import dataclasses
 import typing
 
-from weave.old_weave import graph
+from weave.old_weave import graph, op_args
 
-from . import errors, op_args, val_const, weave_internal
+from . import errors, val_const, weave_internal
 from . import weave_types as types
 
 if typing.TYPE_CHECKING:
-    from . import op_def
+    from weave.old_weave import op_def
 
 
 def verify_weave_fn_is_valid(op: "op_def.OpDef", weavified: graph.Node) -> None:

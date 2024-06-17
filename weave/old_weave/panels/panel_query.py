@@ -76,7 +76,7 @@ class Query(panel.Panel):
             and self.config.tableState.preFilterFunction is not None
             and self.config.tableState.preFilterFunction.type != weave.types.Invalid()
         ):
-            table_node = weave.ops.List.filter(
+            table_node = weave.old_weave.ops.List.filter(
                 table_node,
                 lambda row: weave_internal.call_fn(
                     self.config.tableState.preFilterFunction, {"row": row}

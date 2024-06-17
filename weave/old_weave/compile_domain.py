@@ -2,13 +2,13 @@ import typing
 
 import graphql
 
-from weave import errors, op_args, registry_mem, stitch
+from weave import errors, registry_mem, stitch
 from weave import weave_types as types
 from weave.input_provider import InputAndStitchProvider
-from weave.old_weave import gql_op_plugin, gql_to_weave, graph
+from weave.old_weave import gql_op_plugin, gql_to_weave, graph, op_args
 
 if typing.TYPE_CHECKING:
-    from weave import op_def
+    from weave.old_weave import op_def
 
 
 def fragment_to_query(fragment: str) -> str:

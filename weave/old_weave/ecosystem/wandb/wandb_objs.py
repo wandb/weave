@@ -23,7 +23,7 @@ def org_model(entity_name: str, model_name: str) -> FakeWandbModel:
     return FakeWandbModel(model_name)
 
 
-GHOSTWRITE_MD = weave.ops.Markdown(
+GHOSTWRITE_MD = weave.old_weave.ops.Markdown(
     """
 # [ghostwrite.ai](https://ghostwrite.ai).
 
@@ -47,7 +47,7 @@ def fakewandbmodel_render(
             ),
             weave.old_weave.panels.CardTab(
                 name="Predictions",
-                content=weave.ops.project("shawn", "ghostwrite-test1")
+                content=weave.old_weave.ops.project("shawn", "ghostwrite-test1")
                 .runs()
                 .summary()["predictions"]
                 .table()
@@ -79,7 +79,7 @@ def entity_render(
                                 "entity_name": entity_name_op(project.entity()),
                                 "project_name": project_name_op(project),
                             },
-                            to=lambda input, vars: weave.ops.project(
+                            to=lambda input, vars: weave.old_weave.ops.project(
                                 vars["entity_name"], vars["project_name"]
                             ),
                         ),
@@ -127,7 +127,7 @@ class ProjectRunsTable(weave.Panel):
                         "project_name": project_name_op(run.project()),
                         "run_id": run.id(),
                     },
-                    to=lambda input, vars: weave.ops.project(
+                    to=lambda input, vars: weave.old_weave.ops.project(
                         vars["entity_name"], vars["project_name"]
                     ).run(vars["run_id"]),
                 ),
@@ -164,7 +164,7 @@ class ProjectArtifactsTable(weave.Panel):
                         "project_name": project_name_op(artifact.project()),
                         "artifact_name": artifact._get_op("name")(),
                     },
-                    to=lambda input, vars: weave.ops.project(
+                    to=lambda input, vars: weave.old_weave.ops.project(
                         vars["entity_name"], vars["project_name"]
                     ).artifact(vars["artifact_name"]),
                 ),

@@ -2,8 +2,8 @@ import dataclasses
 import typing
 
 import weave
-from weave import ops, weave_internal
-from weave.old_weave import graph, panel, panel_util
+from weave import weave_internal
+from weave.old_weave import graph, ops, panel, panel_util
 
 
 @weave.type()

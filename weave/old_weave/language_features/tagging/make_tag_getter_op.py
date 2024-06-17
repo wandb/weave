@@ -6,7 +6,7 @@ from weave.old_weave import decorator_op
 from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
 
 if typing.TYPE_CHECKING:
-    from weave import op_def as OpDef
+    from weave.old_weave import op_def as OpDef
 
 
 def make_tag_getter_op(

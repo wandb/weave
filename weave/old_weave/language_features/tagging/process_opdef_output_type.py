@@ -19,7 +19,7 @@ from weave.old_weave.language_features.tagging.tagging_op_logic import (
 )
 
 if typing.TYPE_CHECKING:
-    from weave import op_def as OpDef
+    from weave.old_weave import op_def as OpDef
 
 
 # The following 3 functions are used to get the ops without introducing circular references

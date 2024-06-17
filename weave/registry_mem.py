@@ -1,15 +1,10 @@
-import typing
 import datetime
+import typing
 
-from weave.op_args import OpNamedArgs
+from weave.old_weave import op_aliases, op_args
+from weave.old_weave.op_args import OpNamedArgs
 
-from . import op_args
-from . import weave_types
-from . import errors
-from . import context_state
-from . import storage
-from . import uris
-from . import op_aliases
+from . import context_state, errors, storage, uris, weave_types
 
 if typing.TYPE_CHECKING:
     from .op_def import OpDef
@@ -128,7 +123,7 @@ class Registry:
         return [op for op in self._ops.values() if is_chainable(op)]
 
     def load_saved_ops(self):
-        from . import op_def_type
+        from weave.old_weave import op_def_type
 
         for op_ref in storage.objects(op_def_type.OpDefType()):
             try:

@@ -30,7 +30,7 @@ class Scatter(weave.Panel):
     @weave.op()
     def initialize(self) -> ScatterConfig:
         input_node = self.input_node
-        unnested = weave.ops.unnest(input_node)
+        unnested = weave.old_weave.ops.unnest(input_node)
         return ScatterConfig(
             x_fn=weave_internal.define_fn(
                 {"item": unnested.type.object_type},
@@ -70,7 +70,7 @@ class Scatter(weave.Panel):
     def render(self) -> weave_plotly.PanelPlotly:
         input_node = self.input_node
         config = typing.cast(ScatterConfig, self.config)
-        unnested = weave.ops.unnest(input_node)
+        unnested = weave.old_weave.ops.unnest(input_node)
         if (
             not weave.types.optional(weave.types.Float()).assign_type(config.x_fn.type)
             or not weave.types.optional(weave.types.Float()).assign_type(
@@ -80,14 +80,14 @@ class Scatter(weave.Panel):
                 config.label_fn.type
             )
         ):
-            return weave.old_weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
+            return weave.old_weave.panels.PanelHtml(weave.old_weave.ops.Html("No data"))  # type: ignore
         if config.label_fn.type == weave.types.Invalid():
             plot_data = unnested.map(
-                lambda item: weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore
+                lambda item: weave.old_weave.ops.dict_(x=config.x_fn(item), y=config.y_fn(item))  # type: ignore
             )
         else:
             plot_data = unnested.map(
-                lambda item: weave.ops.dict_(
+                lambda item: weave.old_weave.ops.dict_(
                     x=config.x_fn(item),
                     y=config.y_fn(item),
                     label=config.label_fn(item),
@@ -100,28 +100,30 @@ class Scatter(weave.Panel):
     # TODO: Fix
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):
-        unnested = weave.ops.unnest(self.input_node)
+        unnested = weave.old_weave.ops.unnest(self.input_node)
         config = self.config
         filtered = unnested.filter(
-            lambda item: weave.ops.Boolean.bool_and(
-                weave.ops.Boolean.bool_and(
-                    weave.ops.Boolean.bool_and(
+            lambda item: weave.old_weave.ops.Boolean.bool_and(
+                weave.old_weave.ops.Boolean.bool_and(
+                    weave.old_weave.ops.Boolean.bool_and(
                         config.x_fn(item)
-                        > weave.ops.TypedDict.pick(
+                        > weave.old_weave.ops.TypedDict.pick(
                             self._renderAsPanel.config.selected, "xMin"
                         ),
                         config.x_fn(item)
-                        < weave.ops.TypedDict.pick(
+                        < weave.old_weave.ops.TypedDict.pick(
                             self._renderAsPanel.config.selected, "xMax"
                         ),
                     ),
                     config.y_fn(item)
-                    > weave.ops.TypedDict.pick(
+                    > weave.old_weave.ops.TypedDict.pick(
                         self._renderAsPanel.config.selected, "yMin"
                     ),
                 ),
                 config.y_fn(item)
-                < weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "yMax"),
+                < weave.old_weave.ops.TypedDict.pick(
+                    self._renderAsPanel.config.selected, "yMax"
+                ),
             )
         )
         return weave_internal.use(filtered)

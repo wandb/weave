@@ -123,7 +123,7 @@ def test_custom_class():
     node = TestType().test_fn(1)
     assert weave.use(node) == 2
 
-    node_list = weave.ops.make_list(**{"0": TestType(), "1": TestType()})
+    node_list = weave.old_weave.ops.make_list(**{"0": TestType(), "1": TestType()})
     node = node_list.test_fn(1)
     assert weave.use(node) == [2, 2]
 

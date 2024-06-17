@@ -7,8 +7,8 @@ import random
 import string
 import typing
 
-from weave import ops, weave_internal, weave_types
-from weave.old_weave import decorator_type, graph, panel
+from weave import weave_internal, weave_types
+from weave.old_weave import decorator_type, graph, ops, panel
 from weave.old_weave.language_features.tagging import tagged_value_type
 
 

@@ -18,8 +18,8 @@ from weave.old_weave.decorator_op import op
 from weave.old_weave.language_features.tagging import (
     process_opdef_output_type,
 )
+from weave.old_weave.op_args import OpVarArgs
 from weave.old_weave.ops_primitives import projection_utils
-from weave.op_args import OpVarArgs
 
 
 def typeddict_pick_output_type(input_types):

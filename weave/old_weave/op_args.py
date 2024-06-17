@@ -1,9 +1,8 @@
 import typing
 from dataclasses import dataclass
 
+from weave import weave_types as types
 from weave.old_weave import debug_types
-
-from . import weave_types as types
 
 BT = typing.TypeVar("BT")
 

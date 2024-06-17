@@ -23,7 +23,7 @@ from weave.old_weave import panels
         ),
         (
             lambda: panels.Table(
-                weave.ops.range(1, 100, 1).map(
+                weave.old_weave.ops.range(1, 100, 1).map(
                     lambda row: weave.old_weave.ops_primitives.dict.dict_(
                         x=row,
                         y=weave.old_weave.ops_primitives.list_.make_list(
@@ -45,7 +45,7 @@ from weave.old_weave import panels
         ),
         (
             lambda: panels.Plot(
-                weave.ops.range(1, 100, 1).map(
+                weave.old_weave.ops.range(1, 100, 1).map(
                     lambda row: weave.old_weave.ops_primitives.dict.dict_(
                         x=row,
                         y=row**2,
@@ -65,7 +65,7 @@ from weave.old_weave import panels
             lambda: panels.Group(
                 items={
                     "table": panels.Table(
-                        weave.ops.range(1, 100, 1),
+                        weave.old_weave.ops.range(1, 100, 1),
                         columns=[
                             lambda row: row,
                             lambda row: row**2,
@@ -153,7 +153,7 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
         panels.Group(
             items={
                 "plot": panels.Plot(
-                    weave.ops.local_path(cereal_csv).readcsv(),
+                    weave.old_weave.ops.local_path(cereal_csv).readcsv(),
                     x=lambda row: row["protein"],
                     y=lambda row: row["calories"],
                 ),
@@ -169,7 +169,7 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
         '''weave.old_weave.panels.panel_group.Group(
         items={
             "plot": weave.old_weave.panels.panel_plot.Plot(
-                weave.ops.local_path("'''
+                weave.old_weave.ops.local_path("'''
         + cereal_csv
         + """",).readcsv(),
                 x=lambda row: row["protein"],
@@ -191,12 +191,12 @@ def test_group_case(cereal_csv, consistent_table_col_ids):
 def test_plot_case(cereal_csv, consistent_table_col_ids):
     _test_object_codification(
         panels.Plot(
-            weave.ops.local_path(cereal_csv).readcsv(),
+            weave.old_weave.ops.local_path(cereal_csv).readcsv(),
             x=lambda row: row["protein"],
             y=lambda row: row["calories"],
         ),
         f"""weave.old_weave.panels.panel_plot.Plot(
-    weave.ops.local_path('{cereal_csv}',).readcsv(),
+    weave.old_weave.ops.local_path('{cereal_csv}',).readcsv(),
     x=lambda row: row["protein"],
     y=lambda row: row["calories"],
 )""",
@@ -206,14 +206,14 @@ def test_plot_case(cereal_csv, consistent_table_col_ids):
 def test_table_case(cereal_csv, consistent_table_col_ids):
     _test_object_codification(
         panels.Table(
-            weave.ops.local_path(cereal_csv).readcsv(),
+            weave.old_weave.ops.local_path(cereal_csv).readcsv(),
             columns=[
                 lambda row: row["protein"],
                 lambda row: row["calories"],
             ],
         ),
         f"""weave.old_weave.panels.panel_table.Table(
-    weave.ops.local_path('{cereal_csv}',).readcsv(),
+    weave.old_weave.ops.local_path('{cereal_csv}',).readcsv(),
     columns=[
         lambda row: row["protein"],
         lambda row: row["calories"],

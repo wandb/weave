@@ -57,7 +57,7 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
-        from weave.op_def_type import OpDefType
+        from weave.old_weave.op_def_type import OpDefType
 
         # Only add keys that are accepted by the constructor.
         # This is used for Panels where we have an Class-level id attribute
@@ -329,7 +329,7 @@ class DefaultToPy(mappers.Mapper):
         self._use_stable_refs = use_stable_refs
 
     def apply(self, obj):
-        from weave import op_def
+        from weave.old_weave import op_def
 
         try:
             return self.type.instance_to_dict(obj)

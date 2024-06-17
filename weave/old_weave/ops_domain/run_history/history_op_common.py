@@ -8,7 +8,6 @@ from weave import (
     _dict_utils,
     engine_trace,
     errors,
-    op_args,
     registry_mem,
     util,
 )
@@ -22,6 +21,7 @@ from weave.old_weave import (
     gql_json_cache,
     graph,
     io_service,
+    op_args,
 )
 from weave.old_weave.arrow.concat import concatenate_all
 from weave.old_weave.compile_domain import InputAndStitchProvider

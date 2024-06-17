@@ -11,7 +11,7 @@ from weave.old_weave.panels_py import panel_autoboard
 from weave.old_weave.panels_py.generator_templates import template_registry
 
 panels = weave.old_weave.panels
-ops = weave.ops
+ops = weave.old_weave.ops
 
 
 # BOARD_ID must be unique across all ops. It must only contain letters and underscores.
@@ -101,7 +101,7 @@ def board(
     ## 1. raw_data_range is derived from raw_data
     filtered_range = varbar.add(
         "filtered_range",
-        weave.ops.make_list(
+        weave.old_weave.ops.make_list(
             a=filtered_data[timestamp_col_name].min(),
             b=filtered_data[timestamp_col_name].max(),
         ),
@@ -129,7 +129,7 @@ def board(
     window_data = varbar.add(
         "window_data",
         trace_roots.filter(
-            lambda row: weave.ops.Boolean.bool_and(
+            lambda row: weave.old_weave.ops.Boolean.bool_and(
                 row[timestamp_col_name] >= bin_range[0],
                 row[timestamp_col_name] <= bin_range[1],
             )
@@ -203,7 +203,7 @@ def board(
 
     overview_tab.add(
         "success_distribution",
-        weave.ops.dict_(
+        weave.old_weave.ops.dict_(
             **{
                 "success": filtered_window_data.filter(
                     lambda row: row["status_code"] == "SUCCESS"

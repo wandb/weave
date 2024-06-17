@@ -7,7 +7,7 @@ import torch
 import transformers
 
 import weave
-from weave import op_def_type
+from weave.old_weave import op_def_type
 from weave.old_weave.ecosystem import pytorch
 
 
@@ -72,7 +72,7 @@ class HFModel:
         return transformers.AutoTokenizer.from_pretrained(self._id)
 
     @weave.op()
-    def readme(self) -> weave.ops.Markdown:
+    def readme(self) -> weave.old_weave.ops.Markdown:
         readme = huggingface_hub.hf_hub_download(self._id, "README.md")
         # quick hack: remove the metadata header from the readme
         readme_contents = ""
@@ -85,7 +85,7 @@ class HFModel:
         # if we failed to parse out the header
         if len(readme_contents) < 1:
             readme_contents = open(readme).read()
-        return weave.ops.Markdown(readme_contents)
+        return weave.old_weave.ops.Markdown(readme_contents)
 
     @weave.op()
     def id(self) -> str:

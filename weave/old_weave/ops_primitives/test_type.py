@@ -4,11 +4,11 @@ import weave
 
 
 def test_cast_basic():
-    valid_cast = weave.ops.cast(1, weave.types.Int())
+    valid_cast = weave.old_weave.ops.cast(1, weave.types.Int())
     assert valid_cast.type == weave.types.Int()
     assert weave.use(valid_cast) == 1
 
-    invalid_cast = weave.ops.cast(1, weave.types.String())
+    invalid_cast = weave.old_weave.ops.cast(1, weave.types.String())
     assert invalid_cast.type == weave.types.String()
     with pytest.raises(weave.errors.WeaveTypeError):
         weave.use(invalid_cast)

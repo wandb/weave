@@ -27,7 +27,7 @@ def test_stream_logging(user_by_api_key_in_env):
     st.finish()
 
     hist_node = (
-        weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
+        weave.old_weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table")
         .history3()
     )
@@ -57,7 +57,7 @@ def test_bytes_read_from_arrow_reporting(user_by_api_key_in_env):
     st.finish()
 
     hist_node = (
-        weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
+        weave.old_weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table")
         .history3()
     )
@@ -91,7 +91,7 @@ def test_stream_logging_image(user_by_api_key_in_env):
     time.sleep(5)
 
     hist_node = (
-        weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
+        weave.old_weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
         .run("test_table-8")
         .history2()
     )
@@ -122,7 +122,9 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
 
     def do_asserts():
         hist_node = (
-            weave.ops.project(user_by_api_key_in_env.username, "stream-tables")
+            weave.old_weave.ops.project(
+                user_by_api_key_in_env.username, "stream-tables"
+            )
             .run("test_table")
             .history2()
         )
@@ -182,7 +184,9 @@ def test_multi_writers_parallel(user_by_api_key_in_env):
     st_2.finish()
 
     hist_node = (
-        weave.ops.project(entity_name, "stream-tables").run(table_name).history2()
+        weave.old_weave.ops.project(entity_name, "stream-tables")
+        .run(table_name)
+        .history2()
     )
     assert weave.use(hist_node["index"]).to_pylist_raw() == indexes
     assert weave.use(hist_node["writer"]).to_pylist_raw() == writers

@@ -53,7 +53,7 @@ def use_static_artifact_node(
             }
         }
     )
-    return weave.ops.project(entity_name, project_name).artifactVersion(
+    return weave.old_weave.ops.project(entity_name, project_name).artifactVersion(
         collection_name, version
     )
 
@@ -242,9 +242,11 @@ def test_metric_table_join(fake_wandb):
     file_node = art_node.file("table.table.json")
     table_node = file_node.table()
     table_rows = table_node.rows().createIndexCheckpointTag()
-    grouped = table_rows.groupby(lambda row: weave.ops.dict_(label=row["label"]))
+    grouped = table_rows.groupby(
+        lambda row: weave.old_weave.ops.dict_(label=row["label"])
+    )
     sorted = grouped.sort(
-        lambda row: weave.ops.make_list(a=row.groupkey()["label"]), ["asc"]
+        lambda row: weave.old_weave.ops.make_list(a=row.groupkey()["label"]), ["asc"]
     )
     group_col_0 = sorted[0].groupkey()["label"]
     group_col_1 = sorted[1].groupkey()["label"]
@@ -265,9 +267,11 @@ def test_empty_table(fake_wandb):
     table_node = file_node.table()
     table_rows = table_node.rows().createIndexCheckpointTag()
     filtered = filter(table_rows, lambda row: row["label"] == "cat")
-    grouped = filtered.groupby(lambda row: weave.ops.dict_(label=row["label"]))
+    grouped = filtered.groupby(
+        lambda row: weave.old_weave.ops.dict_(label=row["label"])
+    )
     sorted = grouped.sort(
-        lambda row: weave.ops.make_list(a=row.groupkey()["label"]), ["asc"]
+        lambda row: weave.old_weave.ops.make_list(a=row.groupkey()["label"]), ["asc"]
     )
     res = weave.use(sorted)
     assert res.to_pylist_raw() == []
@@ -306,14 +310,19 @@ def test_join_group_combo(fake_wandb):
     art_2_node = fake_wandb.mock_artifact_as_node(art_2)
     table_1_rows = art_1_node.file("table_1.table.json").table().rows()
     table_2_rows = art_2_node.file("table_2.table.json").table().rows()
-    list_of_tables = weave.ops.make_list(a=table_1_rows, b=table_2_rows).dropna()
+    list_of_tables = weave.old_weave.ops.make_list(
+        a=table_1_rows, b=table_2_rows
+    ).dropna()
     joined_tables = list_of_tables.joinAll(
-        lambda row: weave.ops.make_list(a=row["id"]), False
+        lambda row: weave.old_weave.ops.make_list(a=row["id"]), False
     )
     indexed = joined_tables.createIndexCheckpointTag()
-    grouped = indexed.groupby(lambda row: weave.ops.dict_(label=row["label"][0]))
+    grouped = indexed.groupby(
+        lambda row: weave.old_weave.ops.dict_(label=row["label"][0])
+    )
     sorted = grouped.sort(
-        lambda row: weave.ops.make_list(label=row.groupkey()["label"]), ["asc"]
+        lambda row: weave.old_weave.ops.make_list(label=row.groupkey()["label"]),
+        ["asc"],
     )
     assert weave.use(sorted.count()) == 3
     assert weave.use(sorted[2].groupkey()["label"]) == "C"
@@ -359,7 +368,9 @@ def test_group_by_const(fake_wandb):
     art_1_node = fake_wandb.mock_artifact_as_node(art_1)
     table_1_rows = art_1_node.file("table_1.table.json").table().rows()
     grouped = table_1_rows.groupby(
-        lambda row: weave.ops.dict_(a=make_const_node(weave.types.Boolean(), True))
+        lambda row: weave.old_weave.ops.dict_(
+            a=make_const_node(weave.types.Boolean(), True)
+        )
     )
     assert weave.use(grouped).to_pylist_notags() == [
         [dict(zip(columns, row)) for row in data]
@@ -409,26 +420,32 @@ def test_column_sort(fake_wandb):
     rows = art_1_node.file("table_1.table.json").table().rows()
 
     for col in columns:
-        sorted = rows.sort(lambda row: weave.ops.make_list(label=row[col]), ["desc"])
+        sorted = rows.sort(
+            lambda row: weave.old_weave.ops.make_list(label=row[col]), ["desc"]
+        )
         assert weave.use(sorted).to_pylist_notags() == [
             dict(zip(columns, row)) for row in [row3, row2, row1]
         ]
 
-        sorted = sorted.sort(lambda row: weave.ops.make_list(label=row[col]), ["asc"])
+        sorted = sorted.sort(
+            lambda row: weave.old_weave.ops.make_list(label=row[col]), ["asc"]
+        )
         assert weave.use(sorted).to_pylist_notags() == [
             dict(zip(columns, row)) for row in data
         ]
 
     # Additional test sorting typed timestamps
     sorted = rows.sort(
-        lambda row: weave.ops.make_list(label=row["timestamp"].toTimestamp()), ["desc"]
+        lambda row: weave.old_weave.ops.make_list(label=row["timestamp"].toTimestamp()),
+        ["desc"],
     )
     assert weave.use(sorted).to_pylist_notags() == [
         dict(zip(columns, row)) for row in [row3, row2, row1]
     ]
 
     sorted = sorted.sort(
-        lambda row: weave.ops.make_list(label=row["timestamp"].toTimestamp()), ["asc"]
+        lambda row: weave.old_weave.ops.make_list(label=row["timestamp"].toTimestamp()),
+        ["asc"],
     )
     assert weave.use(sorted).to_pylist_notags() == [
         dict(zip(columns, row)) for row in data
@@ -455,8 +472,8 @@ def test_group_avg_sort_combo(fake_wandb):
     art_1_node = fake_wandb.mock_artifact_as_node(art_1)
     rows = art_1_node.file("table_1.table.json").table().rows()
 
-    grouped = rows.groupby(lambda row: weave.ops.dict_(label=row["label"]))
+    grouped = rows.groupby(lambda row: weave.old_weave.ops.dict_(label=row["label"]))
     sorted = grouped.sort(
-        lambda row: weave.ops.make_list(label=row["score"].avg()), ["asc"]
+        lambda row: weave.old_weave.ops.make_list(label=row["score"].avg()), ["asc"]
     )
     assert weave.use(sorted[2].groupkey()["label"]) == "C"

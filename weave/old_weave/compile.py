@@ -10,7 +10,6 @@ from weave import (
     engine_trace,
     errors,
     input_provider,
-    op_args,
     partial_object,
     propagate_gql_keys,
     registry_mem,
@@ -29,9 +28,10 @@ from weave.old_weave import (
     gql_to_weave,
     graph,
     graph_debug,
+    op_args,
 )
 from weave.old_weave.language_features.tagging import tagged_value_type_helpers
-from weave.op_def import OpDef
+from weave.old_weave.op_def import OpDef
 
 # These call_* functions must match the actual op implementations.
 # But we don't want to import the op definitions themselves here, since

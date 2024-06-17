@@ -20,7 +20,7 @@ def public_env():
 
 def test_access_file(public_env):
     with pytest.raises(errors.WeaveAccessDeniedError):
-        weave.use(weave.ops.local_path("/tmp/bad.json"))
+        weave.use(weave.old_weave.ops.local_path("/tmp/bad.json"))
 
 
 @pytest.mark.parametrize("path", ["..", "/tmp", "//tmp", "//tmp/bad.json", "/tmp/.../"])

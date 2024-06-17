@@ -69,10 +69,10 @@ def geo_default_config(
 def geo(
     input_node: weave.Node[list[typing.Any]], config: GeoConfig
 ) -> weave_plotly.PanelPlotly:
-    unnested = weave.ops.unnest(input_node)
+    unnested = weave.old_weave.ops.unnest(input_node)
     config = geo_default_config(config, unnested)
     plot_data = unnested.map(
-        lambda item: weave.ops.dict_(
+        lambda item: weave.old_weave.ops.dict_(
             long=config.x_fn(item),  # type: ignore
             lat=config.y_fn(item),  # type: ignore
             color=config.color_fn(item),  # type: ignore
@@ -87,7 +87,7 @@ def geo(
 def geo_config(
     input_node: weave.Node[list[typing.Any]], config: GeoConfig
 ) -> weave.old_weave.panels.Group:
-    unnested = weave.ops.unnest(input_node)
+    unnested = weave.old_weave.ops.unnest(input_node)
     config = geo_default_config(config, unnested)
     return weave.old_weave.panels.Group(
         items={
@@ -134,7 +134,7 @@ class Geo(weave.Panel):
         if self.config is None:
             self.config = GeoConfig()
 
-            unnested = weave.ops.unnest(self.input_node)
+            unnested = weave.old_weave.ops.unnest(self.input_node)
             if "x_fn" in options:
                 sig = inspect.signature(options["x_fn"])
                 param_name = list(sig.parameters.values())[0].name
@@ -171,28 +171,30 @@ class Geo(weave.Panel):
     @weave.op(output_type=lambda input_type: input_type["self"].input_node.output_type)
     def selected(self):
         # TODO: This function is not right! We need to do a range selection in polar space!
-        unnested = weave.ops.unnest(self.input_node)
+        unnested = weave.old_weave.ops.unnest(self.input_node)
         config = geo_default_config(self.config, unnested)
         filtered = unnested.filter(
-            lambda item: weave.ops.Boolean.bool_and(
-                weave.ops.Boolean.bool_and(
-                    weave.ops.Boolean.bool_and(
+            lambda item: weave.old_weave.ops.Boolean.bool_and(
+                weave.old_weave.ops.Boolean.bool_and(
+                    weave.old_weave.ops.Boolean.bool_and(
                         config.x_fn(item)
-                        > weave.ops.TypedDict.pick(
+                        > weave.old_weave.ops.TypedDict.pick(
                             self._renderAsPanel.config.selected, "xMin"
                         ),
                         config.x_fn(item)
-                        < weave.ops.TypedDict.pick(
+                        < weave.old_weave.ops.TypedDict.pick(
                             self._renderAsPanel.config.selected, "xMax"
                         ),
                     ),
                     config.y_fn(item)
-                    > weave.ops.TypedDict.pick(
+                    > weave.old_weave.ops.TypedDict.pick(
                         self._renderAsPanel.config.selected, "yMin"
                     ),
                 ),
                 config.y_fn(item)
-                < weave.ops.TypedDict.pick(self._renderAsPanel.config.selected, "yMax"),
+                < weave.old_weave.ops.TypedDict.pick(
+                    self._renderAsPanel.config.selected, "yMax"
+                ),
             )
         )
         return weave_internal.use(filtered)

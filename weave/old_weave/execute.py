@@ -18,9 +18,6 @@ from weave import (
     environment,
     errors,
     memo,
-    op_def,
-    op_execute,
-    op_policy,
     parallelism,
     ref_base,
     registry_mem,
@@ -42,6 +39,9 @@ from weave.old_weave import (
     graph_debug,
     language_nullability,
     object_context,
+    op_def,
+    op_execute,
+    op_policy,
     wandb_api,
 )
 from weave.old_weave.language_features.tagging import (

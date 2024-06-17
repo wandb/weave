@@ -1,6 +1,6 @@
-from weave import op_def, weave_types
-from weave.old_weave import compile
+from weave import weave_types
 from weave.api import op
+from weave.old_weave import compile, op_def
 from weave.old_weave.arrow.arrow import ArrowWeaveListType
 from weave.old_weave.core_types import StreamTableType
 from weave.old_weave.ops_domain.project_ops import project

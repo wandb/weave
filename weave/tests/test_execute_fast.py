@@ -35,7 +35,9 @@ def test_empty_list():
     arr = dispatch.RuntimeConstNode(types.List(types.TypedDict({})), [])
     map_fn = weave_internal.define_fn(
         {"row": arr.type.object_type},
-        lambda row: row.merge(weave.ops.dict_(output_classid=row["output_class"].id())),
+        lambda row: row.merge(
+            weave.old_weave.ops.dict_(output_classid=row["output_class"].id())
+        ),
     )
 
     assert weave.use(arr.map(map_fn)) == []

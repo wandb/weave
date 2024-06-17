@@ -171,7 +171,7 @@ def _otc_using_storage_fallback(obj: typing.Any) -> str:
 # Hack:
 def _module_name_corrections(qualified_name: str) -> str:
     if qualified_name == "weave.old_weave.ops_primitives.file_local":
-        return "weave.ops"
+        return "weave.old_weave.ops"
     elif qualified_name.startswith("weave.decorator_class"):
         raise ValueError("Decorator classes are not supported.")
     elif qualified_name.startswith("weave.decorator_type"):

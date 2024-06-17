@@ -92,7 +92,7 @@ class HuggingfaceModelPanel(weave.Panel):
                 # weave.old_weave.panels.CardTab(
                 #     name="Inference Logs",
                 #     content=weave.old_weave.panels.Table(
-                #         weave.ops.used_by(model, model.call.op_name()),
+                #         weave.old_weave.ops.used_by(model, model.call.op_name()),
                 #         columns=[
                 #             lambda run: run.output.model_input,
                 #             lambda run: run.output.model_output[0]["generated_text"],

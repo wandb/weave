@@ -90,7 +90,7 @@ if engine_trace.datadog_is_enabled():
 
 
 # Ensure these are imported and registered
-from weave import ops
+from weave.old_weave import ops
 
 # NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
 # stat mode instead of watchdog mode. It turns out that "import wandb" breaks
@@ -109,8 +109,7 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
-    from weave import ops
-    from weave.old_weave import panels, panels_py
+    from weave.old_weave import ops, panels, panels_py
 
     # Attempt to import MVP ecosystem modules
     try:

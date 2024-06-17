@@ -7,9 +7,9 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave import op_args, op_def
 from weave import weave_types as types
 from weave.api import op, type_of
+from weave.old_weave import op_args, op_def
 from weave.old_weave.arrow import arrow_tags, convert
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
@@ -961,7 +961,7 @@ def flatten(arr):
 
 
 def _drop_tags_output_type(input_type):
-    from weave.op_def import map_type
+    from weave.old_weave.op_def import map_type
 
     return map_type(
         input_type["arr"],

@@ -24,7 +24,7 @@ from weave.old_weave.language_features.tagging.opdef_util import (
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 
 if typing.TYPE_CHECKING:
-    from weave import op_def as OpDef
+    from weave.old_weave import op_def as OpDef
 
 
 def _is_tagged_value(val: types.Type) -> typing_extensions.TypeGuard[TaggedValueType]:

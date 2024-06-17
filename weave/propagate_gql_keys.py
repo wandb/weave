@@ -1,8 +1,8 @@
 import typing
 
-from weave.old_weave import gql_op_plugin, graph
+from weave.old_weave import gql_op_plugin, graph, op_def
 
-from . import input_provider, op_def, partial_object, registry_mem
+from . import input_provider, partial_object, registry_mem
 from . import weave_types as types
 
 

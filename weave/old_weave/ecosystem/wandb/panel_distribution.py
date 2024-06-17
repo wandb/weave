@@ -35,7 +35,7 @@ class Distribution(weave.Panel):
     @weave.op()
     def initialize(self) -> DistributionConfig:
         input_node = self.input_node
-        unnested = weave.ops.unnest(input_node)
+        unnested = weave.old_weave.ops.unnest(input_node)
         return DistributionConfig(
             value_fn=weave_internal.define_fn(
                 {"item": unnested.type.object_type},
@@ -90,7 +90,7 @@ class Distribution(weave.Panel):
             return weave.old_weave.panels.PanelString("Invalid value_fn")  # type: ignore
         # We always unnest, so that we can compare across groups of items
         # easily. (the Distribution notebook)
-        unnested = weave.ops.unnest(input_node)
+        unnested = weave.old_weave.ops.unnest(input_node)
         bin_size = config.bin_size
 
         def bin_func(item):
@@ -111,10 +111,10 @@ class Distribution(weave.Panel):
             else:
                 group_items["label"] = config.label_fn(item)
 
-            return weave.ops.dict_(**group_items)
+            return weave.old_weave.ops.dict_(**group_items)
 
         binned = unnested.groupby(lambda item: bin_func(item)).map(
-            lambda group: weave.ops.dict_(
+            lambda group: weave.old_weave.ops.dict_(
                 value=group.groupkey()["value"],
                 label=group.groupkey()["label"],
                 count=group.count(),
@@ -129,8 +129,8 @@ class Distribution(weave.Panel):
 def distribution_panel_plot_render(
     input_node: weave.Node[list[typing.Any]], config: DistributionConfig
 ) -> weave.old_weave.panels.Plot:
-    unnested = weave.ops.unnest(input_node)
-    bin_size = weave.ops.execute(config.bin_size)
+    unnested = weave.old_weave.ops.unnest(input_node)
+    bin_size = weave.old_weave.ops.execute(config.bin_size)
 
     def bin_func(item):
         value_fn_output_type = config.value_fn.type.output_type
@@ -146,11 +146,11 @@ def distribution_panel_plot_render(
         else:
             group_items["label"] = config.label_fn(item)
 
-        res = weave.ops.dict_(**group_items)
+        res = weave.old_weave.ops.dict_(**group_items)
         return res
 
     binned = unnested.groupby(lambda item: bin_func(item)).map(
-        lambda group: weave.ops.dict_(
+        lambda group: weave.old_weave.ops.dict_(
             value=group.groupkey()["value"],
             label=group.groupkey()["label"],
             count=group.count(),

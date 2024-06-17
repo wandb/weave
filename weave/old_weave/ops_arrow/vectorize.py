@@ -8,15 +8,13 @@ import pyarrow as pa
 
 from weave import (
     errors,
-    op_args,
-    op_def,
     registry_mem,
     weave_internal,
     weavify,
 )
 from weave import weave_types as types
 from weave.api import op, use
-from weave.old_weave import dispatch, graph, graph_debug
+from weave.old_weave import dispatch, graph, graph_debug, op_args, op_def
 from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.arrow import ArrowWeaveListType
 from weave.old_weave.arrow.arrow_tags import pushdown_list_tags

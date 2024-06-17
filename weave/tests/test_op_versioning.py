@@ -1,13 +1,14 @@
-import pytest
 import shutil
-from .. import api as weave
-from weave.old_weave import artifact_fs
-from .. import op_def
-from .. import derive_op
-import numpy as np
 import typing
 
-from weave.trace_server.trace_server_interface import ObjReadReq, FileContentReadReq
+import numpy as np
+import pytest
+
+from weave.old_weave import artifact_fs, op_def
+from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
+
+from .. import api as weave
+from .. import derive_op
 
 
 @pytest.mark.skip(

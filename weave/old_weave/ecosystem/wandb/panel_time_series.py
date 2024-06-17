@@ -160,7 +160,7 @@ class TimeSeries(weave.Panel):
         super().__init__(input_node=input_node, vars=vars)
         self.config = config
 
-        unnested = weave.ops.unnest(input_node)
+        unnested = weave.old_weave.ops.unnest(input_node)
 
         # TODO: add the ability to configure options here
         if self.config is None:
@@ -296,13 +296,13 @@ class TimeSeries(weave.Panel):
         if not weave.types.optional(weave.types.Timestamp()).assign_type(
             min_x.type
         ) or not weave.types.optional(weave.types.Timestamp()).assign_type(max_x.type):
-            return weave.old_weave.panels.PanelHtml(weave.ops.Html("No data"))  # type: ignore
+            return weave.old_weave.panels.PanelHtml(weave.old_weave.ops.Html("No data"))  # type: ignore
 
         exact_bin_size = ((max_x - min_x) / N_BINS).totalSeconds()  # type: ignore
         bin_size_index = TIME_SERIES_BIN_SIZES_SEC_NODE.map(  # type: ignore
             lambda x: (
                 (x - exact_bin_size).abs()
-                / weave.ops.make_list(a=x, b=exact_bin_size).min()
+                / weave.old_weave.ops.make_list(a=x, b=exact_bin_size).min()
             )
             # lambda x: (x / exact_bin_size - 1).abs() # original
         ).argmin()
@@ -323,35 +323,40 @@ class TimeSeries(weave.Panel):
             bin_start = bin_start_ms
             bin_end = bin_end_ms
 
-            group_items["bin"] = weave.ops.dict_(start=bin_start, stop=bin_end)
+            group_items["bin"] = weave.old_weave.ops.dict_(
+                start=bin_start, stop=bin_end
+            )
 
             if label_fn_output_type == weave.types.Invalid():
                 group_items["label"] = "no_label"
             else:
                 group_items["label"] = config.label(item)
 
-            return weave.ops.dict_(**group_items)
+            return weave.old_weave.ops.dict_(**group_items)
 
         binned = (
             unnested.filter(
-                lambda item: weave.ops.Boolean.bool_and(
+                lambda item: weave.old_weave.ops.Boolean.bool_and(
                     config.x(item) <= max_x,
                     config.x(item) >= min_x,  # type: ignore
                 )
             )
             .groupby(lambda item: bin_fn(item))
             .map(
-                lambda group: weave.ops.dict_(
+                lambda group: weave.old_weave.ops.dict_(
                     x=group.groupkey()["bin"],
                     label=group.groupkey()["label"],
                     y=config.agg(group),  # type: ignore
                 )
             )
             # this is needed because otherwise the lines look like a scrambled mess
-            .sort(lambda item: weave.ops.make_list(a=item["x"]["start"]), ["asc"])
+            .sort(
+                lambda item: weave.old_weave.ops.make_list(a=item["x"]["start"]),
+                ["asc"],
+            )
         )
 
-        default_labels = weave.ops.dict_(
+        default_labels = weave.old_weave.ops.dict_(
             # x=function_to_string(config.x),
             # y=function_to_string(config.agg),
             # label=function_to_string(config.label),

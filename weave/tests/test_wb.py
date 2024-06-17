@@ -7,7 +7,7 @@ import pytest
 import wandb
 
 from weave import stitch
-from weave.old_weave import artifact_fs, artifact_wandb, compile, graph
+from weave.old_weave import artifact_fs, artifact_wandb, compile, graph, ops
 from weave.old_weave import ops_arrow as arrow
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.old_weave.ops_arrow import ArrowWeaveListType
@@ -19,7 +19,6 @@ from weave.old_weave.ops_primitives.file import _as_w0_dict_
 from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
 from .. import api as weave
-from .. import ops as ops
 from .. import uris
 from .. import weave_types as types
 from . import fixture_fakewandb as fwb

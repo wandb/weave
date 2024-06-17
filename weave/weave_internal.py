@@ -127,7 +127,7 @@ def define_fn(
 ) -> graph.ConstNode:
     var_nodes = [make_var_node(t, k) for k, t in parameters.items()]
     try:
-        from . import op_def
+        from weave.old_weave import op_def
 
         with op_def.no_refine():
             fnNode = body(*var_nodes)

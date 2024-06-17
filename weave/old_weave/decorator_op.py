@@ -4,15 +4,9 @@ from typing import Callable, Optional, TypeVar
 
 from typing_extensions import ParamSpec
 
-from weave import (
-    context_state,
-    derive_op,
-    op_args,
-    op_def,
-    pyfunc_type_util,
-    registry_mem,
-)
+from weave import context_state, derive_op, pyfunc_type_util, registry_mem
 from weave import weave_types as types
+from weave.old_weave import op_args, op_def
 
 if typing.TYPE_CHECKING:
     from weave.old_weave.gql_op_plugin import GqlOpPlugin

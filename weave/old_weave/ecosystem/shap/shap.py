@@ -42,7 +42,7 @@ class ShapValues:
         path = "/tmp/shap-%s.png" % random.randrange(0, 1000000)
         plt.savefig(path)
         plt.close()
-        return weave.ops.LocalFile(path)
+        return weave.old_weave.ops.LocalFile(path)
 
 
 class ShapExplanationType(weave.types.Type):
@@ -76,9 +76,9 @@ def shap_explain(
 
 
 @weave.op()
-def shap_plot_text(shap_values: shap.Explanation) -> weave.ops.Html:
+def shap_plot_text(shap_values: shap.Explanation) -> weave.old_weave.ops.Html:
     html = shap.plots.text(shap_values, display=False)
-    return weave.ops.Html(html)
+    return weave.old_weave.ops.Html(html)
 
 
 @weave.type()

@@ -101,7 +101,9 @@ def test_templates_for_run_logs_valid(user_by_api_key_in_env):
     run.log({"a": "hello"})
     run.finish()
 
-    run_history_node = weave.ops.project(run.entity, run.project).run(run.id).history()
+    run_history_node = (
+        weave.old_weave.ops.project(run.entity, run.project).run(run.id).history()
+    )
 
     assert_valid_node(run_history_node)
 
@@ -111,7 +113,9 @@ def test_templates_for_run_logs_invalid(user_by_api_key_in_env):
     run.log({"a": 42})
     run.finish()
 
-    run_history_node = weave.ops.project(run.entity, run.project).run(run.id).history()
+    run_history_node = (
+        weave.old_weave.ops.project(run.entity, run.project).run(run.id).history()
+    )
 
     assert_invalid_node(run_history_node)
 
@@ -122,7 +126,7 @@ def test_templates_for_logged_table_valid(user_by_api_key_in_env):
     run.finish()
 
     table_node = (
-        weave.ops.project(run.entity, run.project)
+        weave.old_weave.ops.project(run.entity, run.project)
         .run(run.id)
         .summary()["table"]
         .table()
@@ -138,7 +142,7 @@ def test_templates_for_logged_table_invalid(user_by_api_key_in_env):
     run.finish()
 
     table_node = (
-        weave.ops.project(run.entity, run.project)
+        weave.old_weave.ops.project(run.entity, run.project)
         .run(run.id)
         .summary()["table"]
         .table()

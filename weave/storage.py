@@ -450,7 +450,7 @@ def to_json_with_refs(
 
     # This is newer than to_python, save and publish above, and doesn't use the "mapper"
     # pattern, which is overkill. Much better to just write a simple function like this.
-    from . import op_def
+    from weave.old_weave import op_def
 
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)

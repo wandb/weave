@@ -1,8 +1,7 @@
 import typing
 from typing import Mapping
 
-from .trace.constants import TRACE_CALL_EMOJI
-
+from weave.trace.constants import TRACE_CALL_EMOJI
 
 if typing.TYPE_CHECKING:
     from .op_def import OpDef

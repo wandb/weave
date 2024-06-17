@@ -11,7 +11,7 @@ from weave.old_weave.panels_py import panel_autoboard
 from weave.old_weave.panels_py.generator_templates import template_registry
 
 panels = weave.old_weave.panels
-ops = weave.ops
+ops = weave.old_weave.ops
 
 
 # BOARD_ID must be unique across all ops. It must only contain letters and underscores.
@@ -137,7 +137,7 @@ def openai_request_cost(record) -> float:  # type: ignore
     model = record["output.model"]
     pt = record["summary.prompt_tokens"]
     ct = record["summary.completion_tokens"]
-    cost_per_1000 = weave.ops.case(
+    cost_per_1000 = weave.old_weave.ops.case(
         [
             # finetuned
             {"when": model.startsWith("ada:"), "then": pt * 0.0016 + ct * 0.0016},
@@ -196,7 +196,7 @@ def board(
     augmented_data = varbar.add(
         "augmented_data",
         source_data.with_columns(
-            weave.ops.dict_(
+            weave.old_weave.ops.dict_(
                 **{
                     "summary.cost": source_data.map(
                         lambda row: openai_request_cost(row)
@@ -231,7 +231,7 @@ def board(
     ## 1. raw_data_range is derived from raw_data
     filtered_range = varbar.add(
         "filtered_range",
-        weave.ops.make_list(
+        weave.old_weave.ops.make_list(
             a=filtered_data[timestamp_col_name].min(),
             b=filtered_data[timestamp_col_name].max(),
         ),
@@ -259,7 +259,7 @@ def board(
     window_data = varbar.add(
         "window_data",
         augmented_data.filter(
-            lambda row: weave.ops.Boolean.bool_and(
+            lambda row: weave.old_weave.ops.Boolean.bool_and(
                 row[timestamp_col_name] >= bin_range[0],
                 row[timestamp_col_name] <= bin_range[1],
             )

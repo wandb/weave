@@ -1,7 +1,7 @@
 import typing
 
-from weave import op_def
 from weave import weave_types as types
+from weave.old_weave import op_def
 from weave.old_weave.arrow.arrow import ArrowWeaveListType
 from weave.old_weave.language_features.tagging import tagged_value_type
 

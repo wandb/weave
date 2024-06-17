@@ -1,11 +1,11 @@
 import typing
 
-from weave import op_args
 from weave import weave_types as types
+from weave.old_weave import op_args
 from weave.old_weave.language_features.tagging import tagged_value_type
 
 if typing.TYPE_CHECKING:
-    from weave import op_def as OpDef
+    from weave.old_weave import op_def as OpDef
 
 
 # This is a heuristic that is used to determine if an op is a tag getter.

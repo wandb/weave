@@ -18,8 +18,8 @@ from weave.old_weave.language_features.tagging import (
     tagged_value_type,
     tagged_value_type_helpers,
 )
+from weave.old_weave.op_args import OpVarArgs
 from weave.old_weave.ops_primitives import projection_utils
-from weave.op_args import OpVarArgs
 
 
 def getitem_output_type(input_types, list_type=types.List):

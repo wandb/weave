@@ -6,33 +6,36 @@ import inspect
 import typing
 from typing import Iterator, Sequence
 
-from weave.old_weave import language_autocall, object_context
+from weave import (
+    context_state,
+    engine_trace,
+    errors,
+    memo,
+    pyfunc_type_util,
+    uris,
+    weave_internal,
+)
+from weave import weave_types as types
+from weave.old_weave import (
+    graph,
+    graph_client_context,
+    language_autocall,
+    object_context,
+    op_args,
+    op_def_type,
+    op_execute,
+)
 from weave.old_weave.language_features.tagging import (
     opdef_util,
     process_opdef_output_type,
     process_opdef_resolve_fn,
     tagged_value_type,
 )
+from weave.old_weave.run import Run
 from weave.weavejs_fixes import fixup_node
 
-from . import (
-    context_state,
-    engine_trace,
-    errors,
-    memo,
-    op_args,
-    op_def_type,
-    op_execute,
-    pyfunc_type_util,
-    uris,
-    weave_internal,
-)
-from weave.old_weave import graph, graph_client_context
-from . import weave_types as types
-from weave.old_weave.run import Run
-
 if typing.TYPE_CHECKING:
-    from . import weave_client
+    from weave import weave_client
     from weave.old_weave.run_streamtable_span import RunStreamTableSpan
 
 
@@ -356,14 +359,14 @@ class OpDef:
             tracer = engine_trace.tracer()  # type: ignore
             with tracer.trace("refine.%s" % _self.uri):
                 # api's use auto-creates client. TODO: Fix inline import
-                from . import api
+                from weave import api
 
                 final_output_type = api.use(called_refine_output_type)  # type: ignore
             if final_output_type == None:
                 # This can happen due to nullability. In that case, accept the output type is null
                 final_output_type = types.NoneType()
             # Have to deref if in case a ref came back...
-            from . import storage
+            from weave import storage
 
             final_output_type = storage.deref(final_output_type)
 

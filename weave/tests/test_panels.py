@@ -117,7 +117,7 @@ def test_board():
     # Just make sure it runs for now.
     weave.old_weave.panels.Board(
         {
-            "nums": weave.ops.range(0, 3, 1),
+            "nums": weave.old_weave.ops.range(0, 3, 1),
         },
         [weave.old_weave.panels.BoardPanel(id="panel0", panel=lambda nums: nums)],
     )

@@ -860,7 +860,7 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
     @property
     def ui_url(self):
         root_type = self.type.root_type_class()
-        from weave.op_def_type import OpDefType
+        from weave.old_weave.op_def_type import OpDefType
 
         if issubclass(root_type, OpDefType):
             return urls.op_version_path(

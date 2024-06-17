@@ -1,7 +1,7 @@
 from weave import api as weave
 from weave import weave_types as types
-from weave.op_def import OpDef
-from weave.op_def_type import OpDefType
+from weave.old_weave.op_def import OpDef
+from weave.old_weave.op_def_type import OpDefType
 
 
 @weave.weave_class(weave_type=OpDefType)

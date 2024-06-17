@@ -10,7 +10,7 @@ def single_distribution(
     input_node: weave.Node[list[float]],
 ) -> weave.old_weave.panels.Plot:
     binned = input_node.groupby(lambda v: round(v * 10) / 10).map(  # type: ignore
-        lambda group: weave.ops.dict_(value=group.key(), count=group.count())
+        lambda group: weave.old_weave.ops.dict_(value=group.key(), count=group.count())
     )
     return weave.old_weave.panels.Plot(
         binned,
@@ -49,7 +49,7 @@ def adder_config(
         label="operand",
         item=weave.old_weave.panels.Slider(
             config=weave.old_weave.panels.SliderConfig(
-                weave.ops.execute(config.operand)
+                weave.old_weave.ops.execute(config.operand)
             )
         ),
     )

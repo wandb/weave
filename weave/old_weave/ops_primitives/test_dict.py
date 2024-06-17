@@ -25,7 +25,7 @@ def test_pick():
         ),
         "a",
     )
-    assert weave.use(weave.ops.TypedDict.pick(obj, key)) == "x"
+    assert weave.use(weave.old_weave.ops.TypedDict.pick(obj, key)) == "x"
 
 
 def test_pick_none_key():

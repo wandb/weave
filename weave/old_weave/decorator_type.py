@@ -3,9 +3,8 @@ import inspect
 import typing
 
 from weave import context_state, errors, infer_types
-from weave.old_weave import object_type_ref_util
 from weave import weave_types as types
-from weave.old_weave import decorator_class
+from weave.old_weave import decorator_class, object_type_ref_util
 
 _py_type = type
 
@@ -94,7 +93,7 @@ def type(
         # and deserialize them along with the data attached to the object
         if relocatable:
             for name, member in inspect.getmembers(target):
-                from weave import op_def, op_def_type
+                from weave.old_weave import op_def, op_def_type
 
                 if isinstance(member, op_def.BoundOpDef):
                     static_property_types[name] = op_def_type.OpDefType()

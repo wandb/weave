@@ -12,7 +12,7 @@ except ImportError:
     from typing_extensions import Annotated  # type: ignore
 
 from . import weave_types as types
-from . import op_args
+from weave.old_weave import op_args
 from . import weave_pydantic
 from . import cache
 from . import errors

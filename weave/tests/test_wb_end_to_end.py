@@ -1,5 +1,6 @@
-import weave
 import wandb
+
+import weave
 from weave.old_weave import compile
 
 
@@ -9,16 +10,20 @@ def test_run_logging(user_by_api_key_in_env):
     run.log({"a": 1})
     run.finish()
 
-    summary_node = weave.ops.project(run.entity, run.project).run(run.id).summary()["a"]
+    summary_node = (
+        weave.old_weave.ops.project(run.entity, run.project).run(run.id).summary()["a"]
+    )
     summary = weave.use(summary_node)
 
     assert summary == 1
 
-    is_none_node = weave.ops.project(run.entity, run.project).isNone()
+    is_none_node = weave.old_weave.ops.project(run.entity, run.project).isNone()
 
     assert weave.use(is_none_node) == False
 
-    is_none_node = weave.ops.project(run.entity, "project_does_not_exist").isNone()
+    is_none_node = weave.old_weave.ops.project(
+        run.entity, "project_does_not_exist"
+    ).isNone()
 
     assert weave.use(is_none_node) == True
 
@@ -69,7 +74,10 @@ def test_run_histories(user_by_api_key_in_env):
     run.finish()
 
     history_node = (
-        weave.ops.project(run.entity, run.project).runs().history().concat()["a"]
+        weave.old_weave.ops.project(run.entity, run.project)
+        .runs()
+        .history()
+        .concat()["a"]
     )
     history = weave.use(history_node)
 
@@ -84,7 +92,7 @@ def test_run_history_count(user_by_api_key_in_env, cache_mode_minimal):
     run.log({"a": 2})
     run.finish()
 
-    run_node = weave.ops.project(run.entity, run.project).run(run.id)
+    run_node = weave.old_weave.ops.project(run.entity, run.project).run(run.id)
     h_count_node = run_node.history().count()
     history_count = weave.use(h_count_node)
     assert history_count == 2

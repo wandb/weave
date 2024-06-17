@@ -1,6 +1,7 @@
-import huggingface_hub
-import datasets
 import typing
+
+import datasets
+import huggingface_hub
 
 import weave
 
@@ -40,7 +41,7 @@ def hf_feature_type_to_type(type_):
     elif isinstance(type_, datasets.features.features.Sequence):
         return weave.types.List(hf_feature_type_to_type(type_.feature))
     elif isinstance(type_, datasets.features.features.Image):
-        return weave.ops.PILImageType()
+        return weave.old_weave.ops.PILImageType()
     elif isinstance(type_, datasets.features.features.ClassLabel):
         # TODO: this should be a classes type!!!!!
         return weave.types.Int()

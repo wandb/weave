@@ -71,10 +71,10 @@ def timeseries(
     x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
         x_title = ""
-        bin_fn = weave.ops.timestamp_bins_nice
+        bin_fn = weave.old_weave.ops.timestamp_bins_nice
     elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
         x_title = x_axis_key
-        bin_fn = weave.ops.numbers_bins_equal
+        bin_fn = weave.old_weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
     if mark == "bar":
@@ -107,9 +107,9 @@ def timeseries_avg_line(
 ) -> weave.Panel:
     x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
-        bin_fn = weave.ops.timestamp_bins_nice
+        bin_fn = weave.old_weave.ops.timestamp_bins_nice
     elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
-        bin_fn = weave.ops.numbers_bins_equal
+        bin_fn = weave.old_weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
     return weave.old_weave.panels.Plot(
@@ -138,10 +138,10 @@ def timeseries_sum_bar(
     x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
         x_title = ""
-        bin_fn = weave.ops.timestamp_bins_nice
+        bin_fn = weave.old_weave.ops.timestamp_bins_nice
     elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
         x_title = x_axis_key
-        bin_fn = weave.ops.numbers_bins_equal
+        bin_fn = weave.old_weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
     return weave.old_weave.panels.Plot(
@@ -169,10 +169,10 @@ def timeseries_count_bar(
     x_axis_type = input_node[x_axis_key].type.object_type  # type: ignore
     if weave.types.optional(weave.types.Timestamp()).assign_type(x_axis_type):
         x_title = ""
-        bin_fn = weave.ops.timestamp_bins_nice
+        bin_fn = weave.old_weave.ops.timestamp_bins_nice
     elif weave.types.optional(weave.types.Number()).assign_type(x_axis_type):
         x_title = x_axis_key
-        bin_fn = weave.ops.numbers_bins_equal
+        bin_fn = weave.old_weave.ops.numbers_bins_equal
     else:
         raise ValueError(f"Unsupported type for x_axis_key {x_axis_key}: {x_axis_type}")
     return weave.old_weave.panels.Plot(
@@ -332,7 +332,7 @@ def auto_panels(
         # TODO: We need a filter editor. Can start with a filter expression
         # editor and make it more user-friendly later
         weave.old_weave.panels.GroupPanel(
-            lambda data: weave.ops.make_list(
+            lambda data: weave.old_weave.ops.make_list(
                 a=data[x_axis].min(), b=data[x_axis].max()
             ),
             id="data_range",
@@ -358,7 +358,7 @@ def auto_panels(
         ),
         weave.old_weave.panels.GroupPanel(
             lambda data, bin_range: data.filter(
-                lambda row: weave.ops.Boolean.bool_and(
+                lambda row: weave.old_weave.ops.Boolean.bool_and(
                     row[x_axis] >= bin_range[0], row[x_axis] < bin_range[1]
                 )
             ),

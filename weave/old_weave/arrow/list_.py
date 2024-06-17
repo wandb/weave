@@ -16,14 +16,12 @@ from weave import (
     context_state,
     errors,
     node_ref,
-    op_def,
-    op_def_type,
     ref_base,
     ref_util,
     weave_internal,
 )
 from weave import weave_types as types
-from weave.old_weave import artifact_base, debug_types, graph
+from weave.old_weave import artifact_base, debug_types, graph, op_def, op_def_type
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
     arrow_as_array,

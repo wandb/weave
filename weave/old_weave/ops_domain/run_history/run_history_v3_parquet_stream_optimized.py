@@ -25,6 +25,7 @@ from weave.old_weave.arrow.list_ import (
     weave_arrow_type_check,
 )
 from weave.old_weave.gql_op_plugin import wb_gql_op_plugin
+from weave.old_weave.op_def import map_type
 from weave.old_weave.ops_domain import trace_tree, wb_util, wbmedia
 from weave.old_weave.ops_domain import wb_domain_types as wdt
 from weave.old_weave.ops_domain.run_history import history_op_common
@@ -33,7 +34,6 @@ from weave.old_weave.ops_domain.run_history.context import (
 )
 from weave.old_weave.ops_domain.table import _patch_legacy_image_file_types
 from weave.old_weave.wandb_interface import wandb_stream_table
-from weave.op_def import map_type
 
 tracer = engine_trace.tracer()
 

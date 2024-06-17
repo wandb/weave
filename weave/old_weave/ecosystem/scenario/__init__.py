@@ -2,6 +2,7 @@ import typing
 
 import weave
 from weave import val_const
+import weave.old_weave
 
 
 class ScenarioResult(typing.TypedDict):
@@ -31,8 +32,8 @@ class MetricsBankPanel(weave.Panel):
         baseline = input["baseline"]
         candidate = input["candidate"]
 
-        joined = weave.ops.join_all(
-            weave.ops.make_list(l0=baseline, l1=candidate),
+        joined = weave.old_weave.ops.join_all(
+            weave.old_weave.ops.make_list(l0=baseline, l1=candidate),
             lambda row: row["scenario_id"],
             False,
         )
@@ -41,7 +42,9 @@ class MetricsBankPanel(weave.Panel):
         joined_keys = joined[0].keys()
 
         # The output type of difference is List["metric1" | "metric2" | "metric3"]
-        metrics = weave.ops.difference(joined_keys, [val_const.const("scenario_id")])
+        metrics = weave.old_weave.ops.difference(
+            joined_keys, [val_const.const("scenario_id")]
+        )
 
         # TODO: broken
         return weave.old_weave.panels.Each(

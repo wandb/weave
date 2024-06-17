@@ -70,7 +70,7 @@ def listindex(self, index):
 
 def _list_op_output_object_type(input_types):
     self_type = input_types["self"]
-    from weave import op_def
+    from weave.old_weave import op_def
 
     def _remove_tags(t):
         if isinstance(t, tagged_value_type.TaggedValueType):

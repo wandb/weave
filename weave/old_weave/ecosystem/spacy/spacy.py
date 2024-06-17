@@ -29,21 +29,25 @@ def spacy(text: str) -> spacy_lib.tokens.doc.Doc:
 
 
 @weave.op()
-def spacy_doc_dep_to_html(spacy_doc: spacy_lib.tokens.doc.Doc) -> weave.ops.Html:
+def spacy_doc_dep_to_html(
+    spacy_doc: spacy_lib.tokens.doc.Doc,
+) -> weave.old_weave.ops.Html:
     from spacy import displacy
 
     html = displacy.render(
         list(spacy_doc.sents), style="dep", jupyter=False, options={"compact": True}
     )
-    return weave.ops.Html(html)
+    return weave.old_weave.ops.Html(html)
 
 
 @weave.op()
-def spacy_doc_ent_to_html(spacy_doc: spacy_lib.tokens.doc.Doc) -> weave.ops.Html:
+def spacy_doc_ent_to_html(
+    spacy_doc: spacy_lib.tokens.doc.Doc,
+) -> weave.old_weave.ops.Html:
     from spacy import displacy
 
     html = displacy.render(spacy_doc, style="ent", jupyter=False)
-    return weave.ops.Html(html)
+    return weave.old_weave.ops.Html(html)
 
 
 @weave.type()

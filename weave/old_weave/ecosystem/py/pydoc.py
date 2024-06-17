@@ -51,8 +51,8 @@ def module_name(module: types.ModuleType) -> str:
 
 
 @weave.op()
-def module_doc(module: types.ModuleType) -> weave.ops.Markdown:
-    return weave.ops.Markdown(module.__doc__ or "")
+def module_doc(module: types.ModuleType) -> weave.old_weave.ops.Markdown:
+    return weave.old_weave.ops.Markdown(module.__doc__ or "")
 
 
 @weave.op()
@@ -93,8 +93,8 @@ def pyclass_module(pyclass: type) -> types.ModuleType:
 
 
 @weave.op()
-def pyclass_doc(pyclass: type) -> weave.ops.Markdown:
-    return weave.ops.Markdown(pyclass.__doc__ or "")
+def pyclass_doc(pyclass: type) -> weave.old_weave.ops.Markdown:
+    return weave.old_weave.ops.Markdown(pyclass.__doc__ or "")
 
 
 @weave.op()
@@ -126,8 +126,8 @@ def function_name(pyfunction: types.FunctionType) -> str:
 
 
 @weave.op()
-def function_doc(pyfunction: types.FunctionType) -> weave.ops.Markdown:
-    return weave.ops.Markdown(pyfunction.__doc__ or "")
+def function_doc(pyfunction: types.FunctionType) -> weave.old_weave.ops.Markdown:
+    return weave.old_weave.ops.Markdown(pyfunction.__doc__ or "")
 
 
 @weave.type()
