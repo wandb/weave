@@ -32,6 +32,10 @@ numpy>=1.21
 wandb>=0.16.4
 graphql-core>3
 gql[requests]>=3.4.1
+# TEMPORARY: Up to, and including wandb==0.17.1, wandb does is not 
+# compatible with numpy >= 2.0.0. This is a temporary fix until wandb
+# is updated to be compatible with numpy >= 2.0.0.
+numpy<2.0.0
 
 # Segment logging
 analytics-python>=1.2.9
