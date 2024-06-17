@@ -76,7 +76,74 @@ Organizing and evaluating LLMs in applications for various use cases is challeng
 The following example demonstrates building a LlamaIndex query engine in a `WeaveModel`:
 
 ```python
+import weave
 
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.llms.openai import OpenAI
+from llama_index.core import PromptTemplate
+
+
+PROMPT_TEMPLATE = """
+You are given with relevant information about Paul Graham. Answer the user query only based on the information provided. Don't make up stuff.
+
+User Query: {query_str}
+Context: {context_str}
+Answer: 
+"""
+
+# highlight-next-line
+class SimpleRAGPipeline(weave.Model):
+    chat_llm: str = "gpt-4"
+    temperature: float = 0.1
+    similarity_top_k: int = 2
+    chunk_size: int = 256
+    chunk_overlap: int = 20
+    prompt_template: str = PROMPT_TEMPLATE
+
+    def get_llm(self):
+        return OpenAI(temperature=self.temperature, model=self.chat_llm)
+
+    def get_template(self):
+        return PromptTemplate(self.prompt_template)
+
+    def load_documents_and_chunk(self, data):
+        documents = SimpleDirectoryReader(data).load_data()
+        splitter = SentenceSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+        )
+        nodes = splitter.get_nodes_from_documents(documents)
+        return nodes
+
+    def get_query_engine(self, data):
+        nodes = self.load_documents_and_chunk(data)
+        index = VectorStoreIndex(nodes)
+
+        llm = self.get_llm()
+        prompt_template = self.get_template()
+
+        return index.as_query_engine(
+            similarity_top_k=self.similarity_top_k,
+            llm=llm,
+            text_qa_template=prompt_template,
+        )
+# highlight-next-line
+    @weave.op()
+    def query(self, query: str):
+        llm = self.get_llm()
+        query_engine = self.get_query_engine(
+            "data/paul_graham",
+        )
+        response = query_engine.query(query)
+        return response
+
+# highlight-next-line
+weave.init("test-llamaindex-weave")
+
+rag_pipeline = SimpleRAGPipeline()
+response = rag_pipeline.query("What did the author do growing up?")
+print(response)
 ```
 
 
