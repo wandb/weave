@@ -17,7 +17,7 @@ from weave.old_weave import (
 )
 from weave.old_weave import timestamp as weave_timestamp
 from weave.old_weave.language_features.tagging import tagged_value_type
-from weave.partial_object import PartialObject, PartialObjectType
+from weave.old_weave.partial_object import PartialObject, PartialObjectType
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):

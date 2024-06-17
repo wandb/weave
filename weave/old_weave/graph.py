@@ -239,7 +239,7 @@ def op_full_name(op: Op) -> str:
 
 
 def node_expr_str(node: Node) -> str:
-    from weave import partial_object
+    from weave.old_weave import partial_object
 
     if isinstance(node, OutputNode):
         param_names = list(node.from_op.inputs.keys())

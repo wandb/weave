@@ -1,10 +1,10 @@
 import logging
 import typing
 
-from weave import engine_trace, environment, errors, partial_object
+from weave import engine_trace, environment, errors
 from weave import weave_types as types
 from weave.api import op
-from weave.old_weave import mappers_gql
+from weave.old_weave import mappers_gql, partial_object
 from weave.old_weave.language_features.tagging import tagged_value_type
 from weave.old_weave.ops_domain import wb_domain_types as wdt
 from weave.old_weave.wandb_client_api import wandb_gql_query

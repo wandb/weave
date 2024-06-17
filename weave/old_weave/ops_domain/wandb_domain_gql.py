@@ -4,9 +4,9 @@ from inspect import Parameter, signature
 
 import pyarrow as pa
 
-from weave import errors, partial_object, weave_types
+from weave import errors, weave_types
 from weave.api import op
-from weave.old_weave import gql_op_plugin, op_def
+from weave.old_weave import gql_op_plugin, op_def, partial_object
 from weave.old_weave.decorator_arrow_op import arrow_op
 from weave.old_weave.gql_op_plugin import wb_gql_op_plugin
 from weave.old_weave.input_provider import InputProvider

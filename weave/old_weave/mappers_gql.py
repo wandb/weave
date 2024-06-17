@@ -4,7 +4,7 @@ from weave import errors
 from weave import weave_types as types
 from weave.old_weave import gql_json_cache, mappers
 from weave.old_weave.mappers_weave import UnionMapper
-from weave.partial_object import PartialObjectType
+from weave.old_weave.partial_object import PartialObjectType
 
 from .mappers_python_def import (
     BoolToPyBool,

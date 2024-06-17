@@ -2,7 +2,7 @@ import typing
 
 from weave import weave_types as types
 from weave.old_weave import mappers
-from weave.partial_object import PartialObjectType
+from weave.old_weave.partial_object import PartialObjectType
 
 
 class TypedDictMapper(mappers.Mapper):

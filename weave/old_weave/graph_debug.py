@@ -123,7 +123,7 @@ def node_expr_str_full(node: graph.Node) -> str:
     This function is a copy/modification of of node_expr_str.
     """
 
-    from weave import partial_object
+    from weave.old_weave import partial_object
 
     if isinstance(node, graph.OutputNode):
         if node.from_op.name == "dict":

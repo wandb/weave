@@ -2,7 +2,7 @@ import typing
 
 from weave import weave_types as types
 from weave.old_weave.decorator_type import type as weave_type
-from weave.partial_object import (
+from weave.old_weave.partial_object import (
     PartialObject,
     PartialObjectTypeGeneratorType,
 )

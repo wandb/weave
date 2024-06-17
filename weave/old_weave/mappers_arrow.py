@@ -5,9 +5,16 @@ from contextlib import contextmanager
 
 import pyarrow as pa
 
-from weave import errors, node_ref, partial_object, ref_base
+from weave import errors, node_ref, ref_base
 from weave import weave_types as types
-from weave.old_weave import arrow_util, artifact_base, box, mappers, mappers_weave
+from weave.old_weave import (
+    arrow_util,
+    artifact_base,
+    box,
+    mappers,
+    mappers_weave,
+    partial_object,
+)
 from weave.old_weave import mappers_python_def as mappers_python
 from weave.old_weave.arrow import arrow
 from weave.old_weave.language_features.tagging import tagged_value_type
