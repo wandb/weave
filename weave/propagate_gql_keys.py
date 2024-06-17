@@ -2,8 +2,9 @@ import typing
 
 from weave.old_weave import gql_op_plugin, graph, op_def
 
-from . import input_provider, partial_object, registry_mem
+from . import partial_object, registry_mem
 from . import weave_types as types
+from .old_weave import input_provider
 
 
 def _propagate_gql_keys_for_node(

@@ -1,9 +1,8 @@
 import typing
 from dataclasses import dataclass
 
-from weave import input_provider
 from weave import weave_types as types
-from weave.old_weave import op_args, op_def
+from weave.old_weave import input_provider, op_args, op_def
 
 # A GQLOutputTypeFn is a function that is called during the refinement phase of the compile pass
 # to propagate the GQL keys of a node's input types to its output type.

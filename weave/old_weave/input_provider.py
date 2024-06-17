@@ -1,7 +1,8 @@
-from dataclasses import dataclass, field
-import typing
 import json
-from . import stitch
+import typing
+from dataclasses import dataclass, field
+
+from .. import stitch
 
 
 @dataclass
