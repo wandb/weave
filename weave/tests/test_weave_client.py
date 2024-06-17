@@ -257,7 +257,7 @@ def test_calls_delete(client):
         )
         return original_calls_delete(post_auth_req)
 
-    # Patch calls_delete with our fake middlewear
+    # Patch calls_delete with our fake middleware
     client.server.calls_delete = patched_delete
 
     call0 = client.create_call("x", {"a": 5, "b": 10})
@@ -301,7 +301,7 @@ def test_calls_delete_cascade(client):
         )
         return original_calls_delete(post_auth_req)
 
-    # Patch calls_delete with our fake middlewear
+    # Patch calls_delete with our fake middleware
     client.server.calls_delete = patched_delete
 
     # run an evaluation, then delete the evaluation and its children
@@ -349,7 +349,7 @@ def test_call_display_name(client):
         )
         return original_call_update(post_auth_req)
 
-    # Patch call_update with our fake middlewear
+    # Patch call_update with our fake middleware
     client.server.call_update = patched_update
 
     call0 = client.create_call("x", {"a": 5, "b": 10})
