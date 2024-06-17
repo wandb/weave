@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 import weave
-from weave import context_state as _context
+from weave.old_weave import context_state as _context
 from weave.old_weave.ecosystem import pytorch
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

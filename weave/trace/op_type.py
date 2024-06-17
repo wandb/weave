@@ -1,30 +1,22 @@
-from _ast import AsyncFunctionDef, ExceptHandler
-import collections
-import collections.abc
-import textwrap
-import json
-import inspect
-import types as py_types
-import typing
-import os
-import sys
 import ast
 import builtins
-from typing import Any, Callable, Union, Optional
+import collections
+import collections.abc
+import inspect
+import json
+import os
+import sys
+import textwrap
+import types as py_types
+import typing
+from _ast import AsyncFunctionDef, ExceptHandler
+from typing import Any, Callable, Optional, Union
 
-from .. import errors
-from .. import context_state
-from .. import errors
-from .. import environment
-from .. import storage
-from weave.old_weave import artifact_fs
-
-from . import serializer
-
-
+from weave.old_weave import artifact_fs, context_state
 from weave.trace.refs import ObjectRef
 
-
+from .. import environment, errors, storage
+from . import serializer
 from .op import Op
 
 

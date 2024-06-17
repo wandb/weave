@@ -12,7 +12,6 @@ import typing_extensions
 
 from weave import (
     box,
-    context_state,
     errors,
     node_ref,
     ref_base,
@@ -23,6 +22,7 @@ from weave import weave_types as types
 from weave.old_weave import (
     _dict_utils,
     artifact_base,
+    context_state,
     debug_types,
     graph,
     op_def,

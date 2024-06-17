@@ -1,12 +1,12 @@
-import typing
 import contextlib
 import datetime
 import logging
+import os
 import shutil
 import time
-import os
+import typing
 
-from . import context_state
+from weave.old_weave import context_state
 from . import engine_trace
 from . import environment
 from . import errors

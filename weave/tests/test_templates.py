@@ -3,9 +3,9 @@ import typing
 import wandb
 
 import weave
+from weave.old_weave import context_state as _context
 from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
 
-from .. import context_state as _context
 from ..old_weave.panels_py import generator_templates
 
 _loading_builtins_token = _context.set_loading_built_ins()

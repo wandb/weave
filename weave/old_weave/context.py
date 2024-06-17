@@ -4,16 +4,15 @@ import os
 import typing
 from urllib.parse import urlparse
 
-from weave.old_weave import client
+from weave import urls, util
+from weave.old_weave import client, context_state
 from weave.old_weave.client_interface import ClientInterface
-
-from . import context_state, urls, util
 
 
 @contextlib.contextmanager
 def execution_client():
     """Returns a client for use by the execution engine and op resolvers."""
-    from . import server
+    from weave import server
 
     # Force in process execution
     with context_state.client(client.NonCachingClient(server.InProcessServer())):
@@ -23,7 +22,7 @@ def execution_client():
 
 @contextlib.contextmanager
 def local_http_client():
-    from . import server
+    from weave import server
 
     s = server.HttpServer()
     s.start()
@@ -35,7 +34,7 @@ def local_http_client():
 
 @contextlib.contextmanager
 def weavejs_client():
-    from . import server
+    from weave import server
 
     s = server.HttpServer()
     s.start()
@@ -49,7 +48,7 @@ def use_fixed_server_port():
     # s = server.HttpServer(port=9994)
     # s.start()
     # _weave_client.set(server.HttpServerClient(s.url))
-    from . import server
+    from weave import server
 
     context_state.set_client(server.HttpServerClient("http://localhost:9994"))
 
@@ -71,7 +70,7 @@ lazy_execution = context_state.lazy_execution
 
 
 def _make_default_client():
-    from . import server
+    from weave import server
 
     if util.is_notebook():
         serv = context_state.get_server()
@@ -106,7 +105,7 @@ def get_client() -> typing.Optional[ClientInterface]:
 
 
 def get_frontend_url():
-    from . import server
+    from weave import server
 
     url = os.environ.get("WEAVE_FRONTEND_URL", context_state.get_frontend_url())
     if url is None:

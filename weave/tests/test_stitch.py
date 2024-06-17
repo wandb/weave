@@ -3,8 +3,8 @@ import typing
 import pytest
 
 import weave
-from weave import context_state as _context
 from weave.old_weave import compile_domain, compile_table
+from weave.old_weave import context_state as _context
 from weave.old_weave.language_features.tagging import make_tag_getter_op
 from weave.old_weave.ops_domain import run_ops
 

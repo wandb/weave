@@ -1,7 +1,7 @@
 import weave
+from weave.old_weave import context_state as _context
 from weave.old_weave import graph
 
-from .. import context_state as _context
 from .. import registry_mem
 from .. import weave_types as types
 from ..weave_internal import make_const_node

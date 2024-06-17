@@ -1,10 +1,10 @@
 import pytest
 from PIL import Image
 
+from weave.old_weave import context_state as _context
 from weave.old_weave import ops_arrow
 
 from .. import api as weave
-from .. import context_state as _context
 from .. import errors
 from . import geom
 

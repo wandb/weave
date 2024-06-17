@@ -1,8 +1,8 @@
 import math
 
-from weave.old_weave import mappers_python
+from weave.old_weave import context, mappers_python
 
-from .. import api, context, val_const, weave_internal
+from .. import api, val_const, weave_internal
 from .. import weave_types as types
 
 

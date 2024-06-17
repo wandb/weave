@@ -1,7 +1,9 @@
-import analytics
 import socket
 
-from . import context_state
+import analytics
+
+from weave.old_weave import context_state
+
 from . import environment
 
 analytics.write_key = "uJ8vZgKqTBVH6ZdhD4GZGZYsR7ucfJmb"

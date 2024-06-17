@@ -6,7 +6,7 @@ import sys
 # the engine and UI layers which should be kept separate from the core layer).
 pre_init_modules = set(sys.modules.keys())
 
-from . import context_state as _context_state
+from weave.old_weave import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
@@ -27,7 +27,8 @@ from . import version
 _wandb_api.init()
 
 # Ensure there is a client available for eager mode
-from . import context as _context
+from weave.old_weave import context as _context
+
 
 _context_state.clear_loading_built_ins(_loading_builtins_token)
 

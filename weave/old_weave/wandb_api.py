@@ -16,10 +16,10 @@ from requests.auth import HTTPBasicAuth
 
 from weave import engine_trace, errors
 from weave import environment as weave_env
+from weave.old_weave import wandb_client_api
 
 # Importing at the top-level namespace so other files can import from here.
-from weave.context_state import WandbApiContext, _wandb_api_context
-from weave.old_weave import wandb_client_api
+from weave.old_weave.context_state import WandbApiContext, _wandb_api_context
 
 tracer = engine_trace.tracer()  # type: ignore
 

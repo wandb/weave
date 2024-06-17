@@ -11,9 +11,9 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any
 
-from weave import context_state, environment, errors, infer_types, registry_mem, storage
+from weave import environment, errors, infer_types, registry_mem, storage
 from weave import weave_types as types
-from weave.old_weave import artifact_fs, artifact_local
+from weave.old_weave import artifact_fs, artifact_local, context_state
 
 if typing.TYPE_CHECKING:
     from .op_def import OpDef

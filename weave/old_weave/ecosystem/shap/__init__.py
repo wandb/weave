@@ -1,4 +1,4 @@
-from weave import context_state as _context
+from weave.old_weave import context_state as _context
 
 _loading_builtins_token = _context.set_loading_built_ins()
 

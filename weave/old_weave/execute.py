@@ -11,8 +11,6 @@ from collections.abc import Mapping
 
 from weave import (
     box,
-    context,
-    context_state,
     eager,
     engine_trace,
     environment,
@@ -34,6 +32,8 @@ from weave import weave_types as types
 # Language Features
 from weave.old_weave import (
     compile,
+    context,
+    context_state,
     forward_graph,
     graph,
     graph_debug,

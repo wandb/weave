@@ -1,11 +1,9 @@
 import typing
-from . import init_message
+
+from weave.old_weave import context_state
+
+from . import autopatch, errors, init_message, trace_sentry, weave_client
 from .trace_server import remote_http_trace_server, sqlite_trace_server
-from . import context_state
-from . import errors
-from . import autopatch
-from . import weave_client
-from . import trace_sentry
 
 _current_inited_client = None
 

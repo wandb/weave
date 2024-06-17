@@ -334,7 +334,7 @@ def test_join_group_combo(fake_wandb):
     join_obj = sorted[0].joinObj()[0]
     assert weave.use(join_obj) == [1.0]
 
-    from .. import context_state
+    from weave.old_weave import context_state
 
     _loading_builtins_token = context_state.set_loading_built_ins()
     tag_getter_op = make_tag_getter_op.make_tag_getter_op(

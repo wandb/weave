@@ -4,6 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Generator, Iterator, Optional, TypeVar
 
 from weave.old_weave import (
+    context,
+    context_state,
     execute,
     forward_graph,
     graph_client_context,
@@ -11,7 +13,7 @@ from weave.old_weave import (
     wandb_api,
 )
 
-from . import cache, context, context_state, memo
+from . import cache, memo
 
 # Must be power of 2
 MAX_PARALLELISM = 16

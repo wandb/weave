@@ -4,7 +4,7 @@ import os
 import typing
 from collections import Counter, defaultdict
 
-from weave import context_state
+from weave.old_weave import context_state
 
 logger = logging.getLogger(__name__)
 

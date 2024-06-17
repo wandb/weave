@@ -1,10 +1,9 @@
 import typing
 
 from weave import api as weave
-from weave import context_state
 
 # TODO: Fix, these should be available from weave
-from weave.old_weave import op_def, ops, panel, panels
+from weave.old_weave import context_state, op_def, ops, panel, panels
 
 loading_builtins_token = context_state.set_loading_built_ins()
 

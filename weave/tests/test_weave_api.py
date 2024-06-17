@@ -3,7 +3,7 @@ import os
 import pytest
 
 import weave
-import weave.context_state
+import weave.old_weave.context_state
 import weave.old_weave.wandb_api
 import weave.weave_init
 
@@ -39,7 +39,7 @@ def test_weave_finish_unsets_client(client):
     def foo():
         return 1
 
-    weave.context_state._graph_client.set(None)
+    weave.old_weave.context_state._graph_client.set(None)
     weave.weave_init._current_inited_client = weave.weave_init.InitializedClient(client)
     weave_client = weave.weave_init._current_inited_client.client
     assert weave.weave_init._current_inited_client is not None

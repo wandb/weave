@@ -1,6 +1,6 @@
 import logging
 
-from weave import context_state
+from weave.old_weave import context_state
 
 logging.getLogger("langchain").setLevel(logging.ERROR)
 

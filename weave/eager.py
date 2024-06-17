@@ -1,8 +1,8 @@
 import typing
 
-from weave.old_weave import graph
+from weave.old_weave import context_state, graph
 
-from . import context_state, weave_internal
+from . import weave_internal
 from . import weave_types as types
 
 WeaveIterObjectType = typing.TypeVar("WeaveIterObjectType")

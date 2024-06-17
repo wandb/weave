@@ -24,7 +24,6 @@ import aioprocessing
 
 from weave import (
     cache,
-    context_state,
     engine_trace,
     errors,
     filesystem,
@@ -35,6 +34,7 @@ from weave import (
 from weave.old_weave import (
     artifact_wandb,
     async_queue,
+    context_state,
     wandb_api,
     wandb_file_manager,
 )

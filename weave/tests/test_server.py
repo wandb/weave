@@ -7,11 +7,10 @@ import pytest
 import requests
 
 from weave.old_weave import client as _client
-from weave.old_weave import ops
+from weave.old_weave import context_state, ops
 from weave.old_weave.decorator_op import op
 
 from .. import api as weave
-from .. import context_state
 from .. import server as _server
 from .. import weave_types as types
 from ..weave_internal import make_const_node

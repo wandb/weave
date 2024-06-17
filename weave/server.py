@@ -13,13 +13,12 @@ import requests
 from flask import current_app
 from werkzeug.serving import make_server
 
-from weave.old_weave import execute, gql_json_cache, graph, wandb_api
+from weave.old_weave import context, execute, gql_json_cache, graph, wandb_api
 from weave.old_weave.language_features.tagging import tag_store
 from weave.old_weave.language_features.tagging.tag_store import isolated_tagging_context
 
 from . import (
     cache,
-    context,
     engine_trace,
     logs,
     serialize,

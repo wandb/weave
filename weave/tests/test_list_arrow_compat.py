@@ -638,7 +638,7 @@ def test_tag_pushdown_on_list_of_lists(use_arrow):
     if use_arrow:
         list_node = arrow.ops.list_to_arrow(list_node)
 
-    from .. import context_state
+    from weave.old_weave import context_state
 
     _loading_builtins_token = context_state.set_loading_built_ins()
 

@@ -1,7 +1,8 @@
 import contextlib
 import typing
 
-from weave import context_state, errors
+from weave import errors
+from weave.old_weave import context_state
 
 if typing.TYPE_CHECKING:
     from weave.weave_client import WeaveClient

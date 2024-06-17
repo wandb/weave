@@ -3,9 +3,8 @@ import typing
 import pytest
 
 import weave
+from weave.old_weave import context_state as _context
 from weave.weave_internal import make_const_node, make_output_node
-
-from .. import context_state as _context
 
 _loading_builtins_token = _context.set_loading_built_ins()
 

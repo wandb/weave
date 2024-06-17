@@ -7,7 +7,6 @@ import typing
 from typing import Iterator, Sequence
 
 from weave import (
-    context_state,
     engine_trace,
     errors,
     memo,
@@ -17,6 +16,7 @@ from weave import (
 )
 from weave import weave_types as types
 from weave.old_weave import (
+    context_state,
     graph,
     graph_client_context,
     language_autocall,

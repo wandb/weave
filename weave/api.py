@@ -28,8 +28,8 @@ from . import errors as _errors
 
 from . import util as _util
 
-from . import context as _context
-from . import context_state as _context_state
+from weave.old_weave import context as _context
+from weave.old_weave import context_state as _context_state
 from weave.old_weave import run as _run
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
@@ -50,7 +50,7 @@ from weave.trace.op import op
 
 from weave.trace.op import Op
 from . import usage_analytics
-from .context import (
+from weave.old_weave.context import (
     use_fixed_server_port,
     use_frontend_devmode,
     # eager_execution,

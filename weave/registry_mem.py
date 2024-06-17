@@ -1,10 +1,10 @@
 import datetime
 import typing
 
-from weave.old_weave import op_aliases, op_args
+from weave.old_weave import context_state, op_aliases, op_args
 from weave.old_weave.op_args import OpNamedArgs
 
-from . import context_state, errors, storage, uris, weave_types
+from . import errors, storage, uris, weave_types
 
 if typing.TYPE_CHECKING:
     from .op_def import OpDef

@@ -12,7 +12,7 @@ from . import test_wb
 
 execute_test_count_op_run_count = 0
 
-from .. import context_state as _context_state
+from weave.old_weave import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 

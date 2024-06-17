@@ -30,7 +30,7 @@ def test_tagged_types():
     class _TestNumber:
         inner: int
 
-    from .. import context_state
+    from weave.old_weave import context_state
 
     _loading_builtins_token = context_state.set_loading_built_ins()
 

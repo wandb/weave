@@ -1,12 +1,12 @@
 import pytest
 
 import weave
+from weave.old_weave import context_state as _context
 from weave.old_weave import graph
 from weave.old_weave.dispatch import _dispatch_first_arg, _resolve_op_ambiguity
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.old_weave.ops_domain import wb_domain_types
 
-from .. import context_state as _context
 from .. import weave_internal
 
 _loading_builtins_token = _context.set_loading_built_ins()
