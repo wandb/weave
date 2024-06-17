@@ -19,7 +19,6 @@ from weave import (
     ref_base,
     registry_mem,
     trace_local,
-    value_or_error,
 )
 from weave import weave_types as types
 
@@ -42,6 +41,7 @@ from weave.old_weave import (
     op_def,
     op_execute,
     op_policy,
+    value_or_error,
     wandb_api,
 )
 from weave.old_weave.language_features.tagging import (

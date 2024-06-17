@@ -13,7 +13,6 @@ from weave import (
     registry_mem,
     serialize,
     stitch,
-    value_or_error,
     weave_internal,
 )
 from weave import weave_types as types
@@ -29,6 +28,7 @@ from weave.old_weave import (
     graph_debug,
     input_provider,
     op_args,
+    value_or_error,
 )
 from weave.old_weave.language_features.tagging import tagged_value_type_helpers
 from weave.old_weave.op_def import OpDef

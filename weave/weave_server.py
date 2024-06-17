@@ -35,10 +35,9 @@ from weave import (
     server,
     storage,
     util,
-    value_or_error,
     weavejs_fixes,
 )
-from weave.old_weave import context_state, graph, wandb_api
+from weave.old_weave import context_state, graph, value_or_error, wandb_api
 from weave.old_weave.language_features.tagging import tag_store
 from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
 

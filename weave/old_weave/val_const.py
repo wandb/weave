@@ -6,7 +6,8 @@ than StringType()
 """
 
 import typing
-from . import weave_types as types
+
+from weave import weave_types as types
 
 
 class Const:

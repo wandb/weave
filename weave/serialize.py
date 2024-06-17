@@ -7,7 +7,7 @@ import hashlib
 import json
 import random
 
-from . import value_or_error
+from weave.old_weave import value_or_error
 
 
 from weave.old_weave import graph

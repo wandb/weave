@@ -1,8 +1,8 @@
 import typing
 
 import weave
-from weave import val_const
 import weave.old_weave
+from weave.old_weave import val_const
 
 
 class ScenarioResult(typing.TypedDict):
