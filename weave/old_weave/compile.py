@@ -8,7 +8,6 @@ import typing
 from weave import (
     engine_trace,
     errors,
-    propagate_gql_keys,
     registry_mem,
     serialize,
     stitch,
@@ -28,6 +27,7 @@ from weave.old_weave import (
     input_provider,
     op_args,
     partial_object,
+    propagate_gql_keys,
     value_or_error,
 )
 from weave.old_weave.language_features.tagging import tagged_value_type_helpers
