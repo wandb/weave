@@ -1,5 +1,6 @@
-from . import weave_types as types
-from . import weave_internal
+from .. import weave_internal
+from .. import weave_types as types
+
 
 # TODO: Consider if this should accept a *args, **kwargs?
 def make(cls, kwargs={}):
