@@ -18,7 +18,6 @@ from weave import (
     engine_trace,
     errors,
     filesystem,
-    memo,
     urls,
     util,
 )
@@ -28,6 +27,7 @@ from weave.old_weave import (
     file_base,
     file_util,
     graph_client_context,
+    memo,
     uris,
     wandb_client_api,
 )

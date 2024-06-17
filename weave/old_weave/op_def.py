@@ -9,7 +9,6 @@ from typing import Iterator, Sequence
 from weave import (
     engine_trace,
     errors,
-    memo,
     pyfunc_type_util,
     weave_internal,
 )
@@ -19,6 +18,7 @@ from weave.old_weave import (
     graph,
     graph_client_context,
     language_autocall,
+    memo,
     object_context,
     op_args,
     op_def_type,

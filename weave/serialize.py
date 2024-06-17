@@ -15,7 +15,7 @@ from . import weave_types as types
 from . import errors
 from . import weave_internal
 from . import storage
-from . import memo
+from weave.old_weave import memo
 
 
 NodeOrOp = typing.Union[graph.Node, graph.Op]

@@ -13,7 +13,8 @@ from weave.old_weave import (
     wandb_api,
 )
 
-from . import cache, memo
+from . import cache
+from .old_weave import memo
 
 # Must be power of 2
 MAX_PARALLELISM = 16

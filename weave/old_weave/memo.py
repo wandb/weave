@@ -1,10 +1,8 @@
+import contextlib
+import contextvars
 import typing
 
-
-import contextvars
-import contextlib
-
-from . import engine_trace
+from .. import engine_trace
 
 statsd = engine_trace.statsd()  # type: ignore
 

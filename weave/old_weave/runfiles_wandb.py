@@ -7,9 +7,9 @@ import shutil
 import typing
 
 from weave import environment as weave_env
-from weave import errors, filesystem, memo
+from weave import errors, filesystem
 from weave import weave_types as types
-from weave.old_weave import artifact_fs, file_util, uris, wandb_client_api
+from weave.old_weave import artifact_fs, file_util, memo, uris, wandb_client_api
 
 if typing.TYPE_CHECKING:
     from wandb.apis.public import Run as WBRun
