@@ -6,7 +6,6 @@ import re
 import typing
 
 from weave import (
-    box,
     engine_trace,
     errors,
     input_provider,
@@ -20,6 +19,7 @@ from weave import (
 )
 from weave import weave_types as types
 from weave.old_weave import (
+    box,
     compile_domain,
     compile_table,
     debug_compile,

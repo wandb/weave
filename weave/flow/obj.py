@@ -1,19 +1,18 @@
-from typing import Optional, Any
+from typing import Any, Optional
+
 from pydantic import (
-    ConfigDict,
-    model_validator,
-    ValidatorFunctionWrapHandler,
-    ValidationInfo,
     BaseModel,
+    ConfigDict,
+    ValidationInfo,
+    ValidatorFunctionWrapHandler,
+    model_validator,
 )
 
 # import pydantic
-
-from weave import box
-from weave.trace.op import Op, ObjectRef
-from weave.trace.vals import pydantic_getattribute
+from weave.old_weave import box
+from weave.trace.op import ObjectRef, Op
+from weave.trace.vals import ObjectRecord, TraceObject, pydantic_getattribute
 from weave.weave_client import get_ref
-from weave.trace.vals import ObjectRecord, TraceObject
 
 
 class Object(BaseModel):

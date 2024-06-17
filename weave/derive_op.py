@@ -7,6 +7,7 @@ import inspect
 import typing
 
 from weave.old_weave import (
+    box,
     context_state,
     execute_fast,
     graph,
@@ -17,7 +18,6 @@ from weave.old_weave import (
 from weave.old_weave.language_features.tagging import tag_store
 
 from . import (
-    box,
     errors,
     parallelism,
     registry_mem,

@@ -10,7 +10,6 @@ import typing
 from collections.abc import Mapping
 
 from weave import (
-    box,
     eager,
     engine_trace,
     environment,
@@ -31,6 +30,7 @@ from weave import weave_types as types
 # Trace / cache
 # Language Features
 from weave.old_weave import (
+    box,
     compile,
     context,
     context_state,

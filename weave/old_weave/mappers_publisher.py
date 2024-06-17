@@ -2,13 +2,14 @@ import copy
 import dataclasses
 import typing
 
-from weave import box, errors, ref_base, storage, weave_internal
+from weave import errors, ref_base, storage, weave_internal
 from weave import weave_types as types
 from weave.node_ref import ref_to_node
 
 # from weave.old_weave.ops_primitives import weave_api
 from weave.old_weave import (
     artifact_local,
+    box,
     context,
     context_state,
     graph,

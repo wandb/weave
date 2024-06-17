@@ -4,9 +4,8 @@ import typing
 
 import numpy as np
 
+from weave import ref_util
 from weave.old_weave import context_state
-
-from . import ref_util
 
 
 def make_id() -> int:

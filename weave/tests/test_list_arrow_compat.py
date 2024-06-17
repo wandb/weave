@@ -5,7 +5,7 @@ import pytest
 
 from weave import weave_internal
 from weave import weave_types as types
-from weave.old_weave import ops
+from weave.old_weave import box, ops
 from weave.old_weave import ops_arrow as arrow
 from weave.old_weave.language_features.tagging import (
     make_tag_getter_op,
@@ -15,7 +15,6 @@ from weave.old_weave.language_features.tagging import (
 from weave.old_weave.ops_primitives import dict_, list_
 
 from .. import api as weave
-from .. import box
 from ..tests import tag_test_util as ttu
 from . import list_arrow_test_helpers as lath
 

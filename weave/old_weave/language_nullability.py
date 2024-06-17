@@ -1,7 +1,7 @@
 import typing
 
-from weave import box
 from weave import weave_types as types
+from weave.old_weave import box
 from weave.old_weave.language_features.tagging import tagged_value_type
 
 if typing.TYPE_CHECKING:

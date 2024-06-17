@@ -1,5 +1,6 @@
 import datetime
-from .. import box
+
+from weave.old_weave import box
 
 
 def test_boxdatetime():

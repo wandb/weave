@@ -11,7 +11,6 @@ import pyarrow.compute as pc
 import typing_extensions
 
 from weave import (
-    box,
     errors,
     node_ref,
     ref_base,
@@ -22,6 +21,7 @@ from weave import weave_types as types
 from weave.old_weave import (
     _dict_utils,
     artifact_base,
+    box,
     context_state,
     debug_types,
     graph,

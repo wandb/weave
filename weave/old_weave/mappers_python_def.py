@@ -4,11 +4,12 @@ import inspect
 import math
 import typing
 
-from weave import box, errors, ref_base, storage, val_const
+from weave import errors, ref_base, storage, val_const
 from weave import timestamp as weave_timestamp
 from weave import weave_types as types
 from weave.old_weave import (
     artifact_fs,
+    box,
     graph_client_context,
     mappers,
     mappers_python,

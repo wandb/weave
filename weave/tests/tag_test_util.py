@@ -1,10 +1,9 @@
 import weave
+from weave.old_weave import box, graph
 from weave.old_weave import context_state as _context_state
-from weave.old_weave import graph
 from weave.old_weave.language_features.tagging import tag_store
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 
-from .. import box
 from .. import weave_types as types
 
 tag_adders = 0

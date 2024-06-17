@@ -5,10 +5,10 @@ import typing
 import weakref
 from typing import Iterable, Optional, Sequence
 
-from weave.old_weave import context_state, graph_client_context, object_context
+from weave.old_weave import box, context_state, graph_client_context, object_context
 from weave.old_weave.language_features.tagging import tag_store
 
-from . import box, errors, uris
+from . import errors, uris
 from . import weave_types as types
 
 # We store Refs here if we can't attach them directly to the object

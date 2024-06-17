@@ -1,8 +1,9 @@
 import pytest
 
 from weave import api as weave
-from weave import box, weave_internal
+from weave import weave_internal
 from weave import weave_types as types
+from weave.old_weave import box
 from weave.old_weave.language_features.tagging import (
     make_tag_getter_op,
     tag_store,

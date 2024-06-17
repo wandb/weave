@@ -2,7 +2,8 @@ import dataclasses
 import typing
 from urllib import parse
 
-from . import box
+from weave.old_weave import box
+
 from .trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME

@@ -2,9 +2,10 @@ import dataclasses
 import typing
 
 import pyarrow as pa
-from weave.old_weave import artifact_base
-from weave import box, errors
+
+from weave import errors
 from weave import weave_types as types
+from weave.old_weave import artifact_base, box
 from weave.old_weave.arrow import arrow_tags, convert
 from weave.old_weave.arrow.arrow import ArrowWeaveListType, arrow_as_array
 from weave.old_weave.arrow.list_ import ArrowWeaveList

@@ -1,6 +1,7 @@
 import pytest
 
 import weave
+from weave.old_weave import box
 from weave.old_weave.artifact_fs import FilesystemArtifactFileType
 from weave.old_weave.language_features.tagging import (
     make_tag_getter_op,
@@ -13,7 +14,7 @@ from weave.old_weave.ops_domain.wb_domain_types import ProjectType, Run, RunType
 from weave.old_weave.ops_primitives import dict as dict_ops
 from weave.old_weave.ops_primitives import list_ as list_ops
 
-from .. import box, weave_internal
+from .. import weave_internal
 from .. import weave_types as types
 
 

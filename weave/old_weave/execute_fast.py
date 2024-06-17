@@ -1,7 +1,6 @@
 import logging
 
 from weave import (
-    box,
     engine_trace,
     errors,
     ref_base,
@@ -10,6 +9,7 @@ from weave import (
 )
 from weave import weave_types as types
 from weave.old_weave import (
+    box,
     compile,
     forward_graph,
     graph,

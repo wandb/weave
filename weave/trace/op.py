@@ -14,8 +14,7 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
-from weave import box
-from weave.old_weave import context_state, graph_client_context, run_context
+from weave.old_weave import box, context_state, graph_client_context, run_context
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef

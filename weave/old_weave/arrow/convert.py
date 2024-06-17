@@ -3,14 +3,9 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave import (
-    api,
-    box,
-    errors,
-    weave_internal,
-)
+from weave import api, errors, weave_internal
 from weave import weave_types as types
-from weave.old_weave import arrow_util, artifact_base, artifact_mem, mappers_arrow
+from weave.old_weave import arrow_util, artifact_base, artifact_mem, box, mappers_arrow
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
 )

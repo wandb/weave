@@ -1,7 +1,8 @@
 import typing
 
-from weave import box, errors
+from weave import errors
 from weave import weave_types as types
+from weave.old_weave import box
 from weave.old_weave.language_features.tagging import tag_store, tagged_value_type
 
 

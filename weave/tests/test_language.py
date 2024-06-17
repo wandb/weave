@@ -3,8 +3,7 @@
 import typing
 
 import weave
-from weave import box
-from weave.old_weave import context_state
+from weave.old_weave import box, context_state
 from weave.old_weave.language_features.tagging import (
     make_tag_getter_op,
     tag_store,
