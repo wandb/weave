@@ -43,7 +43,10 @@ analytics-python>=1.2.9
 # Used for version parsing in integrations.
 packaging>=21.0
 
-tenacity>=8.3.0
+# Need to exclude the 8.4.0 version of tenacity because it has a bug
+# on import of AsyncRetrying
+tenacity>=8.3.0,!=8.4.0
+
 
 # Used for emoji shortcode support in feedback
 emoji>=2.12.1
