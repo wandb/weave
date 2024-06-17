@@ -63,3 +63,8 @@ h2 { font-size: 1.5rem !important; }
 kbd {
   font-size: 0.5em;
 }
+
+.vertical-align-colab-button {
+  vertical-align: middle;
+  line-height: 16px;
+}

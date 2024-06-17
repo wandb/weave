@@ -2011,3 +2011,31 @@ def test_call_stack_order_mixed(client):
         },
         terminal_root_call.id: {},
     }
+
+
+def test_call_query_stream_equality(client):
+    @weave.op
+    def calculate(a: int, b: int) -> int:
+        return a + b
+
+    for i in range(10):
+        calculate(i, i * i)
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    calls_stream = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    i = 0
+    for call in calls_stream:
+        assert call == calls.calls[i]
+        i += 1
+
+    assert i == len(calls.calls)
