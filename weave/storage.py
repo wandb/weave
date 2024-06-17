@@ -18,9 +18,10 @@ from weave.old_weave import (
     graph,
     graph_client_context,
     mappers_python,
+    timestamp,
 )
 
-from . import errors, ref_base, timestamp
+from . import errors, ref_base
 from . import weave_types as types
 
 Ref = ref_base.Ref

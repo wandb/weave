@@ -1,17 +1,16 @@
-import gc
-import os
-import logging
 import datetime
-import threading
-import traceback
+import gc
+import logging
+import os
+import pathlib
 import signal
 import sys
+import threading
+import traceback
 import typing
-import pathlib
 from types import FrameType
 
-
-from . import environment
+from weave import environment
 
 
 def dump_folder() -> pathlib.Path:

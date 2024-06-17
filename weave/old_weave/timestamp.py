@@ -1,6 +1,6 @@
 import datetime
-from math import floor
 import typing
+from math import floor
 
 # Rules for Timestamps in Weave:
 # 1. For now, we only support UTC timestamps. This is not a hard requirement and is more a
