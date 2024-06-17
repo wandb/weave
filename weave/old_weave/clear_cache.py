@@ -1,8 +1,9 @@
 import os
 import time
 
-from weave import cache
+from weave.old_weave import cache
 
+# TODO: This should be split out into a scripts dir
 # Script to run to delete expired caches
 if __name__ == "__main__":
     print("Starting clear cache job", flush=True)

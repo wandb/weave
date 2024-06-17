@@ -2,8 +2,8 @@ import os
 import pathlib
 import typing
 
-from weave import cache, environment, filesystem
-from weave.old_weave import path_util
+from weave import environment, filesystem
+from weave.old_weave import cache, path_util
 
 
 def get_allowed_dir() -> pathlib.Path:

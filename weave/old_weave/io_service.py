@@ -23,7 +23,6 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 import aioprocessing
 
 from weave import (
-    cache,
     engine_trace,
     errors,
     filesystem,
@@ -34,6 +33,7 @@ from weave import (
 from weave.old_weave import (
     artifact_wandb,
     async_queue,
+    cache,
     context_state,
     wandb_api,
     wandb_file_manager,

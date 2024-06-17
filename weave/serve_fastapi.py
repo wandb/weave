@@ -14,7 +14,7 @@ except ImportError:
 from . import weave_types as types
 from weave.old_weave import op_args
 from . import weave_pydantic
-from . import cache
+from weave.old_weave import cache
 from . import errors
 from . import pyfunc_type_util
 from .old_weave.monitoring import monitor
