@@ -197,22 +197,22 @@ def make_dspy_wrapper(name: str) -> Callable:
 # ]
 
 
-patched_functions = MultiPatcher(
+patched_functions = [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="OpenAI.basic_request",
-        make_new_value=weave.op(),
+        make_new_value=make_dspy_wrapper("dspy.OpenAI.basic_request"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="OpenAI.request",
-        make_new_value=weave.op(),
+        make_new_value=make_dspy_wrapper("dspy.OpenAI.request"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="OpenAI.__call__",
-        make_new_value=weave.op(),
+        make_new_value=make_dspy_wrapper("dspy.OpenAI"),
     )
-)
+]
 
 dspy_patcher = MultiPatcher(patched_functions)
