@@ -130,7 +130,7 @@ class SimpleRAGPipeline(weave.Model):
         )
 # highlight-next-line
     @weave.op()
-    def query(self, query: str):
+    def predict(self, query: str):
         llm = self.get_llm()
         query_engine = self.get_query_engine(
             "data/paul_graham",
@@ -142,54 +142,64 @@ class SimpleRAGPipeline(weave.Model):
 weave.init("test-llamaindex-weave")
 
 rag_pipeline = SimpleRAGPipeline()
-response = rag_pipeline.query("What did the author do growing up?")
+response = rag_pipeline.predict("What did the author do growing up?")
 print(response)
 ```
 
+This `SimpleRAGPipeline` class subclassed from `weave.Model` organizes the important parameters for this RAG pipeline. Decorating the `query` method with `weave.op()` allows for tracing.
 
-## Create a `Model` for easier experimentation
+[![llamaindex_model.png](imgs/llamaindex_model.png)](https://wandb.ai/wandbot/test-llamaindex-weave/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fwandbot%2Ftest-llamaindex-weave%2Fcalls%2Fa82afbf4-29a5-43cd-8c51-603350abeafd%3Ftracetree%3D1)
 
-Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
 
-In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](/guides/core-types/evaluations)s.
+## Doing Evaluation with `weave.Evaluation`
 
-In the example below, you can experiment with `model` and `system_message`. Every time you change one of these, you'll get a new _version_ of `GrammarCorrectorModel`. 
+Evaluations help you measure the performance of your models. By using the [`weave.Evaluation`](/guides/core-types/evaluations) class, you can capture how well your model performs on specific tasks or datasets, making it easier to compare different models and iterations of your application. The following example demonstrates how to evaluate the model we created:
 
 ```python
-import weave
-from openai import OpenAI
+import asyncio
+from llama_index.core.evaluation import CorrectnessEvaluator
 
-weave.init('grammar-openai')
+eval_examples = [
+    {
+        "id": "0",
+        "query": "What programming language did Paul Graham learn to teach himself AI when he was in college?",
+        "ground_truth": "Paul Graham learned Lisp to teach himself AI when he was in college.",
+    },
+    {
+        "id": "1",
+        "query": "What was the name of the startup Paul Graham co-founded that was eventually acquired by Yahoo?",
+        "ground_truth": "The startup Paul Graham co-founded that was eventually acquired by Yahoo was called Viaweb.",
+    },
+    {
+        "id": "2",
+        "query": "What is the capital city of France?",
+        "ground_truth": "I cannot answer this question because no information was provided in the text.",
+    },
+]
 
-class GrammarCorrectorModel(weave.Model): # Change to `weave.Model`
-  model: str
-  system_message: str
+llm_judge = OpenAI(model="gpt-4", temperature=0.0)
+evaluator = CorrectnessEvaluator(llm=llm_judge)
 
-  @weave.op()
-  def predict(self, user_input): # Change to `predict`
-    client = OpenAI()
-    response = client.chat.completions.create(
-      model=self.model,
-      messages=[
-          {
-              "role": "system",
-              "content": self.system_message
-          },
-          {
-              "role": "user",
-              "content": user_input
-          }
-          ],
-          temperature=0,
+@weave.op()
+def correctness_evaluator(query: str, ground_truth: str, model_output: dict):
+    result = evaluator.evaluate(
+        query=query, reference=ground_truth, response=model_output.response
     )
-    return response.choices[0].message.content
+    return {"correctness": float(result.score)}
 
 
-corrector = GrammarCorrectorModel(
-    model="gpt-3.5-turbo-1106",
-    system_message = "You are a grammar checker, correct the following user input.")
-result = corrector.predict("That was so easy, it was a piece of pie!")
-print(result)
+evaluation = weave.Evaluation(dataset=eval_examples, scorers=[correctness_evaluator])
+
+rag_pipeline = SimpleRAGPipeline()
+asyncio.run(evaluation.evaluate(rag_pipeline))
 ```
 
-[![openai-model.png](imgs/openai-model.png)](https://wandb.ai/_scott/grammar-openai/weave/calls)
+This example builds on the example in the earlier section. Evaluating using `weave.Evaluation` requires an evaluation dataset, a scorer function and a `weave.Model`. Here are a few nuances about the three key components:
+
+- Make sure that the keys of the evaluation dataset matches the arguments of the scorer function and of the `weave.Model`'s `predict` method.
+- The `weave.Model` should have a method with the name `predict` or `infer` or `forward`. Decorate this method with `weave.op()` for tracing.
+- The scorer function should be decorated with `weave.op()` and should have `model_output` as named argument.
+
+[![llamaindex_evaluation.png](imgs/llamaindex_evaluation.png)]()
+
+By integrating Weave with LlamaIndex, you can ensure comprehensive logging and monitoring of your LLM applications, facilitating easier debugging and performance optimization using evaluation.
