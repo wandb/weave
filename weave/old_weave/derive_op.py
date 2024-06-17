@@ -6,6 +6,14 @@ import copy
 import inspect
 import typing
 
+from weave import (
+    errors,
+    parallelism,
+    registry_mem,
+    storage,
+    weave_internal,
+)
+from weave import weave_types as types
 from weave.old_weave import (
     box,
     context_state,
@@ -16,15 +24,6 @@ from weave.old_weave import (
     op_policy,
 )
 from weave.old_weave.language_features.tagging import tag_store
-
-from . import (
-    errors,
-    parallelism,
-    registry_mem,
-    storage,
-    weave_internal,
-)
-from . import weave_types as types
 
 USE_PARALLEL_DOWNLOAD = True
 USE_PARALLEL_REFINE = True
