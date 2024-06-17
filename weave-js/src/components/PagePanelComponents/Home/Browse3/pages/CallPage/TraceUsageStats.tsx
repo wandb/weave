@@ -19,6 +19,8 @@ export type UsageData = {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  input_tokens?: number;
+  output_tokens?: number;
 };
 
 type UsageDataKeys = keyof UsageData;
@@ -91,6 +93,16 @@ export const getUsageFromCellParams = (params: {[key: string]: any}) => {
   return usage;
 };
 
+// This needs to updated eventually, to either include more possible keys or to be more dynamic
+// accounts for openai and anthropic usage objects (prompt_tokens, input_tokens)
+export const getInputTokens = (usage: UsageData) => {
+  return usage.prompt_tokens || usage.input_tokens || 0;
+};
+
+export const getOutputTokens = (usage: UsageData) => {
+  return usage.completion_tokens || usage.output_tokens || 0;
+};
+
 export const getTokensAndCostFromUsage = (usage: {
   [key: string]: UsageData;
 }) => {
@@ -118,8 +130,8 @@ export const getTokensAndCostFromUsage = (usage: {
 
   if (usage) {
     for (const model of Object.keys(usage)) {
-      const inputTokens = usage[model].prompt_tokens;
-      const outputTokens = usage[model].completion_tokens;
+      const inputTokens = getInputTokens(usage[model]);
+      const outputTokens = getOutputTokens(usage[model]);
       const inputCost = getLLMTokenCost(model, 'input', inputTokens);
       const outputCost = getLLMTokenCost(model, 'output', outputTokens);
 

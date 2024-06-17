@@ -3,106 +3,109 @@ export const isValidLLMModel = (model: string): model is Model => {
   return model in Object.keys(LLM_TOKEN_COSTS);
 };
 
-export const LLM_TOKEN_COSTS: Record<string, {input: number; output: number}> =
-  {
-    // Default pricing if model has no specific pricing
-    default: {
-      input: 0.005,
-      output: 0.015,
-    },
+export const LLM_TOKEN_COSTS = {
+  // Default pricing if model has no specific pricing
+  default: {
+    input: 0.005,
+    output: 0.015,
+  },
 
-    // OPENAI pricing for 1k LLM tokens taken on June 4, 2024
-    // https://openai.com/api/pricing/
-    'gpt-4o': {
-      input: 0.005,
-      output: 0.015,
-    },
-    'gpt-4o-2024-05-13': {
-      input: 0.005,
-      output: 0.015,
-    },
-    'gpt-4-turbo': {
-      input: 0.01,
-      output: 0.03,
-    },
-    'gpt-4-turbo-2024-04-09': {
-      input: 0.01,
-      output: 0.03,
-    },
-    'gpt-4': {
-      input: 0.03,
-      output: 0.06,
-    },
-    'gpt-4-32k': {
-      input: 0.06,
-      output: 0.12,
-    },
-    'gpt-4-0125-preview': {
-      input: 0.01,
-      output: 0.03,
-    },
-    'gpt-4-1106-preview': {
-      input: 0.01,
-      output: 0.03,
-    },
-    'gpt-4-vision-preview': {
-      input: 0.01,
-      output: 0.03,
-    },
-    'gpt-3.5-turbo-1106': {
-      input: 0.001,
-      output: 0.002,
-    },
-    'gpt-3.5-turbo-0613': {
-      input: 0.0015,
-      output: 0.002,
-    },
-    'gpt-3.5-turbo-16k-0613': {
-      input: 0.003,
-      output: 0.004,
-    },
-    'gpt-3.5-turbo-0301': {
-      input: 0.0015,
-      output: 0.002,
-    },
-    'gpt-3.5-turbo-0125': {
-      input: 0.0005,
-      output: 0.0015,
-    },
-    'gpt-3.5-turbo-instruct': {
-      input: 0.0015,
-      output: 0.002,
-    },
-    'davinci-002': {
-      input: 0.002,
-      output: 0.002,
-    },
-    'babbage-002': {
-      input: 0.0004,
-      output: 0.0004,
-    },
+  // OPENAI pricing for 1k LLM tokens taken on June 4, 2024
+  // https://openai.com/api/pricing/
+  'gpt-4o': {
+    input: 0.005,
+    output: 0.015,
+  },
+  'gpt-4o-2024-05-13': {
+    input: 0.005,
+    output: 0.015,
+  },
+  'gpt-4-turbo': {
+    input: 0.01,
+    output: 0.03,
+  },
+  'gpt-4-turbo-2024-04-09': {
+    input: 0.01,
+    output: 0.03,
+  },
+  'gpt-4': {
+    input: 0.03,
+    output: 0.06,
+  },
+  'gpt-4-32k': {
+    input: 0.06,
+    output: 0.12,
+  },
+  'gpt-4-0125-preview': {
+    input: 0.01,
+    output: 0.03,
+  },
+  'gpt-4-1106-preview': {
+    input: 0.01,
+    output: 0.03,
+  },
+  'gpt-4-vision-preview': {
+    input: 0.01,
+    output: 0.03,
+  },
+  'gpt-3.5-turbo-1106': {
+    input: 0.001,
+    output: 0.002,
+  },
+  'gpt-3.5-turbo-0613': {
+    input: 0.0015,
+    output: 0.002,
+  },
+  'gpt-3.5-turbo-16k-0613': {
+    input: 0.003,
+    output: 0.004,
+  },
+  'gpt-3.5-turbo-0301': {
+    input: 0.0015,
+    output: 0.002,
+  },
+  'gpt-3.5-turbo-0125': {
+    input: 0.0005,
+    output: 0.0015,
+  },
+  'gpt-3.5-turbo-instruct': {
+    input: 0.0015,
+    output: 0.002,
+  },
+  'davinci-002': {
+    input: 0.002,
+    output: 0.002,
+  },
+  'babbage-002': {
+    input: 0.0004,
+    output: 0.0004,
+  },
 
-    // Anthropic pricing for 1k LLM tokens taken on June 4, 2024
-    // https://docs.anthropic.com/en/docs/models-overview
-    'claude-3-opus-20240229': {
-      input: 0.015,
-      output: 0.075,
-    },
-    'claude-3-sonnet-20240229': {
-      input: 0.003,
-      output: 0.015,
-    },
-    'claude-3-haiku-20240307': {
-      input: 0.00025,
-      output: 0.00125,
-    },
-  };
+  // Anthropic pricing for 1k LLM tokens taken on June 4, 2024
+  // https://docs.anthropic.com/en/docs/models-overview
+  'claude-3-opus-20240229': {
+    input: 0.015,
+    output: 0.075,
+  },
+  'claude-3-sonnet-20240229': {
+    input: 0.003,
+    output: 0.015,
+  },
+  'claude-3-haiku-20240307': {
+    input: 0.00025,
+    output: 0.00125,
+  },
+};
 
 export const getLLMTokenCost = (
   model: string,
   type: 'input' | 'output',
-  tokens: number
+  tokens: number = 0
 ) => {
+  if (tokens === 0) {
+    return 0;
+  }
+
   if (isValidLLMModel(model)) {
     return (LLM_TOKEN_COSTS[model][type] * tokens) / 1000;
   }
@@ -111,9 +114,13 @@ export const getLLMTokenCost = (
 
 export const getLLMTotalTokenCost = (
   model: string,
-  inputTokens: number,
-  outputTokens: number
+  inputTokens: number = 0,
+  outputTokens: number = 0
 ) => {
+  if (inputTokens + outputTokens === 0) {
+    return 0;
+  }
+
   if (isValidLLMModel(model)) {
     return (
       (LLM_TOKEN_COSTS[model].input * inputTokens +
@@ -135,7 +142,7 @@ export const FORMAT_NUMBER_NO_DECIMALS = new Intl.NumberFormat('en-US', {
 });
 
 // Number formatting function that formats numbers in the thousands and millions with 3 sigfigs
-export const formatTokenCount = (num: number): string => {
+export const formatTokenCount = (num: number = 0): string => {
   if (num < 10000) {
     return FORMAT_NUMBER_NO_DECIMALS.format(num);
   } else if (num >= 10000 && num < 1000000) {
@@ -148,7 +155,7 @@ export const formatTokenCount = (num: number): string => {
   return parseFloat(millions).toString() + 'm';
 };
 
-export const formatTokenCost = (cost: number): string => {
+export const formatTokenCost = (cost: number = 0): string => {
   if (cost === 0) {
     return '$0.00';
   } else if (cost < 0.01) {
