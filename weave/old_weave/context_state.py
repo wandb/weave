@@ -3,8 +3,10 @@ import contextvars
 import dataclasses
 import typing
 
+from weave.old_weave import server_interface
+
 if typing.TYPE_CHECKING:
-    from weave import server_interface, uris
+    from weave import uris
     from weave.old_weave import client_interface
     from weave.old_weave.graph_client import GraphClient
 
