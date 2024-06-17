@@ -200,6 +200,33 @@ def test_feedback_apis(client):
         client.server.feedback_purge(req)
 
 
+def test_feedback_payload(client):
+
+    project_id = client._project_id()
+
+    # Emoji from Jamie
+    req = tsi.FeedbackCreateReq(
+        project_id=project_id,
+        wb_user_id="VXNlcjo0NTI1NDQ=",
+        weave_ref="weave:///entity/project/object/name:digest",
+        feedback_type="wandb.reaction.1",
+        payload={"emoji": "🎱"},
+    )
+    res = client.server.feedback_create(req)
+    assert len(res.id) == 36
+    assert res.payload["alias"] == ":pool_8_ball:"
+    id_emoji_1 = res.id
+
+    # Try querying on the published feedback
+    req = tsi.FeedbackQueryReq(
+        project_id=project_id,
+    )
+    res = client.server.feedback_query(req)
+    payload = res.result[0]["payload"]
+    assert isinstance(payload, dict)
+    assert payload["emoji"] == "🎱"
+
+
 def test_feedback_create_too_large(client):
 
     project_id = client._project_id()

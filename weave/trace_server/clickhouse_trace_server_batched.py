@@ -996,7 +996,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "wb_user_id": req.wb_user_id,
             "creator": req.creator,
             "feedback_type": req.feedback_type,
-            "payload": payload,
+            "payload": req.payload,
             "created_at": created_at,
         }
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")

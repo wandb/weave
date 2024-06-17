@@ -3,19 +3,17 @@ sidebar_position: 1
 hide_table_of_contents: true
 ---
 
-# Quickstart
+# Quickstart: Track inputs & outputs of LLM calls
 
-<a target="_blank" href="http://wandb.me/weave_colab">
-  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
-</a>
+Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-## Installation
+## 1. Install Python library.
+```python
+pip install weave
+```
+Weave currently requires Python 3.9+.
 
-Weave requires Python 3.9+.
-
-`pip install weave`
-
-## Track inputs & outputs of functions
+## 2. Log a trace to a new project
 
 - Import weave
 - Call `weave.init('project-name')` to start logging
@@ -58,12 +56,13 @@ sentence = "There are many fruits that were found on the recently discovered pla
 extract_fruit(sentence)
 ```
 
-Now, every time you call this function, weave will automatically capture the input & output data and log any changes to the code.
-Run this application and your console will output a link to view it within W&B.
-
 :::note
 Calls made with the openai library are automatically tracked with weave but you can add other LLMs easily by wrapping them with `@weave.op()`
 :::
+
+## 3. See traces of your application in your project
+🎉 Congrats! Now, every time you call this function, weave will automatically capture the input & output data and log any changes to the code.
+Run this application and your console will output a link to view it within W&B.
 
 ## What's next?
 

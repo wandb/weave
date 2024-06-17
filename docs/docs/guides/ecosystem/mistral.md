@@ -66,3 +66,47 @@ cheese_recommender(region="Netherlands", model="mistral-large-latest")
 
 [![mistral_ops.png](imgs/mistral_ops.png)](https://wandb.ai/capecape/mistralai_project/weave/calls)
 
+## Create a `Model` for easier experimentation
+
+Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
+
+In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](/guides/core-types/evaluations)s.
+
+In the example below, you can experiment with `model` and `country`. Every time you change one of these, you'll get a new _version_ of `CheeseRecommender`. 
+
+```python
+import weave
+import mistralai
+
+weave.init("mistralai_project")
+
+class CheeseRecommender(weave.Model): # Change to `weave.Model`
+    model: str
+    temperature: float
+
+    @weave.op()
+    def predict(self, region:str) -> str: # Change to `predict`
+        "Recommend the best cheese in a given region"
+        
+        client = MistralClient()
+
+        messages = [ChatMessage(
+            role="user", 
+            content=f"What is the best cheese in {region}?")]
+
+        chat_response = client.chat(
+            model=model,
+            messages=messages,
+            temperature=self.temperature
+        )
+        return chat_response.choices[0].message.content
+
+cheese_model = CheeseRecommender(
+    model="mistral-medium-latest",
+    temperature=0.0
+    )
+result = cheese_model.predict(region="France")
+print(result)
+```
+
+[![mistral_model.png](imgs/mistral_model.png)](https://wandb.ai/capecape/mistralai_project/weave/models)
