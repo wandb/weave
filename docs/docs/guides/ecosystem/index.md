@@ -4,4 +4,4 @@ The Weave ecosystem contains automatic logging integrations for popular AI libra
 
 - [openai](/guides/ecosystem/openai): the `openai` library.
 - [mistralai](/guides/ecosystem/mistral): the `mistralai` library.
-
+- [crewai](/guides/ecosystem/crewai): the `crewai` library.
