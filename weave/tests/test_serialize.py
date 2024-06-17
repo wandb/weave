@@ -1,12 +1,12 @@
 import pytest
 
 import weave
-from weave.old_weave import graph, op_args, ops
+from weave import api, registry_mem, weave_internal
+from weave import weave_types as types
+from weave.old_weave import graph, op_args, ops, serialize
 from weave.old_weave.ops_primitives import list_
+from weave.weave_internal import make_const_node
 
-from .. import api, registry_mem, serialize, weave_internal
-from .. import weave_types as types
-from ..weave_internal import make_const_node
 from . import fixture_fakewandb as fwb
 
 response = {

@@ -19,13 +19,14 @@ from weave.old_weave import (
     execute,
     gql_json_cache,
     graph,
+    serialize,
     value_or_error,
     wandb_api,
 )
 from weave.old_weave.language_features.tagging import tag_store
 from weave.old_weave.language_features.tagging.tag_store import isolated_tagging_context
 
-from . import engine_trace, logs, serialize, storage, util, weave_types
+from . import engine_trace, logs, storage, util, weave_types
 
 # A function to monkeypatch the request post method
 # def patch_request_post():

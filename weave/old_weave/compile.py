@@ -9,7 +9,6 @@ from weave import (
     engine_trace,
     errors,
     registry_mem,
-    serialize,
     stitch,
     weave_internal,
 )
@@ -28,6 +27,7 @@ from weave.old_weave import (
     op_args,
     partial_object,
     propagate_gql_keys,
+    serialize,
     value_or_error,
 )
 from weave.old_weave.language_features.tagging import tagged_value_type_helpers
@@ -489,7 +489,7 @@ def compile_dedupe(
     nodes: dict[str, graph.Node] = {}
 
     def _dedupe(node: graph.Node) -> graph.Node:
-        from weave import serialize
+        from weave.old_weave import serialize
 
         node_id = serialize.node_id(node)
         if node_id in nodes:

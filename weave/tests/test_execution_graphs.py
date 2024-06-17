@@ -1,9 +1,11 @@
-from weave import serialize, storage
-from weave.server import handle_request
 import base64
-import zlib
 import json
 import os
+import zlib
+
+from weave import storage
+from weave.old_weave import serialize
+from weave.server import handle_request
 
 
 def test_graph_playback(dev_only_admin_env_override):

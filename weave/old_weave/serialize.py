@@ -2,21 +2,14 @@
 # needlessly adds an entry for nodes and ops. It'd be simpler to just encode
 # nodes and inline the ops in their respective output nodes.
 
-import typing
 import hashlib
 import json
 import random
+import typing
 
-from weave.old_weave import value_or_error
-
-
-from weave.old_weave import graph
-from . import weave_types as types
-from . import errors
-from . import weave_internal
-from . import storage
-from weave.old_weave import memo
-
+from weave import errors, storage, weave_internal
+from weave import weave_types as types
+from weave.old_weave import graph, memo, value_or_error
 
 NodeOrOp = typing.Union[graph.Node, graph.Op]
 
