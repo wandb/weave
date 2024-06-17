@@ -6,17 +6,15 @@ import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import SymbolPatcher, MultiPatcher
 
-from anthropic.types import (
-    Message,
-    Usage,
-    ContentBlockDeltaEvent,
-    InputJsonDelta,
-    MessageDeltaEvent,
-    TextBlock,
-)
-
 if typing.TYPE_CHECKING:
-    from anthropic.types import Message, MessageStreamEvent
+    from anthropic.types import (
+        Message,
+        Usage,
+        ContentBlockDeltaEvent,
+        MessageStreamEvent,
+        MessageDeltaEvent,
+        TextBlock,
+    )
 
 
 def anthropic_accumulator(
