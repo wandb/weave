@@ -2,16 +2,6 @@ import weave.trace_server.trace_server_interface as tsi
 
 
 def test_client_feedback(client) -> None:
-
-    # Patch feedback_create to set wb_user_id
-    original_feedback_create = client.server.feedback_create
-
-    def patched_create(req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        req.wb_user_id = "test-user-id"
-        return original_feedback_create(req)
-
-    client.server.feedback_create = patched_create
-
     feedbacks = client.feedback()
     assert len(feedbacks) == 0
 
