@@ -1,6 +1,7 @@
 # WeaveJS ops used for testing. These are not used in production.
 
 from weave.old_weave import graph
+from weave.old_weave._dict_utils import typeddict_pick_output_type
 from weave.old_weave.language_features.tagging import tagged_value_type
 from weave.old_weave.language_features.tagging.tagging_op_logic import (
     op_get_tag_type_resolver,
@@ -9,7 +10,6 @@ from weave.old_weave.language_features.tagging.tagging_op_logic import (
 
 from .. import weave_internal
 from .. import weave_types as types
-from .._dict_utils import typeddict_pick_output_type
 
 
 def ensure_node(v):

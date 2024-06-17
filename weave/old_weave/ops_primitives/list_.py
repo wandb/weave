@@ -8,8 +8,8 @@ import pandas as pd
 
 from weave import box, errors, storage
 from weave import weave_types as types
-from weave._dict_utils import tag_aware_dict_val_for_escaped_key
 from weave.old_weave import execute_fast
+from weave.old_weave._dict_utils import tag_aware_dict_val_for_escaped_key
 from weave.old_weave.decorator_class import weave_class
 from weave.old_weave.decorator_op import op
 from weave.old_weave.graph import Node

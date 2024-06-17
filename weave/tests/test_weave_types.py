@@ -3,12 +3,13 @@ import dataclasses
 import pytest
 
 import weave
+import weave.old_weave
 import weave.weave_types
-from weave.old_weave import runs
+from weave.old_weave import _dict_utils, runs
 from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.old_weave.ops_domain import wbmedia
 
-from .. import _dict_utils, errors
+from .. import errors
 from .. import weave_types as types
 
 

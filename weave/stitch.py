@@ -25,8 +25,9 @@ import typing
 from weave.old_weave import graph, op_def
 from weave.old_weave.language_features.tagging import opdef_util
 
-from . import _dict_utils, errors, registry_mem
+from . import errors, registry_mem
 from . import weave_types as types
+from .old_weave import _dict_utils
 
 
 @dataclasses.dataclass

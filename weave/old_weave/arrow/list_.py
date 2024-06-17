@@ -11,7 +11,6 @@ import pyarrow.compute as pc
 import typing_extensions
 
 from weave import (
-    _dict_utils,
     box,
     context_state,
     errors,
@@ -21,7 +20,14 @@ from weave import (
     weave_internal,
 )
 from weave import weave_types as types
-from weave.old_weave import artifact_base, debug_types, graph, op_def, op_def_type
+from weave.old_weave import (
+    _dict_utils,
+    artifact_base,
+    debug_types,
+    graph,
+    op_def,
+    op_def_type,
+)
 from weave.old_weave.arrow.arrow import (
     ArrowWeaveListType,
     arrow_as_array,

@@ -1,7 +1,7 @@
 import typing
 
 from weave import weave_types as types
-from weave._dict_utils import typeddict_pick_output_type
+from weave.old_weave._dict_utils import typeddict_pick_output_type
 from weave.old_weave.decorator_class import weave_class
 from weave.old_weave.decorator_op import op
 from weave.old_weave.language_features.tagging import tagged_value_type

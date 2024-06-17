@@ -3,8 +3,8 @@ import typing
 import numpy as np
 import pyarrow as pa
 
-from weave import _dict_utils
 from weave import weave_types as types
+from weave.old_weave import _dict_utils
 from weave.old_weave.arrow import convert
 from weave.old_weave.arrow.arrow import arrow_as_array, offsets_starting_at_zero
 from weave.old_weave.arrow.arrow_tags import direct_add_arrow_tags
