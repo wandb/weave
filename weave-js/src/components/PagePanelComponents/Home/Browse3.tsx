@@ -1,4 +1,3 @@
-import {LinearProgress} from '@material-ui/core';
 import {Home} from '@mui/icons-material';
 import {
   AppBar,
@@ -19,7 +18,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useState,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
@@ -30,8 +28,6 @@ import {
   useParams,
 } from 'react-router-dom';
 
-import {MOON_200} from '../../../common/css/color.styles';
-import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
@@ -55,9 +51,10 @@ import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
+import {Empty} from './Browse3/pages/common/Empty';
+import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
-import {CompareCallsPage} from './Browse3/pages/CompareCallsPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectsPage} from './Browse3/pages/ObjectsPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
@@ -68,15 +65,12 @@ import {OpVersionPage} from './Browse3/pages/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
-import {TypePage} from './Browse3/pages/TypePage';
-import {TypesPage} from './Browse3/pages/TypesPage';
-import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
-import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
+import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -130,7 +124,6 @@ const tabOptions = [
   'calls',
   'boards',
   'tables',
-  'compare-calls',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -180,15 +173,7 @@ const Browse3Mounted: FC<{
   navigateAwayFromProject?: () => void;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
-  const weaveContext = useWeaveContext();
-  const [weaveLoading, setWeaveLoading] = useState(false);
-  useEffect(() => {
-    const obs = weaveContext.client.loadingObservable();
-    const sub = obs.subscribe(loading => {
-      setWeaveLoading(loading);
-    });
-    return () => sub.unsubscribe();
-  }, [weaveContext.client]);
+  const hasTSContext = useHasTraceServerClientContext();
   return (
     <Box
       sx={{
@@ -197,16 +182,6 @@ const Browse3Mounted: FC<{
         overflow: 'auto',
         flexDirection: 'column',
       }}>
-      {weaveLoading && (
-        <Box
-          sx={{
-            width: '100%',
-            position: 'absolute',
-            zIndex: 2,
-          }}>
-          <LinearProgress />
-        </Box>
-      )}
       {!props.hideHeader && (
         <AppBar
           sx={{
@@ -242,22 +217,9 @@ const Browse3Mounted: FC<{
         <Route path={baseRouter.projectUrl(':entity', ':project')} exact>
           <ProjectRedirect />
         </Route>
-        <Route
-          path={browse3Paths(baseRouter.projectUrl(':entity', ':project'))}>
-          <Box
-            component="main"
-            sx={{
-              flex: '1 1 auto',
-              height: '100%',
-              width: '100%',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'row',
-            }}>
-            <SideNav />
-            {/* <RouteAwareBrowse3ProjectSideNav
-              navigateAwayFromProject={props.navigateAwayFromProject}
-            /> */}
+        {hasTSContext ? (
+          <Route
+            path={browse3Paths(baseRouter.projectUrl(':entity', ':project'))}>
             <Box
               component="main"
               sx={{
@@ -266,14 +228,31 @@ const Browse3Mounted: FC<{
                 width: '100%',
                 overflow: 'hidden',
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: 'row',
               }}>
-              <ErrorBoundary>
-                <MainPeekingLayout />
-              </ErrorBoundary>
+              <SideNav />
+              {/* <RouteAwareBrowse3ProjectSideNav
+              navigateAwayFromProject={props.navigateAwayFromProject}
+            /> */}
+              <Box
+                component="main"
+                sx={{
+                  flex: '1 1 auto',
+                  height: '100%',
+                  width: '100%',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}>
+                <ErrorBoundary>
+                  <MainPeekingLayout />
+                </ErrorBoundary>
+              </Box>
             </Box>
-          </Box>
-        </Route>
+          </Route>
+        ) : (
+          <Empty {...EMPTY_NO_TRACE_SERVER} />
+        )}
 
         <Route>
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
@@ -354,9 +333,8 @@ const MainPeekingLayout: FC = () => {
               zIndex: 1,
               width: `${drawerWidthPct}%`,
               height: '100%',
-              boxShadow:
-                'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
-              borderLeft: `1px solid ${MOON_200}`,
+              boxShadow: '0px 0px 40px 0px rgba(0, 0, 0, 0.16)',
+              borderLeft: 0,
               position: 'absolute',
             },
           }}
@@ -367,11 +345,10 @@ const MainPeekingLayout: FC = () => {
             id="dragger"
             onMouseDown={handleMousedown}
             style={{
-              borderTop: '1px solid #ddd',
               position: 'absolute',
               inset: '0 auto 0 0',
               zIndex: 2,
-              backgroundColor: '#f4f7f9',
+              backgroundColor: 'transparent',
               cursor: 'col-resize',
               width: '5px',
             }}
@@ -453,19 +430,6 @@ const Browse3ProjectRoot: FC<{
         overflowX: 'hidden',
       }}>
       <Switch location={customLocation}>
-        {/* TYPES */}
-        <Route path={`${projectRoot}/types/:itemName/versions/:version?`}>
-          <TypeVersionRoutePageBinding />
-        </Route>
-        <Route path={`${projectRoot}/types/:itemName`}>
-          <TypePageBinding />
-        </Route>
-        <Route path={`${projectRoot}/types`}>
-          <TypesPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/type-versions`}>
-          <TypeVersionsPageBinding />
-        </Route>
         {/* OBJECTS */}
         <Route
           path={`${projectRoot}/objects/:itemName/versions/:version?/:refExtra*`}>
@@ -518,9 +482,6 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/compare-calls`}>
-          <CompareCallsBinding />
         </Route>
       </Switch>
     </Box>
@@ -601,40 +562,6 @@ const OpVersionRoutePageBinding = () => {
   );
 };
 
-// TODO(tim/weaveflow_improved_nav): Generalize this
-const TypeVersionRoutePageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
-
-  const history = useHistory();
-  const routerContext = useWeaveflowCurrentRouteContext();
-  useEffect(() => {
-    if (!params.version) {
-      history.replace(
-        routerContext.typeUIUrl(params.entity, params.project, params.itemName)
-      );
-    }
-  }, [
-    history,
-    params.version,
-    params.entity,
-    params.project,
-    params.itemName,
-    routerContext,
-  ]);
-
-  if (!params.version) {
-    return <>Redirecting...</>;
-  }
-  return (
-    <TypeVersionPage
-      entity={params.entity}
-      project={params.project}
-      typeName={params.itemName}
-      version={params.version}
-    />
-  );
-};
-
 const useCallPeekRedirect = () => {
   // This is a "hack" since the client doesn't have all the info
   // needed to make a correct peek URL. This allows the client to request
@@ -696,32 +623,6 @@ const CallPageBinding = () => {
       project={params.project}
       callId={params.itemName}
       path={query[PATH_PARAM]}
-    />
-  );
-};
-
-const CompareCallsBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
-  const query = useURLSearchParamsDict();
-  const compareSpec = useMemo(() => {
-    const callIds = JSON.parse(query.callIds);
-    const primaryDim = query.primaryDim;
-    const secondaryDim = query.secondaryDim;
-
-    return {
-      callIds,
-      primaryDim,
-      secondaryDim,
-    };
-  }, [query.callIds, query.primaryDim, query.secondaryDim]);
-
-  return (
-    <CompareCallsPage
-      entity={params.entity}
-      project={params.project}
-      callIds={compareSpec.callIds}
-      primaryDim={compareSpec.primaryDim}
-      secondaryDim={compareSpec.secondaryDim}
     />
   );
 };
@@ -789,42 +690,6 @@ const ObjectVersionsPageBinding = () => {
   );
   return (
     <ObjectVersionsPage
-      entity={params.entity}
-      project={params.project}
-      initialFilter={filters}
-      onFilterUpdate={onFilterUpdate}
-    />
-  );
-};
-
-// TODO(tim/weaveflow_improved_nav): Generalize this
-const TypeVersionsPageBinding = () => {
-  const params = useParams<Browse3TabParams>();
-
-  const query = useURLSearchParamsDict();
-  const filters = useMemo(() => {
-    if (query.filter === undefined) {
-      return {};
-    }
-    try {
-      return JSON.parse(query.filter);
-    } catch (e) {
-      console.log(e);
-      return {};
-    }
-  }, [query.filter]);
-  const history = useHistory();
-  const routerContext = useWeaveflowCurrentRouteContext();
-  const onFilterUpdate = useCallback(
-    filter => {
-      history.push(
-        routerContext.typeVersionsUIUrl(params.entity, params.project, filter)
-      );
-    },
-    [history, params.entity, params.project, routerContext]
-  );
-  return (
-    <TypeVersionsPage
       entity={params.entity}
       project={params.project}
       initialFilter={filters}
@@ -904,24 +769,6 @@ const OpPageBinding = () => {
       opName={params.itemName}
     />
   );
-};
-
-const TypePageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
-
-  return (
-    <TypePage
-      entity={params.entity}
-      project={params.project}
-      typeName={params.itemName}
-    />
-  );
-};
-
-const TypesPageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
-
-  return <TypesPage entity={params.entity} project={params.project} />;
 };
 
 const OpsPageBinding = () => {

@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Union, Callable, Optional, Tuple, Any
+from typing import Union, Callable, Optional, Tuple, Any, Sequence
 import weave
 from weave.trace.isinstance import weave_isinstance
 from weave.flow.obj import Object
@@ -14,6 +14,14 @@ class Scorer(Object):
     @weave.op()
     def summarize(self, score_rows: WeaveList) -> Optional[dict]:
         return auto_summarize(score_rows)
+
+
+def stderr(data: Sequence[Union[int, float]]) -> float:
+    if len(data) > 1:
+        sample_variance = np.var(data, ddof=1)
+        return float(np.sqrt(sample_variance / len(data)))
+    else:
+        return 0
 
 
 def auto_summarize(data: WeaveList) -> Optional[dict]:
@@ -46,10 +54,16 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
         }
     elif data.is_boolean():
         valid_data = [x for x in data if x is not None]
-        count_true = valid_data.count(True)
+        count_true = list(valid_data).count(True)
+        int_data = [int(x) for x in valid_data]
+        sample_mean = np.mean(int_data) if int_data else 0
+        # standard error
+        # sample_variance = np.var(int_data) if int_data else 0
+        # sample_error = np.sqrt(sample_variance / len(int_data)) if int_data else 0
         return {
             "true_count": count_true,
-            "true_fraction": count_true / len(valid_data) if valid_data else 0,
+            "true_fraction": sample_mean,
+            # "stderr": stderr(int_data),
             # "none_fraction": (len(data) - len(valid_data)) / len(data),
         }
     elif data.is_dict():

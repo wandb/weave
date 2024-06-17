@@ -3,6 +3,10 @@ import pytest
 import weave
 import os
 
+import weave.context_state
+import weave.wandb_api
+import weave.weave_init
+
 
 def test_create_list_rename_delete():
     os.environ["WEAVE_CACHE_MODE"] = "minimal"
@@ -28,3 +32,23 @@ def test_create_list_rename_delete():
     weave.ops.delete_artifact(art_node)
     arts = weave.use(weave.ops.local_artifacts())
     assert len(arts) == 0
+
+
+def test_weave_finish_unsets_client(client):
+    @weave.op
+    def foo():
+        return 1
+
+    weave.context_state._graph_client.set(None)
+    weave.weave_init._current_inited_client = weave.weave_init.InitializedClient(client)
+    weave_client = weave.weave_init._current_inited_client.client
+    assert weave.weave_init._current_inited_client is not None
+
+    foo()
+    assert len(list(weave_client.calls())) == 1
+
+    weave.finish()
+
+    foo()
+    assert len(list(weave_client.calls())) == 1
+    assert weave.weave_init._current_inited_client is None

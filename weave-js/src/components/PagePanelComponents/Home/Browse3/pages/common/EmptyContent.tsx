@@ -2,6 +2,7 @@ import React from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {EmptyProps} from './Empty';
+import {Link} from './Links';
 
 export const EMPTY_PROPS_TRACES: EmptyProps = {
   icon: 'layout-tabs' as const,
@@ -26,16 +27,16 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
 export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   icon: 'type-boolean' as const,
   heading: 'No evaluations yet',
-  description: 'Use evaluations to track model performance across datasets.',
+  description: 'Use evaluations to track the performance of your application.',
   moreInformation: (
     <>
       Learn{' '}
       <TargetBlank href="https://wandb.me/weave_evals">
         evaluation basics
       </TargetBlank>{' '}
-      or see how you can{' '}
+      or follow our tutorial to{' '}
       <TargetBlank href="http://wandb.me/weave_eval_tut">
-        use models an evaluation pipeline
+        set up an evaluation pipeline
       </TargetBlank>
       .
     </>
@@ -114,6 +115,20 @@ export const EMPTY_PROPS_OBJECTS: EmptyProps = {
         object basics
       </TargetBlank>
       .
+    </>
+  ),
+};
+
+export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
+  icon: 'weave' as const,
+  heading: 'Weave coming soon!',
+  description:
+    'Weave is a lightweight toolkit for tracking and evaluating LLM applications.',
+  moreInformation: (
+    <>
+      Learn about{' '}
+      <TargetBlank href="https://wandb.me/weave">Weave features</TargetBlank> or
+      return to <Link to="..">your project homepage</Link>.
     </>
   ),
 };

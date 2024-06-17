@@ -1,6 +1,8 @@
 import * as path from 'path';
 import pkg from 'lodash';
-import {visit} from 'ast-types';
+import {visit, Type} from 'ast-types';
+
+Type.def('StaticBlock').finalize();
 
 const {sortBy} = pkg;
 
@@ -159,7 +161,6 @@ const ALLOWED_CJS_MODULES = [
   'react-is',
   'react-measure',
   'react-string-replace',
-  'react-table',
   'react-textarea-autosize',
   'react-use-measure',
   'react-virtualized-auto-sizer',
@@ -265,6 +266,7 @@ const ALLOWED_CJS_MODULES = [
   'lowlight/lib/core',
   'refractor',
   'refractor/core',
+  'yet-another-react-lightbox',
 ];
 
 const repositoryRoot = path.dirname(path.dirname(__dirname));

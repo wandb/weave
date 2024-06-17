@@ -1,5 +1,5 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import {Box, ListItemText, MenuList} from '@mui/material';
+import {Box, ListItemText, MenuList, SxProps, Theme} from '@mui/material';
 // import {Menu} from '@mui/base/Menu';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
@@ -8,7 +8,6 @@ import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
   createContext,
-  CSSProperties,
   FC,
   MouseEvent,
   ReactNode,
@@ -42,6 +41,7 @@ export const SimplePageLayout: FC<{
   }>;
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
+  headerExtra?: ReactNode;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -118,6 +118,7 @@ export const SimplePageLayout: FC<{
           </Box>
           {simplePageLayoutContextValue.headerSuffix}
         </Box>
+        {props.headerExtra}
         {(!props.hideTabsIfSingle || tabs.length > 1) && (
           <Tabs.Root
             value={tabs[tabValue].label}
@@ -248,7 +249,7 @@ export const SimplePageLayoutWithHeader: FC<{
         {props.headerExtra}
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
-      <div style={{marginLeft: 4, flex: '1 1 auto', overflow: 'hidden'}}>
+      <div style={{flex: '1 1 auto', overflow: 'hidden'}}>
         <SplitPanel
           minWidth={150}
           defaultWidth={200}
@@ -358,7 +359,7 @@ const ActionMenu: FC<{
 };
 
 export const ScrollableTabContent: FC<{
-  sx?: CSSProperties;
+  sx?: SxProps<Theme>;
 }> = props => {
   return (
     <Box

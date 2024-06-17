@@ -1,11 +1,11 @@
+import Box from '@mui/material/Box';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
-import {
-  WeaveEditor,
-  WeaveEditorSourceContext,
-} from '../../Browse2/WeaveEditors';
-import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
+import {LoadingDots} from '../../../../LoadingDots';
+import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
+import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
+import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
 import {
   CallLink,
   CallsLink,
@@ -66,13 +66,11 @@ export const ObjectVersionPage: React.FC<{
 const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
-  const {useRootObjectVersions, useCalls} = useWFHooks();
-  const objectVersionHash = objectVersion.versionHash;
+  const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
-  const objectFilePath = objectVersion.path;
   const refExtra = objectVersion.refExtra;
   const objectVersions = useRootObjectVersions(entityName, projectName, {
     objectIds: [objectName],
@@ -95,6 +93,31 @@ const ObjectVersionPageInner: React.FC<{
   const consumingCalls = useCalls(entityName, projectName, {
     inputObjectVersionRefs: [refUri],
   });
+  const showCallsTab =
+    !(producingCalls.loading || consumingCalls.loading) &&
+    (producingCalls.result?.length ?? 0) +
+      (consumingCalls.result?.length ?? 0) >
+      0;
+  const data = useRefsData([refUri]);
+  const viewerData = useMemo(() => {
+    if (data.loading) {
+      return {};
+    }
+    return data.result?.[0] ?? {};
+  }, [data.loading, data.result]);
+
+  const viewerDataAsObject = useMemo(() => {
+    const dataIsPrimitive =
+      typeof viewerData !== 'object' ||
+      viewerData === null ||
+      Array.isArray(viewerData);
+    if (dataIsPrimitive) {
+      // _result is a special key that is automatically removed by the
+      // ObjectViewerSection component.
+      return {_result: viewerData};
+    }
+    return viewerData;
+  }, [viewerData]);
 
   return (
     <SimplePageLayoutWithHeader
@@ -104,18 +127,25 @@ const ObjectVersionPageInner: React.FC<{
           data={{
             [refExtra ? 'Parent Object' : 'Name']: (
               <>
-                {objectName} [
-                <ObjectVersionsLink
-                  entity={entityName}
-                  project={projectName}
-                  filter={{
-                    objectName,
-                  }}
-                  versionCount={objectVersionCount}
-                  neverPeek
-                  variant="secondary"
-                />
-                ]
+                {objectName}{' '}
+                {objectVersions.loading ? (
+                  <LoadingDots />
+                ) : (
+                  <>
+                    [
+                    <ObjectVersionsLink
+                      entity={entityName}
+                      project={projectName}
+                      filter={{
+                        objectName,
+                      }}
+                      versionCount={objectVersionCount}
+                      neverPeek
+                      variant="secondary"
+                    />
+                    ]
+                  </>
+                )}
               </>
             ),
             Version: <>{objectVersionIndex}</>,
@@ -128,7 +158,6 @@ const ObjectVersionPageInner: React.FC<{
                   ),
                 }
               : {}),
-
             ...(refExtra
               ? {
                   Subpath: refExtra,
@@ -142,32 +171,6 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            ...((producingCalls.result?.length ?? 0) > 0
-              ? {
-                  [maybePluralizeWord(
-                    producingCalls.result!.length,
-                    'Producing Call'
-                  )]: (
-                    <ObjectVersionProducingCallsItem
-                      producingCalls={producingCalls.result!}
-                      refUri={refUri}
-                    />
-                  ),
-                }
-              : {}),
-            ...((consumingCalls.result?.length ?? 0) > 0
-              ? {
-                  [maybePluralizeWord(
-                    consumingCalls.result!.length,
-                    'Consuming Call'
-                  )]: (
-                    <ObjectVersionConsumingCallsItem
-                      consumingCalls={consumingCalls.result!}
-                      refUri={refUri}
-                    />
-                  ),
-                }
-              : {}),
           }}
         />
       }
@@ -201,24 +204,26 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Values',
           content: (
-            <WeaveEditorSourceContext.Provider
-              key={refUri}
-              value={{
-                entityName,
-                projectName,
-                objectName,
-                objectVersionHash,
-                filePath: objectFilePath,
-                refExtra: refExtra?.split('/'),
-              }}>
-              <ScrollableTabContent>
-                <WeaveEditor
-                  objType={objectName}
-                  objectRefUri={refUri}
-                  disableEdits
-                />
-              </ScrollableTabContent>
-            </WeaveEditorSourceContext.Provider>
+            <ScrollableTabContent sx={{pb: 0}}>
+              <Box
+                sx={{
+                  flex: '0 0 auto',
+                  height: '100%',
+                }}>
+                {data.loading ? (
+                  <CenteredAnimatedLoader />
+                ) : (
+                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                    <ObjectViewerSection
+                      title=""
+                      data={viewerDataAsObject}
+                      noHide
+                      isExpanded
+                    />
+                  </WeaveCHTableSourceRefContext.Provider>
+                )}
+              </Box>
+            </ScrollableTabContent>
           ),
         },
         {
@@ -291,6 +296,47 @@ const ObjectVersionPageInner: React.FC<{
         //     />
         //   ),
         // },
+        ...(showCallsTab
+          ? [
+              {
+                label: 'Calls',
+                content: (
+                  <Box sx={{p: 2}}>
+                    <SimpleKeyValueTable
+                      data={{
+                        ...(producingCalls.result!.length > 0
+                          ? {
+                              [maybePluralizeWord(
+                                producingCalls.result!.length,
+                                'Producing Call'
+                              )]: (
+                                <ObjectVersionProducingCallsItem
+                                  producingCalls={producingCalls.result ?? []}
+                                  refUri={refUri}
+                                />
+                              ),
+                            }
+                          : {}),
+                        ...(consumingCalls.result!.length
+                          ? {
+                              [maybePluralizeWord(
+                                consumingCalls.result!.length,
+                                'Consuming Call'
+                              )]: (
+                                <ObjectVersionConsumingCallsItem
+                                  consumingCalls={consumingCalls.result ?? []}
+                                  refUri={refUri}
+                                />
+                              ),
+                            }
+                          : {}),
+                      }}
+                    />
+                  </Box>
+                ),
+              },
+            ]
+          : []),
       ]}
     />
   );

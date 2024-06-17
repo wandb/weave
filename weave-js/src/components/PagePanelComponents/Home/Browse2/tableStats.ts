@@ -1,7 +1,6 @@
 import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
 import stringify from 'json-stable-stringify';
 import _ from 'lodash';
-import {useState} from 'react';
 
 import {isRef} from '../Browse3/pages/common/util';
 
@@ -51,7 +50,12 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
   };
 
   // Determine set of possible columns and value types
-  const colPatterns: RegExp[] = [/opCategory/, /input\.*/, /output\.*/];
+  const colPatterns: RegExp[] = [
+    /^userId$/,
+    /^opCategory$/,
+    /^inputs\..*$/,
+    /^output\..*$/,
+  ];
   for (const row of table) {
     stats.rowCount++;
     for (const colName of Object.keys(row)) {
@@ -109,19 +113,18 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
   return stats;
 };
 
-export const useColumnVisibility = (tableStats: TableStats) => {
-  const [forceShowAll, setForceShowAll] = useState(false);
+export const useColumnVisibility = (
+  tableStats: TableStats,
+  isSingleOpVersion: boolean
+) => {
   const boringColumns = getBoringColumns(tableStats);
 
   const model: GridColumnVisibilityModel = {};
   for (const colName in tableStats.column) {
-    if (forceShowAll) {
-      // This will include columns that are entirely empty,
-      // but that seemed less confusing than a "Show all" not actually
-      // showing all?
-      model[colName] = true;
-    } else if (boringColumns.includes(colName)) {
+    if (boringColumns.includes(colName)) {
       model[colName] = false;
+    } else if (isSingleOpVersion) {
+      model[colName] = true;
     } else {
       const colStats = tableStats.column[colName];
       if (colStats.typeCounts.null === tableStats.rowCount) {
@@ -137,15 +140,13 @@ export const useColumnVisibility = (tableStats: TableStats) => {
   return {
     allShown,
     columnVisibilityModel: model,
-    forceShowAll,
-    setForceShowAll,
   };
 };
 
 export const getInputColumns = (tableStats: TableStats): string[] => {
   return Object.keys(tableStats.column)
-    .filter(colName => colName.startsWith('input.'))
-    .map(colName => colName.substring(6));
+    .filter(colName => colName.startsWith('inputs.'))
+    .map(colName => colName.substring(7));
 };
 
 // Get a list of "boring" columns.

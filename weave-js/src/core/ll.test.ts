@@ -373,18 +373,20 @@ describe('ll', () => {
     return expect(results).toEqual([2, 42.9]);
   });
 
-  it('ui sim', done => {
+  it('ui sim', () => {
     const entityName = constString('shawn');
     const projectName = constString('fasion-sweep');
     const project = opRootProject({entityName, projectName});
     const runs = opProjectRuns({project});
     const runsCount = opCount({arr: runs as any});
 
-    testClient().then(client => {
-      const obs = client.subscribe(runsCount);
-      obs.subscribe(result => {
-        expect(result).toEqual(2);
-        done();
+    return new Promise<void>(resolve => {
+      testClient().then(client => {
+        const obs = client.subscribe(runsCount);
+        obs.subscribe(result => {
+          expect(result).toEqual(2);
+          resolve();
+        });
       });
     });
   });
@@ -724,7 +726,7 @@ describe('ll', () => {
     };
     const findOp = node.fromOp;
     // Ensure the equality check in the predicate below works. It does as long
-    // as nothing upstream of findOp has alreayd been replaced.
+    // as nothing upstream of findOp has already been replaced.
     expect(
       mapNodes(node, n =>
         n.nodeType === 'output' && n.fromOp === findOp

@@ -1,6 +1,7 @@
 import React, {ElementType, SVGProps} from 'react';
 
 import {ReactComponent as ImportAddNew} from '../../assets/icons/icon-add-new.svg';
+import {ReactComponent as ImportAddReaction} from '../../assets/icons/icon-add-reaction.svg';
 import {ReactComponent as ImportAdminShieldSafe} from '../../assets/icons/icon-admin-shield-safe.svg';
 import {ReactComponent as ImportAmazonSagemaker} from '../../assets/icons/icon-amazon-sagemaker.svg';
 import {ReactComponent as ImportArea} from '../../assets/icons/icon-area.svg';
@@ -58,6 +59,7 @@ import {ReactComponent as ImportEmailAt} from '../../assets/icons/icon-email-at.
 import {ReactComponent as ImportEmailEnvelope} from '../../assets/icons/icon-email-envelope.svg';
 import {ReactComponent as ImportExpandRight} from '../../assets/icons/icon-expand-right.svg';
 import {ReactComponent as ImportExpandUncollapse} from '../../assets/icons/icon-expand-uncollapse.svg';
+import {ReactComponent as ImportExportShareUpload} from '../../assets/icons/icon-export-share-upload.svg';
 import {ReactComponent as ImportFacebookSocial} from '../../assets/icons/icon-facebook-social.svg';
 import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg';
 import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
@@ -165,6 +167,7 @@ import {ReactComponent as ImportRowHeightSmall} from '../../assets/icons/icon-ro
 import {ReactComponent as ImportRowHeightXlarge} from '../../assets/icons/icon-row-height-xlarge.svg';
 import {ReactComponent as ImportRun} from '../../assets/icons/icon-run.svg';
 import {ReactComponent as ImportRunningRepeat} from '../../assets/icons/icon-running-repeat.svg';
+import {ReactComponent as ImportSave} from '../../assets/icons/icon-save.svg';
 import {ReactComponent as ImportScikitLogo} from '../../assets/icons/icon-scikit-logo.svg';
 import {ReactComponent as ImportSearch} from '../../assets/icons/icon-search.svg';
 import {ReactComponent as ImportSelectMoveTool} from '../../assets/icons/icon-select-move-tool.svg';
@@ -198,6 +201,8 @@ import {ReactComponent as ImportTag} from '../../assets/icons/icon-tag.svg';
 import {ReactComponent as ImportTensorflowLogo} from '../../assets/icons/icon-tensorflow-logo.svg';
 import {ReactComponent as ImportTextLanguage} from '../../assets/icons/icon-text-language.svg';
 import {ReactComponent as ImportTextLanguageAlt} from '../../assets/icons/icon-text-language-alt.svg';
+import {ReactComponent as ImportThumbsDown} from '../../assets/icons/icon-thumbs-down.svg';
+import {ReactComponent as ImportThumbsUp} from '../../assets/icons/icon-thumbs-up.svg';
 import {ReactComponent as ImportTriangleDown} from '../../assets/icons/icon-triangle-down.svg';
 import {ReactComponent as ImportTriangleLeft} from '../../assets/icons/icon-triangle-left.svg';
 import {ReactComponent as ImportTriangleRight} from '../../assets/icons/icon-triangle-right.svg';
@@ -220,6 +225,7 @@ import {ReactComponent as ImportViewGlasses} from '../../assets/icons/icon-view-
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
 import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
+import {ReactComponent as ImportWeave} from '../../assets/icons/icon-weave.svg';
 import {ReactComponent as ImportWeaveGroupBoard} from '../../assets/icons/icon-weave-group-board.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
 import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt.svg';
@@ -242,6 +248,9 @@ const updateIconProps = (props: SVGIconProps) => {
 };
 export const IconAddNew = (props: SVGIconProps) => (
   <ImportAddNew {...updateIconProps(props)} />
+);
+export const IconAddReaction = (props: SVGIconProps) => (
+  <ImportAddReaction {...updateIconProps(props)} />
 );
 export const IconAdminShieldSafe = (props: SVGIconProps) => (
   <ImportAdminShieldSafe {...updateIconProps(props)} />
@@ -413,6 +422,9 @@ export const IconExpandRight = (props: SVGIconProps) => (
 );
 export const IconExpandUncollapse = (props: SVGIconProps) => (
   <ImportExpandUncollapse {...updateIconProps(props)} />
+);
+export const IconExportShareUpload = (props: SVGIconProps) => (
+  <ImportExportShareUpload {...updateIconProps(props)} />
 );
 export const IconFacebookSocial = (props: SVGIconProps) => (
   <ImportFacebookSocial {...updateIconProps(props)} />
@@ -735,6 +747,9 @@ export const IconRun = (props: SVGIconProps) => (
 export const IconRunningRepeat = (props: SVGIconProps) => (
   <ImportRunningRepeat {...updateIconProps(props)} />
 );
+export const IconSave = (props: SVGIconProps) => (
+  <ImportSave {...updateIconProps(props)} />
+);
 export const IconScikitLogo = (props: SVGIconProps) => (
   <ImportScikitLogo {...updateIconProps(props)} />
 );
@@ -834,6 +849,12 @@ export const IconTextLanguage = (props: SVGIconProps) => (
 export const IconTextLanguageAlt = (props: SVGIconProps) => (
   <ImportTextLanguageAlt {...updateIconProps(props)} />
 );
+export const IconThumbsDown = (props: SVGIconProps) => (
+  <ImportThumbsDown {...updateIconProps(props)} />
+);
+export const IconThumbsUp = (props: SVGIconProps) => (
+  <ImportThumbsUp {...updateIconProps(props)} />
+);
 export const IconTriangleDown = (props: SVGIconProps) => (
   <ImportTriangleDown {...updateIconProps(props)} />
 );
@@ -900,6 +921,9 @@ export const IconWarning = (props: SVGIconProps) => (
 export const IconWarningAlt = (props: SVGIconProps) => (
   <ImportWarningAlt {...updateIconProps(props)} />
 );
+export const IconWeave = (props: SVGIconProps) => (
+  <ImportWeave {...updateIconProps(props)} />
+);
 export const IconWeaveGroupBoard = (props: SVGIconProps) => (
   <ImportWeaveGroupBoard {...updateIconProps(props)} />
 );
@@ -921,6 +945,7 @@ export const IconZoomInTool = (props: SVGIconProps) => (
 
 const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'add-new': IconAddNew,
+  'add-reaction': IconAddReaction,
   'admin-shield-safe': IconAdminShieldSafe,
   'amazon-sagemaker': IconAmazonSagemaker,
   area: IconArea,
@@ -978,6 +1003,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'email-envelope': IconEmailEnvelope,
   'expand-right': IconExpandRight,
   'expand-uncollapse': IconExpandUncollapse,
+  'export-share-upload': IconExportShareUpload,
   'facebook-social': IconFacebookSocial,
   failed: IconFailed,
   'filter-alt': IconFilterAlt,
@@ -1085,6 +1111,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'row-height-xlarge': IconRowHeightXlarge,
   run: IconRun,
   'running-repeat': IconRunningRepeat,
+  save: IconSave,
   'scikit-logo': IconScikitLogo,
   search: IconSearch,
   'select-move-tool': IconSelectMoveTool,
@@ -1118,6 +1145,8 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'tensorflow-logo': IconTensorflowLogo,
   'text-language': IconTextLanguage,
   'text-language-alt': IconTextLanguageAlt,
+  'thumbs-down': IconThumbsDown,
+  'thumbs-up': IconThumbsUp,
   'triangle-down': IconTriangleDown,
   'triangle-left': IconTriangleLeft,
   'triangle-right': IconTriangleRight,
@@ -1140,6 +1169,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   wandb: IconWandb,
   warning: IconWarning,
   'warning-alt': IconWarningAlt,
+  weave: IconWeave,
   'weave-group-board': IconWeaveGroupBoard,
   webhook: IconWebhook,
   'x-axi-alt': IconXAxiAlt,

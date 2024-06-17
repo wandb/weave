@@ -1,5 +1,6 @@
 import React, {useMemo} from 'react';
 
+import {LoadingDots} from '../../../../LoadingDots';
 import {OpCodeViewer} from '../OpCodeViewer';
 import {
   CallsLink,
@@ -42,7 +43,7 @@ export const OpVersionPage: React.FC<{
 const OpVersionPageInner: React.FC<{
   opVersion: OpVersionSchema;
 }> = ({opVersion}) => {
-  const {useOpVersions, useCalls} = useWFHooks();
+  const {useOpVersions, useCallsStats} = useWFHooks();
   const uri = opVersionKeyToRefUri(opVersion);
   const {entity, project, opId, versionIndex} = opVersion;
 
@@ -50,10 +51,10 @@ const OpVersionPageInner: React.FC<{
     opIds: [opId],
   });
   const opVersionCount = (opVersions.result ?? []).length;
-  const calls = useCalls(entity, project, {
+  const callsStats = useCallsStats(entity, project, {
     opVersionRefs: [uri],
   });
-  const opVersionCallCount = (calls.result ?? []).length;
+  const opVersionCallCount = callsStats?.result?.count ?? 0;
   const useOpSupported = useMemo(() => {
     // TODO: We really want to return `True` only when
     // the op is not a bound op. However, we don't have
@@ -70,7 +71,9 @@ const OpVersionPageInner: React.FC<{
             Name: (
               <>
                 {opId}{' '}
-                {(!opVersions.loading || opVersionCount > 0) && (
+                {opVersions.loading ? (
+                  <LoadingDots />
+                ) : (
                   <>
                     [
                     <OpVersionsLink
@@ -90,7 +93,7 @@ const OpVersionPageInner: React.FC<{
             ),
             Version: <>{versionIndex}</>,
             Calls:
-              !calls.loading || opVersionCallCount > 0 ? (
+              !callsStats.loading || opVersionCallCount > 0 ? (
                 <CallsLink
                   entity={entity}
                   project={project}

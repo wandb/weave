@@ -1,6 +1,8 @@
 # Weave Ecosystem
 
-The Weave ecosystem contains automatic logging integrations for popular AI libraries, and Weave components for common AI workflows.
+The Weave ecosystem contains automatic logging integrations for popular AI libraries, and Weave components for common AI workflows. Weave will automatically trace calls made via the following libraries:
 
-- [openai](/guides/ecosystem/openai): Weave will automaticly trace calls made via the openai library.
+- [openai](/guides/ecosystem/openai): the `openai` library.
+- [anthropic](/guides/ecosystem/anthropic): the `anthropic-sdk-python` library.
+- [mistralai](/guides/ecosystem/mistral): the `mistralai` library.
 

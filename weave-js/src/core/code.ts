@@ -11,7 +11,7 @@ import {EditingNode} from './model';
 //   expr: Expression;
 // }
 
-// Note this is the same as an assingment
+// Note this is the same as an assignment
 export interface Assignment {
   name: string;
   node: EditingNode;

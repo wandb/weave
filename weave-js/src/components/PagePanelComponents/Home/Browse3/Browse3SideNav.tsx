@@ -32,10 +32,9 @@ import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
 import {useWeaveflowRouteContext} from './context';
-import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
+import {WFHighLevelCallFilter} from './pages/CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
-import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './pages/util';
 
 const drawerWidth = 240;
@@ -44,7 +43,6 @@ type NavigationCallbacks = {
   navigateToProject: (project: string) => void;
   navigateToObjectVersions: (filter?: WFHighLevelObjectVersionFilter) => void;
   navigateToCalls: (filter?: WFHighLevelCallFilter) => void;
-  navigateToTypeVersions: (filter?: WFHighLevelTypeVersionFilter) => void;
   navigateToOpVersions: (filter?: WFHighLevelOpVersionFilter) => void;
   navigateToBoards: () => void;
   navigateToTables: () => void;
@@ -153,11 +151,6 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
       navigateToCalls={(filter?: WFHighLevelCallFilter) => {
         history.push(
           baseRouter.callsUIUrl(params.entity, params.project, filter)
-        );
-      }}
-      navigateToTypeVersions={(filter?: WFHighLevelTypeVersionFilter) => {
-        history.push(
-          baseRouter.typeVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
       navigateToOpVersions={(filter?: WFHighLevelOpVersionFilter) => {

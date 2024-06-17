@@ -9,7 +9,6 @@ import {useParams} from 'react-router-dom';
 
 import {usePanelContext} from '../../../Panel2/PanelContext';
 import {useMakeLocalBoardFromNode} from '../../../Panel2/pyBoardGen';
-import {nodeFromExtra} from '../Browse3/pages/wfReactInterface/cgDataModelHooks';
 import {SEED_BOARD_OP_NAME} from '../HomePreviewSidebar';
 import {Browse2CallsPage} from './Browse2CallsPage';
 import {Browse2OpDefPage} from './Browse2OpDefPage';
@@ -35,8 +34,11 @@ export const Browse2ObjectVersionItemComponent: FC<{
     if (params.refExtra == null) {
       return objNode;
     }
-    const extraFields = params.refExtra.split('/');
-    return nodeFromExtra(objNode, extraFields);
+    return objNode;
+    // This is old functionality that no longer exists.
+    // This entire file is likely to be deleted.
+    // const extraFields = params.refExtra.split('/');
+    // return nodeFromExtra(objNode, extraFields);
   }, [uri, params.refExtra]);
   const weave = useWeaveContext();
   const {stack} = usePanelContext();

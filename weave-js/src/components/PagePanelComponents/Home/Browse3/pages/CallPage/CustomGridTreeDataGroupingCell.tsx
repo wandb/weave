@@ -1,6 +1,7 @@
-import {Box, Button as MuiButton} from '@material-ui/core';
 import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
+import Box from '@mui/material/Box';
+import MuiButton from '@mui/material/Button';
 import {GridRenderCellParams, useGridApiContext} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {FC, MouseEvent, useMemo} from 'react';
@@ -13,6 +14,7 @@ import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CursorBox} from './CursorBox';
+import {TraceUsageStats} from './TraceUsageStats';
 
 const INSET_SPACING = 54;
 const TREE_COLOR = '#aaaeb2';
@@ -22,8 +24,10 @@ const CallOrCountRow = styled.div`
   width: 100%;
   height: 100%;
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  justify-items: center;
+  gap: 6px;
+  padding-top: 10px;
 `;
 CallOrCountRow.displayName = 'S.CallOrCountRow';
 
@@ -131,7 +135,7 @@ export const CustomGridTreeDataGroupingCell: FC<
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'top',
         }}>
         {rowNode.type === 'group' ? (
           <MuiButton
@@ -144,6 +148,7 @@ export const CustomGridTreeDataGroupingCell: FC<
               minWidth: '26px',
               borderRadius: '50%',
               color: TREE_COLOR,
+              marginTop: '8px',
             }}>
             {rowNode.childrenExpanded ? <ExpandMore /> : <KeyboardArrowRight />}
           </MuiButton>
@@ -175,19 +180,32 @@ export const CustomGridTreeDataGroupingCell: FC<
           <>
             <Box
               sx={{
-                mr: 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
               }}>
-              <StatusChip value={row.status} iconOnly />
+              <Box
+                sx={{
+                  mr: 1,
+                }}>
+                <StatusChip value={row.status} iconOnly />
+              </Box>
+              <Box
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  flex: '1 1 auto',
+                }}>
+                {opNiceName(call.spanName)}
+              </Box>
             </Box>
-            <Box
-              sx={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                flex: '1 1 auto',
-              }}>
-              {opNiceName(call.spanName)}
-            </Box>
+            {call?.rawSpan?.summary && (
+              <TraceUsageStats
+                usage={call.rawSpan.summary.usage}
+                latency_s={call.rawSpan.summary.latency_s}
+              />
+            )}
           </>
         )}
         {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}

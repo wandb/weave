@@ -1,5 +1,5 @@
-import {Box} from '@material-ui/core';
 import {Typography} from '@mui/material';
+import Box from '@mui/material/Box';
 import _ from 'lodash';
 import React, {FC, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -8,13 +8,14 @@ import styled from 'styled-components';
 import {MOON_800} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
-import {CallsTable} from '../CallsPage/CallsPage';
+import {CallsTable} from '../CallsPage/CallsTable';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ButtonOverlay} from './ButtonOverlay';
+import {ExceptionDetails, getExceptionInfo} from './Exceptions';
 import {ObjectViewerSection} from './ObjectViewerSection';
 import {OpVersionText} from './OpVersionText';
 
@@ -39,6 +40,24 @@ const MultiCallHeader = styled.div`
 `;
 MultiCallHeader.displayName = 'S.MultiCallHeader';
 
+const TitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+`;
+TitleRow.displayName = 'S.TitleRow';
+
+const Title = styled.div`
+  flex: 1 1 auto;
+  font-family: Source Sans Pro;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 32px;
+  letter-spacing: 0px;
+  text-align: left;
+`;
+Title.displayName = 'S.Title';
+
 export const CallSchemaLink = ({call}: {call: CallSchema}) => {
   const {entity: entityName, project: projectName, callId, spanName} = call;
   return (
@@ -55,6 +74,8 @@ export const CallDetails: FC<{
   call: CallSchema;
 }> = ({call}) => {
   const {useCalls} = useWFHooks();
+
+  const excInfo = getExceptionInfo(call.rawSpan.exception);
 
   const {inputs, output} = useMemo(
     () => getDisplayInputsAndOutput(call),
@@ -103,7 +124,16 @@ export const CallDetails: FC<{
             flex: '0 0 auto',
             p: 2,
           }}>
-          <ObjectViewerSection title="Outputs" data={output} />
+          {'traceback' in excInfo ? (
+            <>
+              <TitleRow>
+                <Title>Error</Title>
+              </TitleRow>
+              <ExceptionDetails exceptionInfo={excInfo} />
+            </>
+          ) : (
+            <ObjectViewerSection title="Outputs" data={output} />
+          )}
         </Box>
         {multipleChildCallOpRefs.map(opVersionRef => {
           const exampleCall = childCalls.result?.find(
@@ -124,7 +154,6 @@ export const CallDetails: FC<{
           let callsTable = (
             <CallsTable
               hideControls
-              ioColumnsOnly
               initialFilter={{
                 opVersionRefs: [opVersionRef],
                 parentId: call.callId,

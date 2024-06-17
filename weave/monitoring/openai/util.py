@@ -121,7 +121,8 @@ def num_tokens_from_messages(
             elif isinstance(message["content"], str):
                 num_tokens += len(encoding.encode(message["content"]))
             else:
-                print(f"Warning: couldn't calculate tokens from content with type {type(message['content'])}")            
+                print(f"Warning: couldn't calculate tokens from content with type {type(message['content'])}")   
+                 
         if message["role"] == "user":
             num_tokens += config.per_name
 

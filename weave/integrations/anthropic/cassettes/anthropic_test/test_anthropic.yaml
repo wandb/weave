@@ -1,0 +1,71 @@
+interactions:
+- request:
+    body: '{"max_tokens": 1024, "messages": [{"role": "user", "content": "Hello, Claude"}],
+      "model": "claude-3-haiku-20240307"}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '116'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 0.25.8
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 0.25.8
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.9
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SPT0vEMBTEv0qci5dUun9ANhdZvHQRxJugSAnpYxubvtTmBS2l31266sHTwO/N
+        zGNm+AYGfTrX5ebw2LrqmLvn1h+fHt7ty766pwYaMg20uigleyZojDGswKbkk1gWaPSxoQADF2xu
+        qNgVrfVdLrbldl/uyltouMhCLDCv81+j0NeavYhBRSHEK3WS66TYO1ISVU8kaor5RlXxUznL6qR+
+        3q5USWzsdIflTSNJHOqRbIoMA+Kmljwyfg+JPjKxIxjOIWjkyxIzw/OQpZbYESeYTakRs/xDh2X5
+        BgAA//8DAOyGbJcnAQAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 88dff530683470ee-MRS
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 03 Jun 2024 13:16:28 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      request-id:
+      - req_01MJUv6bJdkzUV6LPKZgw2v8
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 7cd24b20b4ff864e93e4642377747564
+    status:
+      code: 200
+      message: OK

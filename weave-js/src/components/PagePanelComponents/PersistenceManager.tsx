@@ -1,5 +1,5 @@
 import {useMutation as useApolloMutation} from '@apollo/client';
-import {Popover} from '@material-ui/core';
+import Popover from '@mui/material/Popover';
 import {KeyboardShortcut} from '@wandb/weave/common/components/elements/KeyboardShortcut';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';

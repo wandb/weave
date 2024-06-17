@@ -13,8 +13,8 @@ import * as LayoutElements from './LayoutElements';
 
 // This is considered a `hack` because I need to drop down to
 // access .tw-style, to give it a height 100%. When using tailwind
-// components, the hight is not set and it collapses in this case because
-// all children have relative hights.
+// components, the height is not set and it collapses in this case because
+// all children have relative heights.
 const TWDrawerHack = styled.div`
   height: 100%;
   overflow: hidden;
@@ -63,8 +63,8 @@ export const HomeFeaturedTemplateDrawer: React.FC<{
           onValueChange={(val: string) => setTabValue(val)}>
           <Tabs.List className="px-16">
             <Tabs.Trigger value="Instructions">1. Instructions</Tabs.Trigger>
-            {/* 
-              <Tabs.Trigger value="Select Data">2. Select Data</Tabs.Trigger> 
+            {/*
+              <Tabs.Trigger value="Select Data">2. Select Data</Tabs.Trigger>
               NOTE: Once we have the interactive data flow we can re-enable this tab.
             */}
           </Tabs.List>

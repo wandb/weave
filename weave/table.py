@@ -23,5 +23,8 @@ class Table:
         self.rows = rows
         self.ref = None
 
+    def __getitem__(self, key: int) -> dict:
+        return self.rows[key]
+
     def __iter__(self) -> Iterator:
         return iter(self.rows)

@@ -1033,7 +1033,7 @@ img.ui.avatar.image {
 .night-mode {
     filter: @nightModeFilter;
     img, video, iframe, .inverted.segment, .editable-image, .run-logs, .search-nav, .media-card__fullscreen,
-    .night-aware, .night-aware-exclude-children {
+    .night-aware, .night-aware-exclude-children, iframe.intercom-launcher-frame {
         filter: @nightModeFilterRevert;
     }
     .night-aware-exclude-children > :not(.night-aware):not(.night-aware-exclude-children) {

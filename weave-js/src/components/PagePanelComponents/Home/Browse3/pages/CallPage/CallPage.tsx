@@ -1,11 +1,16 @@
-import {Box} from '@material-ui/core';
+import Box from '@mui/material/Box';
+import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
+import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
-import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
+import {
+  TRACETREE_PARAM,
+  useClosePeek,
+  useWeaveflowCurrentRouteContext,
+} from '../../context';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
@@ -24,6 +29,7 @@ export const CallPage: FC<{
   path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
+  const close = useClosePeek();
 
   const call = useCall({
     entity: props.entity,
@@ -33,7 +39,16 @@ export const CallPage: FC<{
   if (call.loading) {
     return <CenteredAnimatedLoader />;
   } else if (call.result === null) {
-    return <div>Call not found</div>;
+    return (
+      <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+        <div style={{alignSelf: 'flex-end', margin: 10}}>
+          <Button icon="close" variant="ghost" onClick={close} />
+        </div>
+        <div style={{flex: 1}}>
+          <ErrorPanel title="Call not found" subtitle="" subtitle2="" />
+        </div>
+      </div>
+    );
   }
   return <CallPageInnerVertical {...props} call={call.result} />;
 };
@@ -109,7 +124,7 @@ const CallPageInnerVertical: FC<{
   const callTabs = useCallTabs(selectedCall);
 
   if (loading && !assumeCallIsSelectedCall) {
-    return <Loader active />;
+    return <Loading centered />;
   }
 
   return (
@@ -132,7 +147,7 @@ const CallPageInnerVertical: FC<{
       headerContent={<CallOverview call={selectedCall} />}
       leftSidebar={
         loading ? (
-          <Loader active />
+          <Loading centered />
         ) : (
           <CallTraceView
             call={call}

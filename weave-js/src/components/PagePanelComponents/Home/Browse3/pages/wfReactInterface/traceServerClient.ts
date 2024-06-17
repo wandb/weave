@@ -16,6 +16,8 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
+import {Query} from './traceServerClientInterface/query';
+
 export type KeyedDictType = {
   [key: string]: any;
   _keys?: string[];
@@ -47,9 +49,13 @@ type TraceCallReadReq = {
   id: string;
 };
 
-export type TraceCallReadRes = {
+export type TraceCallReadSuccess = {
   call: TraceCallSchema;
 };
+export type TraceCallReadError = {
+  detail: string;
+};
+export type TraceCallReadRes = TraceCallReadSuccess | TraceCallReadError;
 
 interface TraceCallsFilter {
   op_names?: string[];
@@ -63,15 +69,34 @@ interface TraceCallsFilter {
   wb_user_ids?: string[];
 }
 
+export type SortBy = {field: string; direction: 'asc' | 'desc'};
+
 export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;
   offset?: number;
+  sort_by?: SortBy[];
+  query?: Query;
 };
 
 export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
+};
+
+export type TraceCallsQueryStatsReq = {
+  project_id: string;
+  filter?: TraceCallsFilter;
+  query?: Query;
+};
+
+export type TraceCallsQueryStatsRes = {
+  count: number;
+};
+
+export type TraceCallsDeleteReq = {
+  project_id: string;
+  call_ids: string[];
 };
 
 interface TraceObjectsFilter {
@@ -100,6 +125,16 @@ export interface TraceObjSchema {
 
 type TraceObjQueryRes = {
   objs: TraceObjSchema[];
+};
+
+type TraceObjReadReq = {
+  project_id: string;
+  object_id: string;
+  digest: string;
+};
+
+export type TraceObjReadRes = {
+  obj: TraceObjSchema;
 };
 
 export type TraceRefsReadBatchReq = {
@@ -155,20 +190,125 @@ export class TraceServerClient {
       }>
     >
   > = {};
+  private onDeleteListeners: Array<() => void>;
 
   constructor(baseUrl: string) {
     this.readBatchCollectors = [];
     this.inFlightFetchesRequests = {};
     this.baseUrl = baseUrl;
     this.scheduleReadBatch();
+    this.onDeleteListeners = [];
   }
 
+  /**
+   * Registers a callback to be called when a delete operation occurs.
+   * This method is purely for local notification within the client
+   *    and does not interact with the REST API.
+   *
+   * @param callback A function to be called when a delete operation is triggered.
+   * @returns A function to unregister the callback.
+   */
+  public registerOnDeleteListener(callback: () => void): () => void {
+    this.onDeleteListeners.push(callback);
+    return () => {
+      this.onDeleteListeners = this.onDeleteListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
+
+  callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
+    const res = this.makeRequest<TraceCallsDeleteReq, void>(
+      '/calls/delete',
+      req
+    ).then(() => {
+      this.onDeleteListeners.forEach(listener => listener());
+    });
+    return res;
+  };
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(
         '/calls/query',
         req
       );
+    };
+  callsQueryStats: (
+    req: TraceCallsQueryStatsReq
+  ) => Promise<TraceCallsQueryStatsRes> = req => {
+    return this.makeRequest<TraceCallsQueryStatsReq, TraceCallsQueryStatsRes>(
+      '/calls/query_stats',
+      req
+    );
+  };
+  callsStreamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
+    req => {
+      const res = this.makeRequest<TraceCallsQueryReq, string>(
+        '/calls/stream_query',
+        req,
+        true
+      );
+      return new Promise((resolve, reject) => {
+        res
+          .then(content => {
+            // `content` is jsonl string, we need to parse it.
+            if (!content) {
+              resolve({calls: []});
+              return;
+            }
+            if (content.endsWith('\n')) {
+              content = content.slice(0, -1);
+            }
+            if (content === '') {
+              resolve({calls: []});
+              return;
+            }
+            const calls: TraceCallSchema[] = [];
+            const lines = content.split('\n');
+            let earlyTermination = false;
+
+            lines.forEach((line, lineIndex) => {
+              try {
+                calls.push(JSON.parse(line));
+              } catch (err) {
+                if (lineIndex === lines.length - 1 && lineIndex > 0) {
+                  // This is a very special case where the last line is not a
+                  // complete json object. This can happen if the stream is
+                  // terminated early. Instead of just failing, we can make a
+                  // new request to the server to resume the stream from the
+                  // last line. This should only occur projects with massive
+                  // trace data (> 150MB per my own testing)
+                  const newReq = {...req};
+                  const origOffset = req.offset || 0;
+                  newReq.offset = origOffset + lineIndex;
+                  console.debug(
+                    `Early stream termination, performing a new request resuming from ${newReq.offset}`
+                  );
+                  earlyTermination = true;
+                  this.callsStreamQuery(newReq)
+                    .then(innerRes => {
+                      calls.push(...innerRes.calls);
+                      resolve({calls});
+                    })
+                    .catch(err => {
+                      reject(err);
+                    });
+                  return;
+                } else {
+                  console.error(
+                    `Error parsing line ${lineIndex} of ${lines.length}: ${line}`
+                  );
+                }
+              }
+            });
+            if (!earlyTermination) {
+              resolve({calls});
+            }
+          })
+          .catch(err => {
+            reject(err);
+          });
+      });
     };
   callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = req => {
     return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
@@ -181,6 +321,9 @@ export class TraceServerClient {
       '/objs/query',
       req
     );
+  };
+  objRead: (req: TraceObjReadReq) => Promise<TraceObjReadRes> = req => {
+    return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
   };
 
   readBatch: (req: TraceRefsReadBatchReq) => Promise<TraceRefsReadBatchRes> =
@@ -346,96 +489,3 @@ export class TraceServerClient {
     );
   };
 }
-
-const MAX_CHUNK_SIZE = 10000;
-
-/**
- * Use this function to query calls from the trace server. This function will
- * handle chunking the results if the user requests more than `MAX_CHUNK_SIZE`
- * calls. This is to protect the server from returning too much data at once.
- *
- * Note: we should probably roll this into the `callsQuery` directly, but I don't
- * want to change the API right now to support cancelation.
- */
-export const chunkedCallsQuery = (
-  client: TraceServerClient,
-  req: TraceCallsQueryReq,
-  onSuccess: (res: TraceCallsQueryRes) => void,
-  onError: (err: any) => void
-): {
-  cancel: () => void;
-} => {
-  let cancelled = false;
-
-  const safeOnSuccess = (res: TraceCallsQueryRes) => {
-    if (!cancelled) {
-      onSuccess(res);
-    }
-  };
-
-  const safeOnError = (err: any) => {
-    if (!cancelled) {
-      onError(err);
-    }
-  };
-
-  const fetchCalls = async () => {
-    const userRequestedLimit = req.limit ?? Infinity;
-    const userRequestedOffset = req.offset ?? 0;
-    const shouldPage = userRequestedLimit > MAX_CHUNK_SIZE;
-    if (!shouldPage) {
-      // If the user requested less than the max chunk size, we can just
-      // make a single request.
-      let page: TraceCallsQueryRes;
-      try {
-        page = await client.callsQuery(req);
-      } catch (err) {
-        safeOnError(err);
-        return;
-      }
-      safeOnSuccess(page);
-    } else {
-      const allCallResults: TraceCallSchema[] = [];
-      let effectiveOffset = userRequestedOffset;
-      let effectiveRemainingLimit = userRequestedLimit;
-
-      // Keep paging until we have all the results requested.
-      while (effectiveRemainingLimit > 0) {
-        const effectiveLimit = Math.min(
-          effectiveRemainingLimit,
-          MAX_CHUNK_SIZE
-        );
-        const pageReq = {
-          ...req,
-          limit: effectiveLimit,
-          offset: effectiveOffset,
-        };
-        let page: TraceCallsQueryRes;
-        try {
-          page = await client.callsQuery(pageReq);
-        } catch (err) {
-          safeOnError(err);
-          return;
-        }
-        allCallResults.push(...page.calls);
-        effectiveRemainingLimit -= page.calls.length;
-        effectiveOffset += page.calls.length;
-
-        // Break if we have less than the requested limit.
-        if (page.calls.length < effectiveLimit) {
-          break;
-        }
-      }
-
-      safeOnSuccess({
-        calls: allCallResults,
-      });
-    }
-  };
-  fetchCalls();
-  return {
-    cancel: () => {
-      cancelled = true;
-    },
-  };
-};

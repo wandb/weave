@@ -15,7 +15,7 @@ from weave.flow.obj import Object
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
 from weave.flow.model import get_infer_method
-from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize
+from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize, stderr
 from weave.flow import util
 
 from rich.console import Console
@@ -38,15 +38,64 @@ def async_call(
 
 
 class Evaluation(Object):
+    """
+    Sets up an evaluation which includes a set of scorers and a dataset.
+
+    Calling evaluation.evaluate(model) will pass in rows from a dataset into a model matching
+        the names of the columns of the dataset to the argument names in model.predict.
+
+    Then it will call all of the scorers and save the results in weave.
+
+    If you want to preprocess the rows from the dataset you can pass in a function
+    to preprocess_model_input.
+
+    Examples:
+
+    ```
+    # Collect your examples
+    examples = [
+        {"question": "What is the capital of France?", "expected": "Paris"},
+        {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+        {"question": "What is the square root of 64?", "expected": "8"},
+    ]
+
+    # Define any custom scoring function
+    @weave.op()
+    def match_score1(expected: str, model_output: dict) -> dict:
+        # Here is where you'd define the logic to score the model output
+        return {'match': expected == model_output['generated_text']}
+
+    @weave.op()
+    def function_to_evaluate(question: str):
+        # here's where you would add your LLM call and return the output
+        return  {'generated_text': 'Paris'}
+
+    # Score your examples using scoring functions
+    evaluation = Evaluation(
+        dataset=examples, scorers=[match_score1]
+    )
+
+    # Start tracking the evaluation
+    weave.init('intro-example')
+    # Run the evaluation
+    asyncio.run(evaluation.evaluate(function_to_evaluate))
+    ```
+    """
+
     dataset: Union[Dataset, list]
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
+    trials: int = 1
 
     def model_post_init(self, __context: Any) -> None:
         scorers = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
+            elif isinstance(scorer, type):
+                raise ValueError(
+                    f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
+                )
             elif callable(scorer) and not isinstance(scorer, Op):
                 scorer = weave.op()(scorer)
             elif isinstance(scorer, Op):
@@ -64,7 +113,7 @@ class Evaluation(Object):
 
     @weave.op()
     async def predict_and_score(
-        self, example: dict, model: Union[Callable, Model]
+        self, model: Union[Callable, Model], example: dict
     ) -> dict:
         if self.preprocess_model_input == None:
             model_input = example
@@ -105,6 +154,7 @@ class Evaluation(Object):
                     f"{model_predict} expects arguments: {model_predict_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                 )
         try:
+            model_start_time = time.time()
             model_output = await async_call(model_predict, **model_predict_args)
         except OpCallError as e:
             dataset_column_names = list(example.keys())
@@ -134,6 +184,7 @@ class Evaluation(Object):
             print("model_output failed")
             traceback.print_exc()
             model_output = None
+        model_latency = time.time() - model_start_time
 
         scores = {}
         scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
@@ -198,6 +249,7 @@ class Evaluation(Object):
         return {
             "model_output": model_output,
             "scores": scores,
+            "model_latency": model_latency,
         }
 
     @weave.op()
@@ -213,6 +265,12 @@ class Evaluation(Object):
             scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
             scorer_scores = eval_table.column("scores").column(scorer_name)
             summary[scorer_name] = summarize_fn(scorer_scores)  # type: ignore
+        latency_col = eval_table.column("model_latency")
+        non_none_latencies = [l for l in latency_col if l is not None]
+        summary["model_latency"] = {
+            "mean": float(np.mean(non_none_latencies)),
+            # "stderr": stderr(list(eval_table.column("model_latency"))),
+        }
         return summary
 
     @weave.op()
@@ -223,7 +281,7 @@ class Evaluation(Object):
 
         async def eval_example(example: dict) -> dict:
             try:
-                eval_row = await self.predict_and_score(example, model)
+                eval_row = await self.predict_and_score(model, example)
             except OpCallError as e:
                 raise e
             except Exception as e:
@@ -236,11 +294,13 @@ class Evaluation(Object):
         # with console.status("Evaluating...") as status:
         dataset = typing.cast(Dataset, self.dataset)
         _rows = dataset.rows
+        trial_rows = list(_rows) * self.trials
         async for example, eval_row in util.async_foreach(
-            _rows, eval_example, get_weave_parallelism()
+            trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
             duration = time.time() - start_time
+            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
             # status.update(
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )

@@ -64,16 +64,24 @@ class WeaveAsyncStream(AsyncStream):
         )
 
     async def __anext__(self) -> ChatCompletionChunk:
-        item = await self._iterator.__anext__()
+        try:
+            item = await self._iterator.__anext__()
+        except StopAsyncIteration:
+            self._on_finish()
+            raise
         self._chunks.append(item)
         return item
 
     async def __aiter__(self) -> AsyncIterator[ChatCompletionChunk]:
-        from weave.flow.chat_util import OpenAIStream
-
         async for item in self._iterator:
             self._chunks.append(item)
             yield item
+
+        self._on_finish()
+
+    def _on_finish(self) -> None:
+        from weave.flow.chat_util import OpenAIStream
+
         wrapped_stream = OpenAIStream(iter(self._chunks))
         list(wrapped_stream)
 
@@ -93,6 +101,47 @@ class WeaveAsyncStream(AsyncStream):
         await super().__aexit__(exc_type, exc, exc_tb)
         if exc:
             raise exc
+
+
+class WeaveStream(Stream):
+    def __init__(
+        self,
+        *,
+        base_stream: Stream,
+        messages: List[ChatCompletionMessageParam],
+        finish_run: Callable,
+    ) -> None:
+        from weave.flow.chat_util import OpenAIStream
+
+        self._messages = messages
+        self._chunks: List[ChatCompletionChunk] = []
+        self._finish_run = finish_run
+        super().__init__(
+            cast_to=ChatCompletionChunk,
+            client=base_stream._client,
+            response=base_stream.response,
+        )
+        self._openai_stream = OpenAIStream(self._iterator)
+
+    def __next__(self) -> ChatCompletionChunk:
+        try:
+            return self._openai_stream.__next__()
+        except StopIteration:
+            self._on_finish()
+            raise
+
+    def __iter__(self) -> Iterator[ChatCompletionChunk]:
+        for chunk in self._openai_stream:
+            yield chunk
+        self._on_finish()
+
+    def _on_finish(self) -> None:
+        result = self._openai_stream.final_response()
+        result_with_usage = ChatCompletion(
+            **result.model_dump(exclude_unset=True),
+            usage=token_usage(self._messages, result.choices),
+        )
+        self._finish_run(result_with_usage.model_dump(exclude_unset=True))
 
 
 class AsyncChatCompletions:
@@ -163,21 +212,14 @@ class ChatCompletions:
 
         with log_run(create_op, named_args) as finish_run:
 
-            def _stream_create_gen():  # type: ignore
-                stream = self._base_create(*args, **kwargs)
-                from weave.flow.chat_util import OpenAIStream
+            base_stream = self._base_create(*args, **kwargs)
+            stream = WeaveStream(
+                base_stream=base_stream,
+                messages=messages,
+                finish_run=finish_run,
+            )
 
-                wrapped_stream = OpenAIStream(stream)
-                for chunk in wrapped_stream:
-                    yield chunk
-                result = wrapped_stream.final_response()
-                result_with_usage = ChatCompletion(
-                    **result.model_dump(exclude_unset=True),
-                    usage=token_usage(messages, result.choices),
-                )
-                finish_run(result_with_usage.model_dump(exclude_unset=True))
-
-        return _stream_create_gen()  # type: ignore
+        return stream
 
 
 def patch() -> None:
@@ -215,7 +257,7 @@ def patch() -> None:
 
 def unpatch() -> None:
     # if _get_global_monitor() is not None:
-    info("Unpatching OpenAI completions")
+    # info("Unpatching OpenAI completions")
     openai.resources.chat.completions.Completions.create = old_create
     openai.resources.chat.completions.AsyncCompletions.create = old_async_create
 
@@ -228,15 +270,14 @@ def log_run(
     client = graph_client_context.require_graph_client()
     parent_run = run_context.get_current_run()
     # TODO: client should not need refs passed in.
-    run = client.create_call(call_name, parent_run, inputs)
+    run = client.create_call(call_name, inputs, parent_run)
 
     def finish_run(output: Any) -> None:
         # TODO: client should not need refs passed in.
         client.finish_call(run, output)
 
     try:
-        with run_context.current_run(run):
-            yield finish_run
+        yield finish_run
     except Exception as e:
         client.fail_call(run, e)
         raise

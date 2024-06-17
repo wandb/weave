@@ -2,13 +2,10 @@
  * TODO: Combine common functionality between this and ValueViewString
  */
 
-import Grow from '@material-ui/core/Grow';
 import {Popover} from '@mui/material';
-import Tooltip, {tooltipClasses, TooltipProps} from '@mui/material/Tooltip';
 import copyToClipboard from 'copy-to-clipboard';
 import isUrl from 'is-url';
 import React, {ReactNode, useCallback, useRef, useState} from 'react';
-import Draggable from 'react-draggable';
 import styled from 'styled-components';
 
 import {toast} from '../../../../common/components/elements/Toast';
@@ -17,6 +14,12 @@ import * as Colors from '../../../../common/css/color.styles';
 import {TargetBlank} from '../../../../common/util/links';
 import {Button} from '../../../Button';
 import {CodeEditor} from '../../../CodeEditor';
+import {
+  DraggableGrow,
+  PoppedBody,
+  StyledTooltip,
+  TooltipHint,
+} from '../../../DraggablePopups';
 
 const isJSON = (value: string): boolean => {
   try {
@@ -58,13 +61,6 @@ const TooltipText = styled.div<{isJSON: boolean}>`
 `;
 TooltipText.displayName = 'S.TooltipText';
 
-const TooltipHint = styled.div`
-  color: ${Colors.MOON_500};
-  text-align: center;
-  font-size: 0.8em;
-`;
-TooltipHint.displayName = 'S.TooltipHint';
-
 const Popped = styled.div`
   border-radius: 4px;
   padding: 4px 8px;
@@ -75,13 +71,6 @@ const Popped = styled.div`
   border: 1px solid ${Colors.MOON_300};
 `;
 Popped.displayName = 'S.Popped';
-
-const PoppedBody = styled.div`
-  width: 600px;
-  max-height: 60vh;
-  overflow: auto;
-`;
-PoppedBody.displayName = 'S.PoppedBody';
 
 const Toolbar = styled.div`
   display: flex;
@@ -95,33 +84,6 @@ const Spacer = styled.div`
   flex: 1 1 auto;
 `;
 Spacer.displayName = 'S.Spacer';
-
-const StyledTooltip = styled(({className, ...props}: TooltipProps) => (
-  <Tooltip {...props} classes={{popper: className}} />
-))(({theme}) => ({
-  [`& .${tooltipClasses.tooltip}`]: {
-    backgroundColor: '#fff',
-    color: Colors.MOON_700,
-    border: `1px solid ${Colors.MOON_300}`,
-    maxWidth: 600,
-  },
-}));
-
-const DraggableWrapper = ({children, ...other}: any) => {
-  return (
-    <Draggable handle=".handle">
-      {React.cloneElement(children, {...other})}
-    </Draggable>
-  );
-};
-
-const DraggableGrow = ({children, ...other}: any) => {
-  return (
-    <Grow {...other} timeout={0}>
-      <DraggableWrapper>{children}</DraggableWrapper>
-    </Grow>
-  );
-};
 
 const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -161,8 +123,8 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
     '' // Suppress tooltip when popper is open.
   ) : (
     <TooltipContent onClick={onClick}>
-      <TooltipText isJSON={json}>{value}</TooltipText>
-      <TooltipHint>Cilck for more details</TooltipHint>
+      <TooltipText isJSON={json}>{trimmed}</TooltipText>
+      <TooltipHint>Click for more details</TooltipHint>
     </TooltipContent>
   );
 

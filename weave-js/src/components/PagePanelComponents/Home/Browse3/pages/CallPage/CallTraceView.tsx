@@ -168,6 +168,9 @@ export const CallTraceView: FC<{
         '& div div div div >.MuiDataGrid-cell': {
           borderBottom: 'none',
         },
+        '& div div div div >.MuiDataGrid-cell:focus': {
+          outline: 'none',
+        },
       },
       '& .MuiDataGrid-columnHeaders': {
         borderBottom: 'none',
@@ -220,7 +223,7 @@ export const CallTraceView: FC<{
       <ErrorBoundary>
         <DataGridPro
           apiRef={apiRef}
-          rowHeight={38}
+          rowHeight={64}
           columnHeaderHeight={0}
           treeData
           loading={animationBuffer}

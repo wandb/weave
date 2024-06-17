@@ -9,9 +9,8 @@
     "dev": "yarn generate && NODE_OPTIONS='--max-http-header-size=10248012' PORT=3000 vite",
     "build": "yarn generate && rm -rf build && NODE_OPTIONS=--max-old-space-size=16384 vite build",
     "preview": "vite preview",
-    "test": "jest",
-    "testci": "CI=true JEST_JUNIT_OUTPUT_DIR=./test-results/junit jest --reporters=default --reporters=jest-junit",
-    "test:watch": "jest --watch",
+    "test": "vitest",
+    "testci": "CI=true vitest --reporter=default --reporter=junit --outputFile=./test-results/junit/results.xml",
     "eslint": "eslint --ext .js,.jsx,.ts,.tsx src",
     "eslint-fix": "eslint --fix --ext .js,.jsx,.ts,.tsx src",
     "tslint": "tslint --project .",
@@ -35,12 +34,10 @@
     "@emotion/styled": "^11.11.0",
     "@floating-ui/react": "^0.24.5",
     "@material-ui/core": "^4.12.4",
-    "@material-ui/icons": "^4.11.3",
     "@monaco-editor/react": "^4.3.1",
     "@mui/icons-material": "^5.14.12",
     "@mui/lab": "^5.0.0-alpha.147",
     "@mui/material": "^5.14.12",
-    "@mui/x-data-grid": "^6.16.0",
     "@mui/x-data-grid-pro": "^6.16.0",
     "@radix-ui/react-checkbox": "^1.0.4",
     "@radix-ui/react-dialog": "^1.0.5",
@@ -49,10 +46,11 @@
     "@radix-ui/react-slider": "^1.0.4",
     "@radix-ui/react-switch": "^1.0.3",
     "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-tooltip": "^1.0.7",
     "@segment/analytics.js-core": "^4.1.11",
     "@segment/analytics.js-integration-segmentio": "^4.4.7",
     "@sentry/react": "^6.17.3",
-    "@testing-library/jest-dom": "5.11.8",
+    "@testing-library/jest-dom": "6.4.5",
     "@testing-library/react": "11.2.3",
     "@testing-library/user-event": "14.4.3",
     "@types/query-string": "^6.3.0",
@@ -67,6 +65,7 @@
     "cytoscape-dagre": "^2.2.2",
     "diff": "^5.1.0",
     "downloadjs": "^1.4.7",
+    "emoji-picker-react": "^4.9.3",
     "graphql": "=16.6.0",
     "handlebars": "^4.7.7",
     "hast-util-sanitize": "^4.0.0",
@@ -109,7 +108,6 @@
     "react-select": "^5.4.0",
     "react-sortable-hoc": "^2.0.0",
     "react-syntax-highlighter": "^15.5.0",
-    "react-table": "^6.8.6",
     "react-textarea-autosize": "8.3.4",
     "react-timeago": "^4.1.9",
     "react-toastify": "^4.4.3",
@@ -120,6 +118,7 @@
     "rehype-katex": "^2.0.0",
     "rehype-raw": "^6.1.1",
     "rehype-sanitize": "^3.0.0",
+    "rehype-slug": "^5.1.0",
     "rehype-stringify": "^9.0.2",
     "reinspect": "^1.1.0",
     "remark-emoji": "^2.0.2",
@@ -145,6 +144,7 @@
     "vite-plugin-svgr": "^2.4.0",
     "wavesurfer.js": "^2.0.0",
     "web-tree-sitter": "^0.20.5",
+    "yet-another-react-lightbox": "^3.17.5",
     "zen-observable": "^0.10.0"
   },
   "devDependencies": {
@@ -192,7 +192,7 @@
     "@types/zen-observable": "^0.8.3",
     "@typescript-eslint/eslint-plugin": "5.35.1",
     "@typescript-eslint/parser": "5.35.1",
-    "@vitejs/plugin-react": "^2.1.0",
+    "@vitejs/plugin-react": "^4.0.4",
     "ast-types": "^0.14.2",
     "autoprefixer": "^10.4.13",
     "babel-eslint": "^10.1.0",
@@ -200,7 +200,6 @@
     "concurrently": "^7.5.0",
     "detect-browser": "^5.2.1",
     "esbuild": "^0.17.15",
-    "esbuild-jest": "^0.5.0",
     "eslint": "^8.40.0",
     "eslint-config-prettier": "^2.3.0",
     "eslint-config-react-app": "^7.0.1",
@@ -215,10 +214,7 @@
     "eslint-plugin-simple-import-sort": "10.0.0",
     "eslint-plugin-wandb": "link:./eslint-plugin-wandb",
     "identity-obj-proxy": "^3.0.0",
-    "jest": "^28.0.1",
-    "jest-environment-jsdom": "^28.0.1",
-    "jest-junit": "^14.0.1",
-    "jest-watch-typeahead": "^2.2.2",
+    "jsdom": "^22.1.0",
     "json-schema-to-typescript": "^11.0.2",
     "less": "^2.7.3",
     "lodash.defaults": "^4.2.0",
@@ -235,7 +231,8 @@
     "tslint-plugin-prettier": "^2.3.0",
     "typescript": "4.7.4",
     "uuid": "^9.0.0",
-    "vite": "3.1.3"
+    "vite": "5.2.9",
+    "vitest": "^1.6.0"
   },
   "resolutions": {
     "@types/react": "^17.0.26",
@@ -243,37 +240,5 @@
     "handlebars": "^4.7.7",
     "lodash": "^4.17.21",
     "react": "^17.0.2"
-  },
-  "jest": {
-    "roots": [
-      "<rootDir>/src"
-    ],
-    "setupFiles": [
-      "react-app-polyfill/jsdom"
-    ],
-    "setupFilesAfterEnv": [
-      "<rootDir>/src/setupTests.ts"
-    ],
-    "testEnvironment": "jsdom",
-    "transformIgnorePatterns": [
-      "^.+\\.module\\.(css|sass|scss)$"
-    ],
-    "moduleNameMapper": {
-      "^@wandb/weave/(.*)$": "<rootDir>/src/$1",
-      "\\.(wasm)$": "<rootDir>/mockTreeSitterForTest.js",
-      "\\.(css|less|svg)$": "identity-obj-proxy"
-    },
-    "moduleFileExtensions": [
-      "js",
-      "ts",
-      "tsx",
-      "json",
-      "jsx",
-      "node"
-    ],
-    "watchPlugins": [
-      "jest-watch-typeahead/filename",
-      "jest-watch-typeahead/testname"
-    ]
   }
 }

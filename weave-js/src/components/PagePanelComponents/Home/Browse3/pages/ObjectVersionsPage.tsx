@@ -7,7 +7,9 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
+import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
@@ -22,7 +24,7 @@ import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {useInitializingFilter, useURLSearchParamsDict} from './util';
+import {useControllableState, useURLSearchParamsDict} from './util';
 import {useWFHooks} from './wfReactInterface/context';
 import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {
@@ -38,8 +40,8 @@ export const ObjectVersionsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
-  const {filter, setFilter} = useInitializingFilter(
-    props.initialFilter,
+  const [filter, setFilter] = useControllableState(
+    props.initialFilter ?? {},
     props.onFilterUpdate
   );
 
@@ -112,6 +114,9 @@ export const FilterableObjectVersionsTable: React.FC<{
   if (filteredObjectVersions.loading) {
     return <Loading centered />;
   }
+  if (filteredObjectVersions.error) {
+    return <ErrorPanel />;
+  }
 
   // TODO: Only show the empty state if no filters other than baseObjectClass
   const objectVersions = filteredObjectVersions.result ?? [];
@@ -171,6 +176,7 @@ const ObjectVersionsTable: React.FC<{
             objectName={obj.objectId}
             version={obj.versionHash}
             versionIndex={obj.versionIndex}
+            fullWidth={true}
           />
         );
       },
@@ -236,6 +242,24 @@ const ObjectVersionsTable: React.FC<{
 
   return (
     <StyledDataGrid
+      // Start Column Menu
+      // ColumnMenu is only needed when we have other actions
+      // such as filtering.
+      disableColumnMenu={true}
+      // We don't have enough columns to justify filtering
+      disableColumnFilter={true}
+      disableMultipleColumnsFiltering={true}
+      // ColumnPinning seems to be required in DataGridPro, else it crashes.
+      disableColumnPinning={false}
+      // We don't have enough columns to justify re-ordering
+      disableColumnReorder={true}
+      // The columns are fairly simple, so we don't need to resize them.
+      disableColumnResize={false}
+      // We don't have enough columns to justify hiding some of them.
+      disableColumnSelector={true}
+      // We don't have enough columns to justify sorting by multiple columns.
+      disableMultipleColumnsSorting={true}
+      // End Column Menu
       rows={rows}
       initialState={{
         sorting: {
@@ -270,6 +294,9 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
     },
     100
   );
+  if (objectVersionsNode.loading) {
+    return <LoadingDots />;
+  }
   const countValue = objectVersionsNode.result?.length ?? 0;
   return (
     <ObjectVersionsLink

@@ -7,6 +7,8 @@ from . import autopatch
 from . import weave_client
 from . import trace_sentry
 
+_current_inited_client = None
+
 
 class InitializedClient:
     def __init__(self, client: weave_client.WeaveClient):
@@ -73,12 +75,24 @@ Args:
 def init_weave(
     project_name: str, ensure_project_exists: bool = True
 ) -> InitializedClient:
+    global _current_inited_client
+    if _current_inited_client is not None:
+        if (
+            _current_inited_client.client.project == project_name
+            and _current_inited_client.client.ensure_project_exists
+            == ensure_project_exists
+        ):
+            return _current_inited_client
+        else:
+            _current_inited_client.reset()
+
     from . import wandb_api
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
     wandb_api.init()
     wandb_context = wandb_api.get_wandb_api_context()
+    wandb_api.check_base_url()
     if wandb_context is None:
         import wandb
 
@@ -87,20 +101,23 @@ def init_weave(
         wandb_api.init()
         wandb_context = wandb_api.get_wandb_api_context()
 
+    entity_name, project_name = get_entity_project_from_project_name(project_name)
+    wandb_run_id = weave_client.safe_current_wb_run_id()
+    weave_client.check_wandb_run_matches(wandb_run_id, entity_name, project_name)
+
     api_key = None
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
+        wandb_api.check_api_key(api_key)
     remote_server = init_weave_get_server(api_key)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-
-    entity_name, project_name = get_entity_project_from_project_name(project_name)
 
     # server = ClickHouseTraceServer(host="localhost")
     client = weave_client.WeaveClient(
         entity_name, project_name, remote_server, ensure_project_exists
     )
 
-    init_client = InitializedClient(client)
+    _current_inited_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
@@ -108,7 +125,7 @@ def init_weave(
 
     # init_client = InitializedClient(client)  # type: ignore
 
-    # autopatching is only supporte for the wandb client, because OpenAI calls are not
+    # autopatching is only supported for the wandb client, because OpenAI calls are not
     # logged in local mode currently. When that's fixed, this autopatch call can be
     # moved to InitializedClient.__init__
     autopatch.autopatch()
@@ -138,7 +155,7 @@ def init_weave(
         }
     )
 
-    return init_client
+    return _current_inited_client
 
 
 def init_weave_get_server(
@@ -155,3 +172,16 @@ def init_local() -> InitializedClient:
     server.setup_tables()
     client = weave_client.WeaveClient("none", "none", server)
     return InitializedClient(client)
+
+
+def finish() -> None:
+    global _current_inited_client
+    if _current_inited_client is not None:
+        _current_inited_client.reset()
+        _current_inited_client = None
+
+    # autopatching is only supported for the wandb client, because OpenAI calls are not
+    # logged in local mode currently. When that's fixed, this reset_autopatch call can be
+    # moved to InitializedClient.reset
+    autopatch.reset_autopatch()
+    trace_sentry.global_trace_sentry.end_session()

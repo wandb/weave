@@ -11,13 +11,13 @@ import React, {
   useCallback,
   useContext,
   useMemo,
+  useState,
 } from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
-import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
+import {WFHighLevelCallFilter} from './pages/CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
-import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './pages/util';
 import {
   AWL_ROW_EDGE_NAME,
@@ -118,21 +118,6 @@ export const browse2Context = {
   opUIUrl: (entityName: string, projectName: string, opName: string) => {
     throw new Error('Not implemented');
   },
-  typeVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    typeName: string,
-    typeVersionHash: string
-  ) => {
-    throw new Error('Not implemented');
-  },
-  typeVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelTypeVersionFilter
-  ) => {
-    throw new Error('Not implemented');
-  },
   objectVersionUIUrl: (
     entityName: string,
     projectName: string,
@@ -227,13 +212,6 @@ export const browse3ContextGen = (
           objRef.artifactName,
           objRef.artifactVersion
         );
-      } else if (wfTable === 'TypeVersion' || rootTypeName === 'type') {
-        return browse3Context.typeVersionUIUrl(
-          objRef.entityName,
-          objRef.projectName,
-          objRef.artifactName,
-          objRef.artifactVersion
-        );
       }
 
       // TEMP HACK (Tim): This is a temp hack to handle old URIs logged with
@@ -294,34 +272,6 @@ export const browse3ContextGen = (
     },
     opUIUrl: (entityName: string, projectName: string, opName: string) => {
       return `${projectRoot(entityName, projectName)}/ops/${opName}`;
-    },
-    typeVersionUIUrl: (
-      entityName: string,
-      projectName: string,
-      typeName: string,
-      typeVersionHash: string
-    ) => {
-      return `${projectRoot(
-        entityName,
-        projectName
-      )}/types/${typeName}/versions/${typeVersionHash}`;
-    },
-    typeVersionsUIUrl: (
-      entityName: string,
-      projectName: string,
-      filter?: WFHighLevelTypeVersionFilter
-    ) => {
-      const prunedFilter = pruneEmptyFields(filter);
-      if (Object.keys(prunedFilter).length === 0) {
-        return `${projectRoot(entityName, projectName)}/type-versions`;
-      }
-
-      return `${projectRoot(
-        entityName,
-        projectName
-      )}/type-versions?filter=${encodeURIComponent(
-        JSON.stringify(prunedFilter)
-      )}`;
     },
     objectVersionUIUrl: (
       entityName: string,
@@ -490,17 +440,6 @@ type RouteType = {
     objectName: string
   ) => string;
   opUIUrl: (entityName: string, projectName: string, opName: string) => string;
-  typeVersionUIUrl: (
-    entityName: string,
-    projectName: string,
-    typeName: string,
-    typeVersionHash: string
-  ) => string;
-  typeVersionsUIUrl: (
-    entityName: string,
-    projectName: string,
-    filter?: WFHighLevelTypeVersionFilter
-  ) => string;
   objectVersionUIUrl: (
     entityName: string,
     projectName: string,
@@ -614,16 +553,6 @@ const useMakePeekingRouter = (): RouteType => {
     opUIUrl: (...args: Parameters<typeof baseContext.opUIUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.opUIUrl(...args));
     },
-    typeVersionUIUrl: (
-      ...args: Parameters<typeof baseContext.typeVersionUIUrl>
-    ) => {
-      return setSearchParam(PEEK_PARAM, baseContext.typeVersionUIUrl(...args));
-    },
-    typeVersionsUIUrl: (
-      ...args: Parameters<typeof baseContext.typeVersionsUIUrl>
-    ) => {
-      return setSearchParam(PEEK_PARAM, baseContext.typeVersionsUIUrl(...args));
-    },
     objectVersionUIUrl: (
       ...args: Parameters<typeof baseContext.objectVersionUIUrl>
     ) => {
@@ -733,4 +662,64 @@ export const usePeekLocation = () => {
       },
     };
   }, [peekPath]);
+};
+
+export const WeaveHeaderExtrasContext = createContext<{
+  extras: {[key: string]: HeaderExtra};
+  addExtra: (key: string, value: HeaderExtra) => void;
+  removeExtra: (key: string) => void;
+  renderExtras: () => ReactNode;
+}>({
+  extras: {},
+  addExtra: () => {},
+  removeExtra: () => {},
+  renderExtras: () => null,
+});
+
+type HeaderExtra = {node: ReactNode; order?: number};
+
+export const WeaveHeaderExtrasProvider = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
+  const [extras, setExtras] = useState<{[key: string]: HeaderExtra}>({});
+  const addExtra = useCallback(
+    (key: string, extra: HeaderExtra) => {
+      setExtras(prev => {
+        return {...prev, [key]: extra};
+      });
+    },
+    [setExtras]
+  );
+
+  const removeExtra = useCallback(
+    (key: string) => {
+      setExtras(prev => {
+        const newExtras = {...prev};
+        delete newExtras[key];
+        return newExtras;
+      });
+    },
+    [setExtras]
+  );
+
+  const renderExtras = useCallback(() => {
+    return (
+      <>
+        {Object.entries(extras)
+          .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))
+          .map(([key, extra]) => {
+            return <React.Fragment key={key}>{extra.node}</React.Fragment>;
+          })}
+      </>
+    );
+  }, [extras]);
+
+  return (
+    <WeaveHeaderExtrasContext.Provider
+      value={{extras, addExtra, removeExtra, renderExtras}}>
+      {children}
+    </WeaveHeaderExtrasContext.Provider>
+  );
 };

@@ -1,9 +1,10 @@
-import {Box} from '@material-ui/core';
+import Box from '@mui/material/Box';
 import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 
+import {useDeepMemo} from '../../../../../hookUtils';
 import {SmallRef} from '../../Browse2/SmallRef';
 
 export const useURLSearchParamsDict = () => {
@@ -48,28 +49,40 @@ export const renderCell = (value: any) => {
   return value;
 };
 
-export const useInitializingFilter = <T,>(
-  initialFilter?: Partial<T>,
-  onFilterUpdate?: (filter: T) => void
-) => {
-  const [filterState, setFilterState] = useState<Partial<T>>(
-    initialFilter ?? {}
-  );
+/**
+ * A hook that returns a state that can be controlled by an external component.
+ * The usage is the same as useState, but with an additional optional parameter
+ * that allows the state to be controlled by an external component.
+ *
+ * This pattern makes it easy to create components that can be controlled by an external
+ * component, but also have a default state if the external component does not provide
+ * a state.
+ */
+export const useControllableState = <T,>(
+  controlledOrInitialState: T,
+  controllingSetState?: (state: T) => void
+): [T, (state: T) => void] => {
+  const isControlled = controllingSetState !== undefined;
+
+  // Initialize inner state and setState functions
+  const [innerState, innerSetState] = useState<T>(controlledOrInitialState);
+
+  // Update inner state if deepState changes (react to external changes)
+  const deepState = useDeepMemo(controlledOrInitialState);
   useEffect(() => {
-    if (initialFilter) {
-      setFilterState(initialFilter);
-    }
-  }, [initialFilter]);
+    innerSetState(deepState);
+  }, [deepState]);
 
-  // If the caller is controlling the filter, use the caller's filter state
-  const filter = useMemo(
-    () => (onFilterUpdate ? initialFilter ?? ({} as Partial<T>) : filterState),
-    [filterState, initialFilter, onFilterUpdate]
+  // If we are controlled, use propsState as state and propOnStateUpdate as setState,
+  // otherwise use innerState and innerSetState
+  const state = useMemo(
+    () => (isControlled ? controlledOrInitialState : innerState),
+    [isControlled, controlledOrInitialState, innerState]
   );
-  const setFilter = useMemo(
-    () => (onFilterUpdate ? onFilterUpdate : setFilterState),
-    [onFilterUpdate]
+  const setState = useMemo(
+    () => (isControlled ? controllingSetState : innerSetState),
+    [isControlled, controllingSetState]
   );
 
-  return {filter, setFilter};
+  return [state, setState];
 };
