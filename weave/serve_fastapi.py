@@ -26,9 +26,9 @@ from weave.trace.vals import TraceObject
 from weave.trace import op
 from weave.trace.refs import ObjectRef, OpRef
 
-key_cache: cache.LruTimeWindowCache[
-    str, typing.Optional[bool]
-] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
+key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
+    cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
+)
 
 api: Optional[WandbApiAsync] = None
 

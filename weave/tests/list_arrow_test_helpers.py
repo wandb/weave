@@ -17,7 +17,7 @@ class ListLikeNodeInterface:
 class ListNode(ListLikeNodeInterface):
     @staticmethod
     def make_node(value):
-        return list_.make_list(**{f"{i}": v for i, v, in enumerate(value)})
+        return list_.make_list(**{f"{i}": v for i, v in enumerate(value)})
 
     @staticmethod
     def use_node(node):

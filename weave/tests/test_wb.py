@@ -278,7 +278,11 @@ artifact_version_sdk_response = {
         "state": "COMMITTED",
         "commitHash": "303db33c9f9264768626",
         "artifactType": fwb.defaultArtifactType_payload,
-        "artifactSequence": {**fwb.artifactSequence_payload, "project": fwb.project_payload, "state": "READY"},  # type: ignore
+        "artifactSequence": {
+            **fwb.artifactSequence_payload,
+            "project": fwb.project_payload,
+            "state": "READY",
+        },  # type: ignore
     }
 }
 

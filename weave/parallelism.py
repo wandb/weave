@@ -78,7 +78,9 @@ def do_in_parallel(
                                         with forward_graph.node_result_store(
                                             result_store
                                         ) as thread_result_store:
-                                            with execute.top_level_stats() as thread_top_level_stats:
+                                            with (
+                                                execute.top_level_stats() as thread_top_level_stats
+                                            ):
                                                 return do_one(x)
         finally:
             memo._memo_storage.reset(memo_token)

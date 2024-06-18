@@ -367,7 +367,7 @@ class AddAdminAndEnsureNoDefaultUser:
 @pytest.fixture(scope="session")
 def fixture_fn(base_url, wandb_server_tag, wandb_server_pull):
     def fixture_util(
-        cmd: Union[UserFixtureCommand, AddAdminAndEnsureNoDefaultUser]
+        cmd: Union[UserFixtureCommand, AddAdminAndEnsureNoDefaultUser],
     ) -> bool:
         endpoint = urllib.parse.urljoin(
             base_url.replace(LOCAL_BASE_PORT, cmd.port),

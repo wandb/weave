@@ -11,7 +11,6 @@ from .. import filesystem
 @pytest.mark.asyncio
 @pytest.mark.parametrize("process", [True, False])
 async def test_io_service_async_client(io_server_factory, process):
-
     server: io_service.Server = io_server_factory(process)
     client = io_service.AsyncClient(
         server=server,
@@ -45,7 +44,6 @@ async def test_io_service_async_client(io_server_factory, process):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("process", [True, False])
 async def test_io_service_sync_client(io_server_factory, process):
-
     server: io_service.Server = io_server_factory(process)
     fs = filesystem.get_filesystem()
     client = io_service.SyncClient(

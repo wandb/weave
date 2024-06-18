@@ -33,7 +33,7 @@ def simple_python_type_to_type(py_type: type):
 
 
 def python_type_to_type(
-    py_type: typing.Union[types.GenericAlias, type]
+    py_type: typing.Union[types.GenericAlias, type],
 ) -> weave_types.Type:
     if py_type == typing.Any:
         return weave_types.Any()
@@ -43,7 +43,8 @@ def python_type_to_type(
         else:
             return python_type_to_type(py_type.__bound__)
     elif isinstance(py_type, types.GenericAlias) or isinstance(
-        py_type, typing._GenericAlias  # type: ignore
+        py_type,
+        typing._GenericAlias,  # type: ignore
     ):
         if py_type.__origin__ == typing.Literal:
             members = [

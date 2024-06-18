@@ -242,9 +242,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> (
-        int
-    ):  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
@@ -743,7 +741,7 @@ def test_trace_call_filter(client):
     basic_op(42, 0.1)
 
     failed_cases = []
-    for (count, query) in [
+    for count, query in [
         # Base Case - simple True
         (
             13,
@@ -1555,6 +1553,7 @@ def map_simple(fn, vals):
 
 
 max_workers = 3
+
 
 # This is a standard way to execute a map operation with thread executor.
 def map_with_thread_executor(fn, vals):

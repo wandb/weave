@@ -80,9 +80,9 @@ class DummyTrace:
         return None
 
 
-_weave_trace_span: contextvars.ContextVar[
-    typing.Optional["WeaveTraceSpan"]
-] = contextvars.ContextVar("_weave_trace_span", default=None)
+_weave_trace_span: contextvars.ContextVar[typing.Optional["WeaveTraceSpan"]] = (
+    contextvars.ContextVar("_weave_trace_span", default=None)
+)
 
 
 _weave_trace_stream = None

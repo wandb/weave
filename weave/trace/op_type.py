@@ -22,7 +22,8 @@ from .op import Op
 
 def type_code(type_: Any) -> str:
     if isinstance(type_, py_types.GenericAlias) or isinstance(
-        type_, typing._GenericAlias  # type: ignore
+        type_,
+        typing._GenericAlias,  # type: ignore
     ):
         args = ", ".join(type_code(t) for t in type_.__args__)
         if type_.__origin__ == list or type_.__origin__ == collections.abc.Sequence:

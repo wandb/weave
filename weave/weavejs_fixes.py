@@ -3,6 +3,7 @@
 TODO: this file is not complete. We should try to put all compability fixes here.
     Grep for "js_compat" to find other instances.
 """
+
 import typing
 import copy
 import math
