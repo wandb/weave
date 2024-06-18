@@ -11,7 +11,6 @@ if typing.TYPE_CHECKING:
 
 
 def verify_weave_fn_is_valid(op: "op_def.OpDef", weavified: graph.Node) -> None:
-
     constituent_ops = typing.cast(
         list[graph.OutputNode],
         graph.filter_nodes_top_level(
@@ -27,7 +26,6 @@ def verify_weave_fn_is_valid(op: "op_def.OpDef", weavified: graph.Node) -> None:
 
 
 def op_to_weave_fn(opdef: "op_def.OpDef") -> graph.Node:
-
     if opdef.name.startswith("mapped"):
         raise errors.WeavifyError("Cannot convert mapped op to weave_fn here")
 

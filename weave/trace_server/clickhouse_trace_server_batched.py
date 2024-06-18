@@ -579,7 +579,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
@@ -1619,7 +1618,7 @@ def _nullable_any_dump_to_any(
 
 
 def _raw_call_dict_to_ch_call(
-    call: typing.Dict[str, typing.Any]
+    call: typing.Dict[str, typing.Any],
 ) -> SelectableCHCallSchema:
     return SelectableCHCallSchema.model_validate(call)
 
@@ -1723,7 +1722,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
 
 
 def _process_parameters(
-    parameters: typing.Dict[str, typing.Any]
+    parameters: typing.Dict[str, typing.Any],
 ) -> typing.Dict[str, typing.Any]:
     # Special processing for datetimes! For some reason, the clickhouse connect
     # client truncates the datetime to the nearest second, so we need to convert

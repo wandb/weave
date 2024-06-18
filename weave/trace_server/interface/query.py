@@ -10,14 +10,14 @@ simplifications:
     is column-oriented. However, the more expressive aggregation language can be
     used for both direct queries, but also for column comparison and
     calculations. We can add support for the "query" operators in the future if
-    needed. 
-    
+    needed.
+
 * We only support a subset of the operators / shorthand forms for now. We can add
     more operators in the future as needed.
-    
+
     * One notable omission here is the lack of support for "$field" as a shorthand for
         the "getField"  operator.
-    
+
 * We have _added_ a `$contains` operator which is not in the MongoDB query
     language. This is a simple substring match operator.
 """
@@ -40,6 +40,7 @@ class Query(BaseModel):
 # Subset of Mongo _Aggregation_ Operators: https://www.mongodb.com/docs/manual/reference/operator/aggregation/
 # Starting with these operators for now since they are the most common and with negation
 # can cover most of the other operators.
+
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/literal/
 # Can be any standard json-able value

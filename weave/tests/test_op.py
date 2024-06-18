@@ -56,7 +56,6 @@ def test_op_inferred_type():
 
 def test_op_incompatible_return_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
-
         _t = _context_state.set_loading_built_ins()
 
         try:

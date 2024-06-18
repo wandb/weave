@@ -57,7 +57,6 @@ def test_monitoring_basic(user_by_api_key_in_env):
 @pytest.mark.skip("Feature removed")
 def test_monitoring_auto_false(user_by_api_key_in_env):
     with async_disabled():
-
         # @monitoring.monitor(
         #     entity_name=user_by_api_key_in_env.username,
         #     project_name="test",
@@ -89,7 +88,6 @@ def test_monitoring_auto_false(user_by_api_key_in_env):
 @pytest.mark.skip("Feature removed")
 def test_monitoring_capture_errors(user_by_api_key_in_env):
     with async_disabled():
-
         # @monitoring.monitor(
         #     entity_name=user_by_api_key_in_env.username,
         #     project_name="test",
@@ -130,7 +128,6 @@ def test_monitoring_capture_errors(user_by_api_key_in_env):
 @pytest.mark.skip("Feature removed")
 def test_monitoring_processors(user_by_api_key_in_env):
     with async_disabled():
-
         # @monitoring.monitor(
         #     entity_name=user_by_api_key_in_env.username,
         #     project_name="test",

@@ -117,7 +117,6 @@ def test_anthropic_stream(
 async def test_async_anthropic(
     client: weave.weave_client.WeaveClient,
 ) -> None:
-
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
         api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
@@ -159,7 +158,6 @@ async def test_async_anthropic(
 async def test_async_anthropic_stream(
     client: weave.weave_client.WeaveClient,
 ) -> None:
-
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
         api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),

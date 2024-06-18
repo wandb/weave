@@ -2,21 +2,22 @@ default_stages: [pre-push]
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.275
+    rev: v0.4.8
     hooks:
+      # Run the linter.
       - id: ruff
+        types_or: [python, pyi, jupyter]
         args: [--fix, --exit-non-zero-on-fix]
-  - repo: https://github.com/psf/black
-    rev: 22.3.0
-    hooks:
-      - id: black
+      # Run the formatter.
+      - id: ruff-format
+        types_or: [python, pyi, jupyter]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.0.0"
+    rev: "v1.10.0"
     hooks:
       - id: mypy
         additional_dependencies: [types-all, wandb>=0.15.5]
         # You have to exclude in 3 places. 1) here. 2) mypi.ini exclude, 3) follow_imports = skip for each module in mypy.ini
-        exclude: (.*pyi$)|(weave/ecosystem)|(weave/tests)|(weave/panel)|(weave/ops)|(weave/legacy/ecosystem)|(weave/legacy/panel)|(weave/legacy/ops)|(weave/legacy/arrow)
+        exclude: (.*pyi$)|(weave/legacy)|(weave/tests)
   # Turn pyright back off, duplicative of mypy
   # - repo: https://github.com/RobertCraigie/pyright-python
   #   rev: v1.1.341

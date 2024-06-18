@@ -299,7 +299,6 @@ def develop(
     base_image: typing.Optional[str] = "python:3.11",
     auth_entity: typing.Optional[str] = None,
 ) -> None:
-
     dir = compile(
         model_ref,
         model_method=model_method,

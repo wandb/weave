@@ -120,16 +120,14 @@ class FilesystemAsync:
         self,
         path: str,
         mode: typing.Literal["w"],
-    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]: ...
 
     @typing.overload
     def open_write(
         self,
         path: str,
         mode: typing.Literal["wb"] = "wb",
-    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]: ...
 
     @contextlib.asynccontextmanager
     async def open_write(
@@ -150,16 +148,14 @@ class FilesystemAsync:
         self,
         path: str,
         mode: typing.Literal["r"],
-    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]: ...
 
     @typing.overload
     def open_read(
         self,
         path: str,
         mode: typing.Literal["rb"] = "rb",
-    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]: ...
 
     @contextlib.asynccontextmanager
     async def open_read(

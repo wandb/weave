@@ -62,11 +62,9 @@ if not import_failed:
 
             # Check to see if the event is an exception.
             if event_type == CBEventType.EXCEPTION:
-
                 # If the event is an exception, and we are actively tracking the corresponding
                 # call, finish the call with the exception.
                 if event_id in self._call_map:
-
                     # Pop the call from the call map.
                     call = self._call_map.pop(event_id)
 
@@ -91,7 +89,6 @@ if not import_failed:
 
                 # If the event is valid, create a call and add it to the call map.
                 if is_valid_root or is_valid_child:
-
                     # Create a call object.
                     call = gc.create_call(
                         "llama_index." + event_type.name.lower(),
@@ -118,7 +115,6 @@ if not import_failed:
 
             # If the event is in the call map, finish the call.
             if event_id in self._call_map:
-
                 # Finish the call.
                 call = self._call_map.pop(event_id)
                 gc.finish_call(call, process_payload(payload))
@@ -138,7 +134,7 @@ if not import_failed:
             pass
 
     def process_payload(
-        payload: Optional[Dict[EventPayload, Any]] = None
+        payload: Optional[Dict[EventPayload, Any]] = None,
     ) -> Optional[Dict[EventPayload, Any]]:
         if payload is None:
             return None
