@@ -27,7 +27,6 @@ from weave import (
     errors,
     filesystem,
     server_error_handling,
-    uris,
     weave_http,
 )
 from weave.legacy import (
@@ -35,6 +34,7 @@ from weave.legacy import (
     async_queue,
     cache,
     context_state,
+    uris,
     wandb_api,
     wandb_file_manager,
 )

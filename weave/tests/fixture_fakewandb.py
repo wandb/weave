@@ -1,23 +1,5 @@
 import json
 import os
-<<<<<<< HEAD
-import uuid
-import typing
-
-from weave import wandb_api
-from weave import util
-from .tag_test_util import op_add_tag
-
-from weave.old_weave.artifact_wandb import (
-    WandbArtifact,
-    WeaveWBArtifactURI,
-    WandbArtifactManifest,
-    WeaveWBArtifactByIDURI,
-)
-from .. import wandb_client_api
-from unittest import mock
-=======
->>>>>>> d8279ced1 (add wandb*.py)
 import shutil
 import typing
 import uuid
@@ -38,6 +20,7 @@ from weave.legacy import io_service, wandb_api, wandb_client_api
 from weave.legacy.artifact_wandb import (
     WandbArtifact,
     WandbArtifactManifest,
+    WeaveWBArtifactByIDURI,
     WeaveWBArtifactURI,
 )
 
