@@ -1,14 +1,12 @@
 import os
 import re
-import requests
-from .. import api
-from .. import ops
-from .. import context
-from .. import server
-from .. import weave_server
-from .. import logs
 
 import pytest
+import requests
+
+from weave.legacy import context, ops
+
+from .. import api, logs, server, weave_server
 
 
 def test_logfile_created(fresh_server_logfile):

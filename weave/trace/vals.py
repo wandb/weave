@@ -1,32 +1,33 @@
-import inspect
-from typing import Iterator, Literal, Any, Union, Optional, Generator, SupportsIndex
 import dataclasses
+import inspect
 import operator
 import typing
+from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
+
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
-from weave.trace.op import Op
-from weave.trace.refs import (
-    RefWithExtra,
-    ObjectRef,
-    TableRef,
-    DICT_KEY_EDGE_NAME,
-    OBJECT_ATTR_EDGE_NAME,
-    LIST_INDEX_EDGE_NAME,
-    TABLE_ROW_ID_EDGE_NAME,
-)
-from weave import box
+from weave.legacy import box
+from weave.legacy.graph_client_context import get_graph_client
 from weave.table import Table
-from weave.trace.serialize import from_json
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.graph_client_context import get_graph_client
+from weave.trace.op import Op
+from weave.trace.refs import (
+    DICT_KEY_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
+    OBJECT_ATTR_EDGE_NAME,
+    TABLE_ROW_ID_EDGE_NAME,
+    ObjectRef,
+    RefWithExtra,
+    TableRef,
+)
+from weave.trace.serialize import from_json
 from weave.trace_server.trace_server_interface import (
+    ObjReadReq,
+    TableQueryReq,
     TraceServerInterface,
     _TableRowFilter,
-    TableQueryReq,
-    ObjReadReq,
 )
 
 

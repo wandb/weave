@@ -12,15 +12,15 @@ except ImportError:
     from typing_extensions import Annotated  # type: ignore
 
 from . import weave_types as types
-from . import op_args
+from weave.legacy import op_args
 from . import weave_pydantic
-from . import cache
+from weave.legacy import cache
 from . import errors
 from . import pyfunc_type_util
-from .monitoring import monitor
-from .wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
+from .legacy.monitoring import monitor
+from weave.legacy.wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
 
-from .artifact_wandb import WandbArtifactRef
+from weave.legacy.artifact_wandb import WandbArtifactRef
 
 from weave.trace.vals import TraceObject
 from weave.trace import op

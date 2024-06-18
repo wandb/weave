@@ -13,7 +13,7 @@ from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
 from weave import trace_sentry, urls
-from weave import run_context
+from weave.legacy import run_context
 from weave.trace.op import Op
 from weave.trace.object_record import (
     ObjectRecord,
@@ -22,7 +22,7 @@ from weave.trace.object_record import (
     pydantic_asdict_one_level,
 )
 from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
-from weave import graph_client_context
+from weave.legacy import graph_client_context
 from weave.trace_server.trace_server_interface import (
     CallUpdateReq,
     CallsDeleteReq,

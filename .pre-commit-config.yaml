@@ -16,7 +16,7 @@ repos:
       - id: mypy
         additional_dependencies: [types-all, wandb>=0.15.5]
         # You have to exclude in 3 places. 1) here. 2) mypi.ini exclude, 3) follow_imports = skip for each module in mypy.ini
-        exclude: (.*pyi$)|(weave/ecosystem)|(weave/tests)|(weave/panel)|(weave/ops)
+        exclude: (.*pyi$)|(weave/ecosystem)|(weave/tests)|(weave/panel)|(weave/ops)|(weave/legacy/ecosystem)|(weave/legacy/panel)|(weave/legacy/ops)|(weave/legacy/arrow)
   # Turn pyright back off, duplicative of mypy
   # - repo: https://github.com/RobertCraigie/pyright-python
   #   rev: v1.1.341

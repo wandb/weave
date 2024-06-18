@@ -1,10 +1,11 @@
-import os
-import pytest
-import time
-from weave.monitoring import monitor
-import weave
 import contextlib
+import os
+import time
 
+import pytest
+
+import weave
+from weave.legacy.monitoring import monitor
 
 ### Skipping some tests here. They are for features that no longer exist. Since we're
 # iterating on the API, I'm not removing them yet.

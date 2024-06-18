@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from ..async_queue import Queue, ProcessQueue, ThreadQueue
+from weave.legacy.async_queue import Queue, ProcessQueue, ThreadQueue
 import threading
 import aioprocessing
 
