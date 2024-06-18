@@ -398,6 +398,8 @@ class CallsQuery(BaseModel):
             project_id=self.project_id,
             select_fields=self.select_fields.copy(),
             query_conditions=self.query_conditions.copy(),
+            order_fields=self.order_fields.copy(),
+            legacy_filter=self.legacy_filter,
             limit=self.limit,
             offset=self.offset,
         )

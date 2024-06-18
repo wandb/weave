@@ -372,6 +372,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.sort_by is not None:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
+        else:
+            cq.add_order("started_at", "asc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
