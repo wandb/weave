@@ -63,12 +63,25 @@ modal = { file = ["requirements.modal.txt"] }
 testpaths = ["weave"]
 filterwarnings = ["error"]
 
-[tool.ruff]
-line-length = 88
-show-fixes = true
+[tool.ruff.lint]
 select = [
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",
   "F541",
 ]
-exclude = ["weave/api.py", "weave/__init__.py", "examples"]
+exclude = [
+  "weave/api.py",
+  "weave/__init__.py",
+  "weave/legacy/**/*.py",
+  "examples",
+]
+
+[tool.ruff]
+line-length = 88
+show-fixes = true
+exclude = [
+  "weave/api.py",
+  "weave/__init__.py",
+  "weave/legacy/**/*.py",
+  "examples",
+]
