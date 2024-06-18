@@ -65,7 +65,7 @@ This set of fields is partitioned into:
   fields is partitioned into (by reformatting the query as ANDS of clauses):
     * FILTER_STATIC_FIELDS
     * FILTER_DYNAMIC_FIELDS
-* SORT_FIELDS: The fields that are used to sort the query. This set of fields is
+* SORT_FIELDS: The fields that are used to order the query. This set of fields is
   partitioned into:
     * SORT_STATIC_FIELDS
     * SORT_DYNAMIC_FIELDS
@@ -136,11 +136,11 @@ Now, under the very specific condition that:
 a) we have no `FILTER_DYNAMIC_FIELDS`
 b) we have no `SORT_DYNAMIC_FIELDS`
 c) we have a limit
-Then we can push the sort into the inner query:
+Then we can push the order into the inner query:
 
-PRE-SORTED/FILTERED QUERY:
+PRE-ORDERED/FILTERED QUERY:
 ```sql
-WITH sorted_filtered_calls AS (
+WITH ordered_filtered_calls AS (
     SELECT id
     FROM calls_merged
     WHERE project_id = {project_id}
@@ -154,7 +154,7 @@ WITH sorted_filtered_calls AS (
 )
 SELECT {SELECT_FIELDS}
 FROM calls_merged
-WHERE id IN (sorted_filtered_calls) -- Consider using an INNER JOIN here
+WHERE id IN (ordered_filtered_calls) -- Consider using an INNER JOIN here
 GROUP BY (project_id, id)
 ORDER BY {SORT_FIELDS}              -- still required to repeat
 ```
@@ -204,7 +204,7 @@ OFFSET {offset}                     -- optional
 ```
 
 BASE QUERY -- (if filters contain at least one static field clause) --> PRE-FILTERED QUERY
-PRE-FILTERED QUERY -- (if sort fields are static and limit is present) --> PRE-SORTED/FILTERED QUERY
+PRE-FILTERED QUERY -- (if order fields are static and limit is present) --> PRE-ORDERED/FILTERED QUERY
 PRE-FILTERED QUERY -- (if all select fields are static) --> STATIC QUERY
 PRE-FILTERED QUERY -- (if expansions are present) --> EXPANDED QUERY
 
@@ -212,12 +212,12 @@ PRE-FILTERED QUERY -- (if expansions are present) --> EXPANDED QUERY
 Now that all this is written, i think an alternative implementation is:
 1. Start with the EXPANDED QUERY.
 2. If there are no expansions needed, then move to the PRE-FILTERED QUERY.
-3. If sort fields are static and limit is present, then move to the PRE-SORTED/FILTERED QUERY.
+3. If order fields are static and limit is present, then move to the PRE-ORDERED/FILTERED QUERY.
 4. If all select fields are static, then move to the STATIC QUERY.
 
 """
 
-# TODO: Consider latency sorting
+# TODO: Consider latency ordering
 
 class CallsMergedField(BaseModel):
     field: str
@@ -301,6 +301,7 @@ class CallsQuery(BaseModel):
     project_id: str
     select_fields: List[CallsMergedField] = Field(default_factory=list)
     filter_conditions: List[Condition] = Field(default_factory=list)
+    order_fields: List[SortField] = Field(default_factory=list)
     limit: Optional[int] = None
     offset: Optional[int] = None
 
@@ -312,11 +313,11 @@ class CallsQuery(BaseModel):
         self.filter_conditions.append(Condition(query=query))
         return self
 
-    def add_sort(self, field: str, direction: str):
+    def add_order(self, field: str, direction: str):
         direction = direction.upper()
         if direction not in ["ASC", "DESC"]:
             raise ValueError(f"Direction {direction} is not allowed")
-        self.sort_fields.append(SortField(field=get_field_by_name(field), direction=direction))
+        self.order_fields.append(SortField(field=get_field_by_name(field), direction=direction))
         return self
 
     def set_limit(self, limit: int):
@@ -334,10 +335,87 @@ class CallsQuery(BaseModel):
             raise ValueError("Offset can only be set once")
         self.offset = offset
         return self
-    
 
-    def build_query(self):
-        pass
+    def clone(self):
+        return CallsQuery(
+            project_id=self.project_id,
+            select_fields=self.select_fields.copy(),
+            filter_conditions=self.filter_conditions.copy(),
+            limit=self.limit,
+            offset=self.offset
+        )
+
+    def as_sql(self, pb: ParamBuilder) -> str:
+        outer_query = self.clone()
+        outer_query.filter_conditions = []
+        filtered_calls_query = CallsQuery(self.project_id).add_field("id").add_condition(not_deleted_at)
+        for cond in self.filter_conditions:
+            consumed_fields = cond.get_consumed_fields()
+            if not any([isinstance(field, CallsMergedDynamicField) for field in consumed_fields]):
+                filtered_calls_query.add_condition(cond)
+            else:
+                outer_query.add_condition(cond)
+
+        dynamic_order_fields = [field for field in self.order_fields if isinstance(field.field, CallsMergedDynamicField)]
+        if len(dynamic_order_fields) == 0 and self.limit is not None and len(self.outer_query.filter_conditions) == 0:
+            filtered_calls_query.set_limit(self.limit)
+            if self.offset is not None:
+                filtered_calls_query.set_offset(self.offset)
+            filtered_calls_query.order_fields = self.order_fields
+            outer_query.offset = None
+            outer_query.limit = None
+
+        dynamic_select_fields = [field for field in self.select_fields if isinstance(field, CallsMergedDynamicField)]
+        if len(dynamic_select_fields) == 0:
+            filtered_calls_query.select_fields = self.select_fields
+            return filtered_calls_query._as_sql_base_format(pb)
+
+        assert filtered_calls_query.limit is None
+        assert filtered_calls_query.offset is None
+        assert len(filtered_calls_query.order_fields) == 0
+
+        # TODO: Recursive expansion goes here
+
+        return f"""
+        WITH filtered_calls AS ({filtered_calls_query._as_sql_base_format(pb)})
+        {outer_query._as_sql_base_format(pb, id_subquery_name="filtered_calls")}
+        """
+
+    def _as_sql_base_format(self, pb: ParamBuilder, id_subquery_name: Optional[str] =  None) -> str:
+        select_fields_sql = ", ".join([field.as_select_sql() for field in self.select_fields])
+
+        having_filter_sql = ""
+        if len(self.filter_conditions) > 0:
+            having_filter_sql = "HAVING " + " AND ".join([condition.as_sql(pb) for condition in self.filter_conditions])
+
+        order_by_sql = ""
+        if len(self.order_fields) > 0:
+            order_by_sql = "ORDER BY "  + ", ".join([order_field.as_sql() for order_field in self.order_fields])
+
+        limit_sql = ""
+        if self.limit is not None:
+            limit_sql = f"LIMIT {self.limit}"
+
+        offset_sql = ""
+        if self.offset is not None:
+            offset_sql = f"OFFSET {self.offset}"
+
+        id_subquery_sql = ""
+        if id_subquery_name is not None:
+            id_subquery_sql = "AND id IN (SELECT id FROM {id_subquery_name})"
+
+        return f"""
+        SELECT {select_fields_sql}
+        FROM calls_merged
+        WHERE project_id = {self.project_id}
+        {id_subquery_sql}                     -- optional
+        GROUP BY (project_id, id)
+        {having_filter_sql}                   -- optional 
+        {order_by_sql}                        -- optional
+        {limit_sql}                           -- optional
+        {offset_sql}                          -- optional
+        """
+
 
 allowed_fields = {
     "project_id": CallsMergedField(field="project_id"),

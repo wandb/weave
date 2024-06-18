@@ -1253,6 +1253,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit_part = "LIMIT {limit: Int64}"
             parameters["limit"] = limit
 
+        # TODO: make this lovely!
+        cq = CallsQuery(project_id)
         if having_conditions_part or len(order_by_events) != 1:
             if having_conditions_part is None:
                 having_conditions_part == "1 = 1"
