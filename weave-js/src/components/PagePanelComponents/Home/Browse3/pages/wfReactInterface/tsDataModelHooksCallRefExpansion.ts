@@ -8,6 +8,7 @@
 import * as _ from 'lodash';
 import {useEffect, useMemo, useState} from 'react';
 
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {isRef} from '../common/util';
 import {refDataCache} from './cache';
 import * as traceServerClient from './traceServerClient';
@@ -66,7 +67,7 @@ export const useClientSideCallRefExpansion = (
           ) {
             value = value[EXPANDED_REF_VAL_KEY];
           }
-          if (isRef(value)) {
+          if (isExpandableRef(value)) {
             refsNeeded.add(value);
           }
         });
@@ -173,4 +174,38 @@ export const directFetchRefsData = async (
   });
 
   return refUris.map(uri => cached[uri]);
+};
+
+export const isTableRef = (ref: any): boolean => {
+  if (typeof ref !== 'string') {
+    return false;
+  }
+  if (!isRef(ref)) {
+    return false;
+  }
+  const parsed = parseRef(ref);
+  if (isWeaveObjectRef(parsed)) {
+    return parsed.weaveKind === 'table';
+  }
+  return false;
+};
+
+export const isExpandableRef = (ref: any): boolean => {
+  if (typeof ref !== 'string') {
+    return false;
+  }
+  if (!isRef(ref)) {
+    return false;
+  }
+  const parsed = parseRef(ref);
+  if (isWeaveObjectRef(parsed)) {
+    return (
+      parsed.weaveKind === 'object' ||
+      parsed.weaveKind === 'op' ||
+      (parsed.weaveKind === 'table' &&
+        parsed.artifactRefExtra != null &&
+        parsed.artifactRefExtra.length > 0)
+    );
+  }
+  return false;
 };

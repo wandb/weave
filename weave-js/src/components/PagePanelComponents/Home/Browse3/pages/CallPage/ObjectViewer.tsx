@@ -17,7 +17,6 @@ import React, {
   useState,
 } from 'react';
 
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
@@ -28,6 +27,7 @@ import {
   OBJECT_ATTR_EDGE_NAME,
 } from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
+import {isExpandableRef} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {
   USE_TABLE_FOR_ARRAYS,
   WeaveCHTableSourceRefContext,
@@ -59,23 +59,6 @@ const getRefs = (data: Data): string[] => {
 
 type RefValues = Record<string, any>; // ref URI to value
 
-const refIsExpandable = (ref: string): boolean => {
-  if (!isRef(ref)) {
-    return false;
-  }
-  const parsed = parseRef(ref);
-  if (isWeaveObjectRef(parsed)) {
-    return (
-      parsed.weaveKind === 'object' ||
-      parsed.weaveKind === 'op' ||
-      (parsed.weaveKind === 'table' &&
-        parsed.artifactRefExtra != null &&
-        parsed.artifactRefExtra.length > 0)
-    );
-  }
-  return false;
-};
-
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({
   apiRef,
@@ -90,7 +73,7 @@ export const ObjectViewer = ({
   const [resolvedData, setResolvedData] = useState<Data>(data);
 
   // `dataRefs` are the refs contained in the data, filtered to only include expandable refs.
-  const dataRefs = useMemo(() => getRefs(data).filter(refIsExpandable), [data]);
+  const dataRefs = useMemo(() => getRefs(data).filter(isExpandableRef), [data]);
 
   // Expanded refs are the explicit set of refs that have been expanded by the user. Note that
   // this might contain nested refs not in the `dataRefs` set. The keys are refs and the values
@@ -187,7 +170,7 @@ export const ObjectViewer = ({
         if (context.path.hasHiddenKey() || isNullDescription) {
           return 'skip';
         }
-        if (refIsExpandable(context.value)) {
+        if (isExpandableRef(context.value)) {
           // These are possibly expandable refs. When we encounter an expandable ref, we
           // indicate that it is expandable and add a loader row. The effect is that the
           // group header will show the expansion icon when `isExpandableRef` is true. Also,

@@ -123,7 +123,10 @@ class CallRef(RefWithExtra):
         return u
 
 
-def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
+AnyRef = Union[ObjectRef, TableRef, CallRef]
+
+
+def parse_uri(uri: str) -> AnyRef:
     if not uri.startswith("weave:///"):
         raise ValueError(f"Invalid URI: {uri}")
     path = uri[len("weave:///") :]
@@ -134,6 +137,10 @@ def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
     remaining = parts[3:]
     if kind == "table":
         return TableRef(entity=entity, project=project, digest=remaining[0])
+    elif kind == "call":
+        return CallRef(
+            entity=entity, project=project, id=remaining[0], extra=remaining[1:]
+        )
     elif kind == "object":
         name, version = remaining[0].split(":")
         return ObjectRef(
