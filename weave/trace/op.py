@@ -52,7 +52,6 @@ class Op:
         self.name = resolve_fn.__name__
         self.signature = inspect.signature(resolve_fn)
         self._on_output_handler = None
-        self.display_name = None
 
     def __get__(
         self, obj: Optional[object], objtype: Optional[type[object]] = None
@@ -85,7 +84,6 @@ class Op:
             inputs_with_defaults,
             parent_run,
             attributes=attributes,
-            display_name=self.display_name,
         )
 
         has_finished = False
@@ -174,7 +172,6 @@ class BoundOp(Op):
         self.signature = inspect.signature(op.resolve_fn)
         self.resolve_fn = op.resolve_fn
         self._on_output_handler = op._on_output_handler
-        self.display_name = op.display_name
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return Op.__call__(self, self.arg0, *args, **kwargs)
@@ -204,8 +201,6 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
     def wrap(f: Callable[P, R]) -> Callable[P, R]:
         op = Op(f)
         functools.update_wrapper(op, f)
-        if "display_name" in kwargs:
-            op.display_name = kwargs["display_name"]
         return op  # type: ignore
 
     if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):

@@ -1,6 +1,6 @@
 # Sqlite Trace Server
 
-from typing import cast, Optional, Any, Union
+from typing import Iterator, cast, Optional, Any, Union
 import threading
 
 import contextvars
@@ -22,7 +22,6 @@ from .trace_server_interface_util import (
 from . import trace_server_interface as tsi
 from .interface import query as tsi_query
 
-from weave.trace import refs
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -39,6 +38,10 @@ from weave.trace_server.refs_internal import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    WEAVE_INTERNAL_SCHEME,
+    InternalObjectRef,
+    InternalTableRef,
+    parse_internal_uri,
 )
 from weave.trace_server.orm import Row
 
@@ -450,6 +453,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        return iter(self.calls_query(req).calls)
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         calls = self.calls_query(
             tsi.CallsQueryReq(
@@ -661,22 +667,22 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_refs = [refs.parse_uri(r) for r in req.refs]
-        if any(isinstance(r, refs.TableRef) for r in parsed_refs):
+        parsed_refs = [parse_internal_uri(r) for r in req.refs]
+        if any(isinstance(r, InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
-        parsed_obj_refs = cast(list[refs.ObjectRef], parsed_refs)
+        parsed_obj_refs = cast(list[InternalObjectRef], parsed_refs)
 
-        def read_ref(r: refs.ObjectRef) -> Any:
+        def read_ref(r: InternalObjectRef) -> Any:
             conds = [
                 f"object_id = '{r.name}'",
-                f"digest = '{r.digest}'",
+                f"digest = '{r.version}'",
             ]
             objs = self._select_objs_query(
-                f"{r.entity}/{r.project}",
+                r.project_id,
                 conditions=conds,
             )
             if len(objs) == 0:
-                raise NotFoundError(f"Obj {r.name}:{r.digest} not found")
+                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
             val = obj.val
             extra = r.extra
@@ -689,14 +695,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 elif op == LIST_INDEX_EDGE_NAME:
                     val = val[int(arg)]
                 elif op == TABLE_ROW_ID_EDGE_NAME:
-                    if isinstance(val, str) and val.startswith("weave://"):
-                        table_ref = refs.parse_uri(val)
-                        if not isinstance(table_ref, refs.TableRef):
+                    weave_internal_prefix = WEAVE_INTERNAL_SCHEME + ":///"
+                    if isinstance(val, str) and val.startswith(weave_internal_prefix):
+                        table_ref = parse_internal_uri(val)
+                        if not isinstance(table_ref, InternalTableRef):
                             raise ValueError(
                                 "invalid data layout encountered, expected TableRef when resolving id"
                             )
                         row = self._table_row_read(
-                            project_id=f"{table_ref.entity}/{table_ref.project}",
+                            project_id=table_ref.project_id,
                             row_digest=arg,
                         )
                         val = row.val
@@ -742,7 +749,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             "wb_user_id": req.wb_user_id,
             "creator": req.creator,
             "feedback_type": req.feedback_type,
-            "payload": payload,
+            "payload": req.payload,
             "created_at": created_at,
         }
         conn, cursor = get_conn_cursor(self.db_path)
