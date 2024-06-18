@@ -256,7 +256,7 @@ class CallsMergedDynamicField(CallsMergedAggField):
         res = super().as_sql(pb, table_alias)
         if self.extra_path:
             param_name = pb.add_param(quote_json_path_parts(self.extra_path))
-            return f"JSON_VALUE({res}, '$.{_param_slot(param_name, 'String')}')"
+            return f"JSON_VALUE({res}, {_param_slot(param_name, 'String')})"
         return res
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
@@ -281,17 +281,17 @@ def quote_json_path_parts(parts: list[str]) -> str:
 
     See comments on `GetFieldOperator` for current limitations
     """
-    parts_final = []
-    for part in parts:
-        append_part = '."' + part + '"'
+
+    def quote_part(part: str) -> str:
         if len(part) > 0 and part[0] != 0:
             try:
                 int(part)
-                append_part = "[" + part + "]"
+                return "[" + part + "]"
             except ValueError:
                 pass
-        parts_final.append(append_part)
-    return "$" + "".join(parts_final)
+        return '"' + part + '"'
+
+    return "$." + ".".join([quote_part(p) for p in parts])
 
 
 class SortField(BaseModel):
@@ -323,7 +323,7 @@ class Condition(BaseModel):
             self._consumed_fields = []
             _, raw_fields = process_query_to_conditions(
                 tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
-                None,
+                ParamBuilder(),
             )
             for field in raw_fields:
                 self._consumed_fields.append(get_field_by_name(field))
@@ -554,9 +554,10 @@ def get_field_by_name(name: str) -> CallsMergedField:
         dumped_start_part = start_part + "_dump"
         if dumped_start_part in allowed_fields:
             field = allowed_fields[dumped_start_part]
-            if len(field_parts) > 1:
-                if isinstance(field, CallsMergedDynamicField):
+            if isinstance(field, CallsMergedDynamicField):
+                if len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
+            return field
         raise ValueError(f"Field {name} is not allowed")
     return allowed_fields[name]
 
@@ -569,7 +570,7 @@ class FilterToConditions(BaseModel):
 
 def process_query_to_conditions(
     query: tsi.Query,
-    param_builder: typing.Optional[ParamBuilder] = None,
+    param_builder: ParamBuilder,
 ) -> tuple[list[str], set[str]]:
     # TODO: Convert to FilterToConditions
     """Converts a Query to a list of conditions for a clickhouse query."""
@@ -773,8 +774,8 @@ def transform_external_field_to_internal_field(
 ) -> tuple[str, ParamBuilder, set[str]]:
     """Transforms a request for a dot-notation field to a clickhouse field."""
     param_builder = param_builder or ParamBuilder()
-    raw_fields_used = set([field])
     structured_field = get_field_by_name(field)
+    raw_fields_used = set([structured_field.field])
 
     if isinstance(structured_field, CallsMergedDynamicField):
         if cast == "exists":
@@ -870,17 +871,6 @@ def is_dynamic_field(field: str) -> bool:
 def _param_slot(param_name: str, param_type: str) -> str:
     """Helper function to create a parameter slot for a clickhouse query."""
     return f"{{{param_name}:{param_type}}}"
-
-
-def _quote_json_path(path: str) -> str:
-    """Helper function to quote a json path for use in a clickhouse query. Moreover,
-    this converts index operations from dot notation (conforms to Mongo) to bracket
-    notation (required by clickhouse)
-
-    See comments on `GetFieldOperator` for current limitations
-    """
-    parts = path.split(".")
-    return quote_json_path_parts(parts)
 
 
 def _python_value_to_ch_type(value: typing.Any) -> str:

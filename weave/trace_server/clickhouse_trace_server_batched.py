@@ -330,9 +330,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 req.filter, param_builder
             )
             raw_fields_used.update(filter_to_conditions.fields_used)
-            having_conditions.extend(filter_to_conditions.having_conditions)
-            start_event_conditions.extend(filter_to_conditions.start_event_conditions)
-            end_event_conditions.extend(filter_to_conditions.end_event_conditions)
+            having_conditions.extend(filter_to_conditions.conditions)
+            # start_event_conditions.extend(filter_to_conditions.start_event_conditions)
+            # end_event_conditions.extend(filter_to_conditions.end_event_conditions)
 
         # Next, apply the query filter
         if req.query:
