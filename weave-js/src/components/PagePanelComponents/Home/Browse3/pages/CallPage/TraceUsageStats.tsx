@@ -96,11 +96,11 @@ export const getUsageFromCellParams = (params: {[key: string]: any}) => {
 // This needs to updated eventually, to either include more possible keys or to be more dynamic
 // accounts for openai and anthropic usage objects (prompt_tokens, input_tokens)
 export const getInputTokens = (usage: UsageData) => {
-  return usage.prompt_tokens || usage.input_tokens || 0;
+  return usage.input_tokens ?? usage.prompt_tokens ?? 0;
 };
 
 export const getOutputTokens = (usage: UsageData) => {
-  return usage.completion_tokens || usage.output_tokens || 0;
+  return usage.output_tokens ?? usage.completion_tokens ?? 0;
 };
 
 export const getTokensAndCostFromUsage = (usage: {

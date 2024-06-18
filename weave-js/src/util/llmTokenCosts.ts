@@ -100,7 +100,7 @@ export const LLM_TOKEN_COSTS = {
 export const getLLMTokenCost = (
   model: string,
   type: 'input' | 'output',
-  tokens: number = 0
+  tokens: number
 ) => {
   if (tokens === 0) {
     return 0;
@@ -114,8 +114,8 @@ export const getLLMTokenCost = (
 
 export const getLLMTotalTokenCost = (
   model: string,
-  inputTokens: number = 0,
-  outputTokens: number = 0
+  inputTokens: number,
+  outputTokens: number
 ) => {
   if (inputTokens + outputTokens === 0) {
     return 0;
@@ -142,7 +142,7 @@ export const FORMAT_NUMBER_NO_DECIMALS = new Intl.NumberFormat('en-US', {
 });
 
 // Number formatting function that formats numbers in the thousands and millions with 3 sigfigs
-export const formatTokenCount = (num: number = 0): string => {
+export const formatTokenCount = (num: number): string => {
   if (num < 10000) {
     return FORMAT_NUMBER_NO_DECIMALS.format(num);
   } else if (num >= 10000 && num < 1000000) {
@@ -155,7 +155,7 @@ export const formatTokenCount = (num: number = 0): string => {
   return parseFloat(millions).toString() + 'm';
 };
 
-export const formatTokenCost = (cost: number = 0): string => {
+export const formatTokenCost = (cost: number): string => {
   if (cost === 0) {
     return '$0.00';
   } else if (cost < 0.01) {
