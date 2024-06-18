@@ -257,14 +257,14 @@ class CallsMergedDynamicField(CallsMergedAggField):
         if self.extra_path:
             param_name = pb.add_param(quote_json_path_parts(self.extra_path))
             return f"JSON_VALUE({res}, {_param_slot(param_name, 'String')})"
-        return res
+        return f"JSON_VALUE({res}, '$')"
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
         if self.extra_path:
             raise NotImplementedError(
                 "Dynamic fields cannot be selected directly, yet - implement me!"
             )
-        return super().as_select_sql(pb, table_alias)
+        return super().as_sql(pb, table_alias)
 
     def with_path(self, path: list[str]) -> "CallsMergedDynamicField":
         extra_path = [*(self.extra_path or [])]
@@ -289,9 +289,9 @@ def quote_json_path_parts(parts: list[str]) -> str:
                 return "[" + part + "]"
             except ValueError:
                 pass
-        return '"' + part + '"'
+        return '."' + part + '"'
 
-    return "$." + ".".join([quote_part(p) for p in parts])
+    return "$" + "".join([quote_part(p) for p in parts])
 
 
 class SortField(BaseModel):
