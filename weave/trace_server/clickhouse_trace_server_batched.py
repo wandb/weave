@@ -319,8 +319,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         having_conditions = []
-        start_event_conditions = []
-        end_event_conditions = []
+        # start_event_conditions = []
+        # end_event_conditions = []
         param_builder = ParamBuilder()
         raw_fields_used = set()
 
@@ -346,8 +346,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stats = self._calls_query_stats_raw(
             req.project_id,
             columns=list(raw_fields_used),
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
+            # start_event_conditions=start_event_conditions,
+            # end_event_conditions=end_event_conditions,
             having_conditions=having_conditions,
             parameters=param_builder.get_params(),
         )
