@@ -198,6 +198,25 @@ class RefFeedbackQuery(FeedbackQuery):
         self.feedbacks = None  # Clear cache
         return response.id
 
+    def add(
+        self,
+        feedback_type: str,
+        payload: Optional[dict[str, Any]] = None,
+        creator: Optional[str] = None,
+        **kwargs: dict[str, Any],
+    ) -> str:
+        """Add feedback to the ref.
+
+        feedback_type: A string identifying the type of feedback. The "wandb." prefix is reserved.
+        creator: The name to display for the originator of the feedback.
+        """
+        if feedback_type.startswith("wandb."):
+            raise ValueError('Feedback type cannot start with "wandb."')
+        feedback = {}
+        feedback.update(payload or {})
+        feedback.update(kwargs)
+        return self._add(feedback_type, feedback, creator)
+
     def add_reaction(self, emoji: str, creator: Optional[str] = None) -> str:
         return self._add(
             "wandb.reaction.1",
