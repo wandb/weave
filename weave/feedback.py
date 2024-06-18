@@ -5,14 +5,15 @@ from typing import Any, Iterable, Iterator, Optional
 
 from rich.table import Table
 
-from . import graph_client_context
-from . import util
 from weave import rich_pydantic_util
+from weave.old_weave import graph_client_context
 from weave.refs import Refs
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.query import Query
 from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import parse_uri
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.interface.query import Query
+
+from . import util
 
 
 class Feedbacks(AbstractRichContainer[tsi.Feedback]):

@@ -3,10 +3,10 @@
 from typing import Iterable, Optional
 
 from rich.table import Table
-from . import graph_client_context
 
-from weave.trace.refs import parse_uri, AnyRef, CallRef
+from weave.old_weave import graph_client_context
 from weave.rich_container import AbstractRichContainer
+from weave.trace.refs import AnyRef, CallRef, parse_uri
 from weave.trace.vals import TraceObject
 
 
