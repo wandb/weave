@@ -8,7 +8,7 @@ import requests
 import tenacity
 from pydantic import BaseModel, ValidationError
 
-from weave.old_weave.wandb_interface import project_creator
+from weave.legacy.wandb_interface import project_creator
 from weave.trace_server import environment as wf_env
 
 from . import trace_server_interface as tsi

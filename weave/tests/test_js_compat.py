@@ -9,8 +9,8 @@
 
 from weave import weave_types as types
 from weave import weavejs_fixes
-from weave.old_weave import partial_object
-from weave.old_weave.ops_domain import wb_domain_types
+from weave.legacy import partial_object
+from weave.legacy.ops_domain import wb_domain_types
 
 
 def test_const_serialization():

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from weave.old_weave import context_state
+from weave.legacy import context_state
 
 from .. import api as weave
 

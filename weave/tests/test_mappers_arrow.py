@@ -3,7 +3,7 @@ import math
 import pyarrow as pa
 
 from weave import weave_types as types
-from weave.old_weave import mappers_arrow
+from weave.legacy import mappers_arrow
 
 
 def test_map_list():

@@ -2,7 +2,7 @@ import copy
 import inspect
 import typing
 
-from weave.old_weave import op_args
+from weave.legacy import op_args
 
 from . import errors, infer_types
 from . import weave_types as types

@@ -5,8 +5,8 @@
 import dataclasses
 import typing
 
-from weave.old_weave import box
-from weave.old_weave.language_features.tagging import tag_store
+from weave.legacy import box
+from weave.legacy.language_features.tagging import tag_store
 
 
 @dataclasses.dataclass

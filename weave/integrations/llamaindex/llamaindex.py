@@ -1,4 +1,4 @@
-from weave.old_weave import graph_client_context
+from weave.legacy import graph_client_context
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
 

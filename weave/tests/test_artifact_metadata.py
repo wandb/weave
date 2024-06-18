@@ -1,8 +1,8 @@
 import wandb
 
 import weave
-from weave.old_weave import artifact_local, artifact_wandb
-from weave.old_weave.wandb_interface.wandb_artifact_pusher import (
+from weave.legacy import artifact_local, artifact_wandb
+from weave.legacy.wandb_interface.wandb_artifact_pusher import (
     write_artifact_to_wandb,
 )
 
@@ -56,8 +56,8 @@ def test_artifact_metadata(user_by_api_key_in_env):
     }
 
     # Push an artifact to wandb and verify that the metadata is correct
-    remote_uri = weave.old_weave.ops.publish_artifact(
-        weave.old_weave.ops.get(local_art.uri + "/obj"),
+    remote_uri = weave.legacy.ops.publish_artifact(
+        weave.legacy.ops.get(local_art.uri + "/obj"),
         "test_artifact",
         "test_project",
         None,
@@ -113,7 +113,7 @@ def test_artifact_files_count(user_by_api_key_in_env):
     run.finish()
 
     count_node = (
-        weave.old_weave.ops.project(run.entity, run.project)
+        weave.legacy.ops.project(run.entity, run.project)
         .artifact("test")
         .membershipForAlias("v0")
         .artifactVersion()

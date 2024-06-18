@@ -7,23 +7,23 @@ import pyarrow as pa
 import pytest
 from PIL import Image
 
-from weave.old_weave import box, context_state, graph, mappers_arrow, ops
+from weave.legacy import box, context_state, graph, mappers_arrow, ops
 
 # If you're thinking of import vectorize here, don't! Put your
 # tests in test_arrow_vectorizer.py instead
-from weave.old_weave import ops_arrow as arrow
-from weave.old_weave.arrow import constructors
-from weave.old_weave.arrow.arrow_tags import (
+from weave.legacy import ops_arrow as arrow
+from weave.legacy.arrow import constructors
+from weave.legacy.arrow.arrow_tags import (
     recursively_encode_pyarrow_strings_as_dictionaries,
 )
-from weave.old_weave.language_features.tagging import (
+from weave.legacy.language_features.tagging import (
     make_tag_getter_op,
     tag_store,
     tagged_value_type,
 )
-from weave.old_weave.op_def import map_type
-from weave.old_weave.ops_domain import project_ops
-from weave.old_weave.ops_primitives import list_, make_list
+from weave.legacy.op_def import map_type
+from weave.legacy.ops_domain import project_ops
+from weave.legacy.ops_primitives import list_, make_list
 from weave.tests import list_arrow_test_helpers as lath
 
 from .. import api as weave
@@ -1307,7 +1307,7 @@ def test_stddev():
 
 
 def test_join_all_struct_val():
-    from weave.old_weave import ops_arrow
+    from weave.legacy import ops_arrow
 
     t1 = arrow.to_arrow([{"a": 5, "b": {"c": 6}}])
     t2 = arrow.to_arrow([{"a": 9, "b": {"c": 10}}, {"a": 5, "b": {"c": 11}}])

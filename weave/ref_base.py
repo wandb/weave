@@ -5,18 +5,18 @@ import typing
 import weakref
 from typing import Iterable, Optional, Sequence
 
-from weave.old_weave import box, context_state, graph_client_context, object_context
-from weave.old_weave.language_features.tagging import tag_store
+from weave.legacy import box, context_state, graph_client_context, object_context
+from weave.legacy.language_features.tagging import tag_store
 
 from . import errors
 from . import weave_types as types
-from .old_weave import uris
+from .legacy import uris
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
-    from weave.old_weave import run
+    from weave.legacy import run
 
     from . import weave_client
     from . import weave_types as types

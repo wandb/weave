@@ -4,8 +4,8 @@ import pytest
 
 from weave import api as weave
 from weave import storage, types, weave_internal
-from weave.old_weave import context_state, graph, uris
-from weave.old_weave import context_state as _context_state
+from weave.legacy import context_state, graph, uris
+from weave.legacy import context_state as _context_state
 
 from . import test_helpers
 

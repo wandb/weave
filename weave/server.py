@@ -13,7 +13,7 @@ import requests
 from flask import current_app
 from werkzeug.serving import make_server
 
-from weave.old_weave import (
+from weave.legacy import (
     cache,
     context,
     execute,
@@ -23,8 +23,8 @@ from weave.old_weave import (
     value_or_error,
     wandb_api,
 )
-from weave.old_weave.language_features.tagging import tag_store
-from weave.old_weave.language_features.tagging.tag_store import isolated_tagging_context
+from weave.legacy.language_features.tagging import tag_store
+from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context
 
 from . import engine_trace, logs, storage, util, weave_types
 
@@ -116,7 +116,7 @@ class SubprocessServer(multiprocessing.Process):
         self.resp_queue = resp_queue
 
     def run(self):
-        from weave.old_weave import ops, panels, panels_py
+        from weave.legacy import ops, panels, panels_py
 
         while True:
             req = self.req_queue.get()

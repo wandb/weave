@@ -2,7 +2,7 @@ import dataclasses
 import typing
 from urllib import parse
 
-from weave.old_weave import box
+from weave.legacy import box
 
 from .trace_server import refs_internal
 
@@ -23,7 +23,7 @@ def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]
 def val_with_relative_ref(
     parent_object: typing.Any, child_object: typing.Any, ref_extra_parts: list[str]
 ) -> typing.Any:
-    from weave.old_weave import context_state
+    from weave.legacy import context_state
 
     from . import ref_base
 

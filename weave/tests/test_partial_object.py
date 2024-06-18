@@ -1,8 +1,8 @@
-from weave.old_weave import compile, ops
-from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.old_weave.ops_domain import wb_domain_types as wdt
-from weave.old_weave.ops_domain.project_ops import root_all_projects
-from weave.old_weave.ops_domain.report_ops import root_all_reports
+from weave.legacy import compile, ops
+from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.legacy.ops_domain import wb_domain_types as wdt
+from weave.legacy.ops_domain.project_ops import root_all_projects
+from weave.legacy.ops_domain.report_ops import root_all_reports
 
 from .. import api as weave
 from .. import weave_types as types

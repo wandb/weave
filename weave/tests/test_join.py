@@ -1,6 +1,6 @@
 import weave
-from weave.old_weave import ops_arrow
-from weave.old_weave.wandb_interface.wandb_stream_table import StreamTable
+from weave.legacy import ops_arrow
+from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
 
 
 def make_stream_table(*args, **kwargs):
@@ -24,7 +24,7 @@ def test_join_awls_with_stitch(user_by_api_key_in_env):
         feedback_st.log(row)
     feedback_st.finish()
 
-    joined = weave.old_weave.ops.join_2(
+    joined = weave.legacy.ops.join_2(
         dataset_st.rows(),
         feedback_st.rows(),
         lambda row: row["id"],

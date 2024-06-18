@@ -6,7 +6,7 @@ import weave
 
 
 def test_timestamp_bins_fixed():
-    bin_fn = weave.old_weave.ops.timestamp_bins_fixed(60)
+    bin_fn = weave.legacy.ops.timestamp_bins_fixed(60)
 
     ts = datetime(2020, 1, 1, 8, 30, 1)
     called = bin_fn(ts)
@@ -19,7 +19,7 @@ def test_timestamp_bins_fixed():
 def test_timestamp_bins_nice():
     start_ts = datetime(2020, 1, 1, 8, 30, 1)
     stop_ts = datetime(2020, 1, 1, 12, 30, 0)
-    bin_fn = weave.old_weave.ops.timestamp_bins_nice([start_ts, stop_ts], 100)
+    bin_fn = weave.legacy.ops.timestamp_bins_nice([start_ts, stop_ts], 100)
 
     ts = datetime(2020, 1, 1, 8, 45, 13)
     called = bin_fn(ts)
@@ -32,7 +32,7 @@ def test_timestamp_bins_nice():
 def test_timestamp_bin():
     start_ts = datetime(2020, 1, 1, 8, 30, 1)
     stop_ts = datetime(2020, 1, 1, 12, 30, 0)
-    bin_fn = weave.old_weave.ops.timestamp_bins_nice([start_ts, stop_ts], 100)
+    bin_fn = weave.legacy.ops.timestamp_bins_nice([start_ts, stop_ts], 100)
 
     ts = datetime(2020, 1, 1, 8, 45, 13)
     ts_node = weave.save(ts)
@@ -45,10 +45,10 @@ def test_timestamp_bin():
 def test_timestamp_bin_vector():
     start_ts = datetime(2020, 1, 1, 8, 30, 1)
     stop_ts = datetime(2020, 1, 1, 12, 30, 0)
-    bin_fn = weave.old_weave.ops.timestamp_bins_nice([start_ts, stop_ts], 100)
+    bin_fn = weave.legacy.ops.timestamp_bins_nice([start_ts, stop_ts], 100)
 
     ts = datetime(2020, 1, 1, 8, 45, 13, tzinfo=timezone.utc)
-    ts_node = weave.old_weave.ops.to_weave_arrow([ts, ts + timedelta(seconds=90)])
+    ts_node = weave.legacy.ops.to_weave_arrow([ts, ts + timedelta(seconds=90)])
 
     # This does not vectorize because mapped ops don't automatically
     # vectorize!

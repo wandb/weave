@@ -5,7 +5,7 @@ import time
 import pytest
 
 import weave
-from weave.old_weave.monitoring import monitor
+from weave.legacy.monitoring import monitor
 
 ### Skipping some tests here. They are for features that no longer exist. Since we're
 # iterating on the API, I'm not removing them yet.

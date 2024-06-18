@@ -12,7 +12,7 @@ import typing
 import pytest
 
 import weave
-from weave.old_weave import (
+from weave.legacy import (
     graph,
     graph_debug,
     language_nullability,
@@ -20,8 +20,8 @@ from weave.old_weave import (
     ops_arrow,
     ops_primitives,
 )
-from weave.old_weave.language_features.tagging import make_tag_getter_op
-from weave.old_weave.language_features.tagging.tagged_value_type import (
+from weave.legacy.language_features.tagging import make_tag_getter_op
+from weave.legacy.language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
 
@@ -81,7 +81,7 @@ def check_case(called: graph.Node, result_type: weave.types.Type, result: typing
     ), f"Expected op output type: {result_type}, but got {called.type}"
 
     # This is a way to save the final output, preserving tags.
-    result_ref = weave.use(weave.old_weave.ops.save_to_ref(called, None))
+    result_ref = weave.use(weave.legacy.ops.save_to_ref(called, None))
     if result_ref == None:
         actual_result = None
     else:

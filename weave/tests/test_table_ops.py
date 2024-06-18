@@ -3,8 +3,8 @@ import time
 
 import pytest
 
-from weave.old_weave import box, context, context_state, graph, ops
-from weave.old_weave.ops_domain import table as table_ops
+from weave.legacy import box, context, context_state, graph, ops
+from weave.legacy.ops_domain import table as table_ops
 
 from .. import api as weave
 from .. import storage, weave_internal

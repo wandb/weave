@@ -1,4 +1,4 @@
-from weave.old_weave.ops_domain import wb_domain_types as wdt
+from weave.legacy.ops_domain import wb_domain_types as wdt
 
 from .. import api as weave
 from .. import storage

@@ -22,12 +22,12 @@
 import dataclasses
 import typing
 
-from weave.old_weave import graph, op_def
-from weave.old_weave.language_features.tagging import opdef_util
+from weave.legacy import graph, op_def
+from weave.legacy.language_features.tagging import opdef_util
 
 from . import errors, registry_mem
 from . import weave_types as types
-from .old_weave import _dict_utils
+from .legacy import _dict_utils
 
 
 @dataclasses.dataclass

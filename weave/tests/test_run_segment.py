@@ -6,9 +6,9 @@ import pyarrow as pa
 import pytest
 
 import weave
-from weave.old_weave import ops
-from weave.old_weave.ops_arrow import ArrowWeaveList, arrow_as_array
-from weave.old_weave.ops_domain.run_segment import RunSegment
+from weave.legacy import ops
+from weave.legacy.ops_arrow import ArrowWeaveList, arrow_as_array
+from weave.legacy.ops_domain.run_segment import RunSegment
 
 from .. import api, storage, weave_internal
 from .. import weave_types as types

@@ -5,7 +5,7 @@ import random
 import typing
 from typing import Mapping
 
-from weave.old_weave import artifact_local, graph, op_def, op_policy, runs
+from weave.legacy import artifact_local, graph, op_def, op_policy, runs
 
 from . import (
     ref_base,
@@ -118,13 +118,13 @@ class TraceLocal:
         return self._single_run(run_key)
 
     def get_run_val(self, run_key: RunKey) -> typing.Optional[runs.Run]:
-        from weave.old_weave import execute_fast
+        from weave.legacy import execute_fast
 
         res = execute_fast._execute_fn_no_engine(None, None, self.get_run(run_key))
         return res
 
     def save_run(self, run: runs.Run):
-        from weave.old_weave.ops_primitives import weave_api
+        from weave.legacy.ops_primitives import weave_api
 
         run_key = RunKey(run.op_name, run.id)
         if self._should_save_to_table(run_key):

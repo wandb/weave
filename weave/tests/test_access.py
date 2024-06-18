@@ -1,7 +1,7 @@
 import pytest
 
 import weave
-from weave.old_weave import artifact_fs, artifact_local, wandb_api
+from weave.legacy import artifact_fs, artifact_local, wandb_api
 
 from .. import environment, errors, storage
 
@@ -20,7 +20,7 @@ def public_env():
 
 def test_access_file(public_env):
     with pytest.raises(errors.WeaveAccessDeniedError):
-        weave.use(weave.old_weave.ops.local_path("/tmp/bad.json"))
+        weave.use(weave.legacy.ops.local_path("/tmp/bad.json"))
 
 
 @pytest.mark.parametrize("path", ["..", "/tmp", "//tmp", "//tmp/bad.json", "/tmp/.../"])

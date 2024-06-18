@@ -6,7 +6,7 @@ from typing import Any, Iterable, Iterator, Optional
 from rich.table import Table
 
 from weave import rich_pydantic_util
-from weave.old_weave import graph_client_context
+from weave.legacy import graph_client_context
 from weave.refs import Refs
 from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import parse_uri

@@ -3,8 +3,8 @@ import math
 import typing
 
 import weave
-from weave.old_weave import context_state as _context_state
-from weave.old_weave import panels
+from weave.legacy import context_state as _context_state
+from weave.legacy import panels
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 

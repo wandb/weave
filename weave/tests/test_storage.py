@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 import wandb
 
-from weave.old_weave import artifact_mem, artifact_wandb, mappers_python, ops_arrow
-from weave.old_weave.arrow import list_ as arrow
+from weave.legacy import artifact_mem, artifact_wandb, mappers_python, ops_arrow
+from weave.legacy.arrow import list_ as arrow
 
 from .. import api as weave
 from .. import storage

@@ -2,14 +2,14 @@ import pytest
 
 import weave
 from weave.flow.obj import Object
-from weave.old_weave import ops_arrow as arrow
+from weave.legacy import ops_arrow as arrow
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
 )
 
-from weave.old_weave import artifact_local
+from weave.legacy import artifact_local
 from .. import ref_util, storage
 
 

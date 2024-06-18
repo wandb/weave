@@ -34,8 +34,8 @@ from weave import util
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should
 # mock wandb_api instead probably.
-from weave.old_weave import io_service, wandb_api, wandb_client_api
-from weave.old_weave.artifact_wandb import (
+from weave.legacy import io_service, wandb_api, wandb_client_api
+from weave.legacy.artifact_wandb import (
     WandbArtifact,
     WandbArtifactManifest,
     WeaveWBArtifactURI,

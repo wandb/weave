@@ -3,10 +3,10 @@ import dataclasses
 import pytest
 
 import weave
-from weave.old_weave.ops_arrow import to_arrow
-from weave.old_weave.ops_domain import wbmedia
+from weave.legacy.ops_arrow import to_arrow
+from weave.legacy.ops_domain import wbmedia
 
-from weave.old_weave import artifact_local
+from weave.legacy import artifact_local
 from weave import storage
 
 # This is not a valid artifact, but we need one to test. We set _read_dirname

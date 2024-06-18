@@ -1,6 +1,6 @@
 import pytest
 
-from weave.old_weave import async_demo, ops, runs
+from weave.legacy import async_demo, ops, runs
 
 from .. import api, storage
 

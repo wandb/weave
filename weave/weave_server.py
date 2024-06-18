@@ -37,8 +37,8 @@ from weave import (
     util,
     weavejs_fixes,
 )
-from weave.old_weave import context_state, graph, value_or_error, wandb_api
-from weave.old_weave.language_features.tagging import tag_store
+from weave.legacy import context_state, graph, value_or_error, wandb_api
+from weave.legacy.language_features.tagging import tag_store
 from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ if engine_trace.datadog_is_enabled():
 
 
 # Ensure these are imported and registered
-from weave.old_weave import ops
+from weave.legacy import ops
 
 # NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
 # stat mode instead of watchdog mode. It turns out that "import wandb" breaks
@@ -107,11 +107,11 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
-    from weave.old_weave import ops, panels, panels_py
+    from weave.legacy import ops, panels, panels_py
 
     # Attempt to import MVP ecosystem modules
     try:
-        from weave.old_weave.ecosystem import langchain, replicate
+        from weave.legacy.ecosystem import langchain, replicate
     except ImportError:
         pass
 
@@ -124,7 +124,7 @@ def import_ecosystem():
         # except (ImportError, OSError, wandb.Error):
         #     print("Error: Couldn't import faiss module for Weaveflow.")
         try:
-            from weave.old_weave.ecosystem import all
+            from weave.legacy.ecosystem import all
         except (ImportError, OSError, wandb.Error):
             pass
 

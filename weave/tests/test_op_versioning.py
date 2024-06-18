@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from weave import api as weave
-from weave.old_weave import artifact_fs, derive_op, op_def
+from weave.legacy import artifact_fs, derive_op, op_def
 from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
 
 

@@ -1,6 +1,6 @@
 import typing
 
-from weave.old_weave import context_state, graph
+from weave.legacy import context_state, graph
 
 from . import weave_internal
 from . import weave_types as types
@@ -81,7 +81,7 @@ class WeaveIter(
 def select_all(node: graph.Node) -> graph.Node:
     if not types.TypedDict().assign_type(node.type):
         raise ValueError("only TypedDict supported for now")
-    from weave.old_weave.ops_primitives import dict_
+    from weave.legacy.ops_primitives import dict_
 
     node_type = typing.cast(types.TypedDict, node.type)
     return dict_(**{k: node[k] for k in node_type.property_types})  # type: ignore

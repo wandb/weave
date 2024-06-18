@@ -3,7 +3,7 @@ import typing
 import pytest
 
 import weave
-from weave.old_weave import context_state as _context
+from weave.legacy import context_state as _context
 from weave.weave_internal import make_const_node, make_output_node
 
 _loading_builtins_token = _context.set_loading_built_ins()
@@ -57,7 +57,7 @@ def test_basic_nullability():
 def test_basic_nullability_in_mappability():
     b_arr = weave.save([2])
     maybe_int_arr = weave.save(
-        weave.old_weave.graph.ConstNode(
+        weave.legacy.graph.ConstNode(
             weave.types.List(weave.types.optional(weave.types.Int())), [1, None]
         )
     )

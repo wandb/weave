@@ -9,7 +9,7 @@ from pydantic import (
 )
 
 # import pydantic
-from weave.old_weave import box
+from weave.legacy import box
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import ObjectRecord, TraceObject, pydantic_getattribute
 from weave.weave_client import get_ref

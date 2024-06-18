@@ -4,7 +4,7 @@ import typing
 import pytest
 
 import weave
-from weave.old_weave import ops_arrow
+from weave.legacy import ops_arrow
 
 from .concrete_tagged_value import (
     TaggedValue,

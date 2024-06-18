@@ -4,10 +4,10 @@ import graphql
 import wandb
 
 import weave
-from weave.old_weave import ops
-from weave.old_weave.language_features.tagging import tagged_value_type
-from weave.old_weave.ops_domain import wb_domain_types
-from weave.old_weave.ops_primitives import _dict_utils
+from weave.legacy import ops
+from weave.legacy.language_features.tagging import tagged_value_type
+from weave.legacy.ops_domain import wb_domain_types
+from weave.legacy.ops_primitives import _dict_utils
 
 from .. import registry_mem
 from . import fixture_fakewandb as fwb

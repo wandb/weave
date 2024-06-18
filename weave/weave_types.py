@@ -10,14 +10,14 @@ from collections.abc import Iterable
 
 import pydantic
 
-from weave.old_weave import box, context_state, mappers_python, object_type_ref_util
-from weave.old_weave import timestamp as weave_timestamp
+from weave.legacy import box, context_state, mappers_python, object_type_ref_util
+from weave.legacy import timestamp as weave_timestamp
 
 from . import errors
 
 if typing.TYPE_CHECKING:
-    from weave.old_weave import artifact_base
-    from weave.old_weave.artifact_fs import FilesystemArtifact
+    from weave.legacy import artifact_base
+    from weave.legacy.artifact_fs import FilesystemArtifact
 
     from . import weave_inspector
 
@@ -878,7 +878,7 @@ class List(Type):
         mapped_result = mapper.apply(result)
 
         # TODO: scan through for ID
-        from weave.old_weave.ops_primitives.list_ import object_lookup
+        from weave.legacy.ops_primitives.list_ import object_lookup
 
         if extra is not None:
             # return object_lookup.resolve_fn(mapped_result, extra[0])
@@ -1359,7 +1359,7 @@ class Function(Type):
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             # TODO: no circular imports!
-            from weave.old_weave import graph
+            from weave.legacy import graph
 
             return graph.Node.node_from_json(json.load(f))
 
@@ -1417,7 +1417,7 @@ class LocalArtifactRefType(FilesystemArtifactRefType):
 @dataclasses.dataclass(frozen=True)
 class WandbArtifactRefType(FilesystemArtifactRefType):
     def load_instance(self, artifact, name, extra=None):
-        from weave.old_weave import artifact_wandb
+        from weave.legacy import artifact_wandb
 
         return artifact_wandb.WandbArtifactRef(artifact, name)
 
@@ -1569,7 +1569,7 @@ def merge_types(a: Type, b: Type) -> Type:
     This implementation must match list.concat implementations (which is the only
     way to extend a list in Weave). Ie list.concat(list[a], [b]) -> list[merge_types(a, b)]
     """
-    from weave.old_weave.language_features.tagging import tagged_value_type
+    from weave.legacy.language_features.tagging import tagged_value_type
 
     if a == b:
         return a

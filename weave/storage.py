@@ -8,7 +8,7 @@ import pathlib
 import re
 import typing
 
-from weave.old_weave import (
+from weave.legacy import (
     artifact_base,
     artifact_fs,
     artifact_local,
@@ -27,7 +27,7 @@ from . import weave_types as types
 Ref = ref_base.Ref
 
 if typing.TYPE_CHECKING:
-    from weave.old_weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+    from weave.legacy.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
 
 def split_path_dotfile(path, dotfile_name):
@@ -63,7 +63,7 @@ def _get_weave_type_with_refs(obj: typing.Any):
 def _ensure_object_components_are_published(
     obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
-    from weave.old_weave.mappers_publisher import map_to_python_remote
+    from weave.legacy.mappers_publisher import map_to_python_remote
 
     mapper = map_to_python_remote(wb_type, artifact)
     return mapper.apply(obj)
@@ -452,7 +452,7 @@ def to_json_with_refs(
 
     # This is newer than to_python, save and publish above, and doesn't use the "mapper"
     # pattern, which is overkill. Much better to just write a simple function like this.
-    from weave.old_weave import op_def
+    from weave.legacy import op_def
 
     if wb_type is None:
         wb_type = types.TypeRegistry.type_of(obj)
@@ -509,7 +509,7 @@ def convert_timestamps_to_epoch_ms(obj: typing.Any) -> typing.Any:
 
 
 def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
-    from weave.old_weave.arrow import list_ as arrow_list
+    from weave.legacy.arrow import list_ as arrow_list
 
     obj = box.unbox(obj)
     if isinstance(obj, (str, int, float, bool, type(None))):

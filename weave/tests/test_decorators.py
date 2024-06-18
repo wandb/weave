@@ -1,4 +1,4 @@
-from weave.old_weave.decorator_op import op
+from weave.legacy.decorator_op import op
 
 from .. import api as weave
 from .. import storage

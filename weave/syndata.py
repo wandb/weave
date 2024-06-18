@@ -6,7 +6,7 @@ import pyarrow as pa
 from scipy.signal import butter, filtfilt
 
 from . import util
-from .old_weave.ops_arrow import ArrowWeaveList
+from .legacy.ops_arrow import ArrowWeaveList
 
 value_fns: list[typing.Any] = [
     lambda steps: steps**2,

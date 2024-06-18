@@ -1,6 +1,6 @@
 import weave
-from weave.old_weave import context_state as _context
-from weave.old_weave import graph
+from weave.legacy import context_state as _context
+from weave.legacy import graph
 
 from .. import registry_mem
 from .. import weave_types as types
@@ -64,7 +64,7 @@ def test_non_mapped_serialized():
     node = weave.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
-        {"x": weave.old_weave.graph.ConstNode(weave.types.Int(), 1)},
+        {"x": weave.legacy.graph.ConstNode(weave.types.Int(), 1)},
     )
     assert weave.use(node) == 2
 
@@ -86,7 +86,7 @@ def test_mapped_serialized():
         weave.types.Int(),
         _test_add_one.name,
         {
-            "x": weave.old_weave.graph.ConstNode(
+            "x": weave.legacy.graph.ConstNode(
                 weave.types.List(weave.types.Int()), [1, 2, 3]
             )
         },
@@ -104,7 +104,7 @@ def test_mapped_empty_serialized():
     node = weave.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
-        {"x": weave.old_weave.graph.ConstNode(weave.types.List(weave.types.Int()), [])},
+        {"x": weave.legacy.graph.ConstNode(weave.types.List(weave.types.Int()), [])},
     )
     assert weave.use(node) == []
 
@@ -123,7 +123,7 @@ def test_custom_class():
     node = TestType().test_fn(1)
     assert weave.use(node) == 2
 
-    node_list = weave.old_weave.ops.make_list(**{"0": TestType(), "1": TestType()})
+    node_list = weave.legacy.ops.make_list(**{"0": TestType(), "1": TestType()})
     node = node_list.test_fn(1)
     assert weave.use(node) == [2, 2]
 

@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 import requests
 
-from weave.old_weave import client as _client
-from weave.old_weave import context_state, ops
-from weave.old_weave.decorator_op import op
+from weave.legacy import client as _client
+from weave.legacy import context_state, ops
+from weave.legacy.decorator_op import op
 
 from .. import api as weave
 from .. import server as _server

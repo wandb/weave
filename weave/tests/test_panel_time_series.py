@@ -3,7 +3,7 @@ import time
 import wandb
 
 import weave
-from weave.old_weave.ecosystem.wandb.panel_time_series import TimeSeries
+from weave.legacy.ecosystem.wandb.panel_time_series import TimeSeries
 
 
 def test_panel_timeseries(user_by_api_key_in_env):
@@ -14,7 +14,7 @@ def test_panel_timeseries(user_by_api_key_in_env):
     run.finish()
 
     history_node = (
-        weave.old_weave.ops.project(run.entity, run.project).run(run.id).history2()
+        weave.legacy.ops.project(run.entity, run.project).run(run.id).history2()
     )
     panel = TimeSeries(history_node)
     init_config_node = panel.initialize()

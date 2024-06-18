@@ -23,7 +23,7 @@ from . import engine_trace
 from . import errors
 from . import util
 from . import environment
-from weave.old_weave import cache
+from weave.legacy import cache
 
 
 tracer = engine_trace.tracer()  # type: ignore

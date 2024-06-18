@@ -1,6 +1,6 @@
 import pytest
 
-from weave.old_weave import graph, ops
+from weave.legacy import graph, ops
 
 from .. import weave_internal, weavify
 from .. import weave_types as types

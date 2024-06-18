@@ -1,5 +1,5 @@
 import weave
-from weave.old_weave import graph
+from weave.legacy import graph
 
 from .. import weave_internal
 from .. import weave_types as types

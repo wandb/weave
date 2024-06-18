@@ -1,7 +1,7 @@
 import pytest
 
 import weave
-from weave.old_weave import ops_arrow
+from weave.legacy import ops_arrow
 
 LIST_CONSTRUCTORS = [
     lambda x: x,

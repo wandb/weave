@@ -1,10 +1,10 @@
 import pytest
 
 import weave
-from weave.old_weave import ops_arrow as arrow
+from weave.legacy import ops_arrow as arrow
 
 from .. import storage
-from weave.old_weave import artifact_fs, artifact_local
+from weave.legacy import artifact_fs, artifact_local
 
 
 def test_artifact():

@@ -6,7 +6,7 @@ import typing
 import click
 
 from weave import __version__
-from weave.old_weave import artifact_wandb
+from weave.legacy import artifact_wandb
 from weave.trace.refs import ObjectRef, parse_uri
 
 from . import api

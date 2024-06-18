@@ -13,13 +13,13 @@ from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
 import weave
 from weave import weave_types as types
-from weave.old_weave import artifact_fs
-from weave.old_weave.artifact_wandb import WandbArtifact, WeaveWBArtifactURI
-from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.old_weave.ops_domain.wbmedia import ImageArtifactFileRefType
-from weave.old_weave.ops_primitives import file
-from weave.old_weave.wandb_client_api import wandb_gql_query
-from weave.old_weave.wandb_util import weave0_type_json_to_weave1_type
+from weave.legacy import artifact_fs
+from weave.legacy.artifact_wandb import WandbArtifact, WeaveWBArtifactURI
+from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.legacy.ops_domain.wbmedia import ImageArtifactFileRefType
+from weave.legacy.ops_primitives import file
+from weave.legacy.wandb_client_api import wandb_gql_query
+from weave.legacy.wandb_util import weave0_type_json_to_weave1_type
 
 from .fixture_fakewandb import FakeApi
 
@@ -109,31 +109,31 @@ def make_molecule(clean_up=True):
         #
         (
             make_image(),
-            weave.old_weave.ops.ImageArtifactFileRef.WeaveType(),  # type: ignore
+            weave.legacy.ops.ImageArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_audio(),
-            weave.old_weave.ops.AudioArtifactFileRef.WeaveType(),  # type: ignore
+            weave.legacy.ops.AudioArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_html(),
-            weave.old_weave.ops.HtmlArtifactFileRef.WeaveType(),  # type: ignore
+            weave.legacy.ops.HtmlArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_bokeh(),
-            weave.old_weave.ops.BokehArtifactFileRef.WeaveType(),  # type: ignore
+            weave.legacy.ops.BokehArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_video(),
-            weave.old_weave.ops.VideoArtifactFileRef.WeaveType(),  # type: ignore
+            weave.legacy.ops.VideoArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_object3d(),
-            weave.old_weave.ops.Object3DArtifactFileRef.WeaveType(),  # type: ignore
+            weave.legacy.ops.Object3DArtifactFileRef.WeaveType(),  # type: ignore
         ),
         (
             make_molecule(),
-            weave.old_weave.ops.MoleculeArtifactFileRef.WeaveType(),  # type: ignore
+            weave.legacy.ops.MoleculeArtifactFileRef.WeaveType(),  # type: ignore
         ),
         # See comment in wandb_util.py - this may change in the future
         # Temporarily disabled until we can figure out how to mock
@@ -630,7 +630,7 @@ def test_grouping_on_images(fake_wandb):
     table_node = file_node.table()
     table_rows = table_node.rows()
     grouped = table_rows.groupby(
-        lambda row: weave.old_weave.ops.dict_(g_image=row["image"])
+        lambda row: weave.legacy.ops.dict_(g_image=row["image"])
     )
 
     raw_data = weave.use(grouped).to_pylist_notags()
@@ -761,7 +761,7 @@ def make_join_table_row_nodes(fake_wandb):
 def test_join_all_on_images(fake_wandb):
     table_1_rows, table_2_rows = make_join_table_row_nodes(fake_wandb)
 
-    rows = weave.old_weave.ops.make_list(a=table_1_rows, b=table_2_rows)
+    rows = weave.legacy.ops.make_list(a=table_1_rows, b=table_2_rows)
 
     joined = rows.joinAll(lambda row: row["image"], True)
 
@@ -855,12 +855,12 @@ def test_media_logging_to_history(user_by_api_key_in_env, cache_mode_minimal):
 
     wait_for_x_times(wait_for)
 
-    run_node = weave.old_weave.ops.project(run.entity, run.project).run(run.id)
+    run_node = weave.legacy.ops.project(run.entity, run.project).run(run.id)
 
     for history_op_name in ["history3", "history"]:
         history_node = run_node._get_op(history_op_name)()
         mapped_node = history_node.map(
-            lambda row: weave.old_weave.ops.dict_(
+            lambda row: weave.legacy.ops.dict_(
                 **{key: row[key] for key in log_dict.keys()}
             )
         )

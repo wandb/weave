@@ -5,8 +5,8 @@ import pytest
 
 import weave
 from weave import weave_types as types
-from weave.old_weave import graph
-from weave.old_weave.panels.panel_plot import Plot, PlotConstants, Series
+from weave.legacy import graph
+from weave.legacy.panels.panel_plot import Plot, PlotConstants, Series
 
 from .. import storage
 from .test_run_segment import create_experiment
@@ -39,11 +39,11 @@ def test_multi_series_plot_config_with_grouping():
     weave.save(last_segment)
     plot = Plot(last_segment.experiment())
     plot.set_x(
-        lambda row: weave.old_weave.ops.number_bin(
-            row["step"], weave.old_weave.ops.numbers_bins_equal([1, 2000], 2)
+        lambda row: weave.legacy.ops.number_bin(
+            row["step"], weave.legacy.ops.numbers_bins_equal([1, 2000], 2)
         )
     )
-    plot.set_y(lambda row: weave.old_weave.ops.numbers_avg(row["metric0"]))
+    plot.set_y(lambda row: weave.legacy.ops.numbers_avg(row["metric0"]))
 
     plot.groupby_x()
     plot.set_mark_constant("line")
@@ -51,8 +51,8 @@ def test_multi_series_plot_config_with_grouping():
     series2 = plot.config.series[0].clone()
     plot.add_series(series2)
 
-    series2.set_y(lambda row: weave.old_weave.ops.numbers_min(row["metric0"]))
-    series2.set_y2(lambda row: weave.old_weave.ops.numbers_max(row["metric0"]))
+    series2.set_y(lambda row: weave.legacy.ops.numbers_min(row["metric0"]))
+    series2.set_y2(lambda row: weave.legacy.ops.numbers_max(row["metric0"]))
     series2.set_mark_constant("area")
 
     plot.groupby_x()
@@ -70,20 +70,20 @@ def test_multi_series_grouping():
     weave.save(last_segment)
     plot = Plot(last_segment.experiment())
     plot.set_x(
-        lambda row: weave.old_weave.ops.number_bin(
-            row["step"], weave.old_weave.ops.numbers_bins_equal([1, 2000], 2)
+        lambda row: weave.legacy.ops.number_bin(
+            row["step"], weave.legacy.ops.numbers_bins_equal([1, 2000], 2)
         )
     )
     plot.groupby_x()
 
-    plot.set_y(lambda row: weave.old_weave.ops.numbers_avg(row["metric0"]))
+    plot.set_y(lambda row: weave.legacy.ops.numbers_avg(row["metric0"]))
     plot.set_mark_constant("line")
 
     series2 = plot.config.series[0].clone()
     plot.add_series(series2)
 
-    series2.set_y(lambda row: weave.old_weave.ops.numbers_min(row["metric0"]))
-    series2.set_y2(lambda row: weave.old_weave.ops.numbers_max(row["metric0"]))
+    series2.set_y(lambda row: weave.legacy.ops.numbers_min(row["metric0"]))
+    series2.set_y2(lambda row: weave.legacy.ops.numbers_max(row["metric0"]))
     series2.set_mark_constant("area")
 
     plot2 = copy.deepcopy(plot)
@@ -101,8 +101,8 @@ def test_multi_series_setting():
     weave.save(last_segment)
     plot = Plot(last_segment.experiment())
     plot.set_x(
-        lambda row: weave.old_weave.ops.number_bin(
-            row["step"], weave.old_weave.ops.numbers_bins_equal([1, 2000], 2)
+        lambda row: weave.legacy.ops.number_bin(
+            row["step"], weave.legacy.ops.numbers_bins_equal([1, 2000], 2)
         )
     )
 
@@ -157,18 +157,18 @@ def test_actual_config_value(fixed_random_seed):
     weave.save(last_segment)
     plot = Plot(last_segment.experiment())
     plot.set_x(
-        lambda row: weave.old_weave.ops.number_bin(
-            row["step"], weave.old_weave.ops.numbers_bins_equal([1, 2000], 2)
+        lambda row: weave.legacy.ops.number_bin(
+            row["step"], weave.legacy.ops.numbers_bins_equal([1, 2000], 2)
         )
     )
-    plot.set_y(lambda row: weave.old_weave.ops.numbers_avg(row["metric0"]))
+    plot.set_y(lambda row: weave.legacy.ops.numbers_avg(row["metric0"]))
     plot.set_mark_constant("line")
 
     series2 = plot.config.series[0].clone()
     plot.add_series(series2)
 
-    series2.set_y(lambda row: weave.old_weave.ops.numbers_min(row["metric0"]))
-    series2.set_y2(lambda row: weave.old_weave.ops.numbers_max(row["metric0"]))
+    series2.set_y(lambda row: weave.legacy.ops.numbers_min(row["metric0"]))
+    series2.set_y2(lambda row: weave.legacy.ops.numbers_max(row["metric0"]))
     series2.set_mark_constant("area")
     assert storage.to_python(plot.config) == {
         "_type": {
@@ -1767,7 +1767,7 @@ def test_actual_config_value(fixed_random_seed):
 
 def test_panel_plot_scale_serialization():
     # checks a problem case where scale would not be serialized correctly as an AxisScale object
-    plot = weave.old_weave.panels.Plot(
+    plot = weave.legacy.panels.Plot(
         [1, 2, 3, 4],
         x=lambda row: row,
         x_title="x",

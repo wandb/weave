@@ -2,7 +2,7 @@ from urllib.parse import quote
 
 from wandb import util as wb_util
 
-from weave.old_weave import context_state
+from weave.legacy import context_state
 
 from . import environment
 

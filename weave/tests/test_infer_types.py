@@ -1,6 +1,6 @@
 import typing
 
-from weave.old_weave import graph
+from weave.legacy import graph
 
 from .. import infer_types, weave_types
 

@@ -1,8 +1,8 @@
 import weave
-from weave.old_weave import box, graph
-from weave.old_weave import context_state as _context_state
-from weave.old_weave.language_features.tagging import tag_store
-from weave.old_weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.legacy import box, graph
+from weave.legacy import context_state as _context_state
+from weave.legacy.language_features.tagging import tag_store
+from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
 
 from .. import weave_types as types
 
@@ -35,6 +35,6 @@ def op_add_tag(obj_node: graph.Node, tags: dict[str, str]):
 
 
 def make_get_tag(tag_name: str):
-    from weave.old_weave.language_features.tagging import make_tag_getter_op
+    from weave.legacy.language_features.tagging import make_tag_getter_op
 
     return make_tag_getter_op.make_tag_getter_op(f"_ct_{tag_name}", types.String())

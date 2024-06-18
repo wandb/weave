@@ -3,7 +3,7 @@ import os
 import time
 
 from weave import environment
-from weave.old_weave import cache
+from weave.legacy import cache
 
 
 def test_lru_time_window_cache():

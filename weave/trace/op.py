@@ -14,7 +14,7 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
-from weave.old_weave import box, context_state, graph_client_context, run_context
+from weave.legacy import box, context_state, graph_client_context, run_context
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -199,7 +199,7 @@ R = TypeVar("R")
 # The decorator!
 def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
     if context_state.get_loading_built_ins():
-        from weave.old_weave.decorator_op import op
+        from weave.legacy.decorator_op import op
 
         return op(*args, **kwargs)
 

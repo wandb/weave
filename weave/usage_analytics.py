@@ -2,7 +2,7 @@ import socket
 
 import analytics
 
-from weave.old_weave import context_state
+from weave.legacy import context_state
 
 from . import environment
 

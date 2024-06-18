@@ -5,14 +5,14 @@ import pytest
 
 from weave import weave_internal
 from weave import weave_types as types
-from weave.old_weave import box, ops
-from weave.old_weave import ops_arrow as arrow
-from weave.old_weave.language_features.tagging import (
+from weave.legacy import box, ops
+from weave.legacy import ops_arrow as arrow
+from weave.legacy.language_features.tagging import (
     make_tag_getter_op,
     tag_store,
     tagged_value_type,
 )
-from weave.old_weave.ops_primitives import dict_, list_
+from weave.legacy.ops_primitives import dict_, list_
 
 from .. import api as weave
 from ..tests import tag_test_util as ttu
@@ -637,7 +637,7 @@ def test_tag_pushdown_on_list_of_lists(use_arrow):
     if use_arrow:
         list_node = arrow.ops.list_to_arrow(list_node)
 
-    from weave.old_weave import context_state
+    from weave.legacy import context_state
 
     _loading_builtins_token = context_state.set_loading_built_ins()
 

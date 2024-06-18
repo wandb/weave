@@ -2,7 +2,7 @@
 # The outputs of weave.show (the generated panel urls and their arguments)
 # need to match what javascript expects.
 
-from weave.old_weave import ops
+from weave.legacy import ops
 
 from ..show import _show_params
 from . import test_helpers

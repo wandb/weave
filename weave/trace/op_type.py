@@ -12,7 +12,7 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union
 
-from weave.old_weave import artifact_fs, context_state
+from weave.legacy import artifact_fs, context_state
 from weave.trace.refs import ObjectRef
 
 from .. import environment, errors, storage

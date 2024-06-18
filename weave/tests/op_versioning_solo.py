@@ -1,7 +1,7 @@
 import numpy as np
 
 import weave
-from weave.old_weave import artifact_fs
+from weave.legacy import artifact_fs
 
 
 @weave.op()

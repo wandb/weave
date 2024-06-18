@@ -3,8 +3,8 @@ import pytest
 import weave
 from weave import api, registry_mem, weave_internal
 from weave import weave_types as types
-from weave.old_weave import graph, op_args, ops, serialize
-from weave.old_weave.ops_primitives import list_
+from weave.legacy import graph, op_args, ops, serialize
+from weave.legacy.ops_primitives import list_
 from weave.weave_internal import make_const_node
 
 from . import fixture_fakewandb as fwb

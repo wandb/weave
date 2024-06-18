@@ -4,7 +4,7 @@ import re
 import pytest
 import requests
 
-from weave.old_weave import context, ops
+from weave.legacy import context, ops
 
 from .. import api, logs, server, weave_server
 

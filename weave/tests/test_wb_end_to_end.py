@@ -1,7 +1,7 @@
 import wandb
 
 import weave
-from weave.old_weave import compile
+from weave.legacy import compile
 
 
 # Example of end to end integration test
@@ -11,17 +11,17 @@ def test_run_logging(user_by_api_key_in_env):
     run.finish()
 
     summary_node = (
-        weave.old_weave.ops.project(run.entity, run.project).run(run.id).summary()["a"]
+        weave.legacy.ops.project(run.entity, run.project).run(run.id).summary()["a"]
     )
     summary = weave.use(summary_node)
 
     assert summary == 1
 
-    is_none_node = weave.old_weave.ops.project(run.entity, run.project).isNone()
+    is_none_node = weave.legacy.ops.project(run.entity, run.project).isNone()
 
     assert weave.use(is_none_node) == False
 
-    is_none_node = weave.old_weave.ops.project(
+    is_none_node = weave.legacy.ops.project(
         run.entity, "project_does_not_exist"
     ).isNone()
 
@@ -74,7 +74,7 @@ def test_run_histories(user_by_api_key_in_env):
     run.finish()
 
     history_node = (
-        weave.old_weave.ops.project(run.entity, run.project)
+        weave.legacy.ops.project(run.entity, run.project)
         .runs()
         .history()
         .concat()["a"]
@@ -92,7 +92,7 @@ def test_run_history_count(user_by_api_key_in_env, cache_mode_minimal):
     run.log({"a": 2})
     run.finish()
 
-    run_node = weave.old_weave.ops.project(run.entity, run.project).run(run.id)
+    run_node = weave.legacy.ops.project(run.entity, run.project).run(run.id)
     h_count_node = run_node.history().count()
     history_count = weave.use(h_count_node)
     assert history_count == 2

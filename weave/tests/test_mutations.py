@@ -1,4 +1,4 @@
-from weave.old_weave import ops
+from weave.legacy import ops
 
 from .. import api as weave
 from .. import storage, weave_internal

@@ -1,4 +1,4 @@
-from weave.old_weave import graph
+from weave.legacy import graph
 
 from .. import api as weave
 from .. import node_ref

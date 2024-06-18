@@ -1,7 +1,7 @@
 import os
 import typing
 
-from weave.old_weave import artifact_local, graph, runs
+from weave.legacy import artifact_local, graph, runs
 
 from . import errors, ref_base
 from . import weave_types as types

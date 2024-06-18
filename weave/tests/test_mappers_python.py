@@ -2,7 +2,7 @@ import math
 
 from weave import api, weave_internal
 from weave import weave_types as types
-from weave.old_weave import context, mappers_python, val_const
+from weave.legacy import context, mappers_python, val_const
 
 
 def test_map_typed_dict():

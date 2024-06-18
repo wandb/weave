@@ -12,28 +12,28 @@ import threading
 
 from . import urls
 
-from weave.old_weave import graph as _graph
-from weave.old_weave.graph import Node
+from weave.legacy import graph as _graph
+from weave.legacy.graph import Node
 
 # If this is not imported, serialization of Weave Nodes is incorrect!
-from weave.old_weave import graph_mapper as _graph_mapper
+from weave.legacy import graph_mapper as _graph_mapper
 
 from . import storage as _storage
 from . import ref_base as _ref_base
-from weave.old_weave import artifact_wandb as _artifact_wandb
-from weave.old_weave import wandb_api as _wandb_api
+from weave.legacy import artifact_wandb as _artifact_wandb
+from weave.legacy import wandb_api as _wandb_api
 
 from . import weave_internal as _weave_internal
 from . import errors as _errors
 
 from . import util as _util
 
-from weave.old_weave import context as _context
-from weave.old_weave import context_state as _context_state
-from weave.old_weave import run as _run
+from weave.legacy import context as _context
+from weave.legacy import context_state as _context_state
+from weave.legacy import run as _run
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
-from weave.old_weave import graph_client_context as _graph_client_context
+from weave.legacy import graph_client_context as _graph_client_context
 from weave.trace import context as trace_context
 from .trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.refs import ObjectRef
@@ -45,26 +45,26 @@ from . import weave_types as types
 from . import types_numpy as _types_numpy
 
 from . import errors
-from weave.old_weave.decorators import weave_class, mutation, type
+from weave.legacy.decorators import weave_class, mutation, type
 from weave.trace.op import op
 
 from weave.trace.op import Op
 from . import usage_analytics
-from weave.old_weave.context import (
+from weave.legacy.context import (
     use_fixed_server_port,
     use_frontend_devmode,
     # eager_execution,
     use_lazy_execution,
 )
 
-from weave.old_weave.panel import Panel
+from weave.legacy.panel import Panel
 
-from weave.old_weave.arrow.list_ import ArrowWeaveList as WeaveList
+from weave.legacy.arrow.list_ import ArrowWeaveList as WeaveList
 from .table import Table
 
 
 def save(node_or_obj, name=None):
-    from weave.old_weave.ops_primitives.weave_api import save, get
+    from weave.legacy.ops_primitives.weave_api import save, get
 
     if isinstance(node_or_obj, _graph.Node):
         return save(node_or_obj, name=name)

@@ -19,7 +19,7 @@
     "weave/box.py",
     "weave/cli.py",
     "weave/client_interface.py",
-    "weave.old_weave.codify.py",
+    "weave.legacy.codify.py",
     "weave/compile_domain.py",
     "weave/conftest.py",
     "weave/context.py",

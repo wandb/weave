@@ -7,7 +7,7 @@ import urllib
 
 from IPython.display import IFrame, display
 
-from weave.old_weave import artifact_fs, context, graph, ops, panel
+from weave.legacy import artifact_fs, context, graph, ops, panel
 
 from . import (
     errors,
@@ -30,7 +30,7 @@ def make_varname_for_type(t: types.Type):
 def make_container(
     obj: typing.Union[panel.Panel, graph.Node], name: str
 ) -> panel.Panel:
-    from weave.old_weave.panels import Group
+    from weave.legacy.panels import Group
 
     if isinstance(obj, graph.Node):
         return Group(

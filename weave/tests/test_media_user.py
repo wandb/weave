@@ -1,7 +1,7 @@
 from PIL import Image
 
-from weave.old_weave import context_state
-from weave.old_weave.ops_primitives import geom as media_user
+from weave.legacy import context_state
+from weave.legacy.ops_primitives import geom as media_user
 
 from .. import api as weave
 

@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from modal import Image, Secret, Stub, asgi_app
 
 from weave.deploy.util import safe_name
-from weave.old_weave.artifact_wandb import WandbArtifactRef
+from weave.legacy.artifact_wandb import WandbArtifactRef
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.uris import WeaveURI
 

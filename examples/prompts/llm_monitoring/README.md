@@ -20,7 +20,7 @@ There are two main ways to authenticate OpenAI API calls so you can view them in
 ### OpenAI API
 
 1. Set your OPENAI_API_KEY in your environment/script/notebook (e.g. via `os.environ["OPENAI_API_KEY"]`).
-2. Import openai as follows: `from weave.old_weave.monitoring import openai`.
+2. Import openai as follows: `from weave.legacy.monitoring import openai`.
 3. Make calls via the OpenAI SDK as usual.
 
 See details and create an interactive board in the [OpenAI monitoring notebook](./openai_client_quickstart.ipynb).

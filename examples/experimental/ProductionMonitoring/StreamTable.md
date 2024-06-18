@@ -11,7 +11,7 @@ A Weave StreamTable object enables continuous streaming of data from an applicat
 The only required argument to create a StreamTable is the name of the StreamTable object.
 
 ```python
-from weave.old_weave.monitoring import StreamTable
+from weave.legacy.monitoring import StreamTable
 st = StreamTable("my_entity_name/my_project_name/my_table_name")
 ```
 

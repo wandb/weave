@@ -1,5 +1,5 @@
 import weave
-from weave.old_weave import dispatch
+from weave.legacy import dispatch
 
 from .. import weave_internal
 from .. import weave_types as types
@@ -36,7 +36,7 @@ def test_empty_list():
     map_fn = weave_internal.define_fn(
         {"row": arr.type.object_type},
         lambda row: row.merge(
-            weave.old_weave.ops.dict_(output_classid=row["output_class"].id())
+            weave.legacy.ops.dict_(output_classid=row["output_class"].id())
         ),
     )
 

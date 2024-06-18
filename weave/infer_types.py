@@ -8,7 +8,7 @@ import typing
 
 import typing_extensions
 
-from weave.old_weave import graph
+from weave.legacy import graph
 
 from . import errors, weave_types
 

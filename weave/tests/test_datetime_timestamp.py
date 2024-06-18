@@ -4,7 +4,7 @@ import typing
 import pytest
 
 import weave
-from weave.old_weave.ops_primitives import date
+from weave.legacy.ops_primitives import date
 
 
 def assert_date_string(
