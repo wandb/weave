@@ -710,8 +710,12 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
+def client_is_sql_lite(client):
+    return isinstance(client.server._internal_trace_server, SqliteTraceServer)
+
+
 def test_trace_call_filter(client):
-    is_sql_lite = isinstance(client.server, SqliteTraceServer)
+    is_sql_lite = client_is_sql_lite(client)
 
     @weave.op()
     def basic_op(in_val: dict, delay) -> dict:
@@ -1291,14 +1295,13 @@ def test_bound_op_retrieval_no_self(client):
         my_op2 = my_op_ref.get()
 
 
-@pytest.mark.skip_clickhouse_client
 def test_dataset_row_ref(client):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:PHOGkwSOn7DqLgIUNgUAq7d2vXpOmG8NGLltn6slzeU/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
