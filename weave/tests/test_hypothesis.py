@@ -33,21 +33,23 @@
 #   )
 # above the test function.
 
-import weave
 import dataclasses
-import os
 import json
+import os
+
 import pyarrow as pa
 import pytest
-
-from weave import ops_arrow
-from weave.arrow import convert
-from weave import ops_primitives
-from weave import storage
-from weave import artifact_local
-from weave.language_features.tagging import tag_store
-from hypothesis import given, strategies as st, example, settings
+from hypothesis import example, given, settings
+from hypothesis import strategies as st
 from hypothesis.strategies import composite
+
+import weave
+from weave import storage
+from weave.legacy import artifact_local
+from weave.legacy.arrow import convert
+from weave.legacy.language_features.tagging import tag_store
+from weave.legacy import ops_primitives
+from weave.legacy import ops_arrow
 
 # Jack this up to find more bugs.
 EXAMPLES_PER_TEST = 100

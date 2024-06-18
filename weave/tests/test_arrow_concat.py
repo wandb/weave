@@ -1,11 +1,13 @@
-import pytest
 import dataclasses
-from ..ops_arrow import to_arrow
+
+import pytest
 
 import weave
-from ..ops_domain import wbmedia
-from .. import artifact_local
-from .. import storage
+from weave.legacy.ops_arrow import to_arrow
+from weave.legacy.ops_domain import wbmedia
+
+from weave.legacy import artifact_local
+from weave import storage
 
 # This is not a valid artifact, but we need one to test. We set _read_dirname
 # so that the artifact's is_saved property is True, so that everything works

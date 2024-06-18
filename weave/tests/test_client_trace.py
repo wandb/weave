@@ -1,29 +1,30 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
-from contextvars import copy_context
 import dataclasses
-from collections import namedtuple
 import datetime
 import os
 import typing
-import pytest
-from collections import defaultdict
+from collections import defaultdict, namedtuple
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from contextvars import copy_context
 
-from pydantic import BaseModel, ValidationError
+import pytest
 import wandb
+from pydantic import BaseModel, ValidationError
+
 import weave
 from weave import weave_client
-from weave import context_state
+from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, TraceObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+
+from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
     generate_id,
 )
-from ..trace_server import trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace
 

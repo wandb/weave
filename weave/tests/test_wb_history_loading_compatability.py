@@ -2,21 +2,19 @@ import datetime
 import json
 import os
 import time
-import datetime
 
+import numpy as np
 import pytest
+from PIL import Image
+
 import weave
-from weave.ops_domain.run_history.context import (
+from weave.legacy import context_state as _context
+from weave.legacy.ops_domain.run_history.context import (
     error_on_non_vectorized_history_transform,
 )
-from weave.ops_domain.run_history.history_op_common import _without_tags
-from .. import context_state as _context
-from PIL import Image
-import numpy as np
-
-from weave.wandb_client_api import wandb_gql_query
-from weave.wandb_interface import wandb_stream_table
-
+from weave.legacy.ops_domain.run_history.history_op_common import _without_tags
+from weave.legacy.wandb_client_api import wandb_gql_query
+from weave.legacy.wandb_interface import wandb_stream_table
 
 HISTORY_OP_NAME = "history3"
 
@@ -182,7 +180,9 @@ def do_batch_test(username, rows, do_assertion):
     row_accumulator, st, user_logged_keys = do_logging(username, rows)
 
     row_type = weave.types.TypeRegistry.type_of([{}, *row_accumulator])
-    run_node = weave.ops.project(st._entity_name, st._project_name).run(st._table_name)
+    run_node = weave.legacy.ops.project(st._entity_name, st._project_name).run(
+        st._table_name
+    )
 
     # First assertion is with liveset
     wait_for_x_times(
@@ -392,7 +392,9 @@ def test_stream_table_perf(user_by_api_key_in_env, n_rows, n_cols):
     timings["log"] += time.time()
     print(f"Log Time: {timings['log']}")
 
-    run_node = weave.ops.project(st._entity_name, st._project_name).run(st._table_name)
+    run_node = weave.legacy.ops.project(st._entity_name, st._project_name).run(
+        st._table_name
+    )
 
     timings["history2_refine"] -= time.time()
     history2_node = run_node.history2()

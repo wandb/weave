@@ -1,7 +1,7 @@
 import pytest
 
-from weave.trace.vals import TraceObject
 import weave
+from weave.trace.vals import TraceObject
 
 
 def test_traceobject_properties():
@@ -32,7 +32,7 @@ def test_traceobject_access_after_init_termination(client):
     # Here we explicitly close the client in order to
     # simulate a situation where the client is closed
     # but a reference to a trace object still exists.
-    from weave import context_state
+    from weave.legacy import context_state
 
     context_state._graph_client.set(None)
 

@@ -1,11 +1,12 @@
-import numpy as np
 import random
 import typing
+
+import numpy as np
 import pyarrow as pa
-from .ops_arrow import ArrowWeaveList
 from scipy.signal import butter, filtfilt
 
 from . import util
+from .legacy.ops_arrow import ArrowWeaveList
 
 value_fns: list[typing.Any] = [
     lambda steps: steps**2,

@@ -1,41 +1,35 @@
-import os
-import random
-import numpy as np
 import hashlib
-
+import logging
+import os
 import pathlib
-import typing
-import pytest
+import random
 import shutil
 import tempfile
+import typing
 
-import weave
-
-from . import context_state
-from .tests import fixture_fakewandb
-from . import serialize
-from . import client as client_legacy
-from .language_features.tagging.tag_store import isolated_tagging_context
-from . import logs
-from . import io_service
-from . import logs
-from . import environment
-import logging
-from . import autopatch
-
+import numpy as np
+import pytest
 from flask.testing import FlaskClient
 
-from .tests.wandb_system_tests_conftest import *
-from .tests.trace_server_clickhouse_conftest import *
-
-from weave.trace_server import (
-    sqlite_trace_server,
-    trace_server_interface as tsi,
-    remote_http_trace_server,
-    external_to_internal_trace_server_adapter,
-    clickhouse_trace_server_batched,
-)
+import weave
 from weave import weave_init
+from weave.legacy import client as client_legacy
+from weave.legacy import context_state, io_service, serialize
+from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context
+from weave.trace_server import (
+    clickhouse_trace_server_batched,
+    external_to_internal_trace_server_adapter,
+    remote_http_trace_server,
+    sqlite_trace_server,
+)
+from weave.trace_server import (
+    trace_server_interface as tsi,
+)
+
+from . import autopatch, environment, logs
+from .tests import fixture_fakewandb
+from .tests.trace_server_clickhouse_conftest import *
+from .tests.wandb_system_tests_conftest import *
 
 logs.configure_logger()
 
@@ -44,10 +38,9 @@ logs.configure_logger()
 # tests.
 context_state._eager_mode.set(False)
 
-# A lot of tests rely on weave.ops.* being in scope. Importing this here
+# A lot of tests rely on weave.legacy.ops.* being in scope. Importing this here
 # makes that work...
-from weave import ops
-
+from weave.legacy import ops
 
 ### Disable datadog engine tracing
 
@@ -61,14 +54,11 @@ def make_fake_tracer():
     return FakeTracer()
 
 
-from . import engine_trace
-
-
 ### End disable datadog engine tracing
-
 ### disable internet access
-
 import socket
+
+from . import engine_trace
 
 
 def guard(*args, **kwargs):
@@ -284,7 +274,7 @@ def io_server_factory():
 
 @pytest.fixture()
 def consistent_table_col_ids():
-    from weave.panels import table_state
+    from weave.legacy.panels import table_state
 
     with table_state.use_consistent_col_ids():
         yield

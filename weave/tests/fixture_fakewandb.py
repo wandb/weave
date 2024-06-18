@@ -1,32 +1,30 @@
-from contextvars import Token
-from dataclasses import dataclass, field
 import json
 import os
-import uuid
-import typing
-
-from weave import wandb_api
-from weave import util
-from .tag_test_util import op_add_tag
-from ..artifact_wandb import (
-    WandbArtifact,
-    WeaveWBArtifactURI,
-    WandbArtifactManifest,
-    WeaveWBArtifactByIDURI,
-)
-from .. import wandb_client_api
-from unittest import mock
 import shutil
-import weave
+import typing
+import uuid
+from contextvars import Token
+from dataclasses import dataclass, field
+from unittest import mock
+from urllib import parse
+
 import wandb
 
-
-from urllib import parse
+import weave
+from weave import util
 
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should
 # mock wandb_api instead probably.
-from .. import io_service
+from weave.legacy import io_service, wandb_api, wandb_client_api
+from weave.legacy.artifact_wandb import (
+    WandbArtifact,
+    WandbArtifactManifest,
+    WeaveWBArtifactByIDURI,
+    WeaveWBArtifactURI,
+)
+
+from .tag_test_util import op_add_tag
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacits/test_res_1fwmcd3q:v0"
 ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)

@@ -1,37 +1,37 @@
+import asyncio
 import dataclasses
+import json
 import re
 import signal
-import requests
-import pytest
-import pydantic
-from pydantic import BaseModel
-import json
-import weave
-import asyncio
-from weave import op_def, Evaluation
 
-from weave import weave_client
+import pydantic
+import pytest
+import requests
+from pydantic import BaseModel
+
+import weave
+import weave.trace_server.trace_server_interface as tsi
+from weave import Evaluation, weave_client
+from weave.legacy import op_def
+from weave.trace import refs
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 from weave.trace.refs import (
+    DICT_KEY_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
-    LIST_INDEX_EDGE_NAME,
-    DICT_KEY_EDGE_NAME,
 )
-from weave.trace.serializer import register_serializer, get_serializer_for_obj
-
-from weave.trace import refs
+from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
-from weave.trace.isinstance import weave_isinstance
 from weave.trace_server.trace_server_interface import (
-    TableCreateReq,
-    TableSchemaForInsert,
-    TableQueryReq,
-    RefsReadBatchReq,
-    FileCreateReq,
     FileContentReadReq,
+    FileCreateReq,
+    RefsReadBatchReq,
+    TableCreateReq,
+    TableQueryReq,
+    TableSchemaForInsert,
 )
-import weave.trace_server.trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace
 

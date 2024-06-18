@@ -8,7 +8,7 @@ import copy
 import math
 
 from . import weave_types
-from . import graph
+from weave.legacy import graph
 from . import weave_types
 from . import errors
 

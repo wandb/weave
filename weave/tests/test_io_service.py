@@ -1,6 +1,9 @@
 import asyncio
+
 import pytest
-from .. import io_service
+
+from weave.legacy import io_service
+
 from .. import filesystem
 
 

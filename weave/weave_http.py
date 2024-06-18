@@ -2,20 +2,20 @@
 # interactions with http servers should go through this interface.
 
 import asyncio
-import time
+import logging
 import os
-import aiohttp
+import time
 import types
 import typing
-import yarl
-import logging
+
+import aiohttp
 import requests
 import requests.auth
+import yarl
 
+from weave import server_error_handling
 
-from . import engine_trace
-from . import filesystem
-from . import server_error_handling
+from . import engine_trace, filesystem
 
 logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
 logging.getLogger("aiohttp.client").setLevel(logging.WARNING)

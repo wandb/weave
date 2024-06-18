@@ -1,37 +1,27 @@
-import pytest
-import re
-from weave import stitch
-import numpy as np
-
-from weave.tests.test_wb_domain_ops import assert_gql_str_equal
-
-from .. import api as weave
-from .. import ops as ops
-from .. import uris
-from .. import artifact_wandb
-
-from . import weavejs_ops
-import json
-from . import fixture_fakewandb as fwb
-from .. import graph
-from .. import artifact_fs
-from ..ops_domain import wb_domain_types as wdt
-from ..ops_domain import artifact_membership_ops as amo
-from ..ops_arrow import ArrowWeaveListType
-from ..ops_primitives import list_, dict_
-from .. import weave_types as types
-from ..ops_primitives.file import _as_w0_dict_
-from ..ops_domain import wbmedia
-
-from .. import ops_arrow as arrow
 import cProfile
-from ..language_features.tagging.tagged_value_type import TaggedValueType
-from ..ops_domain import table
-from ..ops_domain import wb_util
+import json
+import re
+
+import numpy as np
+import pytest
 import wandb
 
-from .. import compile
+from weave import api as weave
+from weave import stitch
+from weave import weave_types as types
+from weave.legacy import artifact_fs, artifact_wandb, compile, graph, ops, uris
+from weave.legacy import ops_arrow as arrow
+from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.legacy.ops_arrow import ArrowWeaveListType
+from weave.legacy.ops_domain import artifact_membership_ops as amo
+from weave.legacy.ops_domain import table, wb_util, wbmedia
+from weave.legacy.ops_domain import wb_domain_types as wdt
+from weave.legacy.ops_primitives import dict_, list_
+from weave.legacy.ops_primitives.file import _as_w0_dict_
+from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
+from . import fixture_fakewandb as fwb
+from . import weavejs_ops
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {

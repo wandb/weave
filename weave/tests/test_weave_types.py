@@ -1,13 +1,16 @@
 import dataclasses
+
 import pytest
-from ..language_features.tagging.tagged_value_type import TaggedValueType
+
 import weave
+import weave.legacy
 import weave.weave_types
+from weave.legacy import _dict_utils, runs
+from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.legacy.ops_domain import wbmedia
+
 from .. import errors
 from .. import weave_types as types
-from .. import runs
-from .. import _dict_utils
-from ..ops_domain import wbmedia
 
 
 def test_typeof_string():
@@ -703,7 +706,7 @@ def test_deserializes_single_member_union():
 
 
 def test_wbrun_not_assignable_to_weave_run():
-    from ..ops_domain import wb_domain_types
+    from weave.legacy.ops_domain import wb_domain_types
 
     assert not weave.types.optional(wb_domain_types.Run().WeaveType()).assign_type(
         weave.types.RunType(
