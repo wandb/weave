@@ -27,20 +27,21 @@ static_art_file_gql = """
             artifactSequence {
                 id
                 name
+                project {
+                    id
+                    name
+                    entity {
+                        id
+                        name
+                    }
+                }
                 defaultArtifactType {
                     id
                     name
-                    project {
-                        id
-                        name
-                        entity {
-                            id
-                            name
-                        }
-                    }
                 }
             }
         """
+
 
 # Section 1/6: Tag Getters
 # None
@@ -550,21 +551,31 @@ def history_metrics(
 
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
-    entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"][
-        "entity"
-    ]["name"]
-    project_name = artifactVersion["artifactSequence"]["defaultArtifactType"][
-        "project"
-    ]["name"]
+    # With the introduction of org-level registries, artifacts from teams can be published
+    # to a collection in an org-registry, such that they're readable by all users in the organization.
+    # However, since not all org users belong to the same team, viewing the published artifact's files
+    # cannot depend on its source artifact's entity.
+    # In the case where the viewer doesn't have access to an artifact's project/entity,
+    # but is trying to view the artifact's files via the collection it was linked to, i.e a collection in an
+    # org-registry, we use WeaveWBArtifactByIDURI as the URI which allows us to query the
+    # artifact's manifest and hence, files, using just its ID.
+    artifact_id = artifactVersion["id"]
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion["artifactSequence"]["name"]
     commit_hash = artifactVersion["commitHash"]
+    uri = artifact_wandb.WeaveWBArtifactByIDURI(
+        home_sequence_name, commit_hash, artifact_id
+    )
+    if artifactVersion["artifactSequence"]["project"] is not None:
+        entity_name = artifactVersion["artifactSequence"]["project"]["entity"]["name"]
+        project_name = artifactVersion["artifactSequence"]["project"]["name"]
+        uri = artifact_wandb.WeaveWBArtifactURI(
+            home_sequence_name, commit_hash, entity_name, project_name
+        )
     return artifact_wandb.WandbArtifact(
         name=home_sequence_name,
         type=type_name,
-        uri=artifact_wandb.WeaveWBArtifactURI(
-            home_sequence_name, commit_hash, entity_name, project_name
-        ),
+        uri=uri,
     )
 
 

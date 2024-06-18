@@ -8,7 +8,12 @@ import typing
 from weave import wandb_api
 from weave import util
 from .tag_test_util import op_add_tag
-from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI, WandbArtifactManifest
+from ..artifact_wandb import (
+    WandbArtifact,
+    WeaveWBArtifactURI,
+    WandbArtifactManifest,
+    WeaveWBArtifactByIDURI,
+)
 from .. import wandb_client_api
 from unittest import mock
 import shutil
@@ -269,7 +274,6 @@ class FakeIoServiceClient:
 
     def add_artifact(self, artifact, artifact_uri):
         ma = MockedArtifact(artifact)
-
         self.mocked_artifacts[str(artifact_uri)] = ma
 
     def manifest(self, artifact_uri):
@@ -277,7 +281,10 @@ class FakeIoServiceClient:
         if uri_str in self.mocked_artifacts:
             return FakeArtifactManifest(self.mocked_artifacts[uri_str].artifact)
             # return FakeFilesystemManifest(self.mocked_artifacts[uri_str].local_path.name)
-        requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
+        if isinstance(artifact_uri, WeaveWBArtifactURI):
+            requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
+        elif isinstance(artifact_uri, WeaveWBArtifactByIDURI):
+            requested_path = f"{artifact_uri.path_root}/{artifact_uri.artifact_id}/{artifact_uri.name}_{artifact_uri.version}"
         target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
         return FakeFilesystemManifest(target)
 
@@ -295,7 +302,10 @@ class FakeIoServiceClient:
         return FakeFs()
 
     def direct_url(self, artifact_uri):
-        return f"https://api.wandb.ai/{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+        if isinstance(artifact_uri, WeaveWBArtifactURI):
+            return f"https://api.wandb.ai/{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+        elif isinstance(artifact_uri, WeaveWBArtifactByIDURI):
+            return f"https://api.wandb.ai/{artifact_uri.path_root}/{artifact_uri.artifact_id}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
     def ensure_file(self, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
@@ -306,7 +316,10 @@ class FakeIoServiceClient:
             if entry is None:
                 return None
             return entry.local_path
-        return f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+        if isinstance(artifact_uri, WeaveWBArtifactURI):
+            return f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+        elif isinstance(artifact_uri, WeaveWBArtifactByIDURI):
+            return f"{artifact_uri.path_root}/{artifact_uri.artifact_id}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
     def ensure_file_downloaded(self, download_url):
         # assumes the file is already in the testdata directory
@@ -335,6 +348,31 @@ class SetupResponse:
     ):
         artifact_uri = WeaveWBArtifactURI.parse(
             f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:{artifact.commit_hash}"
+        )
+
+        self.fake_io.add_artifact(artifact, artifact_uri)
+        res = weave.save(
+            WandbArtifact(
+                "test_name",
+                None,
+                artifact_uri,
+            )
+        )
+        if tag_payload:
+            res = op_add_tag(res, tag_payload)
+        return res
+
+    def mock_artifact_by_id_as_node(
+        self,
+        artifact,
+        tag_payload={
+            # In the future, we should make these actual run and project objects so we can chain ops
+            "fake_run": "test_run",
+            "fake_project": "test_project",
+        },
+    ):
+        artifact_uri = WeaveWBArtifactByIDURI.parse(
+            f"wandb-artifact-by-id:///__wb_artifacts_by_id__/{artifact.id}/{artifact.name}:{artifact.commit_hash}"
         )
 
         self.fake_io.add_artifact(artifact, artifact_uri)
@@ -434,6 +472,7 @@ defaultArtifactType_payload = {
 artifactSequence_payload = {
     "id": "QXJ0aWZhY3RDb2xsZWN0aW9uOjE4MDQ0MjY=",
     "name": "test_res_1fwmcd3q",
+    "project": project_payload,
     "defaultArtifactType": defaultArtifactType_payload,
 }
 artifactVersion_payload = {
@@ -453,4 +492,16 @@ artifactAlias_payload = {
     "alias": "custom_alias",
     "artifact": artifactVersion_payload,
     "artifactCollection": artifactSequence_payload,
+}
+artifactSequence_no_entity_payload = {
+    "id": "QXJ0aWZhY3RDb2xsZWN0aW9uOjE4MDQ0MjY=",
+    "name": "test_res_1fwmcd3q",
+    "project": None,
+    "defaultArtifactType": defaultArtifactType_payload,
+}
+artifactVersion_no_entity_payload = {
+    "id": "QXJ0aWZhY3Q6MTQxODgyNDA=",
+    "versionIndex": 0,
+    "commitHash": "303db33c9f9264768626",
+    "artifactSequence": artifactSequence_no_entity_payload,
 }
