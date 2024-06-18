@@ -10,6 +10,7 @@ import datetime
 from requests import HTTPError
 
 from weave.exception import exception_to_json_str
+from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
 from weave import trace_sentry, urls
 from weave import run_context
@@ -39,6 +40,9 @@ from weave.trace_server.trace_server_interface import (
     CallSchema,
     ObjQueryReq,
     ObjQueryRes,
+    Feedback,
+    FeedbackQueryReq,
+    Query,
     TableCreateReq,
     TableSchemaForInsert,
     TableQueryReq,
@@ -144,8 +148,24 @@ class Call:
     exception: Optional[str] = None
     summary: Optional[dict] = None
     display_name: Optional[str] = None
+    attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
+
+    _feedback: Optional[RefFeedbackQuery] = None
+
+    @property
+    def feedback(self) -> RefFeedbackQuery:
+        if not self.id:
+            raise ValueError("Can't get feedback for call without ID")
+        if self._feedback is None:
+            project_parts = self.project_id.split("/")
+            if len(project_parts) != 2:
+                raise ValueError(f"Invalid project_id: {self.project_id}")
+            entity, project = project_parts
+            weave_ref = CallRef(entity, project, self.id)
+            self._feedback = RefFeedbackQuery(weave_ref.uri())
+        return self._feedback
 
     @property
     def ui_url(self) -> str:
@@ -244,6 +264,7 @@ def make_client_call(
         output=output,
         summary=server_call.summary,
         display_name=server_call.display_name,
+        attributes=server_call.attributes,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -455,11 +476,26 @@ class WeaveClient:
     def create_call(
         self,
         op: Union[str, Op],
-        parent: Optional[Call],
         inputs: dict,
-        attributes: dict = {},
+        parent: Optional[Call] = None,
+        attributes: Optional[dict] = None,
         display_name: Optional[str] = None,
+        *,
+        use_stack: bool = True,
     ) -> Call:
+        """Create, log, and push a call onto the runtime stack.
+
+        Args:
+            op: The operation producing the call, or the name of an anonymous operation.
+            inputs: The inputs to the operation.
+            parent: The parent call. If parent is not provided, the current run is used as the parent.
+            display_name: The display name for the call. Defaults to None.
+            attributes: The attributes for the call. Defaults to None.
+            use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+
+        Returns:
+            The created Call object.
+        """
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -474,7 +510,7 @@ class WeaveClient:
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
 
-        if parent is None:
+        if parent is None and use_stack:
             parent = run_context.get_current_run()
 
         if parent:
@@ -483,6 +519,10 @@ class WeaveClient:
         else:
             trace_id = generate_id()
             parent_id = None
+
+        if attributes is None:
+            attributes = {}
+
         call = Call(
             op_name=op_str,
             project_id=self._project_id(),
@@ -491,6 +531,7 @@ class WeaveClient:
             id=call_id,
             inputs=inputs_with_refs,
             display_name=display_name,
+            attributes=attributes,
         )
         if parent is not None:
             parent._children.append(call)
@@ -510,7 +551,10 @@ class WeaveClient:
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
-        run_context.push_call(call)
+
+        if use_stack:
+            run_context.push_call(call)
+
         return call
 
     @trace_sentry.global_trace_sentry.watch()
@@ -600,6 +644,79 @@ class WeaveClient:
     def remove_call_display_name(self, call: Call) -> None:
         self.set_call_display_name(call, None)
 
+    def feedback(
+        self,
+        query: Optional[Union[Query, str]] = None,
+        *,
+        reaction: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> FeedbackQuery:
+        """Query project for feedback.
+
+        Examples:
+            # Fetch a specific feedback object.
+            # Note that this still returns a collection, which is expected
+            # to contain zero or one item(s).
+            client.feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+
+            # Find all feedback objects with a specific reaction.
+            client.feedback(reaction="👍", limit=10)
+
+        Args:
+            query: A mongo-style query expression. For convenience, also accepts a feedback UUID string.
+            reaction: For convenience, filter by a particular reaction emoji.
+            offset: The offset to start fetching feedback objects from.
+            limit: The maximum number of feedback objects to fetch.
+
+        Returns:
+            A FeedbackQuery object.
+        """
+        expr: dict[str, Any] = {
+            "$eq": [
+                {"$literal": "1"},
+                {"$literal": "1"},
+            ],
+        }
+        if isinstance(query, str):
+            expr = {
+                "$eq": [
+                    {"$getField": "id"},
+                    {"$literal": query},
+                ],
+            }
+        elif isinstance(query, Query):
+            expr = query.expr_.dict()
+
+        if reaction:
+            expr = {
+                "$and": [
+                    expr,
+                    {
+                        "$eq": [
+                            {"$getField": "feedback_type"},
+                            {"$literal": "wandb.reaction.1"},
+                        ],
+                    },
+                    {
+                        "$eq": [
+                            {"$getField": "payload.emoji"},
+                            {"$literal": reaction},
+                        ],
+                    },
+                ]
+            }
+        rewritten_query = Query(**{"$expr": expr})
+
+        return FeedbackQuery(
+            entity=self.entity,
+            project=self.project,
+            query=rewritten_query,
+            offset=offset,
+            limit=limit,
+            show_refs=True,
+        )
+
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
             return
@@ -637,12 +754,6 @@ class WeaveClient:
         raise NotImplementedError()
 
     def ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
-        raise NotImplementedError()
-
-    def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
-        raise NotImplementedError()
-
-    def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
         raise NotImplementedError()
 
     def op_runs(self, op_def: Op) -> Sequence[Call]:

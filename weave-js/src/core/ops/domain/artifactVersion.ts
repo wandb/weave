@@ -1,3 +1,4 @@
+import {opArtifactProject, opIsNone} from '@wandb/weave/core';
 import * as _ from 'lodash';
 
 import * as Urls from '../../_external/util/urls';
@@ -699,6 +700,21 @@ export const opArtifactVersionRunHistoryRow = makeBasicOp({
     engine
   ) => {
     const eng = engine();
+    // With org-level registries allowing access to team-level artifacts,
+    // there are cases where users can have access to the artifact,
+    // but not its source run or project/team. This access check on the frontend
+    // will prevent us from making queries that we know will crash for such users.
+    const noProjectAccessNode = opIsNone({
+      val: opArtifactProject({
+        artifact: opArtifactVersionArtifactSequence({
+          artifactVersion: forwardOp.op.inputs.artifactVersion,
+        }),
+      }),
+    });
+    const [noProjectAccess] = await eng.executeNodes([noProjectAccessNode]);
+    if (noProjectAccess) {
+      return Promise.resolve({});
+    }
     const createdByRunNode = opArtifactVersionCreatedBy({
       artifactVersion: forwardOp.op.inputs.artifactVersion,
     });

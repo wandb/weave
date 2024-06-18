@@ -329,7 +329,7 @@ const MainPeekingLayout: FC = () => {
           PaperProps={{
             style: {
               overflow: 'hidden',
-              display: 'flex',
+              display: isDrawerOpen ? 'flex' : 'none',
               zIndex: 1,
               width: `${drawerWidthPct}%`,
               height: '100%',

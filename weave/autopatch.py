@@ -40,10 +40,12 @@ def autopatch() -> None:
     from .integrations.mistral.mistral import mistral_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
+    from .integrations.anthropic.anthropic_sdk import anthropic_patcher
 
     mistral_patcher.attempt_patch()
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
+    anthropic_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -52,7 +54,9 @@ def reset_autopatch() -> None:
     from .integrations.mistral.mistral import mistral_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
+    from .integrations.anthropic.anthropic_sdk import anthropic_patcher
 
     mistral_patcher.undo_patch()
     litellm_patcher.undo_patch()
     llamaindex_patcher.undo_patch()
+    anthropic_patcher.undo_patch()
