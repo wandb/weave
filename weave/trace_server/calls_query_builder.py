@@ -8,24 +8,24 @@ The "calls table" actually refers to `calls_merged`.
 To query the `calls_merged` table efficiently, there are 4 possible ways to do
 it, each with increasing complexity:
 
-Level 1: 
+Level 1:
 
-* Selected Fields: No "dynamic" fields 
-* Filter Fields: No "dynamic" fields 
+* Selected Fields: No "dynamic" fields
+* Filter Fields: No "dynamic" fields
 * Sort Fields: No "dynamic" fields
 
-Level 2: 
+Level 2:
 
-* Selected Fields: includes "dynamic" fields 
-* Filter Fields: No "dynamic" fields 
+* Selected Fields: includes "dynamic" fields
+* Filter Fields: No "dynamic" fields
 * Sort Fields: No "dynamic" fields & includes a limit
 
-Level 3: 
+Level 3:
 
-* Selected Fields: includes "dynamic" fields 
+* Selected Fields: includes "dynamic" fields
 * Filter Fields/Sort: includes "dynamic" fields
 
-Level 4: 
+Level 4:
 
 * Filter/Sort Fields: include joined fields (read: ref expansion or
 feedback)
@@ -50,7 +50,7 @@ implied to be relatively inexpensive to load into memory
         * REFERENCED_FIELDS: Fields whose values are the result of at least 1
           reference expansion
             * Note: All referenced fields are dynamic fields, but not all
-              dynamic fields are referenced fields! However, we 
+              dynamic fields are referenced fields! However, we
             * cannot know at query building time if a dynamic field is a
               referenced field or not!
         * FEEDBACK_FIELDS: Fields whose values are stored in the feedback table.
@@ -78,8 +78,8 @@ NEVER USE THIS:
 SELECT {SELECT_FIELDS}
 FROM calls_merged
 GROUP BY (project_id, id)
-HAVING 
-    project_id = {project_id} 
+HAVING
+    project_id = {project_id}
     AND isNull(any(deleted_at))
     AND {FILTER_FIELDS}             -- optional
 ORDER BY {SORT_FIELDS}              -- optional
@@ -98,15 +98,15 @@ SELECT {SELECT_FIELDS}
 FROM calls_merged
 WHERE project_id = {project_id}
 GROUP BY (project_id, id)
-HAVING 
+HAVING
     isNull(any(deleted_at))
-    AND {FILTER_FIELDS}             -- optional 
+    AND {FILTER_FIELDS}             -- optional
 ORDER BY {SORT_FIELDS}              -- optional
 LIMIT {limit}                       -- optional
 OFFSET {offset}                     -- optional
-``` 
+```
 
-This is the base query. While in theory it is good, in practice, we never actually use 
+This is the base query. While in theory it is good, in practice, we never actually use
 this case (but that is just because of current features). You will see why in a moment.
 
 The next modification is to push any STATIC_FILTER_FIELDS into a nested query:
@@ -118,7 +118,7 @@ WITH filtered_calls AS (
     FROM calls_merged
     WHERE project_id = {project_id}
     GROUP BY (project_id, id)
-    HAVING 
+    HAVING
         isNull(any(deleted_at))
         AND {STATIC_FILTER_FIELDS}
 )
@@ -126,9 +126,9 @@ SELECT {SELECT_FIELDS}
 FROM calls_merged
 WHERE id IN (filtered_calls)        -- Consider using an INNER JOIN here
 GROUP BY (project_id, id)
-HAVING {FILTER_DYNAMIC_FIELDS}      -- optional 
-ORDER BY {SORT_FIELDS}              -- optional 
-LIMIT {limit}                       -- optional 
+HAVING {FILTER_DYNAMIC_FIELDS}      -- optional
+ORDER BY {SORT_FIELDS}              -- optional
+LIMIT {limit}                       -- optional
 OFFSET {offset}                     -- optional
 ```
 
@@ -145,7 +145,7 @@ WITH ordered_filtered_calls AS (
     FROM calls_merged
     WHERE project_id = {project_id}
     GROUP BY (project_id, id)
-    HAVING 
+    HAVING
         isNull(any(deleted_at))
         AND {STATIC_FILTER_FIELDS}  -- optional
     ORDER BY {SORT_FIELDS}
@@ -159,7 +159,7 @@ GROUP BY (project_id, id)
 ORDER BY {SORT_FIELDS}              -- still required to repeat
 ```
 
-Now, we can do even better! If the requested columns do not contain any dynamic fields, 
+Now, we can do even better! If the requested columns do not contain any dynamic fields,
 can avoid the inner query altogether (notice, this is equivalent to the base query):
 
 STATIC QUERY:
@@ -168,9 +168,9 @@ SELECT {SELECT_FIELDS}
 FROM calls_merged
 WHERE project_id = {project_id}
 GROUP BY (project_id, id)
-HAVING 
+HAVING
     isNull(any(deleted_at))
-    AND {FILTER_FIELDS}             -- optional 
+    AND {FILTER_FIELDS}             -- optional
 ORDER BY {SORT_FIELDS}              -- optional
 LIMIT {limit}                       -- optional
 OFFSET {offset}                     -- optional
@@ -185,7 +185,7 @@ WITH filtered_calls AS (
     FROM calls_merged
     WHERE project_id = {project_id}
     GROUP BY (project_id, id)
-    HAVING 
+    HAVING
         isNull(any(deleted_at))
         AND {STATIC_FILTER_FIELDS}
 ),
@@ -197,9 +197,9 @@ SELECT {SELECT_FIELDS}
 FROM calls_merged
 WHERE id IN (expanded_calls)        -- This almost certainly needs to be a JOIN
 GROUP BY (project_id, id)
-HAVING {FILTER_FIELDS}              -- optional 
-ORDER BY {SORT_FIELDS}              -- optional 
-LIMIT {limit}                       -- optional 
+HAVING {FILTER_FIELDS}              -- optional
+ORDER BY {SORT_FIELDS}              -- optional
+LIMIT {limit}                       -- optional
 OFFSET {offset}                     -- optional
 ```
 
@@ -218,7 +218,6 @@ Now that all this is written, i think an alternative implementation is:
 """
 
 # TODO: Consider latency ordering
-
 
 import typing
 from pydantic import BaseModel, Field
@@ -635,7 +634,11 @@ def process_query_to_conditions(
                 _python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            (field, _, fields_used,) = transform_external_field_to_internal_field(
+            (
+                field,
+                _,
+                fields_used,
+            ) = transform_external_field_to_internal_field(
                 operand.get_field_, None, param_builder
             )
             raw_fields_used.update(fields_used)
