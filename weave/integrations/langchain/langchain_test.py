@@ -73,8 +73,7 @@ def test_simple_chain_invoke(
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
-    llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
+    llm = ChatOpenAI(temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
@@ -96,8 +95,7 @@ def test_simple_chain_stream(
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
-    llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
+    llm = ChatOpenAI(temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
@@ -140,8 +138,7 @@ def test_simple_chain_batch(
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_KEY")
-    llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
+    llm = ChatOpenAI(temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
@@ -180,8 +177,7 @@ def test_simple_chain_batch_inside_op(
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_KEY")
-    llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
+    llm = ChatOpenAI(temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
