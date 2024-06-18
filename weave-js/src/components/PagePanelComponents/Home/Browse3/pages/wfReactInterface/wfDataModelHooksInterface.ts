@@ -152,8 +152,6 @@ export type FeedbackKey = {
   entity: string;
   project: string;
   weaveRef: string;
-  // If true, do a prefix search on weaveRef instead of an exact match
-  includeExtra?: boolean;
 };
 
 export type WFDataModelHooksInterface = {

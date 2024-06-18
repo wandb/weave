@@ -26,7 +26,6 @@ export const FeedbackGrid = ({
     entity,
     project,
     weaveRef,
-    includeExtra: true,
   });
 
   if (query.loading) {
