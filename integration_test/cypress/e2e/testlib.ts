@@ -178,6 +178,15 @@ export const sliderSetValue = (path: string[], value: number) => {
   panel.find('input[type=range]').invoke('val', value).trigger('input');
 };
 
+// TODO: This seems to modify configDivElement, which is not what I expected
+export const switchToExpressionEditor = (
+  configDivElement: Cypress.Chainable
+) => {
+  configDivElement.find('[data-testid=config-dim-overflow]').click();
+  cy.get('[data-testid="enter-a-weave-expression"]').click();
+  configDivElement.click();
+};
+
 export const setPlotConfig = (
   configDivElement: Cypress.Chainable,
   eeText: string

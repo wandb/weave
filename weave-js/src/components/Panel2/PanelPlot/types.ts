@@ -17,6 +17,7 @@ export type DimOption = {
   text: string;
   icon: string;
   onClick: () => void;
+  testId?: string;
 };
 
 export type DimOptionOrSection = DimOption | DimOption[];
@@ -59,4 +60,5 @@ export type DimType =
   | 'optionSelect'
   | 'weaveExpression'
   | 'group'
-  | 'dropdownWithExpression';
+  | 'dropdownWithExpression'
+  | 'columnSelWithExpression';
