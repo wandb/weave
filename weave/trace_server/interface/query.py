@@ -45,7 +45,13 @@ class Query(BaseModel):
 # Can be any standard json-able value
 class LiteralOperation(BaseModel):
     literal_: typing.Union[
-        str, int, float, bool, dict[str, "LiteralOperation"], list["LiteralOperation"]
+        str,
+        int,
+        float,
+        bool,
+        dict[str, "LiteralOperation"],
+        list["LiteralOperation"],
+        None,
     ] = Field(alias="$literal")
 
 

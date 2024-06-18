@@ -35,13 +35,21 @@ from zoneinfo import ZoneInfo
 
 import emoji
 from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.query import QueryResult, StreamContext
+from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
 import clickhouse_connect
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
-from weave.trace_server.calls_query_builder import CallsQuery
+from weave.trace_server.calls_query_builder import (
+    CallsQuery,
+    combine_conditions,
+    is_dynamic_field,
+    make_calls_where_condition_from_event_conditions,
+    process_calls_filter_to_conditions,
+    process_query_to_conditions,
+    transform_external_field_to_internal_field,
+)
 
 from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
@@ -52,7 +60,7 @@ from .feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from .orm import Table, Column, ParamBuilder, Row
+from .orm import ParamBuilder, Row
 
 from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
@@ -60,10 +68,8 @@ from .trace_server_interface_util import (
     generate_id,
     str_digest,
     bytes_digest,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
-from .interface import query as tsi_query
 
 from . import refs_internal
 
@@ -320,7 +326,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # First, apply the application filter
         if req.filter:
-            filter_to_conditions = _process_calls_filter_to_conditions(
+            filter_to_conditions = process_calls_filter_to_conditions(
                 req.filter, param_builder
             )
             raw_fields_used.update(filter_to_conditions.fields_used)
@@ -330,7 +336,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Next, apply the query filter
         if req.query:
-            having_query_conds, fields_used = _process_query_to_conditions(
+            having_query_conds, fields_used = process_query_to_conditions(
                 req.query, all_call_select_columns, all_call_json_columns, param_builder
             )
             raw_fields_used.update(fields_used)
@@ -360,7 +366,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # First, apply the application filter
         if req.filter:
-            filter_to_conditions = _process_calls_filter_to_conditions(
+            filter_to_conditions = process_calls_filter_to_conditions(
                 req.filter, param_builder
             )
             having_conditions.extend(filter_to_conditions.having_conditions)
@@ -369,7 +375,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Next, apply the query filter
         if req.query:
-            having_query_conds, _ = _process_query_to_conditions(
+            having_query_conds, _ = process_query_to_conditions(
                 req.query, all_call_select_columns, all_call_json_columns, param_builder
             )
             having_conditions.extend(having_query_conds)
@@ -654,7 +660,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if conditions:
             conds.extend(conditions)
 
-        predicate = _combine_conditions(conds, "AND")
+        predicate = combine_conditions(conds, "AND")
         # The subqueries are for deduplication of table rows and tables by digest.
         # It might be more efficient to do deduplication of table rows
         # in the outer query instead of the right side of the JOIN clause here,
@@ -759,7 +765,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters[version_param_key] = ref.version
 
             if len(conds) > 0:
-                conditions = [_combine_conditions(conds, "OR")]
+                conditions = [combine_conditions(conds, "OR")]
                 objs = self._select_objs_query(
                     ref.project_id, conditions=conditions, parameters=parameters
                 )
@@ -1158,9 +1164,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         having_conditions_part = None
         if having_conditions:
-            having_conditions_part = _combine_conditions(having_conditions, "AND")
+            having_conditions_part = combine_conditions(having_conditions, "AND")
 
-        where_conditions_part = _make_calls_where_condition_from_event_conditions(
+        where_conditions_part = make_calls_where_condition_from_event_conditions(
             start_event_conditions=start_event_conditions,
             end_event_conditions=end_event_conditions,
         )
@@ -1181,7 +1187,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # For each order by field, if it is a dynamic field, we generate
                 # 3 order by terms: one for existence, one for float casting, and one for string casting.
                 # The effect of this is that we will have stable sorting for nullable, mixed-type fields.
-                if _is_dynamic_field(field):
+                if is_dynamic_field(field):
                     # Prioritize existence, then cast to float, then str
                     options = [
                         ("exists", "desc"),
@@ -1235,7 +1241,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         inner_field,
                         param_builder,
                         _,
-                    ) = _transform_external_field_to_internal_field(
+                    ) = transform_external_field_to_internal_field(
                         field, all_call_select_columns, all_call_json_columns, cast
                     )
                     parameters.update(param_builder.get_params())
@@ -1257,6 +1263,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # TODO: make this lovely!
         cq = CallsQuery(project_id=project_id)
+        print(cq.as_sql(ParamBuilder()))
         if having_conditions_part or len(order_by_events) != 1:
             if having_conditions_part is None:
                 having_conditions_part == "1 = 1"
@@ -1334,9 +1341,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not having_conditions:
             having_conditions = ["1 = 1"]
 
-        having_conditions_part = _combine_conditions(having_conditions, "AND")
+        having_conditions_part = combine_conditions(having_conditions, "AND")
 
-        where_conditions_part = _make_calls_where_condition_from_event_conditions(
+        where_conditions_part = make_calls_where_condition_from_event_conditions(
             start_event_conditions=start_event_conditions,
             end_event_conditions=end_event_conditions,
         )
@@ -1392,7 +1399,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not conditions:
             conditions = ["1 = 1"]
 
-        conditions_part = _combine_conditions(conditions, "AND")
+        conditions_part = combine_conditions(conditions, "AND")
 
         limit_part = ""
         if limit != None:
@@ -1805,15 +1812,6 @@ def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
         return (False, -1)
 
 
-def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
-    if operator not in ("AND", "OR"):
-        raise ValueError(f"Invalid operator: {operator}")
-    if len(conditions) == 1:
-        return conditions[0]
-    combined = f" {operator} ".join(f"({c})" for c in conditions)
-    return f"({combined})"
-
-
 def find_call_descendants(
     root_ids: typing.List[str],
     all_calls: typing.List[SelectableCHCallSchema],
@@ -1841,362 +1839,3 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
-
-
-def _python_value_to_ch_type(value: typing.Any) -> str:
-    """Helper function to convert python types to clickhouse types."""
-    if isinstance(value, str):
-        return "String"
-    elif isinstance(value, int):
-        return "UInt64"
-    elif isinstance(value, float):
-        return "Float64"
-    elif isinstance(value, bool):
-        return "UInt8"
-    elif value is None:
-        return "Nullable(String)"
-    else:
-        raise ValueError(f"Unknown value type: {value}")
-
-
-def _param_slot(param_name: str, param_type: str) -> str:
-    """Helper function to create a parameter slot for a clickhouse query."""
-    return f"{{{param_name}:{param_type}}}"
-
-
-def _quote_json_path(path: str) -> str:
-    """Helper function to quote a json path for use in a clickhouse query. Moreover,
-    this converts index operations from dot notation (conforms to Mongo) to bracket
-    notation (required by clickhouse)
-
-    See comments on `GetFieldOperator` for current limitations
-    """
-    parts = path.split(".")
-    parts_final = []
-    for part in parts:
-        try:
-            int(part)
-            parts_final.append("[" + part + "]")
-        except ValueError:
-            parts_final.append('."' + part + '"')
-    return "$" + "".join(parts_final)
-
-
-def _is_dynamic_field(field: str) -> bool:
-    """Dynamic fields are fields that are arbitrary values produced by the user."""
-    return (
-        field in ("inputs", "output", "attributes", "summary")
-        or field.startswith("inputs.")
-        or field.startswith("output.")
-        or field.startswith("attributes.")
-        or field.startswith("summary.")
-    )
-
-
-def _transform_external_field_to_internal_field(
-    field: str,
-    all_columns: typing.Sequence[str],
-    json_columns: typing.Sequence[str],
-    cast: typing.Optional[str] = None,
-    param_builder: typing.Optional[ParamBuilder] = None,
-) -> tuple[str, ParamBuilder, set[str]]:
-    """Transforms a request for a dot-notation field to a clickhouse field."""
-    param_builder = param_builder or ParamBuilder()
-    raw_fields_used = set()
-    json_path = None
-    for prefix in json_columns:
-        if field == prefix or field.startswith(prefix + "."):
-            if field == prefix:
-                json_path = "$"
-            else:
-                json_path = _quote_json_path(field[len(prefix + ".") :])
-            field = prefix + "_dump"
-            break
-
-    # validate field
-    if field not in all_columns:
-        raise ValueError(f"Unknown field: {field}")
-
-    raw_fields_used.add(field)
-    if json_path is not None:
-        json_path_param_name = param_builder.add_param(json_path)
-        if cast == "exists":
-            field = (
-                "(JSON_EXISTS(" + field + ", {" + json_path_param_name + ":String}))"
-            )
-        else:
-            method = "toString"
-            if cast is not None:
-                if cast == "int":
-                    method = "toInt64OrNull"
-                elif cast == "float":
-                    method = "toFloat64OrNull"
-                elif cast == "bool":
-                    method = "toUInt8OrNull"
-                elif cast == "str":
-                    method = "toString"
-                else:
-                    raise ValueError(f"Unknown cast: {cast}")
-            field = (
-                method
-                + "(JSON_VALUE("
-                + field
-                + ", {"
-                + json_path_param_name
-                + ":String}))"
-            )
-
-    return field, param_builder, raw_fields_used
-
-
-class FilterToConditions(BaseModel):
-    having_conditions: list[str]
-    start_event_conditions: list[str]
-    end_event_conditions: list[str]
-    fields_used: set[str]
-
-
-def _process_calls_filter_to_conditions(
-    filter: tsi._CallsFilter,
-    param_builder: typing.Optional[ParamBuilder] = None,
-) -> FilterToConditions:
-    """Converts a CallsFilter to a list of conditions for a clickhouse query."""
-    param_builder = param_builder or ParamBuilder()
-    having_conditions: list[str] = []
-    start_event_conditions: list[str] = []
-    end_event_conditions: list[str] = []
-    raw_fields_used = set()
-
-    if filter.op_names:
-        # We will build up (0 or 1) + N conditions for the op_version_refs
-        # If there are any non-wildcarded names, then we at least have an IN condition
-        # If there are any wildcarded names, then we have a LIKE condition for each
-
-        or_conditions: typing.List[str] = []
-
-        non_wildcarded_names: typing.List[str] = []
-        wildcarded_names: typing.List[str] = []
-        for name in filter.op_names:
-            if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                wildcarded_names.append(name)
-            else:
-                non_wildcarded_names.append(name)
-
-        if non_wildcarded_names:
-            or_conditions.append(
-                f"calls_merged.op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
-            )
-            raw_fields_used.add("op_name")
-
-        for name in wildcarded_names:
-            like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-            or_conditions.append(
-                f"calls_merged.op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
-            )
-            raw_fields_used.add("op_name")
-
-        if or_conditions:
-            start_event_conditions.append(_combine_conditions(or_conditions, "OR"))
-
-    if filter.input_refs:
-        start_event_conditions.append(
-            f"hasAny(calls_merged.input_refs, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
-        )
-        raw_fields_used.add("input_refs")
-
-    if filter.output_refs:
-        end_event_conditions.append(
-            f"hasAny(calls_merged.output_refs, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
-        )
-        raw_fields_used.add("output_refs")
-
-    if filter.parent_ids:
-        start_event_conditions.append(
-            f"calls_merged.parent_id IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
-        )
-        raw_fields_used.add("parent_id")
-
-    if filter.trace_ids:
-        start_event_conditions.append(
-            f"calls_merged.trace_id IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
-        )
-        raw_fields_used.add("trace_id")
-
-    if filter.call_ids:
-        start_event_conditions.append(
-            f"calls_merged.id IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
-        )
-        raw_fields_used.add("id")
-
-    if filter.trace_roots_only:
-        start_event_conditions.append("calls_merged.parent_id IS NULL")
-        raw_fields_used.add("parent_id")
-
-    if filter.wb_user_ids:
-        start_event_conditions.append(
-            f"calls_merged.wb_user_id IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
-        )
-        raw_fields_used.add("wb_user_id")
-
-    if filter.wb_run_ids:
-        start_event_conditions.append(
-            f"calls_merged.wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
-        )
-        raw_fields_used.add("wb_run_id")
-
-    return FilterToConditions(
-        having_conditions=having_conditions,
-        start_event_conditions=start_event_conditions,
-        end_event_conditions=end_event_conditions,
-        fields_used=raw_fields_used,
-    )
-
-
-# TODO: Implement predicate pushdown just like `_process_calls_filter_to_conditions`
-def _process_query_to_conditions(
-    query: tsi.Query,
-    all_columns: typing.Sequence[str],
-    json_columns: typing.Sequence[str],
-    param_builder: typing.Optional[ParamBuilder] = None,
-) -> tuple[list[str], set[str]]:
-    """Converts a Query to a list of conditions for a clickhouse query."""
-    param_builder = param_builder or ParamBuilder()
-    conditions = []
-    raw_fields_used = set()
-
-    # This is the mongo-style query
-    def process_operation(operation: tsi_query.Operation) -> str:
-        cond = None
-
-        if isinstance(operation, tsi_query.AndOperation):
-            if len(operation.and_) == 0:
-                raise ValueError("Empty AND operation")
-            elif len(operation.and_) == 1:
-                return process_operand(operation.and_[0])
-            parts = [process_operand(op) for op in operation.and_]
-            cond = f"({' AND '.join(parts)})"
-        elif isinstance(operation, tsi_query.OrOperation):
-            if len(operation.or_) == 0:
-                raise ValueError("Empty OR operation")
-            elif len(operation.or_) == 1:
-                return process_operand(operation.or_[0])
-            parts = [process_operand(op) for op in operation.or_]
-            cond = f"({' OR '.join(parts)})"
-        elif isinstance(operation, tsi_query.NotOperation):
-            operand_part = process_operand(operation.not_[0])
-            cond = f"(NOT ({operand_part}))"
-        elif isinstance(operation, tsi_query.EqOperation):
-            lhs_part = process_operand(operation.eq_[0])
-            rhs_part = process_operand(operation.eq_[1])
-            cond = f"({lhs_part} = {rhs_part})"
-        elif isinstance(operation, tsi_query.GtOperation):
-            lhs_part = process_operand(operation.gt_[0])
-            rhs_part = process_operand(operation.gt_[1])
-            cond = f"({lhs_part} > {rhs_part})"
-        elif isinstance(operation, tsi_query.GteOperation):
-            lhs_part = process_operand(operation.gte_[0])
-            rhs_part = process_operand(operation.gte_[1])
-            cond = f"({lhs_part} >= {rhs_part})"
-        elif isinstance(operation, tsi_query.ContainsOperation):
-            lhs_part = process_operand(operation.contains_.input)
-            rhs_part = process_operand(operation.contains_.substr)
-            position_operation = "position"
-            if operation.contains_.case_insensitive:
-                position_operation = "positionCaseInsensitive"
-            cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
-        else:
-            raise ValueError(f"Unknown operation type: {operation}")
-
-        return cond
-
-    def process_operand(operand: tsi_query.Operand) -> str:
-        if isinstance(operand, tsi_query.LiteralOperation):
-            return _param_slot(
-                param_builder.add_param(operand.literal_),  # type: ignore
-                _python_value_to_ch_type(operand.literal_),
-            )
-        elif isinstance(operand, tsi_query.GetFieldOperator):
-            (field, _, fields_used,) = _transform_external_field_to_internal_field(
-                operand.get_field_, all_columns, json_columns, None, param_builder
-            )
-            raw_fields_used.update(fields_used)
-            return field
-        elif isinstance(operand, tsi_query.ConvertOperation):
-            field = process_operand(operand.convert_.input)
-            convert_to = operand.convert_.to
-            if convert_to == "int":
-                method = "toInt64OrNull"
-            elif convert_to == "double":
-                method = "toFloat64OrNull"
-            elif convert_to == "bool":
-                method = "toUInt8OrNull"
-            elif convert_to == "string":
-                method = "toString"
-            else:
-                raise ValueError(f"Unknown cast: {convert_to}")
-            return f"{method}({field})"
-        elif isinstance(
-            operand,
-            (
-                tsi_query.AndOperation,
-                tsi_query.OrOperation,
-                tsi_query.NotOperation,
-                tsi_query.EqOperation,
-                tsi_query.GtOperation,
-                tsi_query.GteOperation,
-                tsi_query.ContainsOperation,
-            ),
-        ):
-            return process_operation(operand)
-        else:
-            raise ValueError(f"Unknown operand type: {operand}")
-
-    filter_cond = process_operation(query.expr_)
-
-    conditions.append(filter_cond)
-
-    return conditions, raw_fields_used
-
-
-def _make_calls_where_condition_from_event_conditions(
-    start_event_conditions: typing.Optional[typing.List[str]] = None,
-    end_event_conditions: typing.Optional[typing.List[str]] = None,
-) -> str:
-    event_conds = []
-    if start_event_conditions is not None and len(start_event_conditions) > 0:
-        conds = _combine_conditions(
-            [
-                "project_id = {project_id: String}",
-                "isNotNull(started_at)",
-                *start_event_conditions,
-            ],
-            "AND",
-        )
-        event_conds.append(
-            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
-        )
-
-    if end_event_conditions is not None and len(end_event_conditions) > 0:
-        conds = _combine_conditions(
-            [
-                "project_id = {project_id: String}",
-                "isNotNull(ended_at)",
-                *end_event_conditions,
-            ],
-            "AND",
-        )
-        event_conds.append(
-            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
-        )
-
-    # Exclude deleted calls
-    conds = _combine_conditions(
-        ["project_id = {project_id: String}", "isNotNull(deleted_at)"], "AND"
-    )
-    event_conds.append(
-        f"calls_merged.id NOT IN (SELECT id FROM calls_merged WHERE {conds})"
-    )
-
-    where_conditions_part = _combine_conditions(event_conds, "AND")
-
-    return where_conditions_part
