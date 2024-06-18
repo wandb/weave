@@ -1,6 +1,7 @@
 """
 Utility methods for converting exceptions to JSON.
 """
+
 import json
 import traceback
 from typing import Any, Optional, TypedDict

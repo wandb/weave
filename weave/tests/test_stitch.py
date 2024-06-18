@@ -43,8 +43,12 @@ def _test_hasobj_obj(self_has_obj: _TestPlanHasObject) -> _TestPlanObject:
     return self_has_obj._obj
 
 
-get_object_self_tag = make_tag_getter_op.make_tag_getter_op("self", _TestPlanObject.WeaveType())  # type: ignore
-get_hasobject_self_tag = make_tag_getter_op.make_tag_getter_op("self_has_obj", _TestPlanHasObject.WeaveType())  # type: ignore
+get_object_self_tag = make_tag_getter_op.make_tag_getter_op(
+    "self", _TestPlanObject.WeaveType()
+)  # type: ignore
+get_hasobject_self_tag = make_tag_getter_op.make_tag_getter_op(
+    "self_has_obj", _TestPlanHasObject.WeaveType()
+)  # type: ignore
 
 _context.clear_loading_built_ins(_loading_builtins_token)
 

@@ -168,5 +168,6 @@ class Http:
                         f.write(r.content)  # type: ignore
                 else:
                     raise server_error_handling.WeaveInternalHttpException.from_code(
-                        r.status_code, "Download failed"  # type: ignore
+                        r.status_code,
+                        "Download failed",  # type: ignore
                     )

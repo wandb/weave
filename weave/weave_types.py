@@ -229,9 +229,9 @@ class Type(metaclass=_TypeSubclassWatcher):
     _base_type: typing.ClassVar[typing.Optional[typing.Type["Type"]]] = None
 
     instance_class: typing.ClassVar[typing.Optional[type]]
-    instance_classes: typing.ClassVar[
-        typing.Union[type, typing.List[type], None]
-    ] = None
+    instance_classes: typing.ClassVar[typing.Union[type, typing.List[type], None]] = (
+        None
+    )
 
     _type_attrs = None
     _hash = None
@@ -1769,36 +1769,44 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
     if isinstance(of_type, List):
         return List(
             _merge_unknowns_of_type_with_types(
-                of_type.object_type, [t.object_type for t in with_types]  # type: ignore
+                of_type.object_type,
+                [t.object_type for t in with_types],  # type: ignore
             )
         )
     elif isinstance(of_type, Dict):
         return Dict(
             of_type.key_type,
             _merge_unknowns_of_type_with_types(
-                of_type.value_type, [t.value_type for t in with_types]  # type: ignore
+                of_type.value_type,  # type: ignore
+                [t.value_type for t in with_types],  # type: ignore
             ),
         )
     elif isinstance(of_type, TypedDict):
         return TypedDict(
             {
                 key: _merge_unknowns_of_type_with_types(
-                    value_type, [t.property_types.get(key, NoneType()) for t in with_types]  # type: ignore
+                    value_type,
+                    [t.property_types.get(key, NoneType()) for t in with_types],  # type: ignore
                 )
                 for key, value_type in of_type.property_types.items()
             }
         )
     elif isinstance(of_type, TaggedValueType):
         return TaggedValueType(
-            _merge_unknowns_of_type_with_types(of_type.tag, [t.tag for t in with_types]),  # type: ignore
             _merge_unknowns_of_type_with_types(
-                of_type.value, [t.value for t in with_types]  # type: ignore
+                of_type.tag,
+                [t.tag for t in with_types],  # type: ignore
+            ),  # type: ignore
+            _merge_unknowns_of_type_with_types(
+                of_type.value,
+                [t.value for t in with_types],  # type: ignore
             ),
         )
     elif isinstance(of_type, Const):
         return Const(
             _merge_unknowns_of_type_with_types(
-                of_type.val_type, [t.val_type for t in with_types]  # type: ignore
+                of_type.val_type,
+                [t.val_type for t in with_types],  # type: ignore
             ),
             of_type.value,
         )

@@ -79,7 +79,6 @@ def random_metrics(
 
         # Apply an optional filter to the noise to simulate more natural variations
         if random.random() < 0.5:
-
             nyquist = 0.5 * 1
             low = random.uniform(0.01, 0.1) / nyquist
             high = random.uniform(0.1, 0.5) / nyquist

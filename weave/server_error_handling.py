@@ -17,7 +17,6 @@ This module provides utilities for handling errors in the Weave server. It provi
     because we have different libraries under the hood that produce different exception classes.
 """
 
-
 from contextlib import contextmanager
 import logging
 import typing
