@@ -7,6 +7,8 @@ import enum
 import os
 import json
 import typing
+
+from weave.trace_server.environment import wf_trace_server_url
 from . import util
 from . import errors
 from urllib.parse import urlparse
@@ -144,13 +146,20 @@ def weave_server_url() -> str:
 
 
 def wandb_base_url() -> str:
+    pod_url = os.getenv("WANDB_PRIVATE_BASE_URL")
+    if pod_url:
+        return pod_url.rstrip("/")
+
     settings = Settings()
     return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")
 
 
 def wandb_frontend_base_url() -> str:
-    public_url = os.getenv("WANDB_PUBLIC_BASE_URL", "").rstrip("/")
-    return public_url if public_url != "" else wandb_base_url()
+    if wf_trace_server_url() == "http://127.0.01:6345":
+        # Always serve dev frontend when trace server is local
+        return "https://app.wandb.test"
+    settings = Settings()
+    return os.environ.get("WANDB_FRONTEND_URL", settings.base_url).rstrip("/")
 
 
 # use filesystem.get_filesystem_dir() instead of directly accessing the env var
