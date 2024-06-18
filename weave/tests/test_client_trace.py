@@ -2044,7 +2044,7 @@ def test_call_query_stream_equality(client):
     assert i == len(calls.calls)
 
 
-def test_sort_through_refs(client):
+def test_sort_and_filter_through_refs(client):
     @weave.op()
     def test_op(label, val):
         return val
