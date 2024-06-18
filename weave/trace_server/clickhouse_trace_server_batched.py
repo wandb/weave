@@ -41,6 +41,8 @@ from clickhouse_connect.driver.summary import QuerySummary
 import clickhouse_connect
 from pydantic import BaseModel, ValidationError
 
+from weave.trace_server.calls_query_builder import CallsQuery
+
 from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
 from .errors import InvalidRequest, RequestTooLarge
@@ -1254,7 +1256,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters["limit"] = limit
 
         # TODO: make this lovely!
-        cq = CallsQuery(project_id)
+        cq = CallsQuery(project_id=project_id)
         if having_conditions_part or len(order_by_events) != 1:
             if having_conditions_part is None:
                 having_conditions_part == "1 = 1"
