@@ -56,9 +56,7 @@ def test_merge():
     weave.save({"a": 5, "b": 6}, "my-dict:latest")
     dict_obj = weave.legacy.ops.get("local-artifact:///my-dict:latest/obj")
     weave.legacy.ops.set(dict_obj["a"], 17, root_args={"branch": "my-branch"})
-    modified_dict_obj = weave.legacy.ops.get(
-        "local-artifact:///my-dict:my-branch/obj"
-    )
+    modified_dict_obj = weave.legacy.ops.get("local-artifact:///my-dict:my-branch/obj")
     new_uri = weave.legacy.ops.merge_artifact(modified_dict_obj)
     dict_obj_node = weave.legacy.ops.get(new_uri)
     assert (
@@ -75,9 +73,7 @@ def test_merge_no_version():
     # uri now has a direct commit hash for the version
     dict_obj = weave.legacy.ops.get(uri)
     weave.legacy.ops.set(dict_obj["a"], 17, root_args={"branch": "my-branch"})
-    modified_dict_obj = weave.legacy.ops.get(
-        "local-artifact:///my-dict:my-branch/obj"
-    )
+    modified_dict_obj = weave.legacy.ops.get("local-artifact:///my-dict:my-branch/obj")
     new_uri = weave.legacy.ops.merge_artifact(modified_dict_obj)
     dict_obj_node = weave.legacy.ops.get(new_uri)
     assert weave.use(dict_obj_node) == {"a": 17, "b": 6}
@@ -92,9 +88,7 @@ def test_merge_list_type():
         obj.append({"a": "x"}, {})
         obj.append([1], {})
 
-    assert weave.use(
-        weave.legacy.ops.get("local-artifact:///my-list:latest/obj")
-    ) == [
+    assert weave.use(weave.legacy.ops.get("local-artifact:///my-list:latest/obj")) == [
         {"a": "x"},
         [1],
     ]

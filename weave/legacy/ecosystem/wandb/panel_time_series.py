@@ -323,9 +323,7 @@ class TimeSeries(weave.Panel):
             bin_start = bin_start_ms
             bin_end = bin_end_ms
 
-            group_items["bin"] = weave.legacy.ops.dict_(
-                start=bin_start, stop=bin_end
-            )
+            group_items["bin"] = weave.legacy.ops.dict_(start=bin_start, stop=bin_end)
 
             if label_fn_output_type == weave.types.Invalid():
                 group_items["label"] = "no_label"

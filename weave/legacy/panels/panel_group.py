@@ -335,7 +335,9 @@ class Group(panel.Panel, codifiable_value_mixin.CodifiableValueMixin):
             param_str = (
                 ",".join([f_name + "=" + f_val for f_name, f_val in field_vals]) + ","
             )
-        return f"""weave.legacy.panels.panel_group.Group({input_node_str} {param_str})"""
+        return (
+            f"""weave.legacy.panels.panel_group.Group({input_node_str} {param_str})"""
+        )
 
     # @property
     # def config(self):

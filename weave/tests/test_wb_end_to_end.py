@@ -74,10 +74,7 @@ def test_run_histories(user_by_api_key_in_env):
     run.finish()
 
     history_node = (
-        weave.legacy.ops.project(run.entity, run.project)
-        .runs()
-        .history()
-        .concat()["a"]
+        weave.legacy.ops.project(run.entity, run.project).runs().history().concat()["a"]
     )
     history = weave.use(history_node)
 

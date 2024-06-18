@@ -403,9 +403,7 @@ def auto_panels(
             layout=weave.legacy.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
         ),
     )
-    return weave.legacy.panels.Board(
-        vars=control_items, panels=panels, editable=False
-    )
+    return weave.legacy.panels.Board(vars=control_items, panels=panels, editable=False)
 
 
 # The interface for constructing this Panel from Python

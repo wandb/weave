@@ -122,9 +122,7 @@ def test_multi_writers_sequential(user_by_api_key_in_env):
 
     def do_asserts():
         hist_node = (
-            weave.legacy.ops.project(
-                user_by_api_key_in_env.username, "stream-tables"
-            )
+            weave.legacy.ops.project(user_by_api_key_in_env.username, "stream-tables")
             .run("test_table")
             .history2()
         )

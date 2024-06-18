@@ -358,9 +358,7 @@ def board(
         overview_tab.add(
             "avg_total_tokens_per_req",
             filtered_window_data["summary.total_tokens"].avg(),  # type: ignore
-            layout=weave.legacy.panels.GroupPanelLayout(
-                x=18, y=height * 2, w=6, h=3
-            ),
+            layout=weave.legacy.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=3),
         ),
     )
 

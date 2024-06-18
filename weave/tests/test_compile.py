@@ -148,21 +148,13 @@ def test_optimize_merge_empty_dict():
     non_empty_dict = weave.legacy.ops.dict_(a=5, b=2)
     assert (
         compile.compile_simple_optimizations(
-            [
-                weave.legacy.ops.TypedDict.merge(
-                    non_empty_dict, weave.legacy.ops.dict_()
-                )
-            ]
+            [weave.legacy.ops.TypedDict.merge(non_empty_dict, weave.legacy.ops.dict_())]
         )[0].to_json()
         == non_empty_dict.to_json()
     )
     assert (
         compile.compile_simple_optimizations(
-            [
-                weave.legacy.ops.TypedDict.merge(
-                    weave.legacy.ops.dict_(), non_empty_dict
-                )
-            ]
+            [weave.legacy.ops.TypedDict.merge(weave.legacy.ops.dict_(), non_empty_dict)]
         )[0].to_json()
         == non_empty_dict.to_json()
     )
@@ -176,12 +168,8 @@ def test_optimize_merge_empty_dict():
 
 
 def test_compile_lambda_uniqueness():
-    list_node_1 = weave.legacy.ops.make_list(
-        a=make_const_node(weave.types.Number(), 1)
-    )
-    list_node_2 = weave.legacy.ops.make_list(
-        a=make_const_node(weave.types.Number(), 2)
-    )
+    list_node_1 = weave.legacy.ops.make_list(a=make_const_node(weave.types.Number(), 1))
+    list_node_2 = weave.legacy.ops.make_list(a=make_const_node(weave.types.Number(), 2))
     fn_node = define_fn({"row": weave.types.Number()}, lambda row: row + 1)
     mapped_1 = list_node_1.map(fn_node)
     mapped_2 = list_node_2.map(fn_node)

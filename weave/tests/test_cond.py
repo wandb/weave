@@ -6,8 +6,7 @@ def test_cond_basic():
     assert weave.use(weave.legacy.ops.cond({"a": True}, {"a": 5})) == 5
     assert weave.use(weave.legacy.ops.cond({"a": False}, {"a": 5})) == None
     assert (
-        weave.use(weave.legacy.ops.cond({"a": False, "b": True}, {"a": 5, "b": 6}))
-        == 6
+        weave.use(weave.legacy.ops.cond({"a": False, "b": True}, {"a": 5, "b": 6})) == 6
     )
 
 

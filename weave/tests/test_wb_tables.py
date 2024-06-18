@@ -242,9 +242,7 @@ def test_metric_table_join(fake_wandb):
     file_node = art_node.file("table.table.json")
     table_node = file_node.table()
     table_rows = table_node.rows().createIndexCheckpointTag()
-    grouped = table_rows.groupby(
-        lambda row: weave.legacy.ops.dict_(label=row["label"])
-    )
+    grouped = table_rows.groupby(lambda row: weave.legacy.ops.dict_(label=row["label"]))
     sorted = grouped.sort(
         lambda row: weave.legacy.ops.make_list(a=row.groupkey()["label"]), ["asc"]
     )
@@ -267,9 +265,7 @@ def test_empty_table(fake_wandb):
     table_node = file_node.table()
     table_rows = table_node.rows().createIndexCheckpointTag()
     filtered = filter(table_rows, lambda row: row["label"] == "cat")
-    grouped = filtered.groupby(
-        lambda row: weave.legacy.ops.dict_(label=row["label"])
-    )
+    grouped = filtered.groupby(lambda row: weave.legacy.ops.dict_(label=row["label"]))
     sorted = grouped.sort(
         lambda row: weave.legacy.ops.make_list(a=row.groupkey()["label"]), ["asc"]
     )
@@ -310,16 +306,12 @@ def test_join_group_combo(fake_wandb):
     art_2_node = fake_wandb.mock_artifact_as_node(art_2)
     table_1_rows = art_1_node.file("table_1.table.json").table().rows()
     table_2_rows = art_2_node.file("table_2.table.json").table().rows()
-    list_of_tables = weave.legacy.ops.make_list(
-        a=table_1_rows, b=table_2_rows
-    ).dropna()
+    list_of_tables = weave.legacy.ops.make_list(a=table_1_rows, b=table_2_rows).dropna()
     joined_tables = list_of_tables.joinAll(
         lambda row: weave.legacy.ops.make_list(a=row["id"]), False
     )
     indexed = joined_tables.createIndexCheckpointTag()
-    grouped = indexed.groupby(
-        lambda row: weave.legacy.ops.dict_(label=row["label"][0])
-    )
+    grouped = indexed.groupby(lambda row: weave.legacy.ops.dict_(label=row["label"][0]))
     sorted = grouped.sort(
         lambda row: weave.legacy.ops.make_list(label=row.groupkey()["label"]),
         ["asc"],
