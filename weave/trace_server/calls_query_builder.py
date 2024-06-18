@@ -794,6 +794,8 @@ def transform_external_field_to_internal_field(
                 else:
                     raise ValueError(f"Unknown cast: {cast}")
             field = f"{method}({structured_field.as_sql(param_builder)})"
+    else:
+        field = structured_field.as_sql(param_builder)
 
     return field, param_builder, raw_fields_used
 
