@@ -339,7 +339,7 @@ class PlotConfig:
     legendSettings: typing.Optional[LegendSettings]
     configOptionsExpanded: typing.Optional[ConfigOptionsExpanded]
     signals: Signals
-    configVersion: int = 15
+    configVersion: int = 16
 
 
 def set_through_array(
