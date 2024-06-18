@@ -156,7 +156,7 @@ def openai_request_cost(record) -> float:  # type: ignore
                 "then": pt * 0.003 + ct * 0.004,
             },
             {
-                "when": model == "text-embedding-ada-002-v2",
+                "when": model == "text-embedding-ada-002",
                 "then": pt * 0.0001 + ct * 0.0001,
             },
             {"when": model == "ada", "then": pt * 0.0004 + ct * 0.0004},
