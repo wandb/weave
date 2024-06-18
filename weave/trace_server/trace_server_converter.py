@@ -4,10 +4,13 @@ from pydantic import BaseModel
 
 from . import refs_internal as ri
 
+A = typing.TypeVar("A")
+B = typing.TypeVar("B")
+
 
 def universal_ext_to_int_ref_converter(
-    obj: typing.Any, convert_ext_to_int_project_id: typing.Callable[[str], str]
-) -> typing.Any:
+    obj: A, convert_ext_to_int_project_id: typing.Callable[[str], str]
+) -> A:
     """Takes any object and recursively replaces all external references with
     internal references. The external references are expected to be in the
     format of `weave:///entity/project/...` and the internal references are
@@ -41,18 +44,22 @@ def universal_ext_to_int_ref_converter(
         internal_project_id = ext_to_int_project_cache[project_key]
         return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
 
-    def mapper(obj: typing.Any) -> typing.Any:
+    def mapper(obj: B) -> B:
         if isinstance(obj, str) and obj.startswith(weave_prefix):
-            return replace_ref(obj)
+            return typing.cast(B, replace_ref(obj))
         return obj
 
     return _map_values(obj, mapper)
 
 
+C = typing.TypeVar("C")
+D = typing.TypeVar("D")
+
+
 def universal_int_to_ext_ref_converter(
-    obj: typing.Any,
+    obj: C,
     convert_int_to_ext_project_id: typing.Callable[[str], str],
-) -> typing.Any:
+) -> C:
     """Takes any object and recursively replaces all internal references with
     external references. The internal references are expected to be in the
     format of `weave-trace-internal:///project_id/...` and the external references are
@@ -86,17 +93,19 @@ def universal_int_to_ext_ref_converter(
         external_project_id = int_to_ext_project_cache[project_id]
         return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
 
-    def mapper(obj: typing.Any) -> typing.Any:
+    def mapper(obj: D) -> D:
         if isinstance(obj, str) and obj.startswith(weave_internal_prefix):
-            return replace_ref(obj)
+            return typing.cast(D, replace_ref(obj))
         return obj
 
     return _map_values(obj, mapper)
 
 
-def _map_values(
-    obj: typing.Any, func: typing.Callable[[typing.Any], typing.Any]
-) -> typing.Any:
+E = typing.TypeVar("E")
+F = typing.TypeVar("F")
+
+
+def _map_values(obj: E, func: typing.Callable[[E], E]) -> E:
     if isinstance(obj, BaseModel):
         # `by_alias` is required since we have Mongo-style properties in the
         # query models that are aliased to conform to start with `$`. Without
@@ -106,11 +115,11 @@ def _map_values(
         new = _map_values(orig, func)
         return obj.model_validate(new)
     if isinstance(obj, dict):
-        return {k: _map_values(v, func) for k, v in obj.items()}
+        return typing.cast(E, {k: _map_values(v, func) for k, v in obj.items()})
     if isinstance(obj, list):
-        return [_map_values(v, func) for v in obj]
+        return typing.cast(E, [_map_values(v, func) for v in obj])
     if isinstance(obj, tuple):
-        return tuple(_map_values(v, func) for v in obj)
+        return typing.cast(E, tuple(_map_values(v, func) for v in obj))
     if isinstance(obj, set):
-        return {_map_values(v, func) for v in obj}
+        return typing.cast(E, {_map_values(v, func) for v in obj})
     return func(obj)

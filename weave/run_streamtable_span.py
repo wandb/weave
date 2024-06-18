@@ -84,14 +84,6 @@ class RunStreamTableSpan:
     def parent_id(self) -> typing.Optional[str]:
         return self._attrs["parent_id"]
 
-    def add_feedback(self, feedback: dict[str, typing.Any]) -> None:
-        client = graph_client_context.require_graph_client()
-        client.add_feedback(self.id, feedback)
-
-    def feedback(self) -> Iterable[dict[str, typing.Any]]:
-        client = graph_client_context.require_graph_client()
-        return client.run_feedback(self.id)
-
     def parent(self) -> typing.Optional["Run"]:
         raise NotImplementedError("parent not implemented")
         # client = graph_client_context.require_graph_client()

@@ -39,7 +39,7 @@ class WeaveURI:
                 return candidate_class.from_parsed_uri(
                     uri, scheme, netloc, path, params, query, fragment
                 )
-        raise errors.WeaveInternalError("invalid scheme ", uri)
+        raise errors.WeaveInternalError("invalid scheme", uri)
 
     def __str__(self) -> str:
         raise NotImplementedError
