@@ -217,7 +217,33 @@ Now that all this is written, i think an alternative implementation is:
 
 """
 
-# TODO: Consider latency ordering
+# PR TODO:
+# - [ ] Actually build the ref expansion
+# Performance:
+# - [ ] When legacy filters or query conditions are an ID mask, we can further optimize the subquery
+# Refactors:
+# - [ ] Refactor the `process_query_to_conditions` to return a FilterToConditions object
+# - [ ] Look for dead code in this file
+# - [ ] Reconcile the differences between ORM and these implementations (ideally push them down into there)
+# - [ ] Fix `ClickHouseTraceServer`:
+#     - [x] `calls_query`
+#     - [x] `calls_query_stream`
+#     - [ ] `calls_query_stats`
+#     - [ ] `call_read`
+#     - [ ] Consider deprecating/removing:
+#           * `_select_calls_query_raw`
+#           * `_calls_query_stats_raw`
+#           * `_select_calls_query`
+#           * `_call_read`
+#     Notes:
+#       good: `calls_query` -> `calls_query_stream` -> `_query_stream`
+#       bad: `_select_calls_query_raw` -> `_query_stream`
+#       bad `_call_read` -> `_select_calls_query` -> `_calls_query_stats_raw` -> `_query_stream`
+#       bad `_calls_query_stats_raw` -> `_query`
+# Considerations:
+# - [ ] Consider column selection
+# - [ ] Consider how we will do latency order/filter
+# - [ ] Consider how we will do feedback fields
 
 import typing
 from pydantic import BaseModel, Field
@@ -306,7 +332,6 @@ class Condition(BaseModel):
     _consumed_fields: typing.Optional[list[CallsMergedField]] = None
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
-        # TODO: This is not quite right - seems too easy...
         conditions, raw_fields = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}), pb
         )
@@ -317,7 +342,6 @@ class Condition(BaseModel):
         return combine_conditions(conditions, "AND")
 
     def get_consumed_fields(self) -> list[CallsMergedField]:
-        # TODO: This is pretty hacky
         if self._consumed_fields is None:
             self._consumed_fields = []
             _, raw_fields = process_query_to_conditions(
@@ -326,12 +350,6 @@ class Condition(BaseModel):
             )
             for field in raw_fields:
                 self._consumed_fields.append(get_field_by_name(field))
-            # def _get_consumed_fields(obj: BaseModel) -> None:
-            #     for field in obj.model_fields.values():
-            #         if isinstance(field, tsi_query.GetFieldOperator):
-            #             typing.cast(list[CallsMergedField], self._consumed_fields).append(get_field_by_name(field.get_field_))
-            #         elif isinstance(field, BaseModel):
-            #             _get_consumed_fields(field)
 
         return self._consumed_fields
 
@@ -428,7 +446,6 @@ class CallsQuery(BaseModel):
 
         # All legacy filters are non-dynamic
         if self.legacy_filter is not None:
-            # TODO: Here and int he queries, we should support pulling out the ID filter as special pre-filter
             filtered_calls_query.set_legacy_filter(self.legacy_filter)
             outer_query.legacy_filter = None
 

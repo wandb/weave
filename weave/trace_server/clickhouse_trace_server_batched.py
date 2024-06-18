@@ -361,7 +361,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(project_id=req.project_id)
 
-        # TODO: This is where columns should be selected
+        # TODO (Perf): By allowing a sub-selection of columns
+        # we will gain increased performance by not having to
+        # fetch all columns from the database. Currently all use
+        # cases call for every column to be fetched, so we have not
+        # implemented this yet.
         columns = all_call_select_columns
         for col in columns:
             cq.add_field(col)
