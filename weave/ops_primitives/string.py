@@ -197,9 +197,11 @@ class String:
 
     @op(name="string-toNumber", output_type=types.optional(types.Number()))
     def to_number(self):
-        if self.isnumeric():
-            return float(self)  # type: ignore
-        return None
+        cleaned = self.replace(",", "")
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
 
 
 types.String.instance_class = String
