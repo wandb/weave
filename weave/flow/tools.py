@@ -1,10 +1,8 @@
 import inspect
 import json
-
 from typing import Callable, get_type_hints
 
-from openai.types.chat import ChatCompletionToolParam
-from openai.types.chat import ChatCompletionMessageToolCall
+from openai.types.chat import ChatCompletionMessageToolCall, ChatCompletionToolParam
 
 from weave.flow.console import LogEvents
 

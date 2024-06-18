@@ -1,6 +1,8 @@
-import weave
 import json
+
 from openai import OpenAI
+
+import weave
 
 
 @weave.op()

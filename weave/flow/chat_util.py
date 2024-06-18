@@ -1,9 +1,9 @@
 from typing import Iterator, Optional
 
 from openai.types.chat import (
+    ChatCompletion,
     ChatCompletionChunk,
 )
-from openai.types.chat import ChatCompletion
 
 
 class OpenAIStream:

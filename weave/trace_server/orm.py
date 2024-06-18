@@ -6,13 +6,12 @@ Abstracts away some of their differences and allows building up SQL queries in a
 import datetime
 import json
 import typing
-from typing_extensions import TypeAlias
 
 from pydantic import BaseModel
+from typing_extensions import TypeAlias
 
 from . import trace_server_interface as tsi
 from .interface import query as tsi_query
-
 
 DatabaseType = typing.Literal["clickhouse", "sqlite"]
 

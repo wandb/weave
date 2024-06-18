@@ -1,10 +1,11 @@
 from __future__ import annotations
+
+import pytest
 from typing_extensions import (
     NotRequired,
     TypedDict,
 )
 
-import pytest
 from weave import infer_types
 from weave import weave_types as types
 

@@ -1,8 +1,8 @@
-from typing import Callable, Generic, List, TypeVar
-from threading import Thread, Lock, Event
-from queue import Queue
-import time
 import atexit
+import time
+from queue import Queue
+from threading import Event, Lock, Thread
+from typing import Callable, Generic, List, TypeVar
 
 T = TypeVar("T")
 

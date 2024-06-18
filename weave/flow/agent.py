@@ -1,17 +1,17 @@
 from typing import Any
-from pydantic import Field
 
 import openai
 from openai._types import NotGiven
 from openai.types.chat import (
     ChatCompletionMessageParam,
 )
+from pydantic import Field
 
 import weave
+from weave.flow.chat_util import OpenAIStream
+from weave.flow.console import LogEvents
 from weave.flow.obj import Object
 from weave.flow.tools import chat_call_tool_params, perform_tool_calls
-from weave.flow.console import LogEvents
-from weave.flow.chat_util import OpenAIStream
 
 
 class AgentState(Object):

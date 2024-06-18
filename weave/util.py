@@ -1,11 +1,13 @@
+import gc
+import inspect
 import os
 import random
 import socket
 import string
-import gc, inspect
 
 # import ipynbname
 import typing
+
 from .errors import WeaveFingerprintErrorMixin
 
 sentry_inited = False
