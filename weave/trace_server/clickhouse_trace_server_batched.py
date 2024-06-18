@@ -337,7 +337,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Next, apply the query filter
         if req.query:
             having_query_conds, fields_used = process_query_to_conditions(
-                req.query, all_call_select_columns, all_call_json_columns, param_builder
+                req.query, param_builder
             )
             raw_fields_used.update(fields_used)
             having_conditions.extend(having_query_conds)
@@ -359,50 +359,36 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        having_conditions = []
-        start_event_conditions = []
-        end_event_conditions = []
-        param_builder = ParamBuilder()
+        cq = CallsQuery(project_id=req.project_id)
 
-        # First, apply the application filter
-        if req.filter:
-            filter_to_conditions = process_calls_filter_to_conditions(
-                req.filter, param_builder
-            )
-            having_conditions.extend(filter_to_conditions.having_conditions)
-            start_event_conditions.extend(filter_to_conditions.start_event_conditions)
-            end_event_conditions.extend(filter_to_conditions.end_event_conditions)
+        # TODO: This is where columns should be selected
+        columns = all_call_select_columns
+        for col in columns:
+            cq.add_field(col)
+        if req.filter is not None:
+            cq.set_legacy_filter(req.filter)
+        if req.query is not None:
+            cq.add_condition(req.query.expr_)
+        if req.sort_by is not None:
+            for sort_by in req.sort_by:
+                cq.add_order(sort_by.field, sort_by.direction)
+        if req.limit is not None:
+            cq.set_limit(req.limit)
+        if req.offset is not None:
+            cq.set_offset(req.offset)
 
-        # Next, apply the query filter
-        if req.query:
-            having_query_conds, _ = process_query_to_conditions(
-                req.query, all_call_select_columns, all_call_json_columns, param_builder
-            )
-            having_conditions.extend(having_query_conds)
-
-        # Perform the query against the database
-        ch_call_dicts = self._select_calls_query_raw(
-            req.project_id,
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
-            having_conditions=having_conditions,
-            parameters=param_builder.get_params(),
-            limit=req.limit,
-            offset=req.offset,
-            # This order-by clause creation should probably be moved into this function
-            # and passed down as a processed object. It will follow the same patterns as
-            # the filters and queries.
-            order_by=(
-                None
-                if not req.sort_by
-                else [(s.field, s.direction) for s in req.sort_by]
-            ),
+        pb = ParamBuilder()
+        better_query = cq.as_sql(pb)
+        better_params = pb.get_params()
+        print(better_query, better_params)
+        raw_res = self._query_stream(
+            better_query,
+            better_params,
         )
 
-        # Yield the marshaled response
-        for ch_dict in ch_call_dicts:
+        for row in raw_res:
             yield tsi.CallSchema.model_validate(
-                _ch_call_dict_to_call_schema_dict(ch_dict)
+                _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
             )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -1241,9 +1227,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         inner_field,
                         param_builder,
                         _,
-                    ) = transform_external_field_to_internal_field(
-                        field, all_call_select_columns, all_call_json_columns, cast
-                    )
+                    ) = transform_external_field_to_internal_field(field, cast)
                     parameters.update(param_builder.get_params())
 
                     order_parts.append(f"{inner_field} {direct}")
@@ -1261,9 +1245,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit_part = "LIMIT {limit: Int64}"
             parameters["limit"] = limit
 
-        # TODO: make this lovely!
-        cq = CallsQuery(project_id=project_id)
-        print(cq.as_sql(ParamBuilder()))
         if having_conditions_part or len(order_by_events) != 1:
             if having_conditions_part is None:
                 having_conditions_part == "1 = 1"
