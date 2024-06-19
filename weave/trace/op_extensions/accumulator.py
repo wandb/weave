@@ -1,4 +1,5 @@
 import atexit
+import weakref
 from typing import (
     Any,
     AsyncIterator,
@@ -11,9 +12,8 @@ from typing import (
     TypeVar,
     Union,
 )
-import weakref
 
-from weave.trace.op import Op, FinishCallbackType
+from weave.trace.op import FinishCallbackType, Op
 
 S = TypeVar("S")
 V = TypeVar("V")

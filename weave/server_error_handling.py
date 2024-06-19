@@ -17,17 +17,17 @@ This module provides utilities for handling errors in the Weave server. It provi
     because we have different libraries under the hood that produce different exception classes.
 """
 
-from contextlib import contextmanager
 import logging
 import typing
+from contextlib import contextmanager
+
 import gql
 import requests
+from werkzeug import Response
+from werkzeug import exceptions as werkzeug_exceptions
+from werkzeug import http as werkzeug_http
 
-from werkzeug import Response, exceptions as werkzeug_exceptions, http as werkzeug_http
-
-
-from . import errors
-from . import util
+from . import errors, util
 
 
 class WeaveInternalHttpException(werkzeug_exceptions.HTTPException):

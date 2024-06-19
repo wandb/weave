@@ -1,5 +1,7 @@
 import json
+
 import openai
+
 import weave
 
 weave.init("intro-example")

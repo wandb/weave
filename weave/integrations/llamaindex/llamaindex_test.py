@@ -1,8 +1,11 @@
 import typing
+from typing import Any, Generator, List, Optional
+
 import pytest
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
-from typing import Any, Generator, List, Optional
+
 from .llamaindex import llamaindex_patcher
 
 
@@ -84,7 +87,7 @@ def test_llamaindex_quickstart(
     client: weave.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
-    from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
 
     documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
     index = VectorStoreIndex.from_documents(documents)
@@ -107,7 +110,7 @@ async def test_llamaindex_quickstart_async(
     client: weave.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
-    from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
 
     documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
     index = VectorStoreIndex.from_documents(documents)

@@ -1,10 +1,12 @@
+from typing import Any, Callable, Optional, Sequence, Tuple, Union
+
 import numpy as np
-from typing import Union, Callable, Optional, Tuple, Any, Sequence
+
 import weave
-from weave.trace.isinstance import weave_isinstance
-from weave.flow.obj import Object
-from weave.trace.op import Op
 from weave import WeaveList
+from weave.flow.obj import Object
+from weave.trace.isinstance import weave_isinstance
+from weave.trace.op import Op
 
 
 class Scorer(Object):

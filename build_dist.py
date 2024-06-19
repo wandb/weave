@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import os
-import subprocess
 import shutil
+import subprocess
 
 if os.path.exists("dist"):
     shutil.rmtree("dist")

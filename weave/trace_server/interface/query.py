@@ -23,6 +23,7 @@ simplifications:
 """
 
 import typing
+
 from pydantic import BaseModel, Field
 
 
