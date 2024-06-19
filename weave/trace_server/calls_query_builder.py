@@ -248,6 +248,7 @@ Now that all this is written, i think an alternative implementation is:
 # - [ ] Consider how we will do feedback fields
 
 import typing
+
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi

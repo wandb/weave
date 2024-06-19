@@ -25,7 +25,6 @@ def _parse_version(version: str) -> "packaging.version.Version":
 
 def _print_version_check() -> None:
     import wandb
-
     import weave
 
     if _parse_version(REQUIRED_WANDB_VERSION) > _parse_version(wandb.__version__):
