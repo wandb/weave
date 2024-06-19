@@ -7,48 +7,27 @@ from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 
 import pydantic
 from requests import HTTPError
+
 from weave import trace_sentry, urls
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.legacy import graph_client_context, run_context
 from weave.table import Table
-from weave.trace.object_record import (
-    ObjectRecord,
-    dataclass_object_record,
-    pydantic_asdict_one_level,
-    pydantic_object_record,
-)
+from weave.trace.object_record import (ObjectRecord, dataclass_object_record,
+                                       pydantic_asdict_one_level,
+                                       pydantic_object_record)
 from weave.trace.op import Op
-from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_uri
+from weave.trace.refs import (CallRef, ObjectRef, OpRef, Ref, TableRef,
+                              parse_uri)
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (
-    CallEndReq,
-    CallSchema,
-    CallsDeleteReq,
-    CallsQueryReq,
-    CallStartReq,
-    CallUpdateReq,
-    EndedCallSchemaForInsert,
-    Feedback,
-    FeedbackQueryReq,
-    ObjCreateReq,
-    ObjQueryReq,
-    ObjQueryRes,
-    ObjReadReq,
-    ObjSchema,
-    ObjSchemaForInsert,
-    Query,
-    RefsReadBatchReq,
-    StartedCallSchemaForInsert,
-    TableCreateReq,
-    TableQueryReq,
-    TableSchemaForInsert,
-    TraceServerInterface,
-    _CallsFilter,
-    _ObjectVersionFilter,
-    _TableRowFilter,
-)
+    CallEndReq, CallSchema, CallsDeleteReq, CallsQueryReq, CallStartReq,
+    CallUpdateReq, EndedCallSchemaForInsert, Feedback, FeedbackQueryReq,
+    ObjCreateReq, ObjQueryReq, ObjQueryRes, ObjReadReq, ObjSchema,
+    ObjSchemaForInsert, Query, RefsReadBatchReq, StartedCallSchemaForInsert,
+    TableCreateReq, TableQueryReq, TableSchemaForInsert, TraceServerInterface,
+    _CallsFilter, _ObjectVersionFilter, _TableRowFilter)
 
 if typing.TYPE_CHECKING:
     from . import ref_base
