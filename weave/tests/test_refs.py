@@ -2,6 +2,7 @@ import pytest
 
 import weave
 from weave.flow.obj import Object
+from weave.legacy import artifact_local
 from weave.legacy import ops_arrow as arrow
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
@@ -9,7 +10,6 @@ from weave.trace_server.refs_internal import (
     OBJECT_ATTR_EDGE_NAME,
 )
 
-from weave.legacy import artifact_local
 from .. import ref_util, storage
 
 

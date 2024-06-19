@@ -1,5 +1,5 @@
-from weave import Model
 import weave
+from weave import Model
 
 
 class YourModel(Model):

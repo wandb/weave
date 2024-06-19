@@ -1,25 +1,24 @@
 import asyncio
-import time
 import inspect
 import textwrap
+import time
 import traceback
 import typing
 from typing import Any, Callable, Optional, Union
+
 import numpy as np
+from rich import print
+from rich.console import Console
 
 import weave
-from weave.trace.op import Op, BoundOp
-from weave.trace.errors import OpCallError
-from weave.trace.env import get_weave_parallelism
-from weave.flow.obj import Object
-from weave.flow.dataset import Dataset
-from weave.flow.model import Model
-from weave.flow.model import get_infer_method
-from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize, stderr
 from weave.flow import util
-
-from rich.console import Console
-from rich import print
+from weave.flow.dataset import Dataset
+from weave.flow.model import Model, get_infer_method
+from weave.flow.obj import Object
+from weave.flow.scorer import Scorer, auto_summarize, get_scorer_attributes, stderr
+from weave.trace.env import get_weave_parallelism
+from weave.trace.errors import OpCallError
+from weave.trace.op import BoundOp, Op
 
 console = Console()
 

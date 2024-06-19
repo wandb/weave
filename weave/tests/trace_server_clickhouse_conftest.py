@@ -1,22 +1,19 @@
 import os
-import pytest
-
-
 import subprocess
 import time
-import requests
 import urllib
+import uuid
 
 import pytest
+import requests
 
+from weave import weave_client
 from weave.trace_server import environment as wf_env
 
-from ..weave_init import InitializedClient
-import uuid
-from weave import weave_client
 from ..trace_server import (
     clickhouse_trace_server_batched,
 )
+from ..weave_init import InitializedClient
 
 
 @pytest.fixture(scope="session")

@@ -1,8 +1,8 @@
 import asyncio
+
 import pytest
-from .. import filesystem
-from .. import errors
-from .. import environment
+
+from .. import environment, errors, filesystem
 
 
 @pytest.fixture()

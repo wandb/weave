@@ -1,8 +1,10 @@
-import json
 import asyncio
+import json
+
+import openai
+
 import weave
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
-import openai
 
 # We create a model class with one predict function.
 # All inputs, predictions and parameters are automatically captured for easy inspection.

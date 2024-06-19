@@ -1,5 +1,6 @@
-import weave
 from numpy import array
+
+import weave
 
 
 @weave.op()

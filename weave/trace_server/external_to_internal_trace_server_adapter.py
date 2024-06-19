@@ -1,7 +1,6 @@
 import abc
-
-from typing import Callable, Iterator, TypeVar
 import typing
+from typing import Callable, Iterator, TypeVar
 
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,

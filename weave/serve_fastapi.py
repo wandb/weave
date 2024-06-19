@@ -1,9 +1,10 @@
-import typing
 import datetime
 import inspect
-from fastapi import FastAPI, Header, HTTPException, Depends
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import typing
 from typing import Optional
+
+from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 try:
     from typing import Annotated
@@ -11,20 +12,16 @@ try:
 except ImportError:
     from typing_extensions import Annotated  # type: ignore
 
-from . import weave_types as types
-from weave.legacy import op_args
-from . import weave_pydantic
-from weave.legacy import cache
-from . import errors
-from . import pyfunc_type_util
-from .legacy.monitoring import monitor
-from weave.legacy.wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
-
+from weave.legacy import cache, op_args
 from weave.legacy.artifact_wandb import WandbArtifactRef
-
-from weave.trace.vals import TraceObject
+from weave.legacy.wandb_api import WandbApiAsync, WandbApiContext, wandb_api_context
 from weave.trace import op
 from weave.trace.refs import ObjectRef, OpRef
+from weave.trace.vals import TraceObject
+
+from . import errors, pyfunc_type_util, weave_pydantic
+from . import weave_types as types
+from .legacy.monitoring import monitor
 
 key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
     cache.LruTimeWindowCache(datetime.timedelta(minutes=5))

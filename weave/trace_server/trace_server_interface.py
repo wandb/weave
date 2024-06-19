@@ -1,6 +1,7 @@
 import abc
 import datetime
 import typing
+
 from pydantic import BaseModel, Field
 
 from .interface.query import Query
