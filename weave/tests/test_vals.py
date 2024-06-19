@@ -1,4 +1,5 @@
 import pytest
+
 from weave.trace.refs import ObjectRef
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,

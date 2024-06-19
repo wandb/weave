@@ -2,25 +2,23 @@ import json
 import os
 import random
 import string
-import urllib
 import typing
+import urllib
 
-from IPython.display import display
-from IPython.display import IFrame
+from IPython.display import IFrame, display
 
-from . import context
-from . import graph
-from . import panel
-from . import node_ref
+from weave.legacy import artifact_fs, context, graph, ops, panel
+
+from . import (
+    errors,
+    node_ref,
+    ref_base,
+    storage,
+    usage_analytics,
+    util,
+    weavejs_fixes,
+)
 from . import weave_types as types
-from . import weavejs_fixes
-from . import storage
-from . import util
-from . import errors
-from . import usage_analytics
-from . import ref_base
-from . import artifact_fs
-from . import ops
 
 
 def make_varname_for_type(t: types.Type):
@@ -32,7 +30,7 @@ def make_varname_for_type(t: types.Type):
 def make_container(
     obj: typing.Union[panel.Panel, graph.Node], name: str
 ) -> panel.Panel:
-    from weave.panels import Group
+    from weave.legacy.panels import Group
 
     if isinstance(obj, graph.Node):
         return Group(

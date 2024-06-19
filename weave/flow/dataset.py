@@ -1,8 +1,8 @@
 from typing import Any
 
 from pydantic import field_validator
-import weave
 
+import weave
 from weave.flow.obj import Object
 from weave.trace.vals import TraceTable
 

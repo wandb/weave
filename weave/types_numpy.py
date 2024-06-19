@@ -1,6 +1,7 @@
 import numpy as np
-from . import weave_types as types
+
 from . import errors
+from . import weave_types as types
 
 
 # TODO: this doesn't match how extra works for list types...

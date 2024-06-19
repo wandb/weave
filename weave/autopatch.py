@@ -16,7 +16,7 @@ def autopatch_openai() -> None:
                 "To automatically track openai calls, upgrade the openai package to a version >= '1.0'"
             )
             return
-        from weave.monitoring.openai import patch
+        from weave.legacy.monitoring.openai import patch
 
         patch()
 
@@ -29,7 +29,7 @@ def unpatch_openai() -> None:
     else:
         if openai.__version__ < "1":
             return
-        from weave.monitoring.openai import unpatch
+        from weave.legacy.monitoring.openai import unpatch
 
         unpatch()
 

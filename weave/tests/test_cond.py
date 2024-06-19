@@ -1,11 +1,13 @@
 import weave
-from weave import ops_arrow
+from weave.legacy import ops_arrow
 
 
 def test_cond_basic():
-    assert weave.use(weave.ops.cond({"a": True}, {"a": 5})) == 5
-    assert weave.use(weave.ops.cond({"a": False}, {"a": 5})) == None
-    assert weave.use(weave.ops.cond({"a": False, "b": True}, {"a": 5, "b": 6})) == 6
+    assert weave.use(weave.legacy.ops.cond({"a": True}, {"a": 5})) == 5
+    assert weave.use(weave.legacy.ops.cond({"a": False}, {"a": 5})) == None
+    assert (
+        weave.use(weave.legacy.ops.cond({"a": False, "b": True}, {"a": 5, "b": 6})) == 6
+    )
 
 
 def test_cond_mapped_vector():
@@ -45,9 +47,9 @@ def test_cond_vector():
     )
     assert weave.use(
         conds.map(
-            lambda row: weave.ops.cond(
-                weave.ops.dict_(**{"a": row["a"], "b": row["b"]}),
-                weave.ops.dict_(**{"a": row["val_a"], "b": row["val_b"]}),
+            lambda row: weave.legacy.ops.cond(
+                weave.legacy.ops.dict_(**{"a": row["a"], "b": row["b"]}),
+                weave.legacy.ops.dict_(**{"a": row["val_a"], "b": row["val_b"]}),
             )
         )
     ).to_pylist_raw() == [5, None, 10]
@@ -66,9 +68,9 @@ def test_cond_vector_arr_value():
     )
     assert weave.use(
         conds.map(
-            lambda row: weave.ops.cond(
-                weave.ops.dict_(**{"a": row["a"], "b": row["b"]}),
-                weave.ops.dict_(**{"a": row["val_a"], "b": row["val_b"]}),
+            lambda row: weave.legacy.ops.cond(
+                weave.legacy.ops.dict_(**{"a": row["a"], "b": row["b"]}),
+                weave.legacy.ops.dict_(**{"a": row["val_a"], "b": row["val_b"]}),
             )
         )
     ).to_pylist_raw() == [[1, 2], None, [11, 12]]
@@ -87,9 +89,9 @@ def test_cond_vector_mixed():
     )
     assert weave.use(
         conds.map(
-            lambda row: weave.ops.cond(
-                weave.ops.dict_(**{"a": row["a"], "b": row["b"]}),
-                weave.ops.dict_(**{"a": row["val_a"], "b": 99}),
+            lambda row: weave.legacy.ops.cond(
+                weave.legacy.ops.dict_(**{"a": row["a"], "b": row["b"]}),
+                weave.legacy.ops.dict_(**{"a": row["val_a"], "b": 99}),
             )
         )
     ).to_pylist_raw() == [1, None, 99]
@@ -108,9 +110,9 @@ def test_cond_vector_mixed_arr_value():
     )
     assert weave.use(
         conds.map(
-            lambda row: weave.ops.cond(
-                weave.ops.dict_(**{"a": row["a"], "b": row["b"]}),
-                weave.ops.dict_(**{"a": row["val_a"], "b": [99, 100]}),
+            lambda row: weave.legacy.ops.cond(
+                weave.legacy.ops.dict_(**{"a": row["a"], "b": row["b"]}),
+                weave.legacy.ops.dict_(**{"a": row["val_a"], "b": [99, 100]}),
             )
         )
     ).to_pylist_raw() == [[1, 2], None, [99, 100]]

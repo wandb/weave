@@ -1,17 +1,19 @@
-from concurrent.futures import ThreadPoolExecutor
 import contextlib
 import contextvars
-from typing import Optional, Callable, TypeVar, Iterator, Generator
+from concurrent.futures import ThreadPoolExecutor
+from typing import Callable, Generator, Iterator, Optional, TypeVar
 
-from . import context
-from . import cache
-from . import context_state
-from . import graph_client_context
-from . import run_context
-from . import execute
-from . import forward_graph
-from . import memo
-from . import wandb_api
+from weave.legacy import (
+    cache,
+    context,
+    context_state,
+    execute,
+    forward_graph,
+    graph_client_context,
+    memo,
+    run_context,
+    wandb_api,
+)
 
 # Must be power of 2
 MAX_PARALLELISM = 16
@@ -76,7 +78,9 @@ def do_in_parallel(
                                         with forward_graph.node_result_store(
                                             result_store
                                         ) as thread_result_store:
-                                            with execute.top_level_stats() as thread_top_level_stats:
+                                            with (
+                                                execute.top_level_stats() as thread_top_level_stats
+                                            ):
                                                 return do_one(x)
         finally:
             memo._memo_storage.reset(memo_token)
