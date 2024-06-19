@@ -1,6 +1,4 @@
-"""
-Utility methods for converting exceptions to JSON.
-"""
+"""Utility methods for converting exceptions to JSON."""
 
 import json
 import traceback

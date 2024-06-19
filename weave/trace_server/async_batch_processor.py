@@ -8,9 +8,7 @@ T = TypeVar("T")
 
 
 class AsyncBatchProcessor(Generic[T]):
-    """
-    A class that asynchronously processes batches of items using a provided processor function.
-    """
+    """A class that asynchronously processes batches of items using a provided processor function."""
 
     def __init__(
         self,
@@ -49,9 +47,7 @@ class AsyncBatchProcessor(Generic[T]):
                 self.queue.put(item)
 
     def _process_batches(self) -> None:
-        """
-        Internal method that continuously processes batches of items from the queue.
-        """
+        """Internal method that continuously processes batches of items from the queue."""
         while True:
             current_batch: List[T] = []
             while not self.queue.empty() and len(current_batch) < self.max_batch_size:
@@ -68,8 +64,6 @@ class AsyncBatchProcessor(Generic[T]):
                 time.sleep(self.min_batch_interval)
 
     def wait_until_all_processed(self) -> None:
-        """
-        Waits until all enqueued items have been processed.
-        """
+        """Waits until all enqueued items have been processed."""
         self.stop_event.set()
         self.processing_thread.join()

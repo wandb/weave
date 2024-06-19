@@ -65,6 +65,7 @@ filterwarnings = ["error"]
 
 [tool.ruff.lint]
 select = [
+  "D200", # https://docs.astral.sh/ruff/rules/fits-on-one-line/
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",
   "F541",

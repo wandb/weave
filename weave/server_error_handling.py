@@ -64,9 +64,7 @@ def client_safe_http_exceptions_as_werkzeug() -> typing.Generator[None, None, No
 
 
 def maybe_extract_code_from_exception(e: Exception) -> typing.Optional[int]:
-    """
-    Use this method to extract the HTTP codes from various library's exceptions.
-    """
+    """Use this method to extract the HTTP codes from various library's exceptions."""
     if isinstance(e, werkzeug_exceptions.HTTPException):
         return _extract_code_from_werkzeug_http_exception(e)
     elif isinstance(e, requests.exceptions.RequestException):

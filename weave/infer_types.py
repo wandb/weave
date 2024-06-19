@@ -1,6 +1,4 @@
-"""
-Functions for inferring Weave Types from Python types.
-"""
+"""Functions for inferring Weave Types from Python types."""
 
 import collections
 import types
