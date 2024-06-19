@@ -64,12 +64,14 @@ testpaths = ["weave"]
 filterwarnings = ["error"]
 
 [tool.ruff.lint]
+preview = true
 select = [
   "D200", # https://docs.astral.sh/ruff/rules/fits-on-one-line/
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",
   "F541",
   "I", # https://docs.astral.sh/ruff/rules/#isort-i
+  "W391", # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
 ]
 exclude = [
   "weave/api.py",
