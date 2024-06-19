@@ -12,6 +12,17 @@ if typing.TYPE_CHECKING:
 
 def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
+    from openai.types.chat.chat_completion_message import FunctionCall
+    from openai.types.chat.chat_completion_chunk import ChoiceDeltaFunctionCall
+
+    def _get_function_call(function_call):
+        if function_call is None:
+            return function_call
+        if isinstance(function_call, ChoiceDeltaFunctionCall):
+            return FunctionCall(
+                arguments=function_call.arguments,
+                name=function_call.name,
+            )
 
     if isinstance(value, ChatCompletionChunk):
         value = ChatCompletion(
@@ -22,7 +33,7 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
                     "message": {
                         "content": choice.delta.content,
                         "role": choice.delta.role,
-                        "function_call": choice.delta.function_call,
+                        "function_call": _get_function_call(choice.delta.function_call),
                         "tool_calls": choice.delta.tool_calls,
                     },
                     "logprobs": choice.logprobs,
@@ -47,6 +58,7 @@ def openai_accumulator(
     value: typing.Optional["ChatCompletionChunk"],
 ) -> "ChatCompletionChunk":
     from openai.types.chat import ChatCompletionChunk
+    from openai.types.chat.chat_completion_chunk import ChoiceDeltaFunctionCall
 
     def _process_chunk(chunk: ChatCompletionChunk, acc_choices: list[dict] = []):
         """Once the first_chunk is set (acc), take the next chunk and append the message content
@@ -81,6 +93,18 @@ def openai_accumulator(
                 choice["delta"]["content"] += chunk_choice.delta.content
             if chunk_choice.delta.role:
                 choice["delta"]["role"] = chunk_choice.delta.role
+
+            # function calling
+            if isinstance(chunk_choice.delta.function_call, ChoiceDeltaFunctionCall):
+                if choice["delta"]["function_call"] is None:
+                    choice["delta"]["function_call"] = ChoiceDeltaFunctionCall(
+                        arguments=chunk_choice.delta.function_call.arguments,
+                        name=chunk_choice.delta.function_call.name,
+                    )
+                else:
+                    choice["delta"]["function_call"][
+                        "arguments"
+                    ] += chunk_choice.delta.function_call.arguments
 
         return acc_choices
 
