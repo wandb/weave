@@ -225,6 +225,8 @@ Now that all this is written, i think an alternative implementation is:
 # - [ ] Refactor the `process_query_to_conditions` to return a FilterToConditions object
 # - [ ] Look for dead code in this file
 # - [ ] Reconcile the differences between ORM and these implementations (ideally push them down into there)
+# - [ ] `process_calls_filter_to_conditions` still uses hard coded `calls_merged` columns - bad!
+# - [ ] `make_calls_where_condition_from_event_conditions` should be removed from everywhere
 # - [ ] Fix `ClickHouseTraceServer`:
 #     - [x] `calls_query`
 #     - [x] `calls_query_stream`
@@ -422,6 +424,13 @@ class CallsQuery(BaseModel):
         )
 
     def as_sql(self, pb: ParamBuilder) -> str:
+        """
+        This is the main entry point for building the query. This method will
+        determine the optimal query to build based on the fields and conditions
+        that have been set.
+        """
+
+        # TODO: Really be sure of and test this query optimizer
         outer_query = self.clone()
         outer_query.query_conditions = []
         not_deleted = tsi_query.EqOperation.model_validate(
@@ -498,6 +507,7 @@ class CallsQuery(BaseModel):
         if len(self.query_conditions) > 0:
             query_conditions.extend([c.as_sql(pb) for c in self.query_conditions])
         if self.legacy_filter is not None:
+            # TODO: `process_calls_filter_to_conditions` should not be used here, move into the correct class
             filter_conditions = process_calls_filter_to_conditions(
                 self.legacy_filter, pb
             )
