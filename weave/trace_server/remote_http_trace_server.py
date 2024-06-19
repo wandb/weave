@@ -1,18 +1,18 @@
 import io
 import json
+import logging
 import sys
 import typing as t
-from pydantic import BaseModel, ValidationError
+
 import requests
 import tenacity
-import logging
+from pydantic import BaseModel, ValidationError
 
+from weave.legacy.wandb_interface import project_creator
 from weave.trace_server import environment as wf_env
 
-
-from weave.wandb_interface import project_creator
-from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
+from .async_batch_processor import AsyncBatchProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         req: BaseModel,
         stream: bool = False,
     ) -> requests.Response:
-
         r = requests.post(
             self.trace_server_url + url,
             # `by_alias` is required since we have Mongo-style properties in the

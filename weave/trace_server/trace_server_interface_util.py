@@ -4,8 +4,8 @@ import json
 import typing
 import uuid
 
-from . import trace_server_interface as tsi
 from . import refs_internal
+from . import trace_server_interface as tsi
 
 TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"

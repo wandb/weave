@@ -1,9 +1,12 @@
 import os
+from typing import Any, Generator
+
+import litellm
 import pytest
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
-from typing import Any, Generator
-import litellm
+
 from .litellm import litellm_patcher
 
 

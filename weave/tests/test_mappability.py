@@ -1,9 +1,10 @@
 import weave
-from ..weave_internal import make_const_node
-from .. import context_state as _context
+from weave.legacy import context_state as _context
+from weave.legacy import graph
+
 from .. import registry_mem
-from .. import graph
 from .. import weave_types as types
+from ..weave_internal import make_const_node
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -63,7 +64,7 @@ def test_non_mapped_serialized():
     node = weave.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
-        {"x": weave.graph.ConstNode(weave.types.Int(), 1)},
+        {"x": weave.legacy.graph.ConstNode(weave.types.Int(), 1)},
     )
     assert weave.use(node) == 2
 
@@ -84,7 +85,11 @@ def test_mapped_serialized():
     node = weave.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
-        {"x": weave.graph.ConstNode(weave.types.List(weave.types.Int()), [1, 2, 3])},
+        {
+            "x": weave.legacy.graph.ConstNode(
+                weave.types.List(weave.types.Int()), [1, 2, 3]
+            )
+        },
     )
     assert weave.use(node) == [2, 3, 4]
 
@@ -99,7 +104,7 @@ def test_mapped_empty_serialized():
     node = weave.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
-        {"x": weave.graph.ConstNode(weave.types.List(weave.types.Int()), [])},
+        {"x": weave.legacy.graph.ConstNode(weave.types.List(weave.types.Int()), [])},
     )
     assert weave.use(node) == []
 
@@ -118,7 +123,7 @@ def test_custom_class():
     node = TestType().test_fn(1)
     assert weave.use(node) == 2
 
-    node_list = weave.ops.make_list(**{"0": TestType(), "1": TestType()})
+    node_list = weave.legacy.ops.make_list(**{"0": TestType(), "1": TestType()})
     node = node_list.test_fn(1)
     assert weave.use(node) == [2, 2]
 

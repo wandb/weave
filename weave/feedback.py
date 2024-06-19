@@ -5,14 +5,15 @@ from typing import Any, Iterable, Iterator, Optional
 
 from rich.table import Table
 
-from . import graph_client_context
-from . import util
 from weave import rich_pydantic_util
+from weave.legacy import graph_client_context
 from weave.refs import Refs
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.query import Query
 from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import parse_uri
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.interface.query import Query
+
+from . import util
 
 
 class Feedbacks(AbstractRichContainer[tsi.Feedback]):
@@ -197,6 +198,25 @@ class RefFeedbackQuery(FeedbackQuery):
         response = self.client.server.feedback_create(freq)
         self.feedbacks = None  # Clear cache
         return response.id
+
+    def add(
+        self,
+        feedback_type: str,
+        payload: Optional[dict[str, Any]] = None,
+        creator: Optional[str] = None,
+        **kwargs: dict[str, Any],
+    ) -> str:
+        """Add feedback to the ref.
+
+        feedback_type: A string identifying the type of feedback. The "wandb." prefix is reserved.
+        creator: The name to display for the originator of the feedback.
+        """
+        if feedback_type.startswith("wandb."):
+            raise ValueError('Feedback type cannot start with "wandb."')
+        feedback = {}
+        feedback.update(payload or {})
+        feedback.update(kwargs)
+        return self._add(feedback_type, feedback, creator)
 
     def add_reaction(self, emoji: str, creator: Optional[str] = None) -> str:
         return self._add(

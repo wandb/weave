@@ -1,32 +1,33 @@
-import inspect
-from typing import Iterator, Literal, Any, Union, Optional, Generator, SupportsIndex
 import dataclasses
+import inspect
 import operator
 import typing
+from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
+
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
-from weave.trace.op import Op
-from weave.trace.refs import (
-    RefWithExtra,
-    ObjectRef,
-    TableRef,
-    DICT_KEY_EDGE_NAME,
-    OBJECT_ATTR_EDGE_NAME,
-    LIST_INDEX_EDGE_NAME,
-    TABLE_ROW_ID_EDGE_NAME,
-)
-from weave import box
+from weave.legacy import box
+from weave.legacy.graph_client_context import get_graph_client
 from weave.table import Table
-from weave.trace.serialize import from_json
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.graph_client_context import get_graph_client
+from weave.trace.op import Op
+from weave.trace.refs import (
+    DICT_KEY_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
+    OBJECT_ATTR_EDGE_NAME,
+    TABLE_ROW_ID_EDGE_NAME,
+    ObjectRef,
+    RefWithExtra,
+    TableRef,
+)
+from weave.trace.serialize import from_json
 from weave.trace_server.trace_server_interface import (
+    ObjReadReq,
+    TableQueryReq,
     TraceServerInterface,
     _TableRowFilter,
-    TableQueryReq,
-    ObjReadReq,
 )
 
 
@@ -115,11 +116,19 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
             return object.__getattribute__(self, "ref")
         except AttributeError:
             return None
-    res = attribute_access_result(self, attribute, name)
+
+    server = gc.server if (gc := get_graph_client()) else None
+    res = attribute_access_result(self, attribute, name, server=server)
     return res
 
 
-def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> Any:
+def attribute_access_result(
+    self: object,
+    val_attr_val: Any,
+    attr_name: str,
+    *,
+    server: Optional[TraceServerInterface],
+) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
         return val_attr_val
@@ -134,18 +143,13 @@ def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> 
 
     new_ref = ref.with_attr(attr_name)
 
-    gc = get_graph_client()
-
-    if gc is None:
-        # In the case that the graph client has been closed but the user still
-        # maintains a reference to this object, we should gracefully fallback
-        # to the raw value.
+    if server is None:
         return val_attr_val
 
     return make_trace_obj(
         val_attr_val,
         new_ref,
-        gc.server,
+        server,
         None,  # TODO: not passing root, needed for mutate which is not implemented yet
         # self.root,
         self,
@@ -173,7 +177,7 @@ class TraceObject(Tracable):
         except AttributeError:
             pass
         val_attr_val = object.__getattribute__(self._val, __name)
-        result = attribute_access_result(self, val_attr_val, __name)
+        result = attribute_access_result(self, val_attr_val, __name, server=self.server)
         # Store the result on _val so we don't deref next time.
         try:
             object.__setattr__(self._val, __name, result)

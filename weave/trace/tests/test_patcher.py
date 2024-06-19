@@ -1,4 +1,5 @@
 import importlib
+
 from weave.trace.patcher import SymbolPatcher
 
 
