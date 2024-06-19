@@ -73,7 +73,11 @@ def test_simple_chain_invoke(
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    llm = ChatOpenAI(temperature=0.0)
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
@@ -95,7 +99,11 @@ def test_simple_chain_stream(
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    llm = ChatOpenAI(temperature=0.0)
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
@@ -138,7 +146,11 @@ def test_simple_chain_batch(
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    llm = ChatOpenAI(temperature=0.0)
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
@@ -177,7 +189,11 @@ def test_simple_chain_batch_inside_op(
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    llm = ChatOpenAI(temperature=0.0)
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
@@ -248,7 +264,11 @@ def test_simple_rag_chain(client: WeaveClient, only_patch_langchain: Callable) -
         "Question: {question}\nContext: {context}\nAnswer:"
     )
 
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
 
     def format_docs(documents: List[Document]) -> str:
         return "\n\n".join(doc.page_content for doc in documents)
@@ -326,7 +346,11 @@ def test_agent_run_with_tools(
         return_direct=True,
     )
 
-    llm = ChatOpenAI(model="gpt-3.5-turbo")
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
 
     tools = [calculator]
     functions = [convert_to_openai_tool(t) for t in tools]
@@ -417,7 +441,11 @@ def test_agent_run_with_function_call(
         return_direct=True,
     )
 
-    llm = ChatOpenAI(model="gpt-3.5-turbo")
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
 
     tools = [calculator]
     functions = [convert_to_openai_function(t) for t in tools]

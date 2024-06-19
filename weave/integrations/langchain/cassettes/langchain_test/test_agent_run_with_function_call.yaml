@@ -34,37 +34,37 @@ interactions:
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
-      string: 'data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"function_call":{"name":"Calculator","arguments":""}},"logprobs":null,"finish_reason":null}]}
+      string: 'data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"function_call":{"name":"Calculator","arguments":""}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"{\""}},"logprobs":null,"finish_reason":null}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"{\""}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"a"}},"logprobs":null,"finish_reason":null}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"a"}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"\":"}},"logprobs":null,"finish_reason":null}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"\":"}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"3"}},"logprobs":null,"finish_reason":null}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"3"}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":",\""}},"logprobs":null,"finish_reason":null}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":",\""}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"b"}},"logprobs":null,"finish_reason":null}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"b"}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"\":"}},"logprobs":null,"finish_reason":null}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"\":"}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"4"}},"logprobs":null,"finish_reason":null}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"4"}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"}"}},"logprobs":null,"finish_reason":null}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"function_call":{"arguments":"}"}},"logprobs":null,"finish_reason":null}]}
 
 
-        data: {"id":"chatcmpl-9bT7O0qhycS0QkkFhLPxx3PPTvvlu","object":"chat.completion.chunk","created":1718717094,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"function_call"}]}
+        data: {"id":"chatcmpl-9bhe5T6vXz2lnPnFLzY13P2MN4HLo","object":"chat.completion.chunk","created":1718772937,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"function_call"}]}
 
 
         data: [DONE]
@@ -75,20 +75,20 @@ interactions:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 895b9a3088387ff8-MAA
+      - 8960ed89ad03b29f-MAA
       Connection:
       - keep-alive
       Content-Type:
       - text/event-stream; charset=utf-8
       Date:
-      - Tue, 18 Jun 2024 13:24:55 GMT
+      - Wed, 19 Jun 2024 04:55:40 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=qDoaV8m16_FoJt2AwjbUYFB8Z_FL2tFBJpCIk6VmFPU-1718717095-1.0.1.1-Cezk.CQWNE3KBtGDSppU4MpjR2Hz.nw_Q.yFS2KoGCBmbYLyfnZzJwRZ.yy1kxOceEER4Cq9a7Ax.MsJhrtBEQ;
-        path=/; expires=Tue, 18-Jun-24 13:54:55 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=4BZEemhNgmHdROzB372xF4KjgwYn8fXIejQKo1kBCK8-1718772940-1.0.1.1-QS3HEUeoFG869rR0EB.xuAz8A0BDHVTxLH1.b2Y3dNxHCIXGuB3tFUQ9.6ZCNdp8E96P3361wqVGz9gMRiD2Yw;
+        path=/; expires=Wed, 19-Jun-24 05:25:40 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=mGo6LEfz245bmD4u_UF9CRM.Z_C0VnItQmrrJigDFxo-1718717095208-0.0.1.1-604800000;
+      - _cfuvid=LCgPMDuwQtynRCfuHy577eU3VsSXIYUQewzpvLTaPh8-1718772940069-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -97,11 +97,11 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '264'
+      - '2478'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
-      - max-age=15724800; includeSubDomains
+      - max-age=31536000; includeSubDomains
       x-ratelimit-limit-requests:
       - '10000'
       x-ratelimit-limit-tokens:
@@ -115,7 +115,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 1ms
       x-request-id:
-      - req_9771532476a213f0e31eb7f22c28cb9f
+      - b10daf039dee843d5028fffbd8cd67b9
     status:
       code: 200
       message: OK

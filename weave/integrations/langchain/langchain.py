@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
-from weave import graph_client_context, run_context
+from weave.legacy import graph_client_context, run_context
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
 

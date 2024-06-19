@@ -35,17 +35,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA1SQy07DMBBF9/mK0aybKmmoUrIGsYENlBVCleNOU4PjMfZUPKr+O3KalrLx4t6c
-        6+PsMwA0a2wA9VaJ7r3Nr9tlXf3I8u72hp7bB6ceC5ktiJ4+7z80ThLB7RtpOVFTzb23JIbdsdaB
-        lFBaLetyUZd1UVdD0fOabMI6L3k1neeyCy3nRTmbj+SWjaaIDbxkAAD74UyObk1f2EAxOSU9xag6
-        wub8EQAGtilBFaOJopzg5K/U7ITcoF3hGB/Oe5Y7H7hNd7udted8Y5yJ21UgFdklNgr7I37IAF4H
-        790/FfSBey8r4XdyabCsjnP496cuyrETFmUv4qts1MP4HYX61ca4joIPZnhDkswO2S8AAAD//wMA
-        HthWdcIBAAA=
+        H4sIAAAAAAAAA1SQy27CMBBF9/kKa9YJIqS8sqzU0nZFxbKqkOMMiYvjsexBKkL8e+UQHt14cW/O
+        9XFOiRCgaygFqFay6pzJllVb7/3qc/NefCzsSuLreLZZ6xd7fF6/QRoJqn5Q8ZUaKeqcQdZkL7Xy
+        KBnjaj7PF/P5ZJnP+qKjGk3EGsdZMZpmfPAVZeN8Mh3IlrTCAKX4SoQQ4tSf0dHW+AulGKfXpMMQ
+        ZINQ3j4SAjyZmIAMQQeWliG9l4oso+21Cxji823PUOM8VfFuezDmlu+01aHdepSBbGQDk7vg50SI
+        79778E8FnKfO8ZZpjzYO5sVlDu5/6qEcOiaW5iF+SgY9CMfA2G132jbondf9G6Jkck7+AAAA//8D
+        AL53NWzCAQAA
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 895b99ad5d157fef-MAA
+      - 8960ed04aa0e17b2-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -53,14 +53,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 18 Jun 2024 13:24:34 GMT
+      - Wed, 19 Jun 2024 04:55:17 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=kN.5qntx5AoRsXuBn7rcOPHTz9ASlQPG28Xs_li9_rk-1718717074-1.0.1.1-pG31P66QQRf27WTx0ZipMnSJ5ENnDzdpDpy.VKFUuvuz_.NSFXbi8KJlVEmHPDCOzZh6hC53VYKAD.AjxhOUDw;
-        path=/; expires=Tue, 18-Jun-24 13:54:34 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=31GVCgQSCJHBPHs02VLsgk0_7eioQUTedG1GBUsm75I-1718772917-1.0.1.1-.jy1Rm.zV8oM7OO5TZmgrSlH3ZWMRzaZOVl3dAmy1cgBGYUwI7LLv7xrHezs_ZiduVJm0UmST601MUJkJ5Wi_g;
+        path=/; expires=Wed, 19-Jun-24 05:25:17 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=1pvdTIGzBMHf7ZJnrrgh0.YVGVRYxic.PVRkRFvGE.g-1718717074115-0.0.1.1-604800000;
+      - _cfuvid=i_P7EgdGItfPVzehtWHMgk8TZ61pXHN8_UdkF6..qqQ-1718772917033-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -69,11 +69,11 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '195'
+      - '65'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
-      - max-age=15724800; includeSubDomains
+      - max-age=31536000; includeSubDomains
       x-ratelimit-limit-requests:
       - '10000'
       x-ratelimit-limit-tokens:
@@ -87,7 +87,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_75863209863da731be1c5bb1ea75b112
+      - bfc0dec07aaf8f5f9535eda45998c2ae
     status:
       code: 200
       message: OK
