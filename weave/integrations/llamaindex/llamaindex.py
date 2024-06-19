@@ -75,7 +75,7 @@ if not import_failed:
                         exception = "Unknown exception occurred."
 
                     # Finish the call with the exception.
-                    gc.finish_call(call, None, exception=exception)
+                    gc._finish_call(call, None, exception=exception)
             else:
                 # Check if the event is a valid root event or child event.
                 # Here, we only allow a subset of event types as the root since not
@@ -90,7 +90,7 @@ if not import_failed:
                 # If the event is valid, create a call and add it to the call map.
                 if is_valid_root or is_valid_child:
                     # Create a call object.
-                    call = gc.create_call(
+                    call = gc._create_call(
                         "llama_index." + event_type.name.lower(),
                         process_payload(payload),
                         self._call_map.get(parent_id),
@@ -117,7 +117,7 @@ if not import_failed:
             if event_id in self._call_map:
                 # Finish the call.
                 call = self._call_map.pop(event_id)
-                gc.finish_call(call, process_payload(payload))
+                gc._finish_call(call, process_payload(payload))
 
         def start_trace(self, trace_id: Optional[str] = None) -> None:
             """Run when an overall trace is launched."""

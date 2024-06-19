@@ -83,9 +83,9 @@ class Op:
         # If/When we do memoization, this would be a good spot
 
         parent_run = run_context.get_current_run()
-        client.save_nested_objects(inputs_with_defaults)
+        client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
-        run = client.create_call(
+        run = client._create_call(
             self,
             inputs_with_defaults,
             parent_run,
@@ -100,7 +100,7 @@ class Op:
             nonlocal has_finished
             if has_finished:
                 raise ValueError("Should not call finish more than once")
-            client.finish_call(run, output, exception)
+            client._finish_call(run, output, exception)
             if not parent_run:
                 print_call_link(run)
 
@@ -153,7 +153,7 @@ class Op:
 
     def calls(self) -> "CallsIter":
         client = client_context.graph_client.require_graph_client()
-        return client.op_calls(self)
+        return client._op_calls(self)
 
     def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
         """This is an experimental API and may change in the future intended for use by internal Weave code."""

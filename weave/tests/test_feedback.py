@@ -8,14 +8,14 @@ def test_client_feedback(client) -> None:
     assert len(feedbacks) == 0
 
     # Make three feedbacks on two calls
-    call1 = client.create_call("x", {"a": 5, "b": 10})
-    client.finish_call(call1, "hello1")
+    call1 = client._create_call("x", {"a": 5, "b": 10})
+    client._finish_call(call1, "hello1")
     trace_object1 = client.call(call1.id)
     feedback_id_emoji = trace_object1.feedback.add_reaction("👍")
     trace_object1.feedback.add_note("this is a note on call1")
 
-    call2 = client.create_call("x", {"a": 6, "b": 11})
-    client.finish_call(call2, "hello2")
+    call2 = client._create_call("x", {"a": 6, "b": 11})
+    client._finish_call(call2, "hello2")
     trace_object2 = client.call(call2.id)
     feedback_id_note2 = trace_object2.feedback.add_note("this is a note on call2")
 
@@ -44,8 +44,8 @@ def test_custom_feedback(client) -> None:
     assert len(feedbacks) == 0
 
     # Add custom feedback to call
-    call = client.create_call("x", {"a": 5, "b": 10})
-    client.finish_call(call, "hello1")
+    call = client._create_call("x", {"a": 5, "b": 10})
+    client._finish_call(call, "hello1")
     trace_object = client.call(call.id)
     feedback_id1 = trace_object.feedback.add("correctness", {"value": 4})
     feedback_id2 = trace_object.feedback.add("hallucination", value=0.5)
