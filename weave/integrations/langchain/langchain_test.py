@@ -181,7 +181,12 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[tsi.CallSchema]) ->
     assert got == exp
 
 
-# TODO: VCR Stuff
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
 def test_simple_chain_batch_inside_op(
     client: WeaveClient, only_patch_langchain: Callable
 ) -> None:
@@ -253,7 +258,11 @@ def test_simple_rag_chain(client: WeaveClient, only_patch_langchain: Callable) -
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     splits = text_splitter.split_documents(docs)
 
-    vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings())
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    vectorstore = Chroma.from_documents(
+        documents=splits, embedding=OpenAIEmbeddings(openai_api_key=api_key)
+    )
     retriever = vectorstore.as_retriever()
 
     prompt = ChatPromptTemplate.from_template(
@@ -263,8 +272,6 @@ def test_simple_rag_chain(client: WeaveClient, only_patch_langchain: Callable) -
         "Use three sentences maximum and keep the answer concise.\n"
         "Question: {question}\nContext: {context}\nAnswer:"
     )
-
-    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
     llm = ChatOpenAI(
         model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
