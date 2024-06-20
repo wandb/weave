@@ -105,10 +105,11 @@ class LLMModel(weave.Model):
         return response.choices[0].message.content
 ```
 This way, the client becomes a model attribute and we can reuse the client to make requests to the API.
+- The `default_factory` is a function that returns a default value for the attribute, in this case, a new `openai.AsyncClient`.
 
 ### Hugging Face model
 
-When you need to intitalize attributes that depends on the input, for instance when loading a model and the tokenizer, you can use the `model_post_init` method. Here you can define the logic to load the model and the tokenizer.
+When you need to intitialize attributes that depends on the input, for instance when loading a model and the tokenizer, you can use the `model_post_init` method. Here you can define the logic to load the model and the tokenizer.
 
  This is a good idea as you want to know exactly what is being sent to the model before tokenization.
 
@@ -116,42 +117,43 @@ When using Hugging Face and `weave.Model` you will want to use `model_post_init`
 
 ```python
 import weave
+from pydantic import PrivateAttr
 from transformers import LlamaForCausalLM, LlamaTokenizerFast
-
 class LlamaModel(weave.Model):
     """A model class for MetaAI-LLama models"""
     model_id: str
     temperature: float = 0.5
     max_new_tokens: int = 128
-    model: LlamaForCausalLM = None
-    tokenizer: LlamaTokenizerFast = None
+
+    _model: LlamaForCausalLM = PrivateAttr()
+    _tokenizer: LlamaTokenizerFast = PrivateAttr()
 
     def model_post_init(self, __context):
-        "Pydantic validator to load the model and the tokenizer"
-        self.model = LlamaForCausalLM.from_pretrained(model_id)
-        self.tokenizer = LlamaTokenizerFast.from_pretrained(model_id)
+        self._model = LlamaForCausalLM.from_pretrained(self.model_id)
+        self._tokenizer = LlamaTokenizerFast.from_pretrained(self.model_id)
 
     @weave.op
-    def apply_chat_template(self, messages: list[dict[str, str]]):
+    def format_prompt(self, messages: list[dict[str, str]]):
         "A simple function to apply the chat template to the prompt"
-        formatted_prompt = self.tokenizer.apply_chat_template(messages, tokenize=False)
+        formatted_prompt = self._tokenizer.apply_chat_template(messages, tokenize=False)
         return formatted_prompt
 
     @weave.op()
     def predict(self, messages: list[dict[str, str]]) -> str:
-        formatted_prompt = self.apply_chat_template(messages)
-        tokenized_prompt = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.model.device)
-        outputs = self.model.generate(
+        formatted_prompt = self.format_prompt(messages)
+        tokenized_prompt = self._tokenizer.encode(formatted_prompt, return_tensors="pt").to(self._model.device)
+        outputs = self._model.generate(
             tokenized_prompt,
             max_new_tokens=self.max_new_tokens,
-            pad_token_id=self.tokenizer.eos_token_id,
+            pad_token_id=self._tokenizer.eos_token_id,
             temperature=self.temperature,
             do_sample=True,
         )
-        generated_text = self.tokenizer.decode(outputs[0][len(tokenized_prompt[0]):], skip_special_tokens=True)
+        generated_text = self._tokenizer.decode(outputs[0][len(tokenized_prompt[0]):], skip_special_tokens=True)
         return {"generated_text": generated_text}
 ```
 Some explanation about the code above.
+- We define model and tokenizer as private attributes, this way Pydantic will not try to validate them.
 - In this code we have a `model_post_init` that loads the model and the tokenizer.
 - We have a `apply_chat_template` method that formats the prompt to be sent to the model. This is a good idea as you want to know exactly what is being sent to the model before tokenization.
 - We have a `predict` method that generates a response from the model. Depending on the use case, you may want to return the raw output from the model or the decoded output.
