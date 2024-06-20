@@ -299,7 +299,7 @@ class Select:
             )
             conditions.extend(query_conds)
 
-        joined = _combine_conditions(conditions, "AND")
+        joined = combine_conditions(conditions, "AND")
         if joined:
             sql += f"\nWHERE {joined}"
 
@@ -406,7 +406,7 @@ class Insert:
         return PreparedInsert(sql=sql, column_names=column_names, data=data)
 
 
-def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
+def combine_conditions(conditions: typing.List[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
     if not conditions:

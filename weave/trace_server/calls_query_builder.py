@@ -226,7 +226,6 @@ Now that all this is written, i think an alternative implementation is:
 #           - [ ] quote_json_path_parts -> quote_json_path
 #           - [ ] process_query_to_conditions -> _process_query_to_conditions
 #           - [ ] transform_external_field_to_internal_field -> _transform_external_field_to_internal_field
-#           - [ ] combine_conditions -> _combine_conditions
 # - [ ] `process_calls_filter_to_conditions` still uses hard coded `calls_merged` columns - bad!
 # Considerations:
 # - [ ] Consider column selection
@@ -239,7 +238,11 @@ from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import ParamBuilder, python_value_to_ch_type
+from weave.trace_server.orm import (
+    ParamBuilder,
+    combine_conditions,
+    python_value_to_ch_type,
+)
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -816,15 +819,6 @@ def transform_external_field_to_internal_field(
         field = structured_field.as_sql(param_builder)
 
     return field, param_builder, raw_fields_used
-
-
-def combine_conditions(conditions: typing.List[str], operator: str) -> str:
-    if operator not in ("AND", "OR"):
-        raise ValueError(f"Invalid operator: {operator}")
-    if len(conditions) == 1:
-        return conditions[0]
-    combined = f" {operator} ".join(f"({c})" for c in conditions)
-    return f"({combined})"
 
 
 def _param_slot(param_name: str, param_type: str) -> str:
