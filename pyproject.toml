@@ -68,22 +68,24 @@ preview = true
 select = [
   "D200", # https://docs.astral.sh/ruff/rules/fits-on-one-line/
   "D201", # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
-  # "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/ - skipped, we use Google style
   "D204", # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
-  # "D206", # https://docs.astral.sh/ruff/rules/indent-with-spaces/ - redundant with formatter
-  # "D207", # https://docs.astral.sh/ruff/rules/under-indentation/ - redundant with formatter
-  # "D208", # https://docs.astral.sh/ruff/rules/over-indentation/ - redundant with formatter
   "D210", # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
   "D211", # https://docs.astral.sh/ruff/rules/blank-line-before-class/
-  # "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/ - skipped, we use Google style
   "D214", # https://docs.astral.sh/ruff/rules/section-not-over-indented/
-  # "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/ - skipped, we use Google style
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",
   "F541",
   "I", # https://docs.astral.sh/ruff/rules/#isort-i
   "W291", # https://docs.astral.sh/ruff/rules/trailing-whitespace/
   "W391", # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
+]
+ignore = [
+  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/ - we use Google style
+  "D206", # https://docs.astral.sh/ruff/rules/indent-with-spaces/ - redundant with formatter
+  "D207", # https://docs.astral.sh/ruff/rules/under-indentation/ - redundant with formatter
+  "D208", # https://docs.astral.sh/ruff/rules/over-indentation/ - redundant with formatter
+  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/ - we use Google style
+  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/ - we use Google style
 ]
 exclude = [
   "weave/api.py",
