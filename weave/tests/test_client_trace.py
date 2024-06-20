@@ -709,12 +709,12 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
-def client_is_sql_lite(client):
+def client_is_sqlite(client):
     return isinstance(client.server._internal_trace_server, SqliteTraceServer)
 
 
 def test_trace_call_filter(client):
-    is_sql_lite = client_is_sql_lite(client)
+    is_sqlite = client_is_sqlite(client)
 
     @weave.op()
     def basic_op(in_val: dict, delay) -> dict:
@@ -816,7 +816,7 @@ def test_trace_call_filter(client):
         (
             6
             + (
-                1 if is_sql_lite else 0
+                1 if is_sqlite else 0
             ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
@@ -838,7 +838,7 @@ def test_trace_call_filter(client):
         (
             5
             + (
-                1 if is_sql_lite else 0
+                1 if is_sqlite else 0
             ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
@@ -860,7 +860,7 @@ def test_trace_call_filter(client):
         (
             13
             + (
-                -2 if is_sql_lite else 0
+                -2 if is_sqlite else 0
             ),  # SQLite returns NULL for non-existent fields rather than ''.
             {
                 "$contains": {
@@ -938,7 +938,7 @@ def test_trace_call_filter(client):
         (
             5
             + (
-                1 if is_sql_lite else 0
+                1 if is_sqlite else 0
             ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$or": [
