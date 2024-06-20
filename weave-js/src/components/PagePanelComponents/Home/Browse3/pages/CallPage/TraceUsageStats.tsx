@@ -30,6 +30,8 @@ const isUsageDataKey = (key: string): key is UsageDataKeys => {
     'prompt_tokens',
     'completion_tokens',
     'total_tokens',
+    'input_tokens',
+    'output_tokens',
   ];
   return usageDataKeys.includes(key as UsageDataKeys);
 };
@@ -127,7 +129,6 @@ export const getTokensAndCostFromUsage = (usage: {
       tokens: {total: 0},
     },
   };
-
   if (usage) {
     for (const model of Object.keys(usage)) {
       const inputTokens = getInputTokens(usage[model]);
