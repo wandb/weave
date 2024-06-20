@@ -68,7 +68,7 @@ class ParamBuilder:
         param_name = param_name or self._prefix + str(len(self._params))
         self._params[param_name] = param_value
         if self._database_type == "clickhouse":
-            ptype = param_type or _python_value_to_ch_type(param_value)
+            ptype = param_type or python_value_to_ch_type(param_value)
             return f"{{{param_name}:{ptype}}}"
         return ":" + param_name
 
@@ -417,7 +417,7 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
     return f"({combined})"
 
 
-def _python_value_to_ch_type(value: typing.Any) -> str:
+def python_value_to_ch_type(value: typing.Any) -> str:
     """Helper function to convert python types to clickhouse types."""
     if isinstance(value, str):
         return "String"
@@ -559,7 +559,7 @@ def _process_query_to_conditions(
     def process_operand(operand: tsi_query.Operand) -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
             return pb.add(
-                operand.literal_, None, _python_value_to_ch_type(operand.literal_)
+                operand.literal_, None, python_value_to_ch_type(operand.literal_)
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             (

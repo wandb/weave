@@ -227,7 +227,6 @@ Now that all this is written, i think an alternative implementation is:
 #           - [ ] process_query_to_conditions -> _process_query_to_conditions
 #           - [ ] transform_external_field_to_internal_field -> _transform_external_field_to_internal_field
 #           - [ ] combine_conditions -> _combine_conditions
-#           - [ ] _python_value_to_ch_type -> _python_value_to_ch_type
 # - [ ] `process_calls_filter_to_conditions` still uses hard coded `calls_merged` columns - bad!
 # Considerations:
 # - [ ] Consider column selection
@@ -240,7 +239,7 @@ from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.orm import ParamBuilder, python_value_to_ch_type
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -644,7 +643,7 @@ def process_query_to_conditions(
         if isinstance(operand, tsi_query.LiteralOperation):
             return _param_slot(
                 param_builder.add_param(operand.literal_),  # type: ignore
-                _python_value_to_ch_type(operand.literal_),
+                python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             (
@@ -831,19 +830,3 @@ def combine_conditions(conditions: typing.List[str], operator: str) -> str:
 def _param_slot(param_name: str, param_type: str) -> str:
     """Helper function to create a parameter slot for a clickhouse query."""
     return f"{{{param_name}:{param_type}}}"
-
-
-def _python_value_to_ch_type(value: typing.Any) -> str:
-    """Helper function to convert python types to clickhouse types."""
-    if isinstance(value, str):
-        return "String"
-    elif isinstance(value, int):
-        return "UInt64"
-    elif isinstance(value, float):
-        return "Float64"
-    elif isinstance(value, bool):
-        return "UInt8"
-    elif value is None:
-        return "Nullable(String)"
-    else:
-        raise ValueError(f"Unknown value type: {value}")
