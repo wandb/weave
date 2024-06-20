@@ -68,7 +68,6 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
             system_fingerprint=value.system_fingerprint,
             usage=value.usage if hasattr(value, "usage") else None,
         )
-
         return value.model_dump(exclude_unset=True, exclude_none=True)
     else:
         return value.model_dump(exclude_unset=True, exclude_none=True)
