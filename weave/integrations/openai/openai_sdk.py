@@ -13,7 +13,8 @@ if typing.TYPE_CHECKING:
 def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_message import FunctionCall
-    from openai.types.chat.chat_completion_chunk import ChoiceDeltaFunctionCall
+    from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall, ChoiceDeltaFunctionCall
+    from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall, Function
 
     def _get_function_call(function_call):
         if function_call is None:
@@ -23,6 +24,26 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
                 arguments=function_call.arguments,
                 name=function_call.name,
             )
+
+    def _get_tool_calls(tool_calls):
+        if tool_calls is None:
+            return tool_calls
+
+        _tool_calls = []
+        if isinstance(tool_calls, list):
+            for tool_call in tool_calls:
+                assert isinstance(tool_call, ChoiceDeltaToolCall)
+                _tool_calls.append(
+                    ChatCompletionMessageToolCall(
+                        id=tool_call.id,
+                        type=tool_call.type,
+                        function=Function(
+                            name=tool_call.function.name,
+                            arguments=tool_call.function.arguments,
+                        ),
+                    )
+                )
+        return _tool_calls
 
     if isinstance(value, ChatCompletionChunk):
         value = ChatCompletion(
@@ -34,7 +55,7 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
                         "content": choice.delta.content,
                         "role": choice.delta.role,
                         "function_call": _get_function_call(choice.delta.function_call),
-                        "tool_calls": choice.delta.tool_calls,
+                        "tool_calls": _get_tool_calls(choice.delta.tool_calls),
                     },
                     "logprobs": choice.logprobs,
                     "finish_reason": choice.finish_reason,
@@ -59,6 +80,8 @@ def openai_accumulator(
 ) -> "ChatCompletionChunk":
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import ChoiceDeltaFunctionCall
+    from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall, Function
+    from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall, ChoiceDeltaToolCallFunction
 
     def _process_chunk(chunk: ChatCompletionChunk, acc_choices: list[dict] = []):
         """Once the first_chunk is set (acc), take the next chunk and append the message content
@@ -95,7 +118,7 @@ def openai_accumulator(
                 choice["delta"]["role"] = chunk_choice.delta.role
 
             # function calling
-            if isinstance(chunk_choice.delta.function_call, ChoiceDeltaFunctionCall):
+            if chunk_choice.delta.function_call:
                 if choice["delta"]["function_call"] is None:
                     choice["delta"]["function_call"] = ChoiceDeltaFunctionCall(
                         arguments=chunk_choice.delta.function_call.arguments,
@@ -105,6 +128,47 @@ def openai_accumulator(
                     choice["delta"]["function_call"][
                         "arguments"
                     ] += chunk_choice.delta.function_call.arguments
+
+            # tool calls
+            if chunk_choice.delta.tool_calls:
+                if choice["delta"]["tool_calls"] is None:
+                    choice["delta"]["tool_calls"] = []
+                    tool_call_delta = chunk_choice.delta.tool_calls[0]
+                    choice["delta"]["tool_calls"].append(
+                        ChoiceDeltaToolCall(
+                            id=tool_call_delta.id,
+                            index=tool_call_delta.index,
+                            function=ChoiceDeltaToolCallFunction(
+                                name=tool_call_delta.function.name,
+                                arguments='',
+                            ),
+                            type=tool_call_delta.type,
+                        )
+                    )
+                else:
+                    tool_call_delta = chunk_choice.delta.tool_calls[0]
+                    if tool_call_delta.index > len(choice["delta"]["tool_calls"]) - 1:
+                        choice["delta"]["tool_calls"].append(
+                            ChoiceDeltaToolCall(
+                                index=tool_call_delta.index,
+                                function=ChoiceDeltaToolCallFunction(
+                                    name=None,
+                                    arguments='',
+                                )
+                            ).model_dump()
+                        )
+                    tool_call = choice["delta"]["tool_calls"][
+                        tool_call_delta.index
+                    ]
+                    if tool_call_delta.id is not None:
+                        tool_call["id"] = tool_call_delta.id
+                    if tool_call_delta.type is not None:
+                        tool_call["type"] = tool_call_delta.type
+                    if tool_call_delta.function is not None:
+                        if tool_call_delta.function.name is not None:
+                            tool_call["function"]["name"] = tool_call_delta.function.name
+                        if tool_call_delta.function.arguments is not None:
+                            tool_call["function"]["arguments"] += tool_call_delta.function.arguments
 
         return acc_choices
 
