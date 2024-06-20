@@ -433,10 +433,10 @@ const useCallsDeleteFunc = () => {
   return callsDelete;
 };
 
-const useCallRenameFunc = () => {
+const useCallUpdateFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
-  const callRename = useCallback(
+  const callUpdate = useCallback(
     (
       entity: string,
       project: string,
@@ -444,7 +444,7 @@ const useCallRenameFunc = () => {
       newName: string
     ): Promise<void> => {
       return getTsClient()
-        .callRename({
+        .callUpdate({
           project_id: projectIdFromParts({entity, project}),
           call_id: callID,
           display_name: newName,
@@ -460,7 +460,7 @@ const useCallRenameFunc = () => {
     [getTsClient]
   );
 
-  return callRename;
+  return callUpdate;
 };
 
 const useFeedback = (
@@ -1317,7 +1317,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCalls,
   useCallsStats,
   useCallsDeleteFunc,
-  useCallRenameFunc,
+  useCallUpdateFunc,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

@@ -180,7 +180,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     callIDs: string[]
   ) => Promise<void>;
-  useCallRenameFunc: () => (
+  useCallUpdateFunc: () => (
     entity: string,
     project: string,
     callID: string,

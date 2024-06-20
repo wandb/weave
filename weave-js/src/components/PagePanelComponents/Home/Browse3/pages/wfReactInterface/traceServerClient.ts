@@ -100,7 +100,7 @@ export type TraceCallsDeleteReq = {
   call_ids: string[];
 };
 
-export type TraceCallRenameReq = {
+export type TraceCallUpdateReq = {
   project_id: string;
   call_id: string;
   display_name: string;
@@ -290,9 +290,9 @@ export class TraceServerClient {
     });
     return res;
   };
-  callRename: (req: TraceCallRenameReq) => Promise<void> = req => {
-    const res = this.makeRequest<TraceCallRenameReq, void>(
-      '/call/rename',
+  callUpdate: (req: TraceCallUpdateReq) => Promise<void> = req => {
+    const res = this.makeRequest<TraceCallUpdateReq, void>(
+      '/call/update',
       req
     ).then(() => {
       this.onRenameListeners.forEach(listener => listener());
