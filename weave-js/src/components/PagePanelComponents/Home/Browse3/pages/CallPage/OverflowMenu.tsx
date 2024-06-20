@@ -6,39 +6,27 @@ import {
 } from '@material-ui/core';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
-import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
+import {IconDelete} from '@wandb/weave/components/Icon';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
 import {useClosePeek} from '../../context';
 import {useWFHooks} from '../wfReactInterface/context';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const OverflowMenu: FC<{
-  entity: string;
-  project: string;
-  callIds: string[];
-  callNames: string[];
-  setIsRenaming: (isEditing: boolean) => void;
-}> = ({entity, project, callIds, callNames, setIsRenaming}) => {
+  selectedCalls: CallSchema[];
+}> = ({selectedCalls}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
-    [
-      {
-        key: 'rename',
-        text: 'Rename',
-        icon: <IconPencilEdit style={{marginRight: '4px'}} />,
-        onClick: () => setIsRenaming(true),
-        disabled: callIds.length === 0,
-      },
-    ],
     [
       {
         key: 'delete',
         text: 'Delete',
         icon: <IconDelete style={{marginRight: '4px'}} />,
         onClick: () => setConfirmDelete(true),
-        disabled: callIds.length === 0,
+        disabled: selectedCalls.length === 0,
       },
     ],
   ];
@@ -47,10 +35,7 @@ export const OverflowMenu: FC<{
     <>
       {confirmDelete && (
         <ConfirmDeleteModal
-          entity={entity}
-          project={project}
-          callIds={callIds}
-          callNames={callNames}
+          calls={selectedCalls}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
         />
@@ -66,7 +51,7 @@ export const OverflowMenu: FC<{
             style={{marginLeft: '4px'}}
           />
         }
-        offset="-78px, -16px"
+        offset="-68px, -10px"
       />
     </>
   );
@@ -107,41 +92,38 @@ DialogActions.displayName = 'S.DialogActions';
 const MAX_DELETED_CALLS_TO_SHOW = 10;
 
 const ConfirmDeleteModal: FC<{
-  entity: string;
-  project: string;
-  callIds: string[];
-  callNames: string[];
+  calls: CallSchema[];
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
-}> = ({
-  entity,
-  project,
-  callIds,
-  callNames,
-  confirmDelete,
-  setConfirmDelete,
-}) => {
+}> = ({calls, confirmDelete, setConfirmDelete}) => {
   const {useCallsDeleteFunc} = useWFHooks();
   const callsDelete = useCallsDeleteFunc();
   const closePeek = useClosePeek();
 
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const [error, setError] = useState(
-    callIds.length === 0 ? 'No call(s) selected' : null
-  );
+  let error = null;
+  if (calls.length === 0) {
+    error = 'No calls selected';
+  } else if (new Set(calls.map(c => c.entity)).size > 1) {
+    error = 'Cannot delete calls from multiple entities';
+  } else if (new Set(calls.map(c => c.project)).size > 1) {
+    error = 'Cannot delete calls from multiple projects';
+  } else if (calls.length > 1) {
+    error = 'Cannot delete multiple calls';
+  }
 
   const onDelete = () => {
     setDeleteLoading(true);
-    callsDelete(entity, project, callIds)
-      .catch(() => {
-        setError(`Failed to delete call(s) ${callNames.join(', ')}`);
-      })
-      .then(() => {
-        setDeleteLoading(false);
-        setConfirmDelete(false);
-        closePeek();
-      });
+    callsDelete(
+      calls[0].entity,
+      calls[0].project,
+      calls.map(c => c.callId)
+    ).then(() => {
+      setDeleteLoading(false);
+      setConfirmDelete(false);
+      closePeek();
+    });
   };
 
   return (
@@ -150,24 +132,22 @@ const ConfirmDeleteModal: FC<{
       onClose={() => setConfirmDelete(false)}
       maxWidth="xs"
       fullWidth>
-      <DialogTitle>Delete {callIds.length > 1 ? 'calls' : 'call'}</DialogTitle>
+      <DialogTitle>Delete {calls.length > 1 ? 'calls' : 'call'}</DialogTitle>
       <DialogContent>
         {error != null ? (
           <p style={{color: 'red'}}>{error}</p>
         ) : (
           <p>
             Are you sure you want to delete
-            {callIds.length > 1 ? ' these calls' : ' this call'}?
+            {calls.length > 1 ? ' these calls' : ' this call'}?
           </p>
         )}
-        {callNames
-          .slice(0, MAX_DELETED_CALLS_TO_SHOW)
-          .map((callName, index) => (
-            <CallName key={callIds[index]}>{callName}</CallName>
-          ))}
-        {callNames.length > MAX_DELETED_CALLS_TO_SHOW && (
+        {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
+          <CallName key={call.callId}>{call.spanName}</CallName>
+        ))}
+        {calls.length > MAX_DELETED_CALLS_TO_SHOW && (
           <p style={{marginTop: '8px'}}>
-            and {callNames.length - MAX_DELETED_CALLS_TO_SHOW} more...
+            and {calls.length - MAX_DELETED_CALLS_TO_SHOW} more...
           </p>
         )}
       </DialogContent>
@@ -176,7 +156,7 @@ const ConfirmDeleteModal: FC<{
           variant="destructive"
           disabled={error != null || deleteLoading}
           onClick={onDelete}>
-          {callIds.length > 1 ? 'Delete calls' : 'Delete call'}
+          {calls.length > 1 ? 'Delete calls' : 'Delete call'}
         </Button>
         <Button
           variant="ghost"

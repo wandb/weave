@@ -9,10 +9,7 @@ export const EditableCallName: React.FC<{
   entity: string;
   project: string;
   callId: string;
-  // Can be used to manually control the editing mode of EditableField
-  externalEditingControl?: boolean;
-  onSave?: () => void;
-}> = ({opName, entity, project, callId, onSave, externalEditingControl}) => {
+}> = ({opName, entity, project, callId}) => {
   const {useCallRenameFunc} = useWFHooks();
   const callRename = useCallRenameFunc();
   const [curOpName, setCurOpName] = useState(opName);
@@ -27,9 +24,8 @@ export const EditableCallName: React.FC<{
     (newName: string) => {
       callRename(entity, project, callId, newName);
       setCurOpName(newName);
-      onSave?.();
     },
-    [callRename, entity, project, callId, onSave]
+    [callRename, entity, project, callId]
   );
 
   return (
@@ -39,8 +35,6 @@ export const EditableCallName: React.FC<{
       placeholder={curOpName}
       updateValue={true}
       autoSelect={true}
-      externalEditingControl={externalEditingControl}
-      inDataGrid={true}
     />
   );
 };
