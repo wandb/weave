@@ -13,8 +13,14 @@ if typing.TYPE_CHECKING:
 def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_message import FunctionCall
-    from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall, ChoiceDeltaFunctionCall
-    from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall, Function
+    from openai.types.chat.chat_completion_chunk import (
+        ChoiceDeltaToolCall,
+        ChoiceDeltaFunctionCall,
+    )
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCall,
+        Function,
+    )
 
     def _get_function_call(function_call):
         if function_call is None:
@@ -79,8 +85,14 @@ def openai_accumulator(
 ) -> "ChatCompletionChunk":
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import ChoiceDeltaFunctionCall
-    from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall, Function
-    from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall, ChoiceDeltaToolCallFunction
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCall,
+        Function,
+    )
+    from openai.types.chat.chat_completion_chunk import (
+        ChoiceDeltaToolCall,
+        ChoiceDeltaToolCallFunction,
+    )
 
     def _process_chunk(chunk: ChatCompletionChunk, acc_choices: list[dict] = []):
         """Once the first_chunk is set (acc), take the next chunk and append the message content
@@ -139,7 +151,7 @@ def openai_accumulator(
                             index=tool_call_delta.index,
                             function=ChoiceDeltaToolCallFunction(
                                 name=tool_call_delta.function.name,
-                                arguments='',
+                                arguments="",
                             ),
                             type=tool_call_delta.type,
                         )
@@ -152,22 +164,24 @@ def openai_accumulator(
                                 index=tool_call_delta.index,
                                 function=ChoiceDeltaToolCallFunction(
                                     name=None,
-                                    arguments='',
-                                )
+                                    arguments="",
+                                ),
                             ).model_dump()
                         )
-                    tool_call = choice["delta"]["tool_calls"][
-                        tool_call_delta.index
-                    ]
+                    tool_call = choice["delta"]["tool_calls"][tool_call_delta.index]
                     if tool_call_delta.id is not None:
                         tool_call["id"] = tool_call_delta.id
                     if tool_call_delta.type is not None:
                         tool_call["type"] = tool_call_delta.type
                     if tool_call_delta.function is not None:
                         if tool_call_delta.function.name is not None:
-                            tool_call["function"]["name"] = tool_call_delta.function.name
+                            tool_call["function"][
+                                "name"
+                            ] = tool_call_delta.function.name
                         if tool_call_delta.function.arguments is not None:
-                            tool_call["function"]["arguments"] += tool_call_delta.function.arguments
+                            tool_call["function"][
+                                "arguments"
+                            ] += tool_call_delta.function.arguments
 
         return acc_choices
 
