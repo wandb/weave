@@ -50,7 +50,7 @@ export const EditableCallName: React.FC<{
     <EditableField
       value={currNameToDisplay}
       onFinish={saveName}
-      placeholder={currNameToDisplay}
+      placeholder={defaultDisplayName}
       updateValue={true}
     />
   );
