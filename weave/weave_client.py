@@ -198,7 +198,7 @@ class Call:
         if name == self.display_name:
             return
         client = client_context.weave_client.require_weave_client()
-        client.set_call_display_name(call=self, display_name=name)
+        client._set_call_display_name(call=self, display_name=name)
         self.display_name = name
 
     def remove_display_name(self) -> None:

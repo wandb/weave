@@ -153,7 +153,7 @@ class Op:
 
     def calls(self) -> "CallsIter":
         client = client_context.weave_client.require_weave_client()
-        return client.op_calls(self)
+        return client._op_calls(self)
 
     def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
         """This is an experimental API and may change in the future intended for use by internal Weave code."""

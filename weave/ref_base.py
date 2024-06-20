@@ -159,11 +159,11 @@ class Ref:
 
     def input_to(self) -> Sequence["weave_client.Call"]:
         client = client_context.weave_client.require_weave_client()
-        return client.ref_input_to(self)
+        return client._ref_input_to(self)
 
     def value_input_to(self) -> Sequence["weave_client.Call"]:
         client = client_context.weave_client.require_weave_client()
-        return client.ref_value_input_to(self)
+        return client._ref_value_input_to(self)
 
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:
