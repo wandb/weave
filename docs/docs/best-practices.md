@@ -141,14 +141,16 @@ class LlamaModel(weave.Model):
         v["tokenizer"] = tokenizer
         return v
 
-    @weave.op()
-    def format_prompt(self, messages: list[dict[str, str]]) -> str:
+    @weave.op
+    def apply_chat_template(messages: str, tokenizer):
         "A simple function to apply the chat template to the prompt"
-        return  self.tokenizer.apply_chat_template(messages, return_tensors="pt").to(self.model.device)
+        formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False)
+        return formatted_prompt
 
     @weave.op()
     def predict(self, messages: list[dict[str, str]]) -> str:
-        tokenized_prompt = self.format_prompt(messages)
+        formatted_prompt = self.format_prompt(messages)
+        tokenized_prompt = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.model.device)
         outputs = self.model.generate(
             tokenized_prompt,
             max_new_tokens=self.max_new_tokens,
