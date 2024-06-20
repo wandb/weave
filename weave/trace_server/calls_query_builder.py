@@ -222,6 +222,12 @@ Now that all this is written, i think an alternative implementation is:
 # Refactors:
 # - [ ] Look for dead code in this file
 # - [ ] Reconcile the differences between ORM and these implementations (ideally push them down into there)
+#   - [ ] All methods in this file are unique
+#           - [ ] quote_json_path_parts -> quote_json_path
+#           - [ ] process_query_to_conditions -> _process_query_to_conditions
+#           - [ ] transform_external_field_to_internal_field -> _transform_external_field_to_internal_field
+#           - [ ] combine_conditions -> _combine_conditions
+#           - [ ] _python_value_to_ch_type -> _python_value_to_ch_type
 # - [ ] `process_calls_filter_to_conditions` still uses hard coded `calls_merged` columns - bad!
 # Considerations:
 # - [ ] Consider column selection
@@ -466,11 +472,10 @@ class CallsQuery(BaseModel):
             filtered_calls_query.select_fields = self.select_fields
             return filtered_calls_query._as_sql_base_format(pb)
 
+        # TODO: What was i thinking here?
         # assert filtered_calls_query.limit is None
         # assert filtered_calls_query.offset is None
         # assert len(filtered_calls_query.order_fields) == 0
-
-        # TODO: Recursive expansion goes here
 
         return f"""
         WITH filtered_calls AS ({filtered_calls_query._as_sql_base_format(pb)})
@@ -823,7 +828,6 @@ def combine_conditions(conditions: typing.List[str], operator: str) -> str:
     return f"({combined})"
 
 
-# --- Private
 def _param_slot(param_name: str, param_type: str) -> str:
     """Helper function to create a parameter slot for a clickhouse query."""
     return f"{{{param_name}:{param_type}}}"
