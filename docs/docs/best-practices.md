@@ -118,44 +118,37 @@ When using Hugging Face and `weave.Model` you will want to use `model_validator`
 ```python
 import weave
 from pydantic import model_validator, Field
-from transformers import AutoModel
-from transformers import PeftModelForCausalLM, LlamaForCausalLM, LlamaTokenizerFast
+from transformers import LlamaForCausalLM, LlamaTokenizerFast
 
 class LlamaModel(weave.Model):
     """A model class for MetaAI-LLama models"""
     model_id: str
     temperature: float = 0.5
     max_new_tokens: int = 128
-    model: PeftModelForCausalLM | LlamaForCausalLM = Field(init=False)
-    tokenizer: LlamaTokenizerFast = Field(init=False)
+    model: LlamaForCausalLM = None
+    tokenizer: LlamaTokenizerFast = None
 
-    @model_validator(mode='before')
-    def load_model_and_tokenizer(cls, v):
+    def model_post_init(self, __context):
         "Pydantic validator to load the model and the tokenizer"
-        model_id = v["model_id"]
-        if model_id is None:
-            raise ValueError("model_id is required")
-        model = AutoModel.from_pretrained(model_id)
-        tokenizer = LlamaTokenizerFast.from_pretrained(model_id)
-        v["model"] = model
-        v["tokenizer"] = tokenizer
-        return v
+        self.model = LlamaForCausalLM.from_pretrained(model_id)
+        self.tokenizer = LlamaTokenizerFast.from_pretrained(model_id)
 
     @weave.op
-    def apply_chat_template(messages: str, tokenizer):
+    def apply_chat_template(self, messages: list[dict[str, str]]):
         "A simple function to apply the chat template to the prompt"
-        formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False)
+        formatted_prompt = self.tokenizer.apply_chat_template(messages, tokenize=False)
         return formatted_prompt
 
     @weave.op()
     def predict(self, messages: list[dict[str, str]]) -> str:
-        formatted_prompt = self.format_prompt(messages)
+        formatted_prompt = self.apply_chat_template(messages)
         tokenized_prompt = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.model.device)
         outputs = self.model.generate(
             tokenized_prompt,
             max_new_tokens=self.max_new_tokens,
             pad_token_id=self.tokenizer.eos_token_id,
             temperature=self.temperature,
+            do_sample=True,
         )
         generated_text = self.tokenizer.decode(outputs[0][len(tokenized_prompt[0]):], skip_special_tokens=True)
         return {"generated_text": generated_text}
