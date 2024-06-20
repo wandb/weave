@@ -75,9 +75,7 @@ class ObjectRef(RefWithExtra):
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
         if gc is None:
-            init_client = init_weave(
-                f"{self.entity}/{self.project}", ensure_project_exists=False
-            )
+            init_client = init_weave(f"{self.entity}/{self.project}")
             try:
                 res = init_client.client.get(self)
             finally:

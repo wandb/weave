@@ -292,7 +292,6 @@ class WeaveClient:
         entity: The entity name.
         project: The project name.
         server: The server to use for communication.
-        ensure_project_exists: Whether to ensure the project exists on the server.
     """
 
     def __init__(
@@ -300,16 +299,12 @@ class WeaveClient:
         entity: str,
         project: str,
         server: TraceServerInterface,
-        ensure_project_exists: bool = True,
     ):
         self.entity = entity
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
-        self.ensure_project_exists = ensure_project_exists
-
-        if ensure_project_exists:
-            self.server.ensure_project_exists(entity, project)
+        self.server.ensure_project_exists(entity, project)
 
     def ref_is_own(self, ref: Ref) -> bool:
         return isinstance(ref, Ref)
