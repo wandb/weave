@@ -226,22 +226,6 @@ Now that all this is written, i think an alternative implementation is:
 # - [ ] Look for dead code in this file
 # - [ ] Reconcile the differences between ORM and these implementations (ideally push them down into there)
 # - [ ] `process_calls_filter_to_conditions` still uses hard coded `calls_merged` columns - bad!
-# - [ ] `make_calls_where_condition_from_event_conditions` should be removed from everywhere
-# - [ ] Fix `ClickHouseTraceServer`:
-#     - [x] `calls_query`
-#     - [x] `calls_query_stream`
-#     - [x] `calls_query_stats`
-#     - [x] `call_read`
-#     - [ ] Consider deprecating/removing:
-#           * `_select_calls_query_raw`
-#           * `_calls_query_stats_raw`
-#           * `_select_calls_query`
-#           * `_call_read`
-#     Notes:
-#       good: `calls_query` -> `calls_query_stream` -> `_query_stream`
-#       bad: `_select_calls_query_raw` -> `_query_stream`
-#       bad `_call_read` -> `_select_calls_query` -> `_calls_query_stats_raw` -> `_query_stream`
-#       bad `_calls_query_stats_raw` -> `_query`
 # Considerations:
 # - [ ] Consider column selection
 # - [ ] Consider how we will do latency order/filter
@@ -834,50 +818,6 @@ def transform_external_field_to_internal_field(
     return field, param_builder, raw_fields_used
 
 
-def make_calls_where_condition_from_event_conditions(
-    start_event_conditions: typing.Optional[typing.List[str]] = None,
-    end_event_conditions: typing.Optional[typing.List[str]] = None,
-) -> str:
-    event_conds = []
-    if start_event_conditions is not None and len(start_event_conditions) > 0:
-        conds = combine_conditions(
-            [
-                "project_id = {project_id: String}",
-                "isNotNull(started_at)",
-                *start_event_conditions,
-            ],
-            "AND",
-        )
-        event_conds.append(
-            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
-        )
-
-    if end_event_conditions is not None and len(end_event_conditions) > 0:
-        conds = combine_conditions(
-            [
-                "project_id = {project_id: String}",
-                "isNotNull(ended_at)",
-                *end_event_conditions,
-            ],
-            "AND",
-        )
-        event_conds.append(
-            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
-        )
-
-    # Exclude deleted calls
-    conds = combine_conditions(
-        ["project_id = {project_id: String}", "isNotNull(deleted_at)"], "AND"
-    )
-    event_conds.append(
-        f"calls_merged.id NOT IN (SELECT id FROM calls_merged WHERE {conds})"
-    )
-
-    where_conditions_part = combine_conditions(event_conds, "AND")
-
-    return where_conditions_part
-
-
 def combine_conditions(conditions: typing.List[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
@@ -885,17 +825,6 @@ def combine_conditions(conditions: typing.List[str], operator: str) -> str:
         return conditions[0]
     combined = f" {operator} ".join(f"({c})" for c in conditions)
     return f"({combined})"
-
-
-def is_dynamic_field(field: str) -> bool:
-    """Dynamic fields are fields that are arbitrary values produced by the user."""
-    return (
-        field in ("inputs", "output", "attributes", "summary")
-        or field.startswith("inputs.")
-        or field.startswith("output.")
-        or field.startswith("attributes.")
-        or field.startswith("summary.")
-    )
 
 
 # --- Private

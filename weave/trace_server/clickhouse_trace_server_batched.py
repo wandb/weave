@@ -38,16 +38,11 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     combine_conditions,
-    is_dynamic_field,
-    make_calls_where_condition_from_event_conditions,
-    process_calls_filter_to_conditions,
-    process_query_to_conditions,
-    transform_external_field_to_internal_field,
 )
 
 from . import clickhouse_trace_server_migrator as wf_migrator
