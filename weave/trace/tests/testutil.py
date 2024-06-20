@@ -1,5 +1,6 @@
-from typing import Optional, Any
-from weave.trace.refs import parse_uri, ObjectRef, OpRef
+from typing import Any, Optional
+
+from weave.trace.refs import ObjectRef, OpRef, parse_uri
 
 
 class ObjectRefStrMatcher:

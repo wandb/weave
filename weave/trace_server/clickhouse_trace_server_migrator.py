@@ -1,7 +1,7 @@
 # Clickhouse Trace Server Manager
-import typing
-import os
 import logging
+import os
+import typing
 
 from clickhouse_connect.driver.client import Client as CHClient
 

@@ -1,19 +1,18 @@
-import typing
 import os
-import weave
-from .. import api
-from .. import weave_types as types
-from .. import weave_internal
-from .. import ops
-from .. import execute
-from .. import environment
-from . import test_wb
+import typing
+
 import pytest
 
+import weave
+from weave.legacy import execute, ops
+
+from .. import api, environment, weave_internal
+from .. import weave_types as types
+from . import test_wb
 
 execute_test_count_op_run_count = 0
 
-from .. import context_state as _context_state
+from weave.legacy import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
@@ -175,12 +174,12 @@ def test_cache_column():
     expected_result = [{"x": x, "y": x + 10000} for x in input_vals]
 
     l = weave.save(input_vals)
-    mapped = l.map(lambda x: weave.ops.dict_(x=x, y=expensive_op(x)))
+    mapped = l.map(lambda x: weave.legacy.ops.dict_(x=x, y=expensive_op(x)))
     res = weave.use(mapped)
     assert res == expected_result
 
     latest_obj = weave.use(
-        weave.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
+        weave.legacy.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
     )
     assert len(latest_obj) == len(input_vals)
     assert len(weave.versions(latest_obj)) == 1
@@ -199,7 +198,7 @@ def test_none_not_cached():
     assert res == expected_result
 
     latest_obj = weave.use(
-        weave.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
+        weave.legacy.ops.get("local-artifact:///run-op-expensive_op:latest/obj")
     )
     assert len(latest_obj) == 1  # not 2! None not cached!
     assert len(weave.versions(latest_obj)) == 1

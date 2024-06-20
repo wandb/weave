@@ -1,6 +1,6 @@
-import weave
-
 import numpy as np
+
+import weave
 
 
 class MyTestObjWithOp(weave.Object):

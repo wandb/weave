@@ -1,3 +1,5 @@
+import pytest
+
 import weave.trace_server.trace_server_interface as tsi
 
 
@@ -35,3 +37,30 @@ def test_client_feedback(client) -> None:
     assert len(trace_object2.feedback) == 0
     feedbacks = client.feedback()
     assert len(feedbacks) == 2
+
+
+def test_custom_feedback(client) -> None:
+    feedbacks = client.feedback()
+    assert len(feedbacks) == 0
+
+    # Add custom feedback to call
+    call = client.create_call("x", {"a": 5, "b": 10})
+    client.finish_call(call, "hello1")
+    trace_object = client.call(call.id)
+    feedback_id1 = trace_object.feedback.add("correctness", {"value": 4})
+    feedback_id2 = trace_object.feedback.add("hallucination", value=0.5)
+
+    # Check expectations
+    feedbacks = client.feedback()
+    assert len(feedbacks) == 2
+
+    f = client.feedback(feedback_id1)[0]
+    assert f.feedback_type == "correctness"
+    assert f.payload["value"] == 4
+
+    f = client.feedback(feedback_id2)[0]
+    assert f.feedback_type == "hallucination"
+    assert f.payload["value"] == 0.5
+
+    with pytest.raises(ValueError):
+        trace_object.feedback.add("wandb.trying_to_use_reserved_prefix", value=1)

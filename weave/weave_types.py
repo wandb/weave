@@ -1,26 +1,24 @@
+import contextvars
 import dataclasses
 import datetime
-import typing
-import inspect
 import functools
-import keyword
-import contextvars
+import inspect
 import json
-import pydantic
+import keyword
+import typing
 from collections.abc import Iterable
 
+import pydantic
 
-from . import box
-from . import context_state
+from weave.legacy import box, context_state, mappers_python, object_type_ref_util
+from weave.legacy import timestamp as weave_timestamp
+
 from . import errors
-from . import mappers_python
-from . import timestamp as weave_timestamp
-from . import object_type_ref_util
-
 
 if typing.TYPE_CHECKING:
-    from .artifact_fs import FilesystemArtifact
-    from . import artifact_base
+    from weave.legacy import artifact_base
+    from weave.legacy.artifact_fs import FilesystemArtifact
+
     from . import weave_inspector
 
 
@@ -231,9 +229,9 @@ class Type(metaclass=_TypeSubclassWatcher):
     _base_type: typing.ClassVar[typing.Optional[typing.Type["Type"]]] = None
 
     instance_class: typing.ClassVar[typing.Optional[type]]
-    instance_classes: typing.ClassVar[
-        typing.Union[type, typing.List[type], None]
-    ] = None
+    instance_classes: typing.ClassVar[typing.Union[type, typing.List[type], None]] = (
+        None
+    )
 
     _type_attrs = None
     _hash = None
@@ -880,7 +878,7 @@ class List(Type):
         mapped_result = mapper.apply(result)
 
         # TODO: scan through for ID
-        from .ops_primitives.list_ import object_lookup
+        from weave.legacy.ops_primitives.list_ import object_lookup
 
         if extra is not None:
             # return object_lookup.resolve_fn(mapped_result, extra[0])
@@ -1361,7 +1359,7 @@ class Function(Type):
     def load_instance(self, artifact, name, extra=None):
         with artifact.open(f"{name}.object.json") as f:
             # TODO: no circular imports!
-            from . import graph
+            from weave.legacy import graph
 
             return graph.Node.node_from_json(json.load(f))
 
@@ -1419,7 +1417,7 @@ class LocalArtifactRefType(FilesystemArtifactRefType):
 @dataclasses.dataclass(frozen=True)
 class WandbArtifactRefType(FilesystemArtifactRefType):
     def load_instance(self, artifact, name, extra=None):
-        from . import artifact_wandb
+        from weave.legacy import artifact_wandb
 
         return artifact_wandb.WandbArtifactRef(artifact, name)
 
@@ -1571,7 +1569,7 @@ def merge_types(a: Type, b: Type) -> Type:
     This implementation must match list.concat implementations (which is the only
     way to extend a list in Weave). Ie list.concat(list[a], [b]) -> list[merge_types(a, b)]
     """
-    from .language_features.tagging import tagged_value_type
+    from weave.legacy.language_features.tagging import tagged_value_type
 
     if a == b:
         return a
@@ -1771,36 +1769,44 @@ def _merge_unknowns_of_type_with_types(of_type: Type, with_types: list[Type]):
     if isinstance(of_type, List):
         return List(
             _merge_unknowns_of_type_with_types(
-                of_type.object_type, [t.object_type for t in with_types]  # type: ignore
+                of_type.object_type,
+                [t.object_type for t in with_types],  # type: ignore
             )
         )
     elif isinstance(of_type, Dict):
         return Dict(
             of_type.key_type,
             _merge_unknowns_of_type_with_types(
-                of_type.value_type, [t.value_type for t in with_types]  # type: ignore
+                of_type.value_type,  # type: ignore
+                [t.value_type for t in with_types],  # type: ignore
             ),
         )
     elif isinstance(of_type, TypedDict):
         return TypedDict(
             {
                 key: _merge_unknowns_of_type_with_types(
-                    value_type, [t.property_types.get(key, NoneType()) for t in with_types]  # type: ignore
+                    value_type,
+                    [t.property_types.get(key, NoneType()) for t in with_types],  # type: ignore
                 )
                 for key, value_type in of_type.property_types.items()
             }
         )
     elif isinstance(of_type, TaggedValueType):
         return TaggedValueType(
-            _merge_unknowns_of_type_with_types(of_type.tag, [t.tag for t in with_types]),  # type: ignore
             _merge_unknowns_of_type_with_types(
-                of_type.value, [t.value for t in with_types]  # type: ignore
+                of_type.tag,
+                [t.tag for t in with_types],  # type: ignore
+            ),  # type: ignore
+            _merge_unknowns_of_type_with_types(
+                of_type.value,
+                [t.value for t in with_types],  # type: ignore
             ),
         )
     elif isinstance(of_type, Const):
         return Const(
             _merge_unknowns_of_type_with_types(
-                of_type.val_type, [t.val_type for t in with_types]  # type: ignore
+                of_type.val_type,
+                [t.val_type for t in with_types],  # type: ignore
             ),
             of_type.value,
         )

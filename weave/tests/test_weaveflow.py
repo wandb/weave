@@ -1,7 +1,9 @@
-import pytest
-import weave
 import typing
+
 import numpy as np
+import pytest
+
+import weave
 
 from .. import ref_base
 

@@ -16,7 +16,7 @@ def autopatch_openai() -> None:
                 "To automatically track openai calls, upgrade the openai package to a version >= '1.0'"
             )
             return
-        from weave.monitoring.openai import patch
+        from weave.legacy.monitoring.openai import patch
 
         patch()
 
@@ -29,7 +29,7 @@ def unpatch_openai() -> None:
     else:
         if openai.__version__ < "1":
             return
-        from weave.monitoring.openai import unpatch
+        from weave.legacy.monitoring.openai import unpatch
 
         unpatch()
 
@@ -39,9 +39,10 @@ def autopatch() -> None:
 
     from .integrations.openai.openai_sdk import openai_patcher
     from .integrations.mistral.mistral import mistral_patcher
+    from .integrations.anthropic.anthropic_sdk import anthropic_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
-    from .integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from .integrations.mistral.mistral import mistral_patcher
 
     openai_patcher.attempt_patch()
     mistral_patcher.attempt_patch()
@@ -55,9 +56,10 @@ def reset_autopatch() -> None:
 
     from .integrations.openai.openai_sdk import openai_patcher
     from .integrations.mistral.mistral import mistral_patcher
+    from .integrations.anthropic.anthropic_sdk import anthropic_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
-    from .integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from .integrations.mistral.mistral import mistral_patcher
 
     openai_patcher.undo_patch()
     mistral_patcher.undo_patch()

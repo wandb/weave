@@ -1,26 +1,16 @@
 # Sqlite Trace Server
 
-from typing import Iterator, cast, Optional, Any, Union
-import threading
-
-import contextvars
 import contextlib
+import contextvars
 import datetime
-import json
 import hashlib
+import json
 import sqlite3
+import threading
+from typing import Any, Iterator, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import emoji
-
-from .trace_server_interface_util import (
-    assert_non_null_wb_user_id,
-    extract_refs_from_values,
-    str_digest,
-    bytes_digest,
-)
-from . import trace_server_interface as tsi
-from .interface import query as tsi_query
 
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
@@ -29,10 +19,7 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from weave.trace_server.trace_server_interface_util import (
-    generate_id,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-)
+from weave.trace_server.orm import Row
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -43,7 +30,19 @@ from weave.trace_server.refs_internal import (
     InternalTableRef,
     parse_internal_uri,
 )
-from weave.trace_server.orm import Row
+from weave.trace_server.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    generate_id,
+)
+
+from . import trace_server_interface as tsi
+from .interface import query as tsi_query
+from .trace_server_interface_util import (
+    assert_non_null_wb_user_id,
+    bytes_digest,
+    extract_refs_from_values,
+    str_digest,
+)
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -489,9 +488,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(
-                ", ".join("?" * len(req.call_ids))
-            )
+            """.format(", ".join("?" * len(req.call_ids)))
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -503,9 +500,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(
-                ", ".join("?" * len(all_ids))
-            )
+            """.format(", ".join("?" * len(all_ids)))
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()

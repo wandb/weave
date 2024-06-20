@@ -1,11 +1,13 @@
 import os
+from typing import Any, Generator
+
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
-from .anthropic_sdk import anthropic_patcher
 
-from typing import Any, Generator
+from .anthropic_sdk import anthropic_patcher
 
 model = "claude-3-haiku-20240307"
 # model = "claude-3-opus-20240229"
@@ -117,7 +119,6 @@ def test_anthropic_stream(
 async def test_async_anthropic(
     client: weave.weave_client.WeaveClient,
 ) -> None:
-
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
         api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
@@ -159,7 +160,6 @@ async def test_async_anthropic(
 async def test_async_anthropic_stream(
     client: weave.weave_client.WeaveClient,
 ) -> None:
-
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
         api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
