@@ -1,15 +1,16 @@
 # Synthetic data for model monitoring
 
 import datetime
-import tqdm
 import os
+import random
+from datetime import time, timedelta
+
 import numpy as np
 import pandas as pd
-import random
+import tqdm
 from faker import Faker
-from weave.arrow.list_ import dataframe_to_arrow
-from datetime import timedelta, time
-from weave.arrow.list_ import ArrowWeaveList
+
+from weave.legacy.arrow.list_ import ArrowWeaveList, dataframe_to_arrow
 
 
 # Generate the version schedule

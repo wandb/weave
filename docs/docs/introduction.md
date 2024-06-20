@@ -7,17 +7,15 @@ hide_table_of_contents: true
 
 # Introduction
 
-<a target="_blank" href="http://wandb.me/weave_colab">
-  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
-</a>
-
-Weave is a lightweight toolkit for tracking and evaluating LLM applications, built by Weights & Biases.
+**Weave** is a lightweight toolkit for tracking and evaluating LLM applications, built by Weights & Biases.
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing AI applications, without introducing cognitive overhead.
 
-[Get started](/quickstart) by decorating Python functions with `@weave.op()`. 
+**[Get started](/quickstart)** by decorating Python functions with `@weave.op()`. 
 
-Seriously, try the 🍪 [quickstart](/quickstart) 🍪 first.
+![Weave Hero](../static/img/weave-hero.png)
+
+Seriously, try the 🍪 **[quickstart](/quickstart)** 🍪 or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 You can use Weave to:
 - Log and debug language model inputs, outputs, and traces

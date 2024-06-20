@@ -21,6 +21,7 @@ import {CellValue} from '../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
+import {SmallRef} from '../../../Browse2/SmallRef';
 import {
   getTokensAndCostFromUsage,
   getUsageFromCellParams,
@@ -34,6 +35,11 @@ import {
   traceCallLatencyS,
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
+import {
+  EXPANDED_REF_REF_KEY,
+  EXPANDED_REF_VAL_KEY,
+  isTableRef,
+} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {OpVersionIndexText} from './CallsTable';
 import {buildTree} from './callsTableBuildTree';
@@ -351,7 +357,15 @@ function buildCallsTableColumns(
         }
         return (
           <ErrorBoundary>
-            <CellValue value={val} />
+            {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
+            into `CallValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
+            CallsTable-specific data structure and we might not want to leak that into the
+            rest of the system*/}
+            {isExpandedRefWithValueAsTableRef(val) ? (
+              <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
+            ) : (
+              <CellValue value={val} />
+            )}
           </ErrorBoundary>
         );
       },
@@ -437,6 +451,11 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: cellParams => {
+      const usage = getUsageFromCellParams(cellParams.row);
+      const {tokensNum} = getTokensAndCostFromUsage(usage);
+      return tokensNum;
+    },
     renderCell: cellParams => {
       const usage = getUsageFromCellParams(cellParams.row);
       const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
@@ -453,6 +472,11 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: cellParams => {
+      const usage = getUsageFromCellParams(cellParams.row);
+      const {costNum} = getTokensAndCostFromUsage(usage);
+      return costNum;
+    },
     renderCell: cellParams => {
       const usage = getUsageFromCellParams(cellParams.row);
       const {cost, costToolTip} = getTokensAndCostFromUsage(usage);
@@ -559,4 +583,29 @@ const refIsExpandable = (ref: string): boolean => {
     );
   }
   return false;
+};
+
+type ExpandedRefWithValue<T = any> = {
+  [EXPANDED_REF_REF_KEY]: string;
+  [EXPANDED_REF_VAL_KEY]: T;
+};
+
+export type ExpandedRefWithValueAsTableRef = ExpandedRefWithValue<string>;
+
+const isExpandedRefWithValue = (ref: any): ref is ExpandedRefWithValue => {
+  return (
+    typeof ref === 'object' &&
+    ref !== null &&
+    EXPANDED_REF_REF_KEY in ref &&
+    EXPANDED_REF_VAL_KEY in ref
+  );
+};
+
+const isExpandedRefWithValueAsTableRef = (
+  ref: any
+): ref is ExpandedRefWithValueAsTableRef => {
+  if (!isExpandedRefWithValue(ref)) {
+    return false;
+  }
+  return isTableRef(ref[EXPANDED_REF_VAL_KEY]);
 };

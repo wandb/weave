@@ -2,10 +2,10 @@ import copy
 import inspect
 import typing
 
-from . import errors
-from . import op_args
+from weave.legacy import op_args
+
+from . import errors, infer_types
 from . import weave_types as types
-from . import infer_types
 
 InputTypeItemType = typing.Union[types.Type, typing.Callable[..., types.Type]]
 InputTypeType = typing.Union[op_args.OpArgs, typing.Mapping[str, InputTypeItemType]]

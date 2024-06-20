@@ -9,18 +9,16 @@
 #   None: DummyTrace that does nothing
 
 
-import os
-import typing
 import contextvars
-import multiprocessing
-import logging
-import time
-import json
 import dataclasses
+import json
+import logging
+import multiprocessing
+import os
+import time
+import typing
 
-from . import environment
-from . import logs
-from . import stream_data_interfaces
+from . import environment, logs, stream_data_interfaces
 
 
 # Thanks co-pilot!
@@ -82,9 +80,9 @@ class DummyTrace:
         return None
 
 
-_weave_trace_span: contextvars.ContextVar[
-    typing.Optional["WeaveTraceSpan"]
-] = contextvars.ContextVar("_weave_trace_span", default=None)
+_weave_trace_span: contextvars.ContextVar[typing.Optional["WeaveTraceSpan"]] = (
+    contextvars.ContextVar("_weave_trace_span", default=None)
+)
 
 
 _weave_trace_stream = None
@@ -93,7 +91,7 @@ _weave_trace_stream = None
 def weave_trace_stream():
     global _weave_trace_stream
     if _weave_trace_stream is None:
-        from weave.wandb_interface.wandb_stream_table import StreamTable
+        from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
 
         _weave_trace_stream = StreamTable(os.getenv("WEAVE_TRACE_STREAM"))
     return _weave_trace_stream
@@ -107,7 +105,7 @@ def span_count(span):
 
 class WeaveTraceSpan:
     def __init__(self, name):
-        from .ops_domain import trace_tree
+        from .legacy.ops_domain import trace_tree
 
         self.log_indent_token = None
         self._token = None
@@ -133,7 +131,7 @@ class WeaveTraceSpan:
         self.span.end_time_ms = int(time.time() * 1000)
         _weave_trace_span.reset(self._token)
 
-        from .ops_domain import trace_tree
+        from .legacy.ops_domain import trace_tree
 
         tt = trace_tree.WBTraceTree(json.dumps(dataclasses.asdict(self.span)))
         tags = self.attributes.get("tags", {})
@@ -274,8 +272,9 @@ class WeaveWriter:
 
 
 def patch_ddtrace_set_tag():
-    from ddtrace import span as ddtrace_span
     from inspect import signature
+
+    from ddtrace import span as ddtrace_span
 
     set_tag_signature = signature(ddtrace_span.Span.set_tag)
 

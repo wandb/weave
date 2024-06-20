@@ -1,18 +1,21 @@
 import pytest
+
 import weave
-from weave.artifact_fs import FilesystemArtifactFileType
-from weave.ops_domain.wb_domain_types import ProjectType, RunType, Run
-from weave.ops_domain.run_ops import run_tag_getter_op
-from weave.ops_primitives import dict as dict_ops, list_ as list_ops
-from ..language_features.tagging import (
+from weave.legacy import box
+from weave.legacy.artifact_fs import FilesystemArtifactFileType
+from weave.legacy.language_features.tagging import (
     make_tag_getter_op,
-    tagged_value_type,
     tag_store,
+    tagged_value_type,
     tagged_value_type_helpers,
 )
-from .. import weave_types as types
-from .. import box
+from weave.legacy.ops_domain.run_ops import run_tag_getter_op
+from weave.legacy.ops_domain.wb_domain_types import ProjectType, Run, RunType
+from weave.legacy.ops_primitives import dict as dict_ops
+from weave.legacy.ops_primitives import list_ as list_ops
+
 from .. import weave_internal
+from .. import weave_types as types
 
 
 def test_tagged_value():
@@ -28,7 +31,7 @@ def test_tagged_types():
     class _TestNumber:
         inner: int
 
-    from .. import context_state
+    from weave.legacy import context_state
 
     _loading_builtins_token = context_state.set_loading_built_ins()
 

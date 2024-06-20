@@ -6,7 +6,7 @@ obj = [
     1,
     2,
     3,
-]  # weave.panels.Board({}, [weave.panels.BoardPanel(weave.panels.Table([1, 2, 3]))])
+]  # weave.legacy.panels.Board({}, [weave.legacy.panels.BoardPanel(weave.legacy.panels.Table([1, 2, 3]))])
 blank = weave.save(obj)
 
 print(show_url(obj))

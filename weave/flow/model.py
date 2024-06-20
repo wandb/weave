@@ -1,4 +1,5 @@
 from typing import Callable
+
 from weave.flow.obj import Object
 
 

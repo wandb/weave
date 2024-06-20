@@ -1,60 +1,62 @@
-from collections import namedtuple
-from typing import Any, Sequence, Union, Optional, TypedDict, Dict
 import dataclasses
+import datetime
 import typing
 import uuid
+from collections import namedtuple
+from typing import Any, Dict, Optional, Sequence, TypedDict, Union
+
 import pydantic
-import datetime
-
-
 from requests import HTTPError
 
-from weave.exception import exception_to_json_str
-from weave.table import Table
 from weave import trace_sentry, urls
-from weave import run_context
-from weave.trace.op import Op
+from weave.exception import exception_to_json_str
+from weave.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.legacy import graph_client_context, run_context
+from weave.table import Table
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
-    pydantic_object_record,
     pydantic_asdict_one_level,
+    pydantic_object_record,
 )
-from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
-from weave import graph_client_context
+from weave.trace.op import Op
+from weave.trace.refs import (
+    CallRef,
+    ObjectRef,
+    OpRef,
+    Ref,
+    TableRef,
+    parse_uri,
+)
+from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
+from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (
-    CallUpdateReq,
-    CallsDeleteReq,
-    ObjSchema,
-    RefsReadBatchReq,
-    TraceServerInterface,
-    ObjCreateReq,
-    ObjSchemaForInsert,
-    ObjReadReq,
-    StartedCallSchemaForInsert,
-    CallStartReq,
-    CallsQueryReq,
     CallEndReq,
-    EndedCallSchemaForInsert,
     CallSchema,
+    CallsDeleteReq,
+    CallsQueryReq,
+    CallStartReq,
+    CallUpdateReq,
+    EndedCallSchemaForInsert,
+    Feedback,
+    FeedbackQueryReq,
+    ObjCreateReq,
     ObjQueryReq,
     ObjQueryRes,
+    ObjReadReq,
+    ObjSchema,
+    ObjSchemaForInsert,
+    Query,
+    RefsReadBatchReq,
+    StartedCallSchemaForInsert,
     TableCreateReq,
-    TableSchemaForInsert,
     TableQueryReq,
-    _TableRowFilter,
+    TableSchemaForInsert,
+    TraceServerInterface,
     _CallsFilter,
     _ObjectVersionFilter,
+    _TableRowFilter,
 )
-from weave.trace.refs import (
-    Ref,
-    ObjectRef,
-    TableRef,
-    CallRef,
-    parse_uri,
-    OpRef,
-)
-from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 
 if typing.TYPE_CHECKING:
     from . import ref_base
@@ -147,6 +149,21 @@ class Call:
     attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
+
+    _feedback: Optional[RefFeedbackQuery] = None
+
+    @property
+    def feedback(self) -> RefFeedbackQuery:
+        if not self.id:
+            raise ValueError("Can't get feedback for call without ID")
+        if self._feedback is None:
+            project_parts = self.project_id.split("/")
+            if len(project_parts) != 2:
+                raise ValueError(f"Invalid project_id: {self.project_id}")
+            entity, project = project_parts
+            weave_ref = CallRef(entity, project, self.id)
+            self._feedback = RefFeedbackQuery(weave_ref.uri())
+        return self._feedback
 
     @property
     def ui_url(self) -> str:
@@ -625,6 +642,79 @@ class WeaveClient:
     def remove_call_display_name(self, call: Call) -> None:
         self.set_call_display_name(call, None)
 
+    def feedback(
+        self,
+        query: Optional[Union[Query, str]] = None,
+        *,
+        reaction: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> FeedbackQuery:
+        """Query project for feedback.
+
+        Examples:
+            # Fetch a specific feedback object.
+            # Note that this still returns a collection, which is expected
+            # to contain zero or one item(s).
+            client.feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+
+            # Find all feedback objects with a specific reaction.
+            client.feedback(reaction="👍", limit=10)
+
+        Args:
+            query: A mongo-style query expression. For convenience, also accepts a feedback UUID string.
+            reaction: For convenience, filter by a particular reaction emoji.
+            offset: The offset to start fetching feedback objects from.
+            limit: The maximum number of feedback objects to fetch.
+
+        Returns:
+            A FeedbackQuery object.
+        """
+        expr: dict[str, Any] = {
+            "$eq": [
+                {"$literal": "1"},
+                {"$literal": "1"},
+            ],
+        }
+        if isinstance(query, str):
+            expr = {
+                "$eq": [
+                    {"$getField": "id"},
+                    {"$literal": query},
+                ],
+            }
+        elif isinstance(query, Query):
+            expr = query.expr_.dict()
+
+        if reaction:
+            expr = {
+                "$and": [
+                    expr,
+                    {
+                        "$eq": [
+                            {"$getField": "feedback_type"},
+                            {"$literal": "wandb.reaction.1"},
+                        ],
+                    },
+                    {
+                        "$eq": [
+                            {"$getField": "payload.emoji"},
+                            {"$literal": reaction},
+                        ],
+                    },
+                ]
+            }
+        rewritten_query = Query(**{"$expr": expr})
+
+        return FeedbackQuery(
+            entity=self.entity,
+            project=self.project,
+            query=rewritten_query,
+            offset=offset,
+            limit=limit,
+            show_refs=True,
+        )
+
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
             return
@@ -662,12 +752,6 @@ class WeaveClient:
         raise NotImplementedError()
 
     def ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
-        raise NotImplementedError()
-
-    def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
-        raise NotImplementedError()
-
-    def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
         raise NotImplementedError()
 
     def op_runs(self, op_def: Op) -> Sequence[Call]:

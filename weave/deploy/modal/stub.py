@@ -1,10 +1,12 @@
+import os
+
 from fastapi import FastAPI
 from modal import Image, Secret, Stub, asgi_app
-from weave.artifact_wandb import WandbArtifactRef
-from weave.uris import WeaveURI
+
 from weave.deploy.util import safe_name
-import os
-from weave.trace.refs import parse_uri, ObjectRef
+from weave.legacy.artifact_wandb import WandbArtifactRef
+from weave.trace.refs import ObjectRef, parse_uri
+from weave.uris import WeaveURI
 
 image = (
     Image.debian_slim()
@@ -25,9 +27,9 @@ uri = WeaveURI.parse("$MODEL_REF")
 @stub.function(image=image, secret=Secret.from_dotenv(__file__))
 @asgi_app(label=safe_name(uri.name))
 def fastapi_app() -> FastAPI:
+    from weave import api
     from weave.serve_fastapi import object_method_app
     from weave.uris import WeaveURI
-    from weave import api
 
     uri_ref = parse_uri(os.environ["MODEL_REF"])
     if not isinstance(uri_ref, ObjectRef):

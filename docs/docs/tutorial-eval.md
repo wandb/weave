@@ -7,7 +7,7 @@ hide_table_of_contents: true
 
 To iterate on an application, we need a way to evaluate if it's improving. To do so, a common practice is to test it against the same set of examples when there is a change. Weave has a first-class way to track evaluations with `Model` & `Evaluation` classes. We have built the APIs to make minimal assumptions to allow for the flexibility to support a wide array of use-cases.
 
-### Build a `Model`
+## 1. Build a `Model`
 
 `Model`s store and version information about your system, such as prompts, temperatures, and more.
 Weave automatically captures when they are used and update the version when there are changes.
@@ -69,7 +69,7 @@ print(asyncio.run(model.predict(sentence)))
 Checkout the [Models](/guides/core-types/models) guide to learn more.
 :::
 
-### Collect some examples
+## 2. Collect some examples
 
 ```python
 sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
@@ -87,7 +87,7 @@ examples = [
 ]
 ```
 
-### Evaluate a `Model`
+## 3. Evaluate a `Model`
 
 `Evaluation`s assess a `Model`s performance on a set of examples using a list of specified scoring functions or `weave.flow.scorer.Scorer` classes.
 
@@ -127,7 +127,7 @@ print(asyncio.run(evaluation.evaluate(model)))
 
 In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information. 
 
-## Pulling it all together
+## 4. Pulling it all together
 
 ```python
 import json

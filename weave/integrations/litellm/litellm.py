@@ -1,11 +1,9 @@
 import importlib
-
 import typing
 
 import weave
-
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import SymbolPatcher, MultiPatcher
+from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
     from litellm.utils import ModelResponse
@@ -17,7 +15,7 @@ def litellm_accumulator(
     value: "ModelResponse",
 ) -> "ModelResponse":
     # This import should be safe at this point
-    from litellm.utils import ModelResponse, Usage, Choices, Message
+    from litellm.utils import Choices, Message, ModelResponse, Usage
 
     if acc is None:
         acc = ModelResponse(

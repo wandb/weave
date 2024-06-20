@@ -1,9 +1,9 @@
 import dataclasses
-import pydantic
 import types
-from inspect import isclass, getmro
-
+from inspect import getmro, isclass
 from typing import Any, Callable
+
+import pydantic
 
 from weave.trace.op import Op
 

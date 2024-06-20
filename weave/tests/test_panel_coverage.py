@@ -14,7 +14,7 @@ def inheritors(klass):
 
 
 def all_panels():
-    return inheritors(weave.panel.Panel)
+    return inheritors(weave.legacy.panel.Panel)
 
 
 def test_panel_coverage():

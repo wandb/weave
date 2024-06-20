@@ -22,48 +22,45 @@
 # the problem.
 
 
-from collections import defaultdict
-import threading
-from contextlib import contextmanager
-import datetime
-import json
-import typing
-import hashlib
 import dataclasses
+import datetime
+import hashlib
+import json
 import logging
+import threading
+import typing
+from collections import defaultdict
+from contextlib import contextmanager
 from zoneinfo import ZoneInfo
 
+import clickhouse_connect
 import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult, StreamContext
 from clickhouse_connect.driver.summary import QuerySummary
-
-import clickhouse_connect
 from pydantic import BaseModel, ValidationError
 
-from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
-from .errors import InvalidRequest, RequestTooLarge
+from . import environment as wf_env
+from . import refs_internal
+from . import trace_server_interface as tsi
 from .emoji_util import detone_emojis
+from .errors import InvalidRequest, RequestTooLarge
 from .feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from .orm import Table, Column, ParamBuilder, Row
-
+from .interface import query as tsi_query
+from .orm import Column, ParamBuilder, Row, Table
 from .trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
+    bytes_digest,
     extract_refs_from_values,
     generate_id,
     str_digest,
-    bytes_digest,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
-from . import trace_server_interface as tsi
-from .interface import query as tsi_query
-
-from . import refs_internal
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -583,7 +580,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
@@ -996,7 +992,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "wb_user_id": req.wb_user_id,
             "creator": req.creator,
             "feedback_type": req.feedback_type,
-            "payload": payload,
+            "payload": req.payload,
             "created_at": created_at,
         }
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
@@ -1625,7 +1621,7 @@ def _nullable_any_dump_to_any(
 
 
 def _raw_call_dict_to_ch_call(
-    call: typing.Dict[str, typing.Any]
+    call: typing.Dict[str, typing.Any],
 ) -> SelectableCHCallSchema:
     return SelectableCHCallSchema.model_validate(call)
 
@@ -1729,7 +1725,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
 
 
 def _process_parameters(
-    parameters: typing.Dict[str, typing.Any]
+    parameters: typing.Dict[str, typing.Any],
 ) -> typing.Dict[str, typing.Any]:
     # Special processing for datetimes! For some reason, the clickhouse connect
     # client truncates the datetime to the nearest second, so we need to convert
@@ -2112,7 +2108,11 @@ def _process_query_to_conditions(
                 _python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            (field, _, fields_used,) = _transform_external_field_to_internal_field(
+            (
+                field,
+                _,
+                fields_used,
+            ) = _transform_external_field_to_internal_field(
                 operand.get_field_, all_columns, json_columns, None, param_builder
             )
             raw_fields_used.update(fields_used)

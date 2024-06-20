@@ -27,6 +27,7 @@ import {
   CallFilter,
   CallKey,
   CallSchema,
+  FeedbackKey,
   Loadable,
   LoadableWithError,
   ObjectVersionFilter,
@@ -432,6 +433,7 @@ const useCallsDeleteFunc = () => {
   return callsDelete;
 };
 
+
 const useCallRenameFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
@@ -455,6 +457,54 @@ const useCallRenameFunc = () => {
   );
 
   return callRename;
+};
+
+const useFeedback = (
+  key: FeedbackKey | null
+): LoadableWithError<traceServerClient.Feedback[]> => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const [result, setResult] = useState<
+    LoadableWithError<traceServerClient.Feedback[]>
+  >({
+    loading: false,
+    result: null,
+    error: null,
+  });
+
+  const deepKey = useDeepMemo(key);
+
+  useEffect(() => {
+    if (!deepKey) {
+      return;
+    }
+    setResult({loading: true, result: null, error: null});
+    getTsClient()
+      .feedbackQuery({
+        project_id: projectIdFromParts({
+          entity: deepKey.entity,
+          project: deepKey.project,
+        }),
+        query: {
+          $expr: {
+            $eq: [{$getField: 'weave_ref'}, {$literal: deepKey.weaveRef}],
+          },
+        },
+        sort_by: [{field: 'created_at', direction: 'desc'}],
+      })
+      .then(res => {
+        if ('result' in res) {
+          setResult({loading: false, result: res.result, error: null});
+        }
+        // TODO: handle error case
+      })
+      .catch(err => {
+        setResult({loading: false, result: null, error: err});
+      });
+  }, [deepKey, getTsClient]);
+
+  return result;
+
 };
 
 const useOpVersion = (
@@ -1271,6 +1321,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
+  useFeedback,
   useFileContent,
   derived: {
     useChildCallsForCompare,
