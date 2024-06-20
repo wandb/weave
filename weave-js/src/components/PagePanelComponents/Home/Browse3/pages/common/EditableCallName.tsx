@@ -34,7 +34,6 @@ export const EditableCallName: React.FC<{
       onFinish={saveName}
       placeholder={curOpName}
       updateValue={true}
-      autoSelect={true}
     />
   );
 };
