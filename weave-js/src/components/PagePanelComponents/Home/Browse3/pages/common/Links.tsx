@@ -4,6 +4,13 @@ import {
   TEAL_500,
   TEAL_600,
 } from '@wandb/weave/common/css/color.styles';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
+import {
+  evaluationViewed,
+  objectViewed,
+  traceViewed,
+} from '@wandb/weave/integrations/analytics/viewEvents';
 import React from 'react';
 import {Link as LinkComp, useHistory} from 'react-router-dom';
 import styled, {css} from 'styled-components';
@@ -137,6 +144,7 @@ export const ObjectVersionLink: React.FC<{
   filePath?: string;
   refExtra?: string;
   fullWidth?: boolean;
+  objectClass?: string;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -152,7 +160,16 @@ export const ObjectVersionLink: React.FC<{
     props.filePath,
     props.refExtra
   );
+  const {loading, userInfo} = useViewerUserInfo2();
+  const {orgName} = useOrgName({entityName: props.entityName});
   const onClick = () => {
+    objectViewed({
+      objectType: props.objectClass ?? '',
+      objectId: props.objectName,
+      userId: !loading ? userInfo.username : '',
+      organizationName: orgName,
+      entityName: props.entityName,
+    });
     history.push(to);
   };
 
@@ -256,6 +273,7 @@ export const CallLink: React.FC<{
   // Preserve the path only when showing trace tree
   const path = props.preservePath ? existingPath : null;
 
+  console.log(props.opName);
   const to = peekingRouter.callUIUrl(
     props.entityName,
     props.projectName,
@@ -263,7 +281,24 @@ export const CallLink: React.FC<{
     props.callId,
     path
   );
+  const {loading, userInfo} = useViewerUserInfo2();
+  const {orgName} = useOrgName({entityName: props.entityName});
   const onClick = () => {
+    if (props.opName === 'Evaluation.evaluate') {
+      evaluationViewed({
+        traceId: props.callId,
+        userId: loading ? '' : userInfo.username,
+        organizationName: orgName,
+        entityName: props.entityName,
+      });
+    } else {
+      traceViewed({
+        traceId: props.callId,
+        userId: loading ? '' : userInfo.username,
+        organizationName: orgName,
+        entityName: props.entityName,
+      });
+    }
     history.push(to);
   };
 

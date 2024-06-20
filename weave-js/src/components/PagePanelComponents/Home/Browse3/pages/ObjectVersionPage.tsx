@@ -139,6 +139,7 @@ const ObjectVersionPageInner: React.FC<{
                       filter={{
                         objectName,
                       }}
+                      objectClass={objectVersion.baseObjectClass ?? ''}
                       versionCount={objectVersionCount}
                       neverPeek
                       variant="secondary"
