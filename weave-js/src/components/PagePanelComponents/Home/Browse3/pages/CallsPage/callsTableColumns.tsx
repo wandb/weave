@@ -207,7 +207,7 @@ function buildCallsTableColumns(
           <CallLink
             entityName={entity}
             projectName={project}
-            opName={opVersionRefOpName(op_name)}
+            opName={rowParams.row.display_name ?? opVersionRefOpName(op_name)}
             callId={rowParams.row.id}
             fullWidth={true}
             preservePath={preservePath}

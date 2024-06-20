@@ -1,6 +1,7 @@
-import React from 'react';
+import React, {useState} from 'react';
 import styled from 'styled-components';
 
+import {EditableCallName} from '../common/EditableCallName';
 import {CopyableId} from '../common/Id';
 import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
@@ -35,18 +36,36 @@ OverflowBin.displayName = 'S.OverflowBin';
 export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
-  const opName = opNiceName(call.spanName);
+  const [isRenamingCall, setIsRenamingCall] = useState<boolean | undefined>(
+    undefined
+  );
+  const opName = call.displayName ?? opNiceName(call.spanName);
 
   const statusCode = call.rawSpan.status_code;
 
   return (
     <>
       <Overview>
-        <CallName>{opName}</CallName>
+        <CallName>
+          <EditableCallName
+            opName={opName}
+            entity={call.entity}
+            project={call.project}
+            callId={call.callId}
+            onSave={() => setIsRenamingCall(undefined)}
+            externalEditingControl={isRenamingCall}
+          />
+        </CallName>
         <CopyableId id={call.callId} type="Call" />
         <StatusChip value={statusCode} iconOnly />
         <OverflowBin>
-          <OverflowMenu selectedCalls={[call]} />
+          <OverflowMenu
+            entity={call.entity}
+            project={call.project}
+            callIds={[call.callId]}
+            callNames={[opName]}
+            setIsRenaming={setIsRenamingCall}
+          />
         </OverflowBin>
       </Overview>
       {call.rawSpan.exception && (
