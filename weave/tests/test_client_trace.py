@@ -55,7 +55,7 @@ def test_simple_op(client):
     assert my_op(5) == 6
 
     op_ref = weave_client.get_ref(my_op)
-    # assert client.ref_is_own(op_ref)
+    # assert client._ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
     calls = list(client.calls())

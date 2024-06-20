@@ -348,7 +348,7 @@ class DefaultToPy(mappers.Mapper):
                 # a nested ref here if it is a ref to the same storage
                 # engine.
                 not gc
-                or (gc and gc.ref_is_own(existing_ref))
+                or (gc and gc._ref_is_own(existing_ref))
             ) and existing_ref.is_saved:
                 if self._use_stable_refs:
                     uri = existing_ref.uri
@@ -363,7 +363,7 @@ class DefaultToPy(mappers.Mapper):
             # top-level objects. This should be achieved by a policy
             # instead. There is a parallel policy in to_weavejs_with_refs
             # at the moment.
-            ref = gc.save_object(obj, obj.name, "latest")
+            ref = gc._save_object(obj, obj.name, "latest")
         elif isinstance(obj, ref_base.Ref):
             ref = obj
         elif isinstance(obj, str):
