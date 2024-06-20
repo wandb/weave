@@ -306,8 +306,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallEndRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        # Return the marshaled response
-        return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
+        res = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi._CallsFilter(
+                    call_ids=[req.call_id],
+                ),
+                limit=1,
+            )
+        )
+        return tsi.CallReadRes(call=next(res))
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
@@ -317,42 +325,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        having_conditions = []
-        # start_event_conditions = []
-        # end_event_conditions = []
-        param_builder = ParamBuilder()
-        raw_fields_used = set()
+        cq = CallsQuery(project_id=req.project_id)
 
-        # First, apply the application filter
-        if req.filter:
-            filter_to_conditions = process_calls_filter_to_conditions(
-                req.filter, param_builder
-            )
-            raw_fields_used.update(filter_to_conditions.fields_used)
-            having_conditions.extend(filter_to_conditions.conditions)
-            # start_event_conditions.extend(filter_to_conditions.start_event_conditions)
-            # end_event_conditions.extend(filter_to_conditions.end_event_conditions)
+        cq.add_field("id")
+        if req.filter is not None:
+            cq.set_legacy_filter(req.filter)
+        if req.query is not None:
+            cq.add_condition(req.query.expr_)
 
-        # Next, apply the query filter
-        if req.query:
-            having_query_conds, fields_used = process_query_to_conditions(
-                req.query, param_builder
-            )
-            raw_fields_used.update(fields_used)
-            having_conditions.extend(having_query_conds)
-
-        # Perform the query against the database
-        stats = self._calls_query_stats_raw(
-            req.project_id,
-            columns=list(raw_fields_used),
-            # start_event_conditions=start_event_conditions,
-            # end_event_conditions=end_event_conditions,
-            having_conditions=having_conditions,
-            parameters=param_builder.get_params(),
+        pb = ParamBuilder()
+        inner_query = cq.as_sql(pb)
+        raw_res = self._query(
+            f"SELECT count() FROM ({inner_query})",
+            pb.get_params(),
         )
-
-        # Return the marshaled response
-        return tsi.CallsQueryStatsRes(count=stats["count"])
+        rows = raw_res.result_rows
+        count = 0
+        if rows and len(rows) == 1 and len(rows[0]) == 1:
+            count = rows[0][0]
+        return tsi.CallsQueryStatsRes(count=count)
 
     def calls_query_stream(
         self, req: tsi.CallsQueryReq
@@ -383,12 +374,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        better_query = cq.as_sql(pb)
-        better_params = pb.get_params()
-        print(better_query, better_params)
         raw_res = self._query_stream(
-            better_query,
-            better_params,
+            cq.as_sql(pb),
+            pb.get_params(),
         )
 
         for row in raw_res:
@@ -408,23 +396,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         proj_params = {"project_id": req.project_id}
 
         # get all parents
-        parents = self._select_calls_query(
-            req.project_id,
-            start_event_conditions=[
-                proj_cond,
-                "calls_merged.id IN {ids: Array(String)}",
-            ],
-            parameters=proj_params | {"ids": req.call_ids},
+        parents = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=tsi._CallsFilter(
+                        call_ids=req.call_ids,
+                    ),
+                )
+            )
         )
 
         # get all calls with trace_ids matching parents
-        all_calls = self._select_calls_query(
-            req.project_id,
-            start_event_conditions=[
-                proj_cond,
-                "calls_merged.trace_id IN {trace_ids: Array(String)}",
-            ],
-            parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
+        all_calls = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=tsi._CallsFilter(
+                        trace_ids=[p.trace_id for p in parents],
+                    ),
+                )
+            )
         )
 
         all_descendants = find_call_descendants(
@@ -1068,311 +1060,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 column_names=all_call_insert_columns,
                 settings=settings,
             )
-
-    def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
-        # Generate and run the query to get the call from the database
-        ch_calls = self._select_calls_query(
-            req.project_id,
-            start_event_conditions=["calls_merged.id = {id: String}"],
-            limit=1,
-            parameters={"id": req.id},
-        )
-
-        # If the call is not found, raise a NotFoundError
-        if not ch_calls:
-            raise NotFoundError(f"Call with id {req.id} not found")
-
-        return ch_calls[0]
-
-    def _select_calls_query(
-        self,
-        project_id: str,
-        columns: typing.Optional[typing.List[str]] = None,
-        start_event_conditions: typing.Optional[typing.List[str]] = None,
-        end_event_conditions: typing.Optional[typing.List[str]] = None,
-        having_conditions: typing.Optional[typing.List[str]] = None,
-        order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
-        offset: typing.Optional[int] = None,
-        limit: typing.Optional[int] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[SelectableCHCallSchema]:
-        dicts = self._select_calls_query_raw(
-            project_id,
-            columns=columns,
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
-            having_conditions=having_conditions,
-            order_by=order_by,
-            offset=offset,
-            limit=limit,
-            parameters=parameters,
-        )
-        calls = []
-        for row in dicts:
-            calls.append(_raw_call_dict_to_ch_call(row))
-        return calls
-
-    def _select_calls_query_raw(
-        self,
-        project_id: str,
-        columns: typing.Optional[typing.List[str]] = None,
-        start_event_conditions: typing.Optional[typing.List[str]] = None,
-        end_event_conditions: typing.Optional[typing.List[str]] = None,
-        having_conditions: typing.Optional[typing.List[str]] = None,
-        order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
-        offset: typing.Optional[int] = None,
-        limit: typing.Optional[int] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.Iterable[typing.Dict]:
-        if not parameters:
-            parameters = {}
-        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
-
-        parameters["project_id"] = project_id
-        if columns == None:
-            columns = all_call_select_columns
-        columns = typing.cast(typing.List[str], columns)
-
-        remaining_columns = set(columns) - set(required_call_columns)
-        columns = required_call_columns + list(remaining_columns)
-
-        # Stop injection
-        assert (
-            set(columns) - set(all_call_select_columns) == set()
-        ), f"Invalid columns: {columns}"
-        merged_cols = []
-        for col in columns:
-            if col in call_select_raw_columns:
-                merged_cols.append(f"{col} AS {col}")
-            elif col in call_select_arrays_columns:
-                merged_cols.append(f"array_concat_agg({col}) AS {col}")
-            elif col in call_select_argmax_columns:
-                merged_cols.append(f"argMaxMerge({col}) AS {col}")
-            else:
-                merged_cols.append(f"any({col}) AS {col}")
-        select_columns_part = ", ".join(merged_cols)
-
-        having_conditions_part = None
-        if having_conditions:
-            having_conditions_part = combine_conditions(having_conditions, "AND")
-
-        where_conditions_part = make_calls_where_condition_from_event_conditions(
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
-        )
-
-        order_by_part = "ORDER BY started_at ASC"
-        order_by_events = set(["START"])
-        if order_by is not None:
-            order_by_events = set([])
-            order_parts = []
-            for field, direction in order_by:
-                assert direction in [
-                    "ASC",
-                    "DESC",
-                    "asc",
-                    "desc",
-                ], f"Invalid order_by direction: {direction}"
-
-                # For each order by field, if it is a dynamic field, we generate
-                # 3 order by terms: one for existence, one for float casting, and one for string casting.
-                # The effect of this is that we will have stable sorting for nullable, mixed-type fields.
-                if is_dynamic_field(field):
-                    # Prioritize existence, then cast to float, then str
-                    options = [
-                        ("exists", "desc"),
-                        ("float", direction),
-                        ("str", direction),
-                    ]
-                else:
-                    options = [(field, direction)]
-
-                start_fields = (
-                    "project_id",
-                    "id",
-                    "trace_id",
-                    "parent_id",
-                    "op_name",
-                    "started_at",
-                    "attributes",
-                    "inputs",
-                    "input_refs",
-                    "wb_user_id",
-                    "wb_run_id",
-                )
-                end_fields = (
-                    "ended_at",
-                    "exception",
-                    "summary",
-                    "output",
-                    "output_refs",
-                )
-
-                if (
-                    field in start_fields
-                    or field.startswith("inputs.")
-                    or field.startswith("attributes.")
-                ):
-                    order_by_events.add("START")
-                elif (
-                    field in end_fields
-                    or field.startswith("output.")
-                    or field.startswith("summary.")
-                ):
-                    order_by_events.add("END")
-                else:
-                    raise ValueError(f"Invalid order_by field: {field}")
-
-                # For each option, build the order by term
-                for cast, direct in options:
-                    # Future refactor: this entire section should be moved into its own helper
-                    # method and hoisted out of this function
-                    (
-                        inner_field,
-                        param_builder,
-                        _,
-                    ) = transform_external_field_to_internal_field(field, cast)
-                    parameters.update(param_builder.get_params())
-
-                    order_parts.append(f"{inner_field} {direct}")
-
-            order_by_part = ", ".join(order_parts)
-            order_by_part = f"ORDER BY {order_by_part}"
-
-        offset_part = ""
-        if offset != None:
-            offset_part = "OFFSET {offset: Int64}"
-            parameters["offset"] = offset
-
-        limit_part = ""
-        if limit != None:
-            limit_part = "LIMIT {limit: Int64}"
-            parameters["limit"] = limit
-
-        if having_conditions_part or len(order_by_events) != 1:
-            if having_conditions_part is None:
-                having_conditions_part == "1 = 1"
-            query_str = f"""
-                SELECT {select_columns_part}
-                FROM calls_merged
-                WHERE project_id = {{project_id: String}}
-                    AND {where_conditions_part}
-                GROUP BY project_id, id
-                HAVING {having_conditions_part}
-                {order_by_part}
-                {limit_part}
-                {offset_part}
-            """
-        else:
-            # FAST PATH!!
-            #
-            # Here we have an opportunity to optimize the query by using a subquery to
-            # filter out the rows before the group by. This is because the group by
-            # is expensive and we can avoid it if we can filter out rows before it.
-            # This is a common pattern in SQL optimization.
-            if "START" in order_by_events:
-                order_by_side = "AND isNotNull(started_at)"
-            elif "END" in order_by_events:
-                order_by_side = "AND isNotNull(ended_at)"
-            else:
-                raise ValueError("Invalid order_by_events")
-
-            where_conditions_part = f"""(
-                calls_merged.id IN (
-                    SELECT id from calls_merged WHERE (
-                        project_id = {{project_id: String}}
-                            AND
-                        {where_conditions_part}
-                    )
-                    {order_by_side}
-                    {order_by_part}
-                    {limit_part}
-                    {offset_part}
-                )
-            )"""
-            query_str = f"""
-                SELECT {select_columns_part}
-                FROM calls_merged
-                WHERE project_id = {{project_id: String}}
-                    AND {where_conditions_part}
-                GROUP BY project_id, id
-                {order_by_part}
-            """
-
-        raw_res = self._query_stream(
-            query_str,
-            parameters,
-        )
-
-        for row in raw_res:
-            yield dict(zip(columns, row))
-
-    def _calls_query_stats_raw(
-        self,
-        project_id: str,
-        columns: typing.Optional[typing.List[str]] = None,
-        start_event_conditions: typing.Optional[typing.List[str]] = None,
-        end_event_conditions: typing.Optional[typing.List[str]] = None,
-        having_conditions: typing.Optional[typing.List[str]] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.Dict:
-        """Generates and executes a query to get stats for a calls query."""
-        if not parameters:
-            parameters = {}
-        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
-
-        parameters["project_id"] = project_id
-
-        if not having_conditions:
-            having_conditions = ["1 = 1"]
-
-        having_conditions_part = combine_conditions(having_conditions, "AND")
-
-        where_conditions_part = make_calls_where_condition_from_event_conditions(
-            start_event_conditions=start_event_conditions,
-            end_event_conditions=end_event_conditions,
-        )
-
-        if columns == None:
-            columns = ["id"]
-        columns = typing.cast(typing.List[str], columns)
-        if len(columns) == 0:
-            columns = ["id"]
-        # Stop injection
-        assert (
-            set(columns) - set(all_call_select_columns) == set()
-        ), f"Invalid columns: {columns}"
-        merged_cols = []
-        for col in columns:
-            if col in ["project_id", "id"]:
-                merged_cols.append(f"{col} AS {col}")
-            elif col in ["input_refs", "output_refs"]:
-                merged_cols.append(f"array_concat_agg({col}) AS {col}")
-            else:
-                merged_cols.append(f"any({col}) AS {col}")
-        select_columns_part = ", ".join(merged_cols)
-
-        query_str = f"""
-            SELECT COUNT(*)
-            FROM (
-                SELECT {select_columns_part}
-                FROM calls_merged
-                WHERE project_id = {{project_id: String}}
-                    AND {where_conditions_part}
-                GROUP BY project_id, id
-                HAVING {having_conditions_part}
-            )
-        """
-
-        raw_res = self._query(
-            query_str,
-            parameters,
-        )
-        rows = raw_res.result_rows
-        count = 0
-        if rows and len(rows) == 1 and len(rows[0]) == 1:
-            count = rows[0][0]
-        return dict(count=count)
 
     def _select_objs_query(
         self,

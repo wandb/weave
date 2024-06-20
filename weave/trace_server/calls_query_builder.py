@@ -230,8 +230,8 @@ Now that all this is written, i think an alternative implementation is:
 # - [ ] Fix `ClickHouseTraceServer`:
 #     - [x] `calls_query`
 #     - [x] `calls_query_stream`
-#     - [ ] `calls_query_stats`
-#     - [ ] `call_read`
+#     - [x] `calls_query_stats`
+#     - [x] `call_read`
 #     - [ ] Consider deprecating/removing:
 #           * `_select_calls_query_raw`
 #           * `_calls_query_stats_raw`
@@ -545,7 +545,7 @@ class CallsQuery(BaseModel):
         WHERE project_id = {_param_slot(project_param, 'String')}
         {id_subquery_sql}
         GROUP BY (project_id, id)
-        {having_filter_sql} 
+        {having_filter_sql}
         {order_by_sql}
         {limit_sql}
         {offset_sql}
