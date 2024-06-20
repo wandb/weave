@@ -30,7 +30,7 @@ class Refs(AbstractRichContainer[str]):
 
     # TODO: Perhaps there should be a Calls that extends AbstractRichContainer
     def calls(self) -> list[TraceObject]:
-        client = client_context.graph_client.require_graph_client()
+        client = client_context.weave_client.require_weave_client()
         objs = []
         for ref in self.call_refs():
             parsed = parse_uri(ref)

@@ -31,7 +31,7 @@ class RunStreamTableSpan:
     @property
     def ui_url(self) -> str:
         raise NotImplementedError("ui_url not implemented")
-        # gc = client_context.graph_client.require_graph_client()
+        # gc = client_context.weave_client.require_weave_client()
         # return gc.run_ui_url(self)
 
     @property
@@ -84,7 +84,7 @@ class RunStreamTableSpan:
 
     def parent(self) -> typing.Optional["Run"]:
         raise NotImplementedError("parent not implemented")
-        # client = client_context.graph_client.require_graph_client()
+        # client = client_context.weave_client.require_weave_client()
         # if self.parent_id is None:
         #     return None
         # return client.run(self.parent_id)

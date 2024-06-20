@@ -100,7 +100,7 @@ class FeedbackQuery:
         limit: Optional[int] = None,
         show_refs: bool = False,
     ):
-        self.client = client_context.graph_client.require_graph_client()
+        self.client = client_context.weave_client.require_weave_client()
         self.entity = entity
         self.project = project
 

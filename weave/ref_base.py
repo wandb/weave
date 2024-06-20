@@ -158,11 +158,11 @@ class Ref:
         return str(self.uri)
 
     def input_to(self) -> Sequence["weave_client.Call"]:
-        client = client_context.graph_client.require_graph_client()
+        client = client_context.weave_client.require_weave_client()
         return client.ref_input_to(self)
 
     def value_input_to(self) -> Sequence["weave_client.Call"]:
-        client = client_context.graph_client.require_graph_client()
+        client = client_context.weave_client.require_weave_client()
         return client.ref_value_input_to(self)
 
 

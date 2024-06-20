@@ -212,7 +212,7 @@ class Monitor:
             return self._streamtable
         # If we weren't init'd with a streamtable, try to get the global
         # one.
-        client = client_context.graph_client.get_graph_client()
+        client = client_context.weave_client.get_weave_client()
         if client:
             # if isinstance(
             #     client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
@@ -363,7 +363,7 @@ def default_monitor() -> Monitor:
 
 
 def _get_global_monitor() -> typing.Optional[Monitor]:
-    client = client_context.graph_client.get_graph_client()
+    client = client_context.weave_client.get_weave_client()
     if client is not None:
         # if not isinstance(
         #     client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
@@ -383,7 +383,7 @@ def new_monitor(stream_key: str) -> Monitor:
 def init_monitor(stream_key: str) -> Monitor:
     """Initialize the global monitor and return it."""
     global _global_monitor
-    client = client_context.graph_client.get_graph_client()
+    client = client_context.weave_client.get_weave_client()
     if client:
         raise ValueError("weave.init already called, init_monitor is invalid.")
     stream_table = _init_monitor_streamtable(stream_key)

@@ -7,7 +7,7 @@ from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, U
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
-from weave.client_context.graph_client import get_graph_client
+from weave.client_context.weave_client import get_weave_client
 from weave.legacy import box
 from weave.table import Table
 from weave.trace.errors import InternalError
@@ -117,7 +117,7 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
         except AttributeError:
             return None
 
-    server = gc.server if (gc := get_graph_client()) else None
+    server = gc.server if (gc := get_weave_client()) else None
     res = attribute_access_result(self, attribute, name, server=server)
 
     # We need this because we override __getattribute__ and wrap the returned values.

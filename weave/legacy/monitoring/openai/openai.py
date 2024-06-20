@@ -214,7 +214,7 @@ def patch() -> None:
     def _patch() -> None:
         unpatch_fqn = f"{unpatch.__module__}.{unpatch.__qualname__}()"
 
-        gc = client_context.graph_client.require_graph_client()
+        gc = client_context.weave_client.require_weave_client()
         if gc:
             # info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
 
@@ -255,7 +255,7 @@ def unpatch() -> None:
 def log_run(
     call_name: typing.Union[str, Op], inputs: dict[str, Any]
 ) -> Iterator[Callable]:
-    client = client_context.graph_client.require_graph_client()
+    client = client_context.weave_client.require_weave_client()
     parent_run = run_context.get_current_run()
     # TODO: client should not need refs passed in.
     run = client.create_call(call_name, inputs, parent_run)

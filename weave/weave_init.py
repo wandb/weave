@@ -12,7 +12,7 @@ _current_inited_client = None
 class InitializedClient:
     def __init__(self, client: weave_client.WeaveClient):
         self.client = client
-        client_context.graph_client.set_graph_client_global(client)
+        client_context.weave_client.set_weave_client_global(client)
         self.ref_tracking_token = context_state._ref_tracking_enabled.set(True)
         self.eager_mode_token = context_state._eager_mode.set(True)
         self.serverless_io_service_token = context_state._serverless_io_service.set(
@@ -20,7 +20,7 @@ class InitializedClient:
         )
 
     def reset(self) -> None:
-        client_context.graph_client.set_graph_client_global(None)
+        client_context.weave_client.set_weave_client_global(None)
         context_state._ref_tracking_enabled.reset(self.ref_tracking_token)
         context_state._eager_mode.reset(self.eager_mode_token)
         context_state._serverless_io_service.reset(self.serverless_io_service_token)
