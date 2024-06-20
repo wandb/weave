@@ -3,7 +3,7 @@ from typing import Iterable
 
 from weave import stream_data_interfaces
 from weave.eager import WeaveIter
-from weave.legacy import artifact_wandb, graph_client_context, uris
+from weave.legacy import artifact_wandb, uris
 from weave.legacy.run import Run
 
 

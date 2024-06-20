@@ -14,7 +14,6 @@ import uuid
 from weave import errors, stream_data_interfaces
 from weave.legacy import (
     graph,
-    graph_client_context,
     run_context,
     run_streamtable_span,
 )

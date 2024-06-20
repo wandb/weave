@@ -55,8 +55,8 @@ class ClickHouseTraceServerMigrator:
                 db_name String,
                 curr_version UInt64,
                 partially_applied_version UInt64 NULL,
-            ) 
-            ENGINE = MergeTree() 
+            )
+            ENGINE = MergeTree()
             ORDER BY (db_name)
         """
         )

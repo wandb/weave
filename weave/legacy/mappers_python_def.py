@@ -9,7 +9,6 @@ from weave import weave_types as types
 from weave.legacy import (
     artifact_fs,
     box,
-    graph_client_context,
     mappers,
     mappers_python,
     mappers_weave,

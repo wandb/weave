@@ -11,7 +11,7 @@ from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from packaging import version
 
-from weave.legacy import graph_client_context, run_context
+from weave.legacy import run_context
 from weave.legacy.monitoring.monitor import _get_global_monitor
 from weave.legacy.monitoring.openai.models import *
 from weave.legacy.monitoring.openai.util import *
