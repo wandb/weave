@@ -485,7 +485,7 @@ def to_json_with_refs(
             raise errors.WeaveSerializeError(
                 "Can't serialize OpDef with a client initialization"
             )
-        return gc.save_object(obj, obj.name, "latest")
+        return gc._save_object(obj, obj.name, "latest")
     else:
         res = artifact.set("/".join(path), wb_type, obj)
         if res.artifact == artifact:

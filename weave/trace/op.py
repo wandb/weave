@@ -83,7 +83,7 @@ class Op:
         # If/When we do memoization, this would be a good spot
 
         parent_run = run_context.get_current_run()
-        client.save_nested_objects(inputs_with_defaults)
+        client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
         run = client.create_call(
             self,

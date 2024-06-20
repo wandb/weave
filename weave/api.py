@@ -210,7 +210,7 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     else:
         save_name = obj.__class__.__name__
 
-    ref = client.save_object(obj, save_name, "latest")
+    ref = client._save_object(obj, save_name, "latest")
 
     if isinstance(ref, _weave_client.ObjectRef):
         url = urls.object_version_path(
@@ -247,7 +247,7 @@ def ref(location: str) -> _weave_client.ObjectRef:
             version = "latest"
         else:
             name, version = location.split(":")
-        location = str(client.ref_uri(name, version, "obj"))
+        location = str(client._ref_uri(name, version, "obj"))
 
     uri = _weave_client.parse_uri(location)
     if not isinstance(uri, _weave_client.ObjectRef):
@@ -266,7 +266,7 @@ def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:
     if ref is None:
         return ref
 
-    return client.ref_output_of(ref)
+    return client._ref_output_of(ref)
 
 
 def as_op(fn: typing.Callable) -> Op:
