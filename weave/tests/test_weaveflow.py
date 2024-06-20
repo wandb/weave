@@ -2,6 +2,7 @@ import typing
 
 import numpy as np
 import pytest
+from pydantic import Field
 
 import weave
 
@@ -293,3 +294,26 @@ def test_construct_eval_with_dataset_get(client):
     assert ref is not None
     dataset2 = weave.ref(ref.uri()).get()
     weave.Evaluation(dataset=dataset2)
+
+
+def test_weave_op_mutates_and_returns_same_object(client):
+    class Thing(weave.Object):
+        tools: list = Field(default_factory=list)
+
+        @weave.op
+        def append_tool(self, f):
+            assert self.tools is self.tools
+            self.tools.append(f)
+            assert self.tools is self.tools
+
+    thing = Thing()
+    assert len(thing.tools) == 0
+    assert thing.tools is thing.tools
+
+    thing.append_tool(lambda: 1)
+    assert len(thing.tools) == 1
+    assert thing.tools is thing.tools
+
+    thing.append_tool(lambda: 2)
+    assert len(thing.tools) == 2
+    assert thing.tools is thing.tools

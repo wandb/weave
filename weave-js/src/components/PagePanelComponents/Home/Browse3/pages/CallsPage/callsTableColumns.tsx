@@ -451,6 +451,11 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: cellParams => {
+      const usage = getUsageFromCellParams(cellParams.row);
+      const {tokensNum} = getTokensAndCostFromUsage(usage);
+      return tokensNum;
+    },
     renderCell: cellParams => {
       const usage = getUsageFromCellParams(cellParams.row);
       const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
@@ -467,6 +472,11 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: cellParams => {
+      const usage = getUsageFromCellParams(cellParams.row);
+      const {costNum} = getTokensAndCostFromUsage(usage);
+      return costNum;
+    },
     renderCell: cellParams => {
       const usage = getUsageFromCellParams(cellParams.row);
       const {cost, costToolTip} = getTokensAndCostFromUsage(usage);

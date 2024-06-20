@@ -83,7 +83,7 @@ def test_root_project_runs(fake_wandb):
         # Note: the inner project/entity query is because it is part of the required fragment for runs
         # this could in theory change in the future.
         """
-        query WeavePythonCG { 
+        query WeavePythonCG {
             project_518fa79465d8ffaeb91015dce87e092f: project(name: "mendeleev", entityName: "stacey") {
                 id
                 name
@@ -384,18 +384,18 @@ def test_multi_root_merging(fake_wandb, cache_mode_minimal):
         """
         query WeavePythonCG{
             project_8d1592567720841659de23c02c97d594:project(name:"p_0" entityName:"e_0"){
-                id 
+                id
                 name
                 createdAt
             }
             project_3c237e5b25fed9a705b21513dd7921c6:project(name:"p_1" entityName:"e_1"){
-                id 
+                id
                 name
                 runs_c1233b7003317090ab5e2a75db4ad965:runs(first:100){
                     edges{
                         node{
-                            id 
-                            name 
+                            id
+                            name
                         }
                     }
                 }
@@ -404,7 +404,7 @@ def test_multi_root_merging(fake_wandb, cache_mode_minimal):
                 projects_500:projects {
                     edges{
                         node{
-                            id 
+                            id
                             name
                             createdAt
                         }

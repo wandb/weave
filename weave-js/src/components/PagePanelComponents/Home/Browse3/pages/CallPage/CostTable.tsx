@@ -56,10 +56,15 @@ const columns: GridColDef[] = [
 
 export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
   const usageData = Object.entries(usage ?? {}).map(([k, v]) => {
+    const promptTokens = v.input_tokens ?? v.prompt_tokens;
+    const completionTokens = v.output_tokens ?? v.completion_tokens;
     return {
       id: k,
       ...v,
-      cost: getLLMTotalTokenCost(k, v.prompt_tokens, v.completion_tokens),
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: v.total_tokens || promptTokens + completionTokens,
+      cost: getLLMTotalTokenCost(k, promptTokens, completionTokens),
     };
   });
 
@@ -67,10 +72,13 @@ export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
   if (usageData.length > 1) {
     const totalUsage = usageData.reduce(
       (acc, curr) => {
+        const promptTokens = curr.input_tokens ?? curr.prompt_tokens;
+        const completionTokens = curr.output_tokens ?? curr.completion_tokens;
         acc.requests += curr.requests;
-        acc.prompt_tokens += curr.prompt_tokens;
-        acc.completion_tokens += curr.completion_tokens;
-        acc.total_tokens += curr.total_tokens;
+        acc.prompt_tokens += promptTokens;
+        acc.completion_tokens += completionTokens;
+        acc.total_tokens +=
+          curr.total_tokens || promptTokens + completionTokens;
         acc.cost += curr.cost;
         return acc;
       },
