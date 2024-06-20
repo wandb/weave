@@ -258,14 +258,14 @@ def log_run(
     client = client_context.graph_client.require_graph_client()
     parent_run = run_context.get_current_run()
     # TODO: client should not need refs passed in.
-    run = client._create_call(call_name, inputs, parent_run)
+    run = client.create_call(call_name, inputs, parent_run)
 
     def finish_run(output: Any) -> None:
         # TODO: client should not need refs passed in.
-        client._finish_call(run, output)
+        client.finish_call(run, output)
 
     try:
         yield finish_run
     except Exception as e:
-        client._fail_call(run, e)
+        client.fail_call(run, e)
         raise

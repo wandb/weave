@@ -197,8 +197,8 @@ def test_pydantic(client):
 
 
 def test_call_create(client):
-    call = client._create_call("x", {"a": 5, "b": 10})
-    client._finish_call(call, "hello")
+    call = client.create_call("x", {"a": 5, "b": 10})
+    client.finish_call(call, "hello")
     result = client.call(call.id)
     expected = weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -217,9 +217,9 @@ def test_call_create(client):
 
 
 def test_calls_query(client):
-    call0 = client._create_call("x", {"a": 5, "b": 10})
-    call1 = client._create_call("x", {"a": 6, "b": 11})
-    call2 = client._create_call("y", {"a": 5, "b": 10})
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call1 = client.create_call("x", {"a": 6, "b": 11})
+    call2 = client.create_call("y", {"a": 5, "b": 10})
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
@@ -240,16 +240,16 @@ def test_calls_query(client):
         id=call1.id,
         attributes={},
     )
-    client._finish_call(call2, None)
-    client._finish_call(call1, None)
-    client._finish_call(call0, None)
+    client.finish_call(call2, None)
+    client.finish_call(call1, None)
+    client.finish_call(call0, None)
 
 
 def test_calls_delete(client):
-    call0 = client._create_call("x", {"a": 5, "b": 10})
-    call0_child1 = client._create_call("x", {"a": 5, "b": 11}, call0)
-    _call0_child2 = client._create_call("x", {"a": 5, "b": 12}, call0_child1)
-    call1 = client._create_call("y", {"a": 6, "b": 11})
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
+    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
+    call1 = client.create_call("y", {"a": 6, "b": 11})
 
     assert len(list(client.calls())) == 4
 
@@ -257,7 +257,7 @@ def test_calls_delete(client):
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
-    client._delete_call(call0_child1)
+    client.delete_call(call0_child1)
 
     result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 1
@@ -266,7 +266,7 @@ def test_calls_delete(client):
     assert len(result) == 0
 
     # no-op if already deleted
-    client._delete_call(call0_child1)
+    client.delete_call(call0_child1)
     call1.delete()
     call1.delete()
 
@@ -301,7 +301,7 @@ def test_calls_delete_cascade(client):
     assert len(eval_call_children) == 3
 
     # delete the evaluation, should cascade to all the calls and sub-calls
-    client._delete_call(eval_call)
+    client.delete_call(eval_call)
 
     # check that all the calls are gone
     result = list(client.calls())
@@ -309,7 +309,7 @@ def test_calls_delete_cascade(client):
 
 
 def test_call_display_name(client):
-    call0 = client._create_call("x", {"a": 5, "b": 10})
+    call0 = client.create_call("x", {"a": 5, "b": 10})
 
     # Rename using the client method
     client._set_call_display_name(call0, "updated_name")
@@ -357,8 +357,8 @@ def test_dataset_calls(client):
         "my-dataset",
     )
     for row in ref.rows:
-        call = client._create_call("x", {"a": row["doc"]})
-        client._finish_call(call, None)
+        call = client.create_call("x", {"a": row["doc"]})
+        client.finish_call(call, None)
 
     calls = list(client.calls({"op_name": "x"}))
     assert calls[0].inputs["a"] == "xx"
@@ -438,13 +438,13 @@ def test_stable_dataset_row_refs(client):
         ),
         "my-dataset",
     )
-    call = client._create_call("x", {"a": dataset.rows[0]["doc"]})
-    client._finish_call(call, "call1")
+    call = client.create_call("x", {"a": dataset.rows[0]["doc"]})
+    client.finish_call(call, "call1")
     dataset.rows.append({"doc": "zz", "label": "e"})
     dataset2_ref = dataset.save()
     dataset2 = client.get(dataset2_ref)
-    call = client._create_call("x", {"a": dataset2.rows[0]["doc"]})
-    client._finish_call(call, "call2")
+    call = client.create_call("x", {"a": dataset2.rows[0]["doc"]})
+    client.finish_call(call, "call2")
     x = client.calls({"ref": weave_client.get_ref(dataset.rows[0]["doc"])})
 
     assert len(list(x)) == 2

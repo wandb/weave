@@ -188,7 +188,7 @@ class Call:
 
     def delete(self) -> bool:
         client = client_context.graph_client.require_graph_client()
-        return client._delete_call(call=self)
+        return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
         if name == "":
@@ -390,6 +390,160 @@ class WeaveClient:
         response_call = response.calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
 
+    @trace_sentry.global_trace_sentry.watch()
+    def create_call(
+        self,
+        op: Union[str, Op],
+        inputs: dict,
+        parent: Optional[Call] = None,
+        attributes: Optional[dict] = None,
+        display_name: Optional[str] = None,
+        *,
+        use_stack: bool = True,
+    ) -> Call:
+        """Create, log, and push a call onto the runtime stack.
+
+        Args:
+            op: The operation producing the call, or the name of an anonymous operation.
+            inputs: The inputs to the operation.
+            parent: The parent call. If parent is not provided, the current run is used as the parent.
+            display_name: The display name for the call. Defaults to None.
+            attributes: The attributes for the call. Defaults to None.
+            use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+
+        Returns:
+            The created Call object.
+        """
+        if isinstance(op, str):
+            if op not in self._anonymous_ops:
+                self._anonymous_ops[op] = _build_anonymous_op(op)
+            op = self._anonymous_ops[op]
+        if isinstance(op, Op):
+            op_def_ref = self._save_op(op)
+            op_str = op_def_ref.uri()
+        else:
+            op_str = op
+
+        self._save_nested_objects(inputs)
+        inputs_with_refs = map_to_refs(inputs)
+        call_id = generate_id()
+
+        if parent is None and use_stack:
+            parent = run_context.get_current_run()
+
+        if parent:
+            trace_id = parent.trace_id
+            parent_id = parent.id
+        else:
+            trace_id = generate_id()
+            parent_id = None
+
+        if attributes is None:
+            attributes = {}
+
+        call = Call(
+            op_name=op_str,
+            project_id=self._project_id(),
+            trace_id=trace_id,
+            parent_id=parent_id,
+            id=call_id,
+            inputs=inputs_with_refs,
+            display_name=display_name,
+            attributes=attributes,
+        )
+        if parent is not None:
+            parent._children.append(call)
+
+        current_wb_run_id = safe_current_wb_run_id()
+        check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
+        start = StartedCallSchemaForInsert(
+            project_id=self._project_id(),
+            id=call_id,
+            op_name=op_str,
+            display_name=display_name,
+            trace_id=trace_id,
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            parent_id=parent_id,
+            inputs=to_json(inputs_with_refs, self._project_id(), self.server),
+            attributes=attributes,
+            wb_run_id=current_wb_run_id,
+        )
+        self.server.call_start(CallStartReq(start=start))
+
+        if use_stack:
+            run_context.push_call(call)
+
+        return call
+
+    @trace_sentry.global_trace_sentry.watch()
+    def finish_call(
+        self, call: Call, output: Any = None, exception: Optional[BaseException] = None
+    ) -> None:
+        self._save_nested_objects(output)
+        original_output = output
+        output = map_to_refs(original_output)
+        call.output = output
+
+        # Summary handling
+        summary = {}
+        if call._children:
+            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+        elif isinstance(output, dict) and "usage" in output and "model" in output:
+            summary["usage"] = {}
+            summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
+        elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
+            # Handle the cases where we are emitting an object instead of a pre-serialized dict
+            # In fact, this is going to become the more common case
+            model = original_output.model
+            usage = original_output.usage
+            if isinstance(usage, pydantic.BaseModel):
+                usage = usage.model_dump(exclude_unset=True)
+            if isinstance(usage, dict) and isinstance(model, str):
+                summary["usage"] = {}
+                summary["usage"][model] = {"requests": 1, **usage}
+
+        # Exception Handling
+        exception_str: Optional[str] = None
+        if exception:
+            exception_str = exception_to_json_str(exception)
+            call.exception = exception_str
+
+        self.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=self._project_id(),
+                    id=call.id,  # type: ignore
+                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    output=to_json(output, self._project_id(), self.server),
+                    summary=summary,
+                    exception=exception_str,
+                )
+            )
+        )
+
+        # Descendent error tracking disabled til we fix UI
+        # Add this call's summary after logging the call, so that only
+        # descendents are included in what we log
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["successes"] += 1
+        call.summary = summary
+        run_context.pop_call(call.id)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def fail_call(self, call: Call, exception: BaseException) -> None:
+        """Fail a call with an exception. This is a convenience method for finish_call."""
+        return self.finish_call(call, exception=exception)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_call(self, call: Call) -> None:
+        self.server.calls_delete(
+            CallsDeleteReq(
+                project_id=self._project_id(),
+                call_ids=[call.id],
+            )
+        )
+
     def feedback(
         self,
         query: Optional[Union[Query, str]] = None,
@@ -582,160 +736,6 @@ class WeaveClient:
         op_def_ref = self._save_object_basic(op, name)
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
-
-    @trace_sentry.global_trace_sentry.watch()
-    def _create_call(
-        self,
-        op: Union[str, Op],
-        inputs: dict,
-        parent: Optional[Call] = None,
-        attributes: Optional[dict] = None,
-        display_name: Optional[str] = None,
-        *,
-        use_stack: bool = True,
-    ) -> Call:
-        """Create, log, and push a call onto the runtime stack.
-
-        Args:
-            op: The operation producing the call, or the name of an anonymous operation.
-            inputs: The inputs to the operation.
-            parent: The parent call. If parent is not provided, the current run is used as the parent.
-            display_name: The display name for the call. Defaults to None.
-            attributes: The attributes for the call. Defaults to None.
-            use_stack: Whether to push the call onto the runtime stack. Defaults to True.
-
-        Returns:
-            The created Call object.
-        """
-        if isinstance(op, str):
-            if op not in self._anonymous_ops:
-                self._anonymous_ops[op] = _build_anonymous_op(op)
-            op = self._anonymous_ops[op]
-        if isinstance(op, Op):
-            op_def_ref = self._save_op(op)
-            op_str = op_def_ref.uri()
-        else:
-            op_str = op
-
-        self._save_nested_objects(inputs)
-        inputs_with_refs = map_to_refs(inputs)
-        call_id = generate_id()
-
-        if parent is None and use_stack:
-            parent = run_context.get_current_run()
-
-        if parent:
-            trace_id = parent.trace_id
-            parent_id = parent.id
-        else:
-            trace_id = generate_id()
-            parent_id = None
-
-        if attributes is None:
-            attributes = {}
-
-        call = Call(
-            op_name=op_str,
-            project_id=self._project_id(),
-            trace_id=trace_id,
-            parent_id=parent_id,
-            id=call_id,
-            inputs=inputs_with_refs,
-            display_name=display_name,
-            attributes=attributes,
-        )
-        if parent is not None:
-            parent._children.append(call)
-
-        current_wb_run_id = safe_current_wb_run_id()
-        check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
-        start = StartedCallSchemaForInsert(
-            project_id=self._project_id(),
-            id=call_id,
-            op_name=op_str,
-            display_name=display_name,
-            trace_id=trace_id,
-            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
-            parent_id=parent_id,
-            inputs=to_json(inputs_with_refs, self._project_id(), self.server),
-            attributes=attributes,
-            wb_run_id=current_wb_run_id,
-        )
-        self.server.call_start(CallStartReq(start=start))
-
-        if use_stack:
-            run_context.push_call(call)
-
-        return call
-
-    @trace_sentry.global_trace_sentry.watch()
-    def _finish_call(
-        self, call: Call, output: Any = None, exception: Optional[BaseException] = None
-    ) -> None:
-        self._save_nested_objects(output)
-        original_output = output
-        output = map_to_refs(original_output)
-        call.output = output
-
-        # Summary handling
-        summary = {}
-        if call._children:
-            summary = sum_dict_leaves([child.summary or {} for child in call._children])
-        elif isinstance(output, dict) and "usage" in output and "model" in output:
-            summary["usage"] = {}
-            summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
-        elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
-            # Handle the cases where we are emitting an object instead of a pre-serialized dict
-            # In fact, this is going to become the more common case
-            model = original_output.model
-            usage = original_output.usage
-            if isinstance(usage, pydantic.BaseModel):
-                usage = usage.model_dump(exclude_unset=True)
-            if isinstance(usage, dict) and isinstance(model, str):
-                summary["usage"] = {}
-                summary["usage"][model] = {"requests": 1, **usage}
-
-        # Exception Handling
-        exception_str: Optional[str] = None
-        if exception:
-            exception_str = exception_to_json_str(exception)
-            call.exception = exception_str
-
-        self.server.call_end(
-            CallEndReq(
-                end=EndedCallSchemaForInsert(
-                    project_id=self._project_id(),
-                    id=call.id,  # type: ignore
-                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-                    output=to_json(output, self._project_id(), self.server),
-                    summary=summary,
-                    exception=exception_str,
-                )
-            )
-        )
-
-        # Descendent error tracking disabled til we fix UI
-        # Add this call's summary after logging the call, so that only
-        # descendents are included in what we log
-        # summary.setdefault("descendants", {}).setdefault(
-        #     call.op_name, {"successes": 0, "errors": 0}
-        # )["successes"] += 1
-        call.summary = summary
-        run_context.pop_call(call.id)
-
-    @trace_sentry.global_trace_sentry.watch()
-    def _fail_call(self, call: Call, exception: BaseException) -> None:
-        """Fail a call with an exception. This is a convenience method for finish_call."""
-        return self._finish_call(call, exception=exception)
-
-    @trace_sentry.global_trace_sentry.watch()
-    def _delete_call(self, call: Call) -> None:
-        self.server.calls_delete(
-            CallsDeleteReq(
-                project_id=self._project_id(),
-                call_ids=[call.id],
-            )
-        )
 
     @trace_sentry.global_trace_sentry.watch()
     def _set_call_display_name(
