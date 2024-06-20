@@ -3,7 +3,7 @@ from typing import Iterable
 
 from weave import stream_data_interfaces
 from weave.eager import WeaveIter
-from weave.legacy import artifact_wandb, graph_client_context, uris
+from weave.legacy import artifact_wandb, uris
 from weave.legacy.run import Run
 
 
@@ -31,7 +31,7 @@ class RunStreamTableSpan:
     @property
     def ui_url(self) -> str:
         raise NotImplementedError("ui_url not implemented")
-        # gc = graph_client_context.require_graph_client()
+        # gc = client_context.graph_client.require_graph_client()
         # return gc.run_ui_url(self)
 
     @property
@@ -84,7 +84,7 @@ class RunStreamTableSpan:
 
     def parent(self) -> typing.Optional["Run"]:
         raise NotImplementedError("parent not implemented")
-        # client = graph_client_context.require_graph_client()
+        # client = client_context.graph_client.require_graph_client()
         # if self.parent_id is None:
         #     return None
         # return client.run(self.parent_id)

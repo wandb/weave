@@ -4,7 +4,7 @@ from typing import Iterable, Optional
 
 from rich.table import Table
 
-from weave.legacy import graph_client_context
+from weave import client_context
 from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import AnyRef, CallRef, parse_uri
 from weave.trace.vals import TraceObject
@@ -30,7 +30,7 @@ class Refs(AbstractRichContainer[str]):
 
     # TODO: Perhaps there should be a Calls that extends AbstractRichContainer
     def calls(self) -> list[TraceObject]:
-        client = graph_client_context.require_graph_client()
+        client = client_context.graph_client.require_graph_client()
         objs = []
         for ref in self.call_refs():
             parsed = parse_uri(ref)

@@ -9,7 +9,6 @@ from weave.legacy import (
     context_state,
     execute,
     forward_graph,
-    graph_client_context,
     memo,
     run_context,
     wandb_api,
@@ -59,7 +58,6 @@ def do_in_parallel(
     result_store = forward_graph.get_node_result_store()
     top_level_stats = execute.get_top_level_stats()
     eager_mode = context_state.eager_mode()
-    graph_client = graph_client_context.get_graph_client()
     run_stack = run_context.get_run_stack()
     cache_prefix = cache.get_cache_prefix_context()
 
@@ -69,19 +67,18 @@ def do_in_parallel(
         thread_top_level_stats = None
         try:
             with parallel_budget_ctx(remaining_budget_per_thread):
-                with graph_client_context.set_graph_client(graph_client):
-                    with run_context.set_run_stack(run_stack):
-                        with context_state.set_eager_mode(eager_mode):
-                            with wandb_api.wandb_api_context(wandb_api_ctx):
-                                with cache.time_interval_cache_prefix(cache_prefix):
-                                    with context.execution_client():
-                                        with forward_graph.node_result_store(
-                                            result_store
-                                        ) as thread_result_store:
-                                            with (
-                                                execute.top_level_stats() as thread_top_level_stats
-                                            ):
-                                                return do_one(x)
+                with run_context.set_run_stack(run_stack):
+                    with context_state.set_eager_mode(eager_mode):
+                        with wandb_api.wandb_api_context(wandb_api_ctx):
+                            with cache.time_interval_cache_prefix(cache_prefix):
+                                with context.execution_client():
+                                    with forward_graph.node_result_store(
+                                        result_store
+                                    ) as thread_result_store:
+                                        with (
+                                            execute.top_level_stats() as thread_top_level_stats
+                                        ):
+                                            return do_one(x)
         finally:
             memo._memo_storage.reset(memo_token)
             if thread_result_store is not None:

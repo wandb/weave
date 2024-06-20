@@ -7,8 +7,8 @@ from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, U
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
+from weave.client_context.graph_client import get_graph_client
 from weave.legacy import box
-from weave.legacy.graph_client_context import get_graph_client
 from weave.table import Table
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord

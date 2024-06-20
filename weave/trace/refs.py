@@ -63,7 +63,7 @@ class ObjectRef(RefWithExtra):
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
-        from weave.legacy.graph_client_context import get_graph_client
+        from weave.client_context.graph_client import get_graph_client
         from weave.weave_init import init_weave
 
         gc = get_graph_client()

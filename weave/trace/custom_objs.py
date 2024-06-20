@@ -4,8 +4,8 @@ import os
 import tempfile
 from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
 
+from weave.client_context.graph_client import require_graph_client
 from weave.legacy import artifact_fs
-from weave.legacy.graph_client_context import require_graph_client
 from weave.trace import op_type  # Must import this to register op save/load
 from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
