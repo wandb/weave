@@ -413,13 +413,13 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     entity = "shawn"
     project = "test-project"
     if weave_server_flag == "sqlite":
-        sql_lite_server = sqlite_trace_server.SqliteTraceServer(
+        sqlite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
         )
-        sql_lite_server.drop_tables()
-        sql_lite_server.setup_tables()
+        sqlite_server.drop_tables()
+        sqlite_server.setup_tables()
         server = TestOnlyUserInjectingExternalTraceServer(
-            sql_lite_server, DummyIdConverter(), entity
+            sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
