@@ -16,7 +16,7 @@ export const EditableCallName: React.FC<{
   // it is the defaultDisplayName.
   const nameToDisplay = setDisplayNameIsEmpty
     ? defaultDisplayName
-    : call.displayName;
+    : call.displayName!;
 
   const {useCallUpdateFunc: useCallRenameFunc} = useWFHooks();
   const callRename = useCallRenameFunc();
