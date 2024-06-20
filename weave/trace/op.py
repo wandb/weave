@@ -14,7 +14,8 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
-from weave.legacy import box, context_state, graph_client_context, run_context
+from weave import client_context
+from weave.legacy import box, context_state, run_context
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -64,7 +65,7 @@ class Op:
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        maybe_client = graph_client_context.get_graph_client()
+        maybe_client = client_context.graph_client.get_graph_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
         client = typing.cast("WeaveClient", maybe_client)
@@ -151,7 +152,7 @@ class Op:
         self.__ref = ref
 
     def calls(self) -> "CallsIter":
-        client = graph_client_context.require_graph_client()
+        client = client_context.graph_client.require_graph_client()
         return client.op_calls(self)
 
     def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:

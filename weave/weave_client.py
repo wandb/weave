@@ -8,10 +8,10 @@ from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 import pydantic
 from requests import HTTPError
 
-from weave import trace_sentry, urls
+from weave import client_context, trace_sentry, urls
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
-from weave.legacy import graph_client_context, run_context
+from weave.legacy import run_context
 from weave.table import Table
 from weave.trace.object_record import (
     ObjectRecord,
@@ -177,7 +177,7 @@ class Call:
 
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
-        client = graph_client_context.require_graph_client()
+        client = client_context.graph_client.require_graph_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
         return CallsIter(
@@ -187,7 +187,7 @@ class Call:
         )
 
     def delete(self) -> bool:
-        client = graph_client_context.require_graph_client()
+        client = client_context.graph_client.require_graph_client()
         return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
@@ -197,7 +197,7 @@ class Call:
             )
         if name == self.display_name:
             return
-        client = graph_client_context.require_graph_client()
+        client = client_context.graph_client.require_graph_client()
         client.set_call_display_name(call=self, display_name=name)
         self.display_name = name
 

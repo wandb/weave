@@ -33,7 +33,7 @@ from weave.legacy import context_state as _context_state
 from weave.legacy import run as _run
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
-from weave.legacy import graph_client_context as _graph_client_context
+from weave import client_context
 from weave.trace import context as trace_context
 from .trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.refs import ObjectRef
@@ -200,7 +200,7 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     Returns:
         A weave Ref to the saved object.
     """
-    client = _graph_client_context.require_graph_client()
+    client = client_context.graph_client.require_graph_client()
 
     save_name: str
     if name:
@@ -237,7 +237,7 @@ def ref(location: str) -> _weave_client.ObjectRef:
         A weave Ref to the object.
     """
     if not "://" in location:
-        client = _graph_client_context.get_graph_client()
+        client = client_context.graph_client.get_graph_client()
         if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")
         if "/" in location:
@@ -260,7 +260,7 @@ def obj_ref(obj: typing.Any) -> typing.Optional[_weave_client.ObjectRef]:
 
 
 def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:
-    client = _graph_client_context.require_graph_client()
+    client = client_context.graph_client.require_graph_client()
 
     ref = obj_ref(obj)
     if ref is None:
@@ -312,7 +312,7 @@ def serve(
     import uvicorn
     from .serve_fastapi import object_method_app
 
-    client = _graph_client_context.require_graph_client()
+    client = client_context.graph_client.require_graph_client()
     # if not isinstance(
     #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
     # ):
@@ -331,10 +331,9 @@ def serve(
     def run():
         # This function doesn't return, because uvicorn.run does not
         # return.
-        with _graph_client_context.set_graph_client(client):
-            with _wandb_api.wandb_api_context(wandb_api_ctx):
-                with attributes(trace_attrs):
-                    uvicorn.run(app, host="0.0.0.0", port=port)
+        with _wandb_api.wandb_api_context(wandb_api_ctx):
+            with attributes(trace_attrs):
+                uvicorn.run(app, host="0.0.0.0", port=port)
 
     if _util.is_notebook():
         thread = True
