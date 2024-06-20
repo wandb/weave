@@ -135,7 +135,7 @@ def test_score_as_class(client):
         "model_output": {"mean": 9.5},
         "MyScorer": {"true_count": 1, "true_fraction": 0.5},
         "model_latency": {
-            "mean": Nearly(0),
+            "mean": pytest.approx(0, abs=0.05),
         },
     }
 
