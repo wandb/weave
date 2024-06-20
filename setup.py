@@ -111,7 +111,7 @@ setup(
     extras_require={
         "mistral": ["mistralai>=0.1.8"],
         "litellm": ["litellm>=1.36.1"],
-        "llama-index": ["llama-index>=0.10.35"],
+        "llamaindex": ["llama-index>=0.10.35"],
         "anthropic": ["anthropic>=0.28.0"],
     },
 )
