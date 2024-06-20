@@ -18,11 +18,14 @@ export const objectViewed = makeTrackEvent<
     };
     objectId: {
       description: 'ID of object viewed';
-      exampleValues: ['123', '456'];
+      exampleValues: [
+        'm7yVOqoSLhTuoN1E6uMKSq4tgCc5il0hxYqMrA4UsEY',
+        'm7yVOqoSLhTuoN1E6uMKSq4tgCc5il0hxYqMrA4UsEY'
+      ];
     };
     userId: {
       description: 'ID of user viewing object';
-      exampleValues: ['123', '456'];
+      exampleValues: ['VXNlcjo0NTM4MTM='];
     };
     organizationName: {
       description: 'Name of organization';
@@ -48,11 +51,14 @@ export const traceViewed = makeTrackEvent<
     _motivation: 'Used for object views';
     traceId: {
       description: 'ID of trace viewed';
-      exampleValues: ['123', '456'];
+      exampleValues: [
+        'bb5621fd-91bc-42af-b017-1a34e3250330',
+        'b2136295-edc5-4778-9304-0fa36c9541a4'
+      ];
     };
     userId: {
-      description: 'ID of user viewing object';
-      exampleValues: ['123', '456'];
+      description: 'ID of user viewing trace';
+      exampleValues: ['VXNlcjo0NTM4MTM='];
     };
     organizationName: {
       description: 'Name of organization';
@@ -78,11 +84,14 @@ export const evaluationViewed = makeTrackEvent<
     _motivation: 'Used for object views';
     traceId: {
       description: 'ID of evaluation viewed';
-      exampleValues: ['123', '456'];
+      exampleValues: [
+        'bb5621fd-91bc-42af-b017-1a34e3250330',
+        'b2136295-edc5-4778-9304-0fa36c9541a4'
+      ];
     };
     userId: {
-      description: 'ID of user viewing object';
-      exampleValues: ['123', '456'];
+      description: 'ID of user viewing evaluation';
+      exampleValues: ['VXNlcjo0NTM4MTM='];
     };
     organizationName: {
       description: 'Name of organization';

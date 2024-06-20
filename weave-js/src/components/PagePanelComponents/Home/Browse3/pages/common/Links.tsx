@@ -166,7 +166,7 @@ export const ObjectVersionLink: React.FC<{
     objectViewed({
       objectType: props.objectClass ?? '',
       objectId: props.objectName,
-      userId: !loading ? userInfo.username : '',
+      userId: !loading ? userInfo.id : '',
       organizationName: orgName,
       entityName: props.entityName,
     });
@@ -273,7 +273,6 @@ export const CallLink: React.FC<{
   // Preserve the path only when showing trace tree
   const path = props.preservePath ? existingPath : null;
 
-  console.log(props.opName);
   const to = peekingRouter.callUIUrl(
     props.entityName,
     props.projectName,
@@ -285,16 +284,17 @@ export const CallLink: React.FC<{
   const {orgName} = useOrgName({entityName: props.entityName});
   const onClick = () => {
     if (props.opName === 'Evaluation.evaluate') {
+      console.log('evaluationViewed');
       evaluationViewed({
         traceId: props.callId,
-        userId: loading ? '' : userInfo.username,
+        userId: loading ? '' : userInfo.id,
         organizationName: orgName,
         entityName: props.entityName,
       });
     } else {
       traceViewed({
         traceId: props.callId,
-        userId: loading ? '' : userInfo.username,
+        userId: loading ? '' : userInfo.id,
         organizationName: orgName,
         entityName: props.entityName,
       });
