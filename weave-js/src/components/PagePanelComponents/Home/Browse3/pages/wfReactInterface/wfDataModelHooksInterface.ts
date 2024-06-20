@@ -176,11 +176,13 @@ export type WFDataModelHooksInterface = {
     opts?: {skip?: boolean}
   ) => Loadable<traceServerClient.TraceCallsQueryStatsRes>;
   useCallsDeleteFunc: () => (
-    projectID: string,
+    entity: string,
+    project: string,
     callIDs: string[]
   ) => Promise<void>;
   useCallRenameFunc: () => (
-    projectID: string,
+    entity: string,
+    project: string,
     callID: string,
     newName: string
   ) => Promise<void>;

@@ -133,7 +133,7 @@ const ConfirmDeleteModal: FC<{
 
   const onDelete = () => {
     setDeleteLoading(true);
-    callsDelete(`${entity}/${project}`, callIds)
+    callsDelete(entity, project, callIds)
       .catch(() => {
         setError(`Failed to delete call(s) ${callNames.join(', ')}`);
       })

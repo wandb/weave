@@ -25,7 +25,7 @@ export const EditableCallName: React.FC<{
 
   const saveName = useCallback(
     (newName: string) => {
-      callRename(`${entity}/${project}`, callId, newName);
+      callRename(entity, project, callId, newName);
       setCurOpName(newName);
       onSave?.();
     },

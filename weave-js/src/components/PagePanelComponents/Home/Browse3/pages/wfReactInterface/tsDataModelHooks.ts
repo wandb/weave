@@ -411,17 +411,17 @@ const useCallsDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const callsDelete = useCallback(
-    (projectID: string, callIDs: string[]): Promise<void> => {
+    (entity: string, project: string, callIDs: string[]): Promise<void> => {
       return getTsClient()
         .callsDelete({
-          project_id: projectID,
+          project_id: projectIdFromParts({entity, project}),
           call_ids: callIDs,
         })
         .then(() => {
           callIDs.forEach(callId => {
             callCache.del({
-              entity: projectID.split('/')[0],
-              project: projectID.split('/')[1],
+              entity,
+              project,
               callId,
             });
           });
@@ -437,17 +437,22 @@ const useCallRenameFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const callRename = useCallback(
-    (projectID: string, callID: string, newName: string): Promise<void> => {
+    (
+      entity: string,
+      project: string,
+      callID: string,
+      newName: string
+    ): Promise<void> => {
       return getTsClient()
         .callRename({
-          project_id: projectID,
+          project_id: projectIdFromParts({entity, project}),
           call_id: callID,
           display_name: newName,
         })
         .then(() => {
           callCache.del({
-            entity: projectID.split('/')[0],
-            project: projectID.split('/')[1],
+            entity,
+            project,
             callId: callID,
           });
         });
