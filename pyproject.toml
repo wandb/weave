@@ -71,6 +71,7 @@ select = [
   "FIX003",
   "F541",
   "I", # https://docs.astral.sh/ruff/rules/#isort-i
+  "W291", # https://docs.astral.sh/ruff/rules/trailing-whitespace/
   "W391", # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
 ]
 exclude = [
