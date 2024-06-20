@@ -4,8 +4,8 @@ from weave.trace_server.orm import (
     Column,
     ParamBuilder,
     Table,
-    combine_conditions,
     _transform_external_field_to_internal_field,
+    combine_conditions,
 )
 
 

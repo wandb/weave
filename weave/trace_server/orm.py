@@ -433,7 +433,7 @@ def python_value_to_ch_type(value: typing.Any) -> str:
         raise ValueError(f"Unknown value type: {value}")
 
 
-def _quote_json_path(path: str) -> str:
+def quote_json_path(path: str) -> str:
     """Helper function to quote a json path for use in a clickhouse query. Moreover,
     this converts index operations from dot notation (conforms to Mongo) to bracket
     notation (required by clickhouse)
@@ -441,6 +441,10 @@ def _quote_json_path(path: str) -> str:
     See comments on `GetFieldOperator` for current limitations
     """
     parts = path.split(".")
+    return quote_json_path_parts(parts)
+
+
+def quote_json_path_parts(parts: list[str]) -> str:
     parts_final = []
     for part in parts:
         try:
@@ -466,7 +470,7 @@ def _transform_external_field_to_internal_field(
         if field == prefix:
             field = prefix + "_dump"
         elif field.startswith(prefix + "."):
-            json_path = _quote_json_path(field[len(prefix + ".") :])
+            json_path = quote_json_path(field[len(prefix + ".") :])
             field = prefix + "_dump"
 
     # validate field

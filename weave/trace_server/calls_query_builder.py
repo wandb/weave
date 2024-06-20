@@ -242,6 +242,7 @@ from weave.trace_server.orm import (
     ParamBuilder,
     combine_conditions,
     python_value_to_ch_type,
+    quote_json_path_parts,
 )
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -289,26 +290,6 @@ class CallsMergedDynamicField(CallsMergedAggField):
         return CallsMergedDynamicField(
             field=self.field, agg_fn=self.agg_fn, extra_path=extra_path
         )
-
-
-def quote_json_path_parts(parts: list[str]) -> str:
-    """Helper function to quote a json path for use in a clickhouse query. Moreover,
-    this converts index operations from dot notation (conforms to Mongo) to bracket
-    notation (required by clickhouse)
-
-    See comments on `GetFieldOperator` for current limitations
-    """
-
-    def quote_part(part: str) -> str:
-        if len(part) > 0 and part[0] != 0:
-            try:
-                int(part)
-                return "[" + part + "]"
-            except ValueError:
-                pass
-        return '."' + part + '"'
-
-    return "$" + "".join([quote_part(p) for p in parts])
 
 
 class SortField(BaseModel):

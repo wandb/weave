@@ -19,7 +19,7 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from weave.trace_server.orm import Row
+from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -942,18 +942,6 @@ def get_base_object_class(val: Any) -> Optional[str]:
     return None
 
 
-def _quote_json_path(path: str) -> str:
-    parts = path.split(".")
-    parts_final = []
-    for part in parts:
-        try:
-            int(part)
-            parts_final.append("[" + part + "]")
-        except ValueError:
-            parts_final.append('."' + part + '"')
-    return "$" + "".join(parts_final)
-
-
 def _transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: Optional[str] = None,
@@ -963,25 +951,25 @@ def _transform_external_calls_field_to_internal_calls_field(
         if field == "inputs":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("inputs.") :])
+            json_path = quote_json_path(field[len("inputs.") :])
         field = "inputs"
     elif field == "output" or field.startswith("output."):
         if field == "output":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("output.") :])
+            json_path = quote_json_path(field[len("output.") :])
         field = "output"
     elif field == "attributes" or field.startswith("attributes."):
         if field == "attributes":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("attributes.") :])
+            json_path = quote_json_path(field[len("attributes.") :])
         field = "attributes"
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("summary.") :])
+            json_path = quote_json_path(field[len("summary.") :])
         field = "summary"
 
     if json_path is not None:
