@@ -128,17 +128,19 @@ jobs:
         # This runner specifically runs the tests that use the `client` fixture (those that support clickhouse client tests)
         # However, we skip tests marked with `skip_clickhouse_client`. These should be considered TODOs and an exception
         run: |
+          CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate
+          cd weave
           pip install .[mistral]
-          CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations/mistral ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+          pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations/mistral ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           pip uninstall .[mistral]
           pip install .[litellm]
-          CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations/litellm ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+          pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations/litellm ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           pip uninstall .[litellm]
           pip install .[llamaindex]
-          CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations/llamaindex ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+          pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations/llamaindex ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           pip uninstall .[llamaindex]
           pip install .[anthropic]
-          CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations/anthropic ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+          pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations/anthropic ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           pip uninstall .[anthropic]
       - name: Run Python Unit Tests
         env:
