@@ -218,11 +218,8 @@ Now that all this is written, i think an alternative implementation is:
 """
 
 # PR TODO:
-# - [ ] Actually build the ref expansion
-# Performance:
 # - [ ] When legacy filters or query conditions are an ID mask, we can further optimize the subquery
 # Refactors:
-# - [ ] Refactor the `process_query_to_conditions` to return a FilterToConditions object
 # - [ ] Look for dead code in this file
 # - [ ] Reconcile the differences between ORM and these implementations (ideally push them down into there)
 # - [ ] `process_calls_filter_to_conditions` still uses hard coded `calls_merged` columns - bad!
@@ -319,23 +316,23 @@ class Condition(BaseModel):
     _consumed_fields: typing.Optional[list[CallsMergedField]] = None
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
-        conditions, raw_fields = process_query_to_conditions(
+        conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}), pb
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
-            for field in raw_fields:
+            for field in conditions.raw_fields:
                 self._consumed_fields.append(get_field_by_name(field))
-        return combine_conditions(conditions, "AND")
+        return combine_conditions(conditions.conditions, "AND")
 
     def get_consumed_fields(self) -> list[CallsMergedField]:
         if self._consumed_fields is None:
             self._consumed_fields = []
-            _, raw_fields = process_query_to_conditions(
+            conditions = process_query_to_conditions(
                 tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
                 ParamBuilder(),
             )
-            for field in raw_fields:
+            for field in conditions.raw_fields:
                 self._consumed_fields.append(get_field_by_name(field))
 
         return self._consumed_fields
@@ -582,8 +579,7 @@ class FilterToConditions(BaseModel):
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
-) -> tuple[list[str], set[str]]:
-    # TODO: Convert to FilterToConditions
+) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
     raw_fields_used = set()
@@ -689,7 +685,7 @@ def process_query_to_conditions(
 
     conditions.append(filter_cond)
 
-    return conditions, raw_fields_used
+    return FilterToConditions(conditions=conditions, fields_used=raw_fields_used)
 
 
 def process_calls_filter_to_conditions(
