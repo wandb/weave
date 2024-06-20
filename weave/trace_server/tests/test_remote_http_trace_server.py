@@ -1,12 +1,13 @@
 import datetime
 import unittest
-from unittest.mock import patch
 import uuid
+from unittest.mock import patch
 
-from pydantic import ValidationError
 import requests
-from weave.trace_server.remote_http_trace_server import RemoteHTTPTraceServer
+from pydantic import ValidationError
+
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.remote_http_trace_server import RemoteHTTPTraceServer
 
 
 def generate_id() -> str:

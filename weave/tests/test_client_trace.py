@@ -1,29 +1,30 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
-from contextvars import copy_context
 import dataclasses
-from collections import namedtuple
 import datetime
 import os
 import typing
-import pytest
-from collections import defaultdict
+from collections import defaultdict, namedtuple
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from contextvars import copy_context
 
-from pydantic import BaseModel, ValidationError
+import pytest
 import wandb
+from pydantic import BaseModel, ValidationError
+
 import weave
 from weave import weave_client
-from weave import context_state
+from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, TraceObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+
+from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
     generate_id,
 )
-from ..trace_server import trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace
 
@@ -241,9 +242,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> (
-        int
-    ):  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
@@ -710,8 +709,12 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
+def client_is_sql_lite(client):
+    return isinstance(client.server._internal_trace_server, SqliteTraceServer)
+
+
 def test_trace_call_filter(client):
-    is_sql_lite = isinstance(client.server, SqliteTraceServer)
+    is_sql_lite = client_is_sql_lite(client)
 
     @weave.op()
     def basic_op(in_val: dict, delay) -> dict:
@@ -738,7 +741,7 @@ def test_trace_call_filter(client):
     basic_op(42, 0.1)
 
     failed_cases = []
-    for (count, query) in [
+    for count, query in [
         # Base Case - simple True
         (
             13,
@@ -1291,14 +1294,13 @@ def test_bound_op_retrieval_no_self(client):
         my_op2 = my_op_ref.get()
 
 
-@pytest.mark.skip_clickhouse_client
 def test_dataset_row_ref(client):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:PHOGkwSOn7DqLgIUNgUAq7d2vXpOmG8NGLltn6slzeU/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -1551,6 +1553,7 @@ def map_simple(fn, vals):
 
 
 max_workers = 3
+
 
 # This is a standard way to execute a map operation with thread executor.
 def map_with_thread_executor(fn, vals):

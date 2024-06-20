@@ -1,12 +1,13 @@
 import pytest
-import weave
 
-from ..language_features.tagging.tagged_value_type import TaggedValueType
-from ..ops_domain import wb_domain_types
-from ..dispatch import _dispatch_first_arg, _resolve_op_ambiguity
-from .. import context_state as _context
+import weave
+from weave.legacy import context_state as _context
+from weave.legacy import graph
+from weave.legacy.dispatch import _dispatch_first_arg, _resolve_op_ambiguity
+from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.legacy.ops_domain import wb_domain_types
+
 from .. import weave_internal
-from .. import graph
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -72,7 +73,7 @@ def test_pick_map():
 
 
 def test_json_pick_map():
-    res = weave.graph.OutputNode.from_json(
+    res = weave.legacy.graph.OutputNode.from_json(
         {
             "nodeType": "output",
             "type": {"type": "list", "objectType": "number"},
@@ -170,7 +171,7 @@ def test_nested_js_dict_pick():
 
 
 def test_dispatch_of_ambiguous_ops():
-    artifacts_node = weave.ops.project("a", "b").artifacts()
+    artifacts_node = weave.legacy.ops.project("a", "b").artifacts()
     # just making this call is the test since it is
     # not clear if it should be artifact-project or
     # tag-project

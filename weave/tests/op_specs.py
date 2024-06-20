@@ -3,10 +3,10 @@ import datetime
 import typing
 
 import weave
-from weave import op_def
-from weave import ops_primitives
-from weave.language_features.tagging import tagged_value_type
-from weave.timestamp import PY_DATETIME_MAX_MS, PY_DATETIME_MIN_MS
+from weave.legacy import op_def, ops_primitives
+from weave.legacy.language_features.tagging import tagged_value_type
+from weave.legacy.timestamp import PY_DATETIME_MAX_MS, PY_DATETIME_MIN_MS
+
 from .concrete_tagged_value import (
     TaggedValue,
 )

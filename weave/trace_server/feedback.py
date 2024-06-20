@@ -1,11 +1,10 @@
 from typing import Any
 
-from pydantic import ValidationError, BaseModel
+from pydantic import BaseModel, ValidationError
 
 from . import trace_server_interface as tsi
 from .errors import InvalidRequest
-from .orm import Table, Column
-
+from .orm import Column, Table
 
 TABLE_FEEDBACK = Table(
     "feedback",

@@ -1,11 +1,8 @@
 import math
 
-from .. import mappers_python
-from .. import weave_types as types
-from .. import context
-from .. import api
-from .. import weave_internal
-from .. import val_const
+from weave import api, weave_internal
+from weave import weave_types as types
+from weave.legacy import context, mappers_python, val_const
 
 
 def test_map_typed_dict():

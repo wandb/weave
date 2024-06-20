@@ -1,5 +1,6 @@
-import pytest
 import datetime
+
+import pytest
 
 from weave.trace_server import trace_server_interface as tsi
 

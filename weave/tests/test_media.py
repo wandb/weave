@@ -1,6 +1,7 @@
 import dataclasses
-import pytest
+
 import numpy as np
+import pytest
 
 from .. import storage
 from .. import weave_types as types

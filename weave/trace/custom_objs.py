@@ -2,18 +2,18 @@ import contextlib
 import io
 import os
 import tempfile
-from typing import Any, Dict, Optional, Union, Mapping, Iterator, Generator
-from weave import artifact_fs
-from weave.trace.op import Op, op
-from weave.trace.serializer import get_serializer_for_obj, get_serializer_by_id
-from weave.trace.refs import parse_uri, ObjectRef
-from weave.graph_client_context import require_graph_client
-from weave.trace_server.trace_server_interface_util import (
-    encode_bytes_as_b64,
-    decode_b64_to_bytes,
-)
+from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
 
+from weave.legacy import artifact_fs
+from weave.legacy.graph_client_context import require_graph_client
 from weave.trace import op_type  # Must import this to register op save/load
+from weave.trace.op import Op, op
+from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
+from weave.trace_server.trace_server_interface_util import (
+    decode_b64_to_bytes,
+    encode_bytes_as_b64,
+)
 
 
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
@@ -140,7 +140,7 @@ def decode_custom_obj(
     encoded_path_contents: Mapping[str, Union[str, bytes]],
     load_instance_op_uri: Optional[str],
 ) -> Any:
-    from .. import artifact_fs
+    from weave.legacy import artifact_fs
 
     load_instance_op = None
     if load_instance_op_uri is not None:

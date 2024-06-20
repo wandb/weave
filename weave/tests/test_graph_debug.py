@@ -1,8 +1,6 @@
 import typing
 
-from .. import graph_debug
-from .. import graph
-from .. import decorator_op
+from weave.legacy import decorator_op, graph, graph_debug
 
 
 class RowType(typing.TypedDict):
@@ -60,5 +58,5 @@ var3 = list-__getitem__(var0, 0)
 var4 = list-__getitem__(var0, 0)
   .typedDict-pick(b) 
 var5 = list-__getitem__(var0, 0)
-  .typedDict-pick(a) """
+  .typedDict-pick(a) """  # noqa: W291
     )

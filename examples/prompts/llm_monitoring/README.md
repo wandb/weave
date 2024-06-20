@@ -20,7 +20,7 @@ There are two main ways to authenticate OpenAI API calls so you can view them in
 ### OpenAI API
 
 1. Set your OPENAI_API_KEY in your environment/script/notebook (e.g. via `os.environ["OPENAI_API_KEY"]`).
-2. Import openai as follows: `from weave.monitoring import openai`.
+2. Import openai as follows: `from weave.legacy.monitoring import openai`.
 3. Make calls via the OpenAI SDK as usual.
 
 See details and create an interactive board in the [OpenAI monitoring notebook](./openai_client_quickstart.ipynb).
@@ -50,10 +50,10 @@ If you specify a wandb entity to which you do not have access, no data will be l
 
 The last header type, `X-Wandb-Attribute-`, lets you add custom attribute fields and values to any call. For example, logging `X-Wandb-Attribute-my_attr` : "my_attr_value" will add a column named `attributes.my_attr` to the stream table and store `my_attr_value` in the row for this call.
 
-| Header name             | Description                                                                                                     | SDK Example                                            | CURL Example                                 | Default setting                       |
-|-------------------------|-----------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|--------------------------------------------|---------------------------------------|
-| X-Wandb-Entity          | Set the wandb entity for this call                                                                             | `{"X-Wandb-Entity": "my_dream_team"}`                | `-H "X-Wandb-Entity: my_dream_team"`      | Your default entity on your W&B instance |
-| X-Wandb-Project         | Set the wandb project name for this call (creates this project)                                                | `{"X-Wandb-Project": "my_dream_llm"}`              | `-H "X-Wandb-Project: my_dream_llm"`    | monitoring                             |
-| X-Wandb-Stream          | Set the StreamTable name for this call                                                                         | `{"X-Wandb-Stream": "my_chatbot_test"}`             | `-H "X-Wandb-Stream: my_chatbot_test"`  | openai                                |
-| X-Wandb-Client-Id      | Set this to group related requests together                                                                   | `{"X-Wandb-Client-Id": "user_A_bottest"}`         | `-H "X-Wandb-Client-Id: user_A_bottest"`| unique client id for each request      |
-| X-Wandb-Attribute-      | Add custom attributes as extra columns in your data stream table                                                | `{"X-Wandb-Attribute-chatbot_name": "wandbot", "X-Wandb-Attribute-chatbot_version": "0.0.0"}` | `-H "X-Wandb-Attribute-chatbot_name: wandbot" -H "X-Wandb-Attribute-chatbot_version: 0.0.0"` | none |
+| Header name        | Description                                                      | SDK Example                                                                                   | CURL Example                                                                                 | Default setting                          |
+| ------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| X-Wandb-Entity     | Set the wandb entity for this call                               | `{"X-Wandb-Entity": "my_dream_team"}`                                                         | `-H "X-Wandb-Entity: my_dream_team"`                                                         | Your default entity on your W&B instance |
+| X-Wandb-Project    | Set the wandb project name for this call (creates this project)  | `{"X-Wandb-Project": "my_dream_llm"}`                                                         | `-H "X-Wandb-Project: my_dream_llm"`                                                         | monitoring                               |
+| X-Wandb-Stream     | Set the StreamTable name for this call                           | `{"X-Wandb-Stream": "my_chatbot_test"}`                                                       | `-H "X-Wandb-Stream: my_chatbot_test"`                                                       | openai                                   |
+| X-Wandb-Client-Id  | Set this to group related requests together                      | `{"X-Wandb-Client-Id": "user_A_bottest"}`                                                     | `-H "X-Wandb-Client-Id: user_A_bottest"`                                                     | unique client id for each request        |
+| X-Wandb-Attribute- | Add custom attributes as extra columns in your data stream table | `{"X-Wandb-Attribute-chatbot_name": "wandbot", "X-Wandb-Attribute-chatbot_version": "0.0.0"}` | `-H "X-Wandb-Attribute-chatbot_name: wandbot" -H "X-Wandb-Attribute-chatbot_version: 0.0.0"` | none                                     |
