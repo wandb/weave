@@ -79,25 +79,20 @@ class LLMModel(weave.Model):
         )
         return response.choices[0].message.content
 ```
-Everytime we call `predict`, we create a new `openai.AsyncClient`. This is not efficient and can lead to a problems when we have a lot of requests to the model and the way Python handles processes. An alternative to this, is using the `model_validator` decorator to create the client before the model is initialized. As a `weave.Model` is a subclass of `pydantic.BaseModel`, we can use the `model_validator` decorator to create the client before the model is initialized.
+Everytime we call `predict`, we create a new `openai.AsyncClient`. This is not efficient and can lead to a problems when we have a lot of requests to the model and the way Python handles processes. An alternative to this, is using the `PrivateAttr` annotation. As a `weave.Model` is a subclass of `pydantic.BaseModel`, we can use the `PrivateAttr` annotation to create the client before the model is initialized. You will need to name the attribute with an underscore to avoid name clashing with the model attributes.
 
 ```python
 import json
 import openai
 import weave
 # highlight-next-line
-from pydantic import Field, model_validator
+from pydantic import PrivateAttr
 
 class LLMModel(weave.Model):
     model_name: str
     prompt_template: str
-    client: openai.AsyncClient = Field(init=False)
-    
     # highlight-next-line
-    @model_validator(mode="before")
-    def create_client(cls, values: dict):
-        values['client'] = openai.AsyncClient()
-        return values
+    _client: openai.AsyncClient = PrivateAttr(default_factory=openai.AsyncClient)
     
     @weave.op()
     async def predict(self, topic: str) -> dict:
@@ -113,11 +108,14 @@ This way, the client becomes a model attribute and we can reuse the client to ma
 
 ### Hugging Face model
 
-When using Hugging Face and `weave.Model` you will want to use `model_validator` on the step where you load the model weights and tokenizer. A simple example of this is the following:
+When you need to intitalize attributes that depends on the input, for instance when loading a model and the tokenizer, you can use the `model_post_init` method. Here you can define the logic to load the model and the tokenizer.
+
+ This is a good idea as you want to know exactly what is being sent to the model before tokenization.
+
+When using Hugging Face and `weave.Model` you will want to use `model_post_init` on the step where you load the model weights and tokenizer. A simple example of this is the following:
 
 ```python
 import weave
-from pydantic import model_validator, Field
 from transformers import LlamaForCausalLM, LlamaTokenizerFast
 
 class LlamaModel(weave.Model):
@@ -154,8 +152,8 @@ class LlamaModel(weave.Model):
         return {"generated_text": generated_text}
 ```
 Some explanation about the code above.
-- In this code we have a `model_validator` that loads the model and the tokenizer.
-- We have a `format_prompt` method that formats the prompt to be sent to the model. This is a good idea as you want to know exactly what is being sent to the model before tokenization.
+- In this code we have a `model_post_init` that loads the model and the tokenizer.
+- We have a `apply_chat_template` method that formats the prompt to be sent to the model. This is a good idea as you want to know exactly what is being sent to the model before tokenization.
 - We have a `predict` method that generates a response from the model. Depending on the use case, you may want to return the raw output from the model or the decoded output.
 
 
