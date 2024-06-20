@@ -44,10 +44,10 @@ def autopatch() -> None:
     from .integrations.anthropic.anthropic_sdk import anthropic_patcher
 
     openai_patcher.attempt_patch()
-    # mistral_patcher.attempt_patch()
-    # litellm_patcher.attempt_patch()
-    # llamaindex_patcher.attempt_patch()
-    # anthropic_patcher.attempt_patch()
+    mistral_patcher.attempt_patch()
+    litellm_patcher.attempt_patch()
+    llamaindex_patcher.attempt_patch()
+    anthropic_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -60,7 +60,7 @@ def reset_autopatch() -> None:
     from .integrations.anthropic.anthropic_sdk import anthropic_patcher
 
     openai_patcher.undo_patch()
-    # mistral_patcher.undo_patch()
-    # litellm_patcher.undo_patch()
-    # llamaindex_patcher.undo_patch()
-    # anthropic_patcher.undo_patch()
+    mistral_patcher.undo_patch()
+    litellm_patcher.undo_patch()
+    llamaindex_patcher.undo_patch()
+    anthropic_patcher.undo_patch()
