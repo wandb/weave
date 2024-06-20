@@ -220,10 +220,8 @@ Now that all this is written, i think an alternative implementation is:
 # PR TODO:
 # - [ ] When legacy filters or query conditions are an ID mask, we can further optimize the subquery
 # Refactors:
-# - [ ] Look for dead code in this file
 # - [ ] Reconcile the differences between ORM and these implementations (ideally push them down into there)
 #   - [ ] All methods in this file are unique
-#           - [ ] quote_json_path_parts -> quote_json_path
 #           - [ ] process_query_to_conditions -> _process_query_to_conditions
 #           - [ ] transform_external_field_to_internal_field -> _transform_external_field_to_internal_field
 # - [ ] `process_calls_filter_to_conditions` still uses hard coded `calls_merged` columns - bad!
@@ -310,7 +308,7 @@ class Condition(BaseModel):
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
-            for field in conditions.raw_fields:
+            for field in conditions.fields_used:
                 self._consumed_fields.append(get_field_by_name(field))
         return combine_conditions(conditions.conditions, "AND")
 
@@ -321,7 +319,7 @@ class Condition(BaseModel):
                 tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
                 ParamBuilder(),
             )
-            for field in conditions.raw_fields:
+            for field in conditions.fields_used:
                 self._consumed_fields.append(get_field_by_name(field))
 
         return self._consumed_fields
