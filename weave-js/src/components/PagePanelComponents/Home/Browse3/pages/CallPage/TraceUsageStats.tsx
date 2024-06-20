@@ -147,12 +147,10 @@ export const getTokensAndCostFromUsage = (usage: {
       metrics.outputs.tokens.total += outputTokens;
     }
   }
-  const cost = formatTokenCost(
-    metrics.inputs.cost.total + metrics.outputs.cost.total
-  );
-  const tokens = formatTokenCount(
-    metrics.inputs.tokens.total + metrics.outputs.tokens.total
-  );
+  const costNum = metrics.inputs.cost.total + metrics.outputs.cost.total;
+  const cost = formatTokenCost(costNum);
+  const tokensNum = metrics.inputs.tokens.total + metrics.outputs.tokens.total;
+  const tokens = formatTokenCount(tokensNum);
 
   const tooltipRowStyles = {
     display: 'flex',
@@ -210,7 +208,7 @@ export const getTokensAndCostFromUsage = (usage: {
       ))}
     </Box>
   );
-  return {cost, tokens, costToolTip, tokenToolTip};
+  return {costNum, cost, tokensNum, tokens, costToolTip, tokenToolTip};
 };
 
 const TraceStat = ({
