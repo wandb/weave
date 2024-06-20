@@ -100,13 +100,11 @@ export type TraceCallsDeleteReq = {
   call_ids: string[];
 };
 
-
 export type TraceCallRenameReq = {
   project_id: string;
   call_id: string;
   display_name: string;
 };
-
 
 export type FeedbackCreateReq = {
   project_id: string;

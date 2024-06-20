@@ -433,7 +433,6 @@ const useCallsDeleteFunc = () => {
   return callsDelete;
 };
 
-
 const useCallRenameFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
@@ -504,7 +503,6 @@ const useFeedback = (
   }, [deepKey, getTsClient]);
 
   return result;
-
 };
 
 const useOpVersion = (
