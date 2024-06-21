@@ -284,10 +284,10 @@ const useCallsNoExpansion = (
   useEffect(() => {
     if (opts?.refetchOnDelete) {
       const client = getTsClient();
-      const unregister = client.registerOnDeleteListener(doFetch);
+      const unregisterDelete = client.registerOnDeleteListener(doFetch);
       const unregisterRename = client.registerOnRenameListener(doFetch);
       return () => {
-        unregister();
+        unregisterDelete();
         unregisterRename();
       };
     }

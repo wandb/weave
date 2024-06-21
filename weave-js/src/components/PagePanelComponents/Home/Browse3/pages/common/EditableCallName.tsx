@@ -1,6 +1,5 @@
 import EditableField from '@wandb/weave/common/components/EditableField';
-import React, {useCallback} from 'react';
-import {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -10,11 +9,11 @@ export const EditableCallName: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
   const defaultDisplayName = opNiceName(call.spanName);
-  const setDisplayNameIsEmpty =
+  const displayNameIsEmpty =
     call.displayName == null || call.displayName === '';
   // The name to display is the displayName if it is not empty, otherwise
   // it is the defaultDisplayName.
-  const nameToDisplay = setDisplayNameIsEmpty
+  const nameToDisplay = displayNameIsEmpty
     ? defaultDisplayName
     : call.displayName!;
 
@@ -34,7 +33,7 @@ export const EditableCallName: React.FC<{
       // then we want to set the name to empty string.
       if (newName === '' || newName === defaultDisplayName) {
         setCurrNameToDisplay(defaultDisplayName);
-        if (!setDisplayNameIsEmpty) {
+        if (!displayNameIsEmpty) {
           callRename(call.entity, call.project, call.callId, '');
         }
       } else if (newName !== call.displayName) {
@@ -43,7 +42,7 @@ export const EditableCallName: React.FC<{
         callRename(call.entity, call.project, call.callId, newName);
       }
     },
-    [defaultDisplayName, call, setDisplayNameIsEmpty, callRename]
+    [defaultDisplayName, call, displayNameIsEmpty, callRename]
   );
 
   return (
