@@ -294,7 +294,8 @@ class CallsMergedDynamicField(CallsMergedAggField):
         if self.extra_path:
             param_name = pb.add_param(quote_json_path_parts(self.extra_path))
             val = f"{json_method}({res}, {_param_slot(param_name, 'String')})"
-        val = f"{json_method}({res}, '$')"
+        else:
+            val = f"{json_method}({res}, '$')"
         if cast != "exists":
             val = clickhouse_cast(val, cast)
         return val
