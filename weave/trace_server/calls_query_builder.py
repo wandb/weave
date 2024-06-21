@@ -225,6 +225,7 @@ Future considerations:
 
 # PR TODO:
 # - [ ] Tests for this builder - direct sql tests
+#   - [ ] Audit the query builder (# TODO: What was i thinking here?)
 # - [ ] When legacy filters or query conditions are an ID mask, we can further optimize the subquery
 # Refactors:
 # - [ ] Fixup the comment above
@@ -647,7 +648,6 @@ def process_query_to_conditions(
     table_alias: str,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
-
     conditions = []
     raw_fields_used = set()
 
