@@ -75,7 +75,6 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
-import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
