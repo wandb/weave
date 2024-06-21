@@ -109,12 +109,15 @@ const ConfirmDeleteModal: FC<{
     error = 'Cannot delete calls from multiple entities';
   } else if (new Set(calls.map(c => c.project)).size > 1) {
     error = 'Cannot delete calls from multiple projects';
+  } else if (calls.length > 1) {
+    error = 'Cannot delete multiple calls';
   }
 
   const onDelete = () => {
     setDeleteLoading(true);
     callsDelete(
-      `${calls[0].entity}/${calls[0].project}`,
+      calls[0].entity,
+      calls[0].project,
       calls.map(c => c.callId)
     ).then(() => {
       setDeleteLoading(false);
