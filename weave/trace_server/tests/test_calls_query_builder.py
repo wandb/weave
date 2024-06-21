@@ -11,7 +11,7 @@ def test_basic_query() -> None:
         cq,
         """
         SELECT calls_merged.id AS id
-        FROM calls_merged 
+        FROM calls_merged
         WHERE project_id = {pb_0:String}
         GROUPBY(project_id,id)
         """,
