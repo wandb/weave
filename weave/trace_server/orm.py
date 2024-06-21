@@ -439,7 +439,7 @@ def clickhouse_cast(
 ) -> str:
     """Helper function to cast a sql expression to a clickhouse type."""
     if cast == None:
-        return inner_sql
+        return f"toString({inner_sql})"  # This feels wrong..
     if cast == "int":
         return f"toInt64OrNull({inner_sql})"
     elif cast == "double":
