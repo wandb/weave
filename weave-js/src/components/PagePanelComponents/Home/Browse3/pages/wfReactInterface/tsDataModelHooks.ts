@@ -160,7 +160,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallReadRes | null>(null);
   const deepKey = useDeepMemo(key);
-  useEffect(() => {
+  const doFetch = useCallback(() => {
     if (deepKey) {
       setCallRes(null);
       loadingRef.current = true;
@@ -175,6 +175,14 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         });
     }
   }, [deepKey, getTsClient]);
+
+  useEffect(() => {
+    doFetch();
+  }, [doFetch]);
+
+  useEffect(() => {
+    return getTsClient().registerOnRenameListener(doFetch);
+  }, [getTsClient, doFetch]);
 
   return useMemo(() => {
     if (key == null) {
@@ -275,7 +283,13 @@ const useCallsNoExpansion = (
   // register doFetch as a callback after deletion
   useEffect(() => {
     if (opts?.refetchOnDelete) {
-      return getTsClient().registerOnDeleteListener(doFetch);
+      const client = getTsClient();
+      const unregisterDelete = client.registerOnDeleteListener(doFetch);
+      const unregisterRename = client.registerOnRenameListener(doFetch);
+      return () => {
+        unregisterDelete();
+        unregisterRename();
+      };
     }
     return () => {};
   }, [opts?.refetchOnDelete, getTsClient, doFetch]);
@@ -397,17 +411,17 @@ const useCallsDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const callsDelete = useCallback(
-    (projectID: string, callIDs: string[]): Promise<void> => {
+    (entity: string, project: string, callIDs: string[]): Promise<void> => {
       return getTsClient()
         .callsDelete({
-          project_id: projectID,
+          project_id: projectIdFromParts({entity, project}),
           call_ids: callIDs,
         })
         .then(() => {
           callIDs.forEach(callId => {
             callCache.del({
-              entity: projectID.split('/')[0],
-              project: projectID.split('/')[1],
+              entity,
+              project,
               callId,
             });
           });
@@ -417,6 +431,36 @@ const useCallsDeleteFunc = () => {
   );
 
   return callsDelete;
+};
+
+const useCallUpdateFunc = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const callUpdate = useCallback(
+    (
+      entity: string,
+      project: string,
+      callID: string,
+      newName: string
+    ): Promise<void> => {
+      return getTsClient()
+        .callUpdate({
+          project_id: projectIdFromParts({entity, project}),
+          call_id: callID,
+          display_name: newName,
+        })
+        .then(() => {
+          callCache.del({
+            entity,
+            project,
+            callId: callID,
+          });
+        });
+    },
+    [getTsClient]
+  );
+
+  return callUpdate;
 };
 
 const useFeedback = (
@@ -1246,6 +1290,7 @@ const traceCallToUICallSchema = (
       traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
         ? refUriToOpVersionKey(traceCall.op_name).opId
         : traceCall.op_name,
+    displayName: traceCall.display_name ?? null,
     opVersionRef:
       traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
       traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
@@ -1272,6 +1317,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCalls,
   useCallsStats,
   useCallsDeleteFunc,
+  useCallUpdateFunc,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

@@ -1,5 +1,6 @@
 import typing
 
+from weave import client_context
 from weave.legacy import context_state
 
 from . import autopatch, errors, init_message, trace_sentry, weave_client
@@ -11,7 +12,7 @@ _current_inited_client = None
 class InitializedClient:
     def __init__(self, client: weave_client.WeaveClient):
         self.client = client
-        self.graph_client_token = context_state._graph_client.set(client)
+        client_context.weave_client.set_weave_client_global(client)
         self.ref_tracking_token = context_state._ref_tracking_enabled.set(True)
         self.eager_mode_token = context_state._eager_mode.set(True)
         self.serverless_io_service_token = context_state._serverless_io_service.set(
@@ -19,7 +20,7 @@ class InitializedClient:
         )
 
     def reset(self) -> None:
-        context_state._graph_client.reset(self.graph_client_token)
+        client_context.weave_client.set_weave_client_global(None)
         context_state._ref_tracking_enabled.reset(self.ref_tracking_token)
         context_state._eager_mode.reset(self.eager_mode_token)
         context_state._serverless_io_service.reset(self.serverless_io_service_token)

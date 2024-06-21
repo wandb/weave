@@ -16,7 +16,6 @@ from weave import weave_types as types
 from weave.legacy import (
     context_state,
     graph,
-    graph_client_context,
     language_autocall,
     memo,
     object_context,

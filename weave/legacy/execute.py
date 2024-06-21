@@ -50,9 +50,6 @@ from weave.legacy.language_features.tagging import (
     tag_store,
 )
 
-if typing.TYPE_CHECKING:
-    from weave.legacy.graph_client import GraphClient
-
 TRACE_LOCAL = trace_local.TraceLocal()
 
 # Set this to true when debugging for costly, but detailed storyline of execution
