@@ -1,8 +1,8 @@
 import React from 'react';
 import styled from 'styled-components';
 
+import {EditableCallName} from '../common/EditableCallName';
 import {CopyableId} from '../common/Id';
-import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ExceptionAlert} from './Exceptions';
@@ -35,14 +35,14 @@ OverflowBin.displayName = 'S.OverflowBin';
 export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
-  const opName = opNiceName(call.spanName);
-
   const statusCode = call.rawSpan.status_code;
 
   return (
     <>
       <Overview>
-        <CallName>{opName}</CallName>
+        <CallName>
+          <EditableCallName call={call} />
+        </CallName>
         <CopyableId id={call.callId} type="Call" />
         <StatusChip value={statusCode} iconOnly />
         <OverflowBin>

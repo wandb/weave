@@ -5,8 +5,7 @@ from typing import Any, Iterable, Iterator, Optional
 
 from rich.table import Table
 
-from weave import rich_pydantic_util
-from weave.legacy import graph_client_context
+from weave import client_context, rich_pydantic_util
 from weave.refs import Refs
 from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import parse_uri
@@ -101,7 +100,7 @@ class FeedbackQuery:
         limit: Optional[int] = None,
         show_refs: bool = False,
     ):
-        self.client = graph_client_context.require_graph_client()
+        self.client = client_context.weave_client.require_weave_client()
         self.entity = entity
         self.project = project
 

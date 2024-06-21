@@ -5,7 +5,8 @@ import typing
 import weakref
 from typing import Iterable, Optional, Sequence
 
-from weave.legacy import box, context_state, graph_client_context, object_context
+from weave import client_context
+from weave.legacy import box, context_state, object_context
 from weave.legacy.language_features.tagging import tag_store
 
 from . import errors
@@ -157,12 +158,12 @@ class Ref:
         return str(self.uri)
 
     def input_to(self) -> Sequence["weave_client.Call"]:
-        client = graph_client_context.require_graph_client()
-        return client.ref_input_to(self)
+        client = client_context.weave_client.require_weave_client()
+        return client._ref_input_to(self)
 
     def value_input_to(self) -> Sequence["weave_client.Call"]:
-        client = graph_client_context.require_graph_client()
-        return client.ref_value_input_to(self)
+        client = client_context.weave_client.require_weave_client()
+        return client._ref_value_input_to(self)
 
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:

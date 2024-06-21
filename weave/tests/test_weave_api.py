@@ -39,7 +39,7 @@ def test_weave_finish_unsets_client(client):
     def foo():
         return 1
 
-    weave.legacy.context_state._graph_client.set(None)
+    weave.client_context.weave_client.set_weave_client_global(None)
     weave.weave_init._current_inited_client = weave.weave_init.InitializedClient(client)
     weave_client = weave.weave_init._current_inited_client.client
     assert weave.weave_init._current_inited_client is not None
