@@ -1,4 +1,160 @@
 """
+This module builds on the orm.py module to provide a more hard-coded optimized
+query builder specifically for the "Calls" table (which is the `calls_merged`
+underlying table).
+
+The `CallsQuery` class is the main entry point for building a query. These
+optimizations are hand-tuned for Clickhouse - and in particular attempt to
+perform predicate pushdown where possible and delay loading expensive fields as
+much as possible. In testing, Clickhouse performance is dominated by the amount
+of data loaded into memory.
+
+Note 1: `LIGHT` fields are those that are relatively inexpensive to load into
+memory, while `HEAVY` fields are those that are expensive to load into memory.
+Practically, `HEAVY` fields are the free-form user-defined fields: `inputs`,
+`output`, `attributes`, and `summary`.
+
+Note 2: `FILTER_CONDITIONS` are assumed to be "anded" together.
+
+Now, everything starts with the `BASE QUERY`:
+
+```sql
+SELECT {SELECT_FIELDS}
+FROM calls_merged
+WHERE project_id = {PROJECT_ID}
+AND id IN {ID_MASK}                     -- optional
+GROUP BY (project_id, id)
+HAVING {FILTER_CONDITIONS}              -- optional
+ORDER BY {ORDER_FIELDS}                 -- optional
+LIMIT {LIMIT}                           -- optional
+OFFSET {OFFSET}                         -- optional
+```
+
+
+From here, we need to answer 2 questions:
+1. Does this query involve any `HEAVY` fields (across `SELECT_FIELDS`, `FILTER_CONDITIONS`, and `ORDER_FIELDS`)?
+2. Is it possible to push down predicates into a subquery? This is true if any of the following are true:
+    a. There is an `ID_MASK`
+    b. The `FILTER_CONDITIONS` have at least one "and" condition composed entirely of `LIGHT` fields that is not the `deleted_at` clause
+    c. The ORDER BY clause can be transformed into a "light filter". Requires:
+        1. No `HEAVY` fields in the ORDER BY clause
+        2. No `HEAVY` fields in the FILTER_CONDITIONS
+        3. A `LIMIT` clause.
+
+If any of the above are true, then we can push down the predicates into a subquery. This
+results in the following query:
+
+```sql
+WITH filtered_calls AS (
+    SELECT id
+    FROM calls_merged
+    WHERE project_id = {PROJECT_ID}
+    AND id IN {ID_MASK}                 -- optional
+    GROUP BY (project_id, id)
+    HAVING {LIGHT_FILTER_CONDITIONS}    -- optional
+    --- IF ORDER BY CAN BE PUSHED DOWN ---
+    ORDER BY {ORDER_FIELDS}                 -- optional
+    LIMIT {LIMIT}                           -- optional
+    OFFSET {OFFSET}                         -- optional
+)
+SELECT {SELECT_FIELDS}
+FROM calls_merged
+WHERE project_id = {PROJECT_ID}
+AND id IN (filtered_calls)
+GROUP BY (project_id, id)
+--- IF ORDER BY CANNOT BE PUSHED DOWN ---
+HAVING {HEAVY_FILTER_CONDITIONS}        -- optional <-- yes, this is inside the conditional
+ORDER BY {ORDER_FIELDS}                 -- optional
+LIMIT {LIMIT}                           -- optional
+OFFSET {OFFSET}                         -- optional
+```
+
+The first optimization is that under the following conditions,
+we can "pushdown" the order component into the inner query:
+
+1. There are no `HEAVY_FILTER_CONDITIONS`
+2. All fields in `ORDER_FIELDS` are `LIGHT`
+3. There is a `LIMIT` clause
+
+resulting in:
+
+
+```sql
+WITH filtered_calls AS (
+    SELECT id
+    FROM calls_merged
+    WHERE project_id = {PROJECT_ID}
+    AND id IN {ID_MASK}                 -- optional
+    GROUP BY (project_id, id)
+    HAVING {LIGHT_FILTER_CONDITIONS}        -- optional
+    ORDER BY {ORDER_FIELDS}
+    LIMIT {LIMIT}
+    OFFSET {OFFSET}                     -- optional
+)
+SELECT {SELECT_FIELDS}
+FROM calls_merged
+WHERE project_id = {PROJECT_ID}
+AND id IN (filtered_calls)
+GROUP BY (project_id, id)
+```
+
+From here, there is a further optimization that can be made if all of the `SELECT_FIELDS`
+are `LIGHT` fields. In this case, we can avoid the inner query altogether and just use
+the base query:
+```sql
+SELECT {SELECT_FIELDS}
+FROM calls_merged
+WHERE project_id = {PROJECT_ID}
+AND id IN {ID_MASK}                     -- optional
+GROUP BY (project_id, id)
+ORDER BY {ORDER_FIELDS}                 -- optional
+LIMIT {LIMIT}                           -- optional
+OFFSET {OFFSET}                         -- optional
+```
+
+At this point, we will have one of the above three queries. If we are in one of the first 2,
+Then if the inner query is trivial (i.e. it is just a project and deleted filter), then the
+    inner query is basically returning every ID, and we will pay the load cost twice. In this case
+    we should just merge the inner query into the outer query. Example trivial inner query:
+```sql
+WITH filtered_calls AS (
+    SELECT id
+    FROM calls_merged
+    WHERE project_id = {PROJECT_ID}
+    GROUP BY (project_id, id)
+    HAVING {LIGHT_FILTER_CONDITIONS}        -- the only LIGHT_FILTER_CONDITIONS is the deleted_at clause
+)
+```
+
+which results in the base query again
+```sql
+SELECT {SELECT_FIELDS}
+FROM calls_merged
+WHERE project_id = {PROJECT_ID}
+AND id IN {ID_MASK}                     -- optional
+GROUP BY (project_id, id)
+HAVING {HEAVY_FILTER_CONDITIONS}            -- optional
+ORDER BY {ORDER_FIELDS}                 -- optional
+LIMIT {LIMIT}                           -- optional
+OFFSET {OFFSET}                         -- optional
+```
+
+1. If the only `LIGHT_FILTER_CONDITIONS` is the deleted_at clause, and there is no `ID_MASK`, then the inner query becomes
+
+
+Outstanding Optimizations:
+
+* [ ] This code could use more of the orm.py code to reduce logical duplication,
+  specifically:
+
+        1. `process_query_to_conditions` is nearly identical to the one in
+        orm.py, but differs enough that generalizing a common function was not
+        trivial.
+        2. We define our own column definitions here, which might be able
+        to use the ones in orm.py.
+* [ ] Implement the ID mask
+
+
 As opposed to the orm.py, this module is responsible for building a hand-tuned
 query for the calls table. THis is preferred for now as it is easier to reason
 about and ...
@@ -61,11 +217,11 @@ Query Components * SELECT_FIELDS: The fields that are selected in the query.
 This set of fields is partitioned into:
     * SELECT_STATIC_FIELDS
     * SELECT_DYNAMIC_FIELDS
-* FILTER_FIELDS: The fields that are used to filter the query. This set of
+* FILTER_CONDITIONS: The fields that are used to filter the query. This set of
   fields is partitioned into (by reformatting the query as ANDS of clauses):
     * FILTER_STATIC_FIELDS
     * FILTER_DYNAMIC_FIELDS
-* SORT_FIELDS: The fields that are used to order the query. This set of fields is
+* ORDER_FIELDS: The fields that are used to order the query. This set of fields is
   partitioned into:
     * SORT_STATIC_FIELDS
     * SORT_DYNAMIC_FIELDS
@@ -81,8 +237,8 @@ GROUP BY (project_id, id)
 HAVING
     project_id = {project_id}
     AND isNull(any(deleted_at))
-    AND {FILTER_FIELDS}             -- optional
-ORDER BY {SORT_FIELDS}              -- optional
+    AND {FILTER_CONDITIONS}             -- optional
+ORDER BY {ORDER_FIELDS}              -- optional
 LIMIT {limit}                       -- optional
 OFFSET {offset}                     -- optional
 ```
@@ -100,8 +256,8 @@ WHERE project_id = {project_id}
 GROUP BY (project_id, id)
 HAVING
     isNull(any(deleted_at))
-    AND {FILTER_FIELDS}             -- optional
-ORDER BY {SORT_FIELDS}              -- optional
+    AND {FILTER_CONDITIONS}             -- optional
+ORDER BY {ORDER_FIELDS}              -- optional
 LIMIT {limit}                       -- optional
 OFFSET {offset}                     -- optional
 ```
@@ -109,7 +265,7 @@ OFFSET {offset}                     -- optional
 This is the base query. While in theory it is good, in practice, we never actually use
 this case (but that is just because of current features). You will see why in a moment.
 
-The next modification is to push any STATIC_FILTER_FIELDS into a nested query:
+The next modification is to push any STATIC_FILTER_CONDITIONS into a nested query:
 
 PRE-FILTERED QUERY:
 ```sql
@@ -120,14 +276,14 @@ WITH filtered_calls AS (
     GROUP BY (project_id, id)
     HAVING
         isNull(any(deleted_at))
-        AND {STATIC_FILTER_FIELDS}
+        AND {STATIC_FILTER_CONDITIONS}
 )
 SELECT {SELECT_FIELDS}
 FROM calls_merged
 WHERE id IN (filtered_calls)        -- Consider using an INNER JOIN here
 GROUP BY (project_id, id)
 HAVING {FILTER_DYNAMIC_FIELDS}      -- optional
-ORDER BY {SORT_FIELDS}              -- optional
+ORDER BY {ORDER_FIELDS}              -- optional
 LIMIT {limit}                       -- optional
 OFFSET {offset}                     -- optional
 ```
@@ -147,8 +303,8 @@ WITH ordered_filtered_calls AS (
     GROUP BY (project_id, id)
     HAVING
         isNull(any(deleted_at))
-        AND {STATIC_FILTER_FIELDS}  -- optional
-    ORDER BY {SORT_FIELDS}
+        AND {STATIC_FILTER_CONDITIONS}  -- optional
+    ORDER BY {ORDER_FIELDS}
     LIMIT {limit}
     OFFSET {offset}                 -- optional
 )
@@ -156,7 +312,7 @@ SELECT {SELECT_FIELDS}
 FROM calls_merged
 WHERE id IN (ordered_filtered_calls) -- Consider using an INNER JOIN here
 GROUP BY (project_id, id)
-ORDER BY {SORT_FIELDS}              -- still required to repeat
+ORDER BY {ORDER_FIELDS}              -- still required to repeat
 ```
 
 Now, we can do even better! If the requested columns do not contain any dynamic fields,
@@ -170,8 +326,8 @@ WHERE project_id = {project_id}
 GROUP BY (project_id, id)
 HAVING
     isNull(any(deleted_at))
-    AND {FILTER_FIELDS}             -- optional
-ORDER BY {SORT_FIELDS}              -- optional
+    AND {FILTER_CONDITIONS}             -- optional
+ORDER BY {ORDER_FIELDS}              -- optional
 LIMIT {limit}                       -- optional
 OFFSET {offset}                     -- optional
 ```
@@ -187,7 +343,7 @@ WITH filtered_calls AS (
     GROUP BY (project_id, id)
     HAVING
         isNull(any(deleted_at))
-        AND {STATIC_FILTER_FIELDS}
+        AND {STATIC_FILTER_CONDITIONS}
 ),
 expanded_calls AS (
     SELECT project_id, id, {FIELDS_TO_FILTER}, {FIELDS_TO_SORT}
@@ -197,8 +353,8 @@ SELECT {SELECT_FIELDS}
 FROM calls_merged
 WHERE id IN (expanded_calls)        -- This almost certainly needs to be a JOIN
 GROUP BY (project_id, id)
-HAVING {FILTER_FIELDS}              -- optional
-ORDER BY {SORT_FIELDS}              -- optional
+HAVING {FILTER_CONDITIONS}              -- optional
+ORDER BY {ORDER_FIELDS}              -- optional
 LIMIT {limit}                       -- optional
 OFFSET {offset}                     -- optional
 ```
