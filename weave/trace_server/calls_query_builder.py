@@ -276,8 +276,8 @@ class CallsMergedAggField(CallsMergedField):
         table_alias: str,
         cast: typing.Optional[tsi_query.CastTo] = None,
     ) -> str:
-        inner = super().as_sql(pb, table_alias, cast)
-        return f"{self.agg_fn}({inner})"
+        inner = super().as_sql(pb, table_alias)
+        return clickhouse_cast(f"{self.agg_fn}({inner})")
 
 
 class CallsMergedDynamicField(CallsMergedAggField):
