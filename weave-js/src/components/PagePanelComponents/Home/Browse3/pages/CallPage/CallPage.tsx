@@ -1,7 +1,13 @@
 import Box from '@mui/material/Box';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
-import React, {FC, useCallback} from 'react';
+import {
+  evaluationViewed,
+  traceViewed,
+} from '@wandb/weave/integrations/analytics/viewEvents';
+import React, {FC, useCallback, useEffect} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {Button} from '../../../../../Button';
@@ -79,6 +85,33 @@ const CallPageInnerVertical: FC<{
   call: CallSchema;
   path?: string;
 }> = ({call, path}) => {
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const {loading: orgNameLoading, orgName} = useOrgName({
+    entityName: call.entity,
+  });
+  useEffect(() => {
+    if (!viewerLoading && !orgNameLoading) {
+      console.log('call', call);
+      if (call.spanName === 'Evaluation.evaluate') {
+        evaluationViewed({
+          traceId: call.traceId,
+          userId: userInfo.id,
+          organizationName: orgName,
+          entityName: call.entity,
+        });
+      } else {
+        traceViewed({
+          traceId: call.traceId,
+          userId: userInfo.id,
+          organizationName: orgName,
+          entityName: call.entity,
+        });
+      }
+    }
+  }, [viewerLoading, orgNameLoading, orgName, userInfo, call]);
+
+  useEffect(() => {}, []);
+
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 

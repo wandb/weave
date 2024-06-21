@@ -4,13 +4,6 @@ import {
   TEAL_500,
   TEAL_600,
 } from '@wandb/weave/common/css/color.styles';
-import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
-import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
-import {
-  evaluationViewed,
-  objectViewed,
-  traceViewed,
-} from '@wandb/weave/integrations/analytics/viewEvents';
 import React from 'react';
 import {Link as LinkComp, useHistory} from 'react-router-dom';
 import styled, {css} from 'styled-components';
@@ -160,16 +153,7 @@ export const ObjectVersionLink: React.FC<{
     props.filePath,
     props.refExtra
   );
-  const {loading, userInfo} = useViewerUserInfo2();
-  const {orgName} = useOrgName({entityName: props.entityName});
   const onClick = () => {
-    objectViewed({
-      objectType: props.objectClass ?? '',
-      objectId: props.objectName,
-      userId: !loading ? userInfo.id : '',
-      organizationName: orgName,
-      entityName: props.entityName,
-    });
     history.push(to);
   };
 
@@ -280,25 +264,7 @@ export const CallLink: React.FC<{
     props.callId,
     path
   );
-  const {loading, userInfo} = useViewerUserInfo2();
-  const {orgName} = useOrgName({entityName: props.entityName});
   const onClick = () => {
-    if (props.opName === 'Evaluation.evaluate') {
-      console.log('evaluationViewed');
-      evaluationViewed({
-        traceId: props.callId,
-        userId: loading ? '' : userInfo.id,
-        organizationName: orgName,
-        entityName: props.entityName,
-      });
-    } else {
-      traceViewed({
-        traceId: props.callId,
-        userId: loading ? '' : userInfo.id,
-        organizationName: orgName,
-        entityName: props.entityName,
-      });
-    }
     history.push(to);
   };
 

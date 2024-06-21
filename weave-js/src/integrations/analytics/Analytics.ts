@@ -40,7 +40,8 @@ export const Analytics = {
     }
 
     // only hit Sentry in prod
-    const envIsProd = window?.CONFIG?.ENVIRONMENT_NAME === 'production';
+    const envIsProd =
+      (window as any)?.CONFIG?.ENVIRONMENT_NAME === 'production';
     const captureMessage = envIsProd ? Sentry.captureMessage : console.warn;
 
     // these represent conditions where expected behavior will fail
