@@ -32,11 +32,17 @@ OFFSET {OFFSET}                         -- optional
 
 
 From here, we need to answer 2 questions:
-1. Does this query involve any `HEAVY` fields (across `SELECT_FIELDS`, `FILTER_CONDITIONS`, and `ORDER_FIELDS`)?
-2. Is it possible to push down predicates into a subquery? This is true if any of the following are true:
+
+1. Does this query involve any `HEAVY` fields (across `SELECT_FIELDS`,
+   `FILTER_CONDITIONS`, and `ORDER_FIELDS`)?
+2. Is it possible to push down predicates into a subquery? This is true if any
+   of the following are true:
+
     a. There is an `ID_MASK`
-    b. The `FILTER_CONDITIONS` have at least one "and" condition composed entirely of `LIGHT` fields that is not the `deleted_at` clause
+    b. The `FILTER_CONDITIONS` have at least one "and" condition composed
+       entirely of `LIGHT` fields that is not the `deleted_at` clause
     c. The ORDER BY clause can be transformed into a "light filter". Requires:
+
         1. No `HEAVY` fields in the ORDER BY clause
         2. No `HEAVY` fields in the FILTER_CONDITIONS
         3. A `LIMIT` clause.
@@ -69,80 +75,7 @@ LIMIT {LIMIT}                           -- optional
 OFFSET {OFFSET}                         -- optional
 ```
 
-The first optimization is that under the following conditions,
-we can "pushdown" the order component into the inner query:
-
-1. There are no `HEAVY_FILTER_CONDITIONS`
-2. All fields in `ORDER_FIELDS` are `LIGHT`
-3. There is a `LIMIT` clause
-
-resulting in:
-
-
-```sql
-WITH filtered_calls AS (
-    SELECT id
-    FROM calls_merged
-    WHERE project_id = {PROJECT_ID}
-    AND id IN {ID_MASK}                 -- optional
-    GROUP BY (project_id, id)
-    HAVING {LIGHT_FILTER_CONDITIONS}        -- optional
-    ORDER BY {ORDER_FIELDS}
-    LIMIT {LIMIT}
-    OFFSET {OFFSET}                     -- optional
-)
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE project_id = {PROJECT_ID}
-AND id IN (filtered_calls)
-GROUP BY (project_id, id)
-```
-
-From here, there is a further optimization that can be made if all of the `SELECT_FIELDS`
-are `LIGHT` fields. In this case, we can avoid the inner query altogether and just use
-the base query:
-```sql
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE project_id = {PROJECT_ID}
-AND id IN {ID_MASK}                     -- optional
-GROUP BY (project_id, id)
-ORDER BY {ORDER_FIELDS}                 -- optional
-LIMIT {LIMIT}                           -- optional
-OFFSET {OFFSET}                         -- optional
-```
-
-At this point, we will have one of the above three queries. If we are in one of the first 2,
-Then if the inner query is trivial (i.e. it is just a project and deleted filter), then the
-    inner query is basically returning every ID, and we will pay the load cost twice. In this case
-    we should just merge the inner query into the outer query. Example trivial inner query:
-```sql
-WITH filtered_calls AS (
-    SELECT id
-    FROM calls_merged
-    WHERE project_id = {PROJECT_ID}
-    GROUP BY (project_id, id)
-    HAVING {LIGHT_FILTER_CONDITIONS}        -- the only LIGHT_FILTER_CONDITIONS is the deleted_at clause
-)
-```
-
-which results in the base query again
-```sql
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE project_id = {PROJECT_ID}
-AND id IN {ID_MASK}                     -- optional
-GROUP BY (project_id, id)
-HAVING {HEAVY_FILTER_CONDITIONS}            -- optional
-ORDER BY {ORDER_FIELDS}                 -- optional
-LIMIT {LIMIT}                           -- optional
-OFFSET {OFFSET}                         -- optional
-```
-
-1. If the only `LIGHT_FILTER_CONDITIONS` is the deleted_at clause, and there is no `ID_MASK`, then the inner query becomes
-
-
-Outstanding Optimizations:
+Outstanding Optimizations/Work:
 
 * [ ] This code could use more of the orm.py code to reduce logical duplication,
   specifically:
@@ -150,232 +83,12 @@ Outstanding Optimizations:
         1. `process_query_to_conditions` is nearly identical to the one in
         orm.py, but differs enough that generalizing a common function was not
         trivial.
-        2. We define our own column definitions here, which might be able
-        to use the ones in orm.py.
-* [ ] Implement the ID mask
+        2. We define our own column definitions here, which might be
+        able to use the ones in orm.py.
 
-
-As opposed to the orm.py, this module is responsible for building a hand-tuned
-query for the calls table. THis is preferred for now as it is easier to reason
-about and ...
-
-The "calls table" actually refers to `calls_merged`.
-
-To query the `calls_merged` table efficiently, there are 4 possible ways to do
-it, each with increasing complexity:
-
-Level 1:
-
-* Selected Fields: No "dynamic" fields
-* Filter Fields: No "dynamic" fields
-* Sort Fields: No "dynamic" fields
-
-Level 2:
-
-* Selected Fields: includes "dynamic" fields
-* Filter Fields: No "dynamic" fields
-* Sort Fields: No "dynamic" fields & includes a limit
-
-Level 3:
-
-* Selected Fields: includes "dynamic" fields
-* Filter Fields/Sort: includes "dynamic" fields
-
-Level 4:
-
-* Filter/Sort Fields: include joined fields (read: ref expansion or
-feedback)
-
-
-For the sake of this document, we will use the following definitions:
-
-Field Categories: * STATIC_FIELDS: Fields that have known, constant size and are
-implied to be relatively inexpensive to load into memory
-    * INDEXED_FIELDS: Fields that are indexed
-        * As of this writing, `project_id` and `id` are indexed
-        * Note: all indexed fields are static fields, but not all static fields
-          are indexed fields!
-        * Note2: when querying, INDEXED_FIELDS are always grouped but all other
-          fields need to have aggregation functions
-* DYNAMIC_FIELDS: Fields that have user-defined size and are implied to be
-  relatively expensive to load into memory
-    * As of this writing, `inputs`, `output`, `attributes`, and `summary` are
-      dynamic fields
-* JOINED_FIELDS: Fields that are joined from another table
-    * As of this writing, this refers to:
-        * REFERENCED_FIELDS: Fields whose values are the result of at least 1
-          reference expansion
-            * Note: All referenced fields are dynamic fields, but not all
-              dynamic fields are referenced fields! However, we
-            * cannot know at query building time if a dynamic field is a
-              referenced field or not!
-        * FEEDBACK_FIELDS: Fields whose values are stored in the feedback table.
-            * Note: we do not yet support these, but we will in the very near
-              future
-
-Query Components * SELECT_FIELDS: The fields that are selected in the query.
-This set of fields is partitioned into:
-    * SELECT_STATIC_FIELDS
-    * SELECT_DYNAMIC_FIELDS
-* FILTER_CONDITIONS: The fields that are used to filter the query. This set of
-  fields is partitioned into (by reformatting the query as ANDS of clauses):
-    * FILTER_STATIC_FIELDS
-    * FILTER_DYNAMIC_FIELDS
-* ORDER_FIELDS: The fields that are used to order the query. This set of fields is
-  partitioned into:
-    * SORT_STATIC_FIELDS
-    * SORT_DYNAMIC_FIELDS
-
-The canonical query is as follows. Note: as a hard rule, we always require a
-project_id to be passed in as a filter.
-
-NEVER USE THIS:
-```sql
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-GROUP BY (project_id, id)
-HAVING
-    project_id = {project_id}
-    AND isNull(any(deleted_at))
-    AND {FILTER_CONDITIONS}             -- optional
-ORDER BY {ORDER_FIELDS}              -- optional
-LIMIT {limit}                       -- optional
-OFFSET {offset}                     -- optional
-```
-
-The above query however is quite naive and will be too slow in practice. The first
-modification is to move the `project_id` filter to the `WHERE` clause. This way we
-avoid bring the entire table into memory and then filtering it. You will see this
-is a trend: avoid loading data into memory:
-
-BASE QUERY:
-```sql
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE project_id = {project_id}
-GROUP BY (project_id, id)
-HAVING
-    isNull(any(deleted_at))
-    AND {FILTER_CONDITIONS}             -- optional
-ORDER BY {ORDER_FIELDS}              -- optional
-LIMIT {limit}                       -- optional
-OFFSET {offset}                     -- optional
-```
-
-This is the base query. While in theory it is good, in practice, we never actually use
-this case (but that is just because of current features). You will see why in a moment.
-
-The next modification is to push any STATIC_FILTER_CONDITIONS into a nested query:
-
-PRE-FILTERED QUERY:
-```sql
-WITH filtered_calls AS (
-    SELECT id
-    FROM calls_merged
-    WHERE project_id = {project_id}
-    GROUP BY (project_id, id)
-    HAVING
-        isNull(any(deleted_at))
-        AND {STATIC_FILTER_CONDITIONS}
-)
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE id IN (filtered_calls)        -- Consider using an INNER JOIN here
-GROUP BY (project_id, id)
-HAVING {FILTER_DYNAMIC_FIELDS}      -- optional
-ORDER BY {ORDER_FIELDS}              -- optional
-LIMIT {limit}                       -- optional
-OFFSET {offset}                     -- optional
-```
-
-Now, under the very specific condition that:
-a) we have no `FILTER_DYNAMIC_FIELDS`
-b) we have no `SORT_DYNAMIC_FIELDS`
-c) we have a limit
-Then we can push the order into the inner query:
-
-PRE-ORDERED/FILTERED QUERY:
-```sql
-WITH ordered_filtered_calls AS (
-    SELECT id
-    FROM calls_merged
-    WHERE project_id = {project_id}
-    GROUP BY (project_id, id)
-    HAVING
-        isNull(any(deleted_at))
-        AND {STATIC_FILTER_CONDITIONS}  -- optional
-    ORDER BY {ORDER_FIELDS}
-    LIMIT {limit}
-    OFFSET {offset}                 -- optional
-)
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE id IN (ordered_filtered_calls) -- Consider using an INNER JOIN here
-GROUP BY (project_id, id)
-ORDER BY {ORDER_FIELDS}              -- still required to repeat
-```
-
-Now, we can do even better! If the requested columns do not contain any dynamic fields,
-can avoid the inner query altogether (notice, this is equivalent to the base query):
-
-STATIC QUERY:
-```sql
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE project_id = {project_id}
-GROUP BY (project_id, id)
-HAVING
-    isNull(any(deleted_at))
-    AND {FILTER_CONDITIONS}             -- optional
-ORDER BY {ORDER_FIELDS}              -- optional
-LIMIT {limit}                       -- optional
-OFFSET {offset}                     -- optional
-```
-
-Now, we have drilled down to 3 possible queries... now, we have to handle expansions.
-
-EXPANDED QUERY:
-```sql
-WITH filtered_calls AS (
-    SELECT id
-    FROM calls_merged
-    WHERE project_id = {project_id}
-    GROUP BY (project_id, id)
-    HAVING
-        isNull(any(deleted_at))
-        AND {STATIC_FILTER_CONDITIONS}
-),
-expanded_calls AS (
-    SELECT project_id, id, {FIELDS_TO_FILTER}, {FIELDS_TO_SORT}
-    -- RECURSIVE EXPANSION OF `filtered_calls`
-)
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE id IN (expanded_calls)        -- This almost certainly needs to be a JOIN
-GROUP BY (project_id, id)
-HAVING {FILTER_CONDITIONS}              -- optional
-ORDER BY {ORDER_FIELDS}              -- optional
-LIMIT {limit}                       -- optional
-OFFSET {offset}                     -- optional
-```
-
-BASE QUERY -- (if filters contain at least one static field clause) --> PRE-FILTERED QUERY
-PRE-FILTERED QUERY -- (if order fields are static and limit is present) --> PRE-ORDERED/FILTERED QUERY
-PRE-FILTERED QUERY -- (if all select fields are static) --> STATIC QUERY
-PRE-FILTERED QUERY -- (if expansions are present) --> EXPANDED QUERY
-
-
-Now that all this is written, i think an alternative implementation is:
-1. Start with the EXPANDED QUERY.
-2. If there are no expansions needed, then move to the PRE-FILTERED QUERY.
-3. If order fields are static and limit is present, then move to the PRE-ORDERED/FILTERED QUERY.
-4. If all select fields are static, then move to the STATIC QUERY.
-
-Future considerations:
-# Considerations:
-# - [ ] Implement column selection from callers
-# - [ ] Consider how we will do latency order/filter
-# - [ ] Consider how we will do feedback fields
+* [ ] Implement column selection from callers
+* [ ] Consider how we will do latency order/filter
+* [ ] Consider how we will do feedback fields
 
 """
 
@@ -383,11 +96,6 @@ Future considerations:
 # - [ ] Tests for this builder - direct sql tests
 #   - [ ] Audit the query builder (# TODO: What was i thinking here?)
 # - [ ] When legacy filters or query conditions are an ID mask, we can further optimize the subquery
-# Refactors:
-# - [ ] Fixup the comment above
-# - [ ] Reconcile the differences between ORM and these implementations (ideally push them down into there)
-#   - [ ] All methods in this file are unique
-#           - [ ] process_query_to_conditions -> _process_query_to_conditions
 # - [ ] Awkward builder API - just simplify this
 
 import typing
