@@ -1,6 +1,9 @@
 import re
 
-from weave.trace_server.calls_query_builder import CallsQuery
+import sqlparse
+
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder import CallsQuery, HardCodedFilter
 from weave.trace_server.orm import ParamBuilder
 
 
@@ -13,7 +16,7 @@ def test_query_baseline() -> None:
         SELECT calls_merged.id AS id
         FROM calls_merged
         WHERE project_id = {pb_0:String}
-        GROUPBY(project_id,id)
+        GROUP BY (project_id,id)
         HAVING (
             any(calls_merged.deleted_at) IS NULL
         )
@@ -22,7 +25,7 @@ def test_query_baseline() -> None:
     )
 
 
-def test_query_with_simple_columns() -> None:
+def test_query_light_column() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_field("started_at")
@@ -34,12 +37,73 @@ def test_query_with_simple_columns() -> None:
             any(calls_merged.started_at) AS started_at
         FROM calls_merged
         WHERE project_id = {pb_0:String}
-        GROUPBY(project_id,id)
+        GROUP BY (project_id,id)
         HAVING (
             any(calls_merged.deleted_at) IS NULL
         )
         """,
         {"pb_0": "project"},
+    )
+
+
+def test_query_heavy_column() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE project_id = {pb_0:String}
+        GROUP BY (project_id,id)
+        HAVING (
+            any(calls_merged.deleted_at) IS NULL
+        )
+        """,
+        {"pb_0": "project"},
+    )
+
+
+def test_query_heavy_column_simple_filter() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi._CallsFilter(
+                op_names=["a", "b"],
+            )
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            WHERE project_id = {pb_1:String}
+            GROUP BY (project_id,id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+            AND
+                (any(calls_merged.op_name) IN {pb_0:Array(String)})
+            )
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE
+            project_id = {pb_2:String}
+        AND
+            (id IN filtered_calls)
+        GROUP BY (project_id,id)
+        """,
+        {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
     )
 
 
@@ -50,7 +114,7 @@ def assert_sql(cq: CallsQuery, exp_query, exp_params):
 
     assert exp_params == params
 
-    expected_no_whitespace = re.sub(r"\s+", "", exp_query)
-    found_no_whitespace = re.sub(r"\s+", "", query)
+    exp_formatted = sqlparse.format(exp_query, reindent=True)
+    found_formatted = sqlparse.format(query, reindent=True)
 
-    assert expected_no_whitespace == found_no_whitespace
+    assert exp_formatted == found_formatted

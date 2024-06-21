@@ -108,7 +108,7 @@ class CallsMergedDynamicField(CallsMergedAggField):
             raise NotImplementedError(
                 "Dynamic fields cannot be selected directly, yet - implement me!"
             )
-        return super().as_sql(pb, table_alias)
+        return f"{super().as_sql(pb, table_alias)} AS {self.field}"
 
     def with_path(self, path: list[str]) -> "CallsMergedDynamicField":
         extra_path = [*(self.extra_path or [])]
