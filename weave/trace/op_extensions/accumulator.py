@@ -15,6 +15,11 @@ from typing import (
 
 from weave.trace.op import FinishCallbackType, Op
 
+try:
+    from openai.resources.chat.completions import Completions, AsyncCompletions
+except ImportError:
+    pass
+
 S = TypeVar("S")
 V = TypeVar("V")
 
@@ -53,6 +58,17 @@ def add_accumulator(
     ```
     """
 
+    def _is_openai_input(inputs: Dict) -> bool:
+        if isinstance(inputs.get('self'), Completions) or isinstance(inputs.get('self'), AsyncCompletions):
+            print("it is openai")
+            return True
+        return False
+    
+    def _openai_stream_options_is_set(inputs: Dict) -> bool:
+        if inputs.get("stream_options") is not None:
+            return True
+        return False
+
     def on_output(
         value: Iterator[V], on_finish: FinishCallbackType, inputs: Dict
     ) -> Iterator:
@@ -62,9 +78,17 @@ def add_accumulator(
             on_finish(value, e)
 
         if should_accumulate is None or should_accumulate(inputs):
-            return _build_iterator_from_accumulator_for_op(
-                value, accumulator, wrapped_on_finish
-            )
+            # check for openai input and handle the stream options
+            # if it is an openai stream and the user has not set `stream_options` then skip the last item.
+            # if the user has set `stream_options` then do not skip the last item.
+            if _is_openai_input(inputs) and not _openai_stream_options_is_set(inputs):
+                return _build_iterator_from_accumulator_for_op(
+                    value, accumulator, wrapped_on_finish, skip_last=True
+                )
+            else:
+                return _build_iterator_from_accumulator_for_op(
+                    value, accumulator, wrapped_on_finish
+                )
         else:
             wrapped_on_finish(value)
             return value
@@ -77,6 +101,7 @@ def _build_iterator_from_accumulator_for_op(
     value: Iterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
+    skip_last: bool = False, # Flag to skip the last item in case of usage stream if not set by user.
 ) -> "_IteratorWrapper":
     acc: _Accumulator = _Accumulator(accumulator)
 
@@ -89,7 +114,7 @@ def _build_iterator_from_accumulator_for_op(
     def on_close() -> None:
         on_finish(acc.get_state(), None)
 
-    return _IteratorWrapper(value, on_yield, on_error, on_close)
+    return _IteratorWrapper(value, on_yield, on_error, on_close, skip_last)
 
 
 class _Accumulator(Generic[S, V]):
@@ -125,12 +150,16 @@ class _IteratorWrapper(Generic[V]):
         on_yield: _OnYieldType,
         on_error: _OnErrorType,
         on_close: _OnCloseType,
+        skip_last: bool = False,
     ) -> None:
         self._iterator = iterator
         self._on_yield = on_yield
         self._on_error = on_error
         self._on_close = on_close
         self._on_finished_called = False
+        self._buffer = None  # Buffer to store the previous item
+        self._end_of_iteration = False  # Flag to mark the end of iteration
+        self.skip_last = skip_last # Flag to skip the last item in case of usage stream if not set by user.
 
         atexit.register(weakref.WeakMethod(self._call_on_close_once))
 
@@ -152,16 +181,40 @@ class _IteratorWrapper(Generic[V]):
             raise TypeError(
                 f"Cannot call next on an iterator of type {type(self._iterator)}"
             )
-        try:
-            value = next(self._iterator)  # type: ignore
-            self._on_yield(value)
-            return value
-        except (StopIteration, StopAsyncIteration) as e:
+
+        if self._end_of_iteration:
             self._call_on_close_once()
             raise
-        except Exception as e:
-            self._call_on_error_once(e)
-            raise
+
+        if self.skip_last:
+            try:
+                current_item = next(self._iterator)  # type: ignore
+                self._on_yield(current_item)
+                if self._buffer is not None:
+                    to_yield = self._buffer
+                    self._buffer = current_item
+                    return to_yield
+                else:
+                    self._buffer = current_item
+                    return self.__next__()  # Skip yielding the first item immediately
+            except (StopIteration, StopAsyncIteration) as e:
+                self._end_of_iteration = True
+                self._call_on_close_once()
+                raise
+            except Exception as e:
+                self._call_on_error_once(e)
+                raise
+        else:
+            try:
+                value = next(self._iterator)  # type: ignore
+                self._on_yield(value)
+                return value
+            except (StopIteration, StopAsyncIteration) as e:
+                self._call_on_close_once()
+                raise
+            except Exception as e:
+                self._call_on_error_once(e)
+                raise
 
     def __aiter__(self) -> "_IteratorWrapper":
         return self

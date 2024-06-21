@@ -1,6 +1,8 @@
 import importlib
 
 import typing
+from functools import wraps
+
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -213,6 +215,7 @@ def openai_accumulator(
         system_fingerprint=acc.system_fingerprint,
     )
 
+    # add usage info
     if len(value.choices) == 0 and value.usage:
         acc.usage = value.usage
 
@@ -227,7 +230,18 @@ def should_use_accumulator(inputs: typing.Dict) -> bool:
 def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Callable]:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         "We need to do this so we can check if `stream` is used"
-        op = weave.op()(fn)
+
+        def _add_stream_options(fn):
+            @wraps(fn)
+            def _wrapper(*args, **kwargs):
+                if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
+                    kwargs["stream_options"] = {
+                        "include_usage": True
+                    }
+                return fn(*args, **kwargs) # This is where the final execution of fn is happening.
+            return _wrapper
+
+        op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
