@@ -1478,12 +1478,12 @@ def test_ref_get_no_client(trace_init_client):
 
 @contextmanager
 def _no_graph_client():
-    client = weave.client_context.graph_client.get_graph_client()
-    weave.client_context.graph_client.set_graph_client_global(None)
+    client = weave.client_context.weave_client.get_weave_client()
+    weave.client_context.weave_client.set_weave_client_global(None)
     try:
         yield
     finally:
-        weave.client_context.graph_client.set_graph_client_global(client)
+        weave.client_context.weave_client.set_weave_client_global(client)
 
 
 @contextmanager

@@ -58,7 +58,7 @@ if not import_failed:
         ) -> str:
             """Run when an event starts and return id of event."""
             # Get a handle to the internal graph client.
-            gc = client_context.graph_client.require_graph_client()
+            gc = client_context.weave_client.require_weave_client()
 
             # Check to see if the event is an exception.
             if event_type == CBEventType.EXCEPTION:
@@ -111,7 +111,7 @@ if not import_failed:
         ) -> None:
             """Run when an event ends."""
             # Get a handle to the internal graph client.
-            gc = client_context.graph_client.require_graph_client()
+            gc = client_context.weave_client.require_weave_client()
 
             # If the event is in the call map, finish the call.
             if event_id in self._call_map:

@@ -200,7 +200,7 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     Returns:
         A weave Ref to the saved object.
     """
-    client = client_context.graph_client.require_graph_client()
+    client = client_context.weave_client.require_weave_client()
 
     save_name: str
     if name:
@@ -237,7 +237,7 @@ def ref(location: str) -> _weave_client.ObjectRef:
         A weave Ref to the object.
     """
     if not "://" in location:
-        client = client_context.graph_client.get_graph_client()
+        client = client_context.weave_client.get_weave_client()
         if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")
         if "/" in location:
@@ -260,7 +260,7 @@ def obj_ref(obj: typing.Any) -> typing.Optional[_weave_client.ObjectRef]:
 
 
 def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:
-    client = client_context.graph_client.require_graph_client()
+    client = client_context.weave_client.require_weave_client()
 
     ref = obj_ref(obj)
     if ref is None:
@@ -312,7 +312,7 @@ def serve(
     import uvicorn
     from .serve_fastapi import object_method_app
 
-    client = client_context.graph_client.require_graph_client()
+    client = client_context.weave_client.require_weave_client()
     # if not isinstance(
     #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
     # ):

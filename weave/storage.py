@@ -480,7 +480,7 @@ def to_json_with_refs(
         ]
     elif isinstance(obj, op_def.OpDef):
         try:
-            gc = client_context.graph_client.require_graph_client()
+            gc = client_context.weave_client.require_weave_client()
         except errors.WeaveInitError:
             raise errors.WeaveSerializeError(
                 "Can't serialize OpDef with a client initialization"

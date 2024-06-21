@@ -4,7 +4,7 @@ import os
 import tempfile
 from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
 
-from weave.client_context.graph_client import require_graph_client
+from weave.client_context.weave_client import require_weave_client
 from weave.legacy import artifact_fs
 from weave.trace import op_type  # Must import this to register op save/load
 from weave.trace.op import Op, op
@@ -117,7 +117,7 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
         if not isinstance(serializer.load, Op):
             serializer.load = op(serializer.load)
         # Save the load_intance_op
-        wc = require_graph_client()
+        wc = require_weave_client()
 
         # TODO(PR): this can fail right? Or does it return None?
         load_instance_op_ref = wc._save_op(serializer.load, "load_" + serializer.id())  # type: ignore
@@ -147,7 +147,7 @@ def decode_custom_obj(
         ref = parse_uri(load_instance_op_uri)
         if not isinstance(ref, ObjectRef):
             raise ValueError(f"Expected ObjectRef, got {load_instance_op_uri}")
-        wc = require_graph_client()
+        wc = require_weave_client()
         load_instance_op = wc.get(ref)
         if load_instance_op == None:  # == to check for None or BoxedNone
             raise ValueError(
