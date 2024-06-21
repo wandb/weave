@@ -25,6 +25,11 @@ from .constants import TRACE_CALL_EMOJI
 if TYPE_CHECKING:
     from weave.weave_client import Call, CallsIter, WeaveClient
 
+try:
+   from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
+except ImportError:
+   OPENAI_NOT_GIVEN = None
+
 
 def print_call_link(call: "Call") -> None:
     print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
@@ -215,6 +220,10 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
     return wrap
 
 
+def value_is_sentinel(param: Any) -> bool:
+    return param.default is None or param.default is OPENAI_NOT_GIVEN
+
+
 def _apply_fn_defaults_to_inputs(
     fn: typing.Callable, inputs: Mapping[str, typing.Any]
 ) -> dict[str, typing.Any]:
@@ -222,7 +231,7 @@ def _apply_fn_defaults_to_inputs(
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():
         if param_name not in inputs:
-            if param.default != inspect.Parameter.empty and param.default is not None:
+            if param.default != inspect.Parameter.empty and not value_is_sentinel(param):
                 inputs[param_name] = param.default
             if param.kind == inspect.Parameter.VAR_POSITIONAL:
                 inputs[param_name] = tuple()
