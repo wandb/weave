@@ -137,7 +137,6 @@ export const ObjectVersionLink: React.FC<{
   filePath?: string;
   refExtra?: string;
   fullWidth?: boolean;
-  objectClass?: string;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
