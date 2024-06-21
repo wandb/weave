@@ -409,6 +409,7 @@ class Insert:
 def combine_conditions(conditions: typing.List[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
+    conditions = [c for c in conditions if c is not None and c != ""]
     if not conditions:
         return ""
     if len(conditions) == 1:

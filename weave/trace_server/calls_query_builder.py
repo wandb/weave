@@ -371,6 +371,21 @@ class Condition(BaseModel):
 class HardCodedFilter(BaseModel):
     filter: tsi._CallsFilter
 
+    def is_useful(self) -> bool:
+        return any(
+            [
+                self.filter.op_names,
+                self.filter.input_refs,
+                self.filter.output_refs,
+                self.filter.parent_ids,
+                self.filter.trace_ids,
+                self.filter.call_ids,
+                self.filter.trace_roots_only,
+                self.filter.wb_user_ids,
+                self.filter.wb_run_ids,
+            ]
+        )
+
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return combine_conditions(
             process_calls_filter_to_conditions(self.filter, pb, table_alias),
@@ -405,7 +420,8 @@ class CallsQuery(BaseModel):
         return self
 
     def set_hardcoded_filter(self, filter: HardCodedFilter) -> "CallsQuery":
-        self.hardcoded_filter = filter
+        if filter.is_useful():
+            self.hardcoded_filter = filter
         return self
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
@@ -536,9 +552,7 @@ class CallsQuery(BaseModel):
             query_conditions.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
         if len(query_conditions) > 0:
-            having_filter_sql = "HAVING " + " AND ".join(
-                [condition for condition in query_conditions]
-            )
+            having_filter_sql = "HAVING " + combine_conditions(query_conditions, "AND")
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
