@@ -27,10 +27,6 @@ Outstanding Optimizations/Work:
 
 """
 
-# PR TODO:
-# - [ ] Tests for this builder - direct sql tests
-#   - [ ] Audit the query builder (# TODO: What was i thinking here?)
-
 import typing
 
 from pydantic import BaseModel, Field
@@ -343,6 +339,10 @@ class CallsQuery(BaseModel):
         ```
 
         """
+
+        if not self.select_fields:
+            raise ValueError("Missing select columns")
+
         # Determine if the query `has_heavy_fields` by checking
         # if it `has_heavy_select or has_heavy_filter or has_heavy_order`
         has_heavy_select = False
