@@ -324,7 +324,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         cq.add_field("id")
         if req.filter is not None:
-            cq.set_legacy_filter(req.filter)
+            cq.set_hardcoded_filter(req.filter)
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 
@@ -355,7 +355,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
-            cq.set_legacy_filter(req.filter)
+            cq.set_hardcoded_filter(req.filter)
         if req.query is not None:
             cq.add_condition(req.query.expr_)
         if req.sort_by is not None:
