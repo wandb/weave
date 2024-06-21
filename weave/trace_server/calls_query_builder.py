@@ -77,6 +77,7 @@ OFFSET {OFFSET}                         -- optional
 
 Outstanding Optimizations/Work:
 
+* [ ] The CallsQuery API itself is a little clunky with the returning self pattern. Consider revision
 * [ ] This code could use more of the orm.py code to reduce logical duplication,
   specifically:
 
@@ -95,8 +96,6 @@ Outstanding Optimizations/Work:
 # PR TODO:
 # - [ ] Tests for this builder - direct sql tests
 #   - [ ] Audit the query builder (# TODO: What was i thinking here?)
-# - [ ] When legacy filters or query conditions are an ID mask, we can further optimize the subquery
-# - [ ] Awkward builder API - just simplify this
 
 import typing
 
