@@ -508,7 +508,7 @@ def _transform_external_field_to_internal_field(
             json_func = "json_extract(" if is_sqlite else "JSON_VALUE("
             field = json_func + field + ", " + json_path_param + ")"
             if not is_sqlite:
-                field = clickhouse_cast(field, cast)  # type: ignore
+                field = clickhouse_cast(field, cast or "string")  # type: ignore
 
     return field, param_builder, raw_fields_used
 
