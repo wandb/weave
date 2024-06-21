@@ -104,6 +104,7 @@ export const useProjectSidebar = (
             key: 'moreModels',
             menu: ['charts', 'jobs', 'automations', 'sweeps', 'artifacts'],
           },
+          // Remember to hide weave if env is not prod
           // {
           //   type: 'button' as const,
           //   name: 'Weave',

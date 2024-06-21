@@ -1,4 +1,5 @@
-from typing import Optional
+from typing import Any, Optional
+
 import pydantic
 
 import weave
@@ -81,3 +82,21 @@ def test_pydantic_nested_type():
         },
         "b": "int",
     }
+
+
+def test_pydantic_v1(client):
+    from pydantic import v1
+
+    class MyV1Object(v1.BaseModel):
+        val: int
+
+    class MyWeaveObject(weave.Object):
+        inner: Any
+        # inner: MyV1Object # v1 properties not yet supported
+
+    @weave.op
+    def get_inner(obj: MyWeaveObject) -> int:
+        return obj.inner.val
+
+    res = get_inner(MyWeaveObject(inner=MyV1Object(val=1)))
+    assert res == 1

@@ -4,8 +4,8 @@ import json
 import typing
 import uuid
 
-from . import trace_server_interface as tsi
 from . import refs_internal
+from . import trace_server_interface as tsi
 
 TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"
@@ -81,3 +81,13 @@ def extract_refs_from_values(
 
     _visit(vals)
     return refs
+
+
+def assert_non_null_wb_user_id(obj: typing.Any) -> None:
+    if not hasattr(obj, "wb_user_id") or obj.wb_user_id is None:
+        raise ValueError("wb_user_id cannot be None")
+
+
+def assert_null_wb_user_id(obj: typing.Any) -> None:
+    if hasattr(obj, "wb_user_id") and obj.wb_user_id is not None:
+        raise ValueError("wb_user_id must be None")

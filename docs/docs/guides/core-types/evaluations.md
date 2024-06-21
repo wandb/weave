@@ -21,7 +21,7 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: dict, model_output: dict) -> dict:
+def match_score1(expected: str, model_output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
     return {'match': expected == model_output['generated_text']}
 
@@ -71,12 +71,17 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: dict, model_output: dict) -> dict:
+def match_score1(expected: str, model_output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
     return {'match': expected == model_output['generated_text']}
 ```
 
-### Defining a Model to evaluate
+### Optional: Define a custom `Scorer` class
+In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. 
+
+See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information. 
+
+### Define a Model to evaluate
 
 To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in weave.
 
@@ -102,7 +107,7 @@ asyncio.run(evaluation.evaluate(model))
 ```
 This will run `predict` on each example and score the output with each scoring functions.
 
-### Defining a function to evaluate
+### Define a function to evaluate
 
 Alternatively, you can also evaluate a function that is wrapped in a `@weave.op()`.
 
@@ -129,7 +134,7 @@ examples = [
 ]
 
 @weave.op()
-def match_score1(expected: dict, model_output: dict) -> dict:
+def match_score1(expected: str, model_output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 
 @weave.op()

@@ -1,5 +1,5 @@
 import Box from '@mui/material/Box';
-import {useGridApiRef} from '@mui/x-data-grid-pro';
+import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useState} from 'react';
 import styled from 'styled-components';
@@ -89,6 +89,7 @@ const ObjectViewerSectionNonEmpty = ({
   const [mode, setMode] = useState(
     isSimpleData(data) || isExpanded ? 'expanded' : 'collapsed'
   );
+  const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   const body = useMemo(() => {
     if (mode === 'collapsed' || mode === 'expanded') {
@@ -97,6 +98,8 @@ const ObjectViewerSectionNonEmpty = ({
           apiRef={apiRef}
           data={data}
           isExpanded={mode === 'expanded'}
+          expandedIds={expandedIds}
+          setExpandedIds={setExpandedIds}
         />
       );
     }
@@ -105,12 +108,14 @@ const ObjectViewerSectionNonEmpty = ({
         <CodeEditor
           value={JSON.stringify(data, null, 2)}
           language="json"
+          handleMouseWheel
+          alwaysConsumeMouseWheel={false}
           readOnly
         />
       );
     }
     return null;
-  }, [apiRef, mode, data]);
+  }, [apiRef, mode, data, expandedIds]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
@@ -124,6 +129,13 @@ const ObjectViewerSectionNonEmpty = ({
     },
     [apiRef]
   );
+  const getGroupIds = useCallback(() => {
+    const rowIds = apiRef.current.getAllRowIds();
+    return rowIds.filter(rowId => {
+      const rowNode = apiRef.current.getRowNode(rowId);
+      return rowNode && rowNode.type === 'group';
+    });
+  }, [apiRef]);
 
   // Re-clicking the button will reapply collapse/expand
   const onClickCollapsed = () => {
@@ -131,12 +143,14 @@ const ObjectViewerSectionNonEmpty = ({
       setTreeExpanded(false);
     }
     setMode('collapsed');
+    setExpandedIds([]);
   };
   const onClickExpanded = () => {
     if (mode === 'expanded') {
       setTreeExpanded(true);
     }
     setMode('expanded');
+    setExpandedIds(getGroupIds());
   };
 
   return (

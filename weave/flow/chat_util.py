@@ -1,9 +1,9 @@
 from typing import Iterator, Optional
 
 from openai.types.chat import (
+    ChatCompletion,
     ChatCompletionChunk,
 )
-from openai.types.chat import ChatCompletion
 
 
 class OpenAIStream:
@@ -22,75 +22,81 @@ class OpenAIStream:
         self.first_chunk: Optional[ChatCompletionChunk] = None
         self.output_choices: list[dict] = []
 
+    def __next__(self) -> ChatCompletionChunk:
+        chunk = self.chunk_iter.__next__()
+        self._process_chunk(chunk)
+        return chunk
+
     def __iter__(self) -> Iterator[ChatCompletionChunk]:
         for chunk in self.chunk_iter:
+            self._process_chunk(chunk)
             yield chunk
-            if self.first_chunk is None:
-                self.first_chunk = chunk
-            for chunk_choice in chunk.choices:
-                for i in range(chunk_choice.index + 1 - len(self.output_choices)):
-                    self.output_choices.append(
-                        {
-                            "index": len(self.output_choices),
-                            "message": {
-                                "content": None,
-                                "tool_calls": None,
-                            },
-                            "finish_reason": None,
-                            "logprobs": None,
-                        }
-                    )
 
-                # choice fields
-                choice = self.output_choices[chunk_choice.index]
-                if chunk_choice.finish_reason:
-                    choice["finish_reason"] = chunk_choice.finish_reason
-                if chunk_choice.logprobs:
-                    choice["logprobs"] = chunk_choice.logprobs
+    def _process_chunk(self, chunk: ChatCompletionChunk) -> None:
+        if self.first_chunk is None:
+            self.first_chunk = chunk
+        for chunk_choice in chunk.choices:
+            for i in range(chunk_choice.index + 1 - len(self.output_choices)):
+                self.output_choices.append(
+                    {
+                        "index": len(self.output_choices),
+                        "message": {
+                            "content": None,
+                            "tool_calls": None,
+                        },
+                        "finish_reason": None,
+                        "logprobs": None,
+                    }
+                )
 
-                # message
-                if chunk_choice.delta.content:
-                    if choice["message"]["content"] is None:
-                        choice["message"]["content"] = ""
-                    choice["message"]["content"] += chunk_choice.delta.content
-                if chunk_choice.delta.role:
-                    choice["message"]["role"] = chunk_choice.delta.role
+            # choice fields
+            choice = self.output_choices[chunk_choice.index]
+            if chunk_choice.finish_reason:
+                choice["finish_reason"] = chunk_choice.finish_reason
+            if chunk_choice.logprobs:
+                choice["logprobs"] = chunk_choice.logprobs
 
-                # function call
-                if chunk_choice.delta.function_call:
-                    raise NotImplementedError("Function calls not supported")
+            # message
+            if chunk_choice.delta.content:
+                if choice["message"]["content"] is None:
+                    choice["message"]["content"] = ""
+                choice["message"]["content"] += chunk_choice.delta.content
+            if chunk_choice.delta.role:
+                choice["message"]["role"] = chunk_choice.delta.role
 
-                # tool calls
-                if chunk_choice.delta.tool_calls:
-                    if choice["message"]["tool_calls"] is None:
-                        choice["message"]["tool_calls"] = []
-                    for tool_call_delta in chunk_choice.delta.tool_calls:
-                        for i in range(
-                            tool_call_delta.index
-                            + 1
-                            - len(choice["message"]["tool_calls"])  # type: ignore
-                        ):
-                            choice["message"]["tool_calls"].append(  # type: ignore
-                                {
-                                    "function": {"name": None, "arguments": ""},
-                                }
+            # function call
+            if chunk_choice.delta.function_call:
+                raise NotImplementedError("Function calls not supported")
+
+            # tool calls
+            if chunk_choice.delta.tool_calls:
+                if choice["message"]["tool_calls"] is None:
+                    choice["message"]["tool_calls"] = []
+                for tool_call_delta in chunk_choice.delta.tool_calls:
+                    for i in range(
+                        tool_call_delta.index + 1 - len(choice["message"]["tool_calls"])  # type: ignore
+                    ):
+                        choice["message"]["tool_calls"].append(  # type: ignore
+                            {
+                                "function": {"name": None, "arguments": ""},
+                            }
+                        )
+                    tool_call = choice["message"]["tool_calls"][  # type: ignore
+                        tool_call_delta.index
+                    ]
+                    if tool_call_delta.id is not None:
+                        tool_call["id"] = tool_call_delta.id
+                    if tool_call_delta.type is not None:
+                        tool_call["type"] = tool_call_delta.type
+                    if tool_call_delta.function is not None:
+                        if tool_call_delta.function.name is not None:
+                            tool_call["function"]["name"] = (
+                                tool_call_delta.function.name
                             )
-                        tool_call = choice["message"]["tool_calls"][  # type: ignore
-                            tool_call_delta.index
-                        ]
-                        if tool_call_delta.id is not None:
-                            tool_call["id"] = tool_call_delta.id
-                        if tool_call_delta.type is not None:
-                            tool_call["type"] = tool_call_delta.type
-                        if tool_call_delta.function is not None:
-                            if tool_call_delta.function.name is not None:
-                                tool_call["function"][
-                                    "name"
-                                ] = tool_call_delta.function.name
-                            if tool_call_delta.function.arguments is not None:
-                                tool_call["function"][
-                                    "arguments"
-                                ] += tool_call_delta.function.arguments
+                        if tool_call_delta.function.arguments is not None:
+                            tool_call["function"]["arguments"] += (
+                                tool_call_delta.function.arguments
+                            )
 
     def final_response(self) -> ChatCompletion:
         if self.first_chunk is None:

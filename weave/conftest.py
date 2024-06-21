@@ -1,37 +1,35 @@
+import hashlib
+import logging
 import os
-import random
-import numpy as np
-
 import pathlib
-import typing
-import pytest
+import random
 import shutil
 import tempfile
+import typing
 
-import weave
-
-from . import context_state
-from .tests import fixture_fakewandb
-from . import serialize
-from . import client as client_legacy
-from .language_features.tagging.tag_store import isolated_tagging_context
-from . import logs
-from . import io_service
-from . import logs
-from . import environment
-import logging
-
+import numpy as np
+import pytest
 from flask.testing import FlaskClient
 
-from .tests.wandb_system_tests_conftest import *
-from .tests.trace_server_clickhouse_conftest import *
-
-from weave.trace_server import (
-    sqlite_trace_server,
-    trace_server_interface,
-    remote_http_trace_server,
-)
+import weave
 from weave import weave_init
+from weave.legacy import client as client_legacy
+from weave.legacy import context_state, io_service, serialize
+from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context
+from weave.trace_server import (
+    clickhouse_trace_server_batched,
+    external_to_internal_trace_server_adapter,
+    remote_http_trace_server,
+    sqlite_trace_server,
+)
+from weave.trace_server import (
+    trace_server_interface as tsi,
+)
+
+from . import autopatch, environment, logs
+from .tests import fixture_fakewandb
+from .tests.trace_server_clickhouse_conftest import *
+from .tests.wandb_system_tests_conftest import *
 
 logs.configure_logger()
 
@@ -40,10 +38,9 @@ logs.configure_logger()
 # tests.
 context_state._eager_mode.set(False)
 
-# A lot of tests rely on weave.ops.* being in scope. Importing this here
+# A lot of tests rely on weave.legacy.ops.* being in scope. Importing this here
 # makes that work...
-from weave import ops
-
+from weave.legacy import ops
 
 ### Disable datadog engine tracing
 
@@ -57,14 +54,11 @@ def make_fake_tracer():
     return FakeTracer()
 
 
-from . import engine_trace
-
-
 ### End disable datadog engine tracing
-
 ### disable internet access
-
 import socket
+
+from . import engine_trace
 
 
 def guard(*args, **kwargs):
@@ -101,6 +95,11 @@ def pytest_collection_modifyitems(config, items):
             selected_items.append(item)
 
     items[:] = selected_items
+
+    # Add the weave_client marker to all tests that have a client fixture
+    for item in items:
+        if "client" in item.fixturenames:
+            item.add_marker(pytest.mark.weave_client)
 
 
 @pytest.fixture(autouse=True)
@@ -275,7 +274,7 @@ def io_server_factory():
 
 @pytest.fixture()
 def consistent_table_col_ids():
-    from weave.panels import table_state
+    from weave.legacy.panels import table_state
 
     with table_state.use_consistent_col_ids():
         yield
@@ -304,17 +303,124 @@ def strict_op_saving():
 #     )
 
 
+class TwoWayMapping:
+    def __init__(self):
+        self._ext_to_int_map = {}
+        self._int_to_ext_map = {}
+
+        # Useful for testing to ensure caching is working
+        self.stats = {
+            "ext_to_int": {
+                "hits": 0,
+                "misses": 0,
+            },
+            "int_to_ext": {
+                "hits": 0,
+                "misses": 0,
+            },
+        }
+
+    def ext_to_int(self, key, default=None):
+        if key not in self._ext_to_int_map:
+            if default is None:
+                raise ValueError(f"Key {key} not found")
+            if default in self._int_to_ext_map:
+                raise ValueError(f"Default {default} already in use")
+            self._ext_to_int_map[key] = default
+            self._int_to_ext_map[default] = key
+            self.stats["ext_to_int"]["misses"] += 1
+        else:
+            self.stats["ext_to_int"]["hits"] += 1
+        return self._ext_to_int_map[key]
+
+    def int_to_ext(self, key, default):
+        if key not in self._int_to_ext_map:
+            if default is None:
+                raise ValueError(f"Key {key} not found")
+            if default in self._ext_to_int_map:
+                raise ValueError(f"Default {default} already in use")
+            self._int_to_ext_map[key] = default
+            self._ext_to_int_map[default] = key
+            self.stats["int_to_ext"]["misses"] += 1
+        else:
+            self.stats["int_to_ext"]["hits"] += 1
+        return self._int_to_ext_map[key]
+
+
+def simple_hash(s: str) -> str:
+    return hashlib.sha256(s.encode()).hexdigest()
+
+
+class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
+    def __init__(self):
+        self._project_map = TwoWayMapping()
+        self._run_map = TwoWayMapping()
+        self._user_map = TwoWayMapping()
+
+    def ext_to_int_project_id(self, project_id: str) -> str:
+        return self._project_map.ext_to_int(project_id, simple_hash(project_id))
+
+    def int_to_ext_project_id(self, project_id: str) -> str:
+        return self._project_map.int_to_ext(project_id, simple_hash(project_id))
+
+    def ext_to_int_run_id(self, run_id: str) -> str:
+        return self._run_map.ext_to_int(run_id, simple_hash(run_id))
+
+    def int_to_ext_run_id(self, run_id: str) -> str:
+        return self._run_map.int_to_ext(run_id, simple_hash(run_id))
+
+    def ext_to_int_user_id(self, user_id: str) -> str:
+        return self._user_map.ext_to_int(user_id, simple_hash(user_id))
+
+    def int_to_ext_user_id(self, user_id: str) -> str:
+        return self._user_map.int_to_ext(user_id, simple_hash(user_id))
+
+
+class TestOnlyUserInjectingExternalTraceServer(
+    external_to_internal_trace_server_adapter.ExternalTraceServer
+):
+    def __init__(
+        self,
+        internal_trace_server: tsi.TraceServerInterface,
+        id_converter: external_to_internal_trace_server_adapter.IdConverter,
+        user_id: str,
+    ):
+        super().__init__(internal_trace_server, id_converter)
+        self._user_id = user_id
+
+    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        req.start.wb_user_id = self._user_id
+        return super().call_start(req)
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        req.wb_user_id = self._user_id
+        return super().calls_delete(req)
+
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        req.wb_user_id = self._user_id
+        return super().call_update(req)
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        req.wb_user_id = self._user_id
+        return super().feedback_create(req)
+
+
 @pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+    inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
-    tsi: trace_server_interface.TraceServerInterface
+    server: tsi.TraceServerInterface
+    entity = "shawn"
+    project = "test-project"
     if weave_server_flag == "sqlite":
-        sql_lite_server = sqlite_trace_server.SqliteTraceServer(
+        sqlite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
         )
-        sql_lite_server.drop_tables()
-        sql_lite_server.setup_tables()
-        tsi = sql_lite_server
+        sqlite_server.drop_tables()
+        sqlite_server.setup_tables()
+        server = TestOnlyUserInjectingExternalTraceServer(
+            sqlite_server, DummyIdConverter(), entity
+        )
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
             use_async_insert=False
@@ -322,15 +428,21 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
-        tsi = ch_server
+        server = TestOnlyUserInjectingExternalTraceServer(
+            ch_server, DummyIdConverter(), entity
+        )
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
             weave_server_flag
         )
-        tsi = remote_server
+        server = remote_server
+    elif weave_server_flag == ("prod"):
+        inited_client = weave_init.init_weave("dev_testing")
 
-    client = weave_client.WeaveClient("shawn", "test-project", tsi)
-    inited_client = weave_init.InitializedClient(client)
+    if inited_client is None:
+        client = weave_client.WeaveClient(entity, project, server)
+        inited_client = weave_init.InitializedClient(client)
+        autopatch.autopatch()
     try:
         yield inited_client.client
     finally:

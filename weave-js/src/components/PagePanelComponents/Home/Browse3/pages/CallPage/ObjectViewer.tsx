@@ -4,9 +4,12 @@ import {
   GridApiPro,
   GridColDef,
   GridRowHeightParams,
+  GridRowId,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {
+  Dispatch,
+  SetStateAction,
   useCallback,
   useContext,
   useEffect,
@@ -14,7 +17,6 @@ import React, {
   useState,
 } from 'react';
 
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
@@ -25,6 +27,7 @@ import {
   OBJECT_ATTR_EDGE_NAME,
 } from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
+import {isExpandableRef} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {
   USE_TABLE_FOR_ARRAYS,
   WeaveCHTableSourceRefContext,
@@ -39,6 +42,8 @@ type ObjectViewerProps = {
   apiRef: React.MutableRefObject<GridApiPro>;
   data: Data;
   isExpanded: boolean;
+  expandedIds: GridRowId[];
+  setExpandedIds: Dispatch<SetStateAction<GridRowId[]>>;
 };
 
 // Traverse the data and find all ref URIs.
@@ -54,32 +59,21 @@ const getRefs = (data: Data): string[] => {
 
 type RefValues = Record<string, any>; // ref URI to value
 
-const refIsExpandable = (ref: string): boolean => {
-  if (!isRef(ref)) {
-    return false;
-  }
-  const parsed = parseRef(ref);
-  if (isWeaveObjectRef(parsed)) {
-    return (
-      parsed.weaveKind === 'object' ||
-      parsed.weaveKind === 'op' ||
-      (parsed.weaveKind === 'table' &&
-        parsed.artifactRefExtra != null &&
-        parsed.artifactRefExtra.length > 0)
-    );
-  }
-  return false;
-};
-
 // This is a general purpose object viewer that can be used to view any object.
-export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
+export const ObjectViewer = ({
+  apiRef,
+  data,
+  isExpanded,
+  expandedIds,
+  setExpandedIds,
+}: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
   // `resolvedData` holds ref-resolved data.
   const [resolvedData, setResolvedData] = useState<Data>(data);
 
   // `dataRefs` are the refs contained in the data, filtered to only include expandable refs.
-  const dataRefs = useMemo(() => getRefs(data).filter(refIsExpandable), [data]);
+  const dataRefs = useMemo(() => getRefs(data).filter(isExpandableRef), [data]);
 
   // Expanded refs are the explicit set of refs that have been expanded by the user. Note that
   // this might contain nested refs not in the `dataRefs` set. The keys are refs and the values
@@ -176,7 +170,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         if (context.path.hasHiddenKey() || isNullDescription) {
           return 'skip';
         }
-        if (refIsExpandable(context.value)) {
+        if (isExpandableRef(context.value)) {
           // These are possibly expandable refs. When we encounter an expandable ref, we
           // indicate that it is expandable and add a loader row. The effect is that the
           // group header will show the expansion icon when `isExpandableRef` is true. Also,
@@ -278,9 +272,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   // the expansion. Importantly, when the column is clicked, we do some
   // bookkeeping to add the expanded ref to the `expandedRefs` state. This
   // triggers a set of state updates to populate the expanded data.
-  const [expandedIds, setExpandedIds] = useState<Array<string | number>>(
-    isExpanded ? rows.filter(r => !r.isExpandableRef).map(r => r.id) : []
-  );
+
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
       headerName: 'Path',
@@ -305,7 +297,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         );
       },
     }),
-    [addExpandedRef]
+    [addExpandedRef, setExpandedIds]
   );
 
   // Next we define a function that updates the row expansion state. This

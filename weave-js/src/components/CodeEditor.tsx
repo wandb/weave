@@ -13,6 +13,8 @@ const Editor = React.lazy(async () => {
   return await import('@monaco-editor/react');
 });
 
+const BORDER_PX = 1;
+
 type CodeEditorProps = {
   value: string;
   language?: string;
@@ -20,7 +22,11 @@ type CodeEditorProps = {
   onChange?: (value: string) => void;
   maxHeight?: number;
   minHeight?: number;
+
+  // To enable horizontal scrolling with the mouse wheel and not just the scrollbar,
+  // set handleMouseWheel to true and alwaysConsumeMouseWheel to false.
   handleMouseWheel?: boolean;
+  alwaysConsumeMouseWheel?: boolean;
 };
 
 export const CodeEditor = ({
@@ -31,6 +37,7 @@ export const CodeEditor = ({
   maxHeight,
   minHeight,
   handleMouseWheel,
+  alwaysConsumeMouseWheel,
 }: CodeEditorProps) => {
   const editorRef = useRef(null);
   const [height, setHeight] = useState(300);
@@ -38,7 +45,8 @@ export const CodeEditor = ({
   const updateHeight = () => {
     const editor: any = editorRef.current;
     if (editor) {
-      const contentHeight = editor.getContentHeight();
+      // box-sizing is border-box, so include border in height.
+      const contentHeight = editor.getContentHeight() + 2 * BORDER_PX;
       const realMin = minHeight
         ? Math.max(minHeight, contentHeight)
         : contentHeight;
@@ -72,11 +80,9 @@ export const CodeEditor = ({
     },
     overviewRulerLanes: 0,
     scrollBeyondLastLine: false,
-
-    // If we are autosizing, don't capture scroll events so we can scroll past editor.
-    // Note that this also means we have to explicitly use horizontal scrollbar to view clipped content.
     scrollbar: {
       handleMouseWheel: handleMouseWheel ?? false,
+      alwaysConsumeMouseWheel: alwaysConsumeMouseWheel ?? true,
     },
   };
 
@@ -91,7 +97,7 @@ export const CodeEditor = ({
       style={{
         width,
         height: `${height}px`,
-        border: `1px solid ${MOON_250}`,
+        border: `${BORDER_PX}px solid ${MOON_250}`,
       }}>
       <React.Suspense fallback={<></>}>
         <Editor

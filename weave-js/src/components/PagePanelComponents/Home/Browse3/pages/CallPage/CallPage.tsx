@@ -1,11 +1,19 @@
 import Box from '@mui/material/Box';
+import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
+import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
+import {
+  TRACETREE_PARAM,
+  useClosePeek,
+  useWeaveflowCurrentRouteContext,
+} from '../../context';
+import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
@@ -24,6 +32,7 @@ export const CallPage: FC<{
   path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
+  const close = useClosePeek();
 
   const call = useCall({
     entity: props.entity,
@@ -33,13 +42,24 @@ export const CallPage: FC<{
   if (call.loading) {
     return <CenteredAnimatedLoader />;
   } else if (call.result === null) {
-    return <div>Call not found</div>;
+    return (
+      <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+        <div style={{alignSelf: 'flex-end', margin: 10}}>
+          <Button icon="close" variant="ghost" onClick={close} />
+        </div>
+        <div style={{flex: 1}}>
+          <ErrorPanel title="Call not found" subtitle="" subtitle2="" />
+        </div>
+      </div>
+    );
   }
   return <CallPageInnerVertical {...props} call={call.result} />;
 };
 
 const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
+  const {entity, project, callId} = call;
+  const weaveRef = makeRefCall(entity, project, callId);
   return [
     {
       label: 'Call',
@@ -53,6 +73,19 @@ const useCallTabs = (call: CallSchema) => {
           },
         ]
       : []),
+    {
+      label: 'Feedback',
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <FeedbackGrid
+            entity={entity}
+            project={project}
+            weaveRef={weaveRef}
+            objectType="call"
+          />
+        </Tailwind>
+      ),
+    },
     {
       label: 'Summary',
       content: <CallSummary call={call} />,

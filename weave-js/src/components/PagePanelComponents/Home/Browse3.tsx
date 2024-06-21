@@ -9,7 +9,6 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import LinearProgress from '@mui/material/LinearProgress';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {Loading} from '@wandb/weave/components/Loading';
@@ -23,7 +22,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useState,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
@@ -35,7 +33,6 @@ import {
   useParams,
 } from 'react-router-dom';
 
-import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
@@ -59,8 +56,9 @@ import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
+import {Empty} from './Browse3/pages/common/Empty';
+import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
-import {CompareCallsPage} from './Browse3/pages/CompareCallsPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
 import {ObjectVersionsPage} from './Browse3/pages/ObjectVersionsPage';
@@ -76,6 +74,8 @@ import {
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
+import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
@@ -129,7 +129,6 @@ const tabOptions = [
   'evaluations',
   'boards',
   'tables',
-  'compare-calls',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -179,15 +178,7 @@ const Browse3Mounted: FC<{
   navigateAwayFromProject?: () => void;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
-  const weaveContext = useWeaveContext();
-  const [weaveLoading, setWeaveLoading] = useState(false);
-  useEffect(() => {
-    const obs = weaveContext.client.loadingObservable();
-    const sub = obs.subscribe(loading => {
-      setWeaveLoading(loading);
-    });
-    return () => sub.unsubscribe();
-  }, [weaveContext.client]);
+  const hasTSContext = useHasTraceServerClientContext();
   return (
     <Box
       sx={{
@@ -196,16 +187,6 @@ const Browse3Mounted: FC<{
         overflow: 'auto',
         flexDirection: 'column',
       }}>
-      {weaveLoading && (
-        <Box
-          sx={{
-            width: '100%',
-            position: 'absolute',
-            zIndex: 2,
-          }}>
-          <LinearProgress />
-        </Box>
-      )}
       {!props.hideHeader && (
         <AppBar
           sx={{
@@ -241,23 +222,27 @@ const Browse3Mounted: FC<{
         <Route path={baseRouter.projectUrl(':entity', ':project')} exact>
           <ProjectRedirect />
         </Route>
-        <Route
-          path={browse3Paths(baseRouter.projectUrl(':entity', ':project'))}>
-          <Box
-            component="main"
-            sx={{
-              flex: '1 1 auto',
-              height: '100%',
-              width: '100%',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}>
-            <ErrorBoundary>
-              <MainPeekingLayout />
-            </ErrorBoundary>
-          </Box>
-        </Route>
+        {hasTSContext ? (
+          <Route
+            path={browse3Paths(baseRouter.projectUrl(':entity', ':project'))}>
+            <Box
+              component="main"
+              sx={{
+                flex: '1 1 auto',
+                height: '100%',
+                width: '100%',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}>
+              <ErrorBoundary>
+                <MainPeekingLayout />
+              </ErrorBoundary>
+            </Box>
+          </Route>
+        ) : (
+          <Empty {...EMPTY_NO_TRACE_SERVER} />
+        )}
 
         <Route>
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
@@ -334,7 +319,7 @@ const MainPeekingLayout: FC = () => {
           PaperProps={{
             style: {
               overflow: 'hidden',
-              display: 'flex',
+              display: isDrawerOpen ? 'flex' : 'none',
               zIndex: 1,
               width: `${drawerWidthPct}%`,
               height: '100%',
@@ -496,9 +481,6 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
         </Route>
-        <Route path={`${projectRoot}/compare-calls`}>
-          <CompareCallsBinding />
-        </Route>
       </Switch>
     </Box>
   );
@@ -639,32 +621,6 @@ const CallPageBinding = () => {
       project={params.project}
       callId={params.itemName}
       path={query[PATH_PARAM]}
-    />
-  );
-};
-
-const CompareCallsBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
-  const query = useURLSearchParamsDict();
-  const compareSpec = useMemo(() => {
-    const callIds = JSON.parse(query.callIds);
-    const primaryDim = query.primaryDim;
-    const secondaryDim = query.secondaryDim;
-
-    return {
-      callIds,
-      primaryDim,
-      secondaryDim,
-    };
-  }, [query.callIds, query.primaryDim, query.secondaryDim]);
-
-  return (
-    <CompareCallsPage
-      entity={params.entity}
-      project={params.project}
-      callIds={compareSpec.callIds}
-      primaryDim={compareSpec.primaryDim}
-      secondaryDim={compareSpec.secondaryDim}
     />
   );
 };

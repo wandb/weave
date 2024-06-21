@@ -1,32 +1,47 @@
 # Sqlite Trace Server
 
-from typing import cast, Optional, Any, Union
-import threading
-
-import contextvars
 import contextlib
+import contextvars
 import datetime
-import json
 import hashlib
+import json
 import sqlite3
+import threading
+from typing import Any, Iterator, Optional, Union, cast
+from zoneinfo import ZoneInfo
 
+import emoji
 
-from .trace_server_interface_util import (
-    extract_refs_from_values,
-    str_digest,
-    bytes_digest,
+from weave.trace_server.emoji_util import detone_emojis
+from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.feedback import (
+    TABLE_FEEDBACK,
+    validate_feedback_create_req,
+    validate_feedback_purge_req,
 )
-from . import trace_server_interface as tsi
-
-from weave.trace import refs
-from weave.trace_server.trace_server_interface_util import (
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-)
+from weave.trace_server.orm import Row
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    WEAVE_INTERNAL_SCHEME,
+    InternalObjectRef,
+    InternalTableRef,
+    parse_internal_uri,
+)
+from weave.trace_server.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    generate_id,
+)
+
+from . import trace_server_interface as tsi
+from .interface import query as tsi_query
+from .trace_server_interface_util import (
+    assert_non_null_wb_user_id,
+    bytes_digest,
+    extract_refs_from_values,
+    str_digest,
 )
 
 MAX_FLUSH_COUNT = 10000
@@ -60,6 +75,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def drop_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(TABLE_FEEDBACK.drop_sql())
         cursor.execute("DROP TABLE IF EXISTS calls")
         cursor.execute("DROP TABLE IF EXISTS objects")
         cursor.execute("DROP TABLE IF EXISTS tables")
@@ -85,7 +101,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 output_refs TEXT,
                 summary TEXT,
                 wb_user_id TEXT,
-                wb_run_id TEXT
+                wb_run_id TEXT,
+                deleted_at TEXT,
+                display_name TEXT
             )
         """
         )
@@ -101,7 +119,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 val_dump TEXT,
                 digest TEXT UNIQUE,
                 version_index INTEGER,
-                is_latest INTEGER
+                is_latest INTEGER,
+                deleted_at TEXT
             )
         """
         )
@@ -129,6 +148,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 val BLOB)
             """
         )
+        cursor.execute(TABLE_FEEDBACK.create_sql())
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -148,19 +168,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     trace_id,
                     parent_id,
                     op_name,
+                    display_name,
                     started_at,
                     attributes,
                     inputs,
                     input_refs,
                     wb_user_id,
                     wb_run_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
                     req.start.trace_id,
                     req.start.parent_id,
                     req.start.op_name,
+                    req.start.display_name,
                     req.start.started_at.isoformat(),
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
@@ -272,7 +294,89 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
 
-        query = f"SELECT * FROM calls WHERE project_id = '{req.project_id}'"
+        if req.query:
+            # This is the mongo-style query
+            def process_operation(operation: tsi_query.Operation) -> str:
+                cond = None
+
+                if isinstance(operation, tsi_query.AndOperation):
+                    lhs_part = process_operand(operation.and_[0])
+                    rhs_part = process_operand(operation.and_[1])
+                    cond = f"({lhs_part} AND {rhs_part})"
+                elif isinstance(operation, tsi_query.OrOperation):
+                    lhs_part = process_operand(operation.or_[0])
+                    rhs_part = process_operand(operation.or_[1])
+                    cond = f"({lhs_part} OR {rhs_part})"
+                elif isinstance(operation, tsi_query.NotOperation):
+                    operand_part = process_operand(operation.not_[0])
+                    cond = f"(NOT ({operand_part}))"
+                elif isinstance(operation, tsi_query.EqOperation):
+                    lhs_part = process_operand(operation.eq_[0])
+                    rhs_part = process_operand(operation.eq_[1])
+                    cond = f"({lhs_part} = {rhs_part})"
+                elif isinstance(operation, tsi_query.GtOperation):
+                    lhs_part = process_operand(operation.gt_[0])
+                    rhs_part = process_operand(operation.gt_[1])
+                    cond = f"({lhs_part} > {rhs_part})"
+                elif isinstance(operation, tsi_query.GteOperation):
+                    lhs_part = process_operand(operation.gte_[0])
+                    rhs_part = process_operand(operation.gte_[1])
+                    cond = f"({lhs_part} >= {rhs_part})"
+                elif isinstance(operation, tsi_query.ContainsOperation):
+                    lhs_part = process_operand(operation.contains_.input)
+                    rhs_part = process_operand(operation.contains_.substr)
+                    if operation.contains_.case_insensitive:
+                        lhs_part = f"LOWER({lhs_part})"
+                        rhs_part = f"LOWER({rhs_part})"
+                    cond = f"instr({lhs_part}, {rhs_part})"
+                else:
+                    raise ValueError(f"Unknown operation type: {operation}")
+
+                return cond
+
+            def process_operand(operand: tsi_query.Operand) -> str:
+                if isinstance(operand, tsi_query.LiteralOperation):
+                    return json.dumps(operand.literal_)
+                elif isinstance(operand, tsi_query.GetFieldOperator):
+                    field = _transform_external_calls_field_to_internal_calls_field(
+                        operand.get_field_, None
+                    )
+                    return field
+                elif isinstance(operand, tsi_query.ConvertOperation):
+                    field = process_operand(operand.convert_.input)
+                    convert_to = operand.convert_.to
+                    if convert_to == "int":
+                        sql_type = "INT"
+                    elif convert_to == "double":
+                        sql_type = "FLOAT"
+                    elif convert_to == "bool":
+                        sql_type = "BOOL"
+                    elif convert_to == "string":
+                        sql_type = "TEXT"
+                    else:
+                        raise ValueError(f"Unknown cast: {convert_to}")
+                    return f"CAST({field} AS {sql_type})"
+                elif isinstance(
+                    operand,
+                    (
+                        tsi_query.AndOperation,
+                        tsi_query.OrOperation,
+                        tsi_query.NotOperation,
+                        tsi_query.EqOperation,
+                        tsi_query.GtOperation,
+                        tsi_query.GteOperation,
+                        tsi_query.ContainsOperation,
+                    ),
+                ):
+                    return process_operation(operand)
+                else:
+                    raise ValueError(f"Unknown operand type: {operand}")
+
+            filter_cond = process_operation(req.query.expr_)
+
+            conds.append(filter_cond)
+
+        query = f"SELECT * FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
 
@@ -300,8 +404,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     field = "attributes_dump" + field[len("attributes") :]
                 elif field.startswith("summary"):
                     field = "summary_dump" + field[len("summary") :]
-                elif field == ("latency"):
-                    field = "ended_at - started_at"
 
                 assert direction in [
                     "ASC",
@@ -314,7 +416,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 order_parts.append(f"{field} {direction}")
 
             order_by_part = ", ".join(order_parts)
-            query += f"ORDER BY {order_by_part}"
+            query += f" ORDER BY {order_by_part}"
 
         limit = req.limit or -1
         if limit:
@@ -344,10 +446,80 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     summary=json.loads(row[13]) if row[13] else None,
                     wb_user_id=row[14],
                     wb_run_id=row[15],
+                    display_name=row[17] if row[17] != "" else None,
                 )
                 for row in query_result
             ]
         )
+
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        return iter(self.calls_query(req).calls)
+
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+            )
+        ).calls
+        return tsi.CallsQueryStatsRes(
+            count=len(calls),
+        )
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        assert_non_null_wb_user_id(req)
+        # update row with a deleted_at field set to now
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            recursive_query = """
+                WITH RECURSIVE Descendants AS (
+                    SELECT id
+                    FROM calls
+                    WHERE project_id = ? AND
+                        deleted_at IS NULL AND
+                        parent_id IN (SELECT id FROM calls WHERE id IN ({}))
+
+                    UNION ALL
+
+                    SELECT c.id
+                    FROM calls c
+                    JOIN Descendants d ON c.parent_id = d.id
+                    WHERE c.deleted_at IS NULL
+                )
+                SELECT id FROM Descendants;
+            """.format(", ".join("?" * len(req.call_ids)))
+
+            params = [req.project_id] + req.call_ids
+            cursor.execute(recursive_query, params)
+            all_ids = [x[0] for x in cursor.fetchall()] + req.call_ids
+
+            # set deleted_at for all children and parents
+            delete_query = """
+                UPDATE calls
+                SET deleted_at = CURRENT_TIMESTAMP
+                WHERE deleted_at is NULL AND
+                    id IN ({})
+            """.format(", ".join("?" * len(all_ids)))
+            print("MUTATION", delete_query)
+            cursor.execute(delete_query, all_ids)
+            conn.commit()
+
+        return tsi.CallsDeleteRes()
+
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        assert_non_null_wb_user_id(req)
+        if req.display_name is None:
+            raise ValueError("One of [display_name] is required for call update")
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute(
+                "UPDATE calls SET display_name = ? WHERE id = ?",
+                (req.display_name, req.call_id),
+            )
+            conn.commit()
+        return tsi.CallUpdateRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -404,9 +576,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = [
-            f"object_id = '{req.object_id}'",
-        ]
+        conds = [f"object_id = '{req.object_id}'"]
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
@@ -492,22 +662,22 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_refs = [refs.parse_uri(r) for r in req.refs]
-        if any(isinstance(r, refs.TableRef) for r in parsed_refs):
+        parsed_refs = [parse_internal_uri(r) for r in req.refs]
+        if any(isinstance(r, InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
-        parsed_obj_refs = cast(list[refs.ObjectRef], parsed_refs)
+        parsed_obj_refs = cast(list[InternalObjectRef], parsed_refs)
 
-        def read_ref(r: refs.ObjectRef) -> Any:
+        def read_ref(r: InternalObjectRef) -> Any:
             conds = [
                 f"object_id = '{r.name}'",
-                f"digest = '{r.digest}'",
+                f"digest = '{r.version}'",
             ]
             objs = self._select_objs_query(
-                f"{r.entity}/{r.project}",
+                r.project_id,
                 conditions=conds,
             )
             if len(objs) == 0:
-                raise NotFoundError(f"Obj {r.name}:{r.digest} not found")
+                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
             val = obj.val
             extra = r.extra
@@ -520,14 +690,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 elif op == LIST_INDEX_EDGE_NAME:
                     val = val[int(arg)]
                 elif op == TABLE_ROW_ID_EDGE_NAME:
-                    if isinstance(val, str) and val.startswith("weave://"):
-                        table_ref = refs.parse_uri(val)
-                        if not isinstance(table_ref, refs.TableRef):
+                    weave_internal_prefix = WEAVE_INTERNAL_SCHEME + ":///"
+                    if isinstance(val, str) and val.startswith(weave_internal_prefix):
+                        table_ref = parse_internal_uri(val)
+                        if not isinstance(table_ref, InternalTableRef):
                             raise ValueError(
                                 "invalid data layout encountered, expected TableRef when resolving id"
                             )
                         row = self._table_row_read(
-                            project_id=f"{table_ref.entity}/{table_ref.project}",
+                            project_id=table_ref.project_id,
                             row_digest=arg,
                         )
                         val = row.val
@@ -540,6 +711,82 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             return val
 
         return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_obj_refs])
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        assert_non_null_wb_user_id(req)
+        validate_feedback_create_req(req)
+
+        # Augment emoji with alias.
+        res_payload = {}
+        if req.feedback_type == "wandb.reaction.1":
+            em = req.payload["emoji"]
+            if emoji.emoji_count(em) != 1:
+                raise InvalidRequest(
+                    "Value of emoji key in payload must be exactly one emoji"
+                )
+            req.payload["alias"] = emoji.demojize(em)
+            detoned = detone_emojis(em)
+            req.payload["detoned"] = detoned
+            req.payload["detoned_alias"] = emoji.demojize(detoned)
+            res_payload = req.payload
+
+        feedback_id = generate_id()
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
+        # TODO: Any validation on weave_ref?
+        payload = json.dumps(req.payload)
+        MAX_PAYLOAD = 1024
+        if len(payload) > MAX_PAYLOAD:
+            raise InvalidRequest("Feedback payload too large")
+        row: Row = {
+            "id": feedback_id,
+            "project_id": req.project_id,
+            "weave_ref": req.weave_ref,
+            "wb_user_id": req.wb_user_id,
+            "creator": req.creator,
+            "feedback_type": req.feedback_type,
+            "payload": req.payload,
+            "created_at": created_at,
+        }
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="sqlite")
+            cursor.executemany(prepared.sql, prepared.data)
+            conn.commit()
+        return tsi.FeedbackCreateRes(
+            id=feedback_id,
+            created_at=created_at,
+            wb_user_id=req.wb_user_id,
+            payload=res_payload,
+        )
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        query = TABLE_FEEDBACK.select()
+        query = query.project_id(req.project_id)
+        query = query.fields(req.fields)
+        query = query.where(req.query)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        prepared = query.prepare(database_type="sqlite")
+        r = cursor.execute(prepared.sql, prepared.parameters)
+        result = TABLE_FEEDBACK.tuples_to_rows(r.fetchall(), prepared.fields)
+        return tsi.FeedbackQueryRes(result=result)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        # TODO: Instead of passing conditions to DELETE FROM,
+        #       should we select matching ids, and then DELETE FROM WHERE id IN (...)?
+        #       This would allow us to return the number of rows deleted, and complain
+        #       if too many things would be deleted.
+        validate_feedback_purge_req(req)
+        conn, cursor = get_conn_cursor(self.db_path)
+        query = TABLE_FEEDBACK.purge()
+        query = query.project_id(req.project_id)
+        query = query.where(req.query)
+        prepared = query.prepare(database_type="sqlite")
+        with self.lock:
+            cursor.execute(prepared.sql, prepared.parameters)
+            conn.commit()
+        return tsi.FeedbackPurgeRes()
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -636,7 +883,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
         cursor.execute(
-            """SELECT * FROM objects WHERE project_id = ? AND """ + pred,
+            """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
+            + pred,
             (project_id,),
         )
         query_result = cursor.fetchall()
@@ -692,3 +940,71 @@ def get_base_object_class(val: Any) -> Optional[str]:
                             elif "_class_name" in val:
                                 return val["_class_name"]
     return None
+
+
+def _quote_json_path(path: str) -> str:
+    parts = path.split(".")
+    parts_final = []
+    for part in parts:
+        try:
+            int(part)
+            parts_final.append("[" + part + "]")
+        except ValueError:
+            parts_final.append('."' + part + '"')
+    return "$" + "".join(parts_final)
+
+
+def _transform_external_calls_field_to_internal_calls_field(
+    field: str,
+    cast: Optional[str] = None,
+) -> str:
+    json_path = None
+    if field == "inputs" or field.startswith("inputs."):
+        if field == "inputs":
+            json_path = "$"
+        else:
+            json_path = _quote_json_path(field[len("inputs.") :])
+        field = "inputs"
+    elif field == "output" or field.startswith("output."):
+        if field == "output":
+            json_path = "$"
+        else:
+            json_path = _quote_json_path(field[len("output.") :])
+        field = "output"
+    elif field == "attributes" or field.startswith("attributes."):
+        if field == "attributes":
+            json_path = "$"
+        else:
+            json_path = _quote_json_path(field[len("attributes.") :])
+        field = "attributes"
+    elif field == "summary" or field.startswith("summary."):
+        if field == "summary":
+            json_path = "$"
+        else:
+            json_path = _quote_json_path(field[len("summary.") :])
+        field = "summary"
+
+    if json_path is not None:
+        sql_type = "TEXT"
+        if cast is not None:
+            if cast == "int":
+                sql_type = "INT"
+            elif cast == "float":
+                sql_type = "FLOAT"
+            elif cast == "bool":
+                sql_type = "BOOL"
+            elif cast == "str":
+                sql_type = "TEXT"
+            else:
+                raise ValueError(f"Unknown cast: {cast}")
+        field = (
+            "CAST(json_extract("
+            + json.dumps(field)
+            + ", '"
+            + json_path
+            + "') AS "
+            + sql_type
+            + ")"
+        )
+
+    return field

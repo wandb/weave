@@ -1,39 +1,45 @@
+import base64
 import cProfile
-import os
 import logging
+import os
 import pathlib
+import sys
 import time
 import traceback
-import sys
-import base64
 import typing
-import zlib
 import urllib.parse
+import zlib
+
 import requests
-from flask import json
+import wandb
+from flask import (
+    Blueprint,
+    Flask,
+    Response,
+    abort,
+    json,
+    redirect,
+    request,
+    send_from_directory,
+)
+from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-from flask import Flask, Blueprint, Response
-from flask import request
-from flask import abort
-from flask_cors import CORS
-from flask import send_from_directory, redirect
-import wandb
-
-from weave import context_state, graph, server, value_or_error
-from weave import storage
-from weave import registry_mem
-from weave import errors
-from weave import weavejs_fixes
-from weave import util
-from weave import engine_trace
-from weave import environment
-from weave import logs
-from weave import filesystem
+from weave import (
+    engine_trace,
+    environment,
+    errors,
+    filesystem,
+    logs,
+    registry_mem,
+    server,
+    storage,
+    util,
+    weavejs_fixes,
+)
+from weave.legacy import context_state, graph, value_or_error, wandb_api
+from weave.legacy.language_features.tagging import tag_store
 from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
-from weave import storage
-from weave import wandb_api
-from weave.language_features.tagging import tag_store
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +88,7 @@ if engine_trace.datadog_is_enabled():
 
 
 # Ensure these are imported and registered
-from weave import ops
-
+from weave.legacy import ops
 
 # NOTE: Fixes flask dev server's auto-reload capability, by forcing it to use
 # stat mode instead of watchdog mode. It turns out that "import wandb" breaks
@@ -102,13 +107,11 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
-    from weave import ops
-    from weave import panels
-    from weave import panels_py
+    from weave.legacy import ops, panels, panels_py
 
     # Attempt to import MVP ecosystem modules
     try:
-        from weave.ecosystem import langchain, replicate
+        from weave.legacy.ecosystem import langchain, replicate
     except ImportError:
         pass
 
@@ -121,7 +124,7 @@ def import_ecosystem():
         # except (ImportError, OSError, wandb.Error):
         #     print("Error: Couldn't import faiss module for Weaveflow.")
         try:
-            from weave.ecosystem import all
+            from weave.legacy.ecosystem import all
         except (ImportError, OSError, wandb.Error):
             pass
 
@@ -396,8 +399,8 @@ def send_local_file(path):
     # path is given relative to the FS root. check to see that path is a subdirectory of the
     # local artifacts path. if not, return 403. then if there is a cache scope function defined
     # call it to make sure we have access to the path
-    abspath = "/" / pathlib.Path(
-        path
+    abspath = (
+        "/" / pathlib.Path(path)
     )  # add preceding slash as werkzeug strips this by default and it is reappended below in send_from_directory
     try:
         local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).absolute()
@@ -421,7 +424,7 @@ def frontend_env():
         "ONPREM": environment.weave_onprem(),
         "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
         "TRACE_BACKEND_BASE_URL": environment.trace_backend_base_url(),
-        "WANDB_BASE_URL": environment.wandb_base_url(),
+        "WANDB_BASE_URL": environment.wandb_frontend_base_url(),
         "DD_ENV": environment.dd_env(),
         "ENV_IS_CI": environment.env_is_ci(),
     }

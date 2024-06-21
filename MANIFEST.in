@@ -17,5 +17,7 @@ graft weave/flow
 graft weave/deploy
 graft weave/trace_server
 graft weave/trace
+graft weave/integrations
 global-exclude */__pycache__/*
 global-exclude *.pyc
+global-exclude */cassettes/*
