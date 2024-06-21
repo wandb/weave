@@ -1,6 +1,6 @@
 import pytest
-
 import wandb
+
 import weave
 from weave.legacy import async_demo, compile, graph
 from weave.legacy.dispatch import RuntimeOutputNode

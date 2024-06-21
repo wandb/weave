@@ -4,14 +4,14 @@ import time
 
 import numpy as np
 import pytest
-from bokeh.plotting import figure
-
 import wandb
-import weave
+from bokeh.plotting import figure
 from wandb import Artifact
 from wandb import data_types as wb_data_types
 from wandb.sdk.artifacts.artifact_state import ArtifactState
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
+
+import weave
 from weave import weave_types as types
 from weave.legacy import artifact_fs
 from weave.legacy.artifact_wandb import WandbArtifact, WeaveWBArtifactURI

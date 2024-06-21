@@ -9,9 +9,9 @@ from contextlib import contextmanager
 from contextvars import copy_context
 
 import pytest
+import wandb
 from pydantic import BaseModel, ValidationError
 
-import wandb
 import weave
 from weave import weave_client
 from weave.legacy import context_state

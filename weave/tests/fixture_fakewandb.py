@@ -9,6 +9,7 @@ from unittest import mock
 from urllib import parse
 
 import wandb
+
 import weave
 from weave import util
 

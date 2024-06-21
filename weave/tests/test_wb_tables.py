@@ -1,8 +1,8 @@
 import time
 
 import numpy as np
-
 import wandb
+
 import weave
 from weave.legacy.language_features.tagging import make_tag_getter_op
 from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType

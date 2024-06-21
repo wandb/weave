@@ -1,6 +1,7 @@
 import time
 
 import wandb
+
 import weave
 from weave.legacy.ecosystem.wandb.panel_time_series import TimeSeries
 

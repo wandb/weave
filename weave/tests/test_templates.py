@@ -1,6 +1,7 @@
 import typing
 
 import wandb
+
 import weave
 from weave.legacy import context_state as _context
 from weave.legacy.wandb_interface.wandb_stream_table import StreamTable

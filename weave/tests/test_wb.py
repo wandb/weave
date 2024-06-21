@@ -4,8 +4,8 @@ import re
 
 import numpy as np
 import pytest
-
 import wandb
+
 from weave import api as weave
 from weave import stitch
 from weave import weave_types as types

@@ -1,8 +1,8 @@
 import json
 
 import graphql
-
 import wandb
+
 import weave
 from weave.legacy import ops
 from weave.legacy.language_features.tagging import tagged_value_type

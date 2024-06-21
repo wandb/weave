@@ -11,6 +11,7 @@ import urllib.parse
 import zlib
 
 import requests
+import wandb
 from flask import (
     Blueprint,
     Flask,
@@ -24,7 +25,6 @@ from flask import (
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-import wandb
 from weave import (
     engine_trace,
     environment,

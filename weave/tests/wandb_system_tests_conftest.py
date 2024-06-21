@@ -13,8 +13,8 @@ from typing import Any, Generator, Literal, Optional, Union
 import filelock
 import pytest
 import requests
-
 import wandb
+
 from weave.legacy.wandb_api import (
     WandbApiContext,
     from_environment,
