@@ -119,17 +119,18 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
     # TODO: figure out if this is the write pattern
     for chunk in response:
         pass
+
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
 
-    exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
+    exp = "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
     choice = call.output["choices"][0]
     assert choice["message"]["content"] == exp
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cCn96TRamm0eSsmZzlbKGdi5tEjL"
+    assert call.output["id"] == "chatcmpl-9cZQgU1vg2n4tXaht0W56LkP4uWpm"
     assert call.output["model"] == "gpt-4o-2024-05-13"
     assert call.output["object"] == "chat.completion"
 
@@ -139,6 +140,15 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
     assert inputs["max_tokens"] == 64
     assert inputs["temperature"] == 0.0
     assert inputs["top_p"] == 1
+
+    # usage information should be available even if `stream_options` is not set
+    usage = call.output["usage"]
+    assert usage["total_tokens"] == 35
+    assert usage["completion_tokens"] == 24
+    assert usage["prompt_tokens"] == 11
+
+    # since we are setting `stream_options`, the chunk should not have usage information
+    assert chunk.usage is None
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -703,3 +713,5 @@ async def test_openai_tool_call_async_stream(
     assert inputs["max_tokens"] == 64
     assert inputs["temperature"] == 0.0
     assert inputs["top_p"] == 1
+
+
