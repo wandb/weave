@@ -393,13 +393,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if field.startswith("inputs"):
                     field = "inputs" + field[len("inputs") :]
                     if field.startswith("inputs."):
-                        field = "inputs"
                         json_path = field[len("inputs.") :]
+                        field = "inputs"
                 elif field.startswith("output"):
                     field = "output" + field[len("output") :]
                     if field.startswith("output."):
-                        field = "output"
                         json_path = field[len("output.") :]
+                        field = "output"
                 elif field.startswith("attributes"):
                     field = "attributes_dump" + field[len("attributes") :]
                 elif field.startswith("summary"):

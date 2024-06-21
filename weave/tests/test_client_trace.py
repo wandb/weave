@@ -710,6 +710,11 @@ def test_trace_call_sort(client):
 
 
 def test_trace_call_sort_with_mixed_types(client):
+    is_sqlite = client_is_sqlite(client)
+    if is_sqlite:
+        # SQLite does not support sorting over mixed types in a column, so we skip this test
+        return
+
     @weave.op()
     def basic_op(in_val: dict) -> dict:
         import time
