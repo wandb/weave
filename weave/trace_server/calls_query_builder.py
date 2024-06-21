@@ -215,11 +215,16 @@ Now that all this is written, i think an alternative implementation is:
 3. If order fields are static and limit is present, then move to the PRE-ORDERED/FILTERED QUERY.
 4. If all select fields are static, then move to the STATIC QUERY.
 
+Future considerations:
+# Considerations:
+# - [ ] Implement column selection from callers
+# - [ ] Consider how we will do latency order/filter
+# - [ ] Consider how we will do feedback fields
+
 """
 
 # PR TODO:
-# - [ ] Tests for this builder
-# - [ ] Re-enable the `exists` check since it should be getting hit with sort
+# - [ ] Tests for this builder - direct sql tests
 # - [ ] When legacy filters or query conditions are an ID mask, we can further optimize the subquery
 # Refactors:
 # - [ ] Fixup the comment above
@@ -227,10 +232,6 @@ Now that all this is written, i think an alternative implementation is:
 #   - [ ] All methods in this file are unique
 #           - [ ] process_query_to_conditions -> _process_query_to_conditions
 # - [ ] Awkward builder API - just simplify this
-# Considerations:
-# - [ ] Consider column selection
-# - [ ] Consider how we will do latency order/filter
-# - [ ] Consider how we will do feedback fields
 
 import typing
 
@@ -288,17 +289,22 @@ class CallsMergedDynamicField(CallsMergedAggField):
         cast: typing.Optional[tsi_query.CastTo] = None,
     ) -> str:
         res = super().as_sql(pb, table_alias)
-        json_method = "JSON_VALUE"
-        if cast == "exists":
-            json_method = "JSON_EXISTS"
-        if self.extra_path:
-            param_name = pb.add_param(quote_json_path_parts(self.extra_path))
-            val = f"{json_method}({res}, {_param_slot(param_name, 'String')})"
-        else:
-            val = f"{json_method}({res}, '$')"
         if cast != "exists":
-            val = clickhouse_cast(val, cast)
-        return val
+            path_str = "$"
+            if self.extra_path:
+                param_name = pb.add_param(quote_json_path_parts(self.extra_path))
+                path_str = _param_slot(param_name, "String")
+            val = f"JSON_VALUE({res}, {path_str})"
+            return clickhouse_cast(val, cast)
+        else:
+            # UGG - this is an ugly part of clickhouse! It is really difficult to differentiate
+            # between null, non-existent, "", and "null"!
+            path_parts = []
+            if self.extra_path:
+                for part in self.extra_path:
+                    path_parts.append(", " + _param_slot(pb.add_param(part), "String"))
+            safe_path = "".join(path_parts)
+            return f"(NOT (JSONType({res}{safe_path}) = 'Null' OR JSONType({res}{safe_path}) IS NULL))"
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         if self.extra_path:

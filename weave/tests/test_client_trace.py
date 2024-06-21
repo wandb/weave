@@ -718,7 +718,7 @@ def test_trace_call_sort_with_mixed_types(client):
         return in_val
 
     basic_op({"prim": None})
-    basic_op({"prim": None})
+    basic_op({"not_prim": 1})
     basic_op({"prim": 100})
     basic_op({"prim": 2})
     basic_op({"prim": "b"})
@@ -729,10 +729,10 @@ def test_trace_call_sort_with_mixed_types(client):
         (
             "asc",
             [
-                "a",
-                "b",
                 2,
                 100,
+                "a",
+                "b",
                 None,
                 None,
             ],
@@ -746,7 +746,7 @@ def test_trace_call_sort_with_mixed_types(client):
         )
 
         for i, call in enumerate(inner_res.calls):
-            assert call.inputs["in_val"]["prim"] == seq[i]
+            assert call.inputs["in_val"].get("prim") == seq[i]
 
 
 def client_is_sqlite(client):
