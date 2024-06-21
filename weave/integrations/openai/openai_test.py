@@ -173,7 +173,6 @@ async def test_openai_async_stream_quickstart(client: weave.weave_client.WeaveCl
         pass
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    print(res.calls)
     assert len(res.calls) == 1
     call = res.calls[0]
 
