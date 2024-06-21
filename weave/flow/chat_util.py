@@ -1,9 +1,9 @@
 from typing import Iterator, Optional
 
 from openai.types.chat import (
+    ChatCompletion,
     ChatCompletionChunk,
 )
-from openai.types.chat import ChatCompletion
 
 
 class OpenAIStream:
@@ -74,9 +74,7 @@ class OpenAIStream:
                     choice["message"]["tool_calls"] = []
                 for tool_call_delta in chunk_choice.delta.tool_calls:
                     for i in range(
-                        tool_call_delta.index
-                        + 1
-                        - len(choice["message"]["tool_calls"])  # type: ignore
+                        tool_call_delta.index + 1 - len(choice["message"]["tool_calls"])  # type: ignore
                     ):
                         choice["message"]["tool_calls"].append(  # type: ignore
                             {
@@ -92,13 +90,13 @@ class OpenAIStream:
                         tool_call["type"] = tool_call_delta.type
                     if tool_call_delta.function is not None:
                         if tool_call_delta.function.name is not None:
-                            tool_call["function"][
-                                "name"
-                            ] = tool_call_delta.function.name
+                            tool_call["function"]["name"] = (
+                                tool_call_delta.function.name
+                            )
                         if tool_call_delta.function.arguments is not None:
-                            tool_call["function"][
-                                "arguments"
-                            ] += tool_call_delta.function.arguments
+                            tool_call["function"]["arguments"] += (
+                                tool_call_delta.function.arguments
+                            )
 
     def final_response(self) -> ChatCompletion:
         if self.first_chunk is None:

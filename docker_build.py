@@ -2,9 +2,9 @@
 #
 # This is a copy of docker_build.py from wandb/core
 
+import argparse
 import os
 import subprocess
-import argparse
 import sys
 from typing import Dict, List, Optional
 

@@ -1,15 +1,14 @@
 import importlib
-
 import typing
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import SymbolPatcher, MultiPatcher
+from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
     from mistralai.models.chat_completion import (
-        ChatCompletionStreamResponse,
         ChatCompletionResponse,
+        ChatCompletionStreamResponse,
     )
 
 

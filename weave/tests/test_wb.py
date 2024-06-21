@@ -1,37 +1,27 @@
-import pytest
-import re
-from weave import stitch
-import numpy as np
-
-from weave.tests.test_wb_domain_ops import assert_gql_str_equal
-
-from .. import api as weave
-from .. import ops as ops
-from .. import uris
-from .. import artifact_wandb
-
-from . import weavejs_ops
-import json
-from . import fixture_fakewandb as fwb
-from .. import graph
-from .. import artifact_fs
-from ..ops_domain import wb_domain_types as wdt
-from ..ops_domain import artifact_membership_ops as amo
-from ..ops_arrow import ArrowWeaveListType
-from ..ops_primitives import list_, dict_
-from .. import weave_types as types
-from ..ops_primitives.file import _as_w0_dict_
-from ..ops_domain import wbmedia
-
-from .. import ops_arrow as arrow
 import cProfile
-from ..language_features.tagging.tagged_value_type import TaggedValueType
-from ..ops_domain import table
-from ..ops_domain import wb_util
+import json
+import re
+
+import numpy as np
+import pytest
 import wandb
 
-from .. import compile
+from weave import api as weave
+from weave import stitch
+from weave import weave_types as types
+from weave.legacy import artifact_fs, artifact_wandb, compile, graph, ops, uris
+from weave.legacy import ops_arrow as arrow
+from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.legacy.ops_arrow import ArrowWeaveListType
+from weave.legacy.ops_domain import artifact_membership_ops as amo
+from weave.legacy.ops_domain import table, wb_util, wbmedia
+from weave.legacy.ops_domain import wb_domain_types as wdt
+from weave.legacy.ops_primitives import dict_, list_
+from weave.legacy.ops_primitives.file import _as_w0_dict_
+from weave.tests.test_wb_domain_ops import assert_gql_str_equal
 
+from . import fixture_fakewandb as fwb
+from . import weavejs_ops
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -45,6 +35,29 @@ file_path_response = {
                             **fwb.artifactSequence_payload,  # type: ignore
                             "artifacts_c1233b7003317090ab5e2a75db4ad965": {
                                 "edges": [{"node": fwb.artifactVersion_payload}]
+                            },
+                        }
+                    }
+                ]
+            },
+        },
+    }
+}
+
+file_path_no_entity_response = {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
+        **fwb.project_payload,  # type: ignore
+        "artifactType_46d22fef09db004187bb8da4b5e98c58": {
+            **fwb.defaultArtifactType_payload,  # type: ignore
+            "artifactCollections_c1233b7003317090ab5e2a75db4ad965": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.artifactSequence_payload,  # type: ignore
+                            "artifacts_c1233b7003317090ab5e2a75db4ad965": {
+                                "edges": [
+                                    {"node": fwb.artifactVersion_no_entity_payload}
+                                ]
                             },
                         }
                     }
@@ -265,7 +278,11 @@ artifact_version_sdk_response = {
         "state": "COMMITTED",
         "commitHash": "303db33c9f9264768626",
         "artifactType": fwb.defaultArtifactType_payload,
-        "artifactSequence": {**fwb.artifactSequence_payload, "project": fwb.project_payload, "state": "READY"},  # type: ignore
+        "artifactSequence": {
+            **fwb.artifactSequence_payload,
+            "project": fwb.project_payload,
+            "state": "READY",
+        },  # type: ignore
     }
 }
 
@@ -341,6 +358,18 @@ def test_table_col_order_and_unknown_types(fake_wandb):
 
 def test_missing_file(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
+    node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("does_not_exist")
+    )
+    assert weave.use(node) == None
+
+
+def test_missing_file_no_entity(fake_wandb):
+    fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_no_entity_response)
     node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -1823,6 +1852,47 @@ def test_filesystem_artifact_dir_dict(fake_wandb):
                 "size": 879,
                 "type": "file",
                 "url": "https://api.wandb.ai/artifacts/test_entity/23f694a1ce4ce2bd5481337025410230/test_results.table.json",
+            },
+            "google_link": {
+                "birthArtifactID": "TODO",
+                "digest": "https://www.google.com",
+                "fullPath": "google_link",
+                "size": 0,
+                "type": "file",
+                "ref": "https://www.google.com",
+                "url": "https://www.google.com",
+            },
+        },
+    }
+
+
+def test_filesystem_artifact_by_id_dir_dict(fake_wandb):
+    table = wandb.Table(
+        data=[[1, wandb.Image(np.zeros((32, 32)))]], columns=["a", "image"]
+    )
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "test_results")
+    art.add_reference("https://www.google.com", "google_link")
+    art_node = fake_wandb.mock_artifact_by_id_as_node(art)
+    assert weave.use(_as_w0_dict_(art_node.file(""))) == {
+        "fullPath": "",
+        "size": 954,
+        "dirs": {
+            "media": {
+                "fullPath": "media/images/842c574e85966d3269f6.png",
+                "size": 75,
+                "dirs": {"images": 1},
+                "files": {},
+            }
+        },
+        "files": {
+            "test_results.table.json": {
+                "birthArtifactID": "TODO",
+                "digest": "I/aUoc5M4r1UgTNwJUECMA==",
+                "fullPath": "test_results.table.json",
+                "size": 879,
+                "type": "file",
+                "url": "https://api.wandb.ai/artifacts/_/23f694a1ce4ce2bd5481337025410230/test_results.table.json",
             },
             "google_link": {
                 "birthArtifactID": "TODO",

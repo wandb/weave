@@ -34,8 +34,8 @@ deserialized in a Python runtime that does not have the serializer
 registered.
 """
 
-from typing import Callable, Any, Optional
 from dataclasses import dataclass
+from typing import Any, Callable, Optional
 
 
 @dataclass

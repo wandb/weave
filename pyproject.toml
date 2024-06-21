@@ -2,30 +2,30 @@
 name = "weave"
 description = "A toolkit for building composable interactive data driven applications."
 readme = "README.md"
-license = {text = "Apache-2.0"}
-maintainers = [{name = "W&B", email = "support@wandb.com"}]
+license = { text = "Apache-2.0" }
+maintainers = [{ name = "W&B", email = "support@wandb.com" }]
 authors = [
-    {name = "Shawn Lewis", email = "shawn@wandb.com"},
-    {name = "Danny Goldstein", email = "danny@wandb.com"},
-    {name = "Tim Sweeney", email = "tim@wandb.com"},
-    {name = "Nick Peneranda", email = "nick.penaranda@wandb.com"},
+  { name = "Shawn Lewis", email = "shawn@wandb.com" },
+  { name = "Danny Goldstein", email = "danny@wandb.com" },
+  { name = "Tim Sweeney", email = "tim@wandb.com" },
+  { name = "Nick Peneranda", email = "nick.penaranda@wandb.com" },
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Environment :: Web Environment",
-    "Framework :: Flask",
-    "Framework :: Jupyter",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python",
-    "Topic :: Database :: Front-Ends",
-    "Topic :: Office/Business :: Financial :: Spreadsheet",
-    "Topic :: Scientific/Engineering :: Information Analysis",
-    "Topic :: Scientific/Engineering :: Visualization",
-    "Topic :: Software Development :: Libraries :: Application Frameworks",
-    "Topic :: Software Development :: Widget Sets",
+  "Development Status :: 4 - Beta",
+  "Environment :: Web Environment",
+  "Framework :: Flask",
+  "Framework :: Jupyter",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Topic :: Database :: Front-Ends",
+  "Topic :: Office/Business :: Financial :: Spreadsheet",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Topic :: Scientific/Engineering :: Visualization",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+  "Topic :: Software Development :: Widget Sets",
 ]
 requires-python = ">=3.9"
 dynamic = ["version", "dependencies", "optional-dependencies"]
@@ -49,32 +49,57 @@ build-backend = "setuptools.build_meta"
 packages = ["weave"]
 
 [tool.setuptools.dynamic]
-version = {attr = "weave.version.VERSION"}
-dependencies = {file = ["requirements.txt"]}
+version = { attr = "weave.version.VERSION" }
+dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
-examples = {file = ["requirements.ecosystem.txt"]}
-engine = {file = ["requirements.engine.txt"]}
-ecosystem = {file = ["requirements.ecosystem.txt"]}
-datadog = {file = ["requirements.datadog.txt"]}
-modal = {file = ["requirements.modal.txt"]}
+examples = { file = ["requirements.ecosystem.txt"] }
+engine = { file = ["requirements.engine.txt"] }
+ecosystem = { file = ["requirements.ecosystem.txt"] }
+datadog = { file = ["requirements.datadog.txt"] }
+modal = { file = ["requirements.modal.txt"] }
 
 [tool.pytest.ini_options]
 testpaths = ["weave"]
 filterwarnings = ["error"]
 
-[tool.autopep8]
-max_line_length = 180
-ignore = "E714"
-
-[tool.ruff]
-line-length = 180
-show-fixes = true
+[tool.ruff.lint]
+preview = true
 select = [
+  "D200", # https://docs.astral.sh/ruff/rules/fits-on-one-line/
+  "D201", # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
+  "D204", # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
+  "D210", # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
+  "D211", # https://docs.astral.sh/ruff/rules/blank-line-before-class/
+  "D214", # https://docs.astral.sh/ruff/rules/section-not-over-indented/
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",
   "F541",
+  "I", # https://docs.astral.sh/ruff/rules/#isort-i
+  "W291", # https://docs.astral.sh/ruff/rules/trailing-whitespace/
+  "W391", # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
+]
+ignore = [
+  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/ - we use Google style
+  "D206", # https://docs.astral.sh/ruff/rules/indent-with-spaces/ - redundant with formatter
+  "D207", # https://docs.astral.sh/ruff/rules/under-indentation/ - redundant with formatter
+  "D208", # https://docs.astral.sh/ruff/rules/over-indentation/ - redundant with formatter
+  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/ - we use Google style
+  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/ - we use Google style
+]
+exclude = [
+  "weave/api.py",
+  "weave/__init__.py",
+  "weave/legacy/**/*.py",
+  "examples",
 ]
 
-[tool.flake8]
-max-line-length = 180
+[tool.ruff]
+line-length = 88
+show-fixes = true
+exclude = [
+  "weave/api.py",
+  "weave/__init__.py",
+  "weave/legacy/**/*.py",
+  "examples",
+]

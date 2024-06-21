@@ -1,5 +1,5 @@
-from .. import gql_to_weave
-from .. import weave_types as types
+from weave import weave_types as types
+from weave.legacy import gql_to_weave
 
 
 def test_simple_query():
@@ -107,18 +107,18 @@ def test_multi_root_query():
     query = """
         query WeavePythonCG{
             project_8d1592567720841659de23c02c97d594:project(name:"p_0" entityName:"e_0"){
-                id 
+                id
                 name
                 createdAt
             }
             project_3c237e5b25fed9a705b21513dd7921c6:project(name:"p_1" entityName:"e_1"){
-                id 
+                id
                 name
                 runs_c1233b7003317090ab5e2a75db4ad965:runs(first:100){
                     edges{
                         node{
-                            id 
-                            name 
+                            id
+                            name
                         }
                     }
                 }
@@ -127,7 +127,7 @@ def test_multi_root_query():
                 projects_500:projects(limit:500){
                     edges{
                         node{
-                            id 
+                            id
                             name
                             createdAt
                         }

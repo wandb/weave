@@ -1,7 +1,9 @@
 import math
+
 import pyarrow as pa
-from .. import mappers_arrow
-from .. import weave_types as types
+
+from weave import weave_types as types
+from weave.legacy import mappers_arrow
 
 
 def test_map_list():

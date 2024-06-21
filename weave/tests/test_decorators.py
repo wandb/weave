@@ -1,8 +1,8 @@
-from .. import api as weave
-from .. import weave_types as types
-from .. import storage
+from weave.legacy.decorator_op import op
 
-from weave.decorator_op import op
+from .. import api as weave
+from .. import storage
+from .. import weave_types as types
 
 
 def test_function_op_name():
