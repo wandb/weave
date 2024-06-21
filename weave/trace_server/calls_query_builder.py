@@ -451,10 +451,17 @@ class CallsQuery(BaseModel):
 
         project_param = pb.add_param(self.project_id)
 
+        # Special Optimization
+        id_mask_sql = ""
+        if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
+            id_mask_sql = f"AND (id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+        # TODO: We should also pull out id-masks from the dynamic query
+
         return f"""
         SELECT {select_fields_sql}
         FROM calls_merged
         WHERE project_id = {_param_slot(project_param, 'String')}
+        {id_mask_sql}
         {id_subquery_sql}
         GROUP BY (project_id, id)
         {having_filter_sql}
