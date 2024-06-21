@@ -315,8 +315,8 @@ class Select:
                     # Prioritize existence, then cast to float, then str
                     options = [
                         ("exists", "desc"),
-                        ("float", direction),
-                        ("str", direction),
+                        ("double", direction),
+                        ("string", direction),
                     ]
                 else:
                     options = [(field, direction)]
@@ -445,7 +445,7 @@ def clickhouse_cast(
         return f"toFloat64OrNull({inner_sql})"
     elif cast == "bool":
         return f"toUInt8OrNull({inner_sql})"
-    elif cast == "str":
+    elif cast == "string":
         return f"toString({inner_sql})"
     elif cast == "exists":
         return f"({inner_sql} IS NOT NULL)"
