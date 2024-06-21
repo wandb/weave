@@ -218,12 +218,14 @@ Now that all this is written, i think an alternative implementation is:
 """
 
 # PR TODO:
+# - [ ] Tests for this builder
+# - [ ] Re-enable the `exists` check since it should be getting hit with sort
 # - [ ] When legacy filters or query conditions are an ID mask, we can further optimize the subquery
 # Refactors:
+# - [ ] Fixup the comment above
 # - [ ] Reconcile the differences between ORM and these implementations (ideally push them down into there)
 #   - [ ] All methods in this file are unique
 #           - [ ] process_query_to_conditions -> _process_query_to_conditions
-#           - [ ] transform_external_field_to_internal_field -> _transform_external_field_to_internal_field
 # - [ ] Awkward builder API - just simplify this
 # Considerations:
 # - [ ] Consider column selection
@@ -238,6 +240,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     ParamBuilder,
+    clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
     quote_json_path_parts,
@@ -250,8 +253,13 @@ from weave.trace_server.trace_server_interface_util import (
 class CallsMergedField(BaseModel):
     field: str
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        return f"{table_alias}.{self.field}"
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: typing.Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        return clickhouse_cast(f"{table_alias}.{self.field}", cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
@@ -260,20 +268,36 @@ class CallsMergedField(BaseModel):
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        inner = super().as_sql(pb, table_alias)
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: typing.Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        inner = super().as_sql(pb, table_alias, cast)
         return f"{self.agg_fn}({inner})"
 
 
 class CallsMergedDynamicField(CallsMergedAggField):
     extra_path: typing.Optional[list[str]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: typing.Optional[tsi_query.CastTo] = None,
+    ) -> str:
         res = super().as_sql(pb, table_alias)
+        json_method = "JSON_VALUE"
+        if cast == "exists":
+            json_method = "JSON_EXISTS"
         if self.extra_path:
             param_name = pb.add_param(quote_json_path_parts(self.extra_path))
-            return f"JSON_VALUE({res}, {_param_slot(param_name, 'String')})"
-        return f"JSON_VALUE({res}, '$')"
+            val = f"{json_method}({res}, {_param_slot(param_name, 'String')})"
+        val = f"{json_method}({res}, '$')"
+        if cast != "exists":
+            val = clickhouse_cast(val, cast)
+        return val
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         if self.extra_path:
@@ -295,7 +319,22 @@ class SortField(BaseModel):
     direction: typing.Literal["ASC", "DESC"]
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        return f"{self.field.as_sql(pb, table_alias)} {self.direction}"
+        options: list[typing.Tuple[typing.Optional[tsi_query.CastTo], str]]
+        if isinstance(self.field, CallsMergedDynamicField):
+            # Prioritize existence, then cast to float, then str
+            options = [
+                ("exists", "desc"),
+                ("double", self.direction),
+                ("string", self.direction),
+            ]
+        else:
+            options = [(None, self.direction)]
+        res = ""
+        for index, (cast, direction) in enumerate(options):
+            if index > 0:
+                res += ", "
+            res += f"{self.field.as_sql(pb, table_alias, cast)} {direction}"
+        return res
 
 
 class Condition(BaseModel):
@@ -513,7 +552,7 @@ class CallsQuery(BaseModel):
 
         id_subquery_sql = ""
         if id_subquery_name is not None:
-            id_subquery_sql = f"AND id IN (SELECT id FROM {id_subquery_name})"
+            id_subquery_sql = f"AND (id IN {id_subquery_name})"
 
         project_param = pb.add_param(self.project_id)
 
@@ -567,7 +606,6 @@ def get_field_by_name(name: str) -> CallsMergedField:
     return allowed_fields[name]
 
 
-# ----- Below this line is old implementation ----
 class FilterToConditions(BaseModel):
     conditions: list[str]
     fields_used: set[str]
@@ -640,29 +678,13 @@ def process_query_to_conditions(
                 python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            (
-                field,
-                _,
-                fields_used,
-            ) = transform_external_field_to_internal_field(
-                operand.get_field_, param_builder, table_alias
-            )
-            raw_fields_used.update(fields_used)
+            structured_field = get_field_by_name(operand.get_field_)
+            field = structured_field.as_sql(param_builder, table_alias)
+            raw_fields_used.add(structured_field.field)
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)
-            convert_to = operand.convert_.to
-            if convert_to == "int":
-                method = "toInt64OrNull"
-            elif convert_to == "double":
-                method = "toFloat64OrNull"
-            elif convert_to == "bool":
-                method = "toUInt8OrNull"
-            elif convert_to == "string":
-                method = "toString"
-            else:
-                raise ValueError(f"Unknown cast: {convert_to}")
-            return f"{method}({field})"
+            return clickhouse_cast(field, operand.convert_.to)
         elif isinstance(
             operand,
             (
@@ -762,43 +784,6 @@ def process_calls_filter_to_conditions(
         )
 
     return conditions
-
-
-def transform_external_field_to_internal_field(
-    field: str,
-    param_builder: ParamBuilder,
-    table_alias: str,
-    cast: typing.Optional[str] = None,
-) -> tuple[str, ParamBuilder, set[str]]:
-    """Transforms a request for a dot-notation field to a clickhouse field."""
-    param_builder = param_builder or ParamBuilder()
-    structured_field = get_field_by_name(field)
-    raw_fields_used = set([structured_field.field])
-
-    if isinstance(structured_field, CallsMergedDynamicField):
-        if cast == "exists":
-            raise ValueError("Cannot cast to exists")
-            # field = (
-            #     "(JSON_EXISTS(" + field + ", {" + json_path_param_name + ":String}))"
-            # )
-        else:
-            method = "toString"
-            if cast is not None:
-                if cast == "int":
-                    method = "toInt64OrNull"
-                elif cast == "float":
-                    method = "toFloat64OrNull"
-                elif cast == "bool":
-                    method = "toUInt8OrNull"
-                elif cast == "str":
-                    method = "toString"
-                else:
-                    raise ValueError(f"Unknown cast: {cast}")
-            field = f"{method}({structured_field.as_sql(param_builder, table_alias)})"
-    else:
-        field = structured_field.as_sql(param_builder, table_alias)
-
-    return field, param_builder, raw_fields_used
 
 
 def _param_slot(param_name: str, param_type: str) -> str:

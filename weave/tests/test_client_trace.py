@@ -709,6 +709,46 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
+def test_trace_call_sort_with_mixed_types(client):
+    @weave.op()
+    def basic_op(in_val: dict) -> dict:
+        import time
+
+        time.sleep(1 / 10)
+        return in_val
+
+    basic_op({"prim": None})
+    basic_op({"prim": None})
+    basic_op({"prim": 100})
+    basic_op({"prim": 2})
+    basic_op({"prim": "b"})
+    basic_op({"prim": "a"})
+
+    for direction, seq in [
+        ("desc", [100, 2, "b", "a", None, None]),
+        (
+            "asc",
+            [
+                "a",
+                "b",
+                2,
+                100,
+                None,
+                None,
+            ],
+        ),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi._SortBy(field="inputs.in_val.prim", direction=direction)],
+            )
+        )
+
+        for i, call in enumerate(inner_res.calls):
+            assert call.inputs["in_val"]["prim"] == seq[i]
+
+
 def client_is_sqlite(client):
     return isinstance(client.server._internal_trace_server, SqliteTraceServer)
 

@@ -82,10 +82,13 @@ class ConvertOperation(BaseModel):
     convert_: "ConvertSpec" = Field(alias="$convert")
 
 
+CastTo = typing.Literal["double", "string", "int", "bool", "exists"]
+
+
 class ConvertSpec(BaseModel):
     input: "Operand"
     # Subset of https://www.mongodb.com/docs/manual/reference/bson-types/#std-label-bson-types
-    to: typing.Literal["double", "string", "int", "bool"]
+    to: CastTo
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/

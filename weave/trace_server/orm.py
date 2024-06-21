@@ -433,6 +433,26 @@ def python_value_to_ch_type(value: typing.Any) -> str:
         raise ValueError(f"Unknown value type: {value}")
 
 
+def clickhouse_cast(
+    inner_sql: str, cast: typing.Optional[tsi_query.CastTo] = None
+) -> str:
+    """Helper function to cast a sql expression to a clickhouse type."""
+    if cast == None:
+        return inner_sql
+    if cast == "int":
+        return f"toInt64OrNull({inner_sql})"
+    elif cast == "double":
+        return f"toFloat64OrNull({inner_sql})"
+    elif cast == "bool":
+        return f"toUInt8OrNull({inner_sql})"
+    elif cast == "str":
+        return f"toString({inner_sql})"
+    elif cast == "exists":
+        return f"({inner_sql} IS NOT NULL)"
+    else:
+        raise ValueError(f"Unknown cast: {cast}")
+
+
 def quote_json_path(path: str) -> str:
     """Helper function to quote a json path for use in a clickhouse query. Moreover,
     this converts index operations from dot notation (conforms to Mongo) to bracket
@@ -483,23 +503,11 @@ def _transform_external_field_to_internal_field(
         if cast == "exists":
             field = "(JSON_EXISTS(" + field + ", " + json_path_param + "))"
         else:
-            method = "toString"
-            if cast is not None:
-                if cast == "int":
-                    method = "toInt64OrNull"
-                elif cast == "float":
-                    method = "toFloat64OrNull"
-                elif cast == "bool":
-                    method = "toUInt8OrNull"
-                elif cast == "str":
-                    method = "toString"
-                else:
-                    raise ValueError(f"Unknown cast: {cast}")
             is_sqlite = param_builder._database_type == "sqlite"
             json_func = "json_extract(" if is_sqlite else "JSON_VALUE("
             field = json_func + field + ", " + json_path_param + ")"
             if not is_sqlite:
-                field = method + "(" + field + ")"
+                field = clickhouse_cast(field, cast)  # type: ignore
 
     return field, param_builder, raw_fields_used
 
@@ -577,18 +585,7 @@ def _process_query_to_conditions(
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)
-            convert_to = operand.convert_.to
-            if convert_to == "int":
-                method = "toInt64OrNull"
-            elif convert_to == "double":
-                method = "toFloat64OrNull"
-            elif convert_to == "bool":
-                method = "toUInt8OrNull"
-            elif convert_to == "string":
-                method = "toString"
-            else:
-                raise ValueError(f"Unknown cast: {convert_to}")
-            return f"{method}({field})"
+            return clickhouse_cast(field, operand.convert_.to)
         elif isinstance(
             operand,
             (
