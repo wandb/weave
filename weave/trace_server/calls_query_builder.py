@@ -63,6 +63,9 @@ class CallsMergedField(BaseModel):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
+    def is_heavy(self) -> bool:
+        return False
+
 
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
@@ -118,8 +121,11 @@ class CallsMergedDynamicField(CallsMergedAggField):
             field=self.field, agg_fn=self.agg_fn, extra_path=extra_path
         )
 
+    def is_heavy(self) -> bool:
+        return True
 
-class SortField(BaseModel):
+
+class OrderField(BaseModel):
     field: CallsMergedField
     direction: typing.Literal["ASC", "DESC"]
 
@@ -158,12 +164,18 @@ class Condition(BaseModel):
                 self._consumed_fields.append(get_field_by_name(field))
         return combine_conditions(conditions.conditions, "AND")
 
-    def get_consumed_fields(self) -> list[CallsMergedField]:
+    def _get_consumed_fields(self) -> list[CallsMergedField]:
         if self._consumed_fields is None:
             self.as_sql(ParamBuilder(), "calls_merged")
         if self._consumed_fields is None:
             raise ValueError("Consumed fields should not be None")
         return self._consumed_fields
+
+    def is_heavy(self) -> bool:
+        for field in self._get_consumed_fields():
+            if field.is_heavy():
+                return True
+        return False
 
 
 class HardCodedFilter(BaseModel):
@@ -198,7 +210,7 @@ class CallsQuery(BaseModel):
     select_fields: list[CallsMergedField] = Field(default_factory=list)
     query_conditions: list[Condition] = Field(default_factory=list)
     hardcoded_filter: typing.Optional[HardCodedFilter] = None
-    order_fields: list[SortField] = Field(default_factory=list)
+    order_fields: list[OrderField] = Field(default_factory=list)
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
 
@@ -228,7 +240,7 @@ class CallsQuery(BaseModel):
             raise ValueError(f"Direction {direction} is not allowed")
         direction = typing.cast(typing.Literal["ASC", "DESC"], direction)
         self.order_fields.append(
-            SortField(field=get_field_by_name(field), direction=direction)
+            OrderField(field=get_field_by_name(field), direction=direction)
         )
         return self
 
@@ -331,77 +343,83 @@ class CallsQuery(BaseModel):
         ```
 
         """
+        # Determine if the query `has_heavy_fields` by checking
+        # if it `has_heavy_select or has_heavy_filter or has_heavy_order`
+        has_heavy_select = False
+        for select_field in self.select_fields:
+            if select_field.is_heavy():
+                has_heavy_select = True
 
-        # TODO: Really be sure of and test this query optimizer
-        outer_query = self.clone()
-        outer_query.query_conditions = []
-        not_deleted = tsi_query.EqOperation.model_validate(
-            {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+        has_heavy_filter = False
+        for query_condition in self.query_conditions:
+            if query_condition.is_heavy():
+                has_heavy_filter = True
+
+        has_heavy_order = False
+        for order_field in self.order_fields:
+            if order_field.field.is_heavy():
+                has_heavy_order = True
+
+        has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
+
+        # Determine if `predicate_pushdown_possible` which is
+        # if it `has_light_filter or has_light_query or has_light_order_filter`
+        has_light_filter = False
+        if self.hardcoded_filter and self.hardcoded_filter.is_useful():
+            has_light_filter = True
+
+        has_light_query = False
+        for query_condition in self.query_conditions:
+            if not query_condition.is_heavy():
+                has_light_query = True
+
+        has_light_order_filter = (
+            self.order_fields
+            and self.limit
+            and not has_heavy_filter
+            and not has_heavy_order
         )
-        filtered_calls_query = (
-            CallsQuery(project_id=self.project_id)
-            .add_field("id")
-            .add_condition(not_deleted)
+
+        predicate_pushdown_possible = (
+            has_light_filter or has_light_query or has_light_order_filter
         )
-        for cond in self.query_conditions:
-            consumed_fields = cond.get_consumed_fields()
-            if not any(
-                [
-                    isinstance(field, CallsMergedDynamicField)
-                    for field in consumed_fields
-                ]
-            ):
-                filtered_calls_query.add_condition(cond.operand)
+
+        # Determine if we should optimize!
+        should_optimize = has_heavy_fields and predicate_pushdown_possible
+        if not should_optimize:
+            return self._as_sql_base_format(pb, table_alias)
+
+        # If so, build the two queries
+        filter_query = CallsQuery(project_id=self.project_id)
+        outer_query = CallsQuery(project_id=self.project_id)
+
+        # Select Fields:
+        filter_query.add_field("id")
+        for field in self.select_fields:
+            outer_query.select_fields.append(field)
+
+        # Query Conditions
+        for condition in self.query_conditions:
+            if condition.is_heavy():
+                outer_query.query_conditions.append(condition)
             else:
-                outer_query.add_condition(cond.operand)
+                filter_query.query_conditions.append(condition)
 
-        # All legacy filters are non-dynamic
-        if self.hardcoded_filter is not None:
-            filtered_calls_query.set_hardcoded_filter(self.hardcoded_filter)
-            outer_query.hardcoded_filter = None
+        # Hardcoded Filter - always light
+        filter_query.hardcoded_filter = self.hardcoded_filter
 
-        dynamic_order_fields = [
-            field
-            for field in self.order_fields
-            if isinstance(field.field, CallsMergedDynamicField)
-        ]
-        if (
-            len(dynamic_order_fields) == 0
-            and self.limit is not None
-            and len(outer_query.query_conditions) == 0
-        ):
-            filtered_calls_query.set_limit(self.limit)
-            if self.offset is not None:
-                filtered_calls_query.set_offset(self.offset)
-            filtered_calls_query.order_fields = self.order_fields
-            outer_query.offset = None
-            outer_query.limit = None
-
-        dynamic_select_fields = [
-            field
-            for field in self.select_fields
-            if isinstance(field, CallsMergedDynamicField)
-        ]
-        if len(dynamic_select_fields) == 0:
-            filtered_calls_query.select_fields = self.select_fields
-            for cond in outer_query.query_conditions:
-                filtered_calls_query.add_condition(cond.operand)
-
-            if outer_query.hardcoded_filter is not None:
-                filtered_calls_query.hardcoded_filter = outer_query.hardcoded_filter
-
-            if len(outer_query.order_fields) > 0:
-                filtered_calls_query.order_fields = outer_query.order_fields
-
-            return filtered_calls_query._as_sql_base_format(pb, table_alias)
-
-        # TODO: What was i thinking here?
-        # assert filtered_calls_query.limit is None
-        # assert filtered_calls_query.offset is None
-        # assert len(filtered_calls_query.order_fields) == 0
+        # Order Fields:
+        if has_light_order_filter:
+            filter_query.order_fields = self.order_fields
+            filter_query.limit = self.limit
+            filter_query.offset = self.offset
+        else:
+            outer_query.order_fields = self.order_fields
+            outer_query.limit = self.limit
+            outer_query.offset = self.offset
 
         return f"""
-        WITH filtered_calls AS ({filtered_calls_query._as_sql_base_format(pb, table_alias)})
+        WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
         {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
         """
 
@@ -416,16 +434,18 @@ class CallsQuery(BaseModel):
         )
 
         having_filter_sql = ""
-        query_conditions = []
+        having_conditions_sql = []
         if len(self.query_conditions) > 0:
-            query_conditions.extend(
+            having_conditions_sql.extend(
                 [c.as_sql(pb, table_alias) for c in self.query_conditions]
             )
         if self.hardcoded_filter is not None:
-            query_conditions.append(self.hardcoded_filter.as_sql(pb, table_alias))
+            having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
-        if len(query_conditions) > 0:
-            having_filter_sql = "HAVING " + combine_conditions(query_conditions, "AND")
+        if len(having_conditions_sql) > 0:
+            having_filter_sql = "HAVING " + combine_conditions(
+                having_conditions_sql, "AND"
+            )
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
