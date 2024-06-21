@@ -38,9 +38,9 @@ Weave's **tracking** layer brings immutable tracing and versioning to your progr
   - **[Ops](/guides/tracking/ops)**: Versioned, reproducible functions, with automatic tracing.
   - **[Tracing](/guides/tracking/tracing)**: Automatic organization of function calls and data lineage.
 
-Weave's **ecosystem** is batteries included for other libraries, systems, and best practices.
+Weave's **integrations** is a batteries-included experience for other libraries, systems, and best practices.
 
-  - **[OpenAI](/guides/ecosystem/openai)**: automatic tracking for openai api calls
+  - **[OpenAI](/guides/integrations/openai)**: automatic tracking for openai api calls
   - [soon] Langchain auto-logging
   - [soon] llama-index auto-logging
 

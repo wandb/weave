@@ -14,7 +14,8 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
-from weave.legacy import box, context_state, graph_client_context, run_context
+from weave import client_context
+from weave.legacy import box, context_state, run_context
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -64,7 +65,7 @@ class Op:
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        maybe_client = graph_client_context.get_graph_client()
+        maybe_client = client_context.weave_client.get_weave_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
         client = typing.cast("WeaveClient", maybe_client)
@@ -82,7 +83,7 @@ class Op:
         # If/When we do memoization, this would be a good spot
 
         parent_run = run_context.get_current_run()
-        client.save_nested_objects(inputs_with_defaults)
+        client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
         run = client.create_call(
             self,
@@ -151,8 +152,8 @@ class Op:
         self.__ref = ref
 
     def calls(self) -> "CallsIter":
-        client = graph_client_context.require_graph_client()
-        return client.op_calls(self)
+        client = client_context.weave_client.require_weave_client()
+        return client._op_calls(self)
 
     def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
         """This is an experimental API and may change in the future intended for use by internal Weave code."""

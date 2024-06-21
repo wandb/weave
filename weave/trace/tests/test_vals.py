@@ -34,6 +34,6 @@ def test_traceobject_access_after_init_termination(client):
     # but a reference to a trace object still exists.
     from weave.legacy import context_state
 
-    context_state._graph_client.set(None)
+    weave.client_context.weave_client.set_weave_client_global(None)
 
     assert my_obj.val == 1

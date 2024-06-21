@@ -26,7 +26,6 @@ from weave.legacy import (
     artifact_fs,
     file_base,
     file_util,
-    graph_client_context,
     memo,
     uris,
     wandb_client_api,
