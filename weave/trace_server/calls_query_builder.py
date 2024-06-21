@@ -764,13 +764,13 @@ def process_calls_filter_to_conditions(
 
         if non_wildcarded_names:
             or_conditions.append(
-                f"any({table_alias}.op_name) IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
+                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
             )
 
         for name in wildcarded_names:
             like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
             or_conditions.append(
-                f"any({table_alias}.op_name) LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
+                f"{get_field_by_name('op_name').as_sql(param_builder, table_alias)} LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
             )
 
         if or_conditions:
@@ -778,40 +778,42 @@ def process_calls_filter_to_conditions(
 
     if filter.input_refs:
         conditions.append(
-            f"hasAny(any({table_alias}.input_refs), {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
 
     if filter.output_refs:
         conditions.append(
-            f"hasAny(any({table_alias}.output_refs), {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
     if filter.parent_ids:
         conditions.append(
-            f"any({table_alias}.parent_id) IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.trace_ids:
         conditions.append(
-            f"any({table_alias}.trace_id) IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
+            f"{get_field_by_name('trace_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
         conditions.append(
-            f"any({table_alias}.id) IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
     if filter.trace_roots_only:
-        conditions.append(f"any({table_alias}.parent_id) IS NULL")
+        conditions.append(
+            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IS NULL"
+        )
 
     if filter.wb_user_ids:
         conditions.append(
-            f"any({table_alias}.wb_user_id) IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
         )
 
     if filter.wb_run_ids:
         conditions.append(
-            f"any({table_alias}.wb_run_id) IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
         )
 
     return conditions
