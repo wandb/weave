@@ -290,7 +290,7 @@ class CallsMergedDynamicField(CallsMergedAggField):
     ) -> str:
         res = super().as_sql(pb, table_alias)
         if cast != "exists":
-            path_str = "$"
+            path_str = "'$'"
             if self.extra_path:
                 param_name = pb.add_param(quote_json_path_parts(self.extra_path))
                 path_str = _param_slot(param_name, "String")
@@ -520,6 +520,15 @@ class CallsQuery(BaseModel):
         ]
         if len(dynamic_select_fields) == 0:
             filtered_calls_query.select_fields = self.select_fields
+            for cond in outer_query.query_conditions:
+                filtered_calls_query.add_condition(cond.operand)
+
+            if outer_query.hardcoded_filter is not None:
+                filtered_calls_query.hardcoded_filter = outer_query.hardcoded_filter
+
+            if len(outer_query.order_fields) > 0:
+                filtered_calls_query.order_fields = outer_query.order_fields
+
             return filtered_calls_query._as_sql_base_format(pb, table_alias)
 
         # TODO: What was i thinking here?
@@ -792,7 +801,7 @@ def process_calls_filter_to_conditions(
         )
 
     if filter.trace_roots_only:
-        conditions.append("any({table_alias}.parent_id) IS NULL")
+        conditions.append(f"any({table_alias}.parent_id) IS NULL")
 
     if filter.wb_user_ids:
         conditions.append(
