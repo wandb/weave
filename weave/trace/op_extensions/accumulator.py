@@ -60,7 +60,6 @@ def add_accumulator(
 
     def _is_openai_input(inputs: Dict) -> bool:
         if isinstance(inputs.get('self'), Completions) or isinstance(inputs.get('self'), AsyncCompletions):
-            print("it is openai")
             return True
         return False
     
@@ -224,16 +223,40 @@ class _IteratorWrapper(Generic[V]):
             raise TypeError(
                 f"Cannot call anext on an iterator of type {type(self._iterator)}"
             )
-        try:
-            value = await self._iterator.__anext__()  # type: ignore
-            self._on_yield(value)
-            return value
-        except StopAsyncIteration:
+        
+        if self._end_of_iteration:
             self._call_on_close_once()
             raise
-        except Exception as e:
-            self._call_on_error_once(e)
-            raise
+
+        if self.skip_last:
+            try:
+                current_item = await self._iterator.__anext__()  # type: ignore
+                self._on_yield(current_item)
+                if self._buffer is not None:
+                    to_yield = self._buffer
+                    self._buffer = current_item
+                    return to_yield
+                else:
+                    self._buffer = current_item
+                    return await self.__anext__()  # Skip yielding the first item immediately
+            except (StopIteration, StopAsyncIteration) as e:
+                self._end_of_iteration = True
+                self._call_on_close_once()
+                raise
+            except Exception as e:
+                self._call_on_error_once(e)
+                raise
+        else:
+            try:
+                value = await self._iterator.__anext__()  # type: ignore
+                self._on_yield(value)
+                return value
+            except StopAsyncIteration:
+                self._call_on_close_once()
+                raise
+            except Exception as e:
+                self._call_on_error_once(e)
+                raise
 
     def __del__(self) -> None:
         self._call_on_close_once()
