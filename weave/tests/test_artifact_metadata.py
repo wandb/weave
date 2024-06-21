@@ -1,5 +1,4 @@
 import wandb
-
 import weave
 from weave.legacy import artifact_local, artifact_wandb
 from weave.legacy.wandb_interface.wandb_artifact_pusher import (
