@@ -9,72 +9,6 @@ perform predicate pushdown where possible and delay loading expensive fields as
 much as possible. In testing, Clickhouse performance is dominated by the amount
 of data loaded into memory.
 
-Note 1: `LIGHT` fields are those that are relatively inexpensive to load into
-memory, while `HEAVY` fields are those that are expensive to load into memory.
-Practically, `HEAVY` fields are the free-form user-defined fields: `inputs`,
-`output`, `attributes`, and `summary`.
-
-Note 2: `FILTER_CONDITIONS` are assumed to be "anded" together.
-
-Now, everything starts with the `BASE QUERY`:
-
-```sql
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE project_id = {PROJECT_ID}
-AND id IN {ID_MASK}                     -- optional
-GROUP BY (project_id, id)
-HAVING {FILTER_CONDITIONS}              -- optional
-ORDER BY {ORDER_FIELDS}                 -- optional
-LIMIT {LIMIT}                           -- optional
-OFFSET {OFFSET}                         -- optional
-```
-
-
-From here, we need to answer 2 questions:
-
-1. Does this query involve any `HEAVY` fields (across `SELECT_FIELDS`,
-   `FILTER_CONDITIONS`, and `ORDER_FIELDS`)?
-2. Is it possible to push down predicates into a subquery? This is true if any
-   of the following are true:
-
-    a. There is an `ID_MASK`
-    b. The `FILTER_CONDITIONS` have at least one "and" condition composed
-       entirely of `LIGHT` fields that is not the `deleted_at` clause
-    c. The ORDER BY clause can be transformed into a "light filter". Requires:
-
-        1. No `HEAVY` fields in the ORDER BY clause
-        2. No `HEAVY` fields in the FILTER_CONDITIONS
-        3. A `LIMIT` clause.
-
-If any of the above are true, then we can push down the predicates into a subquery. This
-results in the following query:
-
-```sql
-WITH filtered_calls AS (
-    SELECT id
-    FROM calls_merged
-    WHERE project_id = {PROJECT_ID}
-    AND id IN {ID_MASK}                 -- optional
-    GROUP BY (project_id, id)
-    HAVING {LIGHT_FILTER_CONDITIONS}    -- optional
-    --- IF ORDER BY CAN BE PUSHED DOWN ---
-    ORDER BY {ORDER_FIELDS}                 -- optional
-    LIMIT {LIMIT}                           -- optional
-    OFFSET {OFFSET}                         -- optional
-)
-SELECT {SELECT_FIELDS}
-FROM calls_merged
-WHERE project_id = {PROJECT_ID}
-AND id IN (filtered_calls)
-GROUP BY (project_id, id)
---- IF ORDER BY CANNOT BE PUSHED DOWN ---
-HAVING {HEAVY_FILTER_CONDITIONS}        -- optional <-- yes, this is inside the conditional
-ORDER BY {ORDER_FIELDS}                 -- optional
-LIMIT {LIMIT}                           -- optional
-OFFSET {OFFSET}                         -- optional
-```
-
 Outstanding Optimizations/Work:
 
 * [ ] The CallsQuery API itself is a little clunky with the returning self pattern. Consider revision
@@ -330,6 +264,72 @@ class CallsQuery(BaseModel):
         This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
         that have been set.
+
+        Note 1: `LIGHT` fields are those that are relatively inexpensive to load into
+        memory, while `HEAVY` fields are those that are expensive to load into memory.
+        Practically, `HEAVY` fields are the free-form user-defined fields: `inputs`,
+        `output`, `attributes`, and `summary`.
+
+        Note 2: `FILTER_CONDITIONS` are assumed to be "anded" together.
+
+        Now, everything starts with the `BASE QUERY`:
+
+        ```sql
+        SELECT {SELECT_FIELDS}
+        FROM calls_merged
+        WHERE project_id = {PROJECT_ID}
+        AND id IN {ID_MASK}                     -- optional
+        GROUP BY (project_id, id)
+        HAVING {FILTER_CONDITIONS}              -- optional
+        ORDER BY {ORDER_FIELDS}                 -- optional
+        LIMIT {LIMIT}                           -- optional
+        OFFSET {OFFSET}                         -- optional
+        ```
+
+        From here, we need to answer 2 questions:
+
+        1. Does this query involve any `HEAVY` fields (across `SELECT_FIELDS`,
+        `FILTER_CONDITIONS`, and `ORDER_FIELDS`)?
+        2. Is it possible to push down predicates into a subquery? This is true if any
+        of the following are true:
+
+            a. There is an `ID_MASK`
+            b. The `FILTER_CONDITIONS` have at least one "and" condition composed
+            entirely of `LIGHT` fields that is not the `deleted_at` clause
+            c. The ORDER BY clause can be transformed into a "light filter". Requires:
+
+                1. No `HEAVY` fields in the ORDER BY clause
+                2. No `HEAVY` fields in the FILTER_CONDITIONS
+                3. A `LIMIT` clause.
+
+        If any of the above are true, then we can push down the predicates into a subquery. This
+        results in the following query:
+
+        ```sql
+        WITH filtered_calls AS (
+            SELECT id
+            FROM calls_merged
+            WHERE project_id = {PROJECT_ID}
+            AND id IN {ID_MASK}                 -- optional
+            GROUP BY (project_id, id)
+            HAVING {LIGHT_FILTER_CONDITIONS}    -- optional
+            --- IF ORDER BY CAN BE PUSHED DOWN ---
+            ORDER BY {ORDER_FIELDS}                 -- optional
+            LIMIT {LIMIT}                           -- optional
+            OFFSET {OFFSET}                         -- optional
+        )
+        SELECT {SELECT_FIELDS}
+        FROM calls_merged
+        WHERE project_id = {PROJECT_ID}
+        AND id IN (filtered_calls)
+        GROUP BY (project_id, id)
+        --- IF ORDER BY CANNOT BE PUSHED DOWN ---
+        HAVING {HEAVY_FILTER_CONDITIONS}        -- optional <-- yes, this is inside the conditional
+        ORDER BY {ORDER_FIELDS}                 -- optional
+        LIMIT {LIMIT}                           -- optional
+        OFFSET {OFFSET}                         -- optional
+        ```
+
         """
 
         # TODO: Really be sure of and test this query optimizer
