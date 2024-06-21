@@ -305,7 +305,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 filter=tsi._CallsFilter(
-                    call_ids=[req.call_id],
+                    call_ids=[req.id],
                 ),
                 limit=1,
             )
