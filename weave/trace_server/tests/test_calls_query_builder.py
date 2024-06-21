@@ -111,7 +111,7 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_field("inputs")
-    cq.set_order("started_at", "desc")
+    cq.add_order("started_at", "desc")
     cq.set_hardcoded_filter(
         HardCodedFilter(
             filter=tsi._CallsFilter(
@@ -143,7 +143,7 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
         AND
             (id IN filtered_calls)
         GROUP BY (project_id,id)
-        ORDER BY any(started_at) DESC
+        ORDER BY any(calls_merged.started_at) DESC
         """,
         {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
     )
@@ -153,7 +153,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_field("inputs")
-    cq.set_order("started_at", "desc")
+    cq.add_order("started_at", "desc")
     cq.set_limit(10)
     cq.set_hardcoded_filter(
         HardCodedFilter(
@@ -176,7 +176,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
             AND
                 (any(calls_merged.op_name) IN {pb_0:Array(String)})
             )
-            ORDER BY any(started_at) DESC
+            ORDER BY any(calls_merged.started_at) DESC
             LIMIT 10
         )
         SELECT
@@ -188,7 +188,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
         AND
             (id IN filtered_calls)
         GROUP BY (project_id,id)
-        ORDER BY any(started_at) DESC
+        ORDER BY any(calls_merged.started_at) DESC
         """,
         {"pb_0": ["a", "b"], "pb_1": "project", "pb_2": "project"},
     )
