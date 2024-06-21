@@ -5,7 +5,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
-from weave.legacy import graph_client_context, run_context
+from weave import client_context
+from weave.legacy import run_context
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
 
@@ -64,7 +65,7 @@ if not import_failed:
         def __init__(self, **kwargs: Any) -> None:
             self._call_map: Dict[str, Call] = {}
             self.latest_run: Optional[Run] = None
-            self.gc = graph_client_context.require_graph_client()
+            self.gc = client_context.weave_client.require_weave_client()
             super().__init__()
 
         def _persist_run(self, run: Run) -> None:
