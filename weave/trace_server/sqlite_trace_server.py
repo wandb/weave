@@ -412,7 +412,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     "desc",
                 ], f"Invalid order_by direction: {direction}"
                 if json_path:
-                    field = f"json_extract({field}, '$.{json_path}')"
+                    field = f"json_extract({field}, '{quote_json_path(json_path)}')"
                 order_parts.append(f"{field} {direction}")
 
             order_by_part = ", ".join(order_parts)
