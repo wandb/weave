@@ -258,3 +258,7 @@ def test_tools_calling(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 56
     assert output.usage.input_tokens == model_usage["input_tokens"] == 354
+
+
+def test_nothing() -> None:
+    assert True

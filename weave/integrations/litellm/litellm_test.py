@@ -214,3 +214,7 @@ async def test_litellm_quickstart_stream_async(
     # )
     # assert output["usage"]["prompt_tokens"] == model_usage["prompt_tokens"] == 0
     # assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 0
+
+
+def test_nothing() -> None:
+    assert True

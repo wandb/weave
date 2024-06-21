@@ -232,3 +232,7 @@ async def test_mistral_quickstart_with_stream_async(
     assert output.usage.completion_tokens == model_usage["completion_tokens"] == 242
     assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
     assert output.usage.total_tokens == model_usage["total_tokens"] == 252
+
+
+def test_nothing() -> None:
+    assert True

@@ -119,3 +119,7 @@ async def test_llamaindex_quickstart_async(
     response = await query_engine.aquery("What did the author do growing up?")
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_calls_correct_for_quickstart(res.calls)
+
+
+def test_nothing() -> None:
+    assert True
