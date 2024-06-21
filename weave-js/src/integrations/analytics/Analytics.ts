@@ -31,7 +31,7 @@ export const Analytics = {
     // optional chaining on the root level object doesn't work
     // window?.analytics?.track will THROW if window is undefined
     try {
-      trackCall = window.analytics.track;
+      trackCall = (window as any).analytics.track;
       // @ts-ignore the `initialized` property is not in the type definition?
       initialized = window.analytics.initialized;
     } catch {
