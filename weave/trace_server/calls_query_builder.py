@@ -647,6 +647,7 @@ def process_query_to_conditions(
     table_alias: str,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
+
     conditions = []
     raw_fields_used = set()
 
