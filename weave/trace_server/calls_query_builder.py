@@ -224,7 +224,7 @@ Now that all this is written, i think an alternative implementation is:
 #   - [ ] All methods in this file are unique
 #           - [ ] process_query_to_conditions -> _process_query_to_conditions
 #           - [ ] transform_external_field_to_internal_field -> _transform_external_field_to_internal_field
-# - [ ] `process_calls_filter_to_conditions` still uses hard coded `calls_merged` columns - bad!
+# - [ ] Awkward builder API - just simplify this
 # Considerations:
 # - [ ] Consider column selection
 # - [ ] Consider how we will do latency order/filter
@@ -250,17 +250,17 @@ from weave.trace_server.trace_server_interface_util import (
 class CallsMergedField(BaseModel):
     field: str
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{table_alias}.{self.field}"
 
-    def as_select_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
 
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         inner = super().as_sql(pb, table_alias)
         return f"{self.agg_fn}({inner})"
 
@@ -268,14 +268,14 @@ class CallsMergedAggField(CallsMergedField):
 class CallsMergedDynamicField(CallsMergedAggField):
     extra_path: typing.Optional[list[str]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         res = super().as_sql(pb, table_alias)
         if self.extra_path:
             param_name = pb.add_param(quote_json_path_parts(self.extra_path))
             return f"JSON_VALUE({res}, {_param_slot(param_name, 'String')})"
         return f"JSON_VALUE({res}, '$')"
 
-    def as_select_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         if self.extra_path:
             raise NotImplementedError(
                 "Dynamic fields cannot be selected directly, yet - implement me!"
@@ -294,7 +294,7 @@ class SortField(BaseModel):
     field: CallsMergedField
     direction: typing.Literal["ASC", "DESC"]
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.field.as_sql(pb, table_alias)} {self.direction}"
 
 
@@ -302,9 +302,11 @@ class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: typing.Optional[list[CallsMergedField]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         conditions = process_query_to_conditions(
-            tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}), pb
+            tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
+            pb,
+            table_alias,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -314,15 +316,20 @@ class Condition(BaseModel):
 
     def get_consumed_fields(self) -> list[CallsMergedField]:
         if self._consumed_fields is None:
-            self._consumed_fields = []
-            conditions = process_query_to_conditions(
-                tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
-                ParamBuilder(),
-            )
-            for field in conditions.fields_used:
-                self._consumed_fields.append(get_field_by_name(field))
-
+            self.as_sql(ParamBuilder(), "calls_merged")
+        if self._consumed_fields is None:
+            raise ValueError("Consumed fields should not be None")
         return self._consumed_fields
+
+
+class HardCodedFilter(BaseModel):
+    filter: tsi._CallsFilter
+
+    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        return combine_conditions(
+            process_calls_filter_to_conditions(self.filter, pb, table_alias),
+            "AND",
+        )
 
 
 class CallsQuery(BaseModel):
@@ -331,7 +338,7 @@ class CallsQuery(BaseModel):
     project_id: str
     select_fields: list[CallsMergedField] = Field(default_factory=list)
     query_conditions: list[Condition] = Field(default_factory=list)
-    legacy_filter: typing.Optional[tsi._CallsFilter] = None
+    hardcoded_filter: typing.Optional[HardCodedFilter] = None
     order_fields: list[SortField] = Field(default_factory=list)
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
@@ -351,8 +358,8 @@ class CallsQuery(BaseModel):
             self.query_conditions.append(Condition(operand=operand))
         return self
 
-    def set_legacy_filter(self, filter: tsi._CallsFilter) -> "CallsQuery":
-        self.legacy_filter = filter
+    def set_hardcoded_filter(self, filter: tsi._CallsFilter) -> "CallsQuery":
+        self.hardcoded_filter = HardCodedFilter(filter=filter)
         return self
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
@@ -387,12 +394,12 @@ class CallsQuery(BaseModel):
             select_fields=self.select_fields.copy(),
             query_conditions=self.query_conditions.copy(),
             order_fields=self.order_fields.copy(),
-            legacy_filter=self.legacy_filter,
+            hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
         )
 
-    def as_sql(self, pb: ParamBuilder) -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
         """
         This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
@@ -423,9 +430,9 @@ class CallsQuery(BaseModel):
                 outer_query.add_condition(cond.operand)
 
         # All legacy filters are non-dynamic
-        if self.legacy_filter is not None:
-            filtered_calls_query.set_legacy_filter(self.legacy_filter)
-            outer_query.legacy_filter = None
+        if self.hardcoded_filter is not None:
+            filtered_calls_query.set_hardcoded_filter(self.hardcoded_filter)
+            outer_query.hardcoded_filter = None
 
         dynamic_order_fields = [
             field
@@ -451,7 +458,7 @@ class CallsQuery(BaseModel):
         ]
         if len(dynamic_select_fields) == 0:
             filtered_calls_query.select_fields = self.select_fields
-            return filtered_calls_query._as_sql_base_format(pb)
+            return filtered_calls_query._as_sql_base_format(pb, table_alias)
 
         # TODO: What was i thinking here?
         # assert filtered_calls_query.limit is None
@@ -459,27 +466,28 @@ class CallsQuery(BaseModel):
         # assert len(filtered_calls_query.order_fields) == 0
 
         return f"""
-        WITH filtered_calls AS ({filtered_calls_query._as_sql_base_format(pb)})
-        {outer_query._as_sql_base_format(pb, id_subquery_name="filtered_calls")}
+        WITH filtered_calls AS ({filtered_calls_query._as_sql_base_format(pb, table_alias)})
+        {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
         """
 
     def _as_sql_base_format(
-        self, pb: ParamBuilder, id_subquery_name: typing.Optional[str] = None
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        id_subquery_name: typing.Optional[str] = None,
     ) -> str:
         select_fields_sql = ", ".join(
-            [field.as_select_sql(pb) for field in self.select_fields]
+            [field.as_select_sql(pb, table_alias) for field in self.select_fields]
         )
 
         having_filter_sql = ""
         query_conditions = []
         if len(self.query_conditions) > 0:
-            query_conditions.extend([c.as_sql(pb) for c in self.query_conditions])
-        if self.legacy_filter is not None:
-            # TODO: `process_calls_filter_to_conditions` should not be used here, move into the correct class
-            filter_conditions = process_calls_filter_to_conditions(
-                self.legacy_filter, pb
+            query_conditions.extend(
+                [c.as_sql(pb, table_alias) for c in self.query_conditions]
             )
-            query_conditions.extend(filter_conditions.conditions)
+        if self.hardcoded_filter is not None:
+            query_conditions.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
         if len(query_conditions) > 0:
             having_filter_sql = "HAVING " + " AND ".join(
@@ -489,7 +497,10 @@ class CallsQuery(BaseModel):
         order_by_sql = ""
         if len(self.order_fields) > 0:
             order_by_sql = "ORDER BY " + ", ".join(
-                [order_field.as_sql(pb) for order_field in self.order_fields]
+                [
+                    order_field.as_sql(pb, table_alias)
+                    for order_field in self.order_fields
+                ]
             )
 
         limit_sql = ""
@@ -565,6 +576,7 @@ class FilterToConditions(BaseModel):
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
+    table_alias: str,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -633,7 +645,7 @@ def process_query_to_conditions(
                 _,
                 fields_used,
             ) = transform_external_field_to_internal_field(
-                operand.get_field_, None, param_builder
+                operand.get_field_, param_builder, table_alias
             )
             raw_fields_used.update(fields_used)
             return field
@@ -675,11 +687,12 @@ def process_query_to_conditions(
 
 
 def process_calls_filter_to_conditions(
-    filter: tsi._CallsFilter, param_builder: ParamBuilder
-) -> FilterToConditions:
+    filter: tsi._CallsFilter,
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> list[str]:
     """Converts a CallsFilter to a list of conditions for a clickhouse query."""
     conditions: list[str] = []
-    raw_fields_used = set()
 
     if filter.op_names:
         # We will build up (0 or 1) + N conditions for the op_version_refs
@@ -698,76 +711,64 @@ def process_calls_filter_to_conditions(
 
         if non_wildcarded_names:
             or_conditions.append(
-                f"any(calls_merged.op_name) IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
+                f"any({table_alias}.op_name) IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
             )
-            raw_fields_used.add("op_name")
 
         for name in wildcarded_names:
             like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
             or_conditions.append(
-                f"any(calls_merged.op_name) LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
+                f"any({table_alias}.op_name) LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
             )
-            raw_fields_used.add("op_name")
 
         if or_conditions:
             conditions.append(combine_conditions(or_conditions, "OR"))
 
     if filter.input_refs:
         conditions.append(
-            f"hasAny(any(calls_merged.input_refs), {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+            f"hasAny(any({table_alias}.input_refs), {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
-        raw_fields_used.add("input_refs")
 
     if filter.output_refs:
         conditions.append(
-            f"hasAny(any(calls_merged.output_refs), {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+            f"hasAny(any({table_alias}.output_refs), {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
-        raw_fields_used.add("output_refs")
 
     if filter.parent_ids:
         conditions.append(
-            f"any(calls_merged.parent_id) IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+            f"any({table_alias}.parent_id) IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
-        raw_fields_used.add("parent_id")
 
     if filter.trace_ids:
         conditions.append(
-            f"any(calls_merged.trace_id) IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
+            f"any({table_alias}.trace_id) IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
-        raw_fields_used.add("trace_id")
 
     if filter.call_ids:
         conditions.append(
-            f"any(calls_merged.id) IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+            f"any({table_alias}.id) IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
-        raw_fields_used.add("id")
 
     if filter.trace_roots_only:
-        conditions.append("any(calls_merged.parent_id) IS NULL")
-        raw_fields_used.add("parent_id")
+        conditions.append("any({table_alias}.parent_id) IS NULL")
 
     if filter.wb_user_ids:
         conditions.append(
-            f"any(calls_merged.wb_user_id) IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
+            f"any({table_alias}.wb_user_id) IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
         )
-        raw_fields_used.add("wb_user_id")
 
     if filter.wb_run_ids:
         conditions.append(
-            f"any(calls_merged.wb_run_id) IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+            f"any({table_alias}.wb_run_id) IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
         )
-        raw_fields_used.add("wb_run_id")
 
-    return FilterToConditions(
-        conditions=conditions,
-        fields_used=raw_fields_used,
-    )
+    return conditions
 
 
 def transform_external_field_to_internal_field(
     field: str,
+    param_builder: ParamBuilder,
+    table_alias: str,
     cast: typing.Optional[str] = None,
-    param_builder: typing.Optional[ParamBuilder] = None,
 ) -> tuple[str, ParamBuilder, set[str]]:
     """Transforms a request for a dot-notation field to a clickhouse field."""
     param_builder = param_builder or ParamBuilder()
@@ -793,9 +794,9 @@ def transform_external_field_to_internal_field(
                     method = "toString"
                 else:
                     raise ValueError(f"Unknown cast: {cast}")
-            field = f"{method}({structured_field.as_sql(param_builder)})"
+            field = f"{method}({structured_field.as_sql(param_builder, table_alias)})"
     else:
-        field = structured_field.as_sql(param_builder)
+        field = structured_field.as_sql(param_builder, table_alias)
 
     return field, param_builder, raw_fields_used
 
