@@ -404,8 +404,8 @@ class CallsQuery(BaseModel):
             self.query_conditions.append(Condition(operand=operand))
         return self
 
-    def set_hardcoded_filter(self, filter: tsi._CallsFilter) -> "CallsQuery":
-        self.hardcoded_filter = HardCodedFilter(filter=filter)
+    def set_hardcoded_filter(self, filter: HardCodedFilter) -> "CallsQuery":
+        self.hardcoded_filter = filter
         return self
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":

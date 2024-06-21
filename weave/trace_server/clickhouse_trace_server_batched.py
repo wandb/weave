@@ -42,6 +42,7 @@ from pydantic import BaseModel
 
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
+    HardCodedFilter,
     combine_conditions,
 )
 
@@ -56,10 +57,8 @@ from .feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from .interface import query as tsi_query
-from .orm import Column, ParamBuilder, Row, Table
+from .orm import ParamBuilder, Row
 from .trace_server_interface_util import (
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
     bytes_digest,
     extract_refs_from_values,
@@ -324,7 +323,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         cq.add_field("id")
         if req.filter is not None:
-            cq.set_hardcoded_filter(req.filter)
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 
@@ -355,7 +354,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
-            cq.set_hardcoded_filter(req.filter)
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
         if req.query is not None:
             cq.add_condition(req.query.expr_)
         if req.sort_by is not None:
