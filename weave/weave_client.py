@@ -8,10 +8,10 @@ from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 import pydantic
 from requests import HTTPError
 
-from weave import trace_sentry, urls
+from weave import client_context, trace_sentry, urls
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
-from weave.legacy import graph_client_context, run_context
+from weave.legacy import run_context
 from weave.table import Table
 from weave.trace.object_record import (ObjectRecord, dataclass_object_record,
                                        pydantic_asdict_one_level,
@@ -148,7 +148,7 @@ class Call:
 
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
-        client = graph_client_context.require_graph_client()
+        client = client_context.weave_client.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
         return CallsIter(
@@ -158,7 +158,7 @@ class Call:
         )
 
     def delete(self) -> bool:
-        client = graph_client_context.require_graph_client()
+        client = client_context.weave_client.require_weave_client()
         return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
@@ -168,8 +168,8 @@ class Call:
             )
         if name == self.display_name:
             return
-        client = graph_client_context.require_graph_client()
-        client.set_call_display_name(call=self, display_name=name)
+        client = client_context.weave_client.require_weave_client()
+        client._set_call_display_name(call=self, display_name=name)
         self.display_name = name
 
     def remove_display_name(self) -> None:
@@ -282,47 +282,11 @@ class WeaveClient:
         if ensure_project_exists:
             self.server.ensure_project_exists(entity, project)
 
-    def ref_is_own(self, ref: Ref) -> bool:
-        return isinstance(ref, Ref)
-
-    def _project_id(self) -> str:
-        return f"{self.entity}/{self.project}"
-
-    # This is used by tests and op_execute still, but the save() interface
-    # is nicer for clients I think?
-    @trace_sentry.global_trace_sentry.watch()
-    def save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        self.save_nested_objects(val, name=name)
-        return self._save_object(val, name, branch)
-
-    def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        is_opdef = isinstance(val, Op)
-        val = map_to_refs(val)
-        if isinstance(val, ObjectRef):
-            return val
-        json_val = to_json(val, self._project_id(), self.server)
-
-        response = self.server.obj_create(
-            ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
-                )
-            )
-        )
-        ref: Ref
-        if is_opdef:
-            ref = OpRef(self.entity, self.project, name, response.digest)
-        else:
-            ref = ObjectRef(self.entity, self.project, name, response.digest)
-        # TODO: Try to put a ref onto val? Or should user code use a style like
-        # save instead?
-        return ref
+    ################ High Level Convenience Methods ################
 
     @trace_sentry.global_trace_sentry.watch()
     def save(self, val: Any, name: str, branch: str = "latest") -> Any:
-        ref = self.save_object(val, name, branch)
+        ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
             raise ValueError(f"Expected ObjectRef, got {ref}")
         return self.get(ref)
@@ -375,18 +339,7 @@ class WeaveClient:
 
         return make_trace_obj(val, ref, self.server, None)
 
-    @trace_sentry.global_trace_sentry.watch()
-    def save_table(self, table: Table) -> TableRef:
-        response = self.server.table_create(
-            TableCreateReq(
-                table=TableSchemaForInsert(
-                    project_id=self._project_id(), rows=table.rows
-                )
-            )
-        )
-        return TableRef(
-            entity=self.entity, project=self.project, digest=response.digest
-        )
+    ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
     def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
@@ -407,39 +360,6 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = response.calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
-
-    @trace_sentry.global_trace_sentry.watch()
-    def op_calls(self, op: Op) -> CallsIter:
-        op_ref = get_ref(op)
-        if op_ref is None:
-            raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
-
-    @trace_sentry.global_trace_sentry.watch()
-    def objects(self, filter: Optional[_ObjectVersionFilter] = None) -> list[ObjSchema]:
-        if not filter:
-            filter = _ObjectVersionFilter()
-        else:
-            filter = filter.model_copy()
-        filter = typing.cast(_ObjectVersionFilter, filter)
-        filter.is_op = False
-
-        response = self.server.objs_query(
-            ObjQueryReq(
-                project_id=self._project_id(),
-                filter=filter,
-            )
-        )
-        return response.objs
-
-    def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
-        if op.ref is not None:
-            return op.ref
-        if name is None:
-            name = op.name
-        op_def_ref = self._save_object(op, name)
-        op.ref = op_def_ref  # type: ignore
-        return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
@@ -475,7 +395,7 @@ class WeaveClient:
         else:
             op_str = op
 
-        self.save_nested_objects(inputs)
+        self._save_nested_objects(inputs)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
 
@@ -530,7 +450,7 @@ class WeaveClient:
     def finish_call(
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
-        self.save_nested_objects(output)
+        self._save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
         call.output = output
@@ -594,24 +514,6 @@ class WeaveClient:
                 call_ids=[call.id],
             )
         )
-
-    @trace_sentry.global_trace_sentry.watch()
-    def set_call_display_name(
-        self, call: Call, display_name: Optional[str] = None
-    ) -> None:
-        # Removing call display name, use "" for db representation
-        if display_name is None:
-            display_name = ""
-        self.server.call_update(
-            CallUpdateReq(
-                project_id=self._project_id(),
-                call_id=call.id,
-                display_name=display_name,
-            )
-        )
-
-    def remove_call_display_name(self, call: Call) -> None:
-        self.set_call_display_name(call, None)
 
     def feedback(
         self,
@@ -686,53 +588,158 @@ class WeaveClient:
             show_refs=True,
         )
 
-    def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
+    ################ Internal Helpers ################
+
+    def _ref_is_own(self, ref: Ref) -> bool:
+        return isinstance(ref, Ref)
+
+    def _project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
+
+    # This is used by tests and op_execute still, but the save() interface
+    # is nicer for clients I think?
+    @trace_sentry.global_trace_sentry.watch()
+    def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
+        self._save_nested_objects(val, name=name)
+        return self._save_object_basic(val, name, branch)
+
+    def _save_object_basic(
+        self, val: Any, name: str, branch: str = "latest"
+    ) -> ObjectRef:
+        is_opdef = isinstance(val, Op)
+        val = map_to_refs(val)
+        if isinstance(val, ObjectRef):
+            return val
+        json_val = to_json(val, self._project_id(), self.server)
+
+        response = self.server.obj_create(
+            ObjCreateReq(
+                obj=ObjSchemaForInsert(
+                    project_id=self.entity + "/" + self.project,
+                    object_id=name,
+                    val=json_val,
+                )
+            )
+        )
+        ref: Ref
+        if is_opdef:
+            ref = OpRef(self.entity, self.project, name, response.digest)
+        else:
+            ref = ObjectRef(self.entity, self.project, name, response.digest)
+        # TODO: Try to put a ref onto val? Or should user code use a style like
+        # save instead?
+        return ref
+
+    def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
             return
         if isinstance(obj, pydantic.BaseModel):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
-                self.save_nested_objects(v)
-            ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
+                self._save_nested_objects(v)
+            ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
         elif dataclasses.is_dataclass(obj):
             obj_rec = dataclass_object_record(obj)
             for v in obj_rec.__dict__.values():
-                self.save_nested_objects(v)
-            ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
+                self._save_nested_objects(v)
+            ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
         elif isinstance(obj, Table):
-            table_ref = self.save_table(obj)
+            table_ref = self._save_table(obj)
             obj.ref = table_ref
         elif isinstance_namedtuple(obj):
             for v in obj._asdict().values():
-                self.save_nested_objects(v)
+                self._save_nested_objects(v)
         elif isinstance(obj, (list, tuple)):
             for v in obj:
-                self.save_nested_objects(v)
+                self._save_nested_objects(v)
         elif isinstance(obj, dict):
             for v in obj.values():
-                self.save_nested_objects(v)
+                self._save_nested_objects(v)
         elif isinstance(obj, Op):
             self._save_op(obj)
 
-    def ref_input_to(self, ref: "ref_base.Ref") -> Sequence[Call]:
+    @trace_sentry.global_trace_sentry.watch()
+    def _save_table(self, table: Table) -> TableRef:
+        response = self.server.table_create(
+            TableCreateReq(
+                table=TableSchemaForInsert(
+                    project_id=self._project_id(), rows=table.rows
+                )
+            )
+        )
+        return TableRef(
+            entity=self.entity, project=self.project, digest=response.digest
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _op_calls(self, op: Op) -> CallsIter:
+        op_ref = get_ref(op)
+        if op_ref is None:
+            raise ValueError(f"Can't get runs for unpublished op: {op}")
+        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _objects(
+        self, filter: Optional[_ObjectVersionFilter] = None
+    ) -> list[ObjSchema]:
+        if not filter:
+            filter = _ObjectVersionFilter()
+        else:
+            filter = filter.model_copy()
+        filter = typing.cast(_ObjectVersionFilter, filter)
+        filter.is_op = False
+
+        response = self.server.objs_query(
+            ObjQueryReq(
+                project_id=self._project_id(),
+                filter=filter,
+            )
+        )
+        return response.objs
+
+    def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
+        if op.ref is not None:
+            return op.ref
+        if name is None:
+            name = op.name
+        op_def_ref = self._save_object_basic(op, name)
+        op.ref = op_def_ref  # type: ignore
+        return op_def_ref
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _set_call_display_name(
+        self, call: Call, display_name: Optional[str] = None
+    ) -> None:
+        # Removing call display name, use "" for db representation
+        if display_name is None:
+            display_name = ""
+        self.server.call_update(
+            CallUpdateReq(
+                project_id=self._project_id(),
+                call_id=call.id,
+                display_name=display_name,
+            )
+        )
+
+    def _remove_call_display_name(self, call: Call) -> None:
+        self._set_call_display_name(call, None)
+
+    def _ref_input_to(self, ref: "ref_base.Ref") -> Sequence[Call]:
         raise NotImplementedError()
 
-    def ref_value_input_to(self, ref: "ref_base.Ref") -> list[Call]:
+    def _ref_value_input_to(self, ref: "ref_base.Ref") -> list[Call]:
         raise NotImplementedError()
 
-    def ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
+    def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
         raise NotImplementedError()
 
-    def op_runs(self, op_def: Op) -> Sequence[Call]:
+    def _op_runs(self, op_def: Op) -> Sequence[Call]:
         raise NotImplementedError()
 
-    def ref_uri(self, name: str, version: str, path: str) -> str:
+    def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
-
-    def __repr__(self) -> str:
-        return ""
 
 
 def safe_current_wb_run_id() -> Optional[str]:

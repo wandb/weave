@@ -8,6 +8,7 @@ import pathlib
 import re
 import typing
 
+from weave import client_context
 from weave.legacy import (
     artifact_base,
     artifact_fs,
@@ -16,7 +17,6 @@ from weave.legacy import (
     artifact_wandb,
     box,
     graph,
-    graph_client_context,
     mappers_python,
     timestamp,
 )
@@ -480,12 +480,12 @@ def to_json_with_refs(
         ]
     elif isinstance(obj, op_def.OpDef):
         try:
-            gc = graph_client_context.require_graph_client()
+            gc = client_context.weave_client.require_weave_client()
         except errors.WeaveInitError:
             raise errors.WeaveSerializeError(
                 "Can't serialize OpDef with a client initialization"
             )
-        return gc.save_object(obj, obj.name, "latest")
+        return gc._save_object(obj, obj.name, "latest")
     else:
         res = artifact.set("/".join(path), wb_type, obj)
         if res.artifact == artifact:

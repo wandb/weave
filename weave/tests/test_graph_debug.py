@@ -58,5 +58,5 @@ var3 = list-__getitem__(var0, 0)
 var4 = list-__getitem__(var0, 0)
   .typedDict-pick(b) 
 var5 = list-__getitem__(var0, 0)
-  .typedDict-pick(a) """
+  .typedDict-pick(a) """  # noqa: W291
     )

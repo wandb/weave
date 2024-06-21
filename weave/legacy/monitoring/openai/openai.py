@@ -10,7 +10,8 @@ import openai
 from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from packaging import version
-from weave.legacy import graph_client_context, run_context
+from weave import client_context
+from weave.legacy import run_context
 from weave.legacy.monitoring.monitor import _get_global_monitor
 from weave.legacy.monitoring.openai.models import *
 from weave.legacy.monitoring.openai.util import *
@@ -212,7 +213,7 @@ def patch() -> None:
     def _patch() -> None:
         unpatch_fqn = f"{unpatch.__module__}.{unpatch.__qualname__}()"
 
-        gc = graph_client_context.require_graph_client()
+        gc = client_context.weave_client.require_weave_client()
         if gc:
             # info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
 
@@ -253,7 +254,7 @@ def unpatch() -> None:
 def log_run(
     call_name: typing.Union[str, Op], inputs: dict[str, Any]
 ) -> Iterator[Callable]:
-    client = graph_client_context.require_graph_client()
+    client = client_context.weave_client.require_weave_client()
     parent_run = run_context.get_current_run()
     # TODO: client should not need refs passed in.
     run = client.create_call(call_name, inputs, parent_run)

@@ -7,8 +7,8 @@ from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, U
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
+from weave.client_context.weave_client import get_weave_client
 from weave.legacy import box
-from weave.legacy.graph_client_context import get_graph_client
 from weave.table import Table
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
@@ -117,8 +117,14 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
         except AttributeError:
             return None
 
-    server = gc.server if (gc := get_graph_client()) else None
+    server = gc.server if (gc := get_weave_client()) else None
     res = attribute_access_result(self, attribute, name, server=server)
+
+    # We need this because we override __getattribute__ and wrap the returned values.
+    # The wrapped result may be mutable (e.g. list), so we need to replace the attribute
+    # on self so that mutations are applied to the correct object and the user gets back
+    # what they expect when they call `self.<name>`.
+    self.__dict__[name] = res
     return res
 
 
