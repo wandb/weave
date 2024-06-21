@@ -386,6 +386,16 @@ class CallsQuery(BaseModel):
 
         # Determine if we should optimize!
         should_optimize = has_heavy_fields and predicate_pushdown_possible
+
+        # Important: Always inject deleted_at into the query.
+        # Note: it might be better to make this configurable.
+        self.add_condition(
+            tsi_query.EqOperation.model_validate(
+                {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+            )
+        )
+
+        # If we should not optimize, then just build the base query
         if not should_optimize:
             return self._as_sql_base_format(pb, table_alias)
 
