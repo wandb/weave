@@ -312,7 +312,7 @@ class Select:
                 # 3 order by terms: one for existence, one for float casting, and one for string casting.
                 # The effect of this is that we will have stable sorting for nullable, mixed-type fields.
                 if _is_dynamic_field(field, self.table.json_cols):
-                    # Prioritize existence, then cast to float, then str
+                    # Prioritize existence, then cast to double, then str
                     options = [
                         ("exists", "desc"),
                         ("double", direction),

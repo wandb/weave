@@ -21,7 +21,7 @@ Outstanding Optimizations/Work:
         2. We define our own column definitions here, which might be
         able to use the ones in orm.py.
 
-* [ ] Implement column selection from callers
+* [ ] Implement column selection at interface level so that it can be used here
 * [ ] Consider how we will do latency order/filter
 * [ ] Consider how we will do feedback fields
 
@@ -128,7 +128,7 @@ class OrderField(BaseModel):
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         options: list[typing.Tuple[typing.Optional[tsi_query.CastTo], str]]
         if isinstance(self.field, CallsMergedDynamicField):
-            # Prioritize existence, then cast to float, then str
+            # Prioritize existence, then cast to double, then str
             options = [
                 ("exists", "desc"),
                 ("double", self.direction),
@@ -178,6 +178,9 @@ class HardCodedFilter(BaseModel):
     filter: tsi._CallsFilter
 
     def is_useful(self) -> bool:
+        """Returns True if the filter is useful - i.e. it has any non-null fields
+        which would affect the query.
+        """
         return any(
             [
                 self.filter.op_names,
@@ -186,7 +189,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.parent_ids,
                 self.filter.trace_ids,
                 self.filter.call_ids,
-                self.filter.trace_roots_only,
+                self.filter.trace_roots_only is not None,
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
             ]
@@ -218,9 +221,8 @@ class CallsQuery(BaseModel):
         if isinstance(operand, tsi_query.AndOperation):
             if len(operand.and_) == 0:
                 raise ValueError("Empty AND operation")
-            else:
-                for op in operand.and_:
-                    self.add_condition(op)
+            for op in operand.and_:
+                self.add_condition(op)
         else:
             self.query_conditions.append(Condition(operand=operand))
         return self
@@ -232,7 +234,7 @@ class CallsQuery(BaseModel):
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
         direction = direction.upper()
-        if direction not in ["ASC", "DESC"]:
+        if direction not in ("ASC", "DESC"):
             raise ValueError(f"Direction {direction} is not allowed")
         direction = typing.cast(typing.Literal["ASC", "DESC"], direction)
         self.order_fields.append(
@@ -345,33 +347,25 @@ class CallsQuery(BaseModel):
 
         # Determine if the query `has_heavy_fields` by checking
         # if it `has_heavy_select or has_heavy_filter or has_heavy_order`
-        has_heavy_select = False
-        for select_field in self.select_fields:
-            if select_field.is_heavy():
-                has_heavy_select = True
+        has_heavy_select = any(field.is_heavy() for field in self.select_fields)
 
-        has_heavy_filter = False
-        for query_condition in self.query_conditions:
-            if query_condition.is_heavy():
-                has_heavy_filter = True
+        has_heavy_filter = any(
+            condition.is_heavy() for condition in self.query_conditions
+        )
 
-        has_heavy_order = False
-        for order_field in self.order_fields:
-            if order_field.field.is_heavy():
-                has_heavy_order = True
+        has_heavy_order = any(
+            order_field.field.is_heavy() for order_field in self.order_fields
+        )
 
         has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
 
         # Determine if `predicate_pushdown_possible` which is
         # if it `has_light_filter or has_light_query or has_light_order_filter`
-        has_light_filter = False
-        if self.hardcoded_filter and self.hardcoded_filter.is_useful():
-            has_light_filter = True
+        has_light_filter = self.hardcoded_filter and self.hardcoded_filter.is_useful()
 
-        has_light_query = False
-        for query_condition in self.query_conditions:
-            if not query_condition.is_heavy():
-                has_light_query = True
+        has_light_query = any(
+            not condition.is_heavy() for condition in self.query_conditions
+        )
 
         has_light_order_filter = (
             self.order_fields
@@ -442,14 +436,14 @@ class CallsQuery(BaseModel):
         id_subquery_name: typing.Optional[str] = None,
     ) -> str:
         select_fields_sql = ", ".join(
-            [field.as_select_sql(pb, table_alias) for field in self.select_fields]
+            field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
 
         having_filter_sql = ""
-        having_conditions_sql = []
+        having_conditions_sql: list[str] = []
         if len(self.query_conditions) > 0:
             having_conditions_sql.extend(
-                [c.as_sql(pb, table_alias) for c in self.query_conditions]
+                c.as_sql(pb, table_alias) for c in self.query_conditions
             )
         if self.hardcoded_filter is not None:
             having_conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
@@ -502,7 +496,7 @@ class CallsQuery(BaseModel):
         """
 
 
-allowed_fields = {
+ALLOWED_CALL_FIELDS = {
     "project_id": CallsMergedField(field="project_id"),
     "id": CallsMergedField(field="id"),
     "trace_id": CallsMergedAggField(field="trace_id", agg_fn="any"),
@@ -525,18 +519,18 @@ allowed_fields = {
 
 
 def get_field_by_name(name: str) -> CallsMergedField:
-    if name not in allowed_fields:
+    if name not in ALLOWED_CALL_FIELDS:
         field_parts = name.split(".")
         start_part = field_parts[0]
         dumped_start_part = start_part + "_dump"
-        if dumped_start_part in allowed_fields:
-            field = allowed_fields[dumped_start_part]
+        if dumped_start_part in ALLOWED_CALL_FIELDS:
+            field = ALLOWED_CALL_FIELDS[dumped_start_part]
             if isinstance(field, CallsMergedDynamicField):
                 if len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
             return field
         raise ValueError(f"Field {name} is not allowed")
-    return allowed_fields[name]
+    return ALLOWED_CALL_FIELDS[name]
 
 
 class FilterToConditions(BaseModel):

@@ -33,7 +33,7 @@ def test_parambuilder_sqlite():
     }
 
 
-def testcombine_conditions():
+def test_combine_conditions():
     with pytest.raises(ValueError):
         combine_conditions([], "NOT")
 
