@@ -47,7 +47,13 @@ class Query(BaseModel):
 # Can be any standard json-able value
 class LiteralOperation(BaseModel):
     literal_: typing.Union[
-        str, int, float, bool, dict[str, "LiteralOperation"], list["LiteralOperation"]
+        str,
+        int,
+        float,
+        bool,
+        dict[str, "LiteralOperation"],
+        list["LiteralOperation"],
+        None,
     ] = Field(alias="$literal")
 
 
@@ -76,10 +82,13 @@ class ConvertOperation(BaseModel):
     convert_: "ConvertSpec" = Field(alias="$convert")
 
 
+CastTo = typing.Literal["double", "string", "int", "bool", "exists"]
+
+
 class ConvertSpec(BaseModel):
     input: "Operand"
     # Subset of https://www.mongodb.com/docs/manual/reference/bson-types/#std-label-bson-types
-    to: typing.Literal["double", "string", "int", "bool"]
+    to: CastTo
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/
