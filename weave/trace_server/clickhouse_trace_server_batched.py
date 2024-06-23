@@ -357,6 +357,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
         if req.query is not None:
             cq.add_condition(req.query.expr_)
+
+        # Sort with empty list results in no sorting
         if req.sort_by is not None:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)

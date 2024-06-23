@@ -27,8 +27,10 @@ Outstanding Optimizations/Work:
 
 """
 
+import logging
 import typing
 
+import sqlparse
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
@@ -43,6 +45,8 @@ from weave.trace_server.orm import (
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CallsMergedField(BaseModel):
@@ -424,10 +428,12 @@ class CallsQuery(BaseModel):
             outer_query.limit = self.limit
             outer_query.offset = self.offset
 
-        return f"""
+        raw_sql = f"""
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
         {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
         """
+
+        return _safely_format_sql(raw_sql)
 
     def _as_sql_base_format(
         self,
@@ -482,7 +488,7 @@ class CallsQuery(BaseModel):
             id_mask_sql = f"AND (id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
         # TODO: We should also pull out id-masks from the dynamic query
 
-        return f"""
+        raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
         WHERE project_id = {_param_slot(project_param, 'String')}
@@ -494,6 +500,8 @@ class CallsQuery(BaseModel):
         {limit_sql}
         {offset_sql}
         """
+
+        return _safely_format_sql(raw_sql)
 
 
 ALLOWED_CALL_FIELDS = {
@@ -718,3 +726,14 @@ def process_calls_filter_to_conditions(
 def _param_slot(param_name: str, param_type: str) -> str:
     """Helper function to create a parameter slot for a clickhouse query."""
     return f"{{{param_name}:{param_type}}}"
+
+
+def _safely_format_sql(
+    sql: str,
+) -> str:
+    """Safely format a SQL string with parameters."""
+    try:
+        return sqlparse.format(sql, reindent=True)
+    except:
+        logger.info(f"Failed to format SQL: {sql}")
+        return sql
