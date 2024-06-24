@@ -1,5 +1,6 @@
-from typing import Union, Any
 import dataclasses
+from typing import Any, Union
+
 from ..trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
@@ -62,10 +63,10 @@ class ObjectRef(RefWithExtra):
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
-        from weave.graph_client_context import get_graph_client
+        from weave.client_context.weave_client import get_weave_client
         from weave.weave_init import init_weave
 
-        gc = get_graph_client()
+        gc = get_weave_client()
         if gc is not None:
             return gc.get(self)
 
@@ -123,7 +124,10 @@ class CallRef(RefWithExtra):
         return u
 
 
-def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
+AnyRef = Union[ObjectRef, TableRef, CallRef]
+
+
+def parse_uri(uri: str) -> AnyRef:
     if not uri.startswith("weave:///"):
         raise ValueError(f"Invalid URI: {uri}")
     path = uri[len("weave:///") :]
@@ -134,6 +138,10 @@ def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
     remaining = parts[3:]
     if kind == "table":
         return TableRef(entity=entity, project=project, digest=remaining[0])
+    elif kind == "call":
+        return CallRef(
+            entity=entity, project=project, id=remaining[0], extra=remaining[1:]
+        )
     elif kind == "object":
         name, version = remaining[0].split(":")
         return ObjectRef(

@@ -1,26 +1,26 @@
-import typing
-from typing import Iterable, Sequence, Optional
-import weakref
+import functools
 import hashlib
 import json
-import functools
+import typing
+import weakref
+from typing import Iterable, Optional, Sequence
 
-from . import uris
-from . import box
+from weave import client_context
+from weave.legacy import box, context_state, object_context
+from weave.legacy.language_features.tagging import tag_store
+
 from . import errors
-from . import graph_client_context
 from . import weave_types as types
-from . import object_context
-from . import context_state
-from .language_features.tagging import tag_store
+from .legacy import uris
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
-    from . import weave_types as types
-    from . import run
+    from weave.legacy import run
+
     from . import weave_client
+    from . import weave_types as types
 
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
@@ -158,12 +158,12 @@ class Ref:
         return str(self.uri)
 
     def input_to(self) -> Sequence["weave_client.Call"]:
-        client = graph_client_context.require_graph_client()
-        return client.ref_input_to(self)
+        client = client_context.weave_client.require_weave_client()
+        return client._ref_input_to(self)
 
     def value_input_to(self) -> Sequence["weave_client.Call"]:
-        client = graph_client_context.require_graph_client()
-        return client.ref_value_input_to(self)
+        client = client_context.weave_client.require_weave_client()
+        return client._ref_value_input_to(self)
 
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:

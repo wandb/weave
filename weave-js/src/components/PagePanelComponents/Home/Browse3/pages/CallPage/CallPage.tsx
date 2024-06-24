@@ -1,16 +1,25 @@
 import Box from '@mui/material/Box';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
-import React, {FC, useCallback} from 'react';
+import {
+  evaluationViewed,
+  traceViewed,
+} from '@wandb/weave/integrations/analytics/viewEvents';
+import React, {FC, useCallback, useEffect} from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
+import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {
   TRACETREE_PARAM,
   useClosePeek,
   useWeaveflowCurrentRouteContext,
 } from '../../context';
+import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
@@ -55,6 +64,8 @@ export const CallPage: FC<{
 
 const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
+  const {entity, project, callId} = call;
+  const weaveRef = makeRefCall(entity, project, callId);
   return [
     {
       label: 'Call',
@@ -69,6 +80,19 @@ const useCallTabs = (call: CallSchema) => {
         ]
       : []),
     {
+      label: 'Feedback',
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <FeedbackGrid
+            entity={entity}
+            project={project}
+            weaveRef={weaveRef}
+            objectType="call"
+          />
+        </Tailwind>
+      ),
+    },
+    {
       label: 'Summary',
       content: <CallSummary call={call} />,
     },
@@ -79,6 +103,33 @@ const CallPageInnerVertical: FC<{
   call: CallSchema;
   path?: string;
 }> = ({call, path}) => {
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const {loading: orgNameLoading, orgName} = useOrgName({
+    entityName: call.entity,
+  });
+  useEffect(() => {
+    if (!viewerLoading && !orgNameLoading) {
+      console.log('call', call);
+      if (call.spanName === 'Evaluation.evaluate') {
+        evaluationViewed({
+          traceId: call.traceId,
+          userId: userInfo.id,
+          organizationName: orgName,
+          entityName: call.entity,
+        });
+      } else {
+        traceViewed({
+          traceId: call.traceId,
+          userId: userInfo.id,
+          organizationName: orgName,
+          entityName: call.entity,
+        });
+      }
+    }
+  }, [viewerLoading, orgNameLoading, orgName, userInfo, call]);
+
+  useEffect(() => {}, []);
+
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 

@@ -1,7 +1,7 @@
 # Clickhouse Trace Server Manager
-import typing
-import os
 import logging
+import os
+import typing
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -55,8 +55,8 @@ class ClickHouseTraceServerMigrator:
                 db_name String,
                 curr_version UInt64,
                 partially_applied_version UInt64 NULL,
-            ) 
-            ENGINE = MergeTree() 
+            )
+            ENGINE = MergeTree()
             ORDER BY (db_name)
         """
         )

@@ -36,6 +36,7 @@ export type CallKey = {
 };
 export type CallSchema = CallKey & {
   spanName: string;
+  displayName: string | null;
   opVersionRef: string | null;
   traceId: string;
   parentId: string | null;
@@ -148,6 +149,12 @@ type AppendRefMutation = {
 
 export type RefMutation = SetRefMutation | AppendRefMutation;
 
+export type FeedbackKey = {
+  entity: string;
+  project: string;
+  weaveRef: string;
+};
+
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
@@ -169,10 +176,16 @@ export type WFDataModelHooksInterface = {
     opts?: {skip?: boolean}
   ) => Loadable<traceServerClient.TraceCallsQueryStatsRes>;
   useCallsDeleteFunc: () => (
-    projectID: string,
+    entity: string,
+    project: string,
     callIDs: string[]
   ) => Promise<void>;
-
+  useCallUpdateFunc: () => (
+    entity: string,
+    project: string,
+    callID: string,
+    newName: string
+  ) => Promise<void>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
@@ -207,6 +220,7 @@ export type WFDataModelHooksInterface = {
     digest: string,
     opts?: {skip?: boolean}
   ) => Loadable<string>;
+  useFeedback: (key: FeedbackKey | null) => LoadableWithError<any[] | null>;
   derived: {
     useChildCallsForCompare: (
       entity: string,

@@ -1,11 +1,9 @@
-import weave
-from .. import api
-from .. import ops
-from .. import environment
-from .. import context_state
-from .. import errors
-
 import pytest
+
+import weave
+from weave.legacy import context_state, ops
+
+from .. import api, environment, errors
 
 
 def test_dir():

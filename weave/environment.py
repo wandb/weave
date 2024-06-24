@@ -4,14 +4,14 @@
 
 import configparser
 import enum
-import os
 import json
-import typing
-from . import util
-from . import errors
-from urllib.parse import urlparse
 import netrc
+import os
+import typing
 from distutils.util import strtobool
+from urllib.parse import urlparse
+
+from . import errors, util
 
 if typing.TYPE_CHECKING:
     from . import logs

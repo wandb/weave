@@ -10,11 +10,13 @@
 #     pass
 
 
-import pytest
+import cProfile
 import json
 import time
+
+import pytest
+
 import weave
-import cProfile
 
 
 def do_assigns(assigns):

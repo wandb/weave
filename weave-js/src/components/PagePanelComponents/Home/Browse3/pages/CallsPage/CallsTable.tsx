@@ -31,7 +31,6 @@ import React, {
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
-import {flattenObject} from '../../../Browse2/browse2Util';
 import {WeaveHeaderExtrasContext} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -49,17 +48,11 @@ import {
 } from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
-import {
-  EXPANDED_REF_REF_KEY,
-  EXPANDED_REF_VAL_KEY,
-} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {
-  CallSchema,
-  OpVersionKey,
-} from '../wfReactInterface/wfDataModelHooksInterface';
+import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {useCallsTableColumns} from './callsTableColumns';
+import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
 import {useOpVersionOptions} from './callsTableFilter';
@@ -638,75 +631,3 @@ const ExportRunsTableButton = ({
     </Button>
   </Box>
 );
-
-/**
- * This function is responsible for taking the raw calls data and flattening it
- * into a format that can be consumed by the MUI Data Grid. Importantly, we strip
- * away the legacy `CallSchema` wrapper and just operate on the inner `TraceCallSchema`
- *
- * Specifically it does 3 things:
- * 1. Flattens the nested object structure of the calls data
- * 2. Removes any keys that start with underscore
- * 3. Converts expanded values to their actual values. This takes two forms:
- *    1. If expanded value is a dictionary, then the flattened data will look like:
- *      {
- *        [EXPANDED_REF_REF_KEY]: 'weave://...',
- *        [EXPANDED_REF_VAL_KEY].sub_key_x: 'value_x',
- *         ...
- *      }
- *      In this case, we want to remove the [EXPANDED_REF_REF_KEY] and [EXPANDED_REF_VAL_KEY] from the paths,
- *      leaving everything else. The result is that the ref is left at the primitive position for the data.
- *     2. If the expanded value is a primitive, then the flattened data will look like:
- *      {
- *        [EXPANDED_REF_REF_KEY]: 'weave://...',
- *        [EXPANDED_REF_VAL_KEY]: 'value'
- *      }
- *      In this case, we don't have a place to put the ref value, so we just remove it.
- */
-function prepareFlattenedCallDataForTable(
-  callsResult: CallSchema[]
-): Array<TraceCallSchema & {[key: string]: string}> {
-  return callsResult.map(r => {
-    // First, flatten the inner trace call (this is the on-wire format)
-    const flattened = flattenObject(r.traceCall ?? {}) as TraceCallSchema & {
-      [key: string]: string;
-    };
-
-    // Next, process some of the keys.
-    const cleaned = {} as TraceCallSchema & {[key: string]: string};
-    Object.keys(flattened).forEach(key => {
-      let newKey = key;
-
-      // If the key ends with the expanded ref key, then we have 2 cases
-      if (key.endsWith('.' + EXPANDED_REF_REF_KEY)) {
-        const keyRoot = newKey.slice(0, -EXPANDED_REF_REF_KEY.length - 1);
-
-        // Case 1: the refVal is a primitive and we just need to toss away the ref key
-        const refValIsPrimitive =
-          flattened[newKey + '.' + EXPANDED_REF_VAL_KEY] !== undefined;
-        if (refValIsPrimitive) {
-          return;
-
-          // Case 2: the refVal is a dictionary and we just remove the ref part of the path
-        } else {
-          newKey = keyRoot;
-        }
-      }
-
-      // Next, we remove all path parts that are the expanded ref val key
-      if (newKey.includes('.' + EXPANDED_REF_VAL_KEY)) {
-        newKey = newKey.replaceAll('.' + EXPANDED_REF_VAL_KEY, '');
-      }
-
-      // Finally, we remove any keys that start with underscore
-      if (newKey.includes('._')) {
-        return;
-      }
-
-      // and add the cleaned key to the cleaned object
-      cleaned[newKey] = flattened[key];
-    });
-
-    return cleaned;
-  });
-}

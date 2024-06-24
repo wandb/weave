@@ -1,5 +1,8 @@
 import Box from '@mui/material/Box';
-import React, {useMemo} from 'react';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
+import {objectViewed} from '@wandb/weave/integrations/analytics/viewEvents';
+import React, {useEffect, useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {LoadingDots} from '../../../../LoadingDots';
@@ -66,6 +69,22 @@ export const ObjectVersionPage: React.FC<{
 const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const {loading: orgNameLoading, orgName} = useOrgName({
+    entityName: objectVersion.entity,
+  });
+  useEffect(() => {
+    if (!viewerLoading && !orgNameLoading) {
+      objectViewed({
+        objectType: objectVersion.baseObjectClass ?? '',
+        objectId: objectVersion.objectId,
+        userId: userInfo.id,
+        organizationName: orgName,
+        entityName: objectVersion.entity,
+      });
+    }
+  }, [viewerLoading, orgNameLoading, orgName, userInfo, objectVersion]);
+
   const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;

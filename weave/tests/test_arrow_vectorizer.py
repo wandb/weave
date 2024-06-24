@@ -1,33 +1,25 @@
-import pytest
+import datetime
 import typing
 
-from .. import box
-from ..ops_primitives import Number, Boolean
-from .. import api as weave
-from .. import ops
-from .. import weave_types as types
-from .. import weave_internal
-from ..ops_primitives import dict_, list_, date
-from .. import errors
-
-from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
-
-from .. import ops_arrow as arrow
-from ..ops_arrow import arraylist_ops
-from ..ops_arrow import convert_ops
-from ..ops_arrow import util
-
-from ..ops_domain import wb_domain_types as wdt
-
-from ..ops_domain import run_ops
-from .. import dispatch
-
-
-import datetime
-
 import pyarrow as pa
-
+import pytest
 from pyarrow import compute as pc
+
+from weave.legacy import box, dispatch, ops
+from weave.legacy import ops_arrow as arrow
+from weave.legacy.language_features.tagging import (
+    make_tag_getter_op,
+    tag_store,
+    tagged_value_type,
+)
+from weave.legacy.ops_arrow import arraylist_ops, convert_ops, util
+from weave.legacy.ops_domain import run_ops
+from weave.legacy.ops_domain import wb_domain_types as wdt
+from weave.legacy.ops_primitives import Boolean, Number, date, dict_, list_
+
+from .. import api as weave
+from .. import errors, weave_internal
+from .. import weave_types as types
 
 string_ops_test_cases = [
     ("eq-scalar", lambda x: x == "bc", [True, False, False]),

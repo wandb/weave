@@ -5,8 +5,8 @@
 # we store the internal `project_id`. However, over the wire, we use the plain-text. Practically,
 # the trace interface should only ever operate on internal refs.
 
-from typing import Union
 import dataclasses
+from typing import Union
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"

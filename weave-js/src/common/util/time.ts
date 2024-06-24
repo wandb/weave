@@ -236,7 +236,11 @@ type TimeSegments = {
   second: number;
 };
 
-export function getTimeSegmentsInTimeZone(timeZone: string): TimeSegments {
+type WeekTimeSegments = TimeSegments & {
+  day: string;
+};
+
+export function getTimeSegmentsInTimeZone(timeZone: string): WeekTimeSegments {
   const timeStr = new Date().toLocaleTimeString('en-US', {
     timeZone,
     hourCycle: 'h23',
@@ -245,11 +249,17 @@ export function getTimeSegmentsInTimeZone(timeZone: string): TimeSegments {
     second: '2-digit',
   });
 
+  const dateStr = new Date().toLocaleDateString('en-US', {
+    timeZone,
+    weekday: 'long',
+  });
+
   const [hour, minute, second] = timeStr.split(':').map(Number);
 
   return {
     hour,
     minute,
     second,
+    day: dateStr,
   };
 }

@@ -1,8 +1,9 @@
-import typing
 import dataclasses
+import typing
 from urllib import parse
 
-from . import box
+from weave.legacy import box
+
 from .trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
@@ -22,7 +23,8 @@ def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]
 def val_with_relative_ref(
     parent_object: typing.Any, child_object: typing.Any, ref_extra_parts: list[str]
 ) -> typing.Any:
-    from . import context_state
+    from weave.legacy import context_state
+
     from . import ref_base
 
     # If we already have a ref, resolve it

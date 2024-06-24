@@ -1,18 +1,19 @@
 import os
-from pathlib import Path
 import string
+import tempfile
 import time
 import typing
-import tempfile
+from pathlib import Path
+
 from weave import artifact_wandb, environment
-from weave.trace.refs import parse_uri, ObjectRef
+from weave.trace.refs import ObjectRef, parse_uri
 
 try:
+    import dotenv
+    from modal.cli.import_refs import import_stub
     from modal.config import config
     from modal.runner import deploy_stub
     from modal.serving import serve_stub
-    from modal.cli.import_refs import import_stub
-    import dotenv
 except ImportError:
     raise ImportError(
         "modal must be installed and configured: \n  pip install weave[modal]\n  modal setup"
