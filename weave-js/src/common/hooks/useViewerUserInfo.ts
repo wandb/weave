@@ -1,4 +1,4 @@
-import {gql} from '@apollo/client';
+import {gql,TypedDocumentNode} from '@apollo/client';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {opRootViewer, opUserUserInfo} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
@@ -97,7 +97,7 @@ export const UPDATE_USER_INFO = gql(`
       }
     }
   }
-`);
+`) as TypedDocumentNode<any, {userInfo: string}>;
 
 export const updateUserInfo = (userInfo: UserInfo) => {
   const variables = {
