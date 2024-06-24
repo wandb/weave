@@ -32,6 +32,7 @@ class CallSchema(BaseModel):
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
+    expanded_input_paths: typing.Optional[typing.List[typing.Tuple[str, str]]] = None
 
     ## End time is required if finished
     ended_at: typing.Optional[datetime.datetime] = None
@@ -41,6 +42,7 @@ class CallSchema(BaseModel):
 
     ## Outputs
     output: typing.Optional[typing.Any] = None
+    expanded_output_paths: typing.Optional[typing.List[typing.Tuple[str, str]]] = None
 
     ## Summary: a summary of the call
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
@@ -190,6 +192,7 @@ class CallsQueryReq(BaseModel):
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[_SortBy]] = None
     query: typing.Optional[Query] = None
+    expand_paths: typing.Optional[typing.List[str]] = None
 
 
 class CallsQueryRes(BaseModel):

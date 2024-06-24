@@ -216,6 +216,7 @@ class CallsQuery(BaseModel):
     order_fields: list[OrderField] = Field(default_factory=list)
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
+    expand_paths: typing.List[str] = Field(default_factory=list)
 
     def add_field(self, field: str) -> "CallsQuery":
         self.select_fields.append(get_field_by_name(field))
@@ -244,6 +245,10 @@ class CallsQuery(BaseModel):
         self.order_fields.append(
             OrderField(field=get_field_by_name(field), direction=direction)
         )
+        return self
+
+    def add_expand_path(self, path: str) -> "CallsQuery":
+        self.expand_paths.append(path)
         return self
 
     def set_limit(self, limit: int) -> "CallsQuery":
@@ -502,6 +507,30 @@ class CallsQuery(BaseModel):
         """
 
         return _safely_format_sql(raw_sql)
+
+
+def expand_field_for_table(base_table_sql: str, field: str) -> str:
+    """This method "expands" a field on a base table. Specifically, it:
+
+    1. ...
+    """
+
+    raw_sql = """
+    SELECT
+        base_table.*,
+        'a' AS expanded_field_value,
+        'b' AS expanded_field_db_table,
+        'c' AS expanded_field_object_id, -- only valid if db_table is 'objects'
+        'c' AS expanded_field_digest
+    
+    
+    SOMETHING as expanded_field,
+    FROM (
+        {BASE_TABLE_SQL}
+    ) AS base_table
+    LEFT JOIN objects ON base_table.id = expanded_table.id
+    """
+    raise NotImplementedError("Implement me!")
 
 
 ALLOWED_CALL_FIELDS = {
