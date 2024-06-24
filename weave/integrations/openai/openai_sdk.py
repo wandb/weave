@@ -86,7 +86,7 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk") -> typing.Dict
 
 
 def openai_accumulator(
-    acc: "ChatCompletionChunk" | None,
+    acc: typing.Optional["ChatCompletionChunk"],
     value: "ChatCompletionChunk",
 ) -> "ChatCompletionChunk":
     from openai.types.chat import ChatCompletionChunk
