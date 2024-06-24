@@ -1,12 +1,10 @@
 import importlib
-
 import typing
 from functools import wraps
 
-
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import SymbolPatcher, MultiPatcher
+from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
@@ -14,11 +12,11 @@ if typing.TYPE_CHECKING:
 
 def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
-    from openai.types.chat.chat_completion_message import FunctionCall
     from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaToolCall,
         ChoiceDeltaFunctionCall,
+        ChoiceDeltaToolCall,
     )
+    from openai.types.chat.chat_completion_message import FunctionCall
     from openai.types.chat.chat_completion_message_tool_call import (
         ChatCompletionMessageToolCall,
         Function,
@@ -54,7 +52,7 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
         return _tool_calls
 
     if isinstance(value, ChatCompletionChunk):
-        value = ChatCompletion(
+        final_value = ChatCompletion(
             id=value.id,
             choices=[
                 {
@@ -76,24 +74,24 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
             system_fingerprint=value.system_fingerprint,
             usage=value.usage if hasattr(value, "usage") else None,
         )
-        return value.model_dump(exclude_unset=True, exclude_none=True)
+        return final_value.model_dump(exclude_unset=True, exclude_none=True)
     else:
         return value.model_dump(exclude_unset=True, exclude_none=True)
 
 
 def openai_accumulator(
     acc,
-    value: typing.Optional["ChatCompletionChunk"],
+    value: "ChatCompletionChunk",
 ) -> "ChatCompletionChunk":
     from openai.types.chat import ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import ChoiceDeltaFunctionCall
+    from openai.types.chat.chat_completion_chunk import (
+        ChoiceDeltaFunctionCall,
+        ChoiceDeltaToolCall,
+        ChoiceDeltaToolCallFunction,
+    )
     from openai.types.chat.chat_completion_message_tool_call import (
         ChatCompletionMessageToolCall,
         Function,
-    )
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaToolCall,
-        ChoiceDeltaToolCallFunction,
     )
 
     def _process_chunk(chunk: ChatCompletionChunk, acc_choices: list[dict] = []):
@@ -126,7 +124,7 @@ def openai_accumulator(
             if chunk_choice.delta.content:
                 if choice["delta"]["content"] is None:
                     choice["delta"]["content"] = ""
-                choice["delta"]["content"] += chunk_choice.delta.content
+                choice["delta"]["content"] += chunk_choice.delta.content # type: ignore
             if chunk_choice.delta.role:
                 choice["delta"]["role"] = chunk_choice.delta.role
 
@@ -146,13 +144,13 @@ def openai_accumulator(
             if chunk_choice.delta.tool_calls:
                 if choice["delta"]["tool_calls"] is None:
                     choice["delta"]["tool_calls"] = []
-                    tool_call_delta = chunk_choice.delta.tool_calls[0]
-                    choice["delta"]["tool_calls"].append(
+                    tool_call_delta = chunk_choice.delta.tool_calls[0] # when streaming, we get one
+                    choice["delta"]["tool_calls"].append( # type: ignore
                         ChoiceDeltaToolCall(
                             id=tool_call_delta.id,
                             index=tool_call_delta.index,
                             function=ChoiceDeltaToolCallFunction(
-                                name=tool_call_delta.function.name,
+                                name=tool_call_delta.function.name, # type: ignore
                                 arguments="",
                             ),
                             type=tool_call_delta.type,
@@ -267,4 +265,4 @@ symbol_pathers = [
     ),
 ]
 
-openai_patcher = MultiPatcher(symbol_pathers)
+openai_patcher = MultiPatcher(symbol_pathers) # type: ignore

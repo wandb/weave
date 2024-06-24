@@ -2,7 +2,7 @@ import os
 import typing
 
 import pytest
-from openai import OpenAI, AsyncOpenAI
+from openai import AsyncOpenAI, OpenAI
 
 import weave
 from weave.trace_server import trace_server_interface as tsi

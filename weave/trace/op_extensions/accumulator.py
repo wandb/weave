@@ -16,7 +16,7 @@ from typing import (
 from weave.trace.op import FinishCallbackType, Op
 
 try:
-    from openai.resources.chat.completions import Completions, AsyncCompletions
+    from openai.resources.chat.completions import AsyncCompletions, Completions
 except ImportError:
     pass
 
