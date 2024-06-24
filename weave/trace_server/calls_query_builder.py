@@ -510,9 +510,54 @@ class CallsQuery(BaseModel):
 
 
 def expand_field_for_table(base_table_sql: str, field: str) -> str:
-    """This method "expands" a field on a base table. Specifically, it:
+    """This method "expands" a field on a base table.
 
-    1. ...
+    Ref expansion is quite complex and involves a few steps:
+
+    1. A "ref" is a string in the format of: `weave-trace-internal://project_id/TYPE/ID[/EXTRA]`
+       * `TYPE` is one of `table`, `object`, or `op`.
+       * `ID` is the ID of the object. For `table`, this is `DIGEST`. For `object` and `op`, this is `NAME:DIGEST`.
+       * `EXTRA` is an optional additional path to walk, in the format of tuples of `/PATH_TYPE/PATH_VALUE`
+    2. "Data" is any valid JSON data - a primitive, an object, an array, etc.
+    3. "refs" can appear anywhere in the data, and can be nested. Refs can be the entire data, or just a part of it.
+    4. Our general problem can be reduced to a SQL procedure similar to the `expand` method expressed in python here:
+        ```python
+        def expand(data: Any, up_to_and_including_path: list[str] = []) -> Any:
+            if data is None:
+                return None:
+            replacement = fetch_data_at_path(data, up_to_and_including_path)
+            if replacement is None:
+                return data
+            return replace_data_at_path(data, up_to_and_including_path, replacement)
+
+        def replace_data_at_path(data: Any, path: list[str], new_data: Any) -> Any:
+            # General purpose function to replace data at a path
+            pass
+
+        def fetch_data_at_path(data: Any, path: list[str]) -> Any:
+            if data is None:
+                return None
+            elif data_is_ref(data):
+                ref_base, ref_extra = parse_ref(data)
+                ref_data = fetch_ref_data(ref_base)
+                return fetch_data_at_path(ref_data, ref_extra + path)
+            elif len(path) == 0:
+                return data
+            elif data_is_dict(data):
+                return data.get(path[0], None)
+            elif data_is_list(data):
+                try:
+                    index = int(path[0])
+                except ValueError:
+                    return None
+                return fetch_data_at_path(data[index], path[1:])
+            else:
+                return None
+        ```
+        * Note: from a performance perspective, we want to operate on lists of paths (or maybe path trees)
+        to minimize the number of queries we need to make.
+
+        Ok, this is ... idea: UDFs
     """
 
     raw_sql = """

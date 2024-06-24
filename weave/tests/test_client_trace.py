@@ -2090,7 +2090,7 @@ def test_call_query_stream_equality(client):
     assert i == len(calls.calls)
 
 
-@pytest.mark.skip("Not implemented: filter / sort through refs")
+# @pytest.mark.skip("Not implemented: filter / sort through refs")
 def test_sort_and_filter_through_refs(client):
     @weave.op()
     def test_op(label, val):
