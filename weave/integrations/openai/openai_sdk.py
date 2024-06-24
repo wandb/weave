@@ -124,7 +124,7 @@ def openai_accumulator(
             if chunk_choice.delta.content:
                 if choice["delta"]["content"] is None:
                     choice["delta"]["content"] = ""
-                choice["delta"]["content"] += chunk_choice.delta.content # type: ignore
+                choice["delta"]["content"] += chunk_choice.delta.content  # type: ignore
             if chunk_choice.delta.role:
                 choice["delta"]["role"] = chunk_choice.delta.role
 
@@ -136,21 +136,23 @@ def openai_accumulator(
                         name=chunk_choice.delta.function_call.name,
                     )
                 else:
-                    choice["delta"]["function_call"][
-                        "arguments"
-                    ] += chunk_choice.delta.function_call.arguments
+                    choice["delta"]["function_call"]["arguments"] += (
+                        chunk_choice.delta.function_call.arguments
+                    )
 
             # tool calls
             if chunk_choice.delta.tool_calls:
                 if choice["delta"]["tool_calls"] is None:
                     choice["delta"]["tool_calls"] = []
-                    tool_call_delta = chunk_choice.delta.tool_calls[0] # when streaming, we get one
-                    choice["delta"]["tool_calls"].append( # type: ignore
+                    tool_call_delta = chunk_choice.delta.tool_calls[
+                        0
+                    ]  # when streaming, we get one
+                    choice["delta"]["tool_calls"].append(  # type: ignore
                         ChoiceDeltaToolCall(
                             id=tool_call_delta.id,
                             index=tool_call_delta.index,
                             function=ChoiceDeltaToolCallFunction(
-                                name=tool_call_delta.function.name, # type: ignore
+                                name=tool_call_delta.function.name,  # type: ignore
                                 arguments="",
                             ),
                             type=tool_call_delta.type,
@@ -175,13 +177,13 @@ def openai_accumulator(
                         tool_call["type"] = tool_call_delta.type
                     if tool_call_delta.function is not None:
                         if tool_call_delta.function.name is not None:
-                            tool_call["function"][
-                                "name"
-                            ] = tool_call_delta.function.name
+                            tool_call["function"]["name"] = (
+                                tool_call_delta.function.name
+                            )
                         if tool_call_delta.function.arguments is not None:
-                            tool_call["function"][
-                                "arguments"
-                            ] += tool_call_delta.function.arguments
+                            tool_call["function"]["arguments"] += (
+                                tool_call_delta.function.arguments
+                            )
 
         return acc_choices
 
@@ -233,10 +235,11 @@ def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Calla
             @wraps(fn)
             def _wrapper(*args, **kwargs):
                 if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
-                    kwargs["stream_options"] = {
-                        "include_usage": True
-                    }
-                return fn(*args, **kwargs) # This is where the final execution of fn is happening.
+                    kwargs["stream_options"] = {"include_usage": True}
+                return fn(
+                    *args, **kwargs
+                )  # This is where the final execution of fn is happening.
+
             return _wrapper
 
         op = weave.op()(_add_stream_options(fn))
@@ -265,4 +268,4 @@ symbol_pathers = [
     ),
 ]
 
-openai_patcher = MultiPatcher(symbol_pathers) # type: ignore
+openai_patcher = MultiPatcher(symbol_pathers)  # type: ignore

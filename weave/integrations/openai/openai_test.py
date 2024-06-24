@@ -156,7 +156,9 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_openai_async_stream_quickstart(client: weave.weave_client.WeaveClient) -> None:
+async def test_openai_async_stream_quickstart(
+    client: weave.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
