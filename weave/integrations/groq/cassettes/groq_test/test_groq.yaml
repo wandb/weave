@@ -1,0 +1,92 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "What is the capital of India?"}],
+      "model": "llama3-8b-8192", "seed": 42}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '115'
+      content-type:
+      - application/json
+      host:
+      - api.groq.com
+      user-agent:
+      - Groq/Python 0.4.2
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 0.4.2
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.14
+    method: POST
+    uri: https://api.groq.com/openai/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SRu27cMBRE+3yFcGtqQepN1m7SpHJnBAJFXa645sskDTte6N8DGVkBaQdzMDOY
+        O5gVBKhNFuWirTs+daumqtbYy7rrNa85H9d6HMaOL5RPyCgQCMsNVfkHXlRw0WIxwQMBlVAWXEGw
+        kfFmaClrCbiwogUB1kon23pa6onx5nBvwSjMIF7uYPyKnyAoAYc5yyuCuEMKFkGAzNnkIn05mOAL
+        +iP9ecNKyWiKtFXQ1U+/GlmZXP3Cj+oJ7WYusBOw4RpTWDII/24tAW28yducUObgQUAuIcL+m8D7
+        IzSm4GKZS3hFn48l5JSMQxD0Qmk7DbRvx6POY/0J8P/Vkxm6ZmJjQ6CEIu1pb4ZTeVgZbaZppHwn
+        kP/kgm7Wxl8xxWS+l+s4Sz4qjW0vEQh8ztcU3o7u338mfJspu7GBfslF6/JRvHulPX6lW89H2Pcf
+        fwEAAP//AwDYkq5l+QEAAA==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 898faa487d7b2f5d-LAX
+      Cache-Control:
+      - private, max-age=0, no-store, no-cache, must-revalidate
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 24 Jun 2024 21:03:33 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=yxcW.657NwDYcA7NiuJzDF9yEeyeNYLxNFpL.1wGaw8-1719263013-1.0.1.1-wDcntIRaj2K.MySdccE7.9bgh1jOXrZpJF8M5eXuOIwfiSvHlFcnua_3OFt2efMl7Yga0PCAQ2krtlfwemvimQ;
+        path=/; expires=Mon, 24-Jun-24 21:33:33 GMT; domain=.groq.com; HttpOnly; Secure;
+        SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      vary:
+      - Origin
+      via:
+      - 1.1 google
+      x-ratelimit-limit-requests:
+      - '100000'
+      x-ratelimit-limit-tokens:
+      - '70000'
+      x-ratelimit-remaining-requests:
+      - '99999'
+      x-ratelimit-remaining-tokens:
+      - '69988'
+      x-ratelimit-reset-requests:
+      - 864ms
+      x-ratelimit-reset-tokens:
+      - 10.285714ms
+      x-request-id:
+      - req_01j160zabfftwtnmk05ezrj597
+    status:
+      code: 200
+      message: OK
+version: 1
