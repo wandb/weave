@@ -4,8 +4,8 @@ from weave.trace_server.orm import (
     Column,
     ParamBuilder,
     Table,
-    _combine_conditions,
     _transform_external_field_to_internal_field,
+    combine_conditions,
 )
 
 
@@ -35,17 +35,17 @@ def test_parambuilder_sqlite():
 
 def test_combine_conditions():
     with pytest.raises(ValueError):
-        _combine_conditions([], "NOT")
+        combine_conditions([], "NOT")
 
-    assert _combine_conditions([], "AND") == ""
-    assert _combine_conditions(["foo = 'bar'"], "AND") == "foo = 'bar'"
-    assert _combine_conditions(["foo = 'bar'"], "OR") == "foo = 'bar'"
+    assert combine_conditions([], "AND") == ""
+    assert combine_conditions(["foo = 'bar'"], "AND") == "foo = 'bar'"
+    assert combine_conditions(["foo = 'bar'"], "OR") == "foo = 'bar'"
     assert (
-        _combine_conditions(["foo = 'bar'", "bim = 12"], "AND")
+        combine_conditions(["foo = 'bar'", "bim = 12"], "AND")
         == "((foo = 'bar') AND (bim = 12))"
     )
     assert (
-        _combine_conditions(["foo = 'bar'", "bim = 12"], "OR")
+        combine_conditions(["foo = 'bar'", "bim = 12"], "OR")
         == "((foo = 'bar') OR (bim = 12))"
     )
 

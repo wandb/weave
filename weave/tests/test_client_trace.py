@@ -709,6 +709,51 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
+def test_trace_call_sort_with_mixed_types(client):
+    is_sqlite = client_is_sqlite(client)
+    if is_sqlite:
+        # SQLite does not support sorting over mixed types in a column, so we skip this test
+        return
+
+    @weave.op()
+    def basic_op(in_val: dict) -> dict:
+        import time
+
+        time.sleep(1 / 10)
+        return in_val
+
+    basic_op({"prim": None})
+    basic_op({"not_prim": 1})
+    basic_op({"prim": 100})
+    basic_op({"prim": 2})
+    basic_op({"prim": "b"})
+    basic_op({"prim": "a"})
+
+    for direction, seq in [
+        ("desc", [100, 2, "b", "a", None, None]),
+        (
+            "asc",
+            [
+                2,
+                100,
+                "a",
+                "b",
+                None,
+                None,
+            ],
+        ),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi._SortBy(field="inputs.in_val.prim", direction=direction)],
+            )
+        )
+
+        for i, call in enumerate(inner_res.calls):
+            assert call.inputs["in_val"].get("prim") == seq[i]
+
+
 def client_is_sqlite(client):
     return isinstance(client.server._internal_trace_server, SqliteTraceServer)
 
@@ -2043,3 +2088,119 @@ def test_call_query_stream_equality(client):
         i += 1
 
     assert i == len(calls.calls)
+
+
+@pytest.mark.skip("Not implemented: filter / sort through refs")
+def test_sort_and_filter_through_refs(client):
+    @weave.op()
+    def test_op(label, val):
+        return val
+
+    class TestObj(weave.Object):
+        val: typing.Any
+
+    def test_obj(val):
+        return weave.publish(TestObj(val=val))
+
+    import random
+
+    # Purposely shuffled and contains values that would not sort correctly as strings
+    values = [3, 9, 15, 21, 0, 12, 6, 18]
+    random.shuffle(values)
+
+    test_op(values[0], {"a": {"b": {"c": {"d": values[0]}}}})
+
+    # Ref at A
+    test_op(values[1], {"a": test_obj({"b": {"c": {"d": values[1]}}})})
+    # Ref at B
+    test_op(values[2], {"a": {"b": test_obj({"c": {"d": values[2]}})}})
+    # Ref at C
+    test_op(values[3], {"a": {"b": {"c": test_obj({"d": values[3]})}}})
+
+    # Ref at A and B
+    test_op(values[4], {"a": test_obj({"b": test_obj({"c": {"d": values[4]}})})})
+    # Ref at A and C
+    test_op(values[5], {"a": test_obj({"b": {"c": test_obj({"d": values[5]})}})})
+    # Ref at B and C
+    test_op(values[6], {"a": {"b": test_obj({"c": test_obj({"d": values[6]})})}})
+
+    # Ref at A, B and C
+    test_op(
+        values[7], {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})}
+    )
+
+    for first, last, sort_by in [
+        (0, 21, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
+        (0, 21, [tsi._SortBy(field="output.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi._SortBy(field="output.a.b.c.d", direction="desc")]),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=sort_by,
+            )
+        )
+
+        assert inner_res.calls[0].inputs["label"] == first
+        assert inner_res.calls[1].inputs["label"] == first
+
+    for first, last, count, query in [
+        (
+            6,
+            21,
+            6,
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.val.a.b.c.d"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        (
+            0,
+            3,
+            2,
+            {
+                "$not": [
+                    {
+                        "$gt": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "output.a.b.c.d"},
+                                    "to": "int",
+                                }
+                            },
+                            {"$literal": 5},
+                        ]
+                    }
+                ]
+            },
+        ),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    sort_by=[tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")],
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        assert len(inner_res.calls) == count
+        inner_res = get_client_trace_server(client).calls_query_stats(
+            tsi.CallsQueryStatsReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        assert inner_res.count == count
