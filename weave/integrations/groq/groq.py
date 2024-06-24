@@ -19,7 +19,6 @@ def groq_accumulator(
 
 def groq_wrapper(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return add_accumulator(
