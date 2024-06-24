@@ -1,4 +1,4 @@
-import {gql,TypedDocumentNode} from '@apollo/client';
+import {gql, TypedDocumentNode} from '@apollo/client';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {opRootViewer, opUserUserInfo} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
