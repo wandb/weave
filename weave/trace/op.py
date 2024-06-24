@@ -12,6 +12,7 @@ from typing import (
     TypeVar,
 )
 
+from tenacity import retry
 from typing_extensions import ParamSpec
 
 from weave import client_context
@@ -139,6 +140,16 @@ class Op:
             return _run_async()
         else:
             return on_output(res)
+
+    def call(self, *args, **kwargs) -> "Call":
+        client = client_context.weave_client.require_weave_client()
+        self.__call__(*args, **kwargs)
+        return self._retry_fetch_call(client, self._id)
+
+    @staticmethod
+    @retry
+    def _retry_fetch_call(client: "WeaveClient", id: str) -> "Call":
+        return client.call(id)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name})"
