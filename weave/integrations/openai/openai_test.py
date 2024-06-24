@@ -33,16 +33,16 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     call = res.calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["content"] == exp
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cB4FScUoIEdwG8LYuoDoTXImaDKo"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cB4FScUoIEdwG8LYuoDoTXImaDKo"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 39
     assert usage["completion_tokens"] == 28
     assert usage["prompt_tokens"] == 11
@@ -77,16 +77,16 @@ async def test_openai_async_quickstart(client: weave.weave_client.WeaveClient) -
     call = res.calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["content"] == exp
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cBcPX4RAb0QcXk7DD8qO7UDkZaXv"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cBcPX4RAb0QcXk7DD8qO7UDkZaXv"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 39
     assert usage["completion_tokens"] == 28
     assert usage["prompt_tokens"] == 11
@@ -125,14 +125,14 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
     call = res.calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["content"] == exp
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cZQgU1vg2n4tXaht0W56LkP4uWpm"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cZQgU1vg2n4tXaht0W56LkP4uWpm"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
     inputs = call.inputs
     assert inputs["model"] == "gpt-4o"
@@ -142,7 +142,7 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
     assert inputs["top_p"] == 1
 
     # usage information should be available even if `stream_options` is not set
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 35
     assert usage["completion_tokens"] == 24
     assert usage["prompt_tokens"] == 11
@@ -179,16 +179,16 @@ async def test_openai_async_stream_quickstart(
     call = res.calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["content"] == exp
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cZiIuL0D4mgSCBkx9vJKUByT366e"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cZiIuL0D4mgSCBkx9vJKUByT366e"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 35
     assert usage["completion_tokens"] == 24
     assert usage["prompt_tokens"] == 11
@@ -229,7 +229,7 @@ def test_openai_stream_usage_quickstart(client: weave.weave_client.WeaveClient) 
     assert len(res.calls) == 1
     call = res.calls[0]
 
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 35
     assert usage["completion_tokens"] == 24
     assert usage["prompt_tokens"] == 11
@@ -290,17 +290,17 @@ def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
     call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["function_call"]["arguments"] == exp
     assert choice["message"]["function_call"]["name"] == "cricket_player_names"
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cD1mZotVpefUM57I2GYwtpsNhiDX"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cD1mZotVpefUM57I2GYwtpsNhiDX"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 18
     assert usage["prompt_tokens"] == 99
@@ -376,17 +376,17 @@ async def test_openai_function_call_async(
     call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["function_call"]["arguments"] == exp
     assert choice["message"]["function_call"]["name"] == "cricket_player_names"
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cDgrpifNA23GSG0lx7fiqUnoLPGP"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cDgrpifNA23GSG0lx7fiqUnoLPGP"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 18
     assert usage["prompt_tokens"] == 99
@@ -467,15 +467,15 @@ async def test_openai_function_call_async_stream(
     call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["function_call"]["arguments"] == exp
     assert choice["message"]["function_call"]["name"] == "cricket_player_names"
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cDoAspZs24R7hQPixbNse9Lg5dgR"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cDoAspZs24R7hQPixbNse9Lg5dgR"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
     inputs = call.inputs
     assert inputs["model"] == "gpt-4o"
@@ -546,7 +546,7 @@ def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
     call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["tool_calls"][0]["function"]["arguments"] == exp
     assert (
         choice["message"]["tool_calls"][0]["function"]["name"] == "cricket_player_names"
@@ -556,11 +556,11 @@ def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cDtVDDbsN9J2mcgUZXLeL3k5qrFo"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cDtVDDbsN9J2mcgUZXLeL3k5qrFo"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 27
     assert usage["prompt_tokens"] == 90
@@ -635,7 +635,7 @@ async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) ->
     call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["tool_calls"][0]["function"]["arguments"] == exp
     assert (
         choice["message"]["tool_calls"][0]["function"]["name"] == "cricket_player_names"
@@ -645,11 +645,11 @@ async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) ->
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cEBMRLj22MO4Pj6giiJxicM0JRK6"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cEBMRLj22MO4Pj6giiJxicM0JRK6"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 27
     assert usage["prompt_tokens"] == 90
@@ -734,7 +734,7 @@ async def test_openai_tool_call_async_stream(
     call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
-    choice = call.output["choices"][0]
+    choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["tool_calls"][0]["function"]["arguments"] == exp
     assert (
         choice["message"]["tool_calls"][0]["function"]["name"] == "cricket_player_names"
@@ -744,11 +744,11 @@ async def test_openai_tool_call_async_stream(
     assert choice["finish_reason"] == "tool_calls"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cEL2tGY6V4efCUFlecqgb6HZOhpV"
-    assert call.output["model"] == "gpt-4o-2024-05-13"
-    assert call.output["object"] == "chat.completion"
+    assert call.output["id"] == "chatcmpl-9cEL2tGY6V4efCUFlecqgb6HZOhpV"  # type: ignore
+    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
+    assert call.output["object"] == "chat.completion"  # type: ignore
 
-    usage = call.output["usage"]
+    usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 27
     assert usage["prompt_tokens"] == 90

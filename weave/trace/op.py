@@ -26,9 +26,9 @@ if TYPE_CHECKING:
     from weave.weave_client import Call, CallsIter, WeaveClient
 
 try:
-   from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
+    from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
 except ImportError:
-   OPENAI_NOT_GIVEN = None
+    OPENAI_NOT_GIVEN = None
 
 
 def print_call_link(call: "Call") -> None:
@@ -231,7 +231,9 @@ def _apply_fn_defaults_to_inputs(
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():
         if param_name not in inputs:
-            if param.default != inspect.Parameter.empty and not value_is_sentinel(param):
+            if param.default != inspect.Parameter.empty and not value_is_sentinel(
+                param
+            ):
                 inputs[param_name] = param.default
             if param.kind == inspect.Parameter.VAR_POSITIONAL:
                 inputs[param_name] = tuple()

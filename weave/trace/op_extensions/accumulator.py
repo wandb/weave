@@ -59,10 +59,12 @@ def add_accumulator(
     """
 
     def _is_openai_input(inputs: Dict) -> bool:
-        if isinstance(inputs.get('self'), Completions) or isinstance(inputs.get('self'), AsyncCompletions):
+        if isinstance(inputs.get("self"), Completions) or isinstance(
+            inputs.get("self"), AsyncCompletions
+        ):
             return True
         return False
-    
+
     def _openai_stream_options_is_set(inputs: Dict) -> bool:
         if inputs.get("stream_options") is not None:
             return True
@@ -100,7 +102,7 @@ def _build_iterator_from_accumulator_for_op(
     value: Iterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
-    skip_last: bool = False, # Flag to skip the last item in case of usage stream if not set by user.
+    skip_last: bool = False,  # Flag to skip the last item in case of usage stream if not set by user.
 ) -> "_IteratorWrapper":
     acc: _Accumulator = _Accumulator(accumulator)
 
@@ -158,7 +160,7 @@ class _IteratorWrapper(Generic[V]):
         self._on_finished_called = False
         self._buffer = None  # Buffer to store the previous item
         self._end_of_iteration = False  # Flag to mark the end of iteration
-        self.skip_last = skip_last # Flag to skip the last item in case of usage stream if not set by user.
+        self.skip_last = skip_last  # Flag to skip the last item in case of usage stream if not set by user.
 
         atexit.register(weakref.WeakMethod(self._call_on_close_once))
 
@@ -223,7 +225,7 @@ class _IteratorWrapper(Generic[V]):
             raise TypeError(
                 f"Cannot call anext on an iterator of type {type(self._iterator)}"
             )
-        
+
         if self._end_of_iteration:
             self._call_on_close_once()
             raise
@@ -238,7 +240,9 @@ class _IteratorWrapper(Generic[V]):
                     return to_yield
                 else:
                     self._buffer = current_item
-                    return await self.__anext__()  # Skip yielding the first item immediately
+                    return (
+                        await self.__anext__()
+                    )  # Skip yielding the first item immediately
             except (StopIteration, StopAsyncIteration) as e:
                 self._end_of_iteration = True
                 self._call_on_close_once()

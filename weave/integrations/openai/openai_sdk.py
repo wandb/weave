@@ -10,7 +10,7 @@ if typing.TYPE_CHECKING:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 
-def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
+def openai_on_finish_post_processor(value: "ChatCompletionChunk") -> typing.Dict:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -22,7 +22,9 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
         Function,
     )
 
-    def _get_function_call(function_call):
+    def _get_function_call(
+        function_call: typing.Optional[ChoiceDeltaFunctionCall],
+    ) -> typing.Optional[FunctionCall]:
         if function_call is None:
             return function_call
         if isinstance(function_call, ChoiceDeltaFunctionCall):
@@ -30,8 +32,12 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
                 arguments=function_call.arguments,
                 name=function_call.name,
             )
+        else:
+            return None
 
-    def _get_tool_calls(tool_calls):
+    def _get_tool_calls(
+        tool_calls: typing.Optional[typing.List[ChoiceDeltaToolCall]],
+    ) -> typing.Optional[typing.List[ChatCompletionMessageToolCall]]:
         if tool_calls is None:
             return tool_calls
 
@@ -80,7 +86,7 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk"):
 
 
 def openai_accumulator(
-    acc,
+    acc: "ChatCompletionChunk" | None,
     value: "ChatCompletionChunk",
 ) -> "ChatCompletionChunk":
     from openai.types.chat import ChatCompletionChunk
@@ -89,12 +95,10 @@ def openai_accumulator(
         ChoiceDeltaToolCall,
         ChoiceDeltaToolCallFunction,
     )
-    from openai.types.chat.chat_completion_message_tool_call import (
-        ChatCompletionMessageToolCall,
-        Function,
-    )
 
-    def _process_chunk(chunk: ChatCompletionChunk, acc_choices: list[dict] = []):
+    def _process_chunk(
+        chunk: ChatCompletionChunk, acc_choices: list[dict] = []
+    ) -> typing.List[typing.Dict]:
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
         """
@@ -231,9 +235,9 @@ def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Calla
     def wrapper(fn: typing.Callable) -> typing.Callable:
         "We need to do this so we can check if `stream` is used"
 
-        def _add_stream_options(fn):
+        def _add_stream_options(fn: typing.Callable) -> typing.Callable:
             @wraps(fn)
-            def _wrapper(*args, **kwargs):
+            def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
                 if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
                     kwargs["stream_options"] = {"include_usage": True}
                 return fn(
