@@ -1,5 +1,5 @@
 # Clickhouse Trace Server
-
+#
 # A note on query structure:
 # There are four major kinds of things that we query:
 # - calls,
