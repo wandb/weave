@@ -20,8 +20,8 @@ from .. import environment, errors, storage
 from . import serializer
 from .op import Op
 
-weave_op_pattern = re.compile(r"@weave\.op(\(\))?")
-weave_op_no_paren_pattern = re.compile(r"@weave\.op(?!\()")
+WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
+WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
 
 
 def type_code(type_: Any) -> str:
@@ -390,10 +390,10 @@ def save_instance(
 
     op_function_code = textwrap.dedent(inspect.getsource(obj.resolve_fn))
 
-    if not weave_op_pattern.search(op_function_code):
+    if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
     else:
-        op_function_code = weave_op_no_paren_pattern.sub(
+        op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
             "@weave.op()", op_function_code
         )
     code.append(op_function_code)
