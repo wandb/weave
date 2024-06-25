@@ -53,7 +53,7 @@ class LiteralOperation(BaseModel):
         bool,
         dict[str, "LiteralOperation"],
         list["LiteralOperation"],
-        None,
+        # None,
     ] = Field(alias="$literal")
 
 
