@@ -45,7 +45,7 @@ def op_name_from_ref(ref: str) -> str:
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_groq(
+def test_groq_quickstart(
     client: weave.weave_client.WeaveClient,
 ) -> None:
     groq_client = Groq(
@@ -69,8 +69,14 @@ def test_groq(
     weave_server_respose = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
-    flattened_call_response = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flattened_call_response == []
+    assert len(weave_server_respose.calls) == 1
+    call = weave_server_respose.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.id == chat_completion.id
+    assert output.model == chat_completion.model
+    assert output.usage.completion_tokens == 9
+    assert output.usage.prompt_tokens == 17
+    assert output.usage.total_tokens == 26
+    assert output.choices[0].finish_reason == "stop"
+    assert output.choices[0].message.content == "The capital of India is New Delhi."

@@ -1,5 +1,5 @@
 import importlib
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import Callable, Dict, Optional, TYPE_CHECKING
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -17,6 +17,10 @@ def groq_accumulator(
     return value
 
 
+def should_use_accumulator(inputs: Dict) -> bool:
+    return isinstance(inputs, dict) and bool(inputs.get("stream"))
+
+
 def groq_wrapper(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
@@ -24,7 +28,7 @@ def groq_wrapper(name: str) -> Callable[[Callable], Callable]:
         return add_accumulator(
             op,  # type: ignore
             groq_accumulator,
-            should_accumulate=lambda _: True,
+            should_accumulate=should_use_accumulator,
         )
 
     return wrapper

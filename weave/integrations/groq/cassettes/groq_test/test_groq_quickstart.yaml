@@ -16,7 +16,7 @@ interactions:
       host:
       - api.groq.com
       user-agent:
-      - Groq/Python 0.4.2
+      - Groq/Python 0.9.0
       x-stainless-arch:
       - x64
       x-stainless-async:
@@ -26,28 +26,28 @@ interactions:
       x-stainless-os:
       - Linux
       x-stainless-package-version:
-      - 0.4.2
+      - 0.9.0
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
-      - 3.10.14
+      - 3.10.12
     method: POST
     uri: https://api.groq.com/openai/v1/chat/completions
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA1SRu27cMBRE+3yFcGtqQepN1m7SpHJnBAJFXa645sskDTte6N8DGVkBaQdzMDOY
-        O5gVBKhNFuWirTs+daumqtbYy7rrNa85H9d6HMaOL5RPyCgQCMsNVfkHXlRw0WIxwQMBlVAWXEGw
-        kfFmaClrCbiwogUB1kon23pa6onx5nBvwSjMIF7uYPyKnyAoAYc5yyuCuEMKFkGAzNnkIn05mOAL
-        +iP9ecNKyWiKtFXQ1U+/GlmZXP3Cj+oJ7WYusBOw4RpTWDII/24tAW28yducUObgQUAuIcL+m8D7
-        IzSm4GKZS3hFn48l5JSMQxD0Qmk7DbRvx6POY/0J8P/Vkxm6ZmJjQ6CEIu1pb4ZTeVgZbaZppHwn
-        kP/kgm7Wxl8xxWS+l+s4Sz4qjW0vEQh8ztcU3o7u338mfJspu7GBfslF6/JRvHulPX6lW89H2Pcf
-        fwEAAP//AwDYkq5l+QEAAA==
+        H4sIAAAAAAAAA1SRu27cMBRE+3yFcGtqQepFirWbNKnSBYFAUVcrrvkySTtrLPTvgYysgLSDOZgZ
+        zAPMAhL0pop20dZatMOKaqjHuevrrhFLLXrKa96Ni2Kcc6oZEAjzDXX5B150cNFiMcEDAZ1QFVxA
+        Ms7Gthl6wQm4sKAFCdYqp9pazLVgY3O4t2A0ZpC/HmD8gneQlIDDnNUVQT4gBYsgQeVsclG+HEzw
+        Bf2R/nPDSqtoirJVWKvvfjGqMrn6gX+qF7SbucBOwIZrTGHOIP27tQRW403epoQqBw8ScgkR9t8E
+        3p+hMQUXy1TCK/p8LCGnZByCpBdKO0o7wfujznP9CYz/qyczdJyyThAooSh72pvhVJ5WRjve06bd
+        CeTPXNBNq/FXTDGZr+VrnARvVT/QkbdA4D5dU3g7un/9mfBtouzG+P11mf16i+NHo4e+/0yD+0DY
+        929/AQAA//8DAKiGeAH5AQAA
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 898faa487d7b2f5d-LAX
+      - 8995ba572f273f9d-BOM
       Cache-Control:
       - private, max-age=0, no-store, no-cache, must-revalidate
       Connection:
@@ -57,12 +57,12 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 24 Jun 2024 21:03:33 GMT
+      - Tue, 25 Jun 2024 14:43:07 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=yxcW.657NwDYcA7NiuJzDF9yEeyeNYLxNFpL.1wGaw8-1719263013-1.0.1.1-wDcntIRaj2K.MySdccE7.9bgh1jOXrZpJF8M5eXuOIwfiSvHlFcnua_3OFt2efMl7Yga0PCAQ2krtlfwemvimQ;
-        path=/; expires=Mon, 24-Jun-24 21:33:33 GMT; domain=.groq.com; HttpOnly; Secure;
+      - __cf_bm=wlwhN8bLQCfykGqdLgoSm0NnsrUALlj0Az8.chNbrCk-1719326587-1.0.1.1-nShf8GyAVWwJOL_oDAzHNPYkNODRxTAzlHyr5Rg.PFKxYUGb7cmXVkHOV8N1erjtJxWCZhh1A9Vl7kirvWTKBQ;
+        path=/; expires=Tue, 25-Jun-24 15:13:07 GMT; domain=.groq.com; HttpOnly; Secure;
         SameSite=None
       Transfer-Encoding:
       - chunked
@@ -85,7 +85,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 10.285714ms
       x-request-id:
-      - req_01j160zabfftwtnmk05ezrj597
+      - req_01j17xkdbnfjp9v2c655yr6mve
     status:
       code: 200
       message: OK
