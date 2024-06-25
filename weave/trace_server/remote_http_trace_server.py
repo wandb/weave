@@ -1,18 +1,18 @@
 import io
 import json
+import logging
 import sys
 import typing as t
-from pydantic import BaseModel, ValidationError
+
 import requests
 import tenacity
-import logging
+from pydantic import BaseModel, ValidationError
 
+from weave.legacy.wandb_interface import project_creator
 from weave.trace_server import environment as wf_env
 
-
-from weave.wandb_interface import project_creator
-from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
+from .async_batch_processor import AsyncBatchProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -169,15 +169,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         retry_error_callback=_log_failure,
         reraise=True,
     )
-    def _generic_request(
+    def _generic_request_executor(
         self,
         url: str,
         req: BaseModel,
-        req_model: t.Type[BaseModel],
-        res_model: t.Type[BaseModel],
-    ) -> BaseModel:
-        if isinstance(req, dict):
-            req = req_model.model_validate(req)
+        stream: bool = False,
+    ) -> requests.Response:
         r = requests.post(
             self.trace_server_url + url,
             # `by_alias` is required since we have Mongo-style properties in the
@@ -186,6 +183,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             # not valid for the `model_validate` step.
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
+            stream=stream,
         )
         if r.status_code == 413 and "obj/create" in url:
             raise requests.HTTPError(
@@ -202,7 +200,34 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 response=r,
             )
         r.raise_for_status()
+
+        return r
+
+    def _generic_request(
+        self,
+        url: str,
+        req: BaseModel,
+        req_model: t.Type[BaseModel],
+        res_model: t.Type[BaseModel],
+    ) -> BaseModel:
+        if isinstance(req, dict):
+            req = req_model.model_validate(req)
+        r = self._generic_request_executor(url, req)
         return res_model.model_validate(r.json())
+
+    def _generic_stream_request(
+        self,
+        url: str,
+        req: BaseModel,
+        req_model: t.Type[BaseModel],
+        res_model: t.Type[BaseModel],
+    ) -> t.Iterator[BaseModel]:
+        if isinstance(req, dict):
+            req = req_model.model_validate(req)
+        r = self._generic_request_executor(url, req, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield res_model.model_validate(json.loads(line))
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
@@ -266,6 +291,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallsQueryRes:
         return self._generic_request(
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
+        )
+
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> t.Iterator[tsi.CallSchema]:
+        return self._generic_stream_request(
+            "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallSchema
         )
 
     def calls_query_stats(

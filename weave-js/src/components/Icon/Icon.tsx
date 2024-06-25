@@ -103,6 +103,7 @@ import {ReactComponent as ImportLayoutHorizontal} from '../../assets/icons/icon-
 import {ReactComponent as ImportLayoutTabs} from '../../assets/icons/icon-layout-tabs.svg';
 import {ReactComponent as ImportLayoutVertical} from '../../assets/icons/icon-layout-vertical.svg';
 import {ReactComponent as ImportLightbulbInfo} from '../../assets/icons/icon-lightbulb-info.svg';
+import {ReactComponent as ImportLinePlotAlt2} from '../../assets/icons/icon-line-plot-alt2.svg';
 import {ReactComponent as ImportLinearScale} from '../../assets/icons/icon-linear-scale.svg';
 import {ReactComponent as ImportLinkAlt} from '../../assets/icons/icon-link-alt.svg';
 import {ReactComponent as ImportLinkedinSocial} from '../../assets/icons/icon-linkedin-social.svg';
@@ -554,6 +555,9 @@ export const IconLayoutVertical = (props: SVGIconProps) => (
 );
 export const IconLightbulbInfo = (props: SVGIconProps) => (
   <ImportLightbulbInfo {...updateIconProps(props)} />
+);
+export const IconLinePlotAlt2 = (props: SVGIconProps) => (
+  <ImportLinePlotAlt2 {...updateIconProps(props)} />
 );
 export const IconLinearScale = (props: SVGIconProps) => (
   <ImportLinearScale {...updateIconProps(props)} />
@@ -1047,6 +1051,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'layout-tabs': IconLayoutTabs,
   'layout-vertical': IconLayoutVertical,
   'lightbulb-info': IconLightbulbInfo,
+  'line-plot-alt2': IconLinePlotAlt2,
   'linear-scale': IconLinearScale,
   'link-alt': IconLinkAlt,
   'linkedin-social': IconLinkedinSocial,

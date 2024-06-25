@@ -1,9 +1,14 @@
 import abc
 import datetime
 import typing
+
 from pydantic import BaseModel, Field
 
 from .interface.query import Query
+
+WB_USER_ID_DESCRIPTION = (
+    "Do not set directly. Server will automatically populate this field."
+)
 
 
 class CallSchema(BaseModel):
@@ -73,7 +78,7 @@ class StartedCallSchemaForInsert(BaseModel):
     inputs: typing.Dict[str, typing.Any]
 
     # WB Metadata
-    wb_user_id: typing.Optional[str] = None
+    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: typing.Optional[str] = None
 
 
@@ -148,9 +153,8 @@ class CallsDeleteReq(BaseModel):
     project_id: str
     call_ids: typing.List[str]
 
-
-class CallsDeleteReqForInsert(CallsDeleteReq):
-    wb_user_id: str
+    # wb_user_id is automatically populated by the server
+    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallsDeleteRes(BaseModel):
@@ -210,9 +214,8 @@ class CallUpdateReq(BaseModel):
     # optional update fields
     display_name: typing.Optional[str] = None
 
-
-class CallUpdateReqForInsert(CallUpdateReq):
-    wb_user_id: str
+    # wb_user_id is automatically populated by the server
+    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallUpdateRes(BaseModel):
@@ -343,9 +346,8 @@ class FeedbackCreateReq(BaseModel):
         ]
     )
 
-
-class FeedbackCreateReqForInsert(FeedbackCreateReq):
-    wb_user_id: str
+    # wb_user_id is automatically populated by the server
+    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 # The response provides the additional fields needed to convert a request
@@ -357,7 +359,7 @@ class FeedbackCreateRes(BaseModel):
     payload: typing.Dict[str, typing.Any]  # If not empty, replace payload
 
 
-class Feedback(FeedbackCreateReqForInsert):
+class Feedback(FeedbackCreateReq):
     id: str
     created_at: datetime.datetime
 
@@ -416,57 +418,61 @@ class TraceServerInterface:
     # Call API
     @abc.abstractmethod
     def call_start(self, req: CallStartReq) -> CallStartRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def call_end(self, req: CallEndReq) -> CallEndRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def call_read(self, req: CallReadReq) -> CallReadRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
-        ...
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def calls_query_stream(self, req: CallsQueryReq) -> typing.Iterator[CallSchema]:
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
-        ...
+        raise NotImplementedError()
 
     # Op API
     @abc.abstractmethod
     def op_create(self, req: OpCreateReq) -> OpCreateRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def op_read(self, req: OpReadReq) -> OpReadRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
-        ...
+        raise NotImplementedError()
 
     # Obj API
     @abc.abstractmethod
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def obj_read(self, req: ObjReadReq) -> ObjReadRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
-        ...
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def table_create(self, req: TableCreateReq) -> TableCreateRes:
@@ -501,15 +507,11 @@ class TraceServerInterface:
         raise NotImplementedError()
 
 
-class TraceServerInterfacePostAuth(TraceServerInterface):
-    @abc.abstractmethod
-    def call_update(self, req: CallUpdateReqForInsert) -> CallUpdateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_delete(self, req: CallsDeleteReqForInsert) -> CallsDeleteRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_create(self, req: FeedbackCreateReqForInsert) -> FeedbackCreateRes:
-        raise NotImplementedError()
+# These symbols are used in the WB Trace Server and it is not safe
+# to remove them, else it will break the server. Once the server
+# is updated to use the new symbols, these can be removed.
+#
+# Remove once https://github.com/wandb/core/pull/22040 lands
+CallsDeleteReqForInsert = CallsDeleteReq
+CallUpdateReqForInsert = CallUpdateReq
+FeedbackCreateReqForInsert = FeedbackCreateReq

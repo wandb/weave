@@ -15,6 +15,9 @@ export function pathToString(path: Path): string {
 }
 
 export function isDynamicCallColumn(path: Path): boolean {
+  if (path.length === 1) {
+    return path[0] === 'output';
+  }
   return (
     path.length > 1 &&
     ['attributes', 'inputs', 'output', 'summary'].includes(path[0])

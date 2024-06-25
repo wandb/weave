@@ -1,6 +1,9 @@
-import weave
+import random
+
+import requests
 from openai import OpenAI
-import requests, random
+
+import weave
 
 PROMPT = """Emulate the Pokedex from early Pokémon episodes. State the name of the Pokemon and then describe it.
         Your tone is informative yet sassy, blending factual details with a touch of dry humor. Be concise, no more than 3 sentences. """
@@ -58,9 +61,11 @@ weave.init("intro-example")
 # Get data for a specific Pokémon
 pokemon_data = pokedex(random.choice(POKEMON), PROMPT)
 
-import weave
 import json
+
 from openai import OpenAI
+
+import weave
 
 
 @weave.op()

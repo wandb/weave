@@ -1,23 +1,29 @@
-from typing import Callable, Any, Mapping, Optional
-import inspect
 import functools
+import inspect
 import typing
-from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine, Dict
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Coroutine,
+    Dict,
+    Mapping,
+    Optional,
+    TypeVar,
+)
+
 from typing_extensions import ParamSpec
 
+from weave import client_context
+from weave.legacy import box, context_state, run_context
+from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
-from weave.trace.context import call_attributes
-from weave import graph_client_context
-from weave import run_context
-from weave import box
-
-from weave import context_state
 
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
-    from weave.weave_client import Call, WeaveClient, CallsIter
+    from weave.weave_client import Call, CallsIter, WeaveClient
 
 
 def print_call_link(call: "Call") -> None:
@@ -52,7 +58,6 @@ class Op:
         self.name = resolve_fn.__name__
         self.signature = inspect.signature(resolve_fn)
         self._on_output_handler = None
-        self.display_name = None
 
     def __get__(
         self, obj: Optional[object], objtype: Optional[type[object]] = None
@@ -60,7 +65,7 @@ class Op:
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        maybe_client = graph_client_context.get_graph_client()
+        maybe_client = client_context.weave_client.get_weave_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
         client = typing.cast("WeaveClient", maybe_client)
@@ -78,14 +83,13 @@ class Op:
         # If/When we do memoization, this would be a good spot
 
         parent_run = run_context.get_current_run()
-        client.save_nested_objects(inputs_with_defaults)
+        client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
         run = client.create_call(
             self,
             inputs_with_defaults,
             parent_run,
             attributes=attributes,
-            display_name=self.display_name,
         )
 
         has_finished = False
@@ -148,8 +152,8 @@ class Op:
         self.__ref = ref
 
     def calls(self) -> "CallsIter":
-        client = graph_client_context.require_graph_client()
-        return client.op_calls(self)
+        client = client_context.weave_client.require_weave_client()
+        return client._op_calls(self)
 
     def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
         """This is an experimental API and may change in the future intended for use by internal Weave code."""
@@ -174,7 +178,6 @@ class BoundOp(Op):
         self.signature = inspect.signature(op.resolve_fn)
         self.resolve_fn = op.resolve_fn
         self._on_output_handler = op._on_output_handler
-        self.display_name = op.display_name
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return Op.__call__(self, self.arg0, *args, **kwargs)
@@ -197,15 +200,13 @@ R = TypeVar("R")
 # The decorator!
 def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
     if context_state.get_loading_built_ins():
-        from weave.decorator_op import op
+        from weave.legacy.decorator_op import op
 
         return op(*args, **kwargs)
 
     def wrap(f: Callable[P, R]) -> Callable[P, R]:
         op = Op(f)
         functools.update_wrapper(op, f)
-        if "display_name" in kwargs:
-            op.display_name = kwargs["display_name"]
         return op  # type: ignore
 
     if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):

@@ -1,11 +1,10 @@
 import typing
-from . import init_message
+
+from weave import client_context
+from weave.legacy import context_state
+
+from . import autopatch, errors, init_message, trace_sentry, weave_client
 from .trace_server import remote_http_trace_server, sqlite_trace_server
-from . import context_state
-from . import errors
-from . import autopatch
-from . import weave_client
-from . import trace_sentry
 
 _current_inited_client = None
 
@@ -13,7 +12,7 @@ _current_inited_client = None
 class InitializedClient:
     def __init__(self, client: weave_client.WeaveClient):
         self.client = client
-        self.graph_client_token = context_state._graph_client.set(client)
+        client_context.weave_client.set_weave_client_global(client)
         self.ref_tracking_token = context_state._ref_tracking_enabled.set(True)
         self.eager_mode_token = context_state._eager_mode.set(True)
         self.serverless_io_service_token = context_state._serverless_io_service.set(
@@ -21,14 +20,14 @@ class InitializedClient:
         )
 
     def reset(self) -> None:
-        context_state._graph_client.reset(self.graph_client_token)
+        client_context.weave_client.set_weave_client_global(None)
         context_state._ref_tracking_enabled.reset(self.ref_tracking_token)
         context_state._eager_mode.reset(self.eager_mode_token)
         context_state._serverless_io_service.reset(self.serverless_io_service_token)
 
 
 def get_username() -> typing.Optional[str]:
-    from . import wandb_api
+    from weave.legacy import wandb_api
 
     api = wandb_api.get_wandb_api_sync()
     try:
@@ -38,7 +37,7 @@ def get_username() -> typing.Optional[str]:
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from . import wandb_api
+    from weave.legacy import wandb_api
 
     fields = project_name.split("/")
     if len(fields) == 1:
@@ -86,7 +85,7 @@ def init_weave(
         else:
             _current_inited_client.reset()
 
-    from . import wandb_api
+    from weave.legacy import wandb_api
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.

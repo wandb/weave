@@ -1,29 +1,30 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
-from contextvars import copy_context
 import dataclasses
-from collections import namedtuple
 import datetime
 import os
 import typing
-import pytest
-from collections import defaultdict
+from collections import defaultdict, namedtuple
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from contextvars import copy_context
 
-from pydantic import BaseModel, ValidationError
+import pytest
 import wandb
+from pydantic import BaseModel, ValidationError
+
 import weave
 from weave import weave_client
-from weave import context_state
+from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, TraceObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+
+from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
     generate_id,
 )
-from ..trace_server import trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace
 
@@ -54,7 +55,7 @@ def test_simple_op(client):
     assert my_op(5) == 6
 
     op_ref = weave_client.get_ref(my_op)
-    # assert client.ref_is_own(op_ref)
+    # assert client._ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
     calls = list(client.calls())
@@ -241,9 +242,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> (
-        int
-    ):  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
@@ -710,8 +709,57 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
+def test_trace_call_sort_with_mixed_types(client):
+    is_sqlite = client_is_sqlite(client)
+    if is_sqlite:
+        # SQLite does not support sorting over mixed types in a column, so we skip this test
+        return
+
+    @weave.op()
+    def basic_op(in_val: dict) -> dict:
+        import time
+
+        time.sleep(1 / 10)
+        return in_val
+
+    basic_op({"prim": None})
+    basic_op({"not_prim": 1})
+    basic_op({"prim": 100})
+    basic_op({"prim": 2})
+    basic_op({"prim": "b"})
+    basic_op({"prim": "a"})
+
+    for direction, seq in [
+        ("desc", [100, 2, "b", "a", None, None]),
+        (
+            "asc",
+            [
+                2,
+                100,
+                "a",
+                "b",
+                None,
+                None,
+            ],
+        ),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi._SortBy(field="inputs.in_val.prim", direction=direction)],
+            )
+        )
+
+        for i, call in enumerate(inner_res.calls):
+            assert call.inputs["in_val"].get("prim") == seq[i]
+
+
+def client_is_sqlite(client):
+    return isinstance(client.server._internal_trace_server, SqliteTraceServer)
+
+
 def test_trace_call_filter(client):
-    is_sql_lite = isinstance(client.server, SqliteTraceServer)
+    is_sqlite = client_is_sqlite(client)
 
     @weave.op()
     def basic_op(in_val: dict, delay) -> dict:
@@ -738,7 +786,7 @@ def test_trace_call_filter(client):
     basic_op(42, 0.1)
 
     failed_cases = []
-    for (count, query) in [
+    for count, query in [
         # Base Case - simple True
         (
             13,
@@ -813,7 +861,7 @@ def test_trace_call_filter(client):
         (
             6
             + (
-                1 if is_sql_lite else 0
+                1 if is_sqlite else 0
             ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
@@ -835,7 +883,7 @@ def test_trace_call_filter(client):
         (
             5
             + (
-                1 if is_sql_lite else 0
+                1 if is_sqlite else 0
             ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
@@ -857,7 +905,7 @@ def test_trace_call_filter(client):
         (
             13
             + (
-                -2 if is_sql_lite else 0
+                -2 if is_sqlite else 0
             ),  # SQLite returns NULL for non-existent fields rather than ''.
             {
                 "$contains": {
@@ -935,7 +983,7 @@ def test_trace_call_filter(client):
         (
             5
             + (
-                1 if is_sql_lite else 0
+                1 if is_sqlite else 0
             ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$or": [
@@ -1291,14 +1339,13 @@ def test_bound_op_retrieval_no_self(client):
         my_op2 = my_op_ref.get()
 
 
-@pytest.mark.skip_clickhouse_client
 def test_dataset_row_ref(client):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:PHOGkwSOn7DqLgIUNgUAq7d2vXpOmG8NGLltn6slzeU/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -1476,11 +1523,12 @@ def test_ref_get_no_client(trace_init_client):
 
 @contextmanager
 def _no_graph_client():
-    token = context_state._graph_client.set(None)
+    client = weave.client_context.weave_client.get_weave_client()
+    weave.client_context.weave_client.set_weave_client_global(None)
     try:
         yield
     finally:
-        context_state._graph_client.reset(token)
+        weave.client_context.weave_client.set_weave_client_global(client)
 
 
 @contextmanager
@@ -1551,6 +1599,7 @@ def map_simple(fn, vals):
 
 
 max_workers = 3
+
 
 # This is a standard way to execute a map operation with thread executor.
 def map_with_thread_executor(fn, vals):
@@ -2011,3 +2060,147 @@ def test_call_stack_order_mixed(client):
         },
         terminal_root_call.id: {},
     }
+
+
+def test_call_query_stream_equality(client):
+    @weave.op
+    def calculate(a: int, b: int) -> int:
+        return a + b
+
+    for i in range(10):
+        calculate(i, i * i)
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    calls_stream = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    i = 0
+    for call in calls_stream:
+        assert call == calls.calls[i]
+        i += 1
+
+    assert i == len(calls.calls)
+
+
+@pytest.mark.skip("Not implemented: filter / sort through refs")
+def test_sort_and_filter_through_refs(client):
+    @weave.op()
+    def test_op(label, val):
+        return val
+
+    class TestObj(weave.Object):
+        val: typing.Any
+
+    def test_obj(val):
+        return weave.publish(TestObj(val=val))
+
+    import random
+
+    # Purposely shuffled and contains values that would not sort correctly as strings
+    values = [3, 9, 15, 21, 0, 12, 6, 18]
+    random.shuffle(values)
+
+    test_op(values[0], {"a": {"b": {"c": {"d": values[0]}}}})
+
+    # Ref at A
+    test_op(values[1], {"a": test_obj({"b": {"c": {"d": values[1]}}})})
+    # Ref at B
+    test_op(values[2], {"a": {"b": test_obj({"c": {"d": values[2]}})}})
+    # Ref at C
+    test_op(values[3], {"a": {"b": {"c": test_obj({"d": values[3]})}}})
+
+    # Ref at A and B
+    test_op(values[4], {"a": test_obj({"b": test_obj({"c": {"d": values[4]}})})})
+    # Ref at A and C
+    test_op(values[5], {"a": test_obj({"b": {"c": test_obj({"d": values[5]})}})})
+    # Ref at B and C
+    test_op(values[6], {"a": {"b": test_obj({"c": test_obj({"d": values[6]})})}})
+
+    # Ref at A, B and C
+    test_op(
+        values[7], {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})}
+    )
+
+    for first, last, sort_by in [
+        (0, 21, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
+        (0, 21, [tsi._SortBy(field="output.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi._SortBy(field="output.a.b.c.d", direction="desc")]),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=sort_by,
+            )
+        )
+
+        assert inner_res.calls[0].inputs["label"] == first
+        assert inner_res.calls[1].inputs["label"] == first
+
+    for first, last, count, query in [
+        (
+            6,
+            21,
+            6,
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.val.a.b.c.d"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        (
+            0,
+            3,
+            2,
+            {
+                "$not": [
+                    {
+                        "$gt": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "output.a.b.c.d"},
+                                    "to": "int",
+                                }
+                            },
+                            {"$literal": 5},
+                        ]
+                    }
+                ]
+            },
+        ),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    sort_by=[tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")],
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        assert len(inner_res.calls) == count
+        inner_res = get_client_trace_server(client).calls_query_stats(
+            tsi.CallsQueryStatsReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        assert inner_res.count == count

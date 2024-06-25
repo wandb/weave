@@ -1,12 +1,14 @@
 import os
+from typing import Any, Generator
+
 import pytest
+from mistralai.async_client import MistralAsyncClient
+from mistralai.client import MistralClient
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
-from mistralai.client import MistralClient
-from mistralai.async_client import MistralAsyncClient
-from .mistral import mistral_patcher
 
-from typing import Any, Generator
+from .mistral import mistral_patcher
 
 
 def _get_call_output(call: tsi.CallSchema) -> Any:

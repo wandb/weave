@@ -4,14 +4,15 @@ import pytest
 
 import weave
 import weave.weave_types as types
+from weave.legacy import box, ops_arrow
+from weave.legacy.arrow.convert import to_arrow
+from weave.legacy.language_features.tagging import tag_store, tagged_value_type
+
 from .concrete_tagged_value import (
     TaggedValue,
-    concrete_to_tagstore,
     concrete_from_tagstore,
+    concrete_to_tagstore,
 )
-from ..arrow.convert import to_arrow
-from .. import ops_arrow, box
-from ..language_features.tagging import tag_store, tagged_value_type
 
 
 def to_awl(l: list) -> ops_arrow.ArrowWeaveList:

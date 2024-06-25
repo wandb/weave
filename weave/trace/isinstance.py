@@ -1,4 +1,5 @@
 from typing import Any, TypeVar
+
 from typing_extensions import TypeGuard
 
 from weave.trace.object_record import ObjectRecord

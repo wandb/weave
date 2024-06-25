@@ -1,0 +1,1 @@
+from weave.legacy.core_types.stream_table_type import StreamTableType

@@ -24,6 +24,9 @@ fastapi>=0.110.0
 tqdm>=4.66.3  # CVE 2024-34062
 cryptography>=42.0.7  # CVE 2023-23931
 
+# SQL Generation Tests
+sqlparse
+
 # Integration Tests
 pytest-recording==0.13.1
 vcrpy==6.0.1
@@ -32,3 +35,4 @@ vcrpy==6.0.1
 mistralai>=0.1.8
 litellm>=1.36.1
 llama-index>=0.10.35
+anthropic>=0.28.0

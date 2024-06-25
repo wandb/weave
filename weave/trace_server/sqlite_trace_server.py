@@ -1,27 +1,17 @@
 # Sqlite Trace Server
 
-from typing import cast, Optional, Any, Union
-import threading
-
-import contextvars
 import contextlib
+import contextvars
 import datetime
-import json
 import hashlib
+import json
 import sqlite3
+import threading
+from typing import Any, Iterator, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import emoji
 
-from .trace_server_interface_util import (
-    extract_refs_from_values,
-    str_digest,
-    bytes_digest,
-)
-from . import trace_server_interface as tsi
-from .interface import query as tsi_query
-
-from weave.trace import refs
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -29,17 +19,30 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from weave.trace_server.trace_server_interface_util import (
-    generate_id,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-)
+from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    WEAVE_INTERNAL_SCHEME,
+    InternalObjectRef,
+    InternalTableRef,
+    parse_internal_uri,
 )
-from weave.trace_server.orm import Row
+from weave.trace_server.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    generate_id,
+)
+
+from . import trace_server_interface as tsi
+from .interface import query as tsi_query
+from .trace_server_interface_util import (
+    assert_non_null_wb_user_id,
+    bytes_digest,
+    extract_refs_from_values,
+    str_digest,
+)
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -65,7 +68,7 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     return conn_cursor
 
 
-class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
+class SqliteTraceServer(tsi.TraceServerInterface):
     def __init__(self, db_path: str):
         self.lock = threading.Lock()
         self.db_path = db_path
@@ -390,13 +393,13 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
                 if field.startswith("inputs"):
                     field = "inputs" + field[len("inputs") :]
                     if field.startswith("inputs."):
-                        field = "inputs"
                         json_path = field[len("inputs.") :]
+                        field = "inputs"
                 elif field.startswith("output"):
                     field = "output" + field[len("output") :]
                     if field.startswith("output."):
-                        field = "output"
                         json_path = field[len("output.") :]
+                        field = "output"
                 elif field.startswith("attributes"):
                     field = "attributes_dump" + field[len("attributes") :]
                 elif field.startswith("summary"):
@@ -409,7 +412,7 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
                     "desc",
                 ], f"Invalid order_by direction: {direction}"
                 if json_path:
-                    field = f"json_extract({field}, '$.{json_path}')"
+                    field = f"json_extract({field}, '{quote_json_path(json_path)}')"
                 order_parts.append(f"{field} {direction}")
 
             order_by_part = ", ".join(order_parts)
@@ -449,6 +452,9 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
             ]
         )
 
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        return iter(self.calls_query(req).calls)
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         calls = self.calls_query(
             tsi.CallsQueryReq(
@@ -462,6 +468,7 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        assert_non_null_wb_user_id(req)
         # update row with a deleted_at field set to now
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
@@ -481,9 +488,7 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(
-                ", ".join("?" * len(req.call_ids))
-            )
+            """.format(", ".join("?" * len(req.call_ids)))
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -495,16 +500,15 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(
-                ", ".join("?" * len(all_ids))
-            )
+            """.format(", ".join("?" * len(all_ids)))
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()
 
         return tsi.CallsDeleteRes()
 
-    def call_update(self, req: tsi.CallUpdateReqForInsert) -> tsi.CallUpdateRes:
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        assert_non_null_wb_user_id(req)
         if req.display_name is None:
             raise ValueError("One of [display_name] is required for call update")
 
@@ -658,22 +662,22 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_refs = [refs.parse_uri(r) for r in req.refs]
-        if any(isinstance(r, refs.TableRef) for r in parsed_refs):
+        parsed_refs = [parse_internal_uri(r) for r in req.refs]
+        if any(isinstance(r, InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
-        parsed_obj_refs = cast(list[refs.ObjectRef], parsed_refs)
+        parsed_obj_refs = cast(list[InternalObjectRef], parsed_refs)
 
-        def read_ref(r: refs.ObjectRef) -> Any:
+        def read_ref(r: InternalObjectRef) -> Any:
             conds = [
                 f"object_id = '{r.name}'",
-                f"digest = '{r.digest}'",
+                f"digest = '{r.version}'",
             ]
             objs = self._select_objs_query(
-                f"{r.entity}/{r.project}",
+                r.project_id,
                 conditions=conds,
             )
             if len(objs) == 0:
-                raise NotFoundError(f"Obj {r.name}:{r.digest} not found")
+                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
             val = obj.val
             extra = r.extra
@@ -686,14 +690,15 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
                 elif op == LIST_INDEX_EDGE_NAME:
                     val = val[int(arg)]
                 elif op == TABLE_ROW_ID_EDGE_NAME:
-                    if isinstance(val, str) and val.startswith("weave://"):
-                        table_ref = refs.parse_uri(val)
-                        if not isinstance(table_ref, refs.TableRef):
+                    weave_internal_prefix = WEAVE_INTERNAL_SCHEME + ":///"
+                    if isinstance(val, str) and val.startswith(weave_internal_prefix):
+                        table_ref = parse_internal_uri(val)
+                        if not isinstance(table_ref, InternalTableRef):
                             raise ValueError(
                                 "invalid data layout encountered, expected TableRef when resolving id"
                             )
                         row = self._table_row_read(
-                            project_id=f"{table_ref.entity}/{table_ref.project}",
+                            project_id=table_ref.project_id,
                             row_digest=arg,
                         )
                         val = row.val
@@ -707,9 +712,8 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
 
         return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_obj_refs])
 
-    def feedback_create(
-        self, req: tsi.FeedbackCreateReqForInsert
-    ) -> tsi.FeedbackCreateRes:
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req)
 
         # Augment emoji with alias.
@@ -740,7 +744,7 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
             "wb_user_id": req.wb_user_id,
             "creator": req.creator,
             "feedback_type": req.feedback_type,
-            "payload": payload,
+            "payload": req.payload,
             "created_at": created_at,
         }
         conn, cursor = get_conn_cursor(self.db_path)
@@ -938,18 +942,6 @@ def get_base_object_class(val: Any) -> Optional[str]:
     return None
 
 
-def _quote_json_path(path: str) -> str:
-    parts = path.split(".")
-    parts_final = []
-    for part in parts:
-        try:
-            int(part)
-            parts_final.append("[" + part + "]")
-        except ValueError:
-            parts_final.append('."' + part + '"')
-    return "$" + "".join(parts_final)
-
-
 def _transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: Optional[str] = None,
@@ -959,25 +951,25 @@ def _transform_external_calls_field_to_internal_calls_field(
         if field == "inputs":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("inputs.") :])
+            json_path = quote_json_path(field[len("inputs.") :])
         field = "inputs"
     elif field == "output" or field.startswith("output."):
         if field == "output":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("output.") :])
+            json_path = quote_json_path(field[len("output.") :])
         field = "output"
     elif field == "attributes" or field.startswith("attributes."):
         if field == "attributes":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("attributes.") :])
+            json_path = quote_json_path(field[len("attributes.") :])
         field = "attributes"
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("summary.") :])
+            json_path = quote_json_path(field[len("summary.") :])
         field = "summary"
 
     if json_path is not None:

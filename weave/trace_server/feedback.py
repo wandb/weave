@@ -1,11 +1,10 @@
 from typing import Any
 
-from pydantic import ValidationError, BaseModel
+from pydantic import BaseModel, ValidationError
 
 from . import trace_server_interface as tsi
 from .errors import InvalidRequest
-from .orm import Table, Column
-
+from .orm import Column, Table
 
 TABLE_FEEDBACK = Table(
     "feedback",
@@ -28,7 +27,7 @@ FEEDBACK_PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
 }
 
 
-def validate_feedback_create_req(req: tsi.FeedbackCreateReqForInsert) -> None:
+def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
     payload_schema = FEEDBACK_PAYLOAD_SCHEMAS.get(req.feedback_type)
     if payload_schema:
         try:
