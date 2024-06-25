@@ -69,7 +69,12 @@ class Op:
         maybe_client = client_context.weave_client.get_weave_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
-        client = typing.cast("WeaveClient", maybe_client)
+
+        run = self._create_run(*args, **kwargs)
+        return self._execute_run(run, *args, **kwargs)
+
+    def _create_run(self, *args: Any, **kwargs: Any) -> Any:
+        client = client_context.weave_client.require_weave_client()
 
         try:
             inputs = self.signature.bind(*args, **kwargs).arguments
@@ -77,22 +82,22 @@ class Op:
             raise OpCallError(f"Error calling {self.name}: {e}")
         inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
 
-        # This should probably be configurable, but for now we redact the api_key
         if "api_key" in inputs_with_defaults:
             inputs_with_defaults["api_key"] = "REDACTED"
-
-        # If/When we do memoization, this would be a good spot
 
         parent_run = run_context.get_current_run()
         client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
-        run = client.create_call(
+
+        return client.create_call(
             self,
             inputs_with_defaults,
             parent_run,
             attributes=attributes,
         )
 
+    def _execute_run(self, run: Any, *args: Any, **kwargs: Any) -> Any:
+        client = client_context.weave_client.require_weave_client()
         has_finished = False
 
         def finish(
@@ -102,24 +107,22 @@ class Op:
             if has_finished:
                 raise ValueError("Should not call finish more than once")
             client.finish_call(run, output, exception)
-            if not parent_run:
+            if not run_context.get_current_run():
                 print_call_link(run)
 
         def on_output(output: Any) -> Any:
             if self._on_output_handler:
-                return self._on_output_handler(output, finish, inputs)
+                return self._on_output_handler(output, finish, run.inputs)
             finish(output)
             return output
 
         try:
             res = self.resolve_fn(*args, **kwargs)
-            # TODO: can we get rid of this?
             res = box.box(res)
         except BaseException as e:
             finish(exception=e)
             raise
-        # We cannot let BoxedNone or BoxedBool escape into the user's code
-        # since they cannot pass instance checks for None or bool.
+
         if isinstance(res, box.BoxedNone):
             res = None
         if isinstance(res, box.BoxedBool):
@@ -141,10 +144,11 @@ class Op:
         else:
             return on_output(res)
 
-    def call(self, *args, **kwargs) -> "Call":
+    def call(self, *args: Any, **kwargs: Any) -> "Call":
         client = client_context.weave_client.require_weave_client()
-        self.__call__(*args, **kwargs)
-        return self._retry_fetch_call(client, self._id)
+        run = self._create_run(*args, **kwargs)
+        self._execute_run(run, *args, **kwargs)
+        return self._retry_fetch_call(client, run.id)
 
     @staticmethod
     @retry
