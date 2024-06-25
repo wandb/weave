@@ -28,7 +28,9 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
         max_tokens=64,
         top_p=1,
     )
+    print(response)
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    print(res)
     assert len(res.calls) == 1
     call = res.calls[0]
 
@@ -38,7 +40,7 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cB4FScUoIEdwG8LYuoDoTXImaDKo"  # type: ignore
+    assert call.output["id"] == "chatcmpl-9dvBj5JWzXkX6Z2o7GKVkfQQpD5U0"  # type: ignore
     assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
     assert call.output["object"] == "chat.completion"  # type: ignore
 
