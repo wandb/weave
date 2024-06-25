@@ -99,12 +99,14 @@ function opToString(
   opStore: OpStore,
   level: number | null = 0
 ): string {
-  const argValues = Object.values(op.inputs);
+  // const argValues = Object.values(op.inputs);
   const innerNodeToString = (node: EditingNode) => {
     return nodeToString(node, opStore, level, graph);
   };
 
   const opDef = opStore.getOpDef(op.name);
+  const keyOrder = Object.keys(opDef.inputTypes);
+  const argValues = keyOrder.map(k => op.inputs[k]);
 
   // Special case for __getattr__
   if (op.name.endsWith('__getattr__')) {
