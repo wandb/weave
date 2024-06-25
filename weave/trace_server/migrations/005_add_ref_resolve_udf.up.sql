@@ -22,8 +22,8 @@ CREATE OR REPLACE FUNCTION resolve_data_through_refs_for_path AS (ref_or_data_du
 	    	FALSE AS last_step_was_object_ref,
 	    	FALSE AS last_step_was_table_row_ref,
 	    	FALSE AS last_step_was_ref,
-	    	ref_or_data_dump AS data_dump, 
-	    	path_parts AS remaining_path_paths,
+	    	ref_or_data_dump AS data_dump,
+	    	CAST(path_parts, 'Array(String)') AS remaining_path_paths,
 	    	0 AS iteration
 	UNION ALL
 	    SELECT 
