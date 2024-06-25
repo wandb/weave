@@ -8,10 +8,9 @@ from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 import pydantic
 from requests import HTTPError
 
-from weave import client_context, trace_sentry, urls
+from weave import client_context, run_context, trace_sentry, urls
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
-from weave.legacy import run_context
 from weave.table import Table
 from weave.trace.object_record import (
     ObjectRecord,

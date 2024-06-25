@@ -3,6 +3,7 @@ import contextvars
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Generator, Iterator, Optional, TypeVar
 
+from weave import run_context
 from weave.legacy import (
     cache,
     context,
@@ -10,7 +11,6 @@ from weave.legacy import (
     execute,
     forward_graph,
     memo,
-    run_context,
     wandb_api,
 )
 
