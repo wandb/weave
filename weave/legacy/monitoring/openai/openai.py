@@ -11,7 +11,7 @@ from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from packaging import version
 
-from weave import run_context
+from weave import call_context
 from weave.legacy.monitoring.monitor import _get_global_monitor
 from weave.legacy.monitoring.openai.models import *
 from weave.legacy.monitoring.openai.util import *
@@ -256,7 +256,7 @@ def log_run(
     call_name: typing.Union[str, Op], inputs: dict[str, Any]
 ) -> Iterator[Callable]:
     client = client_context.weave_client.require_weave_client()
-    parent_run = run_context.get_current_run()
+    parent_run = call_context.get_current_run()
     # TODO: client should not need refs passed in.
     run = client.create_call(call_name, inputs, parent_run)
 

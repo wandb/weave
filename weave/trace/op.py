@@ -14,7 +14,7 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
-from weave import client_context, run_context
+from weave import call_context, client_context
 from weave.legacy import box, context_state
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
@@ -82,7 +82,7 @@ class Op:
 
         # If/When we do memoization, this would be a good spot
 
-        parent_run = run_context.get_current_run()
+        parent_run = call_context.get_current_run()
         client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
         run = client.create_call(
@@ -128,14 +128,14 @@ class Op:
             async def _run_async() -> Coroutine[Any, Any, Any]:
                 try:
                     awaited_res = res
-                    run_context.push_call(run)
+                    call_context.push_call(run)
                     output = await awaited_res
                     return on_output(output)
                 except BaseException as e:
                     finish(exception=e)
                     raise
 
-            run_context.pop_call(run.id)
+            call_context.pop_call(run.id)
             return _run_async()
         else:
             return on_output(res)

@@ -11,7 +11,7 @@ import sys
 import typing
 import uuid
 
-from weave import errors, run_context, stream_data_interfaces
+from weave import call_context, errors, stream_data_interfaces
 from weave.legacy import (
     graph,
     run_streamtable_span,
