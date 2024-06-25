@@ -19,25 +19,25 @@ CREATE OR REPLACE FUNCTION get_object_data AS (project_id, object_id, version_di
     FROM object_versions
     WHERE project_id = project_id AND object_id = object_id AND digest = version_digest
     LIMIT 1
-)
+);
 
 
-CREATE OR REPLACE FUNCTION get_table_data AS (project_id, table_digest, row_index) -> (
+CREATE OR REPLACE FUNCTION get_table_row_data AS (project_id, table_digest, row_index) -> (
     SELECT val_dump
     FROM table_rows
     WHERE project_id = project_id AND digest IN (
         SELECT arrayElement(row_digests, row_index) AS row_digest
-        FROM table_rows
+        FROM table
         WHERE project_id = project_id AND digest = table_digest
         LIMIT 1
     )
-)
+);
 
 
 CREATE OR REPLACE FUNCTION walk_path AS (raw_data, path) -> (
 	-- TODO
 	raw_data
-)
+);
 
 
 CREATE OR REPLACE FUNCTION get_data_for_ref AS (project_id, ref_str) -> (
@@ -63,4 +63,4 @@ CREATE OR REPLACE FUNCTION get_data_for_ref AS (project_id, ref_str) -> (
 			),
 			NULL
 		)
-)
+);

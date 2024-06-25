@@ -9,6 +9,6 @@ DROP FUNCTION parse_table_row_ref_table_digest;
 DROP FUNCTION parse_table_row_ref_row_index;
 DROP FUNCTION parse_table_row_ref_extra;
 DROP FUNCTION get_object_data;
-DROP FUNCTION get_table_data;
+DROP FUNCTION get_table_row_data;
 DROP FUNCTION walk_path;
 DROP FUNCTION get_data_for_ref;
