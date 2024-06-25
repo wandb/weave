@@ -91,11 +91,17 @@ class CallsMergedDynamicField(CallsMergedAggField):
     ) -> str:
         res = super().as_sql(pb, table_alias)
         if cast != "exists":
-            path_str = "'$'"
+            # path_str = "'$'"
+            # if self.extra_path:
+            #     param_name = pb.add_param(quote_json_path_parts(self.extra_path))
+            #     path_str = _param_slot(param_name, "String")
+            # val = f"JSON_VALUE({res}, {path_str})"
+            extra_path = []
             if self.extra_path:
-                param_name = pb.add_param(quote_json_path_parts(self.extra_path))
-                path_str = _param_slot(param_name, "String")
-            val = f"JSON_VALUE({res}, {path_str})"
+                extra_path = self.extra_path
+            param_name = pb.add_param(extra_path)
+            path_str = _param_slot(param_name, "Array(String)")
+            val = f"resolve_data_through_refs_for_path({res}, {path_str}, '60ef21fe774a43865c944cce3938cdd04ce854418ab4c2acc67dd22137e553bf')"
             return clickhouse_cast(val, cast)
         else:
             # UGG - this is an ugly part of clickhouse! It is really difficult to differentiate
