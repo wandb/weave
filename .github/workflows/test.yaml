@@ -134,6 +134,7 @@ jobs:
           pip install ..[mistral]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
           # pip uninstall -y ..[mistral]
+          echo "Running litellm tests"
           pip install ..[litellm]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
           pip uninstall -y ..[litellm]
