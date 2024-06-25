@@ -10,6 +10,7 @@
  */
 
 import * as Types from '../../../../../../core/model/types';
+import {WeaveKind} from '../../../../../../react';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
 import * as traceServerClient from './traceServerClient'; // TODO: This import is not ideal, should delete this whole interface
 import {Query} from './traceServerClientInterface/query'; // TODO: This import is not ideal, should delete this whole interface
@@ -36,6 +37,7 @@ export type CallKey = {
 };
 export type CallSchema = CallKey & {
   spanName: string;
+  displayName: string | null;
   opVersionRef: string | null;
   traceId: string;
   parentId: string | null;
@@ -96,7 +98,7 @@ type WandbArtifactObjectVersionKey = {
 
 type WeaveObjectVersionKey = {
   scheme: 'weave';
-  weaveKind: 'object' | 'table' | 'op';
+  weaveKind: WeaveKind;
 } & CommonObjectVersionKey;
 
 export type ObjectVersionKey =
@@ -175,10 +177,16 @@ export type WFDataModelHooksInterface = {
     opts?: {skip?: boolean}
   ) => Loadable<traceServerClient.TraceCallsQueryStatsRes>;
   useCallsDeleteFunc: () => (
-    projectID: string,
+    entity: string,
+    project: string,
     callIDs: string[]
   ) => Promise<void>;
-
+  useCallUpdateFunc: () => (
+    entity: string,
+    project: string,
+    callID: string,
+    newName: string
+  ) => Promise<void>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,

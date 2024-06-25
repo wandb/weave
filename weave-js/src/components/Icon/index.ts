@@ -104,6 +104,7 @@ export {
   IconLayoutVertical,
   IconLightbulbInfo,
   IconLinearScale,
+  IconLinePlotAlt2,
   IconLinkAlt,
   IconLinkedinSocial,
   IconList,
