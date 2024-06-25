@@ -133,7 +133,7 @@ jobs:
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           pip install ..[mistral]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
-          pip uninstall -y ..[mistral]
+          # pip uninstall -y ..[mistral]
           pip install ..[litellm]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
           pip uninstall -y ..[litellm]
