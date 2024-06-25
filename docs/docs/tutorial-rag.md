@@ -135,7 +135,7 @@ async def context_precision_score(question, model_output):
     question: {question}
     context: {context}
     answer: {answer}
-    verification: """
+    verdict: """
     client = OpenAI()
 
     prompt = context_precision_prompt.format(
@@ -370,7 +370,7 @@ async def context_precision_score(question, model_output):
     question: {question}
     context: {context}
     answer: {answer}
-    verification: """
+    verdict: """
     client = OpenAI()
 
     prompt = context_precision_prompt.format(
