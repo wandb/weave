@@ -12,9 +12,16 @@ from .openai_sdk import openai_patcher
 model = "gpt-4o"
 
 
+def filter_body(r: typing.Any) -> typing.Any:
+     r.body = ""
+     return r
+
+
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+    before_record_request=filter_body,
 )
 def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
@@ -38,7 +45,7 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cB4FScUoIEdwG8LYuoDoTXImaDKo"  # type: ignore
+    assert call.output["id"] == "chatcmpl-9dw1rJh78vq1kz9bifDpBiI29gfoa"  # type: ignore
     assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
     assert call.output["object"] == "chat.completion"  # type: ignore
 
