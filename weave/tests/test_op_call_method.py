@@ -11,7 +11,7 @@ def test_op_call_method(client):
     assert isinstance(res, int)
     assert res == 3
 
-    # call that returns Call obj
+    # call that returns a Call obj
     c = add.call(1, 2)
     assert isinstance(c._val, weave.weave_client.Call)
     assert c.inputs == {"a": 1, "b": 2}
