@@ -126,9 +126,8 @@ class Op:
         except BaseException as e:
             finish(exception=e)
             raise
-
         # We cannot let BoxedNone or BoxedBool escape into the user's code
-        # since they cannot pass instance checks for None or bool
+        # since they cannot pass instance checks for None or bool.
         if isinstance(res, box.BoxedNone):
             res = None
         if isinstance(res, box.BoxedBool):
