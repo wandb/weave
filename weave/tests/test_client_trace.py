@@ -2100,7 +2100,9 @@ def test_sort_and_filter_through_refs(client):
         val: typing.Any
 
     def test_obj(val):
-        return weave.publish(TestObj(val=val))
+        obj = TestObj(val=val)
+        weave.publish(obj)
+        return obj
 
     import random
 
