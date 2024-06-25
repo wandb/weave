@@ -268,7 +268,7 @@ symbol_pathers = [
     SymbolPatcher(
         lambda: importlib.import_module("openai.resources.chat.completions"),
         "AsyncCompletions.create",
-        create_wrapper(name="openai.chat.async_completions.create"),
+        create_wrapper(name="openai.chat.completions.create"),
     ),
 ]
 

@@ -176,7 +176,14 @@ class BoundOp(Op):
     ) -> None:
         self.arg0 = arg0
         self.op = op  # type: ignore
-        if arg0_class is None:
+
+        # A bit hacky, but we want to use the name if
+        # it was explicitly set by the user
+        name_is_custom = op.name != op.resolve_fn.__name__
+
+        if name_is_custom:
+            self.name = op.name
+        elif arg0_class is None:
             self.name = op.resolve_fn.__name__
         else:
             self.name = arg0_class.__name__ + "." + op.resolve_fn.__name__
