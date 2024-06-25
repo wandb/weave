@@ -12,7 +12,7 @@ from typing import (
     TypeVar,
 )
 
-from tenacity import retry
+from tenacity import retry, stop_after_attempt, wait_exponential
 from typing_extensions import ParamSpec
 
 from weave import client_context
@@ -156,7 +156,7 @@ class Op:
         return self._retry_fetch_call(client, run.id)
 
     @staticmethod
-    @retry
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, max=10))
     def _retry_fetch_call(client: "WeaveClient", id: str) -> "Call":
         return client.call(id)
 
