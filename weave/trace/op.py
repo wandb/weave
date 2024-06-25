@@ -82,8 +82,11 @@ class Op:
             raise OpCallError(f"Error calling {self.name}: {e}")
         inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
 
+        # This should probably be configurable, but for now we redact the api_key
         if "api_key" in inputs_with_defaults:
             inputs_with_defaults["api_key"] = "REDACTED"
+
+        # If/When we do memoization, this would be a good spot
 
         parent_run = run_context.get_current_run()
         client._save_nested_objects(inputs_with_defaults)
@@ -118,11 +121,14 @@ class Op:
 
         try:
             res = self.resolve_fn(*args, **kwargs)
+            # TODO: can we get rid of this?
             res = box.box(res)
         except BaseException as e:
             finish(exception=e)
             raise
 
+        # We cannot let BoxedNone or BoxedBool escape into the user's code
+        # since they cannot pass instance checks for None or bool
         if isinstance(res, box.BoxedNone):
             res = None
         if isinstance(res, box.BoxedBool):
