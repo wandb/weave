@@ -13,8 +13,8 @@ model = "gpt-4o"
 
 
 def filter_body(r: typing.Any) -> typing.Any:
-     r.body = ""
-     return r
+    r.body = ""
+    return r
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
