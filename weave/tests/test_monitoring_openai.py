@@ -7,9 +7,8 @@ import pytest
 import pytest_asyncio
 from openai import AsyncStream, Stream
 from openai.types.chat.chat_completion import ChatCompletion, Choice
-from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
+from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, ChoiceDelta
 from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
-from openai.types.chat.chat_completion_chunk import ChoiceDelta
 from openai.types.completion_usage import CompletionUsage
 
 import weave
