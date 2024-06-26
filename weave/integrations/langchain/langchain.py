@@ -5,8 +5,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
-from weave import client_context
-from weave.legacy import run_context
+from weave import call_context, client_context
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
 
@@ -131,7 +130,7 @@ if not import_failed:
                 parent_run = wv_parent_run
             else:
                 # Here is our check for the specific condition
-                wv_current_run = run_context.get_current_run()
+                wv_current_run = call_context.get_current_run()
 
                 # First, there needs to be something on the stack.
                 if wv_current_run is not None:

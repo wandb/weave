@@ -396,20 +396,20 @@ interactions:
         \       \"supports_function_calling\": true\n    },\n    \"groq/llama3-8b-8192\":
         {\n        \"max_tokens\": 8192,\n        \"max_input_tokens\": 8192,\n        \"max_output_tokens\":
         8192,\n        \"input_cost_per_token\": 0.00000005,\n        \"output_cost_per_token\":
-        0.00000010,\n        \"litellm_provider\": \"groq\",\n        \"mode\": \"chat\",\n
+        0.00000008,\n        \"litellm_provider\": \"groq\",\n        \"mode\": \"chat\",\n
         \       \"supports_function_calling\": true\n    },\n    \"groq/llama3-70b-8192\":
         {\n        \"max_tokens\": 8192,\n        \"max_input_tokens\": 8192,\n        \"max_output_tokens\":
         8192,\n        \"input_cost_per_token\": 0.00000059,\n        \"output_cost_per_token\":
         0.00000079,\n        \"litellm_provider\": \"groq\",\n        \"mode\": \"chat\",\n
         \       \"supports_function_calling\": true\n    },\n    \"groq/mixtral-8x7b-32768\":
         {\n        \"max_tokens\": 32768,\n        \"max_input_tokens\": 32768,\n
-        \       \"max_output_tokens\": 32768,\n        \"input_cost_per_token\": 0.00000027,\n
-        \       \"output_cost_per_token\": 0.00000027,\n        \"litellm_provider\":
+        \       \"max_output_tokens\": 32768,\n        \"input_cost_per_token\": 0.00000024,\n
+        \       \"output_cost_per_token\": 0.00000024,\n        \"litellm_provider\":
         \"groq\",\n        \"mode\": \"chat\",\n        \"supports_function_calling\":
         true\n    },\n    \"groq/gemma-7b-it\": {\n        \"max_tokens\": 8192,\n
         \       \"max_input_tokens\": 8192,\n        \"max_output_tokens\": 8192,\n
-        \       \"input_cost_per_token\": 0.00000010,\n        \"output_cost_per_token\":
-        0.00000010,\n        \"litellm_provider\": \"groq\",\n        \"mode\": \"chat\",\n
+        \       \"input_cost_per_token\": 0.00000007,\n        \"output_cost_per_token\":
+        0.00000007,\n        \"litellm_provider\": \"groq\",\n        \"mode\": \"chat\",\n
         \       \"supports_function_calling\": true\n    },\n    \"friendliai/mixtral-8x7b-instruct-v0-1\":
         {\n        \"max_tokens\": 32768,\n        \"max_input_tokens\": 32768,\n
         \       \"max_output_tokens\": 32768,\n        \"input_cost_per_token\": 0.0000004,\n
@@ -956,7 +956,18 @@ interactions:
         200000,\n        \"input_cost_per_token\": 0.00000025,\n        \"output_cost_per_token\":
         0.00000125,\n        \"input_cost_per_image\": 0.0004, \n        \"litellm_provider\":
         \"openrouter\",\n        \"mode\": \"chat\",\n        \"supports_function_calling\":
-        true,\n        \"supports_vision\": true\n    },\n    \"openrouter/anthropic/claude-3-sonnet\":
+        true,\n        \"supports_vision\": true\n    },\n    \"openrouter/anthropic/claude-3-haiku-20240307\":
+        {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\": 200000,\n
+        \       \"max_output_tokens\": 4096,\n        \"input_cost_per_token\": 0.00000025,\n
+        \       \"output_cost_per_token\": 0.00000125,\n        \"litellm_provider\":
+        \"openrouter\",\n        \"mode\": \"chat\",\n        \"supports_function_calling\":
+        true,\n        \"supports_vision\": true,\n        \"tool_use_system_prompt_tokens\":
+        264\n    },\n    \"openrouter/anthropic/claude-3.5-sonnet\": {\n        \"max_tokens\":
+        4096,\n        \"max_input_tokens\": 200000,\n        \"max_output_tokens\":
+        4096,\n        \"input_cost_per_token\": 0.000003,\n        \"output_cost_per_token\":
+        0.000015,\n        \"litellm_provider\": \"openrouter\",\n        \"mode\":
+        \"chat\",\n        \"supports_function_calling\": true,\n        \"supports_vision\":
+        true,\n        \"tool_use_system_prompt_tokens\": 159\n    },\n    \"openrouter/anthropic/claude-3-sonnet\":
         {\n        \"max_tokens\": 200000,\n        \"input_cost_per_token\": 0.000003,\n
         \       \"output_cost_per_token\": 0.000015,\n        \"input_cost_per_image\":
         0.0048,  \n        \"litellm_provider\": \"openrouter\",\n        \"mode\":
@@ -1844,7 +1855,7 @@ interactions:
       Content-Encoding:
       - gzip
       Content-Length:
-      - '7641'
+      - '7668'
       Content-Security-Policy:
       - default-src 'none'; style-src 'unsafe-inline'; sandbox
       Content-Type:
@@ -1852,13 +1863,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Tue, 25 Jun 2024 05:42:31 GMT
+      - Wed, 26 Jun 2024 05:55:26 GMT
       ETag:
-      - W/"8af3b21450b343b06148df84a57523e185d1c77d3d4a4582185eef87a3df63ff"
+      - W/"8b9b91842fff909c2ddc236df6f224f4050425faf4fc028a8c4c8344476eb19c"
       Expires:
-      - Tue, 25 Jun 2024 05:47:31 GMT
+      - Wed, 26 Jun 2024 06:00:26 GMT
       Source-Age:
-      - '167'
+      - '244'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -1868,19 +1879,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '2'
+      - '1'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 260fc1b067a5b000e8053bdf5ac1dfefeddb600e
+      - f75d359516b51034e1461a0108995a1099b35535
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - D9EA:2D3F2F:3D081:4BBEF:6679D4CE
+      - 7382:319BE6:14BCDA:19F39B:667B9540
       X-Served-By:
-      - cache-maa10230-MAA
+      - cache-maa10243-MAA
       X-Timer:
-      - S1719294152.930446,VS0,VE0
+      - S1719381326.362890,VS0,VE1
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -1922,17 +1933,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA1SQPW+DMBRFd36F9WaIQkiUwpiWbl06VKqqKjLwAm5tP8t+SK2i/PfKhHx08XAv
-        5/qYYyIEqA4qAe0guTVOZ2XHtX0enrb1K+9qHF92jw9lbdaDfmveIY0ENV/Y8oVatGScRlZkz3Xr
-        UTLG1Xybl6tynW+KqTDUoY5Y7zgrFpuMR99QtsxXm5kcSLUYoBIfiRBCHKczOtoOf6ASy/SSGAxB
-        9gjV9SMhwJOOCcgQVGBpGdJb2ZJltJN2AXN8uu5p6p2nJt5tR62v+UFZFYa9RxnIRjYwuTN+SoT4
-        nLzHfyrgPBnHe6ZvtHEwL85zcPtTd+XcMbHUd/E6mfUg/AZGsz8o26N3Xk1viJLJKfkDAAD//wMA
-        CfUVgMIBAAA=
+        H4sIAAAAAAAAA1SQPW/CMBRF9/wK680EEQKiZKzUDm2HLiytKmScR+Ji+1n2S0WL+O+VQ/haPNyb
+        c32cQyYE6BoqAaqVrKw3+RKfO9/u3nDVrVr7sf+ZvbzjvvP68fXvCUaJoM03Kj5TY0XWG2RN7lSr
+        gJIxrRaLYlk+FOV00ReWajQJazzn5Xiecxc2lE+K6XwgW9IKI1TiMxNCiEN/JkdX4x4qMRmdE4sx
+        ygahunwkBAQyKQEZo44sHcPoWipyjK7XLmGIj5c9Q40PtEl3u86YS77VTsd2HVBGcomNTP6EHzMh
+        vnrv7k4FfCDrec20Q5cGi/I0B9c/dVMOHRNLcxPPskEP4m9ktOutdg0GH3T/hiSZHbN/AAAA//8D
+        AMlVhFrCAQAA
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 8992a2888e917f97-MAA
+      - 899af2d0d9fa7f74-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -1940,14 +1951,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 25 Jun 2024 05:42:33 GMT
+      - Wed, 26 Jun 2024 05:55:28 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=FWAbcNT2JR77.GaIVUaihiO7XeFzsctB4yQqFBw1sBY-1719294153-1.0.1.1-hkaMdotV7fc6V8tTKWXHi3HOqOE7v.kvxDLW3i5faY0xLtIKqc8yQg5nt1ycV3AwAglUgO4SaEsatckxU6gf.w;
-        path=/; expires=Tue, 25-Jun-24 06:12:33 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=UqMckIzazE3LddJbqWrF6f75lLqlUvZafBLHyIj8Fkk-1719381328-1.0.1.1-BiZydMK.E2fk1LCVAcCescTEN0uMYjM277Y_lLXNxuJwkVnwKzPZxll12IvI5QDyTZFM6v_5fgoqRc1Od9ZXVg;
+        path=/; expires=Wed, 26-Jun-24 06:25:28 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=eNGUjDwD6Wnv0Ca7lLz2vHcLkSenveSWVR4gAVIF5sQ-1719294153679-0.0.1.1-604800000;
+      - _cfuvid=bPWGLXrRIAChmmkSpqFv3Bpc5Dc1HCt65nk15M2TZV0-1719381328155-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -1956,7 +1967,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '103'
+      - '145'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -1974,7 +1985,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - 2852aa61410047275f94db3a8c83fb35
+      - 15d6338ae34d1366b2608f0bf942b03a
     status:
       code: 200
       message: OK
