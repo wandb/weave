@@ -146,7 +146,7 @@ def test_litellm_quickstart_stream(
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
-    exp = """Hello! I'm just a virtual assistant so I don't have feelings, but I'm here and ready to help you with anything you need. How can I assist you today?"""
+    exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
@@ -191,7 +191,7 @@ async def test_litellm_quickstart_stream_async(
     async for chunk in chat_response:
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
-    exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here and ready to help you with anything you need. How can I assist you today?"""
+    exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with any questions or tasks you may have. How can I help you today?"""
 
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
