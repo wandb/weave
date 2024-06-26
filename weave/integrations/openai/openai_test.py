@@ -382,14 +382,14 @@ async def test_openai_function_call_async(
     assert len(res.calls) == 1
     call = res.calls[0]
 
-    exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
+    exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
     choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["function_call"]["arguments"] == exp
     assert choice["message"]["function_call"]["name"] == "cricket_player_names"
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cDgrpifNA23GSG0lx7fiqUnoLPGP"  # type: ignore
+    assert call.output["id"] == "chatcmpl-9eLCCHF8ILInwEbcE5OzmkiHvVbB6"  # type: ignore
     assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
     assert call.output["object"] == "chat.completion"  # type: ignore
 
@@ -558,12 +558,12 @@ def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
     assert (
         choice["message"]["tool_calls"][0]["function"]["name"] == "cricket_player_names"
     )
-    assert choice["message"]["tool_calls"][0]["id"] == "call_fYpe1IPeQu1c5KjnY4NnMwCi"
+    assert choice["message"]["tool_calls"][0]["id"] == "call_SWMuKPyiatqi82zAF37iPLhO"
     assert choice["message"]["tool_calls"][0]["type"] == "function"
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cDtVDDbsN9J2mcgUZXLeL3k5qrFo"  # type: ignore
+    assert call.output["id"] == "chatcmpl-9eLE2jX4BPZeJjBok2gCEnFKmE7De"  # type: ignore
     assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
     assert call.output["object"] == "chat.completion"  # type: ignore
 
@@ -647,12 +647,12 @@ async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) ->
     assert (
         choice["message"]["tool_calls"][0]["function"]["name"] == "cricket_player_names"
     )
-    assert choice["message"]["tool_calls"][0]["id"] == "call_KJgxVkBfypngg2wr7jhen7cu"
+    assert choice["message"]["tool_calls"][0]["id"] == "call_DVZy0O5sFjADkjNjfEVuDRq6"
     assert choice["message"]["tool_calls"][0]["type"] == "function"
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cEBMRLj22MO4Pj6giiJxicM0JRK6"  # type: ignore
+    assert call.output["id"] == "chatcmpl-9eLGYyqoDMdGNMjglDxPc4cNwq3lS"  # type: ignore
     assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
     assert call.output["object"] == "chat.completion"  # type: ignore
 
