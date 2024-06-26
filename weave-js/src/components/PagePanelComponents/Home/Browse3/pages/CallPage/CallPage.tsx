@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
+import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -40,6 +41,7 @@ export const CallPage: FC<{
     project: props.project,
     callId: props.callId,
   });
+
   if (call.loading) {
     return <CenteredAnimatedLoader />;
   } else if (call.result === null) {
@@ -102,6 +104,8 @@ const CallPageInnerVertical: FC<{
   call: CallSchema;
   path?: string;
 }> = ({call, path}) => {
+  useViewTraceEvent(call);
+
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 
