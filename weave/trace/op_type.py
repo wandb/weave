@@ -5,6 +5,7 @@ import collections.abc
 import inspect
 import json
 import os
+import re
 import sys
 import textwrap
 import types as py_types
@@ -18,6 +19,9 @@ from weave.trace.refs import ObjectRef
 from .. import environment, errors, storage
 from . import serializer
 from .op import Op
+
+WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
+WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
 
 
 def type_code(type_: Any) -> str:
@@ -385,8 +389,13 @@ def save_instance(
             pass
 
     op_function_code = textwrap.dedent(inspect.getsource(obj.resolve_fn))
-    if "op()" not in op_function_code:
+
+    if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
+    else:
+        op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
+            "@weave.op()", op_function_code
+        )
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:

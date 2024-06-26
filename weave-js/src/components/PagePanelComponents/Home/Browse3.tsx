@@ -11,6 +11,10 @@ import {
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
+import {Loading} from '@wandb/weave/components/Loading';
+import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
+import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import {KnownBaseObjectClassType} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import _ from 'lodash';
 import React, {
   ComponentProps,
@@ -22,6 +26,7 @@ import React, {
 import useMousetrap from 'react-hook-mousetrap';
 import {
   Link as RouterLink,
+  Redirect,
   Route,
   Switch,
   useHistory,
@@ -53,10 +58,8 @@ import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
-import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
-import {ObjectsPage} from './Browse3/pages/ObjectsPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
 import {ObjectVersionsPage} from './Browse3/pages/ObjectVersionsPage';
 import {OpPage} from './Browse3/pages/OpPage';
@@ -67,11 +70,11 @@ import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
+  useProjectHasTraceServerData,
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
-import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
@@ -122,6 +125,7 @@ const tabOptions = [
   'ops',
   'op-versions',
   'calls',
+  'evaluations',
   'boards',
   'tables',
 ];
@@ -228,26 +232,11 @@ const Browse3Mounted: FC<{
                 width: '100%',
                 overflow: 'hidden',
                 display: 'flex',
-                flexDirection: 'row',
+                flexDirection: 'column',
               }}>
-              <SideNav />
-              {/* <RouteAwareBrowse3ProjectSideNav
-              navigateAwayFromProject={props.navigateAwayFromProject}
-            /> */}
-              <Box
-                component="main"
-                sx={{
-                  flex: '1 1 auto',
-                  height: '100%',
-                  width: '100%',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}>
-                <ErrorBoundary>
-                  <MainPeekingLayout />
-                </ErrorBoundary>
-              </Box>
+              <ErrorBoundary>
+                <MainPeekingLayout />
+              </ErrorBoundary>
             </Box>
           </Route>
         ) : (
@@ -392,22 +381,25 @@ const MainPeekingLayout: FC = () => {
 };
 
 const ProjectRedirect: FC = () => {
-  const history = useHistory();
-  const params = useParams<Browse3ProjectMountedParams>();
+  const {entity, project} = useParams<Browse3ProjectMountedParams>();
   const {baseRouter} = useWeaveflowRouteContext();
 
-  useEffect(() => {
-    if (params.tab == null) {
-      history.replace(
-        // baseRouter.opVersionsUIUrl(params.entity, params.project, {})
-        baseRouter.callsUIUrl(params.entity ?? '', params.project ?? '', {
-          traceRootsOnly: true,
-        })
-      );
-    }
-  }, [baseRouter, history, params.entity, params.project, params.tab]);
+  const projectHasTraceServerData = useProjectHasTraceServerData(
+    entity,
+    project
+  );
+  if (projectHasTraceServerData.loading) {
+    return <Loading centered />;
+  }
+  // TODO: If we have no data, perhaps better to show a quickstart.
+  // const shouldRedirect = projectHasTraceServerData.result;
+  const shouldRedirect = true;
+  if (shouldRedirect) {
+    const url = baseRouter.tracesUIUrl(entity, project);
+    return <Redirect to={url} />;
+  }
 
-  return <CenteredAnimatedLoader />;
+  return null;
 };
 
 const Browse3ProjectRoot: FC<{
@@ -438,10 +430,11 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/objects/:itemName`}>
           <ObjectPageBinding />
         </Route>
-        <Route path={`${projectRoot}/objects`}>
-          <ObjectsPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/object-versions`}>
+        <Route
+          path={[
+            `${projectRoot}/:tab(datasets|models|objects)`,
+            `${projectRoot}/object-versions`, // deprecated
+          ]}>
           <ObjectVersionsPageBinding />
         </Route>
         {/* OPS */}
@@ -454,14 +447,18 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/ops`}>
           <OpsPageBinding />
         </Route>
-        <Route path={`${projectRoot}/op-versions`}>
+        <Route
+          path={[
+            `${projectRoot}/operations`,
+            `${projectRoot}/op-versions`, // deprecated
+          ]}>
           <OpVersionsPageBinding />
         </Route>
         {/* CALLS */}
         <Route path={`${projectRoot}/calls/:itemName`}>
           <CallPageBinding />
         </Route>
-        <Route path={`${projectRoot}/calls`}>
+        <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
         {/* BOARDS */}
@@ -629,9 +626,22 @@ const CallPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
-  const params = useParams<Browse3TabParams>();
+  const {entity, project, tab} = useParams<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const filters = useMemo(() => {
+    if (tab === 'evaluations') {
+      return {
+        frozen: true,
+        opVersionRefs: [
+          opVersionKeyToRefUri({
+            entity,
+            project,
+            opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+            versionHash: '*',
+          }),
+        ],
+      };
+    }
     if (query.filter === undefined) {
       return {};
     }
@@ -641,21 +651,19 @@ const CallsPageBinding = () => {
       console.log(e);
       return {};
     }
-  }, [query.filter]);
+  }, [query.filter, entity, project, tab]);
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
-      history.push(
-        routerContext.callsUIUrl(params.entity, params.project, filter)
-      );
+      history.push(routerContext.callsUIUrl(entity, project, filter));
     },
-    [history, params.entity, params.project, routerContext]
+    [history, entity, project, routerContext]
   );
   return (
     <CallsPage
-      entity={params.entity}
-      project={params.project}
+      entity={entity}
+      project={project}
       initialFilter={filters}
       onFilterUpdate={onFilterUpdate}
     />
@@ -664,34 +672,30 @@ const CallsPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectVersionsPageBinding = () => {
-  const params = useParams<Browse3TabParams>();
-
-  const query = useURLSearchParamsDict();
+  const {entity, project, tab} = useParams<Browse3TabParams>();
   const filters = useMemo(() => {
-    if (query.filter === undefined) {
-      return {};
+    let baseObjectClass: KnownBaseObjectClassType | null = null;
+    if (tab === 'models') {
+      baseObjectClass = 'Model';
     }
-    try {
-      return JSON.parse(query.filter);
-    } catch (e) {
-      console.log(e);
-      return {};
+    if (tab === 'datasets') {
+      baseObjectClass = 'Dataset';
     }
-  }, [query.filter]);
+    return {baseObjectClass};
+  }, [tab]);
+
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
-      history.push(
-        routerContext.objectVersionsUIUrl(params.entity, params.project, filter)
-      );
+      history.push(routerContext.objectVersionsUIUrl(entity, project, filter));
     },
-    [history, params.entity, params.project, routerContext]
+    [history, entity, project, routerContext]
   );
   return (
     <ObjectVersionsPage
-      entity={params.entity}
-      project={params.project}
+      entity={entity}
+      project={project}
       initialFilter={filters}
       onFilterUpdate={onFilterUpdate}
     />
@@ -775,12 +779,6 @@ const OpsPageBinding = () => {
   const params = useParams<Browse3TabItemParams>();
 
   return <OpsPage entity={params.entity} project={params.project} />;
-};
-
-const ObjectsPageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
-
-  return <ObjectsPage entity={params.entity} project={params.project} />;
 };
 
 const BoardsPageBinding = () => {
