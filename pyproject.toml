@@ -94,6 +94,9 @@ exclude = [
   "examples",
 ]
 
+[tool.ruff.lint.isort]
+known-third-party = ["wandb"]
+
 [tool.ruff]
 line-length = 88
 show-fixes = true
