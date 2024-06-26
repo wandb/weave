@@ -36,7 +36,6 @@ def _run_in_process(
     func: Callable, args: Tuple = (), kwargs: dict = {}
 ) -> Tuple[multiprocessing.Process, multiprocessing.Queue]:
     """Run a function in a separate process and return the process object and a multiprocessing.Queue for the result."""
-
     queue: multiprocessing.Queue = multiprocessing.Queue()
     process: multiprocessing.Process = multiprocessing.Process(
         target=_subproc, args=(queue, func) + args, kwargs=kwargs
