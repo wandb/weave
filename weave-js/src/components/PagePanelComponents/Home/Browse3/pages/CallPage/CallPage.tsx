@@ -41,7 +41,6 @@ export const CallPage: FC<{
     callId: props.callId,
   });
 
-  console.log('call', call);
   if (call.loading) {
     return <CenteredAnimatedLoader />;
   } else if (call.result === null) {
