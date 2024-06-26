@@ -109,7 +109,7 @@ import tabulate
 from weave.legacy import graph
 
 from . import weave_types as types
-from .partial_object import PartialObjectType
+from .legacy.partial_object import PartialObjectType
 
 
 def _trimmed_string(s: str, max_len: int = 20) -> str:
