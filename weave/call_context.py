@@ -63,7 +63,7 @@ def pop_call(call_id: typing.Optional[str]) -> None:
     _run_stack.set(new_stack)
 
 
-def get_current_run() -> typing.Optional["Call"]:
+def get_current_call() -> typing.Optional["Call"]:
     return _run_stack.get()[-1] if _run_stack.get() else None
 
 
