@@ -305,7 +305,8 @@ const MainPeekingLayout: FC = () => {
               : 'none',
             marginRight: !isDrawerOpen
               ? 0
-              : `${(drawerWidthPct * windowSize.width) / 100}px`,
+              : // subtract 56px for the sidebar width
+                `${(drawerWidthPct * (windowSize.width - 56)) / 100}px`,
           }}>
           <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
         </Box>

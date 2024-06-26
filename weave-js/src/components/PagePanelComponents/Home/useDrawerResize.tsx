@@ -68,8 +68,9 @@ export const useDrawerResize = () => {
       const minWidth = (300 / windowSize.width) * 100;
       e.preventDefault();
 
-      const newWidth =
-        ((windowSize.width - e.clientX) * 100) / windowSize.width;
+      // subtract 56px for the sidebar width
+      const totalWidth = windowSize.width - 56;
+      const newWidth = ((totalWidth - e.clientX) * 100) / totalWidth;
       setDrawerSize(newWidth, setWidth, minWidth, maxWidth);
     },
     [windowSize.width, setWidth]
