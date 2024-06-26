@@ -49,9 +49,13 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: "category",
-          label: "Ecosystem",
-          link: { type: "doc", id: "guides/ecosystem/index" },
-          items: ["guides/ecosystem/openai", "guides/ecosystem/anthropic", "guides/ecosystem/mistral"],
+          label: "Integrations",
+          link: { type: "doc", id: "guides/integrations/index" },
+          items: [
+            "guides/integrations/openai",
+            "guides/integrations/anthropic",
+            "guides/integrations/mistral",
+          ],
         },
         {
           type: "category",
@@ -60,7 +64,8 @@ const sidebars: SidebarsConfig = {
           items: ["guides/tools/serve", "guides/tools/deploy"],
         },
         {
-          type: "doc", id: "guides/platform/index",
+          type: "doc",
+          id: "guides/platform/index",
         },
       ],
     },
