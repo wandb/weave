@@ -32,14 +32,14 @@ def cohere_accumulator(
 
     return acc
 
-# def cohere_wrapper(name: str) -> typing.Callable:
-#     def wrapper(fn: typing.Callable) -> typing.Callable:
-#         op = weave.op()(fn)
-#         print(f"op: {op}")
-#         op.name = name # type: ignore
-#         print(f"op2: {op}")
-#         return op
-#     return wrapper
+def cohere_wrapper(name: str) -> typing.Callable:
+    def wrapper(fn: typing.Callable) -> typing.Callable:
+        op = weave.op()(fn)
+        print(f"op: {op}")
+        op.name = name # type: ignore
+        print(f"op2: {op}")
+        return op
+    return wrapper
 
 def cohere_stream_wrapper(name: str) -> typing.Callable:
     def wrapper(fn: typing.Callable) -> typing.Callable:
@@ -65,15 +65,15 @@ cohere_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("cohere"),
             "Client.chat",
-            # cohere_wrapper("cohere.Client.chat"),
-            weave.op(),
+            cohere_wrapper("cohere.Client.chat"),
+            # weave.op(),
         ),
         # Patch the async chat method
         SymbolPatcher(
             lambda: importlib.import_module("cohere"),
             "AsyncClient.chat",
-            # cohere_wrapper("cohere.AsyncClient.chat"),
-            weave.op(),
+            cohere_wrapper("cohere.AsyncClient.chat"),
+            # weave.op(),
         ),
         # Add patch for chat_stream method
         SymbolPatcher(
