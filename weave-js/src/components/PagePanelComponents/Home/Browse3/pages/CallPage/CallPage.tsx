@@ -17,6 +17,7 @@ import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -89,6 +90,10 @@ const useCallTabs = (call: CallSchema) => {
     {
       label: 'Summary',
       content: <CallSummary call={call} />,
+    },
+    {
+      label: 'Use',
+      content: <TabUseCall call={call} />,
     },
   ];
 };

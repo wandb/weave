@@ -1,5 +1,5 @@
 import copyToClipboard from 'copy-to-clipboard';
-import React, {useCallback} from 'react';
+import React, {CSSProperties, useCallback} from 'react';
 import styled from 'styled-components';
 
 import {toast} from '../common/components/elements/Toast';
@@ -19,10 +19,10 @@ type CopyableTextProps = {
   onClick?(): void;
 };
 
-const Wrapper = styled.div`
+const Wrapper = styled.div<{isMultiline?: boolean}>`
   background-color: ${MOON_100};
   display: flex;
-  align-items: center;
+  align-items: ${props => (props.isMultiline ? 'flex-start' : 'center')};
   cursor: pointer;
   padding: 8px;
   border-radius: 8px;
@@ -61,8 +61,15 @@ export const CopyableText = ({
     toast(toastText);
   }, [text, copyText, toastText]);
 
+  const style: CSSProperties = {marginRight: 8};
+  const isMultiline = text.includes('\n');
+  if (isMultiline) {
+    style.marginTop = 4;
+  }
+
   const trigger = (
     <Wrapper
+      isMultiline={isMultiline}
       onClick={e => {
         e.stopPropagation();
         if (disabled) {
@@ -72,12 +79,7 @@ export const CopyableText = ({
         onClick?.();
       }}>
       <IconCell>
-        <Icon
-          name={icon ?? 'copy'}
-          width={16}
-          height={16}
-          style={{marginRight: 8}}
-        />
+        <Icon name={icon ?? 'copy'} width={16} height={16} style={style} />
       </IconCell>
       <Text>{text}</Text>
     </Wrapper>
