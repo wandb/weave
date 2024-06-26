@@ -131,20 +131,20 @@ jobs:
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           # Install mistral and run tests
           pip install ..[mistral]
-          pytest -vv -m "not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
+          pytest -vv -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
           pip uninstall -y mistralai
           # Install litellm and run tests
           echo "Running litellm tests"
           pip install ..[litellm]
-          pytest -vv -m "not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
+          pytest -vv -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
           pip uninstall -y litellm
           # Install llamaindex and run tests
           pip install ..[llamaindex]
-          pytest -vv -m "not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
+          pytest -vv -m "weave_client and notskip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
           pip uninstall -y llama-index
           # Install anthropic and run tests
           pip install ..[anthropic]
-          pytest -vv -m "not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
+          pytest -vv -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
           pip uninstall -y anthropic
 
       - name: Run Python Unit Tests
@@ -157,16 +157,16 @@ jobs:
           cd weave
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           pip install ..[mistral]
-          pytest -vv -m "skip_clickhouse_client" --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
+          pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
           pip uninstall -y mistralai
           pip install ..[litellm]
-          pytest -vv -m "skip_clickhouse_client" --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
+          pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
           pip uninstall -y litellm
           pip install ..[llamaindex]
-          pytest -vv -m "skip_clickhouse_client" --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
+          pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
           pip uninstall -y llama-index
           pip install ..[anthropic]
-          pytest -vv -m "skip_clickhouse_client" --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
+          pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
           pip uninstall -y anthropic
 
   # nbmake:

@@ -3,7 +3,6 @@ from typing import Any, Generator
 
 import litellm
 import pytest
-
 import weave
 from weave.trace_server import trace_server_interface as tsi
 
@@ -216,5 +215,5 @@ async def test_litellm_quickstart_stream_async(
     # assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 0
 
 
-def test_nothing() -> None:
+def test_nothing(client: weave.weave_client.WeaveClient) -> None:
     assert True

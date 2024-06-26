@@ -1,13 +1,10 @@
 import os
-from typing import Any, Generator
+from typing import Any
 
 import pytest
-from anthropic import Anthropic, AsyncAnthropic
-
 import weave
+from anthropic import Anthropic, AsyncAnthropic
 from weave.trace_server import trace_server_interface as tsi
-
-from .anthropic_sdk import anthropic_patcher
 
 model = "claude-3-haiku-20240307"
 # model = "claude-3-opus-20240229"
@@ -260,5 +257,5 @@ def test_tools_calling(
     assert output.usage.input_tokens == model_usage["input_tokens"] == 354
 
 
-def test_nothing() -> None:
+def test_nothing(client: weave.weave_client.WeaveClient) -> None:
     assert True
