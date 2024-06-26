@@ -36,6 +36,7 @@ export const Reactions = ({
   const getTsClient = useGetTraceServerClientContext();
 
   useEffect(() => {
+    let mounted = true;
     getTsClient()
       .feedbackQuery({
         project_id: projectId,
@@ -47,10 +48,16 @@ export const Reactions = ({
         sort_by: [{field: 'created_at', direction: 'asc'}],
       })
       .then(res => {
+        if (!mounted) {
+          return;
+        }
         if ('result' in res) {
           setFeedback(res.result);
         }
       });
+    return () => {
+      mounted = false;
+    };
   }, [getTsClient, projectId, weaveRef]);
 
   const onAddEmoji = (emoji: string) => {

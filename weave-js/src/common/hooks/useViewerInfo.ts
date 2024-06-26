@@ -38,13 +38,20 @@ export const useViewerInfo = (): UserInfoResponse => {
   });
 
   useEffect(() => {
+    let mounted = true;
     apolloClient.query({query: VIEWER_QUERY as any}).then(result => {
+      if (!mounted) {
+        return;
+      }
       const userInfo = result.data.viewer;
       setResponse({
         loading: false,
         userInfo,
       });
     });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return response;

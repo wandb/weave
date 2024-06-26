@@ -32,6 +32,7 @@ const englishJoiner = (list: string[]): string => {
   if (list.length === 2) {
     return list.join(' and ');
   }
+  // After discussing with design, keeping the Oxford comma
   return `${list.slice(0, -1).join(', ')}, and ${list[list.length - 1]}`;
 };
 
