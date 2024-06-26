@@ -12,10 +12,11 @@ from typing import (
     TypeVar,
 )
 
+from tenacity import retry, stop_after_attempt, wait_exponential
 from typing_extensions import ParamSpec
 
-from weave import client_context
-from weave.legacy import box, context_state, run_context
+from weave import call_context, client_context
+from weave.legacy import box, context_state
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -73,7 +74,12 @@ class Op:
         maybe_client = client_context.weave_client.get_weave_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
-        client = typing.cast("WeaveClient", maybe_client)
+
+        run = self._create_run(*args, **kwargs)
+        return self._execute_run(run, *args, **kwargs)
+
+    def _create_run(self, *args: Any, **kwargs: Any) -> Any:
+        client = client_context.weave_client.require_weave_client()
 
         try:
             inputs = self.signature.bind(*args, **kwargs).arguments
@@ -87,16 +93,19 @@ class Op:
 
         # If/When we do memoization, this would be a good spot
 
-        parent_run = run_context.get_current_run()
+        parent_run = call_context.get_current_run()
         client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
-        run = client.create_call(
+
+        return client.create_call(
             self,
             inputs_with_defaults,
             parent_run,
             attributes=attributes,
         )
 
+    def _execute_run(self, run: Any, *args: Any, **kwargs: Any) -> Any:
+        client = client_context.weave_client.require_weave_client()
         has_finished = False
 
         def finish(
@@ -106,12 +115,12 @@ class Op:
             if has_finished:
                 raise ValueError("Should not call finish more than once")
             client.finish_call(run, output, exception)
-            if not parent_run:
+            if not call_context.get_current_run():
                 print_call_link(run)
 
         def on_output(output: Any) -> Any:
             if self._on_output_handler:
-                return self._on_output_handler(output, finish, inputs)
+                return self._on_output_handler(output, finish, run.inputs)
             finish(output)
             return output
 
@@ -133,17 +142,28 @@ class Op:
             async def _run_async() -> Coroutine[Any, Any, Any]:
                 try:
                     awaited_res = res
-                    run_context.push_call(run)
+                    call_context.push_call(run)
                     output = await awaited_res
                     return on_output(output)
                 except BaseException as e:
                     finish(exception=e)
                     raise
 
-            run_context.pop_call(run.id)
+            call_context.pop_call(run.id)
             return _run_async()
         else:
             return on_output(res)
+
+    def call(self, *args: Any, **kwargs: Any) -> "Call":
+        client = client_context.weave_client.require_weave_client()
+        run = self._create_run(*args, **kwargs)
+        self._execute_run(run, *args, **kwargs)
+        return self._retry_fetch_call(client, run.id)
+
+    @staticmethod
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, max=10))
+    def _retry_fetch_call(client: "WeaveClient", id: str) -> "Call":
+        return client.call(id)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name})"
