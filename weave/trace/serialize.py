@@ -4,7 +4,7 @@ from typing import Any
 from weave.legacy import box
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
-from weave.trace.refs import ObjectRef, TableRef, parse_uri
+from weave.trace.refs import Ref, TableRef, parse_uri
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -15,7 +15,7 @@ from weave.trace_server.trace_server_interface import (
 def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     if isinstance(obj, TableRef):
         return obj.uri()
-    elif isinstance(obj, ObjectRef):
+    elif isinstance(obj, Ref):
         return obj.uri()
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
