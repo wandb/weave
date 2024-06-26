@@ -5,31 +5,33 @@ hide_table_of_contents: true
 
 # Feedback
 
-Because automatically evaluating LLM applications is difficult, many teams will allow end-users or a pilot group to provide feedback such as a thumbs up or down on generated content. If they have enough domain expertise, the development team may want to flag issues with traces themselves.
+Evaluating LLM applications automatically is challenging. Teams often rely on direct user feedback, particularly from domain experts, who assess the content quality using simple indicators such as thumbs up or down. Developers also actively identify and resolve content issues.
 
-Weave's feedback feature allows users to attach feedback to calls in the Weave UI & via the API. Feedback can include emoji reactions, textual notes, and structured data.
+Weave's feedback feature enables users to provide feedback directly within the Weave UI or through the API. You can add emoji reactions, textual notes, and structured data to calls. This feedback helps compile evaluation datasets, monitor application performance, and collect examples for advanced tasks like fine-tuning.
 
-## UI
+## View and Add Feedback within UI
 
-Reactions and notes are displayed in a column in the calls grid. Hovering over these indicators provides more detail. Notes and reactions can be added by clicking the buttons.
-
-(SCREENSHOT HERE)
-
-Feedback can also be viewed and edited in header of the call details page.
+Reactions and notes are displayed in a column in the calls grid. Hovering over these indicators provides more detail. Use these to add reactions or notes.
 
 (SCREENSHOT HERE)
 
-The feedback on a call can be viewed on the "Feedback" tab of the call details page.
+### Feedback Interaction in the Calls Grid
+
+View and edit feedback in the header of the call details page.
 
 (SCREENSHOT HERE)
 
-The "Use" tab on the call details page provides copy+paste examples of using the SDK to manipulate the feedback for that call.
+View the feedback for a call on the "Feedback" tab of the call details page.
+
+(SCREENSHOT HERE)
+
+Access copy-and-paste examples on the "Use" tab of the call details page to manipulate the feedback for that call using the SDK.
 
 (SCREENSHOT HERE)
 
 ## SDK
 
-The Weave Python SDK allows you to programmatically add, remove, and query feedback on calls.
+Use the Weave Python SDK to programmatically add, remove, and query feedback on calls.
 
 ### Querying a project's feedback
 
