@@ -185,7 +185,7 @@ class _IteratorWrapper(Generic[V]):
 
         if self._end_of_iteration:
             self._call_on_close_once()
-            raise
+            raise StopIteration
 
         if self.skip_last:
             try:
@@ -228,7 +228,7 @@ class _IteratorWrapper(Generic[V]):
 
         if self._end_of_iteration:
             self._call_on_close_once()
-            raise
+            raise StopAsyncIteration
 
         if self.skip_last:
             try:
