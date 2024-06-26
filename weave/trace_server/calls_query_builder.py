@@ -345,7 +345,6 @@ class CallsQuery(BaseModel):
         ```
 
         """
-
         if not self.select_fields:
             raise ValueError("Missing select columns")
 

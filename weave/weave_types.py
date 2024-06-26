@@ -1676,7 +1676,6 @@ def unknown_coalesce(in_type: Type) -> Type:
     type will be Unknown. However, when merging for concatenation, we want to
     remove such unknowns since we know the type from a another list.
     """
-
     # In this function, there are 3 cases:
     # 1) in_type is a union type - in this case we delegate to _unknown_coalesce_on_union
     # 2) Each of the container types calls this function recursively
