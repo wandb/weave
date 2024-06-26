@@ -5,6 +5,7 @@ import {useNodeValue} from '@wandb/weave/react';
 import {useEffect, useState} from 'react';
 
 import {apolloClient} from '../../apollo';
+import {useIsMounted} from './useIsMounted';
 
 type UserInfo = Record<string, any>;
 type UserInfoResponse = {
@@ -58,11 +59,14 @@ type UserInfoResponse2 = UserInfoResponseLoading | UserInfoResponseSuccess;
 // GraphQL version
 export const useViewerUserInfo2 = (): UserInfoResponse2 => {
   const [userInfo, setUserInfo] = useState<UserInfo2 | null>(null);
+  const isMounted = useIsMounted();
   useEffect(
     () => {
       apolloClient.query({query: VIEWER_QUERY as any}).then(result => {
         const info = result.data.viewer;
-        setUserInfo(info);
+        if (isMounted()) {
+          setUserInfo(info);
+        }
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -2,6 +2,7 @@ import {gql} from '@apollo/client';
 import {useEffect, useState} from 'react';
 
 import {apolloClient} from '../../apollo';
+import {useIsMounted} from './useIsMounted';
 
 export const ORGANIZATION_QUERY = gql`
   query Organization($entityName: String) {
@@ -17,6 +18,8 @@ export const ORGANIZATION_QUERY = gql`
 
 export const useOrgName = ({entityName}: {entityName: string}) => {
   const [orgName, setOrgName] = useState<string | null>(null);
+  const isMounted = useIsMounted();
+
   useEffect(
     () => {
       apolloClient
@@ -27,8 +30,10 @@ export const useOrgName = ({entityName}: {entityName: string}) => {
           },
         })
         .then(result => {
-          const info = result.data.entity.organization.name;
-          setOrgName(info);
+          const info = result?.data?.entity?.organization?.name || entityName;
+          if (isMounted()) {
+            setOrgName(info);
+          }
           return info;
         });
     },
