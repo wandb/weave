@@ -110,7 +110,7 @@ class Op:
             if has_finished:
                 raise ValueError("Should not call finish more than once")
             client.finish_call(run, output, exception)
-            if not run_context.get_current_run():
+            if not call_context.get_current_run():
                 print_call_link(run)
 
         def on_output(output: Any) -> Any:
