@@ -34,6 +34,7 @@ from weave.legacy import run as _run
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
 from weave import client_context
+from weave.call_context import get_current_call as get_current_call
 from weave.trace import context as trace_context
 from .trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.refs import ObjectRef
@@ -358,4 +359,10 @@ def finish() -> None:
     _weave_init.finish()
 
 
-__docspec__ = [init, publish, ref]
+__docspec__ = [
+    init,
+    publish,
+    ref,
+    get_current_call,
+    finish,
+]
