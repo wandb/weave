@@ -64,6 +64,13 @@ def pop_call(call_id: typing.Optional[str]) -> None:
 
 
 def get_current_call() -> typing.Optional["Call"]:
+    """Get a reference to the currently running call.
+
+    This can be used to access the call's id, feedback, etc.
+
+    Returns:
+        None if tracking has not been initialized or invoked outside an Op.
+    """
     return _run_stack.get()[-1] if _run_stack.get() else None
 
 
