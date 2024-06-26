@@ -283,7 +283,7 @@ export const CallsTable: FC<{
 
   // DataGrid Model Management
   const [pinnedColumnsModel, setPinnedColumnsModel] =
-    useState<GridPinnedColumns>({left: ['op_name']});
+    useState<GridPinnedColumns>({left: ['op_name', 'feedback']});
 
   // END OF CPR FACTORED CODE
 
