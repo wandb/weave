@@ -88,7 +88,7 @@ class Op:
 
         # If/When we do memoization, this would be a good spot
 
-        parent_run = call_context.get_current_run()
+        parent_run = call_context.get_current_call()
         client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
 
@@ -110,7 +110,7 @@ class Op:
             if has_finished:
                 raise ValueError("Should not call finish more than once")
             client.finish_call(run, output, exception)
-            if not call_context.get_current_run():
+            if not call_context.get_current_call():
                 print_call_link(run)
 
         def on_output(output: Any) -> Any:
