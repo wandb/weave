@@ -120,37 +120,32 @@ jobs:
       - uses: actions/checkout@v2
       - name: Verify wandb server is running
         run: curl -s http://wandbservice:8080/healthz
-      - name: Enable debug logging
-        run: |
-          echo "ACTIONS_RUNNER_DEBUG=true" >> $GITHUB_ENV
-          echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Run Python Unit Tests (Clickhouse Client Only)
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
         run: |
-          set -ex  # Enable debug logging and exit on first error
           CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate
           cd weave
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           # Install mistral and run tests
           pip install ..[mistral]
           pytest -vv -m "not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
-          pip uninstall -y ..[mistral]
+          pip uninstall -y mistralai
           # Install litellm and run tests
           echo "Running litellm tests"
           pip install ..[litellm]
           pytest -vv -m "not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
-          pip uninstall -y ..[litellm]
+          pip uninstall -y litellm
           # Install llamaindex and run tests
           pip install ..[llamaindex]
           pytest -vv -m "not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
-          pip uninstall -y ..[llamaindex]
+          pip uninstall -y llama-index
           # Install anthropic and run tests
           pip install ..[anthropic]
           pytest -vv -m "not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
-          pip uninstall -y ..[anthropic]
+          pip uninstall -y anthropic
 
       - name: Run Python Unit Tests
         env:
