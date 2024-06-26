@@ -296,14 +296,14 @@ def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
     assert len(res.calls) == 1
     call = res.calls[0]
 
-    exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
+    exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
     choice = call.output["choices"][0]  # type: ignore
     assert choice["message"]["function_call"]["arguments"] == exp
     assert choice["message"]["function_call"]["name"] == "cricket_player_names"
     assert choice["finish_reason"] == "stop"
     assert choice["message"]["role"] == "assistant"
 
-    assert call.output["id"] == "chatcmpl-9cD1mZotVpefUM57I2GYwtpsNhiDX"  # type: ignore
+    assert call.output["id"] == "chatcmpl-9eKu7K8ytkaExdP5l8VfV9edkZCdx"  # type: ignore
     assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
     assert call.output["object"] == "chat.completion"  # type: ignore
 
