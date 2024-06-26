@@ -1,8 +1,10 @@
 include requirements.*
 include wb_schema.gql
 graft weave/arrow
+graft weave/client_context
 graft weave/frontend
 graft weave/language_features
+graft weave/legacy
 graft weave/ops_primitives
 graft weave/ops_arrow
 graft weave/ops_domain
