@@ -112,7 +112,7 @@ def map_to_refs(obj: Any) -> Any:
         return ref
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
-    elif isinstance(obj, pydantic.BaseModel):
+    elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
         obj_record = pydantic_object_record(obj)
         return obj_record.map_values(map_to_refs)
     elif dataclasses.is_dataclass(obj):
@@ -661,7 +661,7 @@ class WeaveClient:
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
             return
-        if isinstance(obj, pydantic.BaseModel):
+        if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
