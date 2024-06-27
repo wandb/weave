@@ -1,11 +1,20 @@
-from typing import Any
+from typing import Any, Callable, Union
+import time
+import traceback
 
+from rich import print
+from rich.console import Console
 from pydantic import field_validator
 
 import weave
 from weave.flow.obj import Object
 from weave.trace.vals import TraceTable
+from weave.flow.model import Model, get_infer_method
+from weave.trace.env import get_weave_parallelism
+from weave.trace.errors import OpCallError
+from weave.flow.util import async_call, async_foreach
 
+console = Console()
 
 def short_str(obj: Any, limit: int = 25) -> str:
     str_val = str(obj)
@@ -64,3 +73,39 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+
+    @weave.op()
+    async def map(self, model_or_func: Union[Callable, Model], *args, **kwargs) -> "Dataset":
+            
+        new_dataset_rows = []
+
+        start_time = time.time()
+
+        async def eval_example(row: dict) -> dict:
+            if callable(model_or_func):
+                fn = model_or_func
+            else:
+                fn = get_infer_method(model_or_func)
+            try:
+                map_results = await async_call(fn, **row)
+            except OpCallError as e:
+                raise e
+            except Exception as e:
+                print("Map failed")
+                traceback.print_exc()
+                return {}
+            return map_results
+        
+        n_complete = 0
+        _rows = list(self.rows)
+        async for example, map_results in async_foreach(
+            _rows, eval_example, get_weave_parallelism()
+        ):
+            n_complete += 1
+            example.update({"map_results": map_results})
+            new_dataset_rows.append(example)
+        duration = time.time() - start_time
+        print(f"Mapped {n_complete} of {len(_rows)} examples in {duration:.2f} seconds")
+        return Dataset(name=self.name, rows=new_dataset_rows)
+            
+
