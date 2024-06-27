@@ -242,6 +242,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        print("REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
         conds = []
         filter = req.filter
@@ -422,6 +423,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             query += f" LIMIT {limit}"
         if req.offset:
             query += f" OFFSET {req.offset}"
+        print("QUERY", query)
 
         cursor.execute(query)
 
