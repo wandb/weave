@@ -476,6 +476,10 @@ def _get_history_metrics(
         res = weave_internal.use(node)
     if isinstance(res, list):
         res = res[0]
+    
+    # The run was not found
+    if res == None:
+        return {}
 
     return res
 

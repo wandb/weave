@@ -125,7 +125,6 @@ def stitch(
     on_error: graph.OnErrorFnType = None,
 ) -> StitchedGraph:
     """Given a list of leaf nodes, stitch the graph together."""
-
     if stitched_graph is None:
         sg = StitchedGraph({})
     else:

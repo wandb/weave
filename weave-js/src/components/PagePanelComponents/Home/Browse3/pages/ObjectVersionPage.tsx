@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
@@ -66,6 +67,8 @@ export const ObjectVersionPage: React.FC<{
 const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
+  useObjectViewEvent(objectVersion);
+
   const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;

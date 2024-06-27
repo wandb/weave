@@ -98,7 +98,6 @@ def deploy(
     auth_entity: typing.Optional[str] = None,
 ) -> None:
     """Deploy a model to the modal labs cloud."""
-
     ref = generate_modal_stub(
         model_ref,
         wandb_project,

@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
+import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -17,6 +18,7 @@ import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -39,6 +41,7 @@ export const CallPage: FC<{
     project: props.project,
     callId: props.callId,
   });
+
   if (call.loading) {
     return <CenteredAnimatedLoader />;
   } else if (call.result === null) {
@@ -90,6 +93,10 @@ const useCallTabs = (call: CallSchema) => {
       label: 'Summary',
       content: <CallSummary call={call} />,
     },
+    {
+      label: 'Use',
+      content: <TabUseCall call={call} />,
+    },
   ];
 };
 
@@ -97,6 +104,8 @@ const CallPageInnerVertical: FC<{
   call: CallSchema;
   path?: string;
 }> = ({call, path}) => {
+  useViewTraceEvent(call);
+
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 
