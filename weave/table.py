@@ -28,3 +28,10 @@ class Table:
 
     def __iter__(self) -> Iterator:
         return iter(self.rows)
+
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def __str__(self) -> str:
+        return f"Table(rows={len(self.rows)})"
+
