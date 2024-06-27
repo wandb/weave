@@ -73,6 +73,17 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+    
+    def __iter__(self):
+        return ((k, v) for k, v in self.rows.items())
+
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def __str__(self) -> str:
+        features = list(self.rows.rows[0].keys()) if self.rows.rows else []
+        return f"Dataset({{\n    name: '{self.name}',\n    features: {features},\n    num_rows: {len(self.rows)}\n}})"
+
 
     @weave.op()
     async def map(self, model_or_func: Union[Callable, Model], *args, **kwargs) -> "Dataset":
