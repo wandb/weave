@@ -68,6 +68,7 @@ preview = true
 select = [
   "D200", # https://docs.astral.sh/ruff/rules/fits-on-one-line/
   "D201", # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
+  "D202", # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
   "D204", # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
   "D210", # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
   "D211", # https://docs.astral.sh/ruff/rules/blank-line-before-class/

@@ -428,7 +428,7 @@ class WeaveClient:
         call_id = generate_id()
 
         if parent is None and use_stack:
-            parent = call_context.get_current_run()
+            parent = call_context.get_current_call()
 
         if parent:
             trace_id = parent.trace_id

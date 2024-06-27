@@ -449,7 +449,6 @@ def to_json_with_refs(
       - All other custom objects are saved as refs within the provided artifact
         if there is not are a ref available for them.
     """
-
     # This is newer than to_python, save and publish above, and doesn't use the "mapper"
     # pattern, which is overkill. Much better to just write a simple function like this.
     from weave.legacy import op_def

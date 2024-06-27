@@ -63,7 +63,46 @@ def pop_call(call_id: typing.Optional[str]) -> None:
     _run_stack.set(new_stack)
 
 
-def get_current_run() -> typing.Optional["Call"]:
+def get_current_call() -> typing.Optional["Call"]:
+    """Get the Call object for the currently executing Op, within that Op.
+
+    This allows you to access attributes of the Call such as its id or feedback
+    while it is running.
+
+    ```python
+    @weave.op
+    def hello(name: str) -> None:
+        print(f"Hello {name}!")
+        current_call = weave.get_current_call()
+        print(current_call.id)
+    ```
+
+    It is also possible to access a Call after the Op has returned.
+
+    If you have the Call's id, perhaps from the UI, you can use the `call` method on the
+    `WeaveClient` returned from `weave.init` to retrieve the Call object.
+
+    ```python
+    client = weave.init("<project>")
+    mycall = client.call("<call_id>")
+    ```
+
+    Alternately, after defining your Op you can use its `call` method. For example:
+
+    ```python
+    @weave.op
+    def hello(name: str) -> None:
+        print(f"Hello {name}!")
+
+    mycall = hello.call("world")
+    print(mycall.id)
+    ```
+
+    Returns:
+        The Call object for the currently executing Op, or
+        None if tracking has not been initialized or this method is
+        invoked outside an Op.
+    """
     return _run_stack.get()[-1] if _run_stack.get() else None
 
 

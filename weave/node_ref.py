@@ -85,7 +85,6 @@ def node_to_ref(node: graph.Node) -> typing.Optional[ref_base.Ref]:
 
 def ref_to_node(ref: ref_base.Ref) -> typing.Optional[graph.Node]:
     """Inverse of node_to_ref, see docstring for node_to_ref."""
-
     extra = ref.extra or []
     ref = copy.copy(ref)
     ref.extra = []
