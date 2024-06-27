@@ -146,7 +146,7 @@ class AsyncChatCompletions:
 
     async def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
         named_args = bind_params(old_create, *args, **kwargs)
-        with log_run(create_op, named_args) as finish_run:
+        with log_call(create_op, named_args) as finish_run:
             result = await self._base_create(*args, **kwargs)
             finish_run(result.model_dump(exclude_unset=True))
         return result
@@ -160,7 +160,7 @@ class AsyncChatCompletions:
         messages = to_python(named_args["messages"])
         if not isinstance(messages, list):
             raise ValueError("messages must be a list")
-        with log_run(create_op, named_args) as finish_run:
+        with log_call(create_op, named_args) as finish_run:
             # We return a special AsyncStream that mimics the underlying
             # one, but also logs the result of the completion.
             base_stream = await self._base_create(*args, **kwargs)
@@ -186,7 +186,7 @@ class ChatCompletions:
 
     def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
         named_args = bind_params(old_create, *args, **kwargs)
-        with log_run(create_op, named_args) as finish_run:
+        with log_call(create_op, named_args) as finish_run:
             result = self._base_create(*args, **kwargs)
             finish_run(result.model_dump(exclude_unset=True))
         return result
@@ -199,7 +199,7 @@ class ChatCompletions:
         if not isinstance(messages, list):
             raise ValueError("messages must be a list")
 
-        with log_run(create_op, named_args) as finish_run:
+        with log_call(create_op, named_args) as finish_run:
             base_stream = self._base_create(*args, **kwargs)
             stream = WeaveStream(
                 base_stream=base_stream,
@@ -252,20 +252,20 @@ def unpatch() -> None:
 
 # TODO: centralize
 @contextmanager
-def log_run(
+def log_call(
     call_name: typing.Union[str, Op], inputs: dict[str, Any]
 ) -> Iterator[Callable]:
     client = client_context.weave_client.require_weave_client()
-    parent_run = call_context.get_current_call()
+    parent_call = call_context.get_current_call()
     # TODO: client should not need refs passed in.
-    run = client.create_call(call_name, inputs, parent_run)
+    call = client.create_call(call_name, inputs, parent_call)
 
-    def finish_run(output: Any) -> None:
+    def finish_call(output: Any) -> None:
         # TODO: client should not need refs passed in.
-        client.finish_call(run, output)
+        client.finish_call(call, output)
 
     try:
-        yield finish_run
+        yield finish_call
     except Exception as e:
-        client.fail_call(run, e)
+        client.fail_call(call, e)
         raise
