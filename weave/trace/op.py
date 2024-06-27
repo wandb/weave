@@ -19,7 +19,7 @@ from weave import call_context, client_context
 from weave.legacy import box, context_state
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
-from weave.trace.refs import ObjectRef, CallRef
+from weave.trace.refs import ObjectRef
 
 from .constants import TRACE_CALL_EMOJI
 
@@ -103,9 +103,6 @@ class Op:
         client = client_context.weave_client.require_weave_client()
         has_finished = False
 
-        call_entity, call_project = run.project_id.split("/")
-        call_ref = CallRef(entity=call_entity, project=call_project, id=run.id)
-
         def finish(
             output: Any = None, exception: Optional[BaseException] = None
         ) -> None:
@@ -122,13 +119,10 @@ class Op:
             finish(output)
             return output
 
-        from weave.trace.vals import make_trace_obj
-
         try:
             res = self.resolve_fn(*args, **kwargs)
-            res = make_trace_obj(res, call_ref.with_attr("output"), res, None)
             # TODO: can we get rid of this?
-            # res = box.box(res)
+            res = box.box(res)
         except BaseException as e:
             finish(exception=e)
             raise

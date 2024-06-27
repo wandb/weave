@@ -160,12 +160,5 @@ def parse_uri(uri: str) -> AnyRef:
             digest=version,
             extra=remaining[1:],
         )
-    elif kind == "call":
-        return CallRef(
-            entity=entity,
-            project=project,
-            id=remaining[0],
-            extra=remaining[1:],
-        )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
