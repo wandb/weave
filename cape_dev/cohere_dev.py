@@ -8,14 +8,14 @@ import simple_parsing
 @dataclass
 class Args:
 	stream: bool = False
+	model: str = "command"
 
 args = simple_parsing.parse(Args)
 
 
 co = cohere.Client(os.environ["COHERE_API_KEY"])
 
-co.chat = weave.op(co.chat)
-
+print("imported cohere")
 
 weave.init("cohere_dev")
 
@@ -42,19 +42,23 @@ if args.stream:
 
 else:
 	print("NON streamed")
-	@weave.op
-	def call():
-		response = co.chat(
-			chat_history=[
-				{"role": "USER", "message": "Who discovered gravity?"},
-				{
-					"role": "CHATBOT",
-					"message": "The man who is widely credited with discovering gravity is Sir Isaac Newton",
-				},
-			],
-			message="What year was he born?",
-			# perform web search before answering the question. You can also use your own custom connector.
-			connectors=[{"id": "web-search"}],
-		)
-		return response.dict()
-	print(call())
+	# response = co.chat(
+	# 	chat_history=[
+	# 		{"role": "USER", "message": "Who discovered gravity?"},
+	# 		{
+	# 			"role": "CHATBOT",
+	# 			"message": "The man who is widely credited with discovering gravity is Sir Isaac Newton",
+	# 		},
+	# 	],
+	# 	message="What year was he born?",
+	# 	# perform web search before answering the question. You can also use your own custom connector.
+	# 	connectors=[{"id": "web-search"}],
+	# )
+	# print(response)
+
+	print("simple")
+	response = co.chat(
+		model=args.model, 
+		message="Hi, how are you?",
+	)
+	print(response)
