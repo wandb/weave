@@ -11,23 +11,21 @@ Weave's feedback feature enables users to provide feedback directly within the W
 
 ## View and Add Feedback within UI
 
-Reactions and notes are displayed in a column in the calls grid. Hovering over these indicators provides more detail. Use these to add reactions or notes.
+Reactions and notes are displayed in a column in the calls grid. Hovering over these indicators provides more detail. Use these buttons to add reactions or notes.
 
-(SCREENSHOT HERE)
-
-### Feedback Interaction in the Calls Grid
+![Screenshot of calls grid with feedback column](imgs/feedback_calls.png)
 
 View and edit feedback in the header of the call details page.
 
-(SCREENSHOT HERE)
+![Screenshot of feedback controls in call details header](imgs/feedback_call_header.png)
 
 View the feedback for a call on the "Feedback" tab of the call details page.
 
-(SCREENSHOT HERE)
+![Screenshot of Feedback tab in call details](imgs/feedback_tab.png)
 
 Access copy-and-paste examples on the "Use" tab of the call details page to manipulate the feedback for that call using the SDK.
 
-(SCREENSHOT HERE)
+![Screenshot of Use tab in call details](imgs/feedback_use.png)
 
 ## SDK
 
@@ -57,8 +55,6 @@ for f in client.feedback():
     print(f.feedback_type)
     print(f.payload)
 ```
-
-(TODO: Link to more sophisticated workflow examples)
 
 ### Adding feedback to a call
 
