@@ -19,22 +19,9 @@ from weave.flow.scorer import Scorer, auto_summarize, get_scorer_attributes, std
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.op import BoundOp, Op
+from weave.flow.util import async_call
 
 console = Console()
-
-
-def async_call(
-    func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
-) -> typing.Coroutine:
-    is_async = False
-    if isinstance(func, Op):
-        is_async = inspect.iscoroutinefunction(func.resolve_fn)
-    else:
-        is_async = inspect.iscoroutinefunction(func)
-    if is_async:
-        return func(*args, **kwargs)  # type: ignore
-    return asyncio.to_thread(func, *args, **kwargs)
-
 
 class Evaluation(Object):
     """
