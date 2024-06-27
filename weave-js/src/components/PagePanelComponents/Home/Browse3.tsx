@@ -14,7 +14,6 @@ import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {Loading} from '@wandb/weave/components/Loading';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
-import {KnownBaseObjectClassType} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import _ from 'lodash';
 import React, {
   ComponentProps,
@@ -61,7 +60,10 @@ import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
-import {ObjectVersionsPage} from './Browse3/pages/ObjectVersionsPage';
+import {
+  ObjectVersionsPage,
+  WFHighLevelObjectVersionFilter,
+} from './Browse3/pages/ObjectVersionsPage';
 import {OpPage} from './Browse3/pages/OpPage';
 import {OpsPage} from './Browse3/pages/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpVersionPage';
@@ -673,16 +675,26 @@ const CallsPageBinding = () => {
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectVersionsPageBinding = () => {
   const {entity, project, tab} = useParams<Browse3TabParams>();
-  const filters = useMemo(() => {
-    let baseObjectClass: KnownBaseObjectClassType | null = null;
+  const query = useURLSearchParamsDict();
+  const filters: WFHighLevelObjectVersionFilter = useMemo(() => {
+    let queryFilter: WFHighLevelObjectVersionFilter = {};
+    // Parse the filter from the query string
+    try {
+      queryFilter = JSON.parse(query.filter) as WFHighLevelObjectVersionFilter;
+    } catch (e) {
+      console.log(e);
+    }
+
+    // If the tab is models or datasets, set the baseObjectClass filter
+    // directly from the tab
     if (tab === 'models') {
-      baseObjectClass = 'Model';
+      queryFilter.baseObjectClass = 'Model';
     }
     if (tab === 'datasets') {
-      baseObjectClass = 'Dataset';
+      queryFilter.baseObjectClass = 'Dataset';
     }
-    return {baseObjectClass};
-  }, [tab]);
+    return queryFilter;
+  }, [query.filter, tab]);
 
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
