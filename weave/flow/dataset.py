@@ -86,7 +86,13 @@ class Dataset(Object):
 
     def __str__(self) -> str:
         features = list(self.rows.rows[0].keys()) if self.rows.rows else []
-        return f"Dataset({{\n    name: '{self.name}',\n    features: {features},\n    num_rows: {len(self.rows)}\n}})"
+        result = f"Dataset({{\n"
+        if self.name:
+            result += f"    name: '{self.name}',\n"
+        if self.description:
+            result += f"    description: '{self.description}',\n"
+        result += f"    features: {features},\n    num_rows: {len(self.rows)}\n}}"
+        return result
 
 
     @weave.op()
