@@ -58,7 +58,7 @@ def do_in_parallel(
     result_store = forward_graph.get_node_result_store()
     top_level_stats = execute.get_top_level_stats()
     eager_mode = context_state.eager_mode()
-    run_stack = call_context.get_run_stack()
+    run_stack = call_context.get_call_stack()
     cache_prefix = cache.get_cache_prefix_context()
 
     def do_one_with_memo_and_parallel_budget(x: ItemType) -> ResultType:
@@ -67,7 +67,7 @@ def do_in_parallel(
         thread_top_level_stats = None
         try:
             with parallel_budget_ctx(remaining_budget_per_thread):
-                with call_context.set_run_stack(run_stack):
+                with call_context.set_call_stack(run_stack):
                     with context_state.set_eager_mode(eager_mode):
                         with wandb_api.wandb_api_context(wandb_api_ctx):
                             with cache.time_interval_cache_prefix(cache_prefix):
