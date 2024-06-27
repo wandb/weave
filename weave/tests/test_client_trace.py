@@ -1408,6 +1408,8 @@ def test_named_reuse(client):
     d_ref = weave.publish(d, "test_dataset")
     dataset = weave.ref(d_ref.uri()).get()
 
+    print(f"{dataset=}")
+
     @weave.op()
     async def dummy_score(model_output):
         return 1
@@ -1440,6 +1442,8 @@ def test_named_reuse(client):
     # There are a lot of additional assertions that could be made here!
     print(res.objs)
     assert len(res.objs) == 1
+
+    raise
 
 
 def test_unknown_input_and_output_types(client):

@@ -85,7 +85,7 @@ def get_scorer_attributes(
     scorer: Union[Callable, Op, Scorer],
 ) -> Tuple[str, Callable, Callable]:
     if weave_isinstance(scorer, Scorer):
-        scorer_name = scorer.name
+        scorer_name = scorer.object_name
         if scorer_name == None:
             scorer_name = scorer.__class__.__name__
         try:

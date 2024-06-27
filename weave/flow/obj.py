@@ -16,8 +16,8 @@ from weave.weave_client import get_ref
 
 
 class Object(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
+    object_name: Optional[str] = None
+    object_description: Optional[str] = None
 
     # Allow Op attributes
     model_config = ConfigDict(
