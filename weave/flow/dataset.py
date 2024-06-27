@@ -1,7 +1,9 @@
+import inspect
 from typing import Any, Callable, Union
 import time
 import traceback
 import textwrap
+import asyncio
 
 
 from rich import print
@@ -77,7 +79,7 @@ class Dataset(Object):
         return rows
     
     def __iter__(self):
-        return ((k, v) for k, v in self.rows.items())
+        return iter(self.rows)
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -88,47 +90,55 @@ class Dataset(Object):
 
 
     @weave.op()
-    async def map(self, model_or_func: Union[Callable, Model], *args, **kwargs) -> "Dataset":
+    def map(self, model_or_func: Union[Callable, Model], *args, **kwargs) -> "Dataset":
+        async def async_map():
+            new_dataset_rows = []
+            start_time = time.time()
+
+            async def eval_example(row: dict) -> dict:
+                if callable(model_or_func):
+                    fn = model_or_func
+                else:
+                    fn = get_infer_method(model_or_func)
+                
+                fn_signature = inspect.signature(fn)
+                fn_arg_names = list(fn_signature.parameters.keys())
+                
+                fn_args = {k: v for k, v in row.items() if k in fn_arg_names}
+                
+                if not fn_args:
+                    raise ValueError(f"Function {fn.__name__} expects arguments: {fn_arg_names}, but none of these match the keys in the row: {list(row.keys())}")
+                
+                try:
+                    map_results = await async_call(fn, **fn_args)
+                except OpCallError as e:
+                    raise e
+                except Exception as e:
+                    print("Map failed")
+                    traceback.print_exc()
+                    return {}
+                if isinstance(map_results, dict):
+                    return map_results
+                else:
+                    message = textwrap.dedent(
+                        f"""
+                        Call error:
+
+                        The returning value of the function ({model_or_func.__name__}) you are trying to map  must be a dictionary.
+                        """
+                    )
+                    raise OpCallError(message)
             
-        new_dataset_rows = []
+            n_complete = 0
+            _rows = list(self.rows)
+            async for example, map_results in async_foreach(
+                _rows, eval_example, get_weave_parallelism()
+            ):
+                n_complete += 1
+                example.update(map_results)
+                new_dataset_rows.append(example)
+            duration = time.time() - start_time
+            print(f"Mapped {n_complete} of {len(_rows)} examples in {duration:.2f} seconds")
+            return Dataset(name=self.name, rows=new_dataset_rows)
 
-        start_time = time.time()
-
-        async def eval_example(row: dict) -> dict:
-            if callable(model_or_func):
-                fn = model_or_func
-            else:
-                fn = get_infer_method(model_or_func)
-            try:
-                map_results = await async_call(fn, **row)
-            except OpCallError as e:
-                raise e
-            except Exception as e:
-                print("Map failed")
-                traceback.print_exc()
-                return {}
-            if isinstance(map_results, dict):
-                return map_results
-            else:
-                message = textwrap.dedent(
-                    f"""
-                    Call error:
-
-                    The returning value of the function ({model_or_func.__name__}) you are trying to map  must be a dictionary.
-                    """
-                )
-                raise OpCallError(message)
-        
-        n_complete = 0
-        _rows = list(self.rows)
-        async for example, map_results in async_foreach(
-            _rows, eval_example, get_weave_parallelism()
-        ):
-            n_complete += 1
-            example.update(map_results)
-            new_dataset_rows.append(example)
-        duration = time.time() - start_time
-        print(f"Mapped {n_complete} of {len(_rows)} examples in {duration:.2f} seconds")
-        return Dataset(name=self.name, rows=new_dataset_rows)
-            
-
+        return asyncio.get_event_loop().run_until_complete(async_map())
