@@ -40,6 +40,9 @@ from weave.flow.model import Model
 from weave.flow.eval import Evaluation, Scorer
 from weave.flow.agent import Agent, AgentState
 
+# required for cohere integration
+from weave.autopatch import autopatch  
+
 # See the comment above pre_init_modules above. This is check to ensure we don't accidentally
 # introduce loading weave.legacy.ops or weave.legacy.panels when importing weave.
 newly_added_modules = set(sys.modules.keys()) - pre_init_modules
