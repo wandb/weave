@@ -435,7 +435,7 @@ const Browse3ProjectRoot: FC<{
         <Route
           path={[
             `${projectRoot}/:tab(datasets|models|objects)`,
-            `${projectRoot}/object-versions`, // deprecated
+            `${projectRoot}/object-versions`,
           ]}>
           <ObjectVersionsPageBinding />
         </Route>
@@ -450,10 +450,7 @@ const Browse3ProjectRoot: FC<{
           <OpsPageBinding />
         </Route>
         <Route
-          path={[
-            `${projectRoot}/operations`,
-            `${projectRoot}/op-versions`, // deprecated
-          ]}>
+          path={[`${projectRoot}/operations`, `${projectRoot}/op-versions`]}>
           <OpVersionsPageBinding />
         </Route>
         {/* CALLS */}
