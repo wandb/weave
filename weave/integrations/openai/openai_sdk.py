@@ -10,7 +10,7 @@ if typing.TYPE_CHECKING:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 
-def openai_on_finish_post_processor(value: "ChatCompletionChunk") -> typing.Dict:
+def openai_on_finish_post_processor(value: typing.Optional["ChatCompletionChunk"]) -> typing.Dict:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -88,6 +88,7 @@ def openai_on_finish_post_processor(value: "ChatCompletionChunk") -> typing.Dict
 def openai_accumulator(
     acc: typing.Optional["ChatCompletionChunk"],
     value: "ChatCompletionChunk",
+    skip_last: bool = False,
 ) -> "ChatCompletionChunk":
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
@@ -222,6 +223,8 @@ def openai_accumulator(
     # add usage info
     if len(value.choices) == 0 and value.usage:
         acc.usage = value.usage
+        if skip_last:
+            raise StopIteration(acc)
 
     return acc
 
@@ -245,12 +248,19 @@ def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Calla
                 )  # This is where the final execution of fn is happening.
 
             return _wrapper
+        
+        def _openai_stream_options_is_set(inputs: typing.Dict) -> bool:
+            if inputs.get("stream_options") is not None:
+                return True
+            return False
 
         op = weave.op()(_add_stream_options(fn))
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
-            openai_accumulator,
+            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
+                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
+            ),
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
         )
