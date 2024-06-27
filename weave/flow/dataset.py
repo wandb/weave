@@ -1,6 +1,8 @@
 from typing import Any, Callable, Union
 import time
 import traceback
+import textwrap
+
 
 from rich import print
 from rich.console import Console
@@ -105,7 +107,17 @@ class Dataset(Object):
                 print("Map failed")
                 traceback.print_exc()
                 return {}
-            return map_results
+            if isinstance(map_results, dict):
+                return map_results
+            else:
+                message = textwrap.dedent(
+                    f"""
+                    Call error:
+
+                    The returning value of the function ({model_or_func.__name__}) you are trying to map  must be a dictionary.
+                    """
+                )
+                raise OpCallError(message)
         
         n_complete = 0
         _rows = list(self.rows)
@@ -113,7 +125,7 @@ class Dataset(Object):
             _rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            example.update({"map_results": map_results})
+            example.update(map_results)
             new_dataset_rows.append(example)
         duration = time.time() - start_time
         print(f"Mapped {n_complete} of {len(_rows)} examples in {duration:.2f} seconds")
