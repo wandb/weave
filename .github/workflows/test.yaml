@@ -132,20 +132,20 @@ jobs:
           # Install mistral and run tests
           pip install ..[mistral]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
-          pip uninstall -y mistralai
+          pip uninstall -y ..
           # Install litellm and run tests
           echo "Running litellm tests"
           pip install ..[litellm]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
-          pip uninstall -y litellm
+          pip uninstall -y ..
           # Install llamaindex and run tests
           pip install ..[llamaindex]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
-          pip uninstall -y llama-index
+          pip uninstall -y ..
           # Install anthropic and run tests
           pip install ..[anthropic]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
-          pip uninstall -y anthropic
+          pip uninstall -y ..
 
       - name: Run Python Unit Tests
         env:
@@ -157,7 +157,7 @@ jobs:
           cd weave
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           pip install ..[mistral]
-          pytest -m "weave_client and skip_clickhouse_client" --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
+          pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
           pip uninstall -y mistralai
           pip install ..[litellm]
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
