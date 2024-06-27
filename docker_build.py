@@ -141,7 +141,6 @@ def build(
         extra_write_tags: A list of additional tags to apply to the image (in additiion
                     to the standard SHA and branch name tags).
     """
-
     cache_from_image = cache_from_image if cache_from_image else image
 
     # Cache Sources:

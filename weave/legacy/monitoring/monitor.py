@@ -11,10 +11,9 @@ import sys
 import typing
 import uuid
 
-from weave import errors, stream_data_interfaces
+from weave import call_context, errors, stream_data_interfaces
 from weave.legacy import (
     graph,
-    run_context,
     run_streamtable_span,
 )
 from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
@@ -235,7 +234,7 @@ class Monitor:
         # # A song and dance to switch between span/run semantics. Will be cleaned
         # # up as we switch entirely to the run interface.
 
-        # parent_run = run_context.get_current_run()
+        # parent_run = run_context.get_current_call()
         # trace_id = None
         # if parent_run is not None:
         #     parent_id = parent_run.id

@@ -113,7 +113,12 @@ export type FeedbackCreateReq = {
   payload: Record<string, any>;
 };
 
-export type FeedbackCreateSuccess = {};
+export type FeedbackCreateSuccess = {
+  id: string;
+  created_at: string;
+  wb_user_id: string;
+  payload: Record<string, any>;
+};
 export type FeedbackCreateError = {
   detail: string;
 };
@@ -129,7 +134,7 @@ export type Feedback = {
   id: string;
   weave_ref: string;
   wb_user_id: string; // authenticated creator username
-  creator: string; // display name
+  creator: string | null; // display name
   created_at: string;
   feedback_type: string;
   payload: Record<string, any>;
@@ -145,7 +150,7 @@ export type FeedbackQueryRes = FeedbackQuerySuccess | FeedbackQueryError;
 
 export type FeedbackPurgeReq = {
   project_id: string;
-  id: string;
+  query: Query;
 };
 export type FeedbackPurgeSuccess = {};
 export type FeedbackPurgeError = {
