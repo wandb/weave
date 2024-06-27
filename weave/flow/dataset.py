@@ -96,12 +96,42 @@ class Dataset(Object):
 
 
     @weave.op()
-    def map(self, model_or_func: Union[Callable, Model], *args, **kwargs) -> "Dataset":
+    def map(self, model_or_func: Union[Callable, Model], **func_kwargs) -> "Dataset":
+        """
+        Map a function or model to the dataset.
+
+        Args:
+            model_or_func (Union[Callable, Model]): The function or model to map to the dataset.
+            **func_kwargs (dict): The keyword arguments to pass to the function or model.
+
+        Returns:
+            Dataset: The mapped dataset.
+
+        Examples:
+            ```
+            rows = [
+                {"id": 1, "text": "The quick brown fox jumps over the lazy dog.", "length": 43},
+                {"id": 2, "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "length": 56},
+                {"id": 3, "text": "To be or not to be, that is the question.", "length": 41},
+                {"id": 4, "text": "All that glitters is not gold.", "length": 30},
+                {"id": 5, "text": "A journey of a thousand miles begins with a single step.", "length": 58},
+            ]   
+
+            # Create a dataset
+            ds = Dataset(rows=rows)
+
+            # Define a function
+            def f(text: str, num: int = 1):
+                return {"other_text": text[0:4], "text_length": len(text), "num": num}
+
+            # Map the function to the dataset
+            mapped_ds = ds.map(f, num=2)
+        """
         async def async_map():
             new_dataset_rows = []
             start_time = time.time()
 
-            async def eval_example(row: dict) -> dict:
+            async def eval_example(row: dict, **kwargs) -> dict:
                 if callable(model_or_func):
                     fn = model_or_func
                 else:
@@ -111,26 +141,22 @@ class Dataset(Object):
                 fn_arg_names = list(fn_signature.parameters.keys())
                 
                 fn_args = {k: v for k, v in row.items() if k in fn_arg_names}
-                
+                fn_args.update(func_kwargs)
+                # check inputs
                 if not fn_args:
                     raise ValueError(f"Function {fn.__name__} expects arguments: {fn_arg_names}, but none of these match the keys in the row: {list(row.keys())}")
-                
                 try:
                     map_results = await async_call(fn, **fn_args)
                 except OpCallError as e:
-                    raise e
-                except Exception as e:
-                    print("Map failed")
-                    traceback.print_exc()
-                    return {}
+                    raise OpCallError(f"Error calling function {fn.__name__}: {e}")
+                
+                # check outputs
                 if isinstance(map_results, dict):
                     return map_results
                 else:
                     message = textwrap.dedent(
                         f"""
-                        Call error:
-
-                        The returning value of the function ({model_or_func.__name__}) you are trying to map  must be a dictionary.
+                        The returning value of the function ({model_or_func.__name__}) you are trying to map must be a dictionary.
                         """
                     )
                     raise OpCallError(message)
