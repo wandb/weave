@@ -106,11 +106,9 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
     return getattr(obj, "ref", None)
 
 
-def map_to_refs(obj: Any, ignore_call_ref: bool = False) -> Any:
+def map_to_refs(obj: Any) -> Any:
     ref = _get_direct_ref(obj)
     if ref:
-        if isinstance(ref, CallRef) and ignore_call_ref:
-            return obj
         return ref
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
@@ -267,8 +265,7 @@ def make_client_call(
     )
     if call.id is None:
         raise ValueError("Call ID is None")
-    return call
-    # return TraceObject(call, CallRef(entity, project, call.id), server, None)
+    return TraceObject(call, CallRef(entity, project, call.id), server, None)
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
@@ -483,7 +480,7 @@ class WeaveClient:
     ) -> None:
         self._save_nested_objects(output)
         original_output = output
-        output = map_to_refs(original_output, ignore_call_ref=True)
+        output = map_to_refs(original_output)
         call.output = output
 
         # Summary handling
