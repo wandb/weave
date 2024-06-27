@@ -10,7 +10,9 @@ if typing.TYPE_CHECKING:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 
-def openai_on_finish_post_processor(value: typing.Optional["ChatCompletionChunk"]) -> typing.Dict:
+def openai_on_finish_post_processor(
+    value: typing.Optional["ChatCompletionChunk"],
+) -> typing.Optional[typing.Dict]:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -82,7 +84,7 @@ def openai_on_finish_post_processor(value: typing.Optional["ChatCompletionChunk"
         )
         return final_value.model_dump(exclude_unset=True, exclude_none=True)
     else:
-        return value.model_dump(exclude_unset=True, exclude_none=True)
+        return value
 
 
 def openai_accumulator(
@@ -103,7 +105,6 @@ def openai_accumulator(
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
         """
-
         for chunk_choice in chunk.choices:
             for i in range(chunk_choice.index + 1 - len(acc_choices)):
                 acc_choices.append(
@@ -248,7 +249,7 @@ def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Calla
                 )  # This is where the final execution of fn is happening.
 
             return _wrapper
-        
+
         def _openai_stream_options_is_set(inputs: typing.Dict) -> bool:
             if inputs.get("stream_options") is not None:
                 return True

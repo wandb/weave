@@ -88,7 +88,7 @@ def _build_iterator_from_accumulator_for_op(
     def on_error(e: Exception) -> None:
         on_finish(acc.get_state(), e)
 
-    def on_close(e=None) -> None:
+    def on_close(e: Optional[S] = None) -> None:
         if e is None:
             on_finish(acc.get_state(), None)
         else:
@@ -139,9 +139,9 @@ class _IteratorWrapper(Generic[V]):
 
         atexit.register(weakref.WeakMethod(self._call_on_close_once))
 
-    def _call_on_close_once(self, e=None) -> None:
+    def _call_on_close_once(self, e: Optional[S] = None) -> None:
         if not self._on_finished_called:
-            self._on_close(e)
+            self._on_close(e)  # type: ignore
             self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
@@ -183,7 +183,7 @@ class _IteratorWrapper(Generic[V]):
             value = await self._iterator.__anext__()  # type: ignore
             self._on_yield(value)
             return value
-        except StopAsyncIteration:
+        except StopAsyncIteration as e:
             if e.value:
                 self._call_on_close_once(e.value)
             else:
