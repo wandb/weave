@@ -369,6 +369,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.offset is not None:
             cq.set_offset(req.offset)
 
+        if req.expand_paths:
+            for path in req.expand_paths:
+                cq.add_expand_path(path)
+
         pb = ParamBuilder()
         raw_res = self._query_stream(
             cq.as_sql(pb),
