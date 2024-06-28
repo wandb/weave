@@ -74,7 +74,6 @@ if not import_failed:
         def _persist_run_single(self, run: Run) -> None:
             """Persist a run."""
             run_dict = _run_to_dict(run, as_input=True)
-            # TODO: Figure out how to handle the run name. It errors in the UI
             run_name = make_valid_run_name(run.name)
 
             """
@@ -130,7 +129,7 @@ if not import_failed:
                 parent_run = wv_parent_run
             else:
                 # Here is our check for the specific condition
-                wv_current_run = call_context.get_current_run()
+                wv_current_run = call_context.get_current_call()
 
                 # First, there needs to be something on the stack.
                 if wv_current_run is not None:
