@@ -463,9 +463,9 @@ def test_log_to_span_basic(
     result = chat_completions.create(**create_input)
     streamtable.finish()
 
-    run = client.calls()[0]
-    inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-    outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
+    call = client.calls()[0]
+    inputs = {k: v for k, v in call.inputs.items() if not k.startswith("_")}
+    outputs = {k: v for k, v in call.output.items() if not k.startswith("_")}
 
     inputs_expected = create_input
     assert inputs == inputs_expected
@@ -493,9 +493,9 @@ def test_log_to_span_streaming(
     for x in stream:
         ...
 
-    run = client.calls()[0]
-    inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-    outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
+    call = client.calls()[0]
+    inputs = {k: v for k, v in call.inputs.items() if not k.startswith("_")}
+    outputs = {k: v for k, v in call.output.items() if not k.startswith("_")}
 
     inputs_expected = create_input
     assert inputs == inputs_expected
@@ -524,9 +524,9 @@ async def test_log_to_span_async_streaming(
     async for x in stream:
         ...
 
-    run = client.calls()[0]
-    inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-    outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
+    call = client.calls()[0]
+    inputs = {k: v for k, v in call.inputs.items() if not k.startswith("_")}
+    outputs = {k: v for k, v in call.output.items() if not k.startswith("_")}
 
     inputs_expected = create_input
     assert inputs == inputs_expected

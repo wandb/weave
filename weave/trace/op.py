@@ -45,7 +45,7 @@ class Op:
     # the value it wishes to send back to the user. The finish callback should
     # be called exactly once and can optionally take an exception as a second
     # argument to indicate an error. If the finish callback is not called, the
-    # op will not finish and the run will not complete. This is useful for cases
+    # op will not finish and the call will not complete. This is useful for cases
     # where the output of the op is not immediately available or the op needs to
     # do some processing before it can be returned. If we decide to make this a
     # public API, we will likely add this to the constructor of the op. For now
@@ -70,10 +70,10 @@ class Op:
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
 
-        run = self._create_run(*args, **kwargs)
-        return self._execute_run(run, *args, **kwargs)
+        call = self._create_call(*args, **kwargs)
+        return self._execute_call(call, *args, **kwargs)
 
-    def _create_run(self, *args: Any, **kwargs: Any) -> Any:
+    def _create_call(self, *args: Any, **kwargs: Any) -> Any:
         client = client_context.weave_client.require_weave_client()
 
         try:
@@ -88,18 +88,18 @@ class Op:
 
         # If/When we do memoization, this would be a good spot
 
-        parent_run = call_context.get_current_run()
+        parent_call = call_context.get_current_call()
         client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
 
         return client.create_call(
             self,
             inputs_with_defaults,
-            parent_run,
+            parent_call,
             attributes=attributes,
         )
 
-    def _execute_run(self, run: Any, *args: Any, **kwargs: Any) -> Any:
+    def _execute_call(self, call: Any, *args: Any, **kwargs: Any) -> Any:
         client = client_context.weave_client.require_weave_client()
         has_finished = False
 
@@ -109,13 +109,13 @@ class Op:
             nonlocal has_finished
             if has_finished:
                 raise ValueError("Should not call finish more than once")
-            client.finish_call(run, output, exception)
-            if not call_context.get_current_run():
-                print_call_link(run)
+            client.finish_call(call, output, exception)
+            if not call_context.get_current_call():
+                print_call_link(call)
 
         def on_output(output: Any) -> Any:
             if self._on_output_handler:
-                return self._on_output_handler(output, finish, run.inputs)
+                return self._on_output_handler(output, finish, call.inputs)
             finish(output)
             return output
 
@@ -134,26 +134,26 @@ class Op:
             res = res.val
         if inspect.iscoroutine(res):
 
-            async def _run_async() -> Coroutine[Any, Any, Any]:
+            async def _call_async() -> Coroutine[Any, Any, Any]:
                 try:
                     awaited_res = res
-                    call_context.push_call(run)
+                    call_context.push_call(call)
                     output = await awaited_res
                     return on_output(output)
                 except BaseException as e:
                     finish(exception=e)
                     raise
 
-            call_context.pop_call(run.id)
-            return _run_async()
+            call_context.pop_call(call.id)
+            return _call_async()
         else:
             return on_output(res)
 
     def call(self, *args: Any, **kwargs: Any) -> "Call":
         client = client_context.weave_client.require_weave_client()
-        run = self._create_run(*args, **kwargs)
-        self._execute_run(run, *args, **kwargs)
-        return self._retry_fetch_call(client, run.id)
+        call = self._create_call(*args, **kwargs)
+        self._execute_call(call, *args, **kwargs)
+        return self._retry_fetch_call(client, call.id)
 
     @staticmethod
     @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, max=10))

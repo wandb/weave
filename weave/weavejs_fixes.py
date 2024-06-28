@@ -204,7 +204,6 @@ def remove_partialobject_from_types(data):
     "project"
 
     """
-
     # TODO: check this
 
     if isinstance(data, list):

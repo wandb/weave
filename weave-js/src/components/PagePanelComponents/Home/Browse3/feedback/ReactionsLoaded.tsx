@@ -120,6 +120,7 @@ export const ReactionsLoaded = ({
 
   const wrapperStyles = {
     overflow: 'auto',
+    scrollbarWidth: 'none' as const,
     ...twWrapperStyles,
   };
 
