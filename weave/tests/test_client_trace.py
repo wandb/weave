@@ -1345,7 +1345,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:PHOGkwSOn7DqLgIUNgUAq7d2vXpOmG8NGLltn6slzeU/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:T41nPvr6zpAr4ClFpZeH1p4xXE2x2bH2JeUXyOsQ4nY/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -1442,8 +1442,6 @@ def test_named_reuse(client):
     # There are a lot of additional assertions that could be made here!
     print(res.objs)
     assert len(res.objs) == 1
-
-    raise
 
 
 def test_unknown_input_and_output_types(client):
