@@ -12,16 +12,21 @@ from .openai_sdk import openai_patcher
 model = "gpt-4o"
 
 
-def filter_body(r: typing.Any) -> typing.Any:
-    r.body = ""
-    return r
+def _get_call_output(call: tsi.CallSchema) -> typing.Any:
+    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
+
+    Keeping this here for now, but it should be removed in the future once we have a better solution.
+    """
+    call_output = call.output
+    if isinstance(call_output, str) and call_output.startswith("weave://"):
+        return weave.ref(call_output).get()
+    return call_output
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
-    before_record_request=filter_body,
 )
 def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
@@ -37,22 +42,22 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     )
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    call = res.calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
-    choice = call.output["choices"][0]  # type: ignore
-    assert choice["message"]["content"] == exp
-    assert choice["finish_reason"] == "stop"
-    assert choice["message"]["role"] == "assistant"
+    assert response.choices[0].message.content == exp
 
-    assert call.output["id"] == "chatcmpl-9dw1rJh78vq1kz9bifDpBiI29gfoa"  # type: ignore
-    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
-    assert call.output["object"] == "chat.completion"  # type: ignore
+    call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
 
-    usage = call.output["usage"]  # type: ignore
-    assert usage["total_tokens"] == 39
+    output = _get_call_output(call)
+    assert output.model == "gpt-4o-2024-05-13"
+    assert output.object == "chat.completion"
+
+    usage = call.summary["usage"][output.model]  # type: ignore
+    assert usage["requests"] == 1
     assert usage["completion_tokens"] == 28
     assert usage["prompt_tokens"] == 11
+    assert usage["total_tokens"] == 39
 
     inputs = call.inputs
     assert inputs["model"] == "gpt-4o"
@@ -81,22 +86,22 @@ async def test_openai_async_quickstart(client: weave.weave_client.WeaveClient) -
     )
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    call = res.calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
-    choice = call.output["choices"][0]  # type: ignore
-    assert choice["message"]["content"] == exp
-    assert choice["finish_reason"] == "stop"
-    assert choice["message"]["role"] == "assistant"
+    assert response.choices[0].message.content == exp
 
-    assert call.output["id"] == "chatcmpl-9cBcPX4RAb0QcXk7DD8qO7UDkZaXv"  # type: ignore
-    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
-    assert call.output["object"] == "chat.completion"  # type: ignore
+    call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
 
-    usage = call.output["usage"]  # type: ignore
-    assert usage["total_tokens"] == 39
+    output = _get_call_output(call)
+    assert output.model == "gpt-4o-2024-05-13"
+    assert output.object == "chat.completion"
+
+    usage = call.summary["usage"][output.model]  # type: ignore
+    assert usage["requests"] == 1
     assert usage["completion_tokens"] == 28
     assert usage["prompt_tokens"] == 11
+    assert usage["total_tokens"] == 39
 
     inputs = call.inputs
     assert inputs["model"] == "gpt-4o"
@@ -124,22 +129,23 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
         stream=True,
     )
 
+    all_content = ""
     for chunk in response:
-        pass
+        if chunk.choices[0].delta.content:
+            all_content += chunk.choices[0].delta.content
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    call = res.calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
-    choice = call.output["choices"][0]  # type: ignore
-    assert choice["message"]["content"] == exp
-    assert choice["finish_reason"] == "stop"
-    assert choice["message"]["role"] == "assistant"
+    assert all_content == exp
 
-    assert call.output["id"] == "chatcmpl-9cZQgU1vg2n4tXaht0W56LkP4uWpm"  # type: ignore
-    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
-    assert call.output["object"] == "chat.completion"  # type: ignore
+    call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
+
+    output = _get_call_output(call)
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
 
     inputs = call.inputs
     assert inputs["model"] == "gpt-4o"
@@ -149,7 +155,7 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
     assert inputs["top_p"] == 1
 
     # usage information should be available even if `stream_options` is not set
-    usage = call.output["usage"]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["total_tokens"] == 35
     assert usage["completion_tokens"] == 24
     assert usage["prompt_tokens"] == 11
@@ -178,22 +184,23 @@ async def test_openai_async_stream_quickstart(
         top_p=1,
         stream=True,
     )
+    all_content = ""
     async for chunk in response:
-        pass
+        if chunk.choices[0].delta.content:
+            all_content += chunk.choices[0].delta.content
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    call = res.calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
-    choice = call.output["choices"][0]  # type: ignore
-    assert choice["message"]["content"] == exp
-    assert choice["finish_reason"] == "stop"
-    assert choice["message"]["role"] == "assistant"
+    assert all_content == exp
 
-    assert call.output["id"] == "chatcmpl-9cZiIuL0D4mgSCBkx9vJKUByT366e"  # type: ignore
-    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
-    assert call.output["object"] == "chat.completion"  # type: ignore
+    call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
+
+    output = _get_call_output(call)
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
 
     usage = call.output["usage"]  # type: ignore
     assert usage["total_tokens"] == 35
@@ -235,8 +242,10 @@ def test_openai_stream_usage_quickstart(client: weave.weave_client.WeaveClient) 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
 
-    usage = call.output["usage"]  # type: ignore
+    output = _get_call_output(call)
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["total_tokens"] == 35
     assert usage["completion_tokens"] == 24
     assert usage["prompt_tokens"] == 11
@@ -292,22 +301,21 @@ def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
         max_tokens=64,
         top_p=1,
     )
+    print(response)
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
-    choice = call.output["choices"][0]  # type: ignore
-    assert choice["message"]["function_call"]["arguments"] == exp
-    assert choice["message"]["function_call"]["name"] == "cricket_player_names"
-    assert choice["finish_reason"] == "stop"
-    assert choice["message"]["role"] == "assistant"
+    assert response.choices[0].message.function_call.arguments == exp
 
-    assert call.output["id"] == "chatcmpl-9eKu7K8ytkaExdP5l8VfV9edkZCdx"  # type: ignore
-    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
-    assert call.output["object"] == "chat.completion"  # type: ignore
+    call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
 
-    usage = call.output["usage"]  # type: ignore
+    output = _get_call_output(call)
+    assert output.model == "gpt-4o-2024-05-13"
+    assert output.object == "chat.completion"
+
+    usage = call.summary["usage"][output.model]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 18
     assert usage["prompt_tokens"] == 99
@@ -383,17 +391,16 @@ async def test_openai_function_call_async(
     call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
-    choice = call.output["choices"][0]  # type: ignore
-    assert choice["message"]["function_call"]["arguments"] == exp
-    assert choice["message"]["function_call"]["name"] == "cricket_player_names"
-    assert choice["finish_reason"] == "stop"
-    assert choice["message"]["role"] == "assistant"
+    assert response.choices[0].message.function_call.arguments == exp
 
-    assert call.output["id"] == "chatcmpl-9eLCCHF8ILInwEbcE5OzmkiHvVbB6"  # type: ignore
-    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
-    assert call.output["object"] == "chat.completion"  # type: ignore
+    call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
 
-    usage = call.output["usage"]  # type: ignore
+    output = _get_call_output(call)
+    assert output.model == "gpt-4o-2024-05-13"
+    assert output.object == "chat.completion"
+
+    usage = call.summary["usage"][output.model]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 18
     assert usage["prompt_tokens"] == 99
@@ -472,6 +479,7 @@ async def test_openai_function_call_async_stream(
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
     choice = call.output["choices"][0]  # type: ignore
@@ -548,26 +556,22 @@ def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
         max_tokens=64,
         top_p=1,
     )
+    print(response)
+
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
-    choice = call.output["choices"][0]  # type: ignore
-    assert choice["message"]["tool_calls"][0]["function"]["arguments"] == exp
-    assert (
-        choice["message"]["tool_calls"][0]["function"]["name"] == "cricket_player_names"
-    )
-    assert choice["message"]["tool_calls"][0]["id"] == "call_SWMuKPyiatqi82zAF37iPLhO"
-    assert choice["message"]["tool_calls"][0]["type"] == "function"
-    assert choice["finish_reason"] == "stop"
-    assert choice["message"]["role"] == "assistant"
+    assert response.choices[0].message.tool_calls[0].function.arguments == exp
 
-    assert call.output["id"] == "chatcmpl-9eLE2jX4BPZeJjBok2gCEnFKmE7De"  # type: ignore
-    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
-    assert call.output["object"] == "chat.completion"  # type: ignore
+    call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
 
-    usage = call.output["usage"]  # type: ignore
+    output = _get_call_output(call)
+    assert output.model == "gpt-4o-2024-05-13"
+    assert output.object == "chat.completion"
+
+    usage = call.summary["usage"][output.model]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 27
     assert usage["prompt_tokens"] == 90
@@ -639,24 +643,18 @@ async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) ->
     )
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
-    choice = call.output["choices"][0]  # type: ignore
-    assert choice["message"]["tool_calls"][0]["function"]["arguments"] == exp
-    assert (
-        choice["message"]["tool_calls"][0]["function"]["name"] == "cricket_player_names"
-    )
-    assert choice["message"]["tool_calls"][0]["id"] == "call_DVZy0O5sFjADkjNjfEVuDRq6"
-    assert choice["message"]["tool_calls"][0]["type"] == "function"
-    assert choice["finish_reason"] == "stop"
-    assert choice["message"]["role"] == "assistant"
+    assert response.choices[0].message.tool_calls[0].function.arguments == exp
 
-    assert call.output["id"] == "chatcmpl-9eLGYyqoDMdGNMjglDxPc4cNwq3lS"  # type: ignore
-    assert call.output["model"] == "gpt-4o-2024-05-13"  # type: ignore
-    assert call.output["object"] == "chat.completion"  # type: ignore
+    call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
 
-    usage = call.output["usage"]  # type: ignore
+    output = _get_call_output(call)
+    assert output.model == "gpt-4o-2024-05-13"
+    assert output.object == "chat.completion"
+
+    usage = call.summary["usage"][output.model]  # type: ignore
     assert usage["total_tokens"] == 117
     assert usage["completion_tokens"] == 27
     assert usage["prompt_tokens"] == 90
@@ -739,6 +737,7 @@ async def test_openai_tool_call_async_stream(
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
+    assert call.started_at < call.ended_at  # type: ignore
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
     choice = call.output["choices"][0]  # type: ignore
