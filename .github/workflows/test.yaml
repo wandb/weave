@@ -132,19 +132,23 @@ jobs:
           # Install mistral and run tests
           pip install ..[mistral]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
+          pip uninstall -y mistralai
           pip install -U ..
           # Install litellm and run tests
           echo "Running litellm tests"
           pip install ..[litellm]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
+          pip uninstall -y litellm
           pip install -U ..
           # Install llamaindex and run tests
           pip install ..[llamaindex]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
+          pip uninstall -y llama-index
           pip install -U ..
           # Install anthropic and run tests
           pip install ..[anthropic]
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
+          pip uninstall -y anthropic
           pip install -U ..
 
       - name: Run Python Unit Tests
