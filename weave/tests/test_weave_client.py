@@ -288,7 +288,7 @@ def test_calls_delete_cascade(client):
         return target == model_output
 
     evaluation = Evaluation(
-        name="my-eval",
+        object_name="my-eval",
         dataset=dataset_rows,
         scorers=[score],
     )
@@ -598,7 +598,7 @@ def test_evaluate(client):
         return target == model_output
 
     evaluation = Evaluation(
-        name="my-eval",
+        object_name="my-eval",
         dataset=dataset_rows,
         scorers=[score],
     )
@@ -708,7 +708,7 @@ def test_nested_ref_is_inner(client):
         return target == model_output
 
     evaluation = Evaluation(
-        name="my-eval",
+        object_name="my-eval",
         dataset=dataset_rows,
         scorers=[score],
     )

@@ -3,6 +3,7 @@ from typing import Any, Optional
 from pydantic import (
     BaseModel,
     ConfigDict,
+    Field,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
     model_validator,
@@ -16,8 +17,8 @@ from weave.weave_client import get_ref
 
 
 class Object(BaseModel):
-    object_name: Optional[str] = None
-    object_description: Optional[str] = None
+    object_name: Optional[str] = Field(None, kw_only=True)
+    object_description: Optional[str] = Field(None, kw_only=True)
 
     # Allow Op attributes
     model_config = ConfigDict(
