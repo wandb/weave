@@ -158,16 +158,16 @@ jobs:
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           pip install ..[mistral]
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
-          pip uninstall -y mistralai
+          pip install -U ..
           pip install ..[litellm]
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
-          pip uninstall -y litellm
+          pip install -U ..
           pip install ..[llamaindex]
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
-          pip uninstall -y llama-index
+          pip install -U ..
           pip install ..[anthropic]
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
-          pip uninstall -y anthropic
+          pip install -U ..
 
   # nbmake:
   #   name: Run notebooks with nbmake
