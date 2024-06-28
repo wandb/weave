@@ -146,9 +146,8 @@ jobs:
           pip install -U ..
           # Install anthropic and run tests
           pip install ..[anthropic]
-          pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
-          pip uninstall -y anthropic
           pip install -U ..
+          pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
 
       - name: Run Python Unit Tests
         env:
