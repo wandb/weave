@@ -89,10 +89,7 @@ def _build_iterator_from_accumulator_for_op(
         on_finish(acc.get_state(), e)
 
     def on_close(e: Optional[S] = None) -> None:
-        if e is None:
-            on_finish(acc.get_state(), None)
-        else:
-            on_finish(e, None)
+        on_finish(acc.get_state(), None)
 
     return _IteratorWrapper(value, on_yield, on_error, on_close)
 
@@ -109,7 +106,14 @@ class _Accumulator(Generic[S, V]):
         self._state = initial_state
 
     def next(self, value: V) -> None:
-        self._state = self._accumulator(self._state, value)
+        # the try-except hack to catch `StopIteration` inside `<integration>_accumulator`
+        # this `StopIteration` is raised when some condition is met, for example, when
+        # we don't want to surface last chunk (with usage info) from openai integration.
+        try:
+            self._state = self._accumulator(self._state, value)
+        except StopIteration as e:
+            self._state = e.value
+            raise
 
     def get_state(self) -> Optional[S]:
         return self._state
@@ -162,10 +166,7 @@ class _IteratorWrapper(Generic[V]):
             self._on_yield(value)
             return value
         except (StopIteration, StopAsyncIteration) as e:
-            if e.value:
-                self._call_on_close_once(e.value)
-            else:
-                self._call_on_close_once()
+            self._call_on_close_once()
             raise
         except Exception as e:
             self._call_on_error_once(e)
@@ -183,12 +184,9 @@ class _IteratorWrapper(Generic[V]):
             value = await self._iterator.__anext__()  # type: ignore
             self._on_yield(value)
             return value
-        except StopAsyncIteration as e:
-            if e.value:
-                self._call_on_close_once(e.value)
-            else:
-                self._call_on_close_once()
-            raise
+        except (StopAsyncIteration, StopIteration) as e:
+            self._call_on_close_once()
+            raise StopAsyncIteration
         except Exception as e:
             self._call_on_error_once(e)
             raise
