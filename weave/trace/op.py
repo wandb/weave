@@ -149,8 +149,8 @@ class Op:
             return on_output(res)
 
     def call(self, *args: Any, **kwargs: Any) -> "Call":
-        call = self._create_call(*args, **kwargs)
-        self._execute_call(call, *args, **kwargs)
+        _call = self._create_call(*args, **kwargs)
+        self._execute_call(_call, *args, **kwargs)
         return call
 
     def __repr__(self) -> str:
