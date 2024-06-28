@@ -1,7 +1,7 @@
 interactions:
 - request:
     body: '{"messages": [{"content": "Hello, how are you?", "role": "user"}], "model":
-      "gpt-3.5-turbo-0125", "stream": true, "stream_options": {"include_usage": true}}'
+      "gpt-3.5-turbo-0125", "stream": true}'
     headers:
       accept:
       - application/json
