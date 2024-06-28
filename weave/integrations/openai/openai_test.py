@@ -54,7 +54,6 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -101,7 +100,6 @@ async def test_openai_async_quickstart(client: weave.weave_client.WeaveClient) -
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -154,7 +152,6 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -212,7 +209,6 @@ async def test_openai_async_stream_quickstart(
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -261,7 +257,6 @@ def test_openai_stream_usage_quickstart(client: weave.weave_client.WeaveClient) 
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -331,7 +326,6 @@ def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -418,7 +412,6 @@ async def test_openai_function_call_async(
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -506,7 +499,6 @@ async def test_openai_function_call_async_stream(
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
@@ -595,7 +587,6 @@ def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -681,7 +672,6 @@ async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) ->
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -773,7 +763,6 @@ async def test_openai_tool_call_async_stream(
     call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
-    assert call.ended_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
