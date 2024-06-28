@@ -196,6 +196,7 @@ const CompareEvaluationsPageInner: React.FC<
       }}>
       <ComparisonDefinition {...props} />
       <SummaryPlots />
+      <ScoreCard />
     </VerticalBox>
   );
 };
@@ -244,6 +245,61 @@ const BarPlots: React.FC = () => {
         padding: PLOT_PADDING,
       }}>
       <PlotlyBarPlot />
+    </Box>
+  );
+};
+
+const ScoreCard: React.FC = () => {
+  const modelRefs = ['Model:A', 'Model:B'];
+  const scoreDefs = {
+    score1: {metrics: [{key: 'score1.mean', unit: '', lowerIsBetter: true}]},
+    score2: {
+      metrics: [{key: 'score2.true_fraction', unit: '%', lowerIsBetter: true}],
+    },
+  };
+  const scores = {
+    'score1.mean': {
+      'Model:A': 0.5,
+      'Model:B': 0.6,
+    },
+    'score2.true_fraction': {
+      'Model:A': 0.5,
+      'Model:B': 0.6,
+    },
+  };
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        flex: '0 0 auto',
+        paddingLeft: STANDARD_PADDING,
+        paddingRight: STANDARD_PADDING,
+      }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr',
+        }}>
+        {/* Header Row */}
+        <div></div>
+        <div></div>
+        <div>Model A</div>
+        <div>Model B</div>
+        <div>Diff</div>
+        {/* Score Rows */}
+        {Object.entries(scoreDefs).map(([key, def]) => {
+          return (
+            <div
+              key={key}
+              style={{
+                // vertical span length of metric
+                gridRowEnd: `span ${def.metrics.length}`,
+              }}>
+              {key}
+            </div>
+          );
+        })}
+      </div>
     </Box>
   );
 };
