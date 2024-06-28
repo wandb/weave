@@ -2,9 +2,10 @@ import os
 from typing import Any
 
 import pytest
-import weave
 from mistralai.async_client import MistralAsyncClient
 from mistralai.client import MistralClient
+
+import weave
 from weave.trace_server import trace_server_interface as tsi
 
 

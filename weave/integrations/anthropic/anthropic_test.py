@@ -2,8 +2,9 @@ import os
 from typing import Any
 
 import pytest
-import weave
 from anthropic import Anthropic, AsyncAnthropic
+
+import weave
 from weave.trace_server import trace_server_interface as tsi
 
 model = "claude-3-haiku-20240307"

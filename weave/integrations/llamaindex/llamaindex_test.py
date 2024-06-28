@@ -1,6 +1,7 @@
 from typing import Any, Generator, Optional
 
 import pytest
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
 

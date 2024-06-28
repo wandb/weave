@@ -3,6 +3,7 @@ from typing import Any, Generator
 
 import litellm
 import pytest
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
 
