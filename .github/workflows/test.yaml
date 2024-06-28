@@ -131,6 +131,7 @@ jobs:
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
           # Install anthropic and run tests
           pip install ..[anthropic]
+          pip uninstall -y transformers tokenizers
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
           # Install mistral and run tests
           pip install ..[mistral]
