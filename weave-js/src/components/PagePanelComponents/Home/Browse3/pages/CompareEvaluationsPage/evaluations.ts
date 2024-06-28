@@ -53,17 +53,39 @@ export const useEvaluationCalls = (
   }, [calls.result]);
 };
 
+export const useEvaluationCall = (
+  entity: string,
+  project: string,
+  evaluationCallId: string
+): EvaluationEvaluateCallSchema | null => {
+  const calls = useEvaluationCalls(entity, project, [evaluationCallId]);
+  return useMemo(() => {
+    if (calls.length === 0) {
+      return null;
+    }
+    return calls[0];
+  }, [calls]);
+};
+
+type EvaluationModel = {
+  ref: string;
+  data: any;
+};
+
 export const useModelsFromEvaluationCalls = (
   evaluationCalls: EvaluationEvaluateCallSchema[]
-): any[] => {
+): EvaluationModel[] => {
   const {useRefsData} = useWFHooks();
   const modelRefs = useMemo(() => {
     return evaluationCalls.map(call => call.inputs.model);
   }, [evaluationCalls]);
   const modelData = useRefsData(modelRefs);
   return useMemo(() => {
-    return modelData.result || [];
-  }, [modelData.result]);
+    if (!modelData.result || modelData.result.length !== modelRefs.length) {
+      return [];
+    }
+    return modelRefs.map((ref, i) => ({ref, data: modelData.result![i]}));
+  }, [modelData.result, modelRefs]);
 };
 
 type ComparisonMetric = {

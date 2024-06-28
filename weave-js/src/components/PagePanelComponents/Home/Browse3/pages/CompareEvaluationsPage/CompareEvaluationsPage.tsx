@@ -1,6 +1,6 @@
-import {Box, FormControl} from '@material-ui/core';
+import {Box, BoxProps, FormControl} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
-import {Alert, Autocomplete} from '@mui/material';
+import {Alert, Autocomplete, Skeleton} from '@mui/material';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -17,7 +17,17 @@ import React, {
 } from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {
+  CACTUS_500,
+  MOON_300,
+  MOON_600,
+  MOON_800,
+  TEAL_500,
+} from '../../../../../../common/css/color.styles';
+import {hexToRGB} from '../../../../../../common/css/utils';
+import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {Button} from '../../../../../Button';
+import {Icon, IconNames} from '../../../../../Icon';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
@@ -26,21 +36,49 @@ import {StyledTextField} from '../../StyledTextField';
 import {ObjectViewerSection} from '../CallPage/ObjectViewerSection';
 import {useEvaluationsFilter} from '../CallsPage/CallsPage';
 import {CallsTable} from '../CallsPage/CallsTable';
+import {
+  EVALUATE_OP_NAME_POST_PYDANTIC,
+  PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
+} from '../common/heuristics';
 import {CallLink, ObjectVersionLink, opNiceName} from '../common/Links';
 import {SimplePageLayout} from '../common/SimplePageLayout';
-import {opVersionRefOpName} from '../wfReactInterface/utilities';
+import {useWFHooks} from '../wfReactInterface/context';
+import {
+  opVersionKeyToRefUri,
+  opVersionRefOpName,
+} from '../wfReactInterface/utilities';
+import {
+  ObjectVersionKey,
+  ObjectVersionSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
   EvaluationEvaluateCallSchema,
   evaluationMetrics,
+  useEvaluationCall,
   useEvaluationCalls,
   useModelsFromEvaluationCalls,
 } from './evaluations';
 import MetricTile from './MetricTile';
 
+const EVAL_DEF_HEIGHT = '45px';
+const STANDARD_PADDING = '16px';
+const CIRCLE_SIZE = '16px';
+const BOX_RADIUS = '6px';
+const STANDARD_BORDER = `1px solid ${MOON_300}`;
+const PLOT_HEIGHT = 300;
+const PLOT_PADDING = 30;
+
 type CompareEvaluationsPageProps = {
   entity: string;
   project: string;
   evaluationCallIds: string[];
+};
+
+type CompareDualEvaluationsPageProps = {
+  entity: string;
+  project: string;
+  evaluationCallId1: string;
+  evaluationCallId2: string;
 };
 
 export const CompareEvaluationsPage: React.FC<
@@ -56,7 +94,14 @@ export const CompareEvaluationsPage: React.FC<
       tabs={[
         {
           label: 'All',
-          content: <CompareEvaluationsPageInner {...props} />,
+          content: (
+            <CompareEvaluationsPageInner
+              entity={props.entity}
+              project={props.project}
+              evaluationCallId1={props.evaluationCallIds[0]}
+              evaluationCallId2={props.evaluationCallIds[1]}
+            />
+          ),
         },
       ]}
       headerExtra={<HeaderExtra {...props} />}
@@ -110,61 +155,338 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
   );
 };
 
-const PlotlyScatterPlot: React.FC<{}> = () => {
-  const divRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const trace2 = {
-      x: [2, 3, 4, 5],
-      y: [16, 5, 11, 9],
-      mode: 'markers',
-      type: 'scatter',
-      marker: {color: 'orange', size: 12},
-    };
-
-    const trace3 = {
-      x: [1, 2, 3, 4],
-      y: [12, 9, 15, 12],
-      mode: 'markers',
-      type: 'scatter',
-      marker: {color: 'blue', size: 12},
-    };
-
-    const data = [trace2, trace3];
-    Plotly.newPlot(
-      divRef.current as any,
-      data as any,
-      {
-        height: 300,
-        title: '',
-        margin: {
-          l: 20, // legend
-          r: 0,
-          b: 20, // legend
-          t: 0,
-          pad: 0,
-        },
-      },
-      {
-        displayModeBar: false,
-        responsive: true,
-      }
-    );
-  }, []);
-
+const VerticalBox: React.FC<BoxProps> = props => {
   return (
     <Box
+      {...props}
       sx={{
-        height: '300',
-        width: '100%',
-      }}>
-      <div ref={divRef}></div>
-    </Box>
+        display: 'flex',
+        flexDirection: 'column',
+        gridGap: STANDARD_PADDING,
+        overflow: 'hidden',
+        ...props.sx,
+      }}
+    />
+  );
+};
+
+const HorizontalBox: React.FC<BoxProps> = props => {
+  return (
+    <Box
+      {...props}
+      sx={{
+        display: 'flex',
+        flexDirection: 'row',
+        gridGap: STANDARD_PADDING,
+        overflow: 'hidden',
+        ...props.sx,
+      }}
+    />
   );
 };
 
 const CompareEvaluationsPageInner: React.FC<
-  CompareEvaluationsPageProps
+  CompareDualEvaluationsPageProps
+> = props => {
+  return (
+    <VerticalBox
+      sx={{
+        paddingTop: STANDARD_PADDING,
+        alignItems: 'flex-start',
+      }}>
+      <ComparisonDefinition {...props} />
+      <SummaryPlots />
+    </VerticalBox>
+  );
+};
+
+const SummaryPlots: React.FC = () => {
+  return (
+    <HorizontalBox
+      sx={{
+        paddingLeft: STANDARD_PADDING,
+        paddingRight: STANDARD_PADDING,
+        flex: '1 1 auto',
+        width: '100%',
+      }}>
+      <RadarPlot />
+      <BarPlots />
+    </HorizontalBox>
+  );
+};
+
+const RadarPlot: React.FC = () => {
+  return (
+    <Box
+      sx={{
+        flex: '0 0 auto',
+        height: PLOT_HEIGHT,
+        width: PLOT_HEIGHT,
+        borderRadius: BOX_RADIUS,
+        border: STANDARD_BORDER,
+        overflow: 'hidden',
+      }}>
+      <PlotlyRadialPlot />
+    </Box>
+  );
+};
+
+const BarPlots: React.FC = () => {
+  return (
+    <Box
+      sx={{
+        flex: '1 1 auto',
+        height: PLOT_HEIGHT,
+        width: '100%',
+        overflow: 'hidden',
+        borderRadius: BOX_RADIUS,
+        border: STANDARD_BORDER,
+        padding: PLOT_PADDING,
+      }}>
+      <PlotlyBarPlot />
+    </Box>
+  );
+};
+
+const ComparisonDefinition: React.FC<
+  CompareDualEvaluationsPageProps
+> = props => {
+  return (
+    <HorizontalBox
+      sx={{
+        alignItems: 'center',
+        paddingLeft: STANDARD_PADDING,
+        paddingRight: STANDARD_PADDING,
+      }}>
+      <EvaluationDefinition
+        entity={props.entity}
+        project={props.project}
+        evaluationCallId={props.evaluationCallId1}
+        color={TEAL_500}
+      />
+      <SwapPositionsButton />
+      <EvaluationDefinition
+        entity={props.entity}
+        project={props.project}
+        evaluationCallId={props.evaluationCallId2}
+        color={CACTUS_500}
+      />
+      <DefinitionText text="compare" />
+      <DimensionPicker {...props} />
+      <DefinitionText text="by" />
+      <DimensionPicker {...props} />
+    </HorizontalBox>
+  );
+};
+
+const DefinitionText: React.FC<{text: string}> = props => {
+  return <Box>{props.text}</Box>;
+};
+
+const DimensionPicker: React.FC<CompareDualEvaluationsPageProps> = props => {
+  const dimensions = useEvaluationCallDimensions(
+    props.entity,
+    props.project,
+    useMemo(() => [props.evaluationCallId1, props.evaluationCallId2], [props])
+  );
+  return (
+    <FormControl>
+      <Autocomplete
+        size="small"
+        limitTags={1}
+        value={dimensions[0]}
+        onChange={(event, newValue) => {
+          console.log('onChange', newValue);
+        }}
+        options={dimensions}
+        renderInput={renderParams => (
+          <StyledTextField
+            {...renderParams}
+            label={'Dimension'}
+            sx={{minWidth: '200px'}}
+          />
+        )}
+      />
+    </FormControl>
+  );
+};
+
+const useEvaluationCallDimensions = (
+  entity: string,
+  project: string,
+  callIds: string[]
+): string[] => {
+  return ['dimension1', 'dimension2', 'dimension3'];
+  // const calls = useEvaluationCalls(entity, project, callIds);
+  // const dimensions = useMemo(() => {
+  //   const allDims = calls.map(call => call.inputs.self.dimensions);
+  //   const commonDims = allDims.reduce((acc, dims) => {
+  //     return acc.filter(dim => dims.includes(dim));
+  //   }, allDims[0]);
+  //   return commonDims;
+  // }, [calls]);
+  // return dimensions;
+};
+
+const EvaluationDefinition: React.FC<{
+  entity: string;
+  project: string;
+  evaluationCallId: string;
+  color?: string;
+}> = props => {
+  return (
+    <HorizontalBox
+      sx={{
+        height: EVAL_DEF_HEIGHT,
+        borderRadius: BOX_RADIUS,
+        border: STANDARD_BORDER,
+        padding: '12px',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+      <EvaluationCallLink
+        entity={props.entity}
+        project={props.project}
+        callId={props.evaluationCallId}
+        color={props.color}
+      />
+      <VerticalBar />
+      <EvaluationModelLink
+        entity={props.entity}
+        project={props.project}
+        callId={props.evaluationCallId}
+      />
+    </HorizontalBox>
+  );
+};
+
+const EvaluationCallLink: React.FC<{
+  entity: string;
+  project: string;
+  callId: string;
+  color?: string;
+}> = props => {
+  // TODO: Get user-defined name for the evaluation
+  const name = 'Evaluation';
+  return (
+    <CallLink
+      entityName={props.entity}
+      projectName={props.project}
+      opName={name}
+      callId={props.callId}
+      icon={
+        <Circle
+          sx={{
+            color: props.color,
+            height: CIRCLE_SIZE,
+          }}
+        />
+      }
+      color={MOON_800}
+    />
+  );
+};
+
+const VerticalBar: React.FC = () => {
+  return (
+    <div
+      style={{
+        width: '2px',
+        height: '100%',
+        backgroundColor: MOON_300,
+      }}
+    />
+  );
+};
+
+const ModelIcon: React.FC = () => {
+  return (
+    <Box
+      mr="4px"
+      bgcolor={hexToRGB(MOON_300, 0.48)}
+      sx={{
+        height: '22px',
+        width: '22px',
+        borderRadius: '16px',
+        display: 'flex',
+        flex: '0 0 22px',
+        justifyContent: 'center',
+        alignItems: 'center',
+        color: MOON_600,
+      }}>
+      <Icon name={IconNames.Model} width={14} height={14} />
+    </Box>
+  );
+};
+
+const EvaluationModelLink: React.FC<{
+  entity: string;
+  project: string;
+  callId: string;
+}> = props => {
+  const call = useEvaluationCall(props.entity, props.project, props.callId);
+  const parsed = useModelRefForEvaluationCall(call);
+  const objectVersion = useObjectVersionForWeaveObjectRef(parsed);
+
+  if (!objectVersion) {
+    return <Skeleton variant="rectangular" width={210} />;
+  }
+
+  return (
+    <ObjectVersionLink
+      entityName={objectVersion.entity}
+      projectName={objectVersion.project}
+      objectName={objectVersion.objectId}
+      version={objectVersion.versionHash}
+      versionIndex={objectVersion.versionIndex}
+      color={MOON_800}
+      icon={<ModelIcon />}
+    />
+  );
+};
+
+const useModelRefForEvaluationCall = (
+  call: EvaluationEvaluateCallSchema | null
+): WeaveObjectRef | null => {
+  return useMemo(() => {
+    if (!call) {
+      return null;
+    }
+    return parseRef(call.inputs.model) as WeaveObjectRef;
+  }, [call]);
+};
+
+const useObjectVersionForWeaveObjectRef = (
+  ref: WeaveObjectRef | null
+): ObjectVersionSchema | null => {
+  const {useObjectVersion} = useWFHooks();
+  const objectKey: ObjectVersionKey | null = useMemo(() => {
+    if (!ref) {
+      return null;
+    }
+    return {
+      scheme: 'weave',
+      entity: ref.entityName,
+      project: ref.projectName,
+      weaveKind: ref.weaveKind,
+      objectId: ref.artifactName,
+      versionHash: ref.artifactVersion,
+      path: '',
+      refExtra: ref.artifactRefExtra,
+    };
+  }, [ref]);
+
+  return useObjectVersion(objectKey).result;
+};
+
+const SwapPositionsButton: React.FC = () => {
+  return (
+    <Button size="medium" variant="quiet" onClick={console.log} icon="retry" />
+  );
+};
+
+const CompareEvaluationsPageInner2: React.FC<
+  CompareDualEvaluationsPageProps
 > = props => {
   const calls = useEvaluationCalls(
     props.entity,
@@ -180,8 +502,19 @@ const CompareEvaluationsPageInner: React.FC<
     );
   }, [calls]);
   const callsFilter = useMemo(() => {
-    return {parentId: calls[0] ? calls[0].id : null};
-  }, [calls]);
+    return {
+      parentId: calls[0] ? calls[0].id : null,
+      opVersionRefs: [
+        opVersionKeyToRefUri({
+          entity: props.entity,
+          project: props.project,
+          opId: PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
+          versionHash: '*',
+        }),
+      ],
+    };
+  }, [calls, props.entity, props.project]);
+  console.log(callsFilter);
 
   return (
     <Box
@@ -408,11 +741,11 @@ const TitleWithDot: React.FC<{title: string; color: string}> = ({
 };
 
 const BaselineTitle: React.FC = () => {
-  return <TitleWithDot title={'Baseline'} color={'orange'} />;
+  return <TitleWithDot title={'Baseline'} color={TEAL_500} />;
 };
 
 const ChallengerTitle: React.FC = () => {
-  return <TitleWithDot title={'Challenger'} color={'blue'} />;
+  return <TitleWithDot title={'Challenger'} color={CACTUS_500} />;
 };
 
 const BasicTable: React.FC<{calls: EvaluationEvaluateCallSchema[]}> = props => {
@@ -431,6 +764,8 @@ const BasicTable: React.FC<{calls: EvaluationEvaluateCallSchema[]}> = props => {
             <ChallengerTitle />
           </TableCell>
         </TableRow>
+      </TableHead>
+      <TableBody>
         <TableRow>
           <TableCell>Evaluation Run</TableCell>
           {props.calls.map(call => {
@@ -447,31 +782,44 @@ const BasicTable: React.FC<{calls: EvaluationEvaluateCallSchema[]}> = props => {
             );
           })}
         </TableRow>
+        <TableRow sx={{'&:last-child td, &:last-child th': {border: 0}}}>
+          <TableCell component="th" scope="row">
+            Evaluation Details
+          </TableCell>
+          {props.calls.map((call, ndx) => {
+            // TODO: make this a multi-viewer that only shows diffs
+            return (
+              <TableCell key={ndx}>
+                <ObjectViewerSection
+                  title=""
+                  data={call.inputs.self ?? {}}
+                  noHide
+                  isExpanded
+                />
+              </TableCell>
+            );
+          })}
+        </TableRow>
         <TableRow>
           <TableCell>Model Object</TableCell>
-          <TableCell align="right">
-            <ObjectVersionLink
-              entityName={'wandb-smle'}
-              projectName={'weave-rag-lc-demo'}
-              objectName={'RagModel'}
-              version={'j5VetZto0f9017qA8vzz6jox1Gs3n8wtAHGYUFXEQws'}
-              versionIndex={8}
-              fullWidth={true}
-            />
-          </TableCell>
-          <TableCell align="right">
-            <ObjectVersionLink
-              entityName={'wandb-smle'}
-              projectName={'weave-rag-lc-demo'}
-              objectName={'RagModel'}
-              version={'j5VetZto0f9017qA8vzz6jox1Gs3n8wtAHGYUFXEQws'}
-              versionIndex={8}
-              fullWidth={true}
-            />
-          </TableCell>
+          {models.map((model, ndx) => {
+            const parsed = parseRef(model.ref) as WeaveObjectRef;
+
+            return (
+              <TableCell align="right" key={ndx}>
+                <ObjectVersionLink
+                  entityName={parsed.entityName}
+                  projectName={parsed.projectName}
+                  objectName={parsed.artifactName}
+                  version={parsed.artifactVersion}
+                  versionIndex={0}
+                  fullWidth={true}
+                />
+              </TableCell>
+            );
+          })}
         </TableRow>
-      </TableHead>
-      <TableBody>
+
         <TableRow sx={{'&:last-child td, &:last-child th': {border: 0}}}>
           <TableCell component="th" scope="row">
             Model Details
@@ -482,7 +830,7 @@ const BasicTable: React.FC<{calls: EvaluationEvaluateCallSchema[]}> = props => {
               <TableCell key={ndx}>
                 <ObjectViewerSection
                   title=""
-                  data={models[0] ?? {}}
+                  data={model.data ?? {}}
                   noHide
                   isExpanded
                 />
@@ -495,3 +843,200 @@ const BasicTable: React.FC<{calls: EvaluationEvaluateCallSchema[]}> = props => {
     // </TableContainer>
   );
 };
+
+const PlotlyScatterPlot: React.FC<{}> = () => {
+  const divRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const trace2 = {
+      x: [2, 3, 4, 5],
+      y: [16, 5, 11, 9],
+      mode: 'markers',
+      type: 'scatter',
+      marker: {color: TEAL_500, size: 12},
+    };
+
+    const trace3 = {
+      x: [1, 2, 3, 4],
+      y: [12, 9, 15, 12],
+      mode: 'markers',
+      type: 'scatter',
+      marker: {color: CACTUS_500, size: 12},
+    };
+
+    const data = [trace2, trace3];
+    Plotly.newPlot(
+      divRef.current as any,
+      data as any,
+      {
+        height: PLOT_HEIGHT,
+        title: '',
+        margin: {
+          l: 20, // legend
+          r: 0,
+          b: 20, // legend
+          t: 0,
+          pad: 0,
+        },
+      },
+      {
+        displayModeBar: false,
+        responsive: true,
+      }
+    );
+  }, []);
+
+  return (
+    <Box
+      sx={{
+        height: PLOT_HEIGHT,
+        width: '100%',
+      }}>
+      <div ref={divRef}></div>
+    </Box>
+  );
+};
+
+const PlotlyRadialPlot: React.FC<{}> = () => {
+  const divRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const data = [
+      {
+        type: 'scatterpolar',
+        r: [39, 28, 8, 7, 28, 39],
+        theta: ['A', 'B', 'C', 'D', 'E', 'A'],
+        fill: 'toself',
+        name: 'Group A',
+        marker: {color: TEAL_500},
+      },
+      {
+        type: 'scatterpolar',
+        r: [1.5, 10, 39, 31, 15, 1.5],
+        theta: ['A', 'B', 'C', 'D', 'E', 'A'],
+        fill: 'toself',
+        marker: {color: CACTUS_500},
+      },
+    ];
+
+    const layout = {
+      height: PLOT_HEIGHT,
+
+      showlegend: false,
+      margin: {
+        l: 30, // legend
+        r: 30,
+        b: 30, // legend
+        t: 30,
+        pad: 0,
+      },
+      polar: {
+        color: MOON_300,
+        radialaxis: {
+          linecolor: MOON_300,
+          // color: MOON_300,
+          visible: false,
+          range: [0, 50],
+          gridcolor: MOON_300, // Customize radial grid color
+        },
+        angularaxis: {
+          linecolor: MOON_300,
+          // color: MOON_300,
+          gridcolor: MOON_300, // Customize angular grid color
+        },
+      },
+    };
+    Plotly.newPlot(divRef.current as any, data as any, layout, {
+      displayModeBar: false,
+      responsive: true,
+      // staticPlot: true, // Disable all interactions
+    });
+  }, []);
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        width: '100%',
+      }}>
+      <div ref={divRef}></div>
+    </Box>
+  );
+};
+
+const PlotlyBarPlot: React.FC<{}> = () => {
+  const divRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const trace1 = {
+      x: ['A', 'B', 'C', 'D', 'E'],
+      y: [20, 14, 23, 23, 43],
+      type: 'bar',
+      marker: {color: TEAL_500},
+    };
+
+    const trace2 = {
+      x: ['A', 'B', 'C', 'D', 'E'],
+      y: [12, 18, 29, 54, 23],
+      type: 'bar',
+      marker: {color: CACTUS_500},
+    };
+
+    const data = [trace1, trace2];
+    Plotly.newPlot(
+      divRef.current as any,
+      data as any,
+      {
+        height: PLOT_HEIGHT - 2 * PLOT_PADDING,
+        showlegend: false,
+        title: '',
+        margin: {
+          l: 0,
+          r: 0,
+          b: 20,
+          t: 0,
+          pad: 0,
+        },
+        xaxis: {
+          fixedrange: true,
+          // showgrid: true,
+          gridcolor: MOON_300, // Customize x-axis grid color
+          // color: MOON_300, // Customize x-axis grid color
+          linecolor: MOON_300, // Customize x-axis grid color
+        },
+        yaxis: {
+          fixedrange: true,
+          // showgrid: true,
+          gridcolor: MOON_300, // Customize x-axis grid color
+          // color: MOON_300, // Customize x-axis grid color
+          linecolor: MOON_300, // Customize x-axis grid color
+        },
+      },
+      {
+        displayModeBar: false,
+        responsive: true,
+
+        // staticPlot: true, // Disable all interactions
+      }
+    );
+  }, []);
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        width: '100%',
+      }}>
+      <div ref={divRef}></div>
+    </Box>
+  );
+};
+
+/**
+ * TOOD:
+ * - [ ] Add action to swap the positions of the evaluations
+ * - [ ] Add action to select the dimensions to compare
+ * - [ ] Make colors parametric and dynamic
+ * - [ ] Stop radial interactions
+ * - [ ] Make metrics actually real
+ */
