@@ -6,9 +6,17 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {Autocomplete, Chip, FormControl, ListItem} from '@mui/material';
+import {
+  Autocomplete,
+  Checkbox,
+  Chip,
+  FormControl,
+  ListItem,
+} from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
+  GRID_CHECKBOX_SELECTION_COL_DEF,
+  GRID_CHECKBOX_SELECTION_FIELD,
   GridApiPro,
   GridFilterModel,
   GridPaginationModel,
@@ -31,7 +39,10 @@ import React, {
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
-import {WeaveHeaderExtrasContext} from '../../context';
+import {
+  useWeaveflowRouteContext,
+  WeaveHeaderExtrasContext,
+} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
@@ -60,6 +71,8 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
+import {CheckBox} from '@mui/icons-material';
+import {useHistory} from 'react-router-dom';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 
@@ -283,7 +296,9 @@ export const CallsTable: FC<{
 
   // DataGrid Model Management
   const [pinnedColumnsModel, setPinnedColumnsModel] =
-    useState<GridPinnedColumns>({left: ['op_name', 'feedback']});
+    useState<GridPinnedColumns>({
+      left: ['CustomCheckbox', 'op_name', 'feedback'],
+    });
 
   // END OF CPR FACTORED CODE
 
@@ -329,6 +344,78 @@ export const CallsTable: FC<{
     entity,
     project
   );
+
+  // Selection Management
+  // TODO: Limit this to 2
+  // TODO: by default, consider always including the peekId
+  // TODO: Add this state to the URL
+  const [compareSelection, setCompareSelection] = useState<string[]>([]);
+  const muiColumns = useMemo(() => {
+    if (!isEvaluateTable) {
+      return columns.cols;
+    }
+    return [
+      {
+        width: 40,
+        field: 'CustomCheckbox',
+        headerName: '',
+        renderCell: params => {
+          const rowId = params.id as string;
+          return (
+            <Checkbox
+              checked={compareSelection.includes(rowId)}
+              onChange={() => {
+                if (compareSelection.includes(rowId)) {
+                  setCompareSelection(
+                    compareSelection.filter(id => id !== rowId)
+                  );
+                } else {
+                  setCompareSelection([...compareSelection, rowId]);
+                }
+              }}
+            />
+          );
+        },
+      },
+      ...columns.cols,
+    ];
+  }, [columns.cols, compareSelection, isEvaluateTable]);
+
+  const history = useHistory();
+  const {baseRouter} = useWeaveflowRouteContext();
+  useEffect(() => {
+    if (!isEvaluateTable) {
+      return;
+    }
+    addExtra('compareEvaluations', {
+      node: (
+        <CompareEvaluationsTableButton
+          onClick={() => {
+            history.push(
+              baseRouter.compareEvaluationsUri(
+                entity,
+                project,
+                compareSelection
+              )
+            );
+          }}
+          disabled={compareSelection.length === 0}
+        />
+      ),
+    });
+
+    return () => removeExtra('compareEvaluations');
+  }, [
+    apiRef,
+    addExtra,
+    removeExtra,
+    isEvaluateTable,
+    compareSelection.length,
+    compareSelection,
+    baseRouter,
+    entity,
+    project,
+  ]);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -470,7 +557,7 @@ export const CallsTable: FC<{
         pageSizeOptions={[defaultPageSize]}
         // PAGINATION SECTION END
         rowHeight={38}
-        columns={columns.cols as any}
+        columns={muiColumns}
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
@@ -628,6 +715,30 @@ const ExportRunsTableButton = ({
       onClick={() => tableRef.current?.exportDataAsCsv()}
       icon="export-share-upload">
       Export to CSV
+    </Button>
+  </Box>
+);
+
+const CompareEvaluationsTableButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({onClick, disabled}) => (
+  <Box
+    sx={{
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+    }}>
+    <Button
+      className="mx-16"
+      style={{
+        marginLeft: '0px',
+      }}
+      size="medium"
+      disabled={disabled}
+      onClick={onClick}
+      icon="chart-scatterplot">
+      Compare Evaluations
     </Button>
   </Box>
 );
