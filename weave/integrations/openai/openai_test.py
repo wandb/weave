@@ -23,6 +23,10 @@ def _get_call_output(call: tsi.CallSchema) -> typing.Any:
     return call_output
 
 
+def op_name_from_ref(ref: str) -> str:
+    return ref.split("/")[-1].split(":")[0]
+
+
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
@@ -42,11 +46,14 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     )
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
+    print(res)
 
     exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
     assert response.choices[0].message.content == exp
 
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -91,6 +98,8 @@ async def test_openai_async_quickstart(client: weave.weave_client.WeaveClient) -
     assert response.choices[0].message.content == exp
 
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -141,6 +150,8 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
     assert all_content == exp
 
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -196,6 +207,8 @@ async def test_openai_async_stream_quickstart(
     assert all_content == exp
 
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -242,6 +255,8 @@ def test_openai_stream_usage_quickstart(client: weave.weave_client.WeaveClient) 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -309,6 +324,8 @@ def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
     assert response.choices[0].message.function_call.arguments == exp
 
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -388,12 +405,13 @@ async def test_openai_function_call_async(
     )
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    call = res.calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
     assert response.choices[0].message.function_call.arguments == exp
 
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -479,6 +497,8 @@ async def test_openai_function_call_async_stream(
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
@@ -565,6 +585,8 @@ def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
     assert response.choices[0].message.tool_calls[0].function.arguments == exp
 
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -648,6 +670,8 @@ async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) ->
     assert response.choices[0].message.tool_calls[0].function.arguments == exp
 
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     output = _get_call_output(call)
@@ -737,6 +761,8 @@ async def test_openai_tool_call_async_stream(
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
