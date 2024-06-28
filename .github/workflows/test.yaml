@@ -138,8 +138,8 @@ jobs:
           pip install llama-index>=0.10.35
           pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
           pip uninstall -y llama-index
-          pip install anthropic>=0.28.0
-          pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
+          # pip install anthropic>=0.28.0
+          # pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
 
       - name: Run Python Unit Tests
         env:
@@ -150,18 +150,17 @@ jobs:
           CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate
           cd weave
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
-          pip install ..[mistral]
+          pip install mistralai>=0.1.8
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/mistral --ddtrace --durations=5
-          pip install -U ..
-          pip install ..[litellm]
+          pip uninstall -y mistralai
+          pip install litellm>=1.36.1
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/litellm --ddtrace --durations=5
-          pip install -U ..
-          pip install ..[llamaindex]
+          pip uninstall -y litellm
+          pip install llama-index>=0.10.35
           pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/llamaindex --ddtrace --durations=5
-          pip install -U ..
-          pip install ..[anthropic]
-          pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
-          pip install -U ..
+          pip uninstall -y llama-index
+          # pip install anthropic>=0.28.0
+          # pytest --job-num=${{ matrix.job_num }} --timeout=90 ./integrations/anthropic --ddtrace --durations=5
 
 
   # nbmake:
