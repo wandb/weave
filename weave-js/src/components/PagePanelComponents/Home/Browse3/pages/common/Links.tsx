@@ -158,7 +158,7 @@ export const ObjectVersionLink: React.FC<{
 
   return (
     <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
-      <LinkTruncater>
+      <LinkTruncater fullWidth={props.fullWidth}>
         <Link to={to}>{text}</Link>
       </LinkTruncater>
     </LinkWrapper>

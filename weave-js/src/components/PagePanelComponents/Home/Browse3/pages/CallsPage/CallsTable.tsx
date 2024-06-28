@@ -15,8 +15,6 @@ import {
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
-  GRID_CHECKBOX_SELECTION_COL_DEF,
-  GRID_CHECKBOX_SELECTION_FIELD,
   GridApiPro,
   GridFilterModel,
   GridPaginationModel,
@@ -35,12 +33,13 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {
-  useWeaveflowRouteContext,
+  useWeaveflowCurrentRouteContext,
   WeaveHeaderExtrasContext,
 } from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
@@ -71,8 +70,6 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
-import {CheckBox} from '@mui/icons-material';
-import {useHistory} from 'react-router-dom';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 
@@ -359,7 +356,7 @@ export const CallsTable: FC<{
         width: 40,
         field: 'CustomCheckbox',
         headerName: '',
-        renderCell: params => {
+        renderCell: (params: any) => {
           const rowId = params.id as string;
           return (
             <Checkbox
@@ -382,7 +379,7 @@ export const CallsTable: FC<{
   }, [columns.cols, compareSelection, isEvaluateTable]);
 
   const history = useHistory();
-  const {baseRouter} = useWeaveflowRouteContext();
+  const router = useWeaveflowCurrentRouteContext();
   useEffect(() => {
     if (!isEvaluateTable) {
       return;
@@ -392,11 +389,7 @@ export const CallsTable: FC<{
         <CompareEvaluationsTableButton
           onClick={() => {
             history.push(
-              baseRouter.compareEvaluationsUri(
-                entity,
-                project,
-                compareSelection
-              )
+              router.compareEvaluationsUri(entity, project, compareSelection)
             );
           }}
           disabled={compareSelection.length === 0}
@@ -412,9 +405,10 @@ export const CallsTable: FC<{
     isEvaluateTable,
     compareSelection.length,
     compareSelection,
-    baseRouter,
+    router,
     entity,
     project,
+    history,
   ]);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
