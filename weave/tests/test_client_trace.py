@@ -1408,8 +1408,6 @@ def test_named_reuse(client):
     d_ref = weave.publish(d, "test_dataset")
     dataset = weave.ref(d_ref.uri()).get()
 
-    print(f"{dataset=}")
-
     @weave.op()
     async def dummy_score(model_output):
         return 1

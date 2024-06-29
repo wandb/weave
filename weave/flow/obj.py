@@ -22,7 +22,7 @@ class Metadata(BaseModel):
 
 
 class Object(BaseModel):
-    metadata: Optional[Metadata] = Field(default_factory=Metadata)
+    metadata: Metadata = Field(default_factory=Metadata)
 
     # Allow Op attributes
     model_config = ConfigDict(
@@ -41,6 +41,8 @@ class Object(BaseModel):
     def handle_relocatable_object(
         cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
     ) -> Any:
+        if isinstance(v, Metadata):
+            return handler(v)
         if isinstance(v, ObjectRef):
             return v.get()
         if isinstance(v, TraceObject):
@@ -56,13 +58,12 @@ class Object(BaseModel):
                     val = None
                 fields[k] = val
 
-            metadata = None
-            if "object_name" in fields or "object_description" in fields:
+            # For legacy compat where metadata were stored directly on the obj itself
+            if "metadata" not in fields:
                 metadata = Metadata(
-                    name=fields.pop("object_name", None),
-                    description=fields.pop("object_description", None),
+                    name=fields.pop("name", None),
+                    description=fields.pop("description", None),
                 )
-            if metadata:
                 fields["metadata"] = metadata
 
             # pydantic validation will construct a new pydantic object
@@ -70,6 +71,7 @@ class Object(BaseModel):
                 return isinstance(v, cls.model_config["ignored_types"])
 
             allowed_fields = {k: v for k, v in fields.items() if not is_ignored_type(v)}
+            allowed_fields.pop("metadata", None)
             new_obj = handler(allowed_fields)
             for k, kv in fields.items():
                 if is_ignored_type(kv):

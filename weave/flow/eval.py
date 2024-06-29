@@ -107,8 +107,8 @@ class Evaluation(Object):
         if isinstance(self.dataset, list):
             self.dataset = Dataset(rows=self.dataset)
 
-        if self.object_name == None and self.dataset.object_name != None:
-            self.object_name = self.dataset.object_name + "-evaluation"  # type: ignore
+        if self.metadata.name == None and self.dataset.metadata.name != None:
+            self.metadata.name = self.dataset.metadata.name + "-evaluation"  # type: ignore
 
     @weave.op()
     async def predict_and_score(
