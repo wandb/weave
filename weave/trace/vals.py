@@ -474,7 +474,10 @@ def make_trace_obj(
     if isinstance(box_val, pydantic_v1.BaseModel):
         box_val.__dict__["ref"] = new_ref
     else:
-        setattr(box_val, "ref", new_ref)
+        from weave.flow.obj import Metadata
+
+        if not isinstance(box_val, Metadata):
+            setattr(box_val, "ref", new_ref)
     return box_val
 
 
