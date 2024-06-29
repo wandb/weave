@@ -12,14 +12,10 @@ from pydantic import (
 
 # import pydantic
 from weave.legacy import box
+from weave.trace.metadata import Metadata
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import ObjectRecord, TraceObject, pydantic_getattribute
 from weave.weave_client import get_ref
-
-
-class Metadata(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
 
 
 class Object(BaseModel):

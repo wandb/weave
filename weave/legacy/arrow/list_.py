@@ -1192,7 +1192,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 # with different methods correctly.
                 # TODO: fix
 
-                from weave.flow.obj import Metadata
+                from weave.trace.metadata import Metadata
                 if isinstance(v, Metadata):
                     v = v.model_dump()
 

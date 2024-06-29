@@ -660,7 +660,7 @@ class WeaveClient:
         return ref
 
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
-        from weave.flow.obj import Metadata
+        from weave.trace.metadata import Metadata
 
         if get_ref(obj) is not None:
             return
