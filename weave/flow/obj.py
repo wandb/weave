@@ -35,17 +35,6 @@ class Object(BaseModel):
 
     __str__ = BaseModel.__repr__
 
-    @model_validator(mode="before")
-    @classmethod
-    def check_metadata(cls, data: Any) -> Any:
-        if (metadata := data.get("metadata", None)) and not isinstance(
-            metadata, Metadata
-        ):
-            raise ValueError(
-                "`metadata` is a reserved keyword arg in Weave for labeling objects.  Do not override!"
-            )
-        return data
-
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
     @model_validator(mode="wrap")
