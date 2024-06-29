@@ -1,3 +1,4 @@
+import warnings
 from typing import Any, Optional
 
 from pydantic import (
@@ -22,7 +23,7 @@ class Metadata(BaseModel):
 
 
 class Object(BaseModel):
-    metadata: Metadata = Field(default_factory=Metadata)
+    metadata: Metadata = Field(default_factory=Metadata, repr=False)
 
     # Allow Op attributes
     model_config = ConfigDict(
@@ -33,6 +34,15 @@ class Object(BaseModel):
     )
 
     __str__ = BaseModel.__repr__
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_metadata(cls, data: Any) -> Any:
+        if not isinstance(data["metadata"], Metadata):
+            raise ValueError(
+                "`metadata` is a reserved keyword arg in Weave for labeling objects.  Do not override!"
+            )
+        return data
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
