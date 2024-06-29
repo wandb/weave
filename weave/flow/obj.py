@@ -16,9 +16,13 @@ from weave.trace.vals import ObjectRecord, TraceObject, pydantic_getattribute
 from weave.weave_client import get_ref
 
 
+class Metadata(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
 class Object(BaseModel):
-    object_name: Optional[str] = Field(None, kw_only=True)
-    object_description: Optional[str] = Field(None, kw_only=True)
+    metadata: Optional[Metadata] = Field(default_factory=Metadata)
 
     # Allow Op attributes
     model_config = ConfigDict(
@@ -51,6 +55,15 @@ class Object(BaseModel):
                 if isinstance(val, box.BoxedNone):
                     val = None
                 fields[k] = val
+
+            metadata = None
+            if "object_name" in fields or "object_description" in fields:
+                metadata = Metadata(
+                    name=fields.pop("object_name", None),
+                    description=fields.pop("object_description", None),
+                )
+            if metadata:
+                fields["metadata"] = metadata
 
             # pydantic validation will construct a new pydantic object
             def is_ignored_type(v: type) -> bool:

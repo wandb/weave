@@ -206,8 +206,10 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     save_name: str
     if name:
         save_name = name
-    elif hasattr(obj, "name"):
-        save_name = obj.name
+    elif hasattr(obj, 'metadata') and obj.metadata and obj.metadata.name:
+        save_name = obj.metadata.name
+    # elif hasattr(obj, "name"):
+    #     save_name = obj.name
     else:
         save_name = obj.__class__.__name__
 
