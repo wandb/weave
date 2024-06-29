@@ -81,7 +81,8 @@ def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
 
 
 def get_obj_name(val: Any) -> str:
-    name = getattr(val, "name", None)
+    metadata = getattr(val, "metadata", None)
+    name = getattr(metadata, "name", None)
     if name == None:
         if isinstance(val, ObjectRecord):
             name = val._class_name
@@ -669,18 +670,15 @@ class WeaveClient:
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
-            save_name = (
-                name
-                or (obj.metadata.name if obj.metadata else None)
-                or get_obj_name(obj_rec)
-            )
+            save_name = name or get_obj_name(obj_rec)
             ref = self._save_object_basic(obj_rec, save_name)
             obj.__dict__["ref"] = ref
         elif dataclasses.is_dataclass(obj):
             obj_rec = dataclass_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
-            ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
+            save_name = name or get_obj_name(obj_rec)
+            ref = self._save_object_basic(obj_rec, save_name)
             obj.__dict__["ref"] = ref
         elif isinstance(obj, Table):
             table_ref = self._save_table(obj)
