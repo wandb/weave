@@ -34,12 +34,10 @@ import {
 } from '../../context';
 import {StyledTextField} from '../../StyledTextField';
 import {ObjectViewerSection} from '../CallPage/ObjectViewerSection';
+import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {useEvaluationsFilter} from '../CallsPage/CallsPage';
 import {CallsTable} from '../CallsPage/CallsTable';
-import {
-  EVALUATE_OP_NAME_POST_PYDANTIC,
-  PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
-} from '../common/heuristics';
+import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {CallLink, ObjectVersionLink, opNiceName} from '../common/Links';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -52,6 +50,7 @@ import {
   ObjectVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {
+  ComparisonMetric,
   EvaluationEvaluateCallSchema,
   evaluationMetrics,
   useEvaluationCall,
@@ -59,6 +58,8 @@ import {
   useModelsFromEvaluationCalls,
 } from './evaluations';
 import MetricTile from './MetricTile';
+import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
+import {PlotlyBarPlot} from './PlotlyBarPlot';
 
 const EVAL_DEF_HEIGHT = '45px';
 const STANDARD_PADDING = '16px';
@@ -164,6 +165,7 @@ const VerticalBox: React.FC<BoxProps> = props => {
         flexDirection: 'column',
         gridGap: STANDARD_PADDING,
         overflow: 'hidden',
+        flex: '0 0 auto',
         ...props.sx,
       }}
     />
@@ -179,6 +181,7 @@ const HorizontalBox: React.FC<BoxProps> = props => {
         flexDirection: 'row',
         gridGap: STANDARD_PADDING,
         overflow: 'hidden',
+        flex: '0 0 auto',
         ...props.sx,
       }}
     />
@@ -188,20 +191,103 @@ const HorizontalBox: React.FC<BoxProps> = props => {
 const CompareEvaluationsPageInner: React.FC<
   CompareDualEvaluationsPageProps
 > = props => {
+  const callSpecs: CallSpec[] = useMemo(() => {
+    return [
+      {callId: props.evaluationCallId1, name: 'Baseline', color: TEAL_500},
+      {callId: props.evaluationCallId2, name: 'Challenger', color: CACTUS_500},
+    ];
+  }, [props.evaluationCallId1, props.evaluationCallId2]);
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        width: '100%',
+        overflow: 'auto',
+      }}>
+      <VerticalBox
+        sx={{
+          paddingTop: STANDARD_PADDING,
+          alignItems: 'flex-start',
+        }}>
+        <ComparisonDefinition {...props} />
+        <SummaryPlots callSpecs={callSpecs} {...props} />
+        <ScoreCard />
+        <ScatterFilter {...props} />
+        <CompareEvaluationsCallsTable {...props} />
+      </VerticalBox>{' '}
+    </Box>
+  );
+};
+
+const ScatterFilter: React.FC<CompareDualEvaluationsPageProps> = props => {
   return (
     <VerticalBox
       sx={{
-        paddingTop: STANDARD_PADDING,
-        alignItems: 'flex-start',
+        width: '100%',
+        paddingLeft: STANDARD_PADDING,
+        paddingRight: STANDARD_PADDING,
       }}>
-      <ComparisonDefinition {...props} />
-      <SummaryPlots />
-      <ScoreCard />
+      <VerticalBox
+        sx={{
+          width: '100%',
+          paddingLeft: STANDARD_PADDING,
+          paddingRight: STANDARD_PADDING,
+          borderRadius: BOX_RADIUS,
+          border: STANDARD_BORDER,
+        }}>
+        <ScatterDefinition {...props} />
+        <PlotlyScatterPlot />
+      </VerticalBox>
     </VerticalBox>
   );
 };
 
-const SummaryPlots: React.FC = () => {
+const ScatterDefinition: React.FC<CompareDualEvaluationsPageProps> = props => {
+  return (
+    <HorizontalBox
+      sx={{
+        alignItems: 'center',
+        paddingTop: STANDARD_PADDING,
+      }}>
+      <DefinitionText text="Plot" />
+      <DimensionPicker {...props} />
+      <DefinitionText text="against" />
+      <DimensionPicker {...props} />
+    </HorizontalBox>
+  );
+};
+
+type EvaluationComparisonMetric = {
+  scorerName: string;
+  scorerOpVersionRefUri: string;
+  metricPath: string;
+  unit: string;
+  minimize?: boolean;
+  values: {[callId: string]: number};
+};
+
+const SummaryPlots: React.FC<
+  CompareDualEvaluationsPageProps & {
+    callSpecs: CallSpec[];
+  }
+> = props => {
+  const callIds = useMemo(
+    () => [props.evaluationCallId1, props.evaluationCallId2],
+    [props]
+  );
+  const calls = useEvaluationCalls(props.entity, props.project, callIds);
+
+  const evalMetrics = useMemo(() => {
+    return evaluationMetrics(calls);
+  }, [calls]);
+  // console.log(evalMetrics);
+
+  const plotlyRadarData = useNormalizedRadarPlotDataFromMetrics(
+    props.callSpecs,
+    evalMetrics
+  );
+
   return (
     <HorizontalBox
       sx={{
@@ -210,61 +296,222 @@ const SummaryPlots: React.FC = () => {
         flex: '1 1 auto',
         width: '100%',
       }}>
-      <RadarPlot />
-      <BarPlots />
+      <Box
+        sx={{
+          flex: '0 0 auto',
+          height: PLOT_HEIGHT,
+          width: PLOT_HEIGHT * 2,
+          borderRadius: BOX_RADIUS,
+          border: STANDARD_BORDER,
+          overflow: 'hidden',
+        }}>
+        <PlotlyRadarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+        {/* <PlotlyRadarPlot /> */}
+        {/* // <PlotlyRadialPlot /> */}
+      </Box>
+      <Box
+        sx={{
+          flex: '1 1 auto',
+          height: PLOT_HEIGHT,
+          width: '100%',
+          overflow: 'hidden',
+          borderRadius: BOX_RADIUS,
+          border: STANDARD_BORDER,
+          padding: PLOT_PADDING,
+        }}>
+        <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+      </Box>
+      {/* <RadarPlot plotlyRadarData={plotlyRadarData} />
+      <BarPlots plotlyRadarData={plotlyRadarData}} /> */}
     </HorizontalBox>
   );
 };
 
-const RadarPlot: React.FC = () => {
-  return (
-    <Box
-      sx={{
-        flex: '0 0 auto',
-        height: PLOT_HEIGHT,
-        width: PLOT_HEIGHT,
-        borderRadius: BOX_RADIUS,
-        border: STANDARD_BORDER,
-        overflow: 'hidden',
-      }}>
-      <PlotlyRadialPlot />
-    </Box>
-  );
+const normalizeValues = (values: number[]): number[] => {
+  // find the max value
+  // find the power of 2 that is greater than the max value
+  // divide all values by that power of 2
+  const maxVal = Math.max(...values);
+  const maxPower = Math.ceil(Math.log2(maxVal));
+  return values.map(val => val / 2 ** maxPower);
 };
 
-const BarPlots: React.FC = () => {
-  return (
-    <Box
-      sx={{
-        flex: '1 1 auto',
-        height: PLOT_HEIGHT,
-        width: '100%',
-        overflow: 'hidden',
-        borderRadius: BOX_RADIUS,
-        border: STANDARD_BORDER,
-        padding: PLOT_PADDING,
-      }}>
-      <PlotlyBarPlot />
-    </Box>
-  );
+type CallSpec = {
+  callId: string;
+  name: string;
+  color: string;
 };
+
+const useNormalizedRadarPlotDataFromMetrics = (
+  callSpecs: CallSpec[],
+  metrics: ComparisonMetric[]
+): RadarPlotData => {
+  return useMemo(() => {
+    const normalizedMetrics = metrics.map(metric => {
+      const keys = Object.keys(metric.values);
+      const values = keys.map(key => metric.values[key]);
+      const normalizedValues = normalizeValues(values);
+
+      return {
+        ...metric,
+        values: Object.fromEntries(
+          keys.map((key, i) => [key, normalizedValues[i]])
+        ),
+      };
+    });
+    return Object.fromEntries(
+      callSpecs.map(spec => {
+        return [
+          spec.callId,
+          {
+            name: spec.name,
+            color: spec.color,
+            metrics: Object.fromEntries(
+              normalizedMetrics.map(metric => {
+                return [metric.path, metric.values[spec.callId]];
+              })
+            ),
+          },
+        ];
+      })
+    );
+  }, [callSpecs, metrics]);
+};
+
+// const RadarPlot: React.FC<{
+//   plotlyRadarData={plotlyRadarData}
+// }> = props => {
+//   const plotlyRadarData = useNormalizedRadarPlotDataFromMetrics(
+//     props.callSpecs,
+//     props.metrics
+//   );
+
+//   return (
+//     <Box
+//       sx={{
+//         flex: '0 0 auto',
+//         height: PLOT_HEIGHT,
+//         width: PLOT_HEIGHT * 2,
+//         borderRadius: BOX_RADIUS,
+//         border: STANDARD_BORDER,
+//         overflow: 'hidden',
+//       }}>
+//       <PlotlyRadarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+//       {/* <PlotlyRadarPlot /> */}
+//       {/* // <PlotlyRadialPlot /> */}
+//     </Box>
+//   );
+// };
+
+// const BarPlots: React.FC = () => {
+//   return (
+//     <Box
+//       sx={{
+//         flex: '1 1 auto',
+//         height: PLOT_HEIGHT,
+//         width: '100%',
+//         overflow: 'hidden',
+//         borderRadius: BOX_RADIUS,
+//         border: STANDARD_BORDER,
+//         padding: PLOT_PADDING,
+//       }}>
+//       <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+//     </Box>
+//   );
+// };
 
 const ScoreCard: React.FC = () => {
-  const modelRefs = ['Model:A', 'Model:B'];
+  const modelRefs = ['Baseline', 'Challenger'];
+  const modelProps = {
+    Model: {
+      Baseline: 'Model A',
+      Challenger: 'Model B',
+    },
+    Version: {
+      Baseline: '1.0.0',
+      Challenger: '1.0.0',
+    },
+    Author: {
+      Baseline: 'Author A',
+      Challenger: 'Author B',
+    },
+  };
   const scoreDefs = {
-    score1: {metrics: [{key: 'score1.mean', unit: '', lowerIsBetter: true}]},
+    score1: {
+      metrics: [
+        {key: 'score1.a.mean', unit: '', lowerIsBetter: true},
+        {key: 'score1.b.mean', unit: '%', lowerIsBetter: false},
+        {key: 'score1.c.mean', unit: ' ms', lowerIsBetter: true},
+      ],
+    },
     score2: {
-      metrics: [{key: 'score2.true_fraction', unit: '%', lowerIsBetter: true}],
+      metrics: [
+        {key: 'score2.a.true_fraction', unit: '', lowerIsBetter: false},
+        {key: 'score2.b.true_fraction', unit: '%', lowerIsBetter: true},
+        {key: 'score2.c.true_fraction', unit: ' ms', lowerIsBetter: false},
+      ],
+    },
+    usage: {
+      metrics: [
+        // {key: 'tokens.requests', unit: '', lowerIsBetter: false},
+        // {key: 'tokens.inputs', unit: '', lowerIsBetter: true},
+        // {key: 'tokens.output', unit: '', lowerIsBetter: false},
+        {key: 'tokens.total', unit: '', lowerIsBetter: false},
+        {key: 'tokens.cost', unit: ' $', lowerIsBetter: false},
+      ],
+    },
+    latency: {
+      metrics: [{key: 'latency', unit: ' ms', lowerIsBetter: false}],
     },
   };
   const scores = {
-    'score1.mean': {
-      'Model:A': 0.5,
-      'Model:B': 0.6,
+    'score1.a.mean': {
+      Baseline: 0.5,
+      Challenger: 0.6,
     },
-    'score2.true_fraction': {
-      'Model:A': 0.5,
-      'Model:B': 0.6,
+    'score1.b.mean': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    'score1.c.mean': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    'score2.a.true_fraction': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    'score2.b.true_fraction': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    'score2.c.true_fraction': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    'tokens.requests': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    'tokens.inputs': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    'tokens.output': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    'tokens.total': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    'tokens.cost': {
+      Baseline: 0.5,
+      Challenger: 0.6,
+    },
+    latency: {
+      Baseline: 0.5,
+      Challenger: 0.6,
     },
   };
   return (
@@ -283,20 +530,99 @@ const ScoreCard: React.FC = () => {
         {/* Header Row */}
         <div></div>
         <div></div>
-        <div>Model A</div>
-        <div>Model B</div>
-        <div>Diff</div>
+        <div
+          style={{
+            fontWeight: 'bold',
+            // borderTopLeftRadius: '6px',
+            // borderTop: '1px solid #ccc',
+            // borderLeft: '1px solid #ccc',
+          }}>
+          Model A
+        </div>
+        <div
+          style={{
+            fontWeight: 'bold',
+            // borderTopRightRadius: '6px',
+            // borderTop: '1px solid #ccc',
+            // borderRight: '1px solid #ccc',
+          }}>
+          Model B
+        </div>
+        <div></div>
+        {/* Model Rows */}
+        {Object.entries(modelProps).map(([prop, modelData]) => {
+          return (
+            <>
+              <div></div>
+              <div
+                style={{
+                  fontWeight: 'bold',
+                  textAlign: 'right',
+                  paddingRight: '10px',
+                }}>
+                {prop}
+              </div>
+              {modelRefs.map(model => {
+                return <div>{modelData[model]}</div>;
+              })}
+              <div></div>
+            </>
+          );
+        })}
         {/* Score Rows */}
         {Object.entries(scoreDefs).map(([key, def]) => {
           return (
-            <div
-              key={key}
-              style={{
-                // vertical span length of metric
-                gridRowEnd: `span ${def.metrics.length}`,
-              }}>
-              {key}
-            </div>
+            <>
+              <div
+                key={key}
+                style={{
+                  // vertical span length of metric
+                  gridRowEnd: `span ${def.metrics.length}`,
+                  borderTop: '1px solid #ccc',
+                  fontWeight: 'bold',
+                }}>
+                {key}
+              </div>
+              {def.metrics.map((metric, metricNdx) => {
+                return (
+                  <>
+                    <div
+                      style={{
+                        borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
+                      }}>
+                      {metric.key}
+                    </div>
+                    {modelRefs.map(model => {
+                      return (
+                        <div
+                          style={{
+                            borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
+                          }}>
+                          <ValueViewNumber
+                            fractionDigits={4}
+                            value={scores[metric.key][model]}
+                          />
+                          {metric.unit}
+                        </div>
+                      );
+                    })}
+                    <div
+                      style={{
+                        borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
+                      }}>
+                      <ValueViewNumber
+                        fractionDigits={4}
+                        value={
+                          scores[metric.key][modelRefs[0]] -
+                          scores[metric.key][modelRefs[1]]
+                        }
+                      />
+                      {metric.unit}
+                    </div>
+                  </>
+                );
+              })}
+            </>
           );
         })}
       </div>
@@ -327,10 +653,6 @@ const ComparisonDefinition: React.FC<
         evaluationCallId={props.evaluationCallId2}
         color={CACTUS_500}
       />
-      <DefinitionText text="compare" />
-      <DimensionPicker {...props} />
-      <DefinitionText text="by" />
-      <DimensionPicker {...props} />
     </HorizontalBox>
   );
 };
@@ -352,7 +674,7 @@ const DimensionPicker: React.FC<CompareDualEvaluationsPageProps> = props => {
         limitTags={1}
         value={dimensions[0]}
         onChange={(event, newValue) => {
-          console.log('onChange', newValue);
+          // console.log('onChange', newValue);
         }}
         options={dimensions}
         renderInput={renderParams => (
@@ -541,22 +863,14 @@ const SwapPositionsButton: React.FC = () => {
   );
 };
 
-const CompareEvaluationsPageInner2: React.FC<
+const CompareEvaluationsCallsTable: React.FC<
   CompareDualEvaluationsPageProps
 > = props => {
   const calls = useEvaluationCalls(
     props.entity,
     props.project,
-    props.evaluationCallIds
+    useMemo(() => [props.evaluationCallId1, props.evaluationCallId2], [props])
   );
-  const hasMoreThanOneEval = useMemo(() => {
-    return new Set(calls.map(call => call.inputs.self)).size > 1;
-  }, [calls]);
-  const evalMetrics = useMemo(() => {
-    return evaluationMetrics(calls).filter(
-      metric => metric.values.filter(v => v != null).length === 2
-    );
-  }, [calls]);
   const callsFilter = useMemo(() => {
     return {
       parentId: calls[0] ? calls[0].id : null,
@@ -570,208 +884,249 @@ const CompareEvaluationsPageInner2: React.FC<
       ],
     };
   }, [calls, props.entity, props.project]);
-  console.log(callsFilter);
-
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        gridGap: 10,
-        height: '100%',
-        width: '100%',
-        overflow: 'auto',
-      }}>
-      <div
-        style={{
-          width: '100%',
-          backgroundColor: '#eee',
-          padding: '10px',
-          overflowY: 'hidden',
-          overflowX: 'auto',
-          display: 'flex',
-          flexDirection: 'row',
-          gridGap: 10,
-          flex: '0 0 auto',
-        }}>
-        {evalMetrics.map(metric => {
-          const val = metric.values[1] - metric.values[0];
-          const isGood = metric.lowerIsBetter ? val <= 0 : val >= 0;
-          const pathParts = pathToParts(metric.path);
-          return (
-            <Box
-              key={metric.path}
-              sx={{
-                width: '300px',
-                flex: '1 0 auto',
-              }}>
-              <MetricTile
-                title={pathParts.title}
-                subtitle={pathParts.subtitle ?? ''}
-                mainMetric={val}
-                isGood={isGood}
-                unit={metric.unit}
-                subMetric1={{
-                  label: 'Baseline',
-                  value: metric.values[0],
-                }}
-                subMetric2={{
-                  label: 'Challenger',
-                  value: metric.values[1],
-                }}
-              />
-            </Box>
-          );
-        })}
-      </div>
-      <Box
-        sx={{
-          display: 'grid',
-          width: '100%',
-          height: '100%',
-          gridGap: 10,
-          gridTemplateColumns: '230px auto',
-          padding: 10,
-          overflow: 'auto',
-        }}>
-        {hasMoreThanOneEval && (
-          <Box
-            sx={{
-              gridColumn: '1 / span 2',
-            }}>
-            <Alert severity="warning">
-              The selected evaluations have different Datasets and/or Scoring
-              functions, therefore aggregate metrics may not be apples-to-apples
-              comparisons.
-            </Alert>
-          </Box>
-        )}
-        {/* <Box
-          sx={{
-            fontWeight: 'bold',
-            fontSize: 24,
-            padding: 10,
-            textAlign: 'center',
-          }}>
-          <h3>Summary Metrics</h3>
-        </Box>
-        <BasicTable /> */}
-        <Box
-          sx={{
-            fontWeight: 'bold',
-            fontSize: 24,
-            padding: 10,
-            textAlign: 'center',
-          }}>
-          <h3>Model Properties</h3>
-        </Box>
-        <BasicTable calls={calls} />
-        {/* <Box></Box> */}
-        <Box
-          sx={{
-            fontWeight: 'bold',
-            fontSize: 24,
-            padding: 10,
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            gridGap: 10,
-          }}>
-          <h3>Compare Models</h3>
-          <FormControl fullWidth>
-            <Autocomplete
-              // PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-              size="small"
-              // Temp disable multiple for simplicity - may want to re-enable
-              // multiple
-              limitTags={1}
-              // disabled={Object.keys(frozenFilter ?? {}).includes('opVersions')}
-              value={''}
-              onChange={(event, newValue) => {
-                // console.log('onChange', newValue);
-              }}
-              options={[]}
-              renderInput={renderParams => (
-                <StyledTextField
-                  {...renderParams}
-                  label={'Dimension 1'}
-                  sx={{maxWidth: '350px'}}
-                />
-              )}
-              // getOptionLabel={option => {
-              //   return opVersionOptions[option]?.title ?? 'loading...';
-              // }}
-              // disableClearable={
-              //   selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-              // }
-              // groupBy={option => opVersionOptions[option]?.group}
-              // options={Object.keys(opVersionOptions)}
-            />
-          </FormControl>
-          <FormControl fullWidth>
-            <Autocomplete
-              // PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-              size="small"
-              // Temp disable multiple for simplicity - may want to re-enable
-              // multiple
-              limitTags={1}
-              // disabled={Object.keys(frozenFilter ?? {}).includes('opVersions')}
-              value={''}
-              onChange={(event, newValue) => {
-                // console.log('onChange', newValue);
-              }}
-              options={[]}
-              renderInput={renderParams => (
-                <StyledTextField
-                  {...renderParams}
-                  label={'Dimension 2'}
-                  sx={{maxWidth: '350px'}}
-                />
-              )}
-              // getOptionLabel={option => {
-              //   return opVersionOptions[option]?.title ?? 'loading...';
-              // }}
-              // disableClearable={
-              //   selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-              // }
-              // groupBy={option => opVersionOptions[option]?.group}
-              // options={Object.keys(opVersionOptions)}
-            />
-          </FormControl>
-        </Box>
-        <Box
-          sx={{
-            height: '300px',
-            width: '100%',
-          }}>
-          <PlotlyScatterPlot />
-        </Box>
-        <Box>Model Predictions and Scores</Box>
-        <Box sx={{height: '600px', width: '100%', overflow: 'hidden'}}>
-          {calls[0] && (
-            <CallsTable
-              entity={props.entity}
-              project={props.project}
-              frozenFilter={callsFilter}
-              hideControls
-            />
-          )}
-        </Box>
-      </Box>
+    <Box sx={{height: '500px', width: '100%', overflow: 'hidden'}}>
+      <CallsTable
+        entity={props.entity}
+        project={props.project}
+        frozenFilter={callsFilter}
+        hideControls
+      />
     </Box>
   );
 };
 
-const pathToParts = (path: string) => {
-  if (!path.includes('.')) {
-    return {title: path, subtitle: null};
-  }
-  const parts = path.split('.');
-  return {
-    title: parts[parts.length - 1],
-    subtitle: parts.slice(0, -1).join('.'),
-  };
-};
+// const CompareEvaluationsPageInner2: React.FC<
+//   CompareDualEvaluationsPageProps
+// > = props => {
+//   const calls = useEvaluationCalls(
+//     props.entity,
+//     props.project,
+//     props.evaluationCallIds
+//   );
+//   const hasMoreThanOneEval = useMemo(() => {
+//     return new Set(calls.map(call => call.inputs.self)).size > 1;
+//   }, [calls]);
+//   const evalMetrics = useMemo(() => {
+//     return evaluationMetrics(calls).filter(
+//       metric => metric.values.filter(v => v != null).length === 2
+//     );
+//   }, [calls]);
+//   const callsFilter = useMemo(() => {
+//     return {
+//       parentId: calls[0] ? calls[0].id : null,
+//       opVersionRefs: [
+//         opVersionKeyToRefUri({
+//           entity: props.entity,
+//           project: props.project,
+//           opId: PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
+//           versionHash: '*',
+//         }),
+//       ],
+//     };
+//   }, [calls, props.entity, props.project]);
+// console.log(callsFilter);
+
+//   return (
+//     <Box
+//       sx={{
+//         display: 'flex',
+//         flexDirection: 'column',
+//         gridGap: 10,
+//         height: '100%',
+//         width: '100%',
+//         overflow: 'auto',
+//       }}>
+//       <div
+//         style={{
+//           width: '100%',
+//           backgroundColor: '#eee',
+//           padding: '10px',
+//           overflowY: 'hidden',
+//           overflowX: 'auto',
+//           display: 'flex',
+//           flexDirection: 'row',
+//           gridGap: 10,
+//           flex: '0 0 auto',
+//         }}>
+//         {evalMetrics.map(metric => {
+//           const val = metric.values[1] - metric.values[0];
+//           const isGood = metric.lowerIsBetter ? val <= 0 : val >= 0;
+//           const pathParts = pathToParts(metric.path);
+//           return (
+//             <Box
+//               key={metric.path}
+//               sx={{
+//                 width: '300px',
+//                 flex: '1 0 auto',
+//               }}>
+//               <MetricTile
+//                 title={pathParts.title}
+//                 subtitle={pathParts.subtitle ?? ''}
+//                 mainMetric={val}
+//                 isGood={isGood}
+//                 unit={metric.unit}
+//                 subMetric1={{
+//                   label: 'Baseline',
+//                   value: metric.values[0],
+//                 }}
+//                 subMetric2={{
+//                   label: 'Challenger',
+//                   value: metric.values[1],
+//                 }}
+//               />
+//             </Box>
+//           );
+//         })}
+//       </div>
+//       <Box
+//         sx={{
+//           display: 'grid',
+//           width: '100%',
+//           height: '100%',
+//           gridGap: 10,
+//           gridTemplateColumns: '230px auto',
+//           padding: 10,
+//           overflow: 'auto',
+//         }}>
+//         {hasMoreThanOneEval && (
+//           <Box
+//             sx={{
+//               gridColumn: '1 / span 2',
+//             }}>
+//             <Alert severity="warning">
+//               The selected evaluations have different Datasets and/or Scoring
+//               functions, therefore aggregate metrics may not be apples-to-apples
+//               comparisons.
+//             </Alert>
+//           </Box>
+//         )}
+//         {/* <Box
+//           sx={{
+//             fontWeight: 'bold',
+//             fontSize: 24,
+//             padding: 10,
+//             textAlign: 'center',
+//           }}>
+//           <h3>Summary Metrics</h3>
+//         </Box>
+//         <BasicTable /> */}
+//         <Box
+//           sx={{
+//             fontWeight: 'bold',
+//             fontSize: 24,
+//             padding: 10,
+//             textAlign: 'center',
+//           }}>
+//           <h3>Model Properties</h3>
+//         </Box>
+//         <BasicTable calls={calls} />
+//         {/* <Box></Box> */}
+//         <Box
+//           sx={{
+//             fontWeight: 'bold',
+//             fontSize: 24,
+//             padding: 10,
+//             textAlign: 'center',
+//             display: 'flex',
+//             flexDirection: 'column',
+//             gridGap: 10,
+//           }}>
+//           <h3>Compare Models</h3>
+//           <FormControl fullWidth>
+//             <Autocomplete
+//               // PaperComponent={paperProps => <StyledPaper {...paperProps} />}
+//               size="small"
+//               // Temp disable multiple for simplicity - may want to re-enable
+//               // multiple
+//               limitTags={1}
+//               // disabled={Object.keys(frozenFilter ?? {}).includes('opVersions')}
+//               value={''}
+//               onChange={(event, newValue) => {
+// console.log('onChange', newValue);
+//               }}
+//               options={[]}
+//               renderInput={renderParams => (
+//                 <StyledTextField
+//                   {...renderParams}
+//                   label={'Dimension 1'}
+//                   sx={{maxWidth: '350px'}}
+//                 />
+//               )}
+//               // getOptionLabel={option => {
+//               //   return opVersionOptions[option]?.title ?? 'loading...';
+//               // }}
+//               // disableClearable={
+//               //   selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
+//               // }
+//               // groupBy={option => opVersionOptions[option]?.group}
+//               // options={Object.keys(opVersionOptions)}
+//             />
+//           </FormControl>
+//           <FormControl fullWidth>
+//             <Autocomplete
+//               // PaperComponent={paperProps => <StyledPaper {...paperProps} />}
+//               size="small"
+//               // Temp disable multiple for simplicity - may want to re-enable
+//               // multiple
+//               limitTags={1}
+//               // disabled={Object.keys(frozenFilter ?? {}).includes('opVersions')}
+//               value={''}
+//               onChange={(event, newValue) => {
+// console.log('onChange', newValue);
+//               }}
+//               options={[]}
+//               renderInput={renderParams => (
+//                 <StyledTextField
+//                   {...renderParams}
+//                   label={'Dimension 2'}
+//                   sx={{maxWidth: '350px'}}
+//                 />
+//               )}
+//               // getOptionLabel={option => {
+//               //   return opVersionOptions[option]?.title ?? 'loading...';
+//               // }}
+//               // disableClearable={
+//               //   selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
+//               // }
+//               // groupBy={option => opVersionOptions[option]?.group}
+//               // options={Object.keys(opVersionOptions)}
+//             />
+//           </FormControl>
+//         </Box>
+//         <Box
+//           sx={{
+//             height: PLOT_HEIGHT,
+//             width: '100%',
+//           }}>
+//           <PlotlyScatterPlot />
+//         </Box>
+//         <Box>Model Predictions and Scores</Box>
+//         <Box sx={{height: '600px', width: '100%', overflow: 'hidden'}}>
+//           {calls[0] && (
+//             <CallsTable
+//               entity={props.entity}
+//               project={props.project}
+//               frozenFilter={callsFilter}
+//               hideControls
+//             />
+//           )}
+//         </Box>
+//       </Box>
+//     </Box>
+//   );
+// };
+
+// const pathToParts = (path: string) => {
+//   if (!path.includes('.')) {
+//     return {title: path, subtitle: null};
+//   }
+//   const parts = path.split('.');
+//   return {
+//     title: parts[parts.length - 1],
+//     subtitle: parts.slice(0, -1).join('.'),
+//   };
+// };
 
 const TitleWithDot: React.FC<{title: string; color: string}> = ({
   title,
@@ -926,11 +1281,12 @@ const PlotlyScatterPlot: React.FC<{}> = () => {
       data as any,
       {
         height: PLOT_HEIGHT,
+        showlegend: false,
         title: '',
         margin: {
           l: 20, // legend
           r: 0,
-          b: 20, // legend
+          b: 30, // legend
           t: 0,
           pad: 0,
         },
@@ -953,140 +1309,73 @@ const PlotlyScatterPlot: React.FC<{}> = () => {
   );
 };
 
-const PlotlyRadialPlot: React.FC<{}> = () => {
-  const divRef = useRef<HTMLDivElement>(null);
+// const PlotlyBarPlot: React.FC<{}> = () => {
+//   const divRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const data = [
-      {
-        type: 'scatterpolar',
-        r: [39, 28, 8, 7, 28, 39],
-        theta: ['A', 'B', 'C', 'D', 'E', 'A'],
-        fill: 'toself',
-        name: 'Group A',
-        marker: {color: TEAL_500},
-      },
-      {
-        type: 'scatterpolar',
-        r: [1.5, 10, 39, 31, 15, 1.5],
-        theta: ['A', 'B', 'C', 'D', 'E', 'A'],
-        fill: 'toself',
-        marker: {color: CACTUS_500},
-      },
-    ];
+//   useEffect(() => {
+//     const trace1 = {
+//       x: ['A', 'B', 'C', 'D', 'E'],
+//       y: [20, 14, 23, 23, 43],
+//       type: 'bar',
+//       marker: {color: TEAL_500},
+//     };
 
-    const layout = {
-      height: PLOT_HEIGHT,
+//     const trace2 = {
+//       x: ['A', 'B', 'C', 'D', 'E'],
+//       y: [12, 18, 29, 54, 23],
+//       type: 'bar',
+//       marker: {color: CACTUS_500},
+//     };
 
-      showlegend: false,
-      margin: {
-        l: 30, // legend
-        r: 30,
-        b: 30, // legend
-        t: 30,
-        pad: 0,
-      },
-      polar: {
-        color: MOON_300,
-        radialaxis: {
-          linecolor: MOON_300,
-          // color: MOON_300,
-          visible: false,
-          range: [0, 50],
-          gridcolor: MOON_300, // Customize radial grid color
-        },
-        angularaxis: {
-          linecolor: MOON_300,
-          // color: MOON_300,
-          gridcolor: MOON_300, // Customize angular grid color
-        },
-      },
-    };
-    Plotly.newPlot(divRef.current as any, data as any, layout, {
-      displayModeBar: false,
-      responsive: true,
-      // staticPlot: true, // Disable all interactions
-    });
-  }, []);
+//     const data = [trace1, trace2];
+//     Plotly.newPlot(
+//       divRef.current as any,
+//       data as any,
+//       {
+//         height: PLOT_HEIGHT - 2 * PLOT_PADDING,
+//         showlegend: false,
+//         title: '',
+//         margin: {
+//           l: 0,
+//           r: 0,
+//           b: 20,
+//           t: 0,
+//           pad: 0,
+//         },
+//         xaxis: {
+//           fixedrange: true,
+//           // showgrid: true,
+//           gridcolor: MOON_300, // Customize x-axis grid color
+//           // color: MOON_300, // Customize x-axis grid color
+//           linecolor: MOON_300, // Customize x-axis grid color
+//         },
+//         yaxis: {
+//           fixedrange: true,
+//           // showgrid: true,
+//           gridcolor: MOON_300, // Customize x-axis grid color
+//           // color: MOON_300, // Customize x-axis grid color
+//           linecolor: MOON_300, // Customize x-axis grid color
+//         },
+//       },
+//       {
+//         displayModeBar: false,
+//         responsive: true,
 
-  return (
-    <Box
-      sx={{
-        height: '100%',
-        width: '100%',
-      }}>
-      <div ref={divRef}></div>
-    </Box>
-  );
-};
+//         // staticPlot: true, // Disable all interactions
+//       }
+//     );
+//   }, []);
 
-const PlotlyBarPlot: React.FC<{}> = () => {
-  const divRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const trace1 = {
-      x: ['A', 'B', 'C', 'D', 'E'],
-      y: [20, 14, 23, 23, 43],
-      type: 'bar',
-      marker: {color: TEAL_500},
-    };
-
-    const trace2 = {
-      x: ['A', 'B', 'C', 'D', 'E'],
-      y: [12, 18, 29, 54, 23],
-      type: 'bar',
-      marker: {color: CACTUS_500},
-    };
-
-    const data = [trace1, trace2];
-    Plotly.newPlot(
-      divRef.current as any,
-      data as any,
-      {
-        height: PLOT_HEIGHT - 2 * PLOT_PADDING,
-        showlegend: false,
-        title: '',
-        margin: {
-          l: 0,
-          r: 0,
-          b: 20,
-          t: 0,
-          pad: 0,
-        },
-        xaxis: {
-          fixedrange: true,
-          // showgrid: true,
-          gridcolor: MOON_300, // Customize x-axis grid color
-          // color: MOON_300, // Customize x-axis grid color
-          linecolor: MOON_300, // Customize x-axis grid color
-        },
-        yaxis: {
-          fixedrange: true,
-          // showgrid: true,
-          gridcolor: MOON_300, // Customize x-axis grid color
-          // color: MOON_300, // Customize x-axis grid color
-          linecolor: MOON_300, // Customize x-axis grid color
-        },
-      },
-      {
-        displayModeBar: false,
-        responsive: true,
-
-        // staticPlot: true, // Disable all interactions
-      }
-    );
-  }, []);
-
-  return (
-    <Box
-      sx={{
-        height: '100%',
-        width: '100%',
-      }}>
-      <div ref={divRef}></div>
-    </Box>
-  );
-};
+//   return (
+//     <Box
+//       sx={{
+//         height: '100%',
+//         width: '100%',
+//       }}>
+//       <div ref={divRef}></div>
+//     </Box>
+//   );
+// };
 
 /**
  * TOOD:

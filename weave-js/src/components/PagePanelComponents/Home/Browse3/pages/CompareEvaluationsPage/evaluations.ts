@@ -88,11 +88,11 @@ export const useModelsFromEvaluationCalls = (
   }, [modelData.result, modelRefs]);
 };
 
-type ComparisonMetric = {
+export type ComparisonMetric = {
   path: string;
   unit: string;
-  values: number[];
   lowerIsBetter: boolean;
+  values: {[callId: string]: number};
 };
 
 export const evaluationMetrics = (
@@ -104,8 +104,10 @@ export const evaluationMetrics = (
   const tokensMetric: ComparisonMetric = {
     path: 'total_tokens',
     unit: ' tokens',
-    values: evaluationCalls.map(call =>
-      sum(Object.values(call.summary.usage).map(v => v.total_tokens))
+    values: Object.fromEntries(
+      evaluationCalls.map(call =>
+        ([call.id, sum(Object.values(call.summary.usage).map(v => v.total_tokens))])
+      )
     ),
     lowerIsBetter: true,
   };
@@ -138,17 +140,19 @@ export const evaluationMetrics = (
         allScorers[scorerKey] = {
           path: scorerKey,
           unit,
-          values: [],
+          values: {},
           lowerIsBetter,
         };
       }
       if (hasFraction) {
-        allScorers[scorerKey].values.push(flattenedOutput[fractionKey]);
+        allScorers[scorerKey].values[call.id] = flattenedOutput[fractionKey]
       } else {
-        allScorers[scorerKey].values.push(flattenedOutput[meanKey]);
+        allScorers[scorerKey].values[call.id] = flattenedOutput[meanKey]
       }
     });
   });
 
   return [tokensMetric, ...Object.values(allScorers)];
 };
+
+
