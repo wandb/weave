@@ -1191,6 +1191,11 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 # So we don't yet correctly deserialize lists of relocatable objects
                 # with different methods correctly.
                 # TODO: fix
+
+                from weave.flow.obj import Metadata
+                if isinstance(v, Metadata):
+                    v = v.model_dump()
+
                 return (
                     None
                     if v is None

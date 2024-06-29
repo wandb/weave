@@ -37,7 +37,7 @@ def test_flask_server(flask_server):
     url = flask_server
     response = requests.get(url)
     assert response.status_code == 200
-    assert response.text == "T41nPvr6zpAr4ClFpZeH1p4xXE2x2bH2JeUXyOsQ4nY"
+    assert response.text == "PHOGkwSOn7DqLgIUNgUAq7d2vXpOmG8NGLltn6slzeU"
 
 
 def test_graph_client_global_accessible_in_thread(client):
