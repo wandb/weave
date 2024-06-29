@@ -38,7 +38,9 @@ class Object(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def check_metadata(cls, data: Any) -> Any:
-        if not isinstance(data["metadata"], Metadata):
+        if (metadata := data.get("metadata", None)) and not isinstance(
+            metadata, Metadata
+        ):
             raise ValueError(
                 "`metadata` is a reserved keyword arg in Weave for labeling objects.  Do not override!"
             )
