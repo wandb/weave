@@ -232,6 +232,9 @@ class Evaluation(Object):
                     """
                 )
                 raise OpCallError(message)
+            # this is a catchall in case the user's scorer function throws
+            except Exception as e:
+                result = {"error": str(e), "example": example}
             scores[scorer_name] = result
 
         return {
@@ -252,8 +255,14 @@ class Evaluation(Object):
                     scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
                     scorer_stats = transpose(vals)
                     score_table = scorer_stats[scorer_name]
-                    scored = summarize_fn(score_table)
-                    summary[scorer_name] = scored
+
+                    if errs := [
+                        s for s in score_table if isinstance(s, dict) and "error" in s
+                    ]:
+                        summary[scorer_name] = {"errors": errs}
+                    else:
+                        scored = summarize_fn(score_table)
+                        summary[scorer_name] = scored
             else:
                 model_output_summary = auto_summarize(vals)
                 if model_output_summary:
