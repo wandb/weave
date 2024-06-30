@@ -19,7 +19,6 @@ from weave.flow.scorer import (
     Scorer,
     auto_summarize,
     get_scorer_attributes,
-    new_auto_summarize,
     transpose,
 )
 from weave.trace.env import get_weave_parallelism
@@ -272,7 +271,7 @@ class Evaluation(Object):
                     scored = summarize_fn(score_table)
                     summary[scorer_name] = scored
             else:
-                model_output_summary = new_auto_summarize(vals)
+                model_output_summary = auto_summarize(vals)
                 if model_output_summary:
                     summary[name] = model_output_summary
 
