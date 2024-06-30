@@ -182,3 +182,37 @@ def test_multiclass_f1_score(client):
             "mean": pytest.approx(0, abs=0.05),
         },
     }
+
+
+def test_score_with_errors(client):
+    @weave.op
+    def raise_above_2_score(model_output: int, actual: int) -> dict:
+        if actual > 2:
+            raise ValueError("actual is too big")
+        return {"actual": model_output == actual}
+
+    evaluation = Evaluation(
+        dataset=[
+            {"pred": 1, "actual": 1},
+            {"pred": 2, "actual": 2},
+            {"pred": 3, "actual": 3},
+            {"pred": 4, "actual": 4},
+        ],
+        scorers=[raise_above_2_score],
+    )
+
+    @weave.op()
+    def return_pred(pred):
+        return pred
+
+    result = asyncio.run(evaluation.evaluate(return_pred))
+    assert result == {
+        "model_output": {"mean": 2.5},
+        "model_latency": {"mean": pytest.approx(0, abs=0.05)},
+        "raise_above_2_score": {
+            "errors": [
+                {"error": "actual is too big", "example": {"actual": 3, "pred": 3}},
+                {"error": "actual is too big", "example": {"actual": 4, "pred": 4}},
+            ]
+        },
+    }
