@@ -1,10 +1,16 @@
+from __future__ import annotations
+
+from collections import defaultdict
+from numbers import Number
 from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
 import numpy as np
+from pydantic import BaseModel
 
 import weave
 from weave import WeaveList
 from weave.flow.obj import Object
+from weave.legacy import box
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 
@@ -15,7 +21,7 @@ class Scorer(Object):
 
     @weave.op()
     def summarize(self, score_rows: WeaveList) -> Optional[dict]:
-        return auto_summarize(score_rows)
+        return new_auto_summarize(score_rows)
 
 
 def stderr(data: Sequence[Union[int, float]]) -> float:
@@ -101,7 +107,7 @@ def get_scorer_attributes(
         else:
             scorer_name = scorer.__name__
         score_fn = scorer
-        summarize_fn = auto_summarize  # type: ignore
+        summarize_fn = new_auto_summarize  # type: ignore
     else:
         raise ValueError(f"Unknown scorer type: {scorer}")
     return (scorer_name, score_fn, summarize_fn)  # type: ignore
@@ -126,27 +132,22 @@ class MultiTaskBinaryClassificationF1(Scorer):
 
     @weave.op()
     def summarize(self, score_rows: WeaveList) -> Optional[dict]:
-        # Compute f1, precision, recall
         result = {}
+        cols = transpose(score_rows)
+
         for class_name in self.class_names:
-            class_scores = [row.get(class_name) for row in score_rows]
-            true_positives = sum(
-                not score["negative"] and score["correct"] for score in class_scores
-            )
-            false_positives = sum(
-                not score["negative"] and not score["correct"] for score in class_scores
-            )
-            false_negatives = sum(
-                score["negative"] and not score["correct"] for score in class_scores
-            )
-            precision, recall, f1 = p_r_f1(
-                true_positives, false_positives, false_negatives
-            )
+            col = cols[class_name]
+            tp = sum(r["correct"] and not r["negative"] for r in col)
+            fp = sum(not r["correct"] and not r["negative"] for r in col)
+            fn = sum(not r["correct"] and r["negative"] for r in col)
+            precision, recall, f1 = p_r_f1(tp, fp, fn)
             result[class_name] = {"f1": f1, "precision": precision, "recall": recall}
+
         return result
 
     @weave.op()
     def score(self, target: dict, model_output: Optional[dict]) -> dict:
+        print(f"inside score... {target=}, {model_output=}")
         result = {}
         for class_name in self.class_names:
             class_label = target.get(class_name)
@@ -156,3 +157,45 @@ class MultiTaskBinaryClassificationF1(Scorer):
                 "negative": not class_model_output,
             }
         return result
+
+
+def new_auto_summarize(values: list) -> dict[str, Any] | None:
+    if not values:
+        return {}
+
+    values = [x for x in values if x is not None]
+    val = values[0]
+
+    if isinstance(val, (bool, box.BoxedBool)):
+        return {
+            "true_count": (true_count := sum(1 for x in values if x)),
+            "true_fraction": true_count / len(values),
+        }
+
+    elif isinstance(val, Number):
+        return {"mean": np.mean(values).item()}
+
+    elif isinstance(val, dict):
+        result = {}
+        for k in val:
+            if (summary := new_auto_summarize([x[k] for x in values])) is not None:
+                if k in summary:
+                    result.update(summary)
+                else:
+                    result[k] = summary
+        if not result:
+            return None
+        return result
+
+    elif isinstance(val, BaseModel):
+        return new_auto_summarize([x.model_dump() for x in values])
+
+    return None
+
+
+def transpose(rows: list[dict]) -> dict[str, list]:
+    cols = defaultdict(list)
+    for row in rows:
+        for k, v in row.items():
+            cols[k].append(v)
+    return dict(cols)
