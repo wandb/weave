@@ -1,9 +1,13 @@
 """Utilities for working with IPython/Jupyter notebooks."""
 
 import ast
+from typing import Callable
 
 
-def is_running_interactively():
+class NotInteractiveEnvironmentError(Exception): ...
+
+
+def is_running_interactively() -> bool:
     """Check if the code is running in an interactive environment."""
     try:
         from IPython import get_ipython
@@ -13,16 +17,16 @@ def is_running_interactively():
         return False
 
 
-def get_notebook_source():
+def get_notebook_source() -> str:
     """Get the source code of the running notebook."""
     from IPython import get_ipython
 
     shell = get_ipython()
     if shell is None:
-        return "Not running in IPython/Jupyter environment"
+        raise NotInteractiveEnvironmentError
 
     if not hasattr(shell, "user_ns"):
-        return "Cannot access user namespace"
+        raise AttributeError("Cannot access user namespace")
 
     # This is the list of input cells in the notebook
     in_list = shell.user_ns["In"]
@@ -33,7 +37,7 @@ def get_notebook_source():
     return full_source
 
 
-def get_class_source(cls):
+def get_class_source(cls: Callable) -> str:
     """Get the latest source definition of a class in the notebook."""
     notebook_source = get_notebook_source()
     tree = ast.parse(notebook_source)
