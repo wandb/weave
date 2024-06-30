@@ -281,7 +281,7 @@ def get_code_deps(
                 import_code += fn_import_code
 
                 code += fn_code
-                code.append(get_source_notebook_safe(fn))
+                code.append(get_source_notebook_safe(var_value))
 
                 warnings += fn_warnings
             else:
