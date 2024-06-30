@@ -89,7 +89,7 @@ def get_scorer_attributes(
         else:
             scorer_name = scorer.__name__
         score_fn = scorer
-        summarize_fn = auto_summarize  # type: ignore
+        summarize_fn = new_auto_summarize  # type: ignore
     else:
         raise ValueError(f"Unknown scorer type: {scorer}")
     return (scorer_name, score_fn, summarize_fn)  # type: ignore
