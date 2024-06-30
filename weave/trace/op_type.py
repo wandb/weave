@@ -200,6 +200,23 @@ def get_source_notebook_safe(fn: typing.Callable) -> str:
     return textwrap.dedent(src)
 
 
+def get_source_or_fallback(fn: typing.Callable) -> str:
+    missing_code_template = textwrap.dedent(
+        """
+        def op_fn(*args, **kwargs):  # type: ignore
+            # Code-capture unavailable for this op
+            pass
+        """
+    )
+    if isinstance(fn, Op):
+        fn = fn.resolve_fn
+
+    try:
+        return get_source_notebook_safe(fn)
+    except OSError:
+        return missing_code_template
+
+
 def get_code_deps(
     fn: Union[typing.Callable, type],  # A function or a class
     artifact: artifact_fs.FilesystemArtifact,
@@ -234,7 +251,7 @@ def get_code_deps(
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
 
-    source = get_source_notebook_safe(fn)
+    source = get_source_or_fallback(fn)
     try:
         parsed = ast.parse(source)
     except SyntaxError:
@@ -398,7 +415,7 @@ def save_instance(
             # print(message)
             pass
 
-    op_function_code = get_source_notebook_safe(obj.resolve_fn)
+    op_function_code = get_source_or_fallback(obj)
 
     if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
