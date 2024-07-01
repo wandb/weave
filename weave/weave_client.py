@@ -19,14 +19,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.op import Op
-from weave.trace.refs import (
-    CallRef,
-    ObjectRef,
-    OpRef,
-    Ref,
-    TableRef,
-    parse_uri,
-)
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (

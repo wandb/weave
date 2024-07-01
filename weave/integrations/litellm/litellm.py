@@ -88,7 +88,7 @@ def make_wrapper(name: str) -> typing.Callable:
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
-            litellm_accumulator,
+            make_accumulator=lambda inputs: litellm_accumulator,
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=litellm_on_finish_post_processor,
         )
