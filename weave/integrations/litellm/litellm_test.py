@@ -163,12 +163,9 @@ def test_litellm_quickstart_stream(
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
-    # Stream tokens not supported yet with liteLLM - need to add manual counting similar to openai
-    # assert (
-    #     output["usage"]["completion_tokens"] == model_usage["completion_tokens"] == 0
-    # )
-    # assert output["usage"]["prompt_tokens"] == model_usage["prompt_tokens"] == 0
-    # assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 0
+    assert model_usage["completion_tokens"] == 31
+    assert model_usage["prompt_tokens"] == 13
+    assert model_usage["total_tokens"] == 44
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -208,9 +205,6 @@ async def test_litellm_quickstart_stream_async(
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
-    # Stream tokens not supported yet with liteLLM - need to add manual counting similar to openai
-    # assert (
-    #     output["usage"]["completion_tokens"] == model_usage["completion_tokens"] == 0
-    # )
-    # assert output["usage"]["prompt_tokens"] == model_usage["prompt_tokens"] == 0
-    # assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 0
+    assert model_usage["completion_tokens"] == 41
+    assert model_usage["prompt_tokens"] == 13
+    assert model_usage["total_tokens"] == 54
