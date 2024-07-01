@@ -157,5 +157,5 @@ export const evaluationMetrics = (
     });
   });
 
-  return [tokensMetric, ...Object.values(allScorers)];
+  return [...Object.values(allScorers), tokensMetric];
 };

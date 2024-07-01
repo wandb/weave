@@ -1,22 +1,22 @@
 import {Box} from '@material-ui/core';
+import {ToggleButton} from '@mui/material';
 import {sum} from 'lodash';
 import React, {useMemo} from 'react';
 
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
+import {Checkbox, Switch} from '../../../../..';
+import {Pill, TagColorName} from '../../../../../Tag';
+import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
+import {OpVersionLink} from '../common/Links';
 import {EvaluationComparisonState} from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './constants';
+import {EvaluationCallLink, EvaluationModelLink} from './EvaluationDefinition';
 import {
   isBinarySummaryScore,
   isContinuousSummaryScore,
 } from './evaluationResults';
-import {EvaluationCallLink, EvaluationModelLink} from './EvaluationDefinition';
-import {ToggleButton} from '@mui/material';
-import {Checkbox, Switch} from '../../../../..';
-import {SmallRef} from '../../../Browse2/SmallRef';
-import {OpVersionLink} from '../common/Links';
 import {HorizontalBox, VerticalBox} from './Layout';
-import {Pill, TagColorName} from '../../../../../Tag';
 
 const moveItemToFront = (arr: any[], item: any) => {
   const index = arr.indexOf(item);
@@ -202,7 +202,7 @@ export const ScoreCard: React.FC<{
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: gridTemplateColumns,
+          gridTemplateColumns,
           gap: '4px',
         }}>
         {/* Header Row */}
@@ -302,6 +302,10 @@ export const ScoreCard: React.FC<{
         {/* <div></div> */}
         {/* Score Rows */}
         {Object.entries(betterScores).map(([key, def]) => {
+          // TODO: this might be wrong if the scorers change between evals with the same name!! Need to revisit
+          const scorerRefParsed = parseRefMaybe(
+            def.scorerRef ?? ''
+          ) as WeaveObjectRef | null;
           return (
             <React.Fragment key={key}>
               <div
@@ -311,7 +315,11 @@ export const ScoreCard: React.FC<{
                   borderTop: '1px solid #ccc',
                   fontWeight: 'bold',
                 }}>
-                {def.scorerName ?? ''}
+                {scorerRefParsed ? (
+                  <SmallRef objRef={scorerRefParsed} />
+                ) : (
+                  def.scorerName ?? ''
+                )}
               </div>
               {Object.keys(def.metrics).map((metricKey, metricNdx) => {
                 return (

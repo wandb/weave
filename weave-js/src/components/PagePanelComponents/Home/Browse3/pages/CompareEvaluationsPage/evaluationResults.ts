@@ -239,7 +239,13 @@ export const fetchEvaluationComparisonData = async (
         {
           ref,
           properties: Object.fromEntries(
-            Object.entries(objData as any).filter(([key]) => key !== 'predict' && !key.startsWith("_") && key !== "name" && key !== "description")
+            Object.entries(objData as any).filter(
+              ([key]) =>
+                key !== 'predict' &&
+                !key.startsWith('_') &&
+                key !== 'name' &&
+                key !== 'description'
+            )
           ) as any,
           predictOpRef: objData.predict,
           entity: parsed.entityName,

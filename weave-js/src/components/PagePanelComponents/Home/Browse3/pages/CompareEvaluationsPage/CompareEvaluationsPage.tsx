@@ -49,6 +49,9 @@ type CompareEvaluationsPageProps = {
 export const CompareEvaluationsPage: React.FC<
   CompareEvaluationsPageProps
 > = props => {
+  if (props.evaluationCallIds.length === 0) {
+    return <div>No evaluations to compare</div>;
+  }
   return (
     <SimplePageLayout
       title={'Compare Evaluations'}
@@ -120,6 +123,11 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC = props => {
   const state = useCompareEvaluationsState();
+  const dims = useEvaluationCallDimensions(state);
+  useEffect(() => {
+    if (state.primaryDimension == null) {
+    }
+  }, []);
   return (
     <Box
       sx={{
@@ -158,29 +166,29 @@ const ScatterFilter: React.FC<{state: EvaluationComparisonState}> = props => {
           borderRadius: BOX_RADIUS,
           border: STANDARD_BORDER,
         }}>
-        <ScatterDefinition {...props} />
+        {/* <ScatterDefinition {...props} /> */}
         <PlotlyScatterPlot />
       </VerticalBox>
     </VerticalBox>
   );
 };
 
-const ScatterDefinition: React.FC<{
-  state: EvaluationComparisonState;
-}> = props => {
-  return (
-    <HorizontalBox
-      sx={{
-        alignItems: 'center',
-        paddingTop: STANDARD_PADDING,
-      }}>
-      <DefinitionText text="Plot" />
-      <DimensionPicker {...props} />
-      <DefinitionText text="against" />
-      <DimensionPicker {...props} />
-    </HorizontalBox>
-  );
-};
+// const ScatterDefinition: React.FC<{
+//   state: EvaluationComparisonState;
+// }> = props => {
+//   return (
+//     <HorizontalBox
+//       sx={{
+//         alignItems: 'center',
+//         paddingTop: STANDARD_PADDING,
+//       }}>
+//       <DefinitionText text="Plot" />
+//       <DimensionPicker {...props} />
+//       <DefinitionText text="against" />
+//       <DimensionPicker {...props} />
+//     </HorizontalBox>
+//   );
+// };
 
 const SummaryPlots: React.FC<{state: EvaluationComparisonState}> = props => {
   const plotlyRadarData = useNormalizedRadarPlotDataFromMetrics(props.state);
@@ -317,7 +325,7 @@ const DimensionPicker: React.FC<{state: EvaluationComparisonState}> = props => {
           <StyledTextField
             {...renderParams}
             label={'Dimension'}
-            sx={{minWidth: '200px'}}
+            sx={{width: '300px'}}
           />
         )}
       />
@@ -328,16 +336,21 @@ const DimensionPicker: React.FC<{state: EvaluationComparisonState}> = props => {
 const useEvaluationCallDimensions = (
   state: EvaluationComparisonState
 ): string[] => {
-  return ['dimension1', 'dimension2', 'dimension3'];
-  // const calls = useEvaluationCalls(entity, project, callIds);
-  // const dimensions = useMemo(() => {
-  //   const allDims = calls.map(call => call.inputs.self.dimensions);
-  //   const commonDims = allDims.reduce((acc, dims) => {
-  //     return acc.filter(dim => dims.includes(dim));
-  //   }, allDims[0]);
-  //   return commonDims;
-  // }, [calls]);
-  // return dimensions;
+  return useMemo(() => {
+    const availableScorers = Object.values(state.data.evaluationCalls)
+      .map(evalCall =>
+        Object.entries(evalCall.scores)
+          .map(([k, v]) => Object.keys(v).map(innerKey => k + '.' + innerKey))
+          .flat()
+      )
+      .flat();
+
+    return [
+      ...Array.from(new Set(availableScorers)),
+      'model_latency',
+      'total_tokens',
+    ];
+  }, [state.data.evaluationCalls]);
 };
 
 const SwapPositionsButton: React.FC = () => {
@@ -440,6 +453,7 @@ const PlotlyScatterPlot: React.FC<{}> = () => {
  * - [ ] Wireup the baseline replace button
  * - [ ] Fix Plot to show correct data
  * - [ ] Build grouping
+ * - [ ] Add scorer links in scorecard
  * TEST:
  * - [ ] Single Case
  * - [ ] Dual Case
