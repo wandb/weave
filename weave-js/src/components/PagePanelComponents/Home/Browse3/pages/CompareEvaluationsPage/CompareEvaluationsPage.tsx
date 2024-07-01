@@ -1,5 +1,4 @@
-import {Box, BoxProps, FormControl} from '@material-ui/core';
-import {Circle} from '@mui/icons-material';
+import {Box, FormControl} from '@material-ui/core';
 import {Autocomplete} from '@mui/material';
 import * as Plotly from 'plotly.js';
 import React, {
@@ -12,41 +11,34 @@ import React, {
 } from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {
-  CACTUS_500,
-  MOON_300,
-  MOON_600,
-  MOON_800,
-  TEAL_500,
-} from '../../../../../../common/css/color.styles';
-import {hexToRGB} from '../../../../../../common/css/utils';
+import {CACTUS_500, TEAL_500} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
-import {Icon, IconNames} from '../../../../../Icon';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
 import {StyledTextField} from '../../StyledTextField';
 import {useEvaluationsFilter} from '../CallsPage/CallsPage';
-import {CallLink, ObjectVersionLink} from '../common/Links';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
   EvaluationComparisonState,
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
+import {
+  BOX_RADIUS,
+  PLOT_HEIGHT,
+  PLOT_PADDING,
+  STANDARD_BORDER,
+  STANDARD_PADDING,
+} from './constants';
+import {EvaluationDefinition} from './EvaluationDefinition';
 import {evaluationMetrics} from './evaluations';
+import {HorizontalBox, VerticalBox} from './Layout';
+import {PlotlyBarPlot} from './PlotlyBarPlot';
 // import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {ScoreCard} from './Scorecard';
-
-const EVAL_DEF_HEIGHT = '45px';
-const STANDARD_PADDING = '16px';
-const CIRCLE_SIZE = '16px';
-const BOX_RADIUS = '6px';
-const STANDARD_BORDER = `1px solid ${MOON_300}`;
-const PLOT_HEIGHT = 300;
-// const PLOT_PADDING = 30;
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -123,38 +115,6 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
         Return to Evaluations
       </Button>
     </Box>
-  );
-};
-
-const VerticalBox: React.FC<BoxProps> = props => {
-  return (
-    <Box
-      {...props}
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        gridGap: STANDARD_PADDING,
-        overflow: 'hidden',
-        flex: '0 0 auto',
-        ...props.sx,
-      }}
-    />
-  );
-};
-
-const HorizontalBox: React.FC<BoxProps> = props => {
-  return (
-    <Box
-      {...props}
-      sx={{
-        display: 'flex',
-        flexDirection: 'row',
-        gridGap: STANDARD_PADDING,
-        overflow: 'hidden',
-        flex: '0 0 auto',
-        ...props.sx,
-      }}
-    />
   );
 };
 
@@ -247,7 +207,7 @@ const SummaryPlots: React.FC<{state: EvaluationComparisonState}> = props => {
         {/* <PlotlyRadarPlot /> */}
         {/* // <PlotlyRadialPlot /> */}
       </Box>
-      {/* <Box
+      <Box
         sx={{
           flex: '1 1 auto',
           height: PLOT_HEIGHT,
@@ -258,7 +218,7 @@ const SummaryPlots: React.FC<{state: EvaluationComparisonState}> = props => {
           padding: PLOT_PADDING,
         }}>
         <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
-      </Box> */}
+      </Box>
       {/* <RadarPlot plotlyRadarData={plotlyRadarData} />
       <BarPlots plotlyRadarData={plotlyRadarData}} /> */}
     </HorizontalBox>
@@ -380,106 +340,6 @@ const useEvaluationCallDimensions = (
   // return dimensions;
 };
 
-const EvaluationDefinition: React.FC<{
-  state: EvaluationComparisonState;
-  callId: string;
-}> = props => {
-  return (
-    <HorizontalBox
-      sx={{
-        height: EVAL_DEF_HEIGHT,
-        borderRadius: BOX_RADIUS,
-        border: STANDARD_BORDER,
-        padding: '12px',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-      <EvaluationCallLink {...props} />
-      <VerticalBar />
-      <EvaluationModelLink {...props} />
-    </HorizontalBox>
-  );
-};
-
-const EvaluationCallLink: React.FC<{
-  callId: string;
-  state: EvaluationComparisonState;
-}> = props => {
-  // console.log(props.state, props.callId);
-  const evaluationCall = props.state.data.evaluationCalls[props.callId];
-  const [entity, project] =
-    evaluationCall._rawEvaluationTraceData.project_id.split('/');
-  return (
-    <CallLink
-      entityName={entity}
-      projectName={project}
-      opName={evaluationCall.name}
-      callId={props.callId}
-      icon={
-        <Circle
-          sx={{
-            color: evaluationCall.color,
-            height: CIRCLE_SIZE,
-          }}
-        />
-      }
-      color={MOON_800}
-    />
-  );
-};
-
-const VerticalBar: React.FC = () => {
-  return (
-    <div
-      style={{
-        width: '2px',
-        height: '100%',
-        backgroundColor: MOON_300,
-      }}
-    />
-  );
-};
-
-const ModelIcon: React.FC = () => {
-  return (
-    <Box
-      mr="4px"
-      bgcolor={hexToRGB(MOON_300, 0.48)}
-      sx={{
-        height: '22px',
-        width: '22px',
-        borderRadius: '16px',
-        display: 'flex',
-        flex: '0 0 22px',
-        justifyContent: 'center',
-        alignItems: 'center',
-        color: MOON_600,
-      }}>
-      <Icon name={IconNames.Model} width={14} height={14} />
-    </Box>
-  );
-};
-
-const EvaluationModelLink: React.FC<{
-  callId: string;
-  state: EvaluationComparisonState;
-}> = props => {
-  const evaluationCall = props.state.data.evaluationCalls[props.callId];
-  const modelObj = props.state.data.models[evaluationCall.modelRef];
-
-  return (
-    <ObjectVersionLink
-      entityName={modelObj.entity}
-      projectName={modelObj.project}
-      objectName={modelObj._rawModelObject.object_id}
-      version={modelObj._rawModelObject.digest}
-      versionIndex={modelObj._rawModelObject.version_index}
-      color={MOON_800}
-      icon={<ModelIcon />}
-    />
-  );
-};
-
 const SwapPositionsButton: React.FC = () => {
   return (
     <Button size="medium" variant="quiet" onClick={console.log} icon="retry" />
@@ -576,9 +436,12 @@ const PlotlyScatterPlot: React.FC<{}> = () => {
 
 /**
  * TOOD:
- * - [ ] Add action to swap the positions of the evaluations
- * - [ ] Add action to select the dimensions to compare
- * - [ ] Make colors parametric and dynamic
- * - [ ] Stop radial interactions
- * - [ ] Make metrics actually real
+ * - [ ] Allow user to select primary metric & save to local storage + URL
+ * - [ ] Wireup the baseline replace button
+ * - [ ] Fix Plot to show correct data
+ * - [ ] Build grouping
+ * TEST:
+ * - [ ] Single Case
+ * - [ ] Dual Case
+ * - [ ] Multi Case
  */

@@ -25,7 +25,7 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
       [score: string]: BinarySummaryScore | ContinuousSummaryScore;
     };
   } & {
-    model_latency: number;
+    model_latency: ContinuousSummaryScore;
   };
   summary: TraceCallSchema['summary'] & {
     usage?: {

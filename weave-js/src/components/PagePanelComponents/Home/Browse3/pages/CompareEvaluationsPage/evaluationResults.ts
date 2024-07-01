@@ -8,13 +8,25 @@ import {
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {EvaluationEvaluateCallSchema} from './evaluations';
 
-type BinarySummaryScore = {
+export type BinarySummaryScore = {
   true_count: number;
   true_fraction: number;
 };
 
-type ContinuousSummaryScore = {
+export type ContinuousSummaryScore = {
   mean: number;
+};
+
+export const isBinarySummaryScore = (
+  score: BinarySummaryScore | ContinuousSummaryScore
+): score is BinarySummaryScore => {
+  return 'true_count' in score && 'true_fraction' in score;
+};
+
+export const isContinuousSummaryScore = (
+  score: BinarySummaryScore | ContinuousSummaryScore
+): score is ContinuousSummaryScore => {
+  return 'mean' in score;
 };
 
 type EvaluationCall = {
@@ -24,7 +36,7 @@ type EvaluationCall = {
   evaluationRef: string;
   modelRef: string;
   scores: {
-    [scorerRef: string]: {
+    [scoreName: string]: {
       [path: string]: BinarySummaryScore | ContinuousSummaryScore;
     };
   };
@@ -117,7 +129,9 @@ export type EvaluationComparisonData = {
 const generateColorFromId = (id: string) => {
   const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const hue = hash % 360;
-  return `hsl(${hue}, 100%, 50%)`;
+  const saturation = 70 + (hash % 30); // Saturation between 70% and 100%
+  const lightness = 40 + (hash % 20); // Lightness between 40% and 60%
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };
 
 export const fetchEvaluationComparisonData = async (
@@ -166,7 +180,7 @@ export const fetchEvaluationComparisonData = async (
         modelRef: call.inputs.model,
         scores: Object.fromEntries(
           Object.entries(call.output as any).filter(
-            ([key]) => key !== 'model_usage'
+            ([key]) => key !== 'model_latency'
           )
         ) as any,
         _rawEvaluationTraceData: call as EvaluationEvaluateCallSchema,
@@ -225,7 +239,7 @@ export const fetchEvaluationComparisonData = async (
         {
           ref,
           properties: Object.fromEntries(
-            Object.entries(objData as any).filter(([key]) => key !== 'predict')
+            Object.entries(objData as any).filter(([key]) => key !== 'predict' && !key.startsWith("_") && key !== "name" && key !== "description")
           ) as any,
           predictOpRef: objData.predict,
           entity: parsed.entityName,
