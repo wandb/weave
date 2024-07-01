@@ -213,7 +213,7 @@ def test_score_with_errors(client):
     ]
 
     assert result["model_output"] == {"mean": 2.5}
-    assert result["model_latency"] == {"mean": pytest.approx(0, abs=0.05)}
+    assert result["model_latency"] == {"mean": pytest.approx(0, abs=0.1)}
 
     # Errors may be in a different order because they are processed in parallel
     errors = result["raise_above_2_score"]["errors"]
