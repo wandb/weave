@@ -11,7 +11,11 @@ import React, {
 } from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {CACTUS_500, TEAL_500} from '../../../../../../common/css/color.styles';
+import {
+  CACTUS_500,
+  MOON_300,
+  TEAL_500,
+} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {
   useWeaveflowCurrentRouteContext,
@@ -39,6 +43,7 @@ import {PlotlyBarPlot} from './PlotlyBarPlot';
 // import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {ScoreCard} from './Scorecard';
+import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -143,7 +148,9 @@ const CompareEvaluationsPageInner: React.FC = props => {
         <ComparisonDefinition state={state} />
         <SummaryPlots state={state} />
         <ScoreCard state={state} />
-        <ScatterFilter state={state} />
+        {Object.keys(state.data.models).length == 2 && (
+          <ScatterFilter state={state} />
+        )}
         <CompareEvaluationsCallsTable state={state} />
       </VerticalBox>
     </Box>
@@ -151,6 +158,23 @@ const CompareEvaluationsPageInner: React.FC = props => {
 };
 
 const ScatterFilter: React.FC<{state: EvaluationComparisonState}> = props => {
+  const data = useMemo(() => {
+    const primaryDimension = 'model_latency';
+    const series: ScatterPlotData[number] = {
+      x: [],
+      y: [],
+      color: MOON_300,
+    };
+    const modelRefs = Object.keys(props.state.data.models);
+    const modelX = modelRefs[0];
+    const modelY = modelRefs[1];
+    Object.values(props.state.data.resultRows).forEach(row => {
+      series.x.push(row.models[modelX].model_latency ?? 0);
+      series.y.push(row.models[modelY].model_latency ?? 0);
+    });
+    return [series];
+  }, [props.state]);
+  console.log(data, props.state);
   return (
     <VerticalBox
       sx={{
@@ -167,7 +191,7 @@ const ScatterFilter: React.FC<{state: EvaluationComparisonState}> = props => {
           border: STANDARD_BORDER,
         }}>
         {/* <ScatterDefinition {...props} /> */}
-        <PlotlyScatterPlot />
+        <PlotlyScatterPlot height={PLOT_HEIGHT} data={data} />
       </VerticalBox>
     </VerticalBox>
   );
@@ -389,60 +413,6 @@ const CompareEvaluationsCallsTable: React.FC<{
         frozenFilter={callsFilter}
         hideControls
       /> */}
-    </Box>
-  );
-};
-
-const PlotlyScatterPlot: React.FC<{}> = () => {
-  const divRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const trace2 = {
-      x: [2, 3, 4, 5],
-      y: [16, 5, 11, 9],
-      mode: 'markers',
-      type: 'scatter',
-      marker: {color: TEAL_500, size: 12},
-    };
-
-    const trace3 = {
-      x: [1, 2, 3, 4],
-      y: [12, 9, 15, 12],
-      mode: 'markers',
-      type: 'scatter',
-      marker: {color: CACTUS_500, size: 12},
-    };
-
-    const data = [trace2, trace3];
-    Plotly.newPlot(
-      divRef.current as any,
-      data as any,
-      {
-        height: PLOT_HEIGHT,
-        showlegend: false,
-        title: '',
-        margin: {
-          l: 20, // legend
-          r: 0,
-          b: 30, // legend
-          t: 0,
-          pad: 0,
-        },
-      },
-      {
-        displayModeBar: false,
-        responsive: true,
-      }
-    );
-  }, []);
-
-  return (
-    <Box
-      sx={{
-        height: PLOT_HEIGHT,
-        width: '100%',
-      }}>
-      <div ref={divRef}></div>
     </Box>
   );
 };

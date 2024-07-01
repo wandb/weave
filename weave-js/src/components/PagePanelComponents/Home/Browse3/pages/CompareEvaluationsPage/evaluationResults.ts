@@ -1,4 +1,5 @@
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
+import { opNiceName } from '../common/Links';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
   TraceCallSchema,
@@ -117,6 +118,7 @@ export type EvaluationComparisonData = {
       models: {
         [modelRef: string]: {
           prediction?: PredictCall;
+          model_latency?: number;
           scores: {
             [scorerRef: string]: ScoreResults;
           };
@@ -178,11 +180,12 @@ export const fetchEvaluationComparisonData = async (
         color: generateColorFromId(call.id),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
-        scores: Object.fromEntries(
-          Object.entries(call.output as any).filter(
-            ([key]) => key !== 'model_latency'
-          )
-        ) as any,
+        scores: call.output as any,
+        // Object.fromEntries(
+        //   Object.entries(call.output as any).filter(
+        //     ([key]) => key !== 'model_latency'
+        //   )
+        // ) as any,
         _rawEvaluationTraceData: call as EvaluationEvaluateCallSchema,
       },
     ])
@@ -228,6 +231,7 @@ export const fetchEvaluationComparisonData = async (
 
   // 3. populate the model objects
   const modelRefs = evalRes.calls.map(call => call.inputs.model);
+  // console.log(modelRefs)
   const modelObjRes = await objReadMany(modelRefs);
   result.models = Object.fromEntries(
     modelObjRes.map((objRes, objNdx) => {
@@ -273,10 +277,11 @@ export const fetchEvaluationComparisonData = async (
   // Create a map of all the predict_and_score_ops
   const predictAndScoreOps = Object.fromEntries(
     evalTraceRes.calls
-      .filter(call => call.op_name === PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
+      .filter(call => call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC))
       .map(call => [call.id, call])
   );
 
+  // console.log(evalTraceRes, predictAndScoreOps)
   // Next, we need to build the predictions object
   evalTraceRes.calls.forEach(traceCall => {
     // We are looking for 2 types of calls:
@@ -287,7 +292,7 @@ export const fetchEvaluationComparisonData = async (
       predictAndScoreOps[traceCall.parent_id] != null
     ) {
       const parentPredictAndScore = predictAndScoreOps[traceCall.parent_id];
-
+      // console.log(traceCall)
       const exampleRef = parentPredictAndScore.inputs.example;
       const modelRef = parentPredictAndScore.inputs.model;
 
@@ -299,8 +304,8 @@ export const fetchEvaluationComparisonData = async (
           if (maybeDigest != null && !maybeDigest.includes('/')) {
             const rowDigest = maybeDigest;
             const isProbablyPredictCall =
-              traceCall.op_name.includes('predict:') &&
-              modelRefs.includes(traceCall.inputs.model);
+              traceCall.op_name.includes('.predict:') &&
+              modelRefs.includes(traceCall.inputs.self);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
 
@@ -324,6 +329,7 @@ export const fetchEvaluationComparisonData = async (
                 modelRef,
                 _rawPredictTraceData: traceCall,
               };
+              result.resultRows[rowDigest].models[modelRef].model_latency = (parentPredictAndScore.output as any).model_latency;
             } else if (isProbablyScoreCall) {
               result.resultRows[rowDigest].models[modelRef].scores[
                 traceCall.op_name
@@ -332,6 +338,8 @@ export const fetchEvaluationComparisonData = async (
                 results: traceCall.output as any,
                 _rawScoreTraceData: traceCall,
               };
+            } else {
+              console.log(traceCall)
             }
           }
         }
