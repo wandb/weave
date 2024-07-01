@@ -1,7 +1,8 @@
-import typing
 import copy
+import typing
 
-from . import graph
+from weave.legacy import graph
+
 from . import ref_base
 from . import weave_types as types
 
@@ -84,12 +85,11 @@ def node_to_ref(node: graph.Node) -> typing.Optional[ref_base.Ref]:
 
 def ref_to_node(ref: ref_base.Ref) -> typing.Optional[graph.Node]:
     """Inverse of node_to_ref, see docstring for node_to_ref."""
-
     extra = ref.extra or []
     ref = copy.copy(ref)
     ref.extra = []
 
-    from weave.ops_primitives import get
+    from weave.legacy.ops_primitives import get
 
     node = get(str(ref))
     for str_key in extra:

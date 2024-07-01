@@ -27,6 +27,7 @@ import {
   CallFilter,
   CallKey,
   CallSchema,
+  FeedbackKey,
   Loadable,
   LoadableWithError,
   ObjectVersionFilter,
@@ -159,7 +160,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallReadRes | null>(null);
   const deepKey = useDeepMemo(key);
-  useEffect(() => {
+  const doFetch = useCallback(() => {
     if (deepKey) {
       setCallRes(null);
       loadingRef.current = true;
@@ -174,6 +175,14 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         });
     }
   }, [deepKey, getTsClient]);
+
+  useEffect(() => {
+    doFetch();
+  }, [doFetch]);
+
+  useEffect(() => {
+    return getTsClient().registerOnRenameListener(doFetch);
+  }, [getTsClient, doFetch]);
 
   return useMemo(() => {
     if (key == null) {
@@ -274,7 +283,13 @@ const useCallsNoExpansion = (
   // register doFetch as a callback after deletion
   useEffect(() => {
     if (opts?.refetchOnDelete) {
-      return getTsClient().registerOnDeleteListener(doFetch);
+      const client = getTsClient();
+      const unregisterDelete = client.registerOnDeleteListener(doFetch);
+      const unregisterRename = client.registerOnRenameListener(doFetch);
+      return () => {
+        unregisterDelete();
+        unregisterRename();
+      };
     }
     return () => {};
   }, [opts?.refetchOnDelete, getTsClient, doFetch]);
@@ -293,7 +308,9 @@ const useCallsNoExpansion = (
         result: [],
       };
     }
-    const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
+    const allResults = (callRes?.calls ?? [])
+      .filter(isValidTraceCall)
+      .map(traceCallToUICallSchema);
     const result = allResults;
 
     if (callRes == null || loadingRef.current) {
@@ -396,17 +413,17 @@ const useCallsDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const callsDelete = useCallback(
-    (projectID: string, callIDs: string[]): Promise<void> => {
+    (entity: string, project: string, callIDs: string[]): Promise<void> => {
       return getTsClient()
         .callsDelete({
-          project_id: projectID,
+          project_id: projectIdFromParts({entity, project}),
           call_ids: callIDs,
         })
         .then(() => {
           callIDs.forEach(callId => {
             callCache.del({
-              entity: projectID.split('/')[0],
-              project: projectID.split('/')[1],
+              entity,
+              project,
               callId,
             });
           });
@@ -416,6 +433,83 @@ const useCallsDeleteFunc = () => {
   );
 
   return callsDelete;
+};
+
+const useCallUpdateFunc = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const callUpdate = useCallback(
+    (
+      entity: string,
+      project: string,
+      callID: string,
+      newName: string
+    ): Promise<void> => {
+      return getTsClient()
+        .callUpdate({
+          project_id: projectIdFromParts({entity, project}),
+          call_id: callID,
+          display_name: newName,
+        })
+        .then(() => {
+          callCache.del({
+            entity,
+            project,
+            callId: callID,
+          });
+        });
+    },
+    [getTsClient]
+  );
+
+  return callUpdate;
+};
+
+const useFeedback = (
+  key: FeedbackKey | null
+): LoadableWithError<traceServerClient.Feedback[]> => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const [result, setResult] = useState<
+    LoadableWithError<traceServerClient.Feedback[]>
+  >({
+    loading: false,
+    result: null,
+    error: null,
+  });
+
+  const deepKey = useDeepMemo(key);
+
+  useEffect(() => {
+    if (!deepKey) {
+      return;
+    }
+    setResult({loading: true, result: null, error: null});
+    getTsClient()
+      .feedbackQuery({
+        project_id: projectIdFromParts({
+          entity: deepKey.entity,
+          project: deepKey.project,
+        }),
+        query: {
+          $expr: {
+            $eq: [{$getField: 'weave_ref'}, {$literal: deepKey.weaveRef}],
+          },
+        },
+        sort_by: [{field: 'created_at', direction: 'desc'}],
+      })
+      .then(res => {
+        if ('result' in res) {
+          setResult({loading: false, result: res.result, error: null});
+        }
+        // TODO: handle error case
+      })
+      .catch(err => {
+        setResult({loading: false, result: null, error: err});
+      });
+  }, [deepKey, getTsClient]);
+
+  return result;
 };
 
 const useOpVersion = (
@@ -1183,6 +1277,11 @@ const projectIdToParts = (projectId: string) => {
   return {entity, project};
 };
 
+// Hack - underlying client should be updated to handle deleted projects better.
+const isValidTraceCall = (callRes: traceServerClient.TraceCallSchema) => {
+  return !('detail' in callRes);
+};
+
 const traceCallToUICallSchema = (
   traceCall: traceServerClient.TraceCallSchema
 ): CallSchema => {
@@ -1198,6 +1297,7 @@ const traceCallToUICallSchema = (
       traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
         ? refUriToOpVersionKey(traceCall.op_name).opId
         : traceCall.op_name,
+    displayName: traceCall.display_name ?? null,
     opVersionRef:
       traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
       traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
@@ -1224,12 +1324,14 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCalls,
   useCallsStats,
   useCallsDeleteFunc,
+  useCallUpdateFunc,
   useOpVersion,
   useOpVersions,
   useObjectVersion,
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
+  useFeedback,
   useFileContent,
   derived: {
     useChildCallsForCompare,

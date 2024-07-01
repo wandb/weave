@@ -1,13 +1,15 @@
-import pytest
 import random
 import typing
-import weave
 
-from .. import ops_arrow
+import pytest
+
+import weave
+from weave.legacy import ops_arrow
+
 from .concrete_tagged_value import (
     TaggedValue,
-    concrete_to_tagstore,
     concrete_from_tagstore,
+    concrete_to_tagstore,
 )
 
 

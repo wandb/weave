@@ -1,36 +1,33 @@
-from _ast import AsyncFunctionDef, ExceptHandler
-import collections
-import collections.abc
-import textwrap
-import json
-import inspect
-import types as py_types
-import typing
-import os
-import sys
 import ast
 import builtins
-from typing import Any, Callable, Union, Optional
+import collections
+import collections.abc
+import inspect
+import json
+import os
+import re
+import sys
+import textwrap
+import types as py_types
+import typing
+from _ast import AsyncFunctionDef, ExceptHandler
+from typing import Any, Callable, Optional, Union
 
-from .. import errors
-from .. import context_state
-from .. import errors
-from .. import environment
-from .. import storage
-from .. import artifact_fs
-
-from . import serializer
-
-
+from weave.legacy import artifact_fs, context_state
 from weave.trace.refs import ObjectRef
 
-
+from .. import environment, errors, storage
+from . import serializer
 from .op import Op
+
+WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
+WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
 
 
 def type_code(type_: Any) -> str:
     if isinstance(type_, py_types.GenericAlias) or isinstance(
-        type_, typing._GenericAlias  # type: ignore
+        type_,
+        typing._GenericAlias,  # type: ignore
     ):
         args = ", ".join(type_code(t) for t in type_.__args__)
         if type_.__origin__ == list or type_.__origin__ == collections.abc.Sequence:
@@ -392,8 +389,13 @@ def save_instance(
             pass
 
     op_function_code = textwrap.dedent(inspect.getsource(obj.resolve_fn))
-    if "op()" not in op_function_code:
+
+    if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
+    else:
+        op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
+            "@weave.op()", op_function_code
+        )
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:

@@ -1,8 +1,10 @@
-import json
 import asyncio
+import json
+
+import openai
+
 import weave
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
-import openai
 
 # We create a model class with one predict function.
 # All inputs, predictions and parameters are automatically captured for easy inspection.
@@ -59,6 +61,7 @@ examples = [
 ]
 # If you have already published the Dataset, you can run:
 # dataset = weave.ref('example_labels').get()
+
 
 # We define a scoring functions to compare our model predictions with a ground truth label.
 @weave.op()

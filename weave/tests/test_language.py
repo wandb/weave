@@ -1,11 +1,14 @@
 # Tests interactions between language features.
 
 import typing
+
 import weave
-from weave.language_features.tagging import tagged_value_type
-from weave import box
-from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
-from .. import context_state
+from weave.legacy import box, context_state
+from weave.legacy.language_features.tagging import (
+    make_tag_getter_op,
+    tag_store,
+    tagged_value_type,
+)
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 

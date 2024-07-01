@@ -1,9 +1,10 @@
-import typing
 import datetime
-from ..ops_primitives import date
+import typing
+
 import pytest
 
 import weave
+from weave.legacy.ops_primitives import date
 
 
 def assert_date_string(

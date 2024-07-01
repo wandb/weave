@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, Iterable, Iterator, TypeVar, Generic, Optional
+from typing import Any, Generic, Iterable, Iterator, Optional, TypeVar
 
 from rich.table import Table
 
 from weave import rich_pydantic_util
-
 
 T = TypeVar("T")
 

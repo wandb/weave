@@ -1,26 +1,16 @@
 # Sqlite Trace Server
 
-from typing import Iterator, cast, Optional, Any, Union
-import threading
-
-import contextvars
 import contextlib
+import contextvars
 import datetime
-import json
 import hashlib
+import json
 import sqlite3
+import threading
+from typing import Any, Iterator, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import emoji
-
-from .trace_server_interface_util import (
-    assert_non_null_wb_user_id,
-    extract_refs_from_values,
-    str_digest,
-    bytes_digest,
-)
-from . import trace_server_interface as tsi
-from .interface import query as tsi_query
 
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
@@ -29,10 +19,7 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
-from weave.trace_server.trace_server_interface_util import (
-    generate_id,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-)
+from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -43,7 +30,19 @@ from weave.trace_server.refs_internal import (
     InternalTableRef,
     parse_internal_uri,
 )
-from weave.trace_server.orm import Row
+from weave.trace_server.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    generate_id,
+)
+
+from . import trace_server_interface as tsi
+from .interface import query as tsi_query
+from .trace_server_interface_util import (
+    assert_non_null_wb_user_id,
+    bytes_digest,
+    extract_refs_from_values,
+    str_digest,
+)
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -394,13 +393,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if field.startswith("inputs"):
                     field = "inputs" + field[len("inputs") :]
                     if field.startswith("inputs."):
-                        field = "inputs"
                         json_path = field[len("inputs.") :]
+                        field = "inputs"
                 elif field.startswith("output"):
                     field = "output" + field[len("output") :]
                     if field.startswith("output."):
-                        field = "output"
                         json_path = field[len("output.") :]
+                        field = "output"
                 elif field.startswith("attributes"):
                     field = "attributes_dump" + field[len("attributes") :]
                 elif field.startswith("summary"):
@@ -413,7 +412,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     "desc",
                 ], f"Invalid order_by direction: {direction}"
                 if json_path:
-                    field = f"json_extract({field}, '$.{json_path}')"
+                    field = f"json_extract({field}, '{quote_json_path(json_path)}')"
                 order_parts.append(f"{field} {direction}")
 
             order_by_part = ", ".join(order_parts)
@@ -489,9 +488,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(
-                ", ".join("?" * len(req.call_ids))
-            )
+            """.format(", ".join("?" * len(req.call_ids)))
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -503,9 +500,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(
-                ", ".join("?" * len(all_ids))
-            )
+            """.format(", ".join("?" * len(all_ids)))
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()
@@ -947,18 +942,6 @@ def get_base_object_class(val: Any) -> Optional[str]:
     return None
 
 
-def _quote_json_path(path: str) -> str:
-    parts = path.split(".")
-    parts_final = []
-    for part in parts:
-        try:
-            int(part)
-            parts_final.append("[" + part + "]")
-        except ValueError:
-            parts_final.append('."' + part + '"')
-    return "$" + "".join(parts_final)
-
-
 def _transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: Optional[str] = None,
@@ -968,25 +951,25 @@ def _transform_external_calls_field_to_internal_calls_field(
         if field == "inputs":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("inputs.") :])
+            json_path = quote_json_path(field[len("inputs.") :])
         field = "inputs"
     elif field == "output" or field.startswith("output."):
         if field == "output":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("output.") :])
+            json_path = quote_json_path(field[len("output.") :])
         field = "output"
     elif field == "attributes" or field.startswith("attributes."):
         if field == "attributes":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("attributes.") :])
+            json_path = quote_json_path(field[len("attributes.") :])
         field = "attributes"
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"
         else:
-            json_path = _quote_json_path(field[len("summary.") :])
+            json_path = quote_json_path(field[len("summary.") :])
         field = "summary"
 
     if json_path is not None:

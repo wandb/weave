@@ -1,15 +1,13 @@
 import typing
-import pytest
-from .. import api as weave
-from .. import graph
-from .. import types
-from .. import weave_internal
-from .. import storage
-from .. import context_state
-from . import test_helpers
-from .. import uris
 
-from .. import context_state as _context_state
+import pytest
+
+from weave import api as weave
+from weave import storage, types, weave_internal
+from weave.legacy import context_state, graph, uris
+from weave.legacy import context_state as _context_state
+
+from . import test_helpers
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
@@ -58,7 +56,6 @@ def test_op_inferred_type():
 
 def test_op_incompatible_return_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
-
         _t = _context_state.set_loading_built_ins()
 
         try:

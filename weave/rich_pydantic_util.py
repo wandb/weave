@@ -1,4 +1,5 @@
 """Helper methods for displaying pydantic models."""
+
 from typing import Any
 
 from pydantic import BaseModel

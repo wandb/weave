@@ -12,13 +12,13 @@ from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
 from openai.types.completion_usage import CompletionUsage
 
 import weave
-from weave.monitoring import init_monitor
-from weave.monitoring.openai import util
-from weave.monitoring.openai.models import *
-from weave.monitoring.openai.models import Context
-from weave.monitoring.openai.openai import patch, unpatch
-from weave.monitoring.openai.util import Context
-from weave.wandb_interface.wandb_stream_table import StreamTable
+from weave.legacy.monitoring import init_monitor
+from weave.legacy.monitoring.openai import util
+from weave.legacy.monitoring.openai.models import *
+from weave.legacy.monitoring.openai.models import Context
+from weave.legacy.monitoring.openai.openai import patch, unpatch
+from weave.legacy.monitoring.openai.util import Context
+from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
 
 
 @pytest.fixture
@@ -453,7 +453,9 @@ def test_log_to_span_basic(
     streamtable = make_stream_table(
         stream_name, project_name=project, entity_name=entity
     )
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_create)
+    chat_completions = weave.legacy.monitoring.openai.openai.ChatCompletions(
+        mocked_create
+    )
     create_input = dict(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": "Tell me a joke"}],
@@ -461,9 +463,9 @@ def test_log_to_span_basic(
     result = chat_completions.create(**create_input)
     streamtable.finish()
 
-    run = client.calls()[0]
-    inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-    outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
+    call = client.calls()[0]
+    inputs = {k: v for k, v in call.inputs.items() if not k.startswith("_")}
+    outputs = {k: v for k, v in call.output.items() if not k.startswith("_")}
 
     inputs_expected = create_input
     assert inputs == inputs_expected
@@ -479,7 +481,7 @@ def test_log_to_span_streaming(
     reassembled_chat_completion_message,
     client,
 ):
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
+    chat_completions = weave.legacy.monitoring.openai.openai.ChatCompletions(
         mocked_streaming_create
     )
     create_input = dict(
@@ -491,9 +493,9 @@ def test_log_to_span_streaming(
     for x in stream:
         ...
 
-    run = client.calls()[0]
-    inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-    outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
+    call = client.calls()[0]
+    inputs = {k: v for k, v in call.inputs.items() if not k.startswith("_")}
+    outputs = {k: v for k, v in call.output.items() if not k.startswith("_")}
 
     inputs_expected = create_input
     assert inputs == inputs_expected
@@ -510,7 +512,7 @@ async def test_log_to_span_async_streaming(
     reassembled_chat_completion_message,
     client,
 ):
-    chat_completions = weave.monitoring.openai.openai.AsyncChatCompletions(
+    chat_completions = weave.legacy.monitoring.openai.openai.AsyncChatCompletions(
         mocked_async_streaming_create
     )
     create_input = dict(
@@ -522,9 +524,9 @@ async def test_log_to_span_async_streaming(
     async for x in stream:
         ...
 
-    run = client.calls()[0]
-    inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-    outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
+    call = client.calls()[0]
+    inputs = {k: v for k, v in call.inputs.items() if not k.startswith("_")}
+    outputs = {k: v for k, v in call.output.items() if not k.startswith("_")}
 
     inputs_expected = create_input
     assert inputs == inputs_expected

@@ -1,7 +1,10 @@
-import pytest
-import weave
 import typing
+
 import numpy as np
+import pytest
+from pydantic import Field
+
+import weave
 
 from .. import ref_base
 
@@ -64,26 +67,26 @@ def test_output_of(client):
 
     result = add_5(10)
 
-    run = weave.output_of(result)
-    assert run is not None
-    assert "add_5" in run.op_name
-    assert run.inputs["v"] == 10
+    call = weave.output_of(result)
+    assert call is not None
+    assert "add_5" in call.op_name
+    assert call.inputs["v"] == 10
 
     result2 = add_5(result)
-    run = weave.output_of(result2)
-    assert run is not None
-    assert "add_5" in run.op_name
+    call = weave.output_of(result2)
+    assert call is not None
+    assert "add_5" in call.op_name
 
     # v_input is a ref here and we have to deref it
     # TODO: this is not consistent. Shouldn't it already be
     # dereffed recursively when we get it from weave.output_of() ?
-    v_input = run.inputs["v"].get()
+    v_input = call.inputs["v"].get()
     assert v_input == 15
 
-    run = weave.output_of(v_input)
-    assert run is not None
-    assert "add_5" in run.op_name
-    assert run.inputs["v"] == 10
+    call = weave.output_of(v_input)
+    assert call is not None
+    assert "add_5" in call.op_name
+    assert call.inputs["v"] == 10
 
 
 def test_weaveflow_op_wandb(client):
@@ -291,3 +294,26 @@ def test_construct_eval_with_dataset_get(client):
     assert ref is not None
     dataset2 = weave.ref(ref.uri()).get()
     weave.Evaluation(dataset=dataset2)
+
+
+def test_weave_op_mutates_and_returns_same_object(client):
+    class Thing(weave.Object):
+        tools: list = Field(default_factory=list)
+
+        @weave.op
+        def append_tool(self, f):
+            assert self.tools is self.tools
+            self.tools.append(f)
+            assert self.tools is self.tools
+
+    thing = Thing()
+    assert len(thing.tools) == 0
+    assert thing.tools is thing.tools
+
+    thing.append_tool(lambda: 1)
+    assert len(thing.tools) == 1
+    assert thing.tools is thing.tools
+
+    thing.append_tool(lambda: 2)
+    assert len(thing.tools) == 2
+    assert thing.tools is thing.tools

@@ -8,6 +8,7 @@ import {
   GridColumnGroup,
   GridColumnGroupingModel,
   GridColumnNode,
+  GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
@@ -15,6 +16,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {makeRefCall} from '../../../../../../util/refs';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {Timestamp} from '../../../../../Timestamp';
 import {CellValue} from '../../../Browse2/CellValue';
@@ -22,6 +24,7 @@ import {CollapseHeader} from '../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../Browse2/SmallRef';
+import {Reactions} from '../../feedback/Reactions';
 import {
   getTokensAndCostFromUsage,
   getUsageFromCellParams,
@@ -207,10 +210,34 @@ function buildCallsTableColumns(
           <CallLink
             entityName={entity}
             projectName={project}
-            opName={opVersionRefOpName(op_name)}
+            opName={rowParams.row.display_name ?? opVersionRefOpName(op_name)}
             callId={rowParams.row.id}
             fullWidth={true}
             preservePath={preservePath}
+          />
+        );
+      },
+    },
+    {
+      field: 'feedback',
+      headerName: 'Feedback',
+      width: 150,
+      sortable: false,
+      filterable: false,
+      renderCell: (rowParams: GridRenderCellParams) => {
+        const rowIndex = rowParams.api.getRowIndexRelativeToVisibleRows(
+          rowParams.id
+        );
+        const callId = rowParams.row.id;
+        const weaveRef = makeRefCall(entity, project, callId);
+        return (
+          <Reactions
+            weaveRef={weaveRef}
+            forceVisible={rowIndex === 0}
+            twWrapperStyles={{
+              width: '100%',
+              height: '100%',
+            }}
           />
         );
       },
@@ -451,6 +478,11 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: cellParams => {
+      const usage = getUsageFromCellParams(cellParams.row);
+      const {tokensNum} = getTokensAndCostFromUsage(usage);
+      return tokensNum;
+    },
     renderCell: cellParams => {
       const usage = getUsageFromCellParams(cellParams.row);
       const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
@@ -467,6 +499,11 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: cellParams => {
+      const usage = getUsageFromCellParams(cellParams.row);
+      const {costNum} = getTokensAndCostFromUsage(usage);
+      return costNum;
+    },
     renderCell: cellParams => {
       const usage = getUsageFromCellParams(cellParams.row);
       const {cost, costToolTip} = getTokensAndCostFromUsage(usage);

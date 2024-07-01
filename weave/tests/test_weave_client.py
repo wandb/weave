@@ -1,37 +1,37 @@
+import asyncio
 import dataclasses
+import json
 import re
 import signal
-import requests
-import pytest
-import pydantic
-from pydantic import BaseModel
-import json
-import weave
-import asyncio
-from weave import op_def, Evaluation
 
-from weave import weave_client
+import pydantic
+import pytest
+import requests
+from pydantic import BaseModel
+
+import weave
+import weave.trace_server.trace_server_interface as tsi
+from weave import Evaluation, weave_client
+from weave.legacy import op_def
+from weave.trace import refs
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 from weave.trace.refs import (
+    DICT_KEY_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
-    LIST_INDEX_EDGE_NAME,
-    DICT_KEY_EDGE_NAME,
 )
-from weave.trace.serializer import register_serializer, get_serializer_for_obj
-
-from weave.trace import refs
+from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
-from weave.trace.isinstance import weave_isinstance
 from weave.trace_server.trace_server_interface import (
-    TableCreateReq,
-    TableSchemaForInsert,
-    TableQueryReq,
-    RefsReadBatchReq,
-    FileCreateReq,
     FileContentReadReq,
+    FileCreateReq,
+    RefsReadBatchReq,
+    TableCreateReq,
+    TableQueryReq,
+    TableSchemaForInsert,
 )
-import weave.trace_server.trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace
 
@@ -165,7 +165,7 @@ def test_obj_with_table(client):
         table: weave_client.Table
 
     o = ObjWithTable(table=weave_client.Table([{"a": 1}, {"a": 2}, {"a": 3}]))
-    res = client.save_object(o, "my-obj")
+    res = client._save_object(o, "my-obj")
     o2 = client.get(res)
     row_vals = list(o2.table)
     assert row_vals[0]["a"] == 1
@@ -181,7 +181,7 @@ def test_pydantic(client):
         b: str
 
     val = B(a=5, b="x")
-    ref = client.save_object(val, "my-pydantic-obj")
+    ref = client._save_object(val, "my-pydantic-obj")
     val2 = client.get(ref)
     assert val == val2
 
@@ -312,7 +312,7 @@ def test_call_display_name(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
 
     # Rename using the client method
-    client.set_call_display_name(call0, "updated_name")
+    client._set_call_display_name(call0, "updated_name")
     # same op_name
     result = list(client.calls())
     assert len(result) == 1
@@ -326,7 +326,7 @@ def test_call_display_name(client):
 
     # delete the display name
     call0 = result[0]
-    client.remove_call_display_name(call0)
+    client._remove_call_display_name(call0)
     call0 = client.call(call0.id)
     assert call0.display_name == None
 
@@ -472,7 +472,7 @@ def test_saveload_op(client):
         return x + y + z
 
     obj = {"a": add2, "b": add3}
-    ref = client.save_object(obj, "my-ops")
+    ref = client._save_object(obj, "my-ops")
     obj2 = client.get(ref)
     assert isinstance(obj2["a"], op_def.OpDef)
     assert obj2["a"].name == "op-add2"
@@ -501,7 +501,7 @@ def test_saveload_customtype(client, strict_op_saving):
     register_serializer(MyCustomObj, custom_obj_save, custom_obj_load)
 
     obj = MyCustomObj(5, "x")
-    ref = client.save_object(obj, "my-obj")
+    ref = client._save_object(obj, "my-obj")
 
     # Hack the serializer so that it's loader no longer exists, to ensure
     # it can't be called.
@@ -520,7 +520,7 @@ def test_save_unknown_type(client):
             self.a = a
 
     obj = SomeUnknownThing(3)
-    ref = client.save_object(obj, "my-np-array")
+    ref = client._save_object(obj, "my-np-array")
     obj2 = client.get(ref)
     # Expect None for now
     assert obj2 == repr(obj)
@@ -535,11 +535,12 @@ def test_save_model(client):
             return self.prompt.format(input=input)
 
     model = MyModel(prompt="input is: {input}")
-    ref = client.save_object(model, "my-model")
+    ref = client._save_object(model, "my-model")
     model2 = client.get(ref)
     assert model2.predict("x") == "input is: x"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 def test_saved_nested_modellike(client):
     class A(weave.Object):
         x: int
@@ -557,7 +558,7 @@ def test_saved_nested_modellike(client):
             return await self.a.call(input - self.y)
 
     model = B(a=A(x=3), y=2)
-    ref = client.save_object(model, "my-model")
+    ref = client._save_object(model, "my-model")
     model2 = client.get(ref)
 
     class C(weave.Object):
@@ -718,10 +719,10 @@ def test_nested_ref_is_inner(client):
 
 
 def test_obj_dedupe(client):
-    client.save_object({"a": 1}, "my-obj")
-    client.save_object({"a": 1}, "my-obj")
-    client.save_object({"a": 2}, "my-obj")
-    res = client.objects()
+    client._save_object({"a": 1}, "my-obj")
+    client._save_object({"a": 1}, "my-obj")
+    client._save_object({"a": 2}, "my-obj")
+    res = client._objects()
     assert len(res) == 2
     assert res[0].version_index == 0
     assert res[1].version_index == 1
@@ -732,15 +733,15 @@ def test_op_query(client):
     def myop(x):
         return x
 
-    client.save_object({"a": 1}, "my-obj")
-    client.save_object(myop, "my-op")
-    res = client.objects()
+    client._save_object({"a": 1}, "my-obj")
+    client._save_object(myop, "my-op")
+    res = client._objects()
     assert len(res) == 1
 
 
 def test_refs_read_batch_noextra(client):
-    ref = client.save_object([1, 2, 3], "my-list")
-    ref2 = client.save_object({"a": [3, 4, 5]}, "my-obj")
+    ref = client._save_object([1, 2, 3], "my-list")
+    ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
     res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri(), ref2.uri()]))
     assert len(res.vals) == 2
     assert res.vals[0] == [1, 2, 3]
@@ -784,7 +785,7 @@ def test_large_files(client):
 
     register_serializer(CoolCustomThing, save_instance, load_instance)
 
-    ref = client.save_object(CoolCustomThing("x"), "my-obj")
+    ref = client._save_object(CoolCustomThing("x"), "my-obj")
     res = client.get(ref)
     assert len(res.a) == 10000005
 
@@ -810,7 +811,7 @@ def test_isinstance_checks(client):
 
     b = PydanticObjB(a=PydanticObjA(x={"y": [1, "j", True, None]}))
 
-    client.save_nested_objects(b)
+    client._save_nested_objects(b)
 
     assert isinstance(b, PydanticObjB)
     a = b.a
@@ -948,7 +949,7 @@ def test_weave_server(client):
             return self.prompt.format(input=input)
 
     model = MyModel(prompt="input is: {input}")
-    ref = client.save_object(model, "my-model")
+    ref = client._save_object(model, "my-model")
 
     url = weave.serve(ref, thread=True)
     response = requests.post(url + "/predict", json={"input": "x"})

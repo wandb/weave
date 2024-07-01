@@ -1,19 +1,24 @@
 import Box from '@mui/material/Box';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {Loading} from '@wandb/weave/components/Loading';
+import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
+import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {
   TRACETREE_PARAM,
   useClosePeek,
   useWeaveflowCurrentRouteContext,
 } from '../../context';
+import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -36,6 +41,7 @@ export const CallPage: FC<{
     project: props.project,
     callId: props.callId,
   });
+
   if (call.loading) {
     return <CenteredAnimatedLoader />;
   } else if (call.result === null) {
@@ -55,6 +61,8 @@ export const CallPage: FC<{
 
 const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
+  const {entity, project, callId} = call;
+  const weaveRef = makeRefCall(entity, project, callId);
   return [
     {
       label: 'Call',
@@ -69,8 +77,25 @@ const useCallTabs = (call: CallSchema) => {
         ]
       : []),
     {
+      label: 'Feedback',
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <FeedbackGrid
+            entity={entity}
+            project={project}
+            weaveRef={weaveRef}
+            objectType="call"
+          />
+        </Tailwind>
+      ),
+    },
+    {
       label: 'Summary',
       content: <CallSummary call={call} />,
+    },
+    {
+      label: 'Use',
+      content: <TabUseCall call={call} />,
     },
   ];
 };
@@ -79,6 +104,8 @@ const CallPageInnerVertical: FC<{
   call: CallSchema;
   path?: string;
 }> = ({call, path}) => {
+  useViewTraceEvent(call);
+
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 

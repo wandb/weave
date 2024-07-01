@@ -27,6 +27,7 @@ export type TraceCallSchema = {
   project_id: string;
   id: string;
   op_name: string;
+  display_name?: string;
   trace_id: string;
   parent_id?: string;
   started_at: string;
@@ -98,6 +99,64 @@ export type TraceCallsDeleteReq = {
   project_id: string;
   call_ids: string[];
 };
+
+export type TraceCallUpdateReq = {
+  project_id: string;
+  call_id: string;
+  display_name: string;
+};
+
+export type FeedbackCreateReq = {
+  project_id: string;
+  weave_ref: string;
+  feedback_type: string;
+  payload: Record<string, any>;
+};
+
+export type FeedbackCreateSuccess = {
+  id: string;
+  created_at: string;
+  wb_user_id: string;
+  payload: Record<string, any>;
+};
+export type FeedbackCreateError = {
+  detail: string;
+};
+export type FeedbackCreateRes = FeedbackCreateSuccess | FeedbackCreateError;
+
+export type FeedbackQueryReq = {
+  project_id: string;
+  query?: Query;
+  sort_by?: SortBy[];
+};
+
+export type Feedback = {
+  id: string;
+  weave_ref: string;
+  wb_user_id: string; // authenticated creator username
+  creator: string | null; // display name
+  created_at: string;
+  feedback_type: string;
+  payload: Record<string, any>;
+};
+
+export type FeedbackQuerySuccess = {
+  result: Feedback[];
+};
+export type FeedbackQueryError = {
+  detail: string;
+};
+export type FeedbackQueryRes = FeedbackQuerySuccess | FeedbackQueryError;
+
+export type FeedbackPurgeReq = {
+  project_id: string;
+  query: Query;
+};
+export type FeedbackPurgeSuccess = {};
+export type FeedbackPurgeError = {
+  detail: string;
+};
+export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
 
 interface TraceObjectsFilter {
   base_object_classes?: string[];
@@ -191,6 +250,7 @@ export class TraceServerClient {
     >
   > = {};
   private onDeleteListeners: Array<() => void>;
+  private onRenameListeners: Array<() => void>;
 
   constructor(baseUrl: string) {
     this.readBatchCollectors = [];
@@ -198,6 +258,7 @@ export class TraceServerClient {
     this.baseUrl = baseUrl;
     this.scheduleReadBatch();
     this.onDeleteListeners = [];
+    this.onRenameListeners = [];
   }
 
   /**
@@ -216,6 +277,14 @@ export class TraceServerClient {
       );
     };
   }
+  public registerOnRenameListener(callback: () => void): () => void {
+    this.onRenameListeners.push(callback);
+    return () => {
+      this.onRenameListeners = this.onRenameListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
 
   callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
     const res = this.makeRequest<TraceCallsDeleteReq, void>(
@@ -223,6 +292,15 @@ export class TraceServerClient {
       req
     ).then(() => {
       this.onDeleteListeners.forEach(listener => listener());
+    });
+    return res;
+  };
+  callUpdate: (req: TraceCallUpdateReq) => Promise<void> = req => {
+    const res = this.makeRequest<TraceCallUpdateReq, void>(
+      '/call/update',
+      req
+    ).then(() => {
+      this.onRenameListeners.forEach(listener => listener());
     });
     return res;
   };
@@ -338,6 +416,28 @@ export class TraceServerClient {
         req
       );
     };
+
+  feedbackCreate: (req: FeedbackCreateReq) => Promise<FeedbackCreateRes> =
+    req => {
+      return this.makeRequest<FeedbackCreateReq, FeedbackCreateRes>(
+        '/feedback/create',
+        req
+      );
+    };
+
+  feedbackQuery: (req: FeedbackQueryReq) => Promise<FeedbackQueryRes> = req => {
+    return this.makeRequest<FeedbackQueryReq, FeedbackQueryRes>(
+      '/feedback/query',
+      req
+    );
+  };
+
+  feedbackPurge: (req: FeedbackPurgeReq) => Promise<FeedbackPurgeRes> = req => {
+    return this.makeRequest<FeedbackPurgeReq, FeedbackPurgeRes>(
+      '/feedback/purge',
+      req
+    );
+  };
 
   fileContent: (
     req: TraceFileContentReadReq

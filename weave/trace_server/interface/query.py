@@ -10,19 +10,20 @@ simplifications:
     is column-oriented. However, the more expressive aggregation language can be
     used for both direct queries, but also for column comparison and
     calculations. We can add support for the "query" operators in the future if
-    needed. 
-    
+    needed.
+
 * We only support a subset of the operators / shorthand forms for now. We can add
     more operators in the future as needed.
-    
+
     * One notable omission here is the lack of support for "$field" as a shorthand for
         the "getField"  operator.
-    
+
 * We have _added_ a `$contains` operator which is not in the MongoDB query
     language. This is a simple substring match operator.
 """
 
 import typing
+
 from pydantic import BaseModel, Field
 
 
@@ -41,11 +42,18 @@ class Query(BaseModel):
 # Starting with these operators for now since they are the most common and with negation
 # can cover most of the other operators.
 
+
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/literal/
 # Can be any standard json-able value
 class LiteralOperation(BaseModel):
     literal_: typing.Union[
-        str, int, float, bool, dict[str, "LiteralOperation"], list["LiteralOperation"]
+        str,
+        int,
+        float,
+        bool,
+        dict[str, "LiteralOperation"],
+        list["LiteralOperation"],
+        None,
     ] = Field(alias="$literal")
 
 
@@ -74,10 +82,13 @@ class ConvertOperation(BaseModel):
     convert_: "ConvertSpec" = Field(alias="$convert")
 
 
+CastTo = typing.Literal["double", "string", "int", "bool", "exists"]
+
+
 class ConvertSpec(BaseModel):
     input: "Operand"
     # Subset of https://www.mongodb.com/docs/manual/reference/bson-types/#std-label-bson-types
-    to: typing.Literal["double", "string", "int", "bool"]
+    to: CastTo
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/

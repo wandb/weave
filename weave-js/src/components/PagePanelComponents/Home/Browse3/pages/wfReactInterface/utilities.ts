@@ -5,7 +5,7 @@
  * the context.
  */
 
-import {parseRef} from '../../../../../../react';
+import {parseRef, WeaveKind} from '../../../../../../react';
 import {WANDB_ARTIFACT_SCHEME} from '../../../common';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
@@ -108,7 +108,7 @@ type WFNaiveRefDict = {
   scheme: string;
   entity: string;
   project: string;
-  weaveKind?: 'object' | 'table' | 'op';
+  weaveKind?: WeaveKind;
   artifactName: string;
   versionCommitHash: string;
   filePathParts: string[];

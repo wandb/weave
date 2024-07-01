@@ -5,14 +5,14 @@ from typing import Any, Iterable, Iterator, Optional
 
 from rich.table import Table
 
-from . import graph_client_context
-from . import util
-from weave import rich_pydantic_util
+from weave import client_context, rich_pydantic_util
 from weave.refs import Refs
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.query import Query
 from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import parse_uri
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.interface.query import Query
+
+from . import util
 
 
 class Feedbacks(AbstractRichContainer[tsi.Feedback]):
@@ -100,7 +100,7 @@ class FeedbackQuery:
         limit: Optional[int] = None,
         show_refs: bool = False,
     ):
-        self.client = graph_client_context.require_graph_client()
+        self.client = client_context.weave_client.require_weave_client()
         self.entity = entity
         self.project = project
 

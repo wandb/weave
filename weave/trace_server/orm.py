@@ -6,13 +6,12 @@ Abstracts away some of their differences and allows building up SQL queries in a
 import datetime
 import json
 import typing
-from typing_extensions import TypeAlias
 
 from pydantic import BaseModel
+from typing_extensions import TypeAlias
 
 from . import trace_server_interface as tsi
 from .interface import query as tsi_query
-
 
 DatabaseType = typing.Literal["clickhouse", "sqlite"]
 
@@ -69,7 +68,7 @@ class ParamBuilder:
         param_name = param_name or self._prefix + str(len(self._params))
         self._params[param_name] = param_value
         if self._database_type == "clickhouse":
-            ptype = param_type or _python_value_to_ch_type(param_value)
+            ptype = param_type or python_value_to_ch_type(param_value)
             return f"{{{param_name}:{ptype}}}"
         return ":" + param_name
 
@@ -300,7 +299,7 @@ class Select:
             )
             conditions.extend(query_conds)
 
-        joined = _combine_conditions(conditions, "AND")
+        joined = combine_conditions(conditions, "AND")
         if joined:
             sql += f"\nWHERE {joined}"
 
@@ -313,11 +312,11 @@ class Select:
                 # 3 order by terms: one for existence, one for float casting, and one for string casting.
                 # The effect of this is that we will have stable sorting for nullable, mixed-type fields.
                 if _is_dynamic_field(field, self.table.json_cols):
-                    # Prioritize existence, then cast to float, then str
+                    # Prioritize existence, then cast to double, then str
                     options = [
                         ("exists", "desc"),
-                        ("float", direction),
-                        ("str", direction),
+                        ("double", direction),
+                        ("string", direction),
                     ]
                 else:
                     options = [(field, direction)]
@@ -326,7 +325,11 @@ class Select:
                 for cast, direct in options:
                     # Future refactor: this entire section should be moved into its own helper
                     # method and hoisted out of this function
-                    (inner_field, _, _,) = _transform_external_field_to_internal_field(
+                    (
+                        inner_field,
+                        _,
+                        _,
+                    ) = _transform_external_field_to_internal_field(
                         field,
                         self.all_columns,
                         self.table.json_cols,
@@ -403,9 +406,10 @@ class Insert:
         return PreparedInsert(sql=sql, column_names=column_names, data=data)
 
 
-def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
+def combine_conditions(conditions: typing.List[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
+    conditions = [c for c in conditions if c is not None and c != ""]
     if not conditions:
         return ""
     if len(conditions) == 1:
@@ -414,7 +418,7 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
     return f"({combined})"
 
 
-def _python_value_to_ch_type(value: typing.Any) -> str:
+def python_value_to_ch_type(value: typing.Any) -> str:
     """Helper function to convert python types to clickhouse types."""
     if isinstance(value, str):
         return "String"
@@ -430,7 +434,27 @@ def _python_value_to_ch_type(value: typing.Any) -> str:
         raise ValueError(f"Unknown value type: {value}")
 
 
-def _quote_json_path(path: str) -> str:
+def clickhouse_cast(
+    inner_sql: str, cast: typing.Optional[tsi_query.CastTo] = None
+) -> str:
+    """Helper function to cast a sql expression to a clickhouse type."""
+    if cast == None:
+        return inner_sql
+    if cast == "int":
+        return f"toInt64OrNull({inner_sql})"
+    elif cast == "double":
+        return f"toFloat64OrNull({inner_sql})"
+    elif cast == "bool":
+        return f"toUInt8OrNull({inner_sql})"
+    elif cast == "string":
+        return f"toString({inner_sql})"
+    elif cast == "exists":
+        return f"({inner_sql} IS NOT NULL)"
+    else:
+        raise ValueError(f"Unknown cast: {cast}")
+
+
+def quote_json_path(path: str) -> str:
     """Helper function to quote a json path for use in a clickhouse query. Moreover,
     this converts index operations from dot notation (conforms to Mongo) to bracket
     notation (required by clickhouse)
@@ -438,6 +462,10 @@ def _quote_json_path(path: str) -> str:
     See comments on `GetFieldOperator` for current limitations
     """
     parts = path.split(".")
+    return quote_json_path_parts(parts)
+
+
+def quote_json_path_parts(parts: list[str]) -> str:
     parts_final = []
     for part in parts:
         try:
@@ -463,7 +491,7 @@ def _transform_external_field_to_internal_field(
         if field == prefix:
             field = prefix + "_dump"
         elif field.startswith(prefix + "."):
-            json_path = _quote_json_path(field[len(prefix + ".") :])
+            json_path = quote_json_path(field[len(prefix + ".") :])
             field = prefix + "_dump"
 
     # validate field
@@ -476,23 +504,11 @@ def _transform_external_field_to_internal_field(
         if cast == "exists":
             field = "(JSON_EXISTS(" + field + ", " + json_path_param + "))"
         else:
-            method = "toString"
-            if cast is not None:
-                if cast == "int":
-                    method = "toInt64OrNull"
-                elif cast == "float":
-                    method = "toFloat64OrNull"
-                elif cast == "bool":
-                    method = "toUInt8OrNull"
-                elif cast == "str":
-                    method = "toString"
-                else:
-                    raise ValueError(f"Unknown cast: {cast}")
             is_sqlite = param_builder._database_type == "sqlite"
             json_func = "json_extract(" if is_sqlite else "JSON_VALUE("
             field = json_func + field + ", " + json_path_param + ")"
             if not is_sqlite:
-                field = method + "(" + field + ")"
+                field = clickhouse_cast(field, cast or "string")  # type: ignore
 
     return field, param_builder, raw_fields_used
 
@@ -556,28 +572,21 @@ def _process_query_to_conditions(
     def process_operand(operand: tsi_query.Operand) -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
             return pb.add(
-                operand.literal_, None, _python_value_to_ch_type(operand.literal_)
+                operand.literal_, None, python_value_to_ch_type(operand.literal_)
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            (field, _, fields_used,) = _transform_external_field_to_internal_field(
+            (
+                field,
+                _,
+                fields_used,
+            ) = _transform_external_field_to_internal_field(
                 operand.get_field_, all_columns, json_columns, None, pb
             )
             raw_fields_used.update(fields_used)
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)
-            convert_to = operand.convert_.to
-            if convert_to == "int":
-                method = "toInt64OrNull"
-            elif convert_to == "double":
-                method = "toFloat64OrNull"
-            elif convert_to == "bool":
-                method = "toUInt8OrNull"
-            elif convert_to == "string":
-                method = "toString"
-            else:
-                raise ValueError(f"Unknown cast: {convert_to}")
-            return f"{method}({field})"
+            return clickhouse_cast(field, operand.convert_.to)
         elif isinstance(
             operand,
             (

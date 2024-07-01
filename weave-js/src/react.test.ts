@@ -16,6 +16,21 @@ describe('parseRef', () => {
         weaveKind: 'object',
       });
     });
+    // Capital letters in team names seen in the wild.
+    it('parses a ref with capital letters in entity', () => {
+      const parsed = parseRef(
+        'weave:///Entity/project/object/artifact-name:artifactversion'
+      );
+      expect(parsed).toEqual({
+        artifactName: 'artifact-name',
+        artifactRefExtra: '',
+        artifactVersion: 'artifactversion',
+        entityName: 'Entity',
+        projectName: 'project',
+        scheme: 'weave',
+        weaveKind: 'object',
+      });
+    });
     it('parses a ref without slashes in name and with extra', () => {
       const parsed = parseRef(
         'weave:///entity/project/object/artifact-name:artifactversion/attr/rows/id/rowversion'
@@ -100,6 +115,20 @@ describe('parseRef', () => {
       entityName: 'entity',
       projectName: 'project',
       weaveKind: 'table',
+    });
+  });
+  it('parses a weave call ref', () => {
+    const parsed = parseRef(
+      'weave:///entity/project/call/178a32ca-1c00-486d-bd55-6207a7a25ff7'
+    );
+    expect(parsed).toEqual({
+      scheme: 'weave',
+      artifactName: '178a32ca-1c00-486d-bd55-6207a7a25ff7',
+      artifactRefExtra: '',
+      artifactVersion: '',
+      entityName: 'entity',
+      projectName: 'project',
+      weaveKind: 'call',
     });
   });
   it('parses an op ref with * as version', () => {

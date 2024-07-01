@@ -12,28 +12,29 @@ import threading
 
 from . import urls
 
-from . import graph as _graph
-from .graph import Node
+from weave.legacy import graph as _graph
+from weave.legacy.graph import Node
 
 # If this is not imported, serialization of Weave Nodes is incorrect!
-from . import graph_mapper as _graph_mapper
+from weave.legacy import graph_mapper as _graph_mapper
 
 from . import storage as _storage
 from . import ref_base as _ref_base
-from . import artifact_wandb as _artifact_wandb
-from . import wandb_api as _wandb_api
+from weave.legacy import artifact_wandb as _artifact_wandb
+from weave.legacy import wandb_api as _wandb_api
 
 from . import weave_internal as _weave_internal
 from . import errors as _errors
 
 from . import util as _util
 
-from . import context as _context
-from . import context_state as _context_state
-from . import run as _run
+from weave.legacy import context as _context
+from weave.legacy import context_state as _context_state
+from weave.legacy import run as _run
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
-from . import graph_client_context as _graph_client_context
+from weave import client_context
+from weave.call_context import get_current_call as get_current_call
 from weave.trace import context as trace_context
 from .trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.refs import ObjectRef
@@ -45,26 +46,26 @@ from . import weave_types as types
 from . import types_numpy as _types_numpy
 
 from . import errors
-from .decorators import weave_class, mutation, type
+from weave.legacy.decorators import weave_class, mutation, type
 from weave.trace.op import op
 
 from weave.trace.op import Op
 from . import usage_analytics
-from .context import (
+from weave.legacy.context import (
     use_fixed_server_port,
     use_frontend_devmode,
     # eager_execution,
     use_lazy_execution,
 )
 
-from .panel import Panel
+from weave.legacy.panel import Panel
 
-from .arrow.list_ import ArrowWeaveList as WeaveList
+from weave.legacy.arrow.list_ import ArrowWeaveList as WeaveList
 from .table import Table
 
 
 def save(node_or_obj, name=None):
-    from .ops_primitives.weave_api import save, get
+    from weave.legacy.ops_primitives.weave_api import save, get
 
     if isinstance(node_or_obj, _graph.Node):
         return save(node_or_obj, name=name)
@@ -200,7 +201,7 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     Returns:
         A weave Ref to the saved object.
     """
-    client = _graph_client_context.require_graph_client()
+    client = client_context.weave_client.require_weave_client()
 
     save_name: str
     if name:
@@ -210,7 +211,7 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     else:
         save_name = obj.__class__.__name__
 
-    ref = client.save_object(obj, save_name, "latest")
+    ref = client._save_object(obj, save_name, "latest")
 
     if isinstance(ref, _weave_client.ObjectRef):
         url = urls.object_version_path(
@@ -237,7 +238,7 @@ def ref(location: str) -> _weave_client.ObjectRef:
         A weave Ref to the object.
     """
     if not "://" in location:
-        client = _graph_client_context.get_graph_client()
+        client = client_context.weave_client.get_weave_client()
         if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")
         if "/" in location:
@@ -247,7 +248,7 @@ def ref(location: str) -> _weave_client.ObjectRef:
             version = "latest"
         else:
             name, version = location.split(":")
-        location = str(client.ref_uri(name, version, "obj"))
+        location = str(client._ref_uri(name, version, "obj"))
 
     uri = _weave_client.parse_uri(location)
     if not isinstance(uri, _weave_client.ObjectRef):
@@ -260,13 +261,13 @@ def obj_ref(obj: typing.Any) -> typing.Optional[_weave_client.ObjectRef]:
 
 
 def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:
-    client = _graph_client_context.require_graph_client()
+    client = client_context.weave_client.require_weave_client()
 
     ref = obj_ref(obj)
     if ref is None:
         return ref
 
-    return client.ref_output_of(ref)
+    return client._ref_output_of(ref)
 
 
 def as_op(fn: typing.Callable) -> Op:
@@ -312,7 +313,7 @@ def serve(
     import uvicorn
     from .serve_fastapi import object_method_app
 
-    client = _graph_client_context.require_graph_client()
+    client = client_context.weave_client.require_weave_client()
     # if not isinstance(
     #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
     # ):
@@ -331,10 +332,9 @@ def serve(
     def run():
         # This function doesn't return, because uvicorn.run does not
         # return.
-        with _graph_client_context.set_graph_client(client):
-            with _wandb_api.wandb_api_context(wandb_api_ctx):
-                with attributes(trace_attrs):
-                    uvicorn.run(app, host="0.0.0.0", port=port)
+        with _wandb_api.wandb_api_context(wandb_api_ctx):
+            with attributes(trace_attrs):
+                uvicorn.run(app, host="0.0.0.0", port=port)
 
     if _util.is_notebook():
         thread = True
@@ -359,4 +359,10 @@ def finish() -> None:
     _weave_init.finish()
 
 
-__docspec__ = [init, publish, ref]
+__docspec__ = [
+    init,
+    publish,
+    ref,
+    get_current_call,
+    finish,
+]
