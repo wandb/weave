@@ -1,14 +1,14 @@
 import {Box} from '@material-ui/core';
-import {ToggleButton} from '@mui/material';
 import {sum} from 'lodash';
 import React, {useMemo} from 'react';
+import styled from 'styled-components';
 
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import {Checkbox, Switch} from '../../../../..';
+import {Checkbox} from '../../../../..';
 import {Pill, TagColorName} from '../../../../../Tag';
+import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
-import {OpVersionLink} from '../common/Links';
 import {EvaluationComparisonState} from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './constants';
 import {EvaluationCallLink, EvaluationModelLink} from './EvaluationDefinition';
@@ -16,7 +16,9 @@ import {
   isBinarySummaryScore,
   isContinuousSummaryScore,
 } from './evaluationResults';
-import {HorizontalBox, VerticalBox} from './Layout';
+import {HorizontalBox} from './Layout';
+
+const FIXED_SCORE_LABEL_WIDTH = 'inherit'; //'150px';
 
 const moveItemToFront = (arr: any[], item: any) => {
   const index = arr.indexOf(item);
@@ -41,9 +43,14 @@ type BetterScoresType = {
   };
 };
 
+const GridCell = styled.div`
+  padding: 8px;
+`;
+
 export const ScoreCard: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
+  console.log(props);
   const baselineRef =
     props.state.data.evaluationCalls[props.state.baselineEvaluationCallId]
       .modelRef;
@@ -54,6 +61,12 @@ export const ScoreCard: React.FC<{
     moveItemToFront(refs, baselineRef);
     return refs;
   }, [baselineRef, props.state.data.models]);
+  const evalCallIds = useMemo(() => {
+    const all = Object.keys(props.state.data.evaluationCalls);
+    // Make sure the baseline model is first
+    moveItemToFront(all, props.state.baselineEvaluationCallId);
+    return all;
+  }, [props.state.baselineEvaluationCallId, props.state.data.evaluationCalls]);
 
   const modelProps = useMemo(() => {
     const propsRes: {[prop: string]: {[ref: string]: any}} = {};
@@ -186,9 +199,9 @@ export const ScoreCard: React.FC<{
   // console.log(betterScores);
 
   let gridTemplateColumns = '';
-  gridTemplateColumns += '1fr '; // Scorer Name
-  gridTemplateColumns += '1fr '; // Metric/Property Name
-  gridTemplateColumns += modelRefs.map(() => 'auto ').join(' '); // each model
+  gridTemplateColumns += 'min-content '; // Scorer Name
+  gridTemplateColumns += 'min-content '; // Metric/Property Name
+  gridTemplateColumns += evalCallIds.map(() => 'auto ').join(' '); // each model
 
   return (
     <Box
@@ -203,11 +216,11 @@ export const ScoreCard: React.FC<{
         style={{
           display: 'grid',
           gridTemplateColumns,
-          gap: '4px',
+          // gap: '16px',
         }}>
         {/* Header Row */}
-        <div></div>
-        <div
+        <GridCell></GridCell>
+        <GridCell
           style={{
             fontWeight: 'bold',
             paddingRight: '10px',
@@ -222,10 +235,12 @@ export const ScoreCard: React.FC<{
             checked={showDifferences}
             onClick={() => setShowDifferences(v => !v)}
           />
-        </div>
-        {modelRefs.map(modelRef => {
+        </GridCell>
+        {evalCallIds.map(evalCallId => {
+          const modelRef =
+            props.state.data.evaluationCalls[evalCallId].modelRef;
           return (
-            <div
+            <GridCell
               key={modelRef}
               style={{
                 fontWeight: 'bold',
@@ -233,18 +248,11 @@ export const ScoreCard: React.FC<{
                 // borderTop: '1px solid #ccc',
                 // borderLeft: '1px solid #ccc',
               }}>
-              <EvaluationModelLink
-                callId={
-                  Object.entries(props.state.data.evaluationCalls).find(
-                    ([_, val]) => val.modelRef === modelRef
-                  )![0]
-                }
-                state={props.state}
-              />
-            </div>
+              <EvaluationModelLink callId={evalCallId} state={props.state} />
+            </GridCell>
           );
         })}
-        {/* <div></div> */}
+        {/* <GridCell></GridCell> */}
         {/* Model Rows */}
         {Object.entries(modelProps).map(([prop, modelData]) => {
           if (!showDifferences && !propsWithDifferences.includes(prop)) {
@@ -252,35 +260,48 @@ export const ScoreCard: React.FC<{
           }
           return (
             <React.Fragment key={prop}>
-              <div></div>
-              <div
+              <GridCell></GridCell>
+              <GridCell
                 style={{
                   fontWeight: 'bold',
                   textAlign: 'right',
                   paddingRight: '10px',
+                  width: FIXED_SCORE_LABEL_WIDTH,
+                  textOverflow: 'ellipsis',
                 }}>
                 {prop}
-              </div>
-              {modelRefs.map((model, mNdx) => {
-                if (prop === 'predict') {
+              </GridCell>
+              {evalCallIds.map((evalCallId, mNdx) => {
+                const model =
+                  props.state.data.evaluationCalls[evalCallId].modelRef;
+                const parsed = parseRefMaybe(
+                  modelProps[prop][model]
+                ) as WeaveObjectRef;
+                if (parsed) {
                   const parsed = parseRef(
                     modelProps[prop][model]
                   ) as WeaveObjectRef;
-                  return <SmallRef objRef={parsed} />;
+                  return (
+                    <GridCell key={mNdx}>
+                      <SmallRef objRef={parsed} />
+                    </GridCell>
+                  );
                 } else {
-                  return <div key={mNdx}>{modelData[model]}</div>;
+                  return <GridCell key={mNdx}>{modelData[model]}</GridCell>;
                 }
               })}
-              {/* <div></div> */}
+              {/* <GridCell></GridCell> */}
             </React.Fragment>
           );
         })}
         {/* Header Row */}
-        <div></div>
-        <div></div>
-        {modelRefs.map(modelRef => {
+        <GridCell></GridCell>
+        <GridCell></GridCell>
+        {evalCallIds.map(evalCallId => {
+          const modelRef =
+            props.state.data.evaluationCalls[evalCallId].modelRef;
           return (
-            <div
+            <GridCell
               key={modelRef}
               style={{
                 fontWeight: 'bold',
@@ -288,18 +309,11 @@ export const ScoreCard: React.FC<{
                 // borderTop: '1px solid #ccc',
                 // borderLeft: '1px solid #ccc',
               }}>
-              <EvaluationCallLink
-                callId={
-                  Object.entries(props.state.data.evaluationCalls).find(
-                    ([_, val]) => val.modelRef === modelRef
-                  )![0]
-                }
-                state={props.state}
-              />
-            </div>
+              <EvaluationCallLink callId={evalCallId} state={props.state} />
+            </GridCell>
           );
         })}
-        {/* <div></div> */}
+        {/* <GridCell></GridCell> */}
         {/* Score Rows */}
         {Object.entries(betterScores).map(([key, def]) => {
           // TODO: this might be wrong if the scorers change between evals with the same name!! Need to revisit
@@ -308,34 +322,42 @@ export const ScoreCard: React.FC<{
           ) as WeaveObjectRef | null;
           return (
             <React.Fragment key={key}>
-              <div
+              <GridCell
                 style={{
                   // vertical span length of metric
                   gridRowEnd: `span ${Object.keys(def.metrics).length}`,
                   borderTop: '1px solid #ccc',
                   fontWeight: 'bold',
+                  textAlign: 'right',
                 }}>
                 {scorerRefParsed ? (
                   <SmallRef objRef={scorerRefParsed} />
                 ) : (
                   def.scorerName ?? ''
                 )}
-              </div>
+              </GridCell>
               {Object.keys(def.metrics).map((metricKey, metricNdx) => {
                 return (
                   <React.Fragment key={metricKey}>
-                    <div
+                    <GridCell
                       style={{
                         borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
+                        fontWeight: 'bold',
+                        textAlign: 'right',
+                        width: FIXED_SCORE_LABEL_WIDTH,
+                        textOverflow: 'ellipsis',
                       }}>
                       {def.metrics[metricKey].displayName}
-                    </div>
-                    {modelRefs.map((modelRef, mNdx) => {
+                    </GridCell>
+                    {evalCallIds.map((evalCallId, mNdx) => {
+                      const modelRef =
+                        props.state.data.evaluationCalls[evalCallId].modelRef;
                       // const value = betterScores[key].metrics[metric.key]
                       const baseline =
                         def.metrics[metricKey].modelScores[baselineRef];
                       const value =
                         def.metrics[metricKey].modelScores[modelRef];
+                      console.log({value});
                       // console.log({baseline, value});
                       let color: TagColorName = 'moon';
                       const diff = value - baseline;
@@ -360,30 +382,44 @@ export const ScoreCard: React.FC<{
                         : diff.toFixed(6);
 
                       return (
-                        <HorizontalBox
+                        <GridCell
                           key={modelRef}
                           style={{
                             borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
                           }}>
-                          <div style={{minWidth: '100px'}}>
-                            <ValueViewNumber fractionDigits={4} value={value} />
-                            {def.metrics[metricKey].unit}
-                          </div>
-                          {modelRef !== baselineRef && diff !== 0 && (
-                            <Pill
-                              label={diffFixed + def.metrics[metricKey].unit}
-                              color={color}
-                            />
+                          {value != null ? (
+                            <HorizontalBox
+                              style={{
+                                alignItems: 'center',
+                              }}>
+                              <span
+                                style={{
+                                  minWidth: '100px',
+                                }}>
+                                <ValueViewNumber
+                                  fractionDigits={4}
+                                  value={value}
+                                />
+                                {def.metrics[metricKey].unit}
+                              </span>
+                              {modelRef !== baselineRef && diff !== 0 && (
+                                <Pill
+                                  label={
+                                    (diff > 0 ? '+' : '') +
+                                    diffFixed +
+                                    def.metrics[metricKey].unit
+                                  }
+                                  color={color}
+                                />
+                              )}
+                            </HorizontalBox>
+                          ) : (
+                            <NotApplicable />
                           )}
-
-                          {/* <ValueViewNumber
-                                fractionDigits={4}
-                                value={value - baseline}
-                              />  */}
-                        </HorizontalBox>
+                        </GridCell>
                       );
                     })}
-                    {/* <div
+                    {/* <GridCell
                       style={{
                         borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
                       }}>
@@ -395,8 +431,8 @@ export const ScoreCard: React.FC<{
                         }
                       />
                       {metric.unit}
-                    </div> */}
-                    {/* <div></div> */}
+                    </GridCell> */}
+                    {/* <GridCell></GridCell> */}
                   </React.Fragment>
                 );
               })}

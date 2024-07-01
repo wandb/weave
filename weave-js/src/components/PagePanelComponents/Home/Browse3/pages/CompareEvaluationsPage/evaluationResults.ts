@@ -1,12 +1,14 @@
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import { opNiceName } from '../common/Links';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
   TraceCallSchema,
   TraceObjSchema,
   TraceServerClient,
 } from '../wfReactInterface/traceServerClient';
-import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {
+  convertISOToDate,
+  projectIdFromParts,
+} from '../wfReactInterface/tsDataModelHooks';
 import {EvaluationEvaluateCallSchema} from './evaluations';
 
 export type BinarySummaryScore = {
@@ -19,15 +21,15 @@ export type ContinuousSummaryScore = {
 };
 
 export const isBinarySummaryScore = (
-  score: BinarySummaryScore | ContinuousSummaryScore
+  score: any
 ): score is BinarySummaryScore => {
-  return 'true_count' in score && 'true_fraction' in score;
+  return typeof score == 'object' && score != null && 'true_count' in score && 'true_fraction' in score;
 };
 
 export const isContinuousSummaryScore = (
-  score: BinarySummaryScore | ContinuousSummaryScore
+  score: any
 ): score is ContinuousSummaryScore => {
-  return 'mean' in score;
+  return typeof score == 'object' && score != null && 'mean' in score;
 };
 
 type EvaluationCall = {
@@ -65,12 +67,12 @@ type EvaluationObj = {
 //     _rawDatasetObjectVersionData: TraceObjSchema;
 //   };
 
-type PredictCall = {
-  callId: string;
-  inputDigest: string;
-  modelRef: string;
-  _rawPredictTraceData: TraceCallSchema;
-};
+// type PredictCall = {
+//   callId: string;
+//   inputDigest: string;
+//   modelRef: string;
+//   _rawPredictTraceData: TraceCallSchema;
+// };
 
 //   type Input = {
 //     digest: string;
@@ -117,15 +119,30 @@ export type EvaluationComparisonData = {
     [rowDigest: string]: {
       models: {
         [modelRef: string]: {
-          prediction?: PredictCall;
-          model_latency?: number;
-          scores: {
-            [scorerRef: string]: ScoreResults;
+          predictAndScores: {
+            [predictAndScoreCallId: string]: PredictAndScoreCall;
           };
         };
       };
     };
   };
+};
+
+type PredictAndScoreCall = {
+  callId: string;
+  exampleRef: string;
+  modelRef: string;
+  predictCall?: {
+    callId: string;
+    output: any;
+    latencyMs: number;
+    totalUsageTokens: number;
+    _rawPredictTraceData: TraceCallSchema;
+  };
+  scores: {
+    [scorerRef: string]: ScoreResults;
+  };
+  _rawPredictAndScoreTraceData: TraceCallSchema;
 };
 
 const generateColorFromId = (id: string) => {
@@ -180,12 +197,17 @@ export const fetchEvaluationComparisonData = async (
         color: generateColorFromId(call.id),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
-        scores: call.output as any,
-        // Object.fromEntries(
-        //   Object.entries(call.output as any).filter(
-        //     ([key]) => key !== 'model_latency'
-        //   )
-        // ) as any,
+        scores: Object.fromEntries(
+          Object.entries(call.output as any).filter(([key]) => key !== 'model_latency').map(
+            ([key, val]) => {
+              // return [key, val];
+              if (isBinarySummaryScore(val) || isContinuousSummaryScore(val)) {
+                return [key, {'': val}] as any; // no nesting. probably something we should fix more generally
+              }
+              return [key, val];
+            }
+          )
+        ) ,
         _rawEvaluationTraceData: call as EvaluationEvaluateCallSchema,
       },
     ])
@@ -277,7 +299,9 @@ export const fetchEvaluationComparisonData = async (
   // Create a map of all the predict_and_score_ops
   const predictAndScoreOps = Object.fromEntries(
     evalTraceRes.calls
-      .filter(call => call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC))
+      .filter(call =>
+        call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
+      )
       .map(call => [call.id, call])
   );
 
@@ -314,32 +338,92 @@ export const fetchEvaluationComparisonData = async (
                 models: {},
               };
             }
+            const digestCollection = result.resultRows[rowDigest];
+            // resultRows: {
+            //   [rowDigest: string]: {
+            //     models: {
+            //       [modelRef: string]: {
+            //         predictAndScores: {
+            //           [predictAndScoreCallId: string]: PredictAndScoreCall;
+            //         };
+            //       }
+            //     };
+            //   };
+            // };
 
-            if (result.resultRows[rowDigest].models[modelRef] == null) {
-              result.resultRows[rowDigest].models[modelRef] = {
-                prediction: undefined,
-                scores: {},
+            // type PredictAndScoreCall = {
+            //   callId: string;
+            //   exampleRef: string;
+            //   modelRef: string;
+            //   predictCall?: {
+            //     callId: string;
+            //     exampleRef: string;
+            //     output: any
+            //     latencyMs: number;
+            //     totalUsageTokens: number;
+            //     _rawPredictTraceData: TraceCallSchema;
+            //   }
+            //   scores: {
+            //     [scorerRef: string]: ScoreResults;
+            //   };
+            //   _rawPredictAndScoreTraceData: TraceCallSchema;
+            // };
+            if (digestCollection.models[modelRef] == null) {
+              digestCollection.models[modelRef] = {
+                predictAndScores: {},
               };
             }
 
-            if (isProbablyPredictCall) {
-              result.resultRows[rowDigest].models[modelRef].prediction = {
-                callId: traceCall.id,
-                inputDigest: rowDigest,
+            const modelForDigestCollection = digestCollection.models[modelRef];
+
+            if (
+              modelForDigestCollection.predictAndScores[
+                parentPredictAndScore.id
+              ] == null
+            ) {
+              modelForDigestCollection.predictAndScores[
+                parentPredictAndScore.id
+              ] = {
+                callId: parentPredictAndScore.id,
+                exampleRef,
                 modelRef,
+                predictCall: undefined,
+                scores: {},
+                _rawPredictAndScoreTraceData: parentPredictAndScore,
+              };
+            }
+
+            const predictAndScoreFinal =
+              modelForDigestCollection.predictAndScores[
+                parentPredictAndScore.id
+              ];
+
+            if (isProbablyPredictCall) {
+              predictAndScoreFinal.predictCall = {
+                callId: traceCall.id,
+                output: traceCall.output as any,
+                latencyMs:
+                  (convertISOToDate(
+                    traceCall.ended_at ?? traceCall.started_at
+                  ).getTime() -
+                    convertISOToDate(traceCall.started_at).getTime()) /
+                  1000, // why is this different than the predictandscore model latency?
+                totalUsageTokens:
+                  traceCall.summary?.usage?.totalUsageTokens || 0,
                 _rawPredictTraceData: traceCall,
               };
-              result.resultRows[rowDigest].models[modelRef].model_latency = (parentPredictAndScore.output as any).model_latency;
             } else if (isProbablyScoreCall) {
-              result.resultRows[rowDigest].models[modelRef].scores[
-                traceCall.op_name
-              ] = {
+              let results = traceCall.output as any;
+              if (isBinarySummaryScore(results) || isContinuousSummaryScore(results)) {
+                results = {'': results}; // no nesting. probably something we should fix more generally
+              }
+              predictAndScoreFinal.scores[traceCall.op_name] = {
                 callId: traceCall.id,
-                results: traceCall.output as any,
+                results: results,
                 _rawScoreTraceData: traceCall,
               };
             } else {
-              console.log(traceCall)
+              console.log(traceCall);
             }
           }
         }

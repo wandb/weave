@@ -119,6 +119,7 @@ export const evaluationMetrics = (
 
   // scorers
   const allScorers: {[scorer: string]: ComparisonMetric} = {};
+  const allCallIds = evaluationCalls.map(call => call.id);
   evaluationCalls.forEach(call => {
     const flattenedOutput = flattenObject(call.output);
     const scorerKeys: string[] = [];
@@ -145,7 +146,7 @@ export const evaluationMetrics = (
         allScorers[scorerKey] = {
           path: scorerKey,
           unit,
-          values: {},
+          values: Object.fromEntries(allCallIds.map(id => [id, 0])),
           lowerIsBetter,
         };
       }

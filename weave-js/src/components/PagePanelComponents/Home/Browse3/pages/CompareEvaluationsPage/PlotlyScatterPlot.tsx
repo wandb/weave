@@ -3,7 +3,7 @@ import React, {useEffect, useMemo, useRef} from 'react';
 
 import {MOON_300} from '../../../../../../common/css/color.styles';
 
-export type ScatterPlotData = {x: number[]; y: number[]; color: string}[];
+export type ScatterPlotData = Array<{x: number[]; y: number[]; color: string}>;
 export const PlotlyScatterPlot: React.FC<{
   height: number;
   data: ScatterPlotData;
@@ -19,7 +19,19 @@ export const PlotlyScatterPlot: React.FC<{
     }));
   }, [props.data]);
 
-  const plotlyLayout = useMemo(() => {
+  const ranges = useMemo(() => {
+    const x = props.data.map(s => s.x).flat();
+    const y = props.data.map(s => s.y).flat();
+    return {
+      x: [Math.min(...x), Math.max(...x)],
+      y: [Math.min(...y), Math.max(...y)],
+    };
+  }, [props.data]);
+
+  const lowerBound = Math.min(ranges.x[0], ranges.y[0]);
+  const upperBound = Math.min(ranges.x[1], ranges.y[1]);
+
+  const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
       height: props.height,
       showlegend: false,
@@ -31,22 +43,22 @@ export const PlotlyScatterPlot: React.FC<{
         pad: 0,
       },
       xaxis: {
+        // fixedrange: true,
         gridcolor: MOON_300,
         linecolor: MOON_300,
       },
       yaxis: {
+        // fixedrange: true,
         gridcolor: MOON_300,
         linecolor: MOON_300,
       },
       shapes: [
         {
           type: 'line',
-          x0: 0,
-          y0: 0,
-          x1: 1,
-          y1: 1,
-          xref: 'paper',
-          yref: 'paper',
+          x0: lowerBound,
+          y0: lowerBound,
+          x1: upperBound,
+          y1: upperBound,
           line: {
             color: 'rgba(50, 171, 96, 1)',
             width: 2,

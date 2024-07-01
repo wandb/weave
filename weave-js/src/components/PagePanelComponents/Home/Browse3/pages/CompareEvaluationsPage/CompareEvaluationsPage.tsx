@@ -1,21 +1,9 @@
 import {Box, FormControl} from '@material-ui/core';
 import {Autocomplete} from '@mui/material';
-import * as Plotly from 'plotly.js';
-import React, {
-  FC,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-} from 'react';
+import React, {FC, useCallback, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {
-  CACTUS_500,
-  MOON_300,
-  TEAL_500,
-} from '../../../../../../common/css/color.styles';
+import {MOON_500} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {
   useWeaveflowCurrentRouteContext,
@@ -42,8 +30,8 @@ import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 // import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
-import {ScoreCard} from './Scorecard';
 import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
+import {ScoreCard} from './Scorecard';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -128,11 +116,7 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC = props => {
   const state = useCompareEvaluationsState();
-  const dims = useEvaluationCallDimensions(state);
-  useEffect(() => {
-    if (state.primaryDimension == null) {
-    }
-  }, []);
+
   return (
     <Box
       sx={{
@@ -148,7 +132,7 @@ const CompareEvaluationsPageInner: React.FC = props => {
         <ComparisonDefinition state={state} />
         <SummaryPlots state={state} />
         <ScoreCard state={state} />
-        {Object.keys(state.data.models).length == 2 && (
+        {Object.keys(state.data.models).length === 2 && (
           <ScatterFilter state={state} />
         )}
         <CompareEvaluationsCallsTable state={state} />
@@ -159,18 +143,22 @@ const CompareEvaluationsPageInner: React.FC = props => {
 
 const ScatterFilter: React.FC<{state: EvaluationComparisonState}> = props => {
   const data = useMemo(() => {
-    const primaryDimension = 'model_latency';
+    // const primaryDimension = 'model_latency';
     const series: ScatterPlotData[number] = {
       x: [],
       y: [],
-      color: MOON_300,
+      color: MOON_500,
     };
     const modelRefs = Object.keys(props.state.data.models);
     const modelX = modelRefs[0];
     const modelY = modelRefs[1];
     Object.values(props.state.data.resultRows).forEach(row => {
-      series.x.push(row.models[modelX].model_latency ?? 0);
-      series.y.push(row.models[modelY].model_latency ?? 0);
+      Object.values(row.models[modelX].predictAndScores).forEach(score => {
+        series.x.push(score.predictCall?.latencyMs ?? 0);
+      });
+      Object.values(row.models[modelY].predictAndScores).forEach(score => {
+        series.y.push(score.predictCall?.latencyMs ?? 0);
+      });
     });
     return [series];
   }, [props.state]);
@@ -424,6 +412,8 @@ const CompareEvaluationsCallsTable: React.FC<{
  * - [ ] Fix Plot to show correct data
  * - [ ] Build grouping
  * - [ ] Add scorer links in scorecard
+ * - [ ] Definition header does not scale small enough
+ * - [ ] Auto-expand first-level properties (see prompt here: https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22bf5188ba-48cd-4c6d-91ea-e25464570c13%22%2C%222f4544f3-9649-487e-b083-df6985e21b12%22%2C%228cbeccd6-6ff7-4eac-a305-6fb6450530f1%22%5D)
  * TEST:
  * - [ ] Single Case
  * - [ ] Dual Case
