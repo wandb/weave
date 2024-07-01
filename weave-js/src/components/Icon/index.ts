@@ -1,6 +1,7 @@
 export {
   Icon,
   IconAddNew,
+  IconAddReaction,
   IconAdminShieldSafe,
   IconAmazonSagemaker,
   IconArea,
@@ -103,6 +104,7 @@ export {
   IconLayoutVertical,
   IconLightbulbInfo,
   IconLinearScale,
+  IconLinePlotAlt2,
   IconLinkAlt,
   IconLinkedinSocial,
   IconList,

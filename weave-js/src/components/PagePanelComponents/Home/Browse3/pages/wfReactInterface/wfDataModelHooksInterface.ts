@@ -10,7 +10,10 @@
  */
 
 import * as Types from '../../../../../../core/model/types';
+import {WeaveKind} from '../../../../../../react';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
+import * as traceServerClient from './traceServerClient'; // TODO: This import is not ideal, should delete this whole interface
+import {Query} from './traceServerClientInterface/query'; // TODO: This import is not ideal, should delete this whole interface
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
@@ -34,6 +37,7 @@ export type CallKey = {
 };
 export type CallSchema = CallKey & {
   spanName: string;
+  displayName: string | null;
   opVersionRef: string | null;
   traceId: string;
   parentId: string | null;
@@ -43,6 +47,7 @@ export type CallSchema = CallKey & {
   rawFeedback?: any;
   userId: string | null;
   runId: string | null;
+  traceCall?: traceServerClient.TraceCallSchema; // this will eventually be the entire call schema
 };
 
 export type CallFilter = {
@@ -93,7 +98,7 @@ type WandbArtifactObjectVersionKey = {
 
 type WeaveObjectVersionKey = {
   scheme: 'weave';
-  weaveKind: 'object' | 'table' | 'op';
+  weaveKind: WeaveKind;
 } & CommonObjectVersionKey;
 
 export type ObjectVersionKey =
@@ -145,6 +150,12 @@ type AppendRefMutation = {
 
 export type RefMutation = SetRefMutation | AppendRefMutation;
 
+export type FeedbackKey = {
+  entity: string;
+  project: string;
+  weaveRef: string;
+};
+
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
@@ -152,8 +163,30 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: CallFilter,
     limit?: number,
-    opts?: {skip?: boolean}
+    offset?: number,
+    sortBy?: traceServerClient.SortBy[],
+    query?: Query,
+    expandedRefColumns?: Set<string>,
+    opts?: {skip?: boolean; refetchOnDelete?: boolean}
   ) => Loadable<CallSchema[]>;
+  useCallsStats: (
+    entity: string,
+    project: string,
+    filter: CallFilter,
+    query?: Query,
+    opts?: {skip?: boolean}
+  ) => Loadable<traceServerClient.TraceCallsQueryStatsRes>;
+  useCallsDeleteFunc: () => (
+    entity: string,
+    project: string,
+    callIDs: string[]
+  ) => Promise<void>;
+  useCallUpdateFunc: () => (
+    entity: string,
+    project: string,
+    callID: string,
+    newName: string
+  ) => Promise<void>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
@@ -161,7 +194,7 @@ export type WFDataModelHooksInterface = {
     filter: OpVersionFilter,
     limit?: number,
     opts?: {skip?: boolean}
-  ) => Loadable<OpVersionSchema[]>;
+  ) => LoadableWithError<OpVersionSchema[]>;
   useObjectVersion: (
     key: ObjectVersionKey | null
   ) => Loadable<ObjectVersionSchema | null>;
@@ -171,7 +204,7 @@ export type WFDataModelHooksInterface = {
     filter: ObjectVersionFilter,
     limit?: number,
     opts?: {skip?: boolean}
-  ) => Loadable<ObjectVersionSchema[]>;
+  ) => LoadableWithError<ObjectVersionSchema[]>;
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
   useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
   // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB
@@ -188,6 +221,7 @@ export type WFDataModelHooksInterface = {
     digest: string,
     opts?: {skip?: boolean}
   ) => Loadable<string>;
+  useFeedback: (key: FeedbackKey | null) => LoadableWithError<any[] | null>;
   derived: {
     useChildCallsForCompare: (
       entity: string,

@@ -1,5 +1,6 @@
 export const IconNames = {
   AddNew: 'add-new',
+  AddReaction: 'add-reaction',
   AdminShieldSafe: 'admin-shield-safe',
   AmazonSagemaker: 'amazon-sagemaker',
   Area: 'area',
@@ -101,6 +102,7 @@ export const IconNames = {
   LayoutTabs: 'layout-tabs',
   LayoutVertical: 'layout-vertical',
   LightbulbInfo: 'lightbulb-info',
+  LinePlotAlt2: 'line-plot-alt2',
   LinearScale: 'linear-scale',
   LinkAlt: 'link-alt',
   LinkedinSocial: 'linkedin-social',

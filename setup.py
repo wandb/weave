@@ -1,15 +1,16 @@
 import os
+import subprocess
+import tarfile
+import tempfile
+import urllib.request
 from pathlib import Path
+from typing import Union
+from urllib.error import HTTPError
+
 from setuptools import setup  # type: ignore[import]
 from setuptools.command.build import build  # type: ignore[import]
 from setuptools.command.editable_wheel import editable_wheel  # type: ignore[import]
 from setuptools.command.sdist import sdist  # type: ignore[import]
-import subprocess
-import tarfile
-import tempfile
-from typing import Union
-import urllib.request
-from urllib.error import HTTPError
 
 ROOT = Path(__file__).resolve().parent
 SKIP_BUILD = os.environ.get("WEAVE_SKIP_BUILD", False)

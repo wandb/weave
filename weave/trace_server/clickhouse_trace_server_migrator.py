@@ -1,8 +1,11 @@
 # Clickhouse Trace Server Manager
-import typing
+import logging
 import os
+import typing
 
 from clickhouse_connect.driver.client import Client as CHClient
+
+logger = logging.getLogger(__name__)
 
 
 class ClickHouseTraceServerMigrator:
@@ -20,9 +23,9 @@ class ClickHouseTraceServerMigrator:
         self, target_db: str, target_version: typing.Optional[int] = None
     ) -> None:
         status = self._get_migration_status(target_db)
-        print(f"""`{target_db}` migration status: {status}""")
+        logger.info(f"""`{target_db}` migration status: {status}""")
         if status["partially_applied_version"]:
-            print(
+            logger.info(
                 f"Unable to apply migrations to `{target_db}`. Found partially applied migration version {status['partially_applied_version']}. Please fix the database manually and try again."
             )
             return
@@ -31,9 +34,9 @@ class ClickHouseTraceServerMigrator:
             status["curr_version"], migration_map, target_version
         )
         if len(migrations_to_apply) == 0:
-            print(f"No migrations to apply to `{target_db}`")
+            logger.info(f"No migrations to apply to `{target_db}`")
             return
-        print(f"Migrations to apply: {migrations_to_apply}")
+        logger.info(f"Migrations to apply: {migrations_to_apply}")
         if status["curr_version"] == 0:
             self.ch_client.command(f"CREATE DATABASE IF NOT EXISTS {target_db}")
         for target_version, migration_file in migrations_to_apply:
@@ -52,8 +55,8 @@ class ClickHouseTraceServerMigrator:
                 db_name String,
                 curr_version UInt64,
                 partially_applied_version UInt64 NULL,
-            ) 
-            ENGINE = MergeTree() 
+            )
+            ENGINE = MergeTree()
             ORDER BY (db_name)
         """
         )
@@ -162,7 +165,7 @@ class ClickHouseTraceServerMigrator:
     def _apply_migration(
         self, target_db: str, target_version: int, migration_file: str
     ) -> None:
-        print(f"Applying migration {migration_file} to `{target_db}`")
+        logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_file_path = os.path.join(migration_dir, migration_file)
         with open(migration_file_path, "r") as f:
@@ -186,4 +189,4 @@ class ClickHouseTraceServerMigrator:
             ALTER TABLE db_management.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'
         """
         )
-        print(f"Migration {migration_file} applied to `{target_db}`")
+        logger.info(f"Migration {migration_file} applied to `{target_db}`")

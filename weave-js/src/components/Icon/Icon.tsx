@@ -1,6 +1,7 @@
 import React, {ElementType, SVGProps} from 'react';
 
 import {ReactComponent as ImportAddNew} from '../../assets/icons/icon-add-new.svg';
+import {ReactComponent as ImportAddReaction} from '../../assets/icons/icon-add-reaction.svg';
 import {ReactComponent as ImportAdminShieldSafe} from '../../assets/icons/icon-admin-shield-safe.svg';
 import {ReactComponent as ImportAmazonSagemaker} from '../../assets/icons/icon-amazon-sagemaker.svg';
 import {ReactComponent as ImportArea} from '../../assets/icons/icon-area.svg';
@@ -102,6 +103,7 @@ import {ReactComponent as ImportLayoutHorizontal} from '../../assets/icons/icon-
 import {ReactComponent as ImportLayoutTabs} from '../../assets/icons/icon-layout-tabs.svg';
 import {ReactComponent as ImportLayoutVertical} from '../../assets/icons/icon-layout-vertical.svg';
 import {ReactComponent as ImportLightbulbInfo} from '../../assets/icons/icon-lightbulb-info.svg';
+import {ReactComponent as ImportLinePlotAlt2} from '../../assets/icons/icon-line-plot-alt2.svg';
 import {ReactComponent as ImportLinearScale} from '../../assets/icons/icon-linear-scale.svg';
 import {ReactComponent as ImportLinkAlt} from '../../assets/icons/icon-link-alt.svg';
 import {ReactComponent as ImportLinkedinSocial} from '../../assets/icons/icon-linkedin-social.svg';
@@ -247,6 +249,9 @@ const updateIconProps = (props: SVGIconProps) => {
 };
 export const IconAddNew = (props: SVGIconProps) => (
   <ImportAddNew {...updateIconProps(props)} />
+);
+export const IconAddReaction = (props: SVGIconProps) => (
+  <ImportAddReaction {...updateIconProps(props)} />
 );
 export const IconAdminShieldSafe = (props: SVGIconProps) => (
   <ImportAdminShieldSafe {...updateIconProps(props)} />
@@ -550,6 +555,9 @@ export const IconLayoutVertical = (props: SVGIconProps) => (
 );
 export const IconLightbulbInfo = (props: SVGIconProps) => (
   <ImportLightbulbInfo {...updateIconProps(props)} />
+);
+export const IconLinePlotAlt2 = (props: SVGIconProps) => (
+  <ImportLinePlotAlt2 {...updateIconProps(props)} />
 );
 export const IconLinearScale = (props: SVGIconProps) => (
   <ImportLinearScale {...updateIconProps(props)} />
@@ -941,6 +949,7 @@ export const IconZoomInTool = (props: SVGIconProps) => (
 
 const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'add-new': IconAddNew,
+  'add-reaction': IconAddReaction,
   'admin-shield-safe': IconAdminShieldSafe,
   'amazon-sagemaker': IconAmazonSagemaker,
   area: IconArea,
@@ -1042,6 +1051,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'layout-tabs': IconLayoutTabs,
   'layout-vertical': IconLayoutVertical,
   'lightbulb-info': IconLightbulbInfo,
+  'line-plot-alt2': IconLinePlotAlt2,
   'linear-scale': IconLinearScale,
   'link-alt': IconLinkAlt,
   'linkedin-social': IconLinkedinSocial,

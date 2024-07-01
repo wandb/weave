@@ -223,7 +223,7 @@ export const CallTraceView: FC<{
       <ErrorBoundary>
         <DataGridPro
           apiRef={apiRef}
-          rowHeight={38}
+          rowHeight={64}
           columnHeaderHeight={0}
           treeData
           loading={animationBuffer}

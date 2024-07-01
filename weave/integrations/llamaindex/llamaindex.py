@@ -1,6 +1,6 @@
+from weave import client_context
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
-from weave import graph_client_context
 
 TRANSFORM_EMBEDDINGS = False
 ALLOWED_ROOT_EVENT_TYPES = ("query",)
@@ -11,7 +11,15 @@ try:
     from llama_index.core.callbacks.base_handler import BaseCallbackHandler
     from llama_index.core.callbacks.schema import CBEventType, EventPayload
 except ImportError:
+    # This occurs if llama_index is not installed.
     import_failed = True
+except Exception:
+    # This occurs if llama_index is installed but there is an error in the import or some other error occured in the interaction between packages.
+    import_failed = True
+    print(
+        "Failed to autopatch llama_index. If you are tracing Llama calls, please upgrade llama_index to be version>=0.10.35"
+    )
+
 
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -50,15 +58,13 @@ if not import_failed:
         ) -> str:
             """Run when an event starts and return id of event."""
             # Get a handle to the internal graph client.
-            gc = graph_client_context.require_graph_client()
+            gc = client_context.weave_client.require_weave_client()
 
             # Check to see if the event is an exception.
             if event_type == CBEventType.EXCEPTION:
-
                 # If the event is an exception, and we are actively tracking the corresponding
                 # call, finish the call with the exception.
                 if event_id in self._call_map:
-
                     # Pop the call from the call map.
                     call = self._call_map.pop(event_id)
 
@@ -83,12 +89,11 @@ if not import_failed:
 
                 # If the event is valid, create a call and add it to the call map.
                 if is_valid_root or is_valid_child:
-
                     # Create a call object.
                     call = gc.create_call(
                         "llama_index." + event_type.name.lower(),
-                        self._call_map.get(parent_id),
                         process_payload(payload),
+                        self._call_map.get(parent_id),
                     )
 
                     # Add the call to the call map.
@@ -106,11 +111,10 @@ if not import_failed:
         ) -> None:
             """Run when an event ends."""
             # Get a handle to the internal graph client.
-            gc = graph_client_context.require_graph_client()
+            gc = client_context.weave_client.require_weave_client()
 
             # If the event is in the call map, finish the call.
             if event_id in self._call_map:
-
                 # Finish the call.
                 call = self._call_map.pop(event_id)
                 gc.finish_call(call, process_payload(payload))
@@ -130,7 +134,7 @@ if not import_failed:
             pass
 
     def process_payload(
-        payload: Optional[Dict[EventPayload, Any]] = None
+        payload: Optional[Dict[EventPayload, Any]] = None,
     ) -> Optional[Dict[EventPayload, Any]]:
         if payload is None:
             return None

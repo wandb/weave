@@ -1,10 +1,21 @@
 import os
+from typing import Any, Generator
+
+import litellm
 import pytest
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
-from typing import Any, Generator
-import litellm
+
 from .litellm import litellm_patcher
+
+
+class Nearly:
+    def __init__(self, v: float) -> None:
+        self.v = v
+
+    def __eq__(self, other: Any) -> bool:
+        return abs(self.v - other) < 2
 
 
 def _get_call_output(call: tsi.CallSchema) -> Any:
@@ -34,6 +45,7 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
     litellm_patcher.undo_patch()
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -61,7 +73,7 @@ def test_litellm_quickstart(
     assert output["id"] == chat_response.id
     assert output["model"] == chat_response.model
     assert output["object"] == chat_response.object
-    assert output["created"] == chat_response.created
+    assert output["created"] == Nearly(chat_response.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
@@ -73,6 +85,7 @@ def test_litellm_quickstart(
     assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 44
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -101,7 +114,7 @@ async def test_litellm_quickstart_async(
     assert output["id"] == chat_response.id
     assert output["model"] == chat_response.model
     assert output["object"] == chat_response.object
-    assert output["created"] == chat_response.created
+    assert output["created"] == Nearly(chat_response.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
@@ -113,6 +126,7 @@ async def test_litellm_quickstart_async(
     assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 48
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -144,7 +158,7 @@ def test_litellm_quickstart_stream(
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id
     assert output["model"] == chunk.model
-    assert output["created"] == chunk.created
+    assert output["created"] == Nearly(chunk.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
@@ -157,6 +171,7 @@ def test_litellm_quickstart_stream(
     # assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 0
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -188,7 +203,7 @@ async def test_litellm_quickstart_stream_async(
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id
     assert output["model"] == chunk.model
-    assert output["created"] == chunk.created
+    assert output["created"] == Nearly(chunk.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]

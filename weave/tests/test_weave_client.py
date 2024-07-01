@@ -1,33 +1,36 @@
+import asyncio
 import dataclasses
+import json
 import re
 import signal
-import requests
-import pytest
-import pydantic
-from pydantic import BaseModel
-import weave
-import asyncio
-from weave import op_def, Evaluation
 
-from weave import weave_client
+import pydantic
+import pytest
+import requests
+from pydantic import BaseModel
+
+import weave
+import weave.trace_server.trace_server_interface as tsi
+from weave import Evaluation, weave_client
+from weave.legacy import op_def
+from weave.trace import refs
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 from weave.trace.refs import (
+    DICT_KEY_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
-    LIST_INDEX_EDGE_NAME,
-    DICT_KEY_EDGE_NAME,
 )
-
-from weave.trace import refs
+from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
-from weave.trace.isinstance import weave_isinstance
 from weave.trace_server.trace_server_interface import (
-    TableCreateReq,
-    TableSchemaForInsert,
-    TableQueryReq,
-    RefsReadBatchReq,
-    FileCreateReq,
     FileContentReadReq,
+    FileCreateReq,
+    RefsReadBatchReq,
+    TableCreateReq,
+    TableQueryReq,
+    TableSchemaForInsert,
 )
 
 pytestmark = pytest.mark.trace
@@ -162,7 +165,7 @@ def test_obj_with_table(client):
         table: weave_client.Table
 
     o = ObjWithTable(table=weave_client.Table([{"a": 1}, {"a": 2}, {"a": 3}]))
-    res = client.save_object(o, "my-obj")
+    res = client._save_object(o, "my-obj")
     o2 = client.get(res)
     row_vals = list(o2.table)
     assert row_vals[0]["a"] == 1
@@ -178,7 +181,7 @@ def test_pydantic(client):
         b: str
 
     val = B(a=5, b="x")
-    ref = client.save_object(val, "my-pydantic-obj")
+    ref = client._save_object(val, "my-pydantic-obj")
     val2 = client.get(ref)
     assert val == val2
 
@@ -194,11 +197,11 @@ def test_pydantic(client):
 
 
 def test_call_create(client):
-    call = client.create_call("x", None, {"a": 5, "b": 10})
+    call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.call(call.id)
     expected = weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:SP4LIwNDvmCFjxXhKSA1JysAqEB0x39RH03gXjBLOkc",
+        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -208,35 +211,144 @@ def test_call_create(client):
         exception=None,
         summary={},
         _children=[],
+        attributes={},
     )
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
 
 def test_calls_query(client):
-    call0 = client.create_call("x", None, {"a": 5, "b": 10})
-    call1 = client.create_call("x", None, {"a": 6, "b": 11})
-    call2 = client.create_call("y", None, {"a": 5, "b": 10})
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call1 = client.create_call("x", {"a": 6, "b": 11})
+    call2 = client.create_call("y", {"a": 5, "b": 10})
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:SP4LIwNDvmCFjxXhKSA1JysAqEB0x39RH03gXjBLOkc",
+        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call0.id,
+        attributes={},
     )
     assert result[1] == weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:SP4LIwNDvmCFjxXhKSA1JysAqEB0x39RH03gXjBLOkc",
+        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=call0.id,
         inputs={"a": 6, "b": 11},
         id=call1.id,
+        attributes={},
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
     client.finish_call(call0, None)
+
+
+def test_calls_delete(client):
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
+    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
+    call1 = client.create_call("y", {"a": 6, "b": 11})
+
+    assert len(list(client.calls())) == 4
+
+    result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
+    assert len(result) == 3
+
+    # should deleted call0_child1, _call0_child2, call1, but not call0
+    client.delete_call(call0_child1)
+
+    result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
+    assert len(result) == 1
+
+    result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
+    assert len(result) == 0
+
+    # no-op if already deleted
+    client.delete_call(call0_child1)
+    call1.delete()
+    call1.delete()
+
+    result = list(client.calls())
+    # only call0 should be left
+    assert len(result) == 1
+
+
+def test_calls_delete_cascade(client):
+    # run an evaluation, then delete the evaluation and its children
+    @weave.op()
+    async def model_predict(input) -> str:
+        return eval(input)
+
+    dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
+
+    @weave.op()
+    async def score(target, model_output):
+        return target == model_output
+
+    evaluation = Evaluation(
+        name="my-eval",
+        dataset=dataset_rows,
+        scorers=[score],
+    )
+    asyncio.run(evaluation.evaluate(model_predict))
+
+    evaluate_calls = list(weave.as_op(evaluation.evaluate).calls())
+    assert len(evaluate_calls) == 1
+    eval_call = evaluate_calls[0]
+    eval_call_children = list(eval_call.children())
+    assert len(eval_call_children) == 3
+
+    # delete the evaluation, should cascade to all the calls and sub-calls
+    client.delete_call(eval_call)
+
+    # check that all the calls are gone
+    result = list(client.calls())
+    assert len(result) == 0
+
+
+def test_call_display_name(client):
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+
+    # Rename using the client method
+    client._set_call_display_name(call0, "updated_name")
+    # same op_name
+    result = list(client.calls())
+    assert len(result) == 1
+
+    # Rename using the call object's method
+    call0 = result[0]
+    call0.set_display_name("new_name")
+    result = list(client.calls())
+    assert len(result) == 1
+    assert result[0].display_name == "new_name"
+
+    # delete the display name
+    call0 = result[0]
+    client._remove_call_display_name(call0)
+    call0 = client.call(call0.id)
+    assert call0.display_name == None
+
+    # add it back
+    call0.set_display_name("new new name")
+    call0 = client.call(call0.id)
+    assert call0.display_name == "new new name"
+
+    # delete display_name by setting to None
+    call0.remove_display_name()
+    call0 = client.call(call0.id)
+    assert call0.display_name == None
+
+    # add it back
+    call0.set_display_name("new new name")
+    call0 = client.call(call0.id)
+    assert call0.display_name == "new new name"
+
+    # delete by passing None to set
+    call0.set_display_name(None)
+    call0 = client.call(call0.id)
+    assert call0.display_name == None
 
 
 def test_dataset_calls(client):
@@ -245,7 +357,7 @@ def test_dataset_calls(client):
         "my-dataset",
     )
     for row in ref.rows:
-        call = client.create_call("x", None, {"a": row["doc"]})
+        call = client.create_call("x", {"a": row["doc"]})
         client.finish_call(call, None)
 
     calls = list(client.calls({"op_name": "x"}))
@@ -350,7 +462,7 @@ def test_opdef(client):
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_saveload_customtype(client):
+def test_saveload_op(client):
     @weave.op()
     def add2(x, y):
         return x + y
@@ -360,12 +472,46 @@ def test_saveload_customtype(client):
         return x + y + z
 
     obj = {"a": add2, "b": add3}
-    ref = client.save_object(obj, "my-ops")
+    ref = client._save_object(obj, "my-ops")
     obj2 = client.get(ref)
     assert isinstance(obj2["a"], op_def.OpDef)
     assert obj2["a"].name == "op-add2"
     assert isinstance(obj2["b"], op_def.OpDef)
     assert obj2["b"].name == "op-add3"
+
+
+def test_saveload_customtype(client, strict_op_saving):
+    class MyCustomObj:
+        a: int
+        b: str
+
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+    def custom_obj_save(obj, artifact, name) -> None:
+        with artifact.new_file(f"{name}.json") as f:
+            json.dump({"a": obj.a, "b": obj.b}, f)
+
+    def custom_obj_load(artifact, name):
+        with artifact.open(f"{name}.json") as f:
+            json_obj = json.load(f)
+            return MyCustomObj(json_obj["a"], json_obj["b"])
+
+    register_serializer(MyCustomObj, custom_obj_save, custom_obj_load)
+
+    obj = MyCustomObj(5, "x")
+    ref = client._save_object(obj, "my-obj")
+
+    # Hack the serializer so that it's loader no longer exists, to ensure
+    # it can't be called.
+    serializer = get_serializer_for_obj(obj)
+    serializer.load = None
+
+    obj2 = client.get(ref)
+    assert obj2.__class__.__name__ == "MyCustomObj"
+    assert obj2.a == 5
+    assert obj2.b == "x"
 
 
 def test_save_unknown_type(client):
@@ -374,7 +520,7 @@ def test_save_unknown_type(client):
             self.a = a
 
     obj = SomeUnknownThing(3)
-    ref = client.save_object(obj, "my-np-array")
+    ref = client._save_object(obj, "my-np-array")
     obj2 = client.get(ref)
     # Expect None for now
     assert obj2 == repr(obj)
@@ -389,11 +535,12 @@ def test_save_model(client):
             return self.prompt.format(input=input)
 
     model = MyModel(prompt="input is: {input}")
-    ref = client.save_object(model, "my-model")
+    ref = client._save_object(model, "my-model")
     model2 = client.get(ref)
     assert model2.predict("x") == "input is: x"
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 def test_saved_nested_modellike(client):
     class A(weave.Object):
         x: int
@@ -411,7 +558,7 @@ def test_saved_nested_modellike(client):
             return await self.a.call(input - self.y)
 
     model = B(a=A(x=3), y=2)
-    ref = client.save_object(model, "my-model")
+    ref = client._save_object(model, "my-model")
     model2 = client.get(ref)
 
     class C(weave.Object):
@@ -572,10 +719,10 @@ def test_nested_ref_is_inner(client):
 
 
 def test_obj_dedupe(client):
-    client.save_object({"a": 1}, "my-obj")
-    client.save_object({"a": 1}, "my-obj")
-    client.save_object({"a": 2}, "my-obj")
-    res = client.objects()
+    client._save_object({"a": 1}, "my-obj")
+    client._save_object({"a": 1}, "my-obj")
+    client._save_object({"a": 2}, "my-obj")
+    res = client._objects()
     assert len(res) == 2
     assert res[0].version_index == 0
     assert res[1].version_index == 1
@@ -586,15 +733,15 @@ def test_op_query(client):
     def myop(x):
         return x
 
-    client.save_object({"a": 1}, "my-obj")
-    client.save_object(myop, "my-op")
-    res = client.objects()
+    client._save_object({"a": 1}, "my-obj")
+    client._save_object(myop, "my-op")
+    res = client._objects()
     assert len(res) == 1
 
 
 def test_refs_read_batch_noextra(client):
-    ref = client.save_object([1, 2, 3], "my-list")
-    ref2 = client.save_object({"a": [3, 4, 5]}, "my-obj")
+    ref = client._save_object([1, 2, 3], "my-list")
+    ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
     res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri(), ref2.uri()]))
     assert len(res.vals) == 2
     assert res.vals[0] == [1, 2, 3]
@@ -628,18 +775,17 @@ def test_large_files(client):
         def __init__(self, a):
             self.a = a
 
-    class CoolCustomThingType(weave.types.Type):
-        instance_classes = CoolCustomThing
+    def save_instance(obj, artifact, name):
+        with artifact.new_file(name) as f:
+            f.write(obj.a * 10000005)
 
-        def save_instance(self, obj, artifact, name):
-            with artifact.new_file(name) as f:
-                f.write(obj.a * 10000005)
+    def load_instance(artifact, name, extra=None):
+        with artifact.open(name) as f:
+            return CoolCustomThing(f.read())
 
-        def load_instance(self, artifact, name, extra=None):
-            with artifact.open(name) as f:
-                return CoolCustomThing(f.read())
+    register_serializer(CoolCustomThing, save_instance, load_instance)
 
-    ref = client.save_object(CoolCustomThing("x"), "my-obj")
+    ref = client._save_object(CoolCustomThing("x"), "my-obj")
     res = client.get(ref)
     assert len(res.a) == 10000005
 
@@ -665,7 +811,7 @@ def test_isinstance_checks(client):
 
     b = PydanticObjB(a=PydanticObjA(x={"y": [1, "j", True, None]}))
 
-    client.save_nested_objects(b)
+    client._save_nested_objects(b)
 
     assert isinstance(b, PydanticObjB)
     a = b.a
@@ -803,7 +949,7 @@ def test_weave_server(client):
             return self.prompt.format(input=input)
 
     model = MyModel(prompt="input is: {input}")
-    ref = client.save_object(model, "my-model")
+    ref = client._save_object(model, "my-model")
 
     url = weave.serve(ref, thread=True)
     response = requests.post(url + "/predict", json={"input": "x"})

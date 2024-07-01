@@ -4,7 +4,8 @@
 This tells mypy to treat it as such.
 """
 
-from typing import Optional, Callable
+from typing import Callable, Optional
+
 from mypy.plugin import ClassDefContext, Plugin
 
 

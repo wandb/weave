@@ -3,14 +3,14 @@
 TODO: this file is not complete. We should try to put all compability fixes here.
     Grep for "js_compat" to find other instances.
 """
-import typing
+
 import copy
 import math
+import typing
 
-from . import weave_types
-from . import graph
-from . import weave_types
-from . import errors
+from weave.legacy import graph
+
+from . import errors, weave_types
 
 
 def _convert_specific_opname_to_generic_opname(
@@ -204,7 +204,6 @@ def remove_partialobject_from_types(data):
     "project"
 
     """
-
     # TODO: check this
 
     if isinstance(data, list):

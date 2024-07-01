@@ -1,16 +1,16 @@
 import asyncio
+
 import pytest
-from .. import filesystem
-from .. import errors
-from .. import environment
+
+from .. import environment, errors, filesystem
 
 
 @pytest.fixture()
 def test_datafs():
-    old_weave_filesystem_dir = environment.weave_filesystem_dir
+    legacy_filesystem_dir = environment.weave_filesystem_dir
     environment.weave_filesystem_dir = lambda: "./testdata"
     yield
-    environment.weave_filesystem_dir = old_weave_filesystem_dir
+    environment.weave_filesystem_dir = legacy_filesystem_dir
 
 
 def test_filesystem_access(test_datafs):

@@ -16,6 +16,8 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
+import {Query} from './traceServerClientInterface/query';
+
 export type KeyedDictType = {
   [key: string]: any;
   _keys?: string[];
@@ -25,6 +27,7 @@ export type TraceCallSchema = {
   project_id: string;
   id: string;
   op_name: string;
+  display_name?: string;
   trace_id: string;
   parent_id?: string;
   started_at: string;
@@ -67,16 +70,93 @@ interface TraceCallsFilter {
   wb_user_ids?: string[];
 }
 
+export type SortBy = {field: string; direction: 'asc' | 'desc'};
+
 export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;
   offset?: number;
+  sort_by?: SortBy[];
+  query?: Query;
 };
 
 export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
 };
+
+export type TraceCallsQueryStatsReq = {
+  project_id: string;
+  filter?: TraceCallsFilter;
+  query?: Query;
+};
+
+export type TraceCallsQueryStatsRes = {
+  count: number;
+};
+
+export type TraceCallsDeleteReq = {
+  project_id: string;
+  call_ids: string[];
+};
+
+export type TraceCallUpdateReq = {
+  project_id: string;
+  call_id: string;
+  display_name: string;
+};
+
+export type FeedbackCreateReq = {
+  project_id: string;
+  weave_ref: string;
+  feedback_type: string;
+  payload: Record<string, any>;
+};
+
+export type FeedbackCreateSuccess = {
+  id: string;
+  created_at: string;
+  wb_user_id: string;
+  payload: Record<string, any>;
+};
+export type FeedbackCreateError = {
+  detail: string;
+};
+export type FeedbackCreateRes = FeedbackCreateSuccess | FeedbackCreateError;
+
+export type FeedbackQueryReq = {
+  project_id: string;
+  query?: Query;
+  sort_by?: SortBy[];
+};
+
+export type Feedback = {
+  id: string;
+  weave_ref: string;
+  wb_user_id: string; // authenticated creator username
+  creator: string | null; // display name
+  created_at: string;
+  feedback_type: string;
+  payload: Record<string, any>;
+};
+
+export type FeedbackQuerySuccess = {
+  result: Feedback[];
+};
+export type FeedbackQueryError = {
+  detail: string;
+};
+export type FeedbackQueryRes = FeedbackQuerySuccess | FeedbackQueryError;
+
+export type FeedbackPurgeReq = {
+  project_id: string;
+  query: Query;
+};
+export type FeedbackPurgeSuccess = {};
+export type FeedbackPurgeError = {
+  detail: string;
+};
+export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
 
 interface TraceObjectsFilter {
   base_object_classes?: string[];
@@ -169,14 +249,61 @@ export class TraceServerClient {
       }>
     >
   > = {};
+  private onDeleteListeners: Array<() => void>;
+  private onRenameListeners: Array<() => void>;
 
   constructor(baseUrl: string) {
     this.readBatchCollectors = [];
     this.inFlightFetchesRequests = {};
     this.baseUrl = baseUrl;
     this.scheduleReadBatch();
+    this.onDeleteListeners = [];
+    this.onRenameListeners = [];
   }
 
+  /**
+   * Registers a callback to be called when a delete operation occurs.
+   * This method is purely for local notification within the client
+   *    and does not interact with the REST API.
+   *
+   * @param callback A function to be called when a delete operation is triggered.
+   * @returns A function to unregister the callback.
+   */
+  public registerOnDeleteListener(callback: () => void): () => void {
+    this.onDeleteListeners.push(callback);
+    return () => {
+      this.onDeleteListeners = this.onDeleteListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
+  public registerOnRenameListener(callback: () => void): () => void {
+    this.onRenameListeners.push(callback);
+    return () => {
+      this.onRenameListeners = this.onRenameListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
+
+  callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
+    const res = this.makeRequest<TraceCallsDeleteReq, void>(
+      '/calls/delete',
+      req
+    ).then(() => {
+      this.onDeleteListeners.forEach(listener => listener());
+    });
+    return res;
+  };
+  callUpdate: (req: TraceCallUpdateReq) => Promise<void> = req => {
+    const res = this.makeRequest<TraceCallUpdateReq, void>(
+      '/call/update',
+      req
+    ).then(() => {
+      this.onRenameListeners.forEach(listener => listener());
+    });
+    return res;
+  };
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(
@@ -184,7 +311,15 @@ export class TraceServerClient {
         req
       );
     };
-  callsSteamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
+  callsQueryStats: (
+    req: TraceCallsQueryStatsReq
+  ) => Promise<TraceCallsQueryStatsRes> = req => {
+    return this.makeRequest<TraceCallsQueryStatsReq, TraceCallsQueryStatsRes>(
+      '/calls/query_stats',
+      req
+    );
+  };
+  callsStreamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       const res = this.makeRequest<TraceCallsQueryReq, string>(
         '/calls/stream_query',
@@ -228,7 +363,7 @@ export class TraceServerClient {
                     `Early stream termination, performing a new request resuming from ${newReq.offset}`
                   );
                   earlyTermination = true;
-                  this.callsSteamQuery(newReq)
+                  this.callsStreamQuery(newReq)
                     .then(innerRes => {
                       calls.push(...innerRes.calls);
                       resolve({calls});
@@ -281,6 +416,28 @@ export class TraceServerClient {
         req
       );
     };
+
+  feedbackCreate: (req: FeedbackCreateReq) => Promise<FeedbackCreateRes> =
+    req => {
+      return this.makeRequest<FeedbackCreateReq, FeedbackCreateRes>(
+        '/feedback/create',
+        req
+      );
+    };
+
+  feedbackQuery: (req: FeedbackQueryReq) => Promise<FeedbackQueryRes> = req => {
+    return this.makeRequest<FeedbackQueryReq, FeedbackQueryRes>(
+      '/feedback/query',
+      req
+    );
+  };
+
+  feedbackPurge: (req: FeedbackPurgeReq) => Promise<FeedbackPurgeRes> = req => {
+    return this.makeRequest<FeedbackPurgeReq, FeedbackPurgeRes>(
+      '/feedback/purge',
+      req
+    );
+  };
 
   fileContent: (
     req: TraceFileContentReadReq

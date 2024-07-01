@@ -1,15 +1,14 @@
-"""
-Functions for inferring Weave Types from Python types.
-"""
+"""Functions for inferring Weave Types from Python types."""
 
 import collections
 import types
 import typing
+
 import typing_extensions
 
-from . import weave_types
-from . import errors
-from . import graph
+from weave.legacy import graph
+
+from . import errors, weave_types
 
 
 class TypedDictLike:
@@ -32,7 +31,7 @@ def simple_python_type_to_type(py_type: type):
 
 
 def python_type_to_type(
-    py_type: typing.Union[types.GenericAlias, type]
+    py_type: typing.Union[types.GenericAlias, type],
 ) -> weave_types.Type:
     if py_type == typing.Any:
         return weave_types.Any()
@@ -42,7 +41,8 @@ def python_type_to_type(
         else:
             return python_type_to_type(py_type.__bound__)
     elif isinstance(py_type, types.GenericAlias) or isinstance(
-        py_type, typing._GenericAlias  # type: ignore
+        py_type,
+        typing._GenericAlias,  # type: ignore
     ):
         if py_type.__origin__ == typing.Literal:
             members = [

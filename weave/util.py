@@ -1,11 +1,13 @@
+import gc
+import inspect
 import os
 import random
 import socket
 import string
-import gc, inspect
 
 # import ipynbname
 import typing
+
 from .errors import WeaveFingerprintErrorMixin
 
 sentry_inited = False
@@ -116,7 +118,7 @@ def is_colab():
     return True
 
 
-def is_notebook():
+def is_notebook() -> bool:
     if is_colab():
         return True
     try:

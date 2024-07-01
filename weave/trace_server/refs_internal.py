@@ -5,8 +5,8 @@
 # we store the internal `project_id`. However, over the wire, we use the plain-text. Practically,
 # the trace interface should only ever operate on internal refs.
 
-from typing import Union
 import dataclasses
+from typing import Union
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -70,6 +70,14 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
             raise ValueError(f"Invalid URI: {uri}")
         project_id, kind = parts[:2]
         remaining = parts[2:]
+    elif uri.startswith(f"{WEAVE_SCHEME}:///"):
+        path = uri[len(f"{WEAVE_SCHEME}:///") :]
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise ValueError(f"Invalid URI: {uri}")
+        entity, project, kind = parts[:3]
+        project_id = f"{entity}/{project}"
+        remaining = parts[3:]
     else:
         raise ValueError(f"Invalid URI: {uri}")
     if kind == "table":

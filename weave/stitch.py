@@ -22,14 +22,12 @@
 import dataclasses
 import typing
 
-from . import _dict_utils
+from weave.legacy import graph, op_def
+from weave.legacy.language_features.tagging import opdef_util
 
-from . import graph
-from . import errors
-from . import registry_mem
-from . import op_def
-from .language_features.tagging import opdef_util
+from . import errors, registry_mem
 from . import weave_types as types
+from .legacy import _dict_utils
 
 
 @dataclasses.dataclass
@@ -127,7 +125,6 @@ def stitch(
     on_error: graph.OnErrorFnType = None,
 ) -> StitchedGraph:
     """Given a list of leaf nodes, stitch the graph together."""
-
     if stitched_graph is None:
         sg = StitchedGraph({})
     else:

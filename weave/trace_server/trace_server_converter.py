@@ -1,0 +1,125 @@
+import typing
+
+from pydantic import BaseModel
+
+from . import refs_internal as ri
+
+A = typing.TypeVar("A")
+B = typing.TypeVar("B")
+
+
+def universal_ext_to_int_ref_converter(
+    obj: A, convert_ext_to_int_project_id: typing.Callable[[str], str]
+) -> A:
+    """Takes any object and recursively replaces all external references with
+    internal references. The external references are expected to be in the
+    format of `weave:///entity/project/...` and the internal references are
+    expected to be in the format of `weave-trace-internal:///project_id/...`.
+
+    Args:
+        obj: The object to convert.
+        convert_ext_to_int_project_id: A function that takes an external
+            project ID and returns the internal project ID.
+
+    Returns:
+        The object with all external references replaced with internal
+        references.
+    """
+    ext_to_int_project_cache: typing.Dict[str, str] = {}
+    weave_prefix = ri.WEAVE_SCHEME + ":///"
+
+    def replace_ref(ref_str: str) -> str:
+        if not ref_str.startswith(weave_prefix):
+            raise ValueError(f"Invalid URI: {ref_str}")
+        rest = ref_str[len(weave_prefix) :]
+        parts = rest.split("/", 2)
+        if len(parts) != 3:
+            raise ValueError(f"Invalid URI: {ref_str}")
+        entity, project, tail = parts
+        project_key = f"{entity}/{project}"
+        if project_key not in ext_to_int_project_cache:
+            ext_to_int_project_cache[project_key] = convert_ext_to_int_project_id(
+                project_key
+            )
+        internal_project_id = ext_to_int_project_cache[project_key]
+        return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
+
+    def mapper(obj: B) -> B:
+        if isinstance(obj, str) and obj.startswith(weave_prefix):
+            return typing.cast(B, replace_ref(obj))
+        return obj
+
+    return _map_values(obj, mapper)
+
+
+C = typing.TypeVar("C")
+D = typing.TypeVar("D")
+
+
+def universal_int_to_ext_ref_converter(
+    obj: C,
+    convert_int_to_ext_project_id: typing.Callable[[str], str],
+) -> C:
+    """Takes any object and recursively replaces all internal references with
+    external references. The internal references are expected to be in the
+    format of `weave-trace-internal:///project_id/...` and the external references are
+    expected to be in the format of `weave:///entity/project/...`.
+
+    Args:
+        obj: The object to convert.
+        convert_int_to_ext_project_id: A function that takes an internal
+            project ID and returns the external project ID.
+
+    Returns:
+        The object with all internal references replaced with external
+        references.
+    """
+    int_to_ext_project_cache: dict[str, str] = {}
+
+    weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
+
+    def replace_ref(ref_str: str) -> str:
+        if not ref_str.startswith(weave_internal_prefix):
+            raise ValueError(f"Invalid URI: {ref_str}")
+        rest = ref_str[len(weave_internal_prefix) :]
+        parts = rest.split("/", 1)
+        if len(parts) != 2:
+            raise ValueError(f"Invalid URI: {ref_str}")
+        project_id, tail = parts
+        if project_id not in int_to_ext_project_cache:
+            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
+                project_id
+            )
+        external_project_id = int_to_ext_project_cache[project_id]
+        return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
+
+    def mapper(obj: D) -> D:
+        if isinstance(obj, str) and obj.startswith(weave_internal_prefix):
+            return typing.cast(D, replace_ref(obj))
+        return obj
+
+    return _map_values(obj, mapper)
+
+
+E = typing.TypeVar("E")
+F = typing.TypeVar("F")
+
+
+def _map_values(obj: E, func: typing.Callable[[E], E]) -> E:
+    if isinstance(obj, BaseModel):
+        # `by_alias` is required since we have Mongo-style properties in the
+        # query models that are aliased to conform to start with `$`. Without
+        # this, the model_dump will use the internal property names which are
+        # not valid for the `model_validate` step.
+        orig = obj.model_dump(by_alias=True)
+        new = _map_values(orig, func)
+        return obj.model_validate(new)
+    if isinstance(obj, dict):
+        return typing.cast(E, {k: _map_values(v, func) for k, v in obj.items()})
+    if isinstance(obj, list):
+        return typing.cast(E, [_map_values(v, func) for v in obj])
+    if isinstance(obj, tuple):
+        return typing.cast(E, tuple(_map_values(v, func) for v in obj))
+    if isinstance(obj, set):
+        return typing.cast(E, {_map_values(v, func) for v in obj})
+    return func(obj)
