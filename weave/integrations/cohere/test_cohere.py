@@ -15,9 +15,6 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
         return weave.ref(call_output).get()
     return call_output
 
-    
-def pprint(obj):
-    print(json.dumps(obj.dict(), indent=4))
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -43,17 +40,29 @@ def test_cohere(
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    print("-----------------")
-    pprint(response)
-    print("-----------------")
-    print(output)  #<- the output is a big string and doens't get parsed as it is a Pydantic.v1.BaseModel
     assert output.text == exp
     assert output.generation_id == response.generation_id
-    assert output.response_id == response.response_id
     assert output.citations == response.citations
-    assert output.chat_history == response.chat_history
-    assert output.meta == response.meta
+    assert output.documents == response.documents
+    assert output.is_search_required == response.is_search_required
+    assert output.search_queries == response.search_queries
+    assert output.search_results == response.search_results
+    print(response.meta)
+    print("-----------------")
+    print(output.meta)
+    print("-----------------")
+    assert output.meta.ApiMeta.v1.api_version.ApiMetaApiVersion.v0.version == 1
+    assert output.meta.ApiMeta.v1.api_version.ApiMetaApiVersion.v0.is_deprecated is None
+    assert output.meta.ApiMeta.v1.api_version.ApiMetaApiVersion.v0.is_experimental is None
+    assert output.meta.ApiMeta.v1.billed_units.ApiMetaBilledUnits.v1.input_tokens == 1
+    assert output.meta.ApiMeta.v1.billed_units.ApiMetaBilledUnits.v1.output_tokens == 12
+    assert output.meta.ApiMeta.v1.billed_units.ApiMetaBilledUnits.v1.search_units is None
+    assert output.meta.ApiMeta.v1.billed_units.ApiMetaBilledUnits.v1.classifications is None
+    assert output.meta.ApiMeta.v1.tokens.ApiMetaTokens.v1.input_tokens == 67
+    assert output.meta.ApiMeta.v1.tokens.ApiMetaTokens.v1.output_tokens == 12
+    assert output.meta.ApiMeta.v1.tokens.ApiMetaTokens.v1.warnings is None
     assert output.finish_reason == response.finish_reason
+    assert output.tool_calls == response.tool_calls
 
 
 @pytest.mark.skip_clickhouse_client
