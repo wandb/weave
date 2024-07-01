@@ -1,7 +1,17 @@
 import importlib
+from typing import Callable
 
 import weave
 from weave.trace.patcher import SymbolPatcher, MultiPatcher
+
+
+def dspy_wrapper(name: str) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        op = weave.op()(fn)
+        op.name = name  # type: ignore
+        return op
+
+    return wrapper
 
 
 def dspy_get_patched_lm_functions(
@@ -16,7 +26,7 @@ def dspy_get_patched_lm_functions(
         SymbolPatcher(
             get_base_symbol=lambda: importlib.import_module(base_symbol),
             attribute_name=f"{lm_class_name}.{functional_attribute}",
-            make_new_value=weave.op(),
+            make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.{functional_attribute}"),
         )
         for functional_attribute in patchable_functional_attributes
     ]
@@ -26,109 +36,117 @@ patched_functions = [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Predict.__call__",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.Predict.__call__"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Predict.forward",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.Predict.forward"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="TypedPredictor.__call__",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.TypedPredictor.__call__"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="TypedPredictor.forward",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.TypedPredictor.forward"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Module.__call__",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.Module.__call__"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="TypedChainOfThought.__call__",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.TypedChainOfThought.__call__"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Retrieve.__call__",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.Retrieve.__call__"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Retrieve.forward",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.Retrieve.forward"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.evaluate.evaluate"),
         attribute_name="Evaluate.__call__",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.evaluate.Evaluate.__call__"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="BootstrapFewShot.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.teleprompt.BootstrapFewShot.compile"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="COPRO.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.teleprompt.COPRO.compile"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="Ensemble.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.teleprompt.Ensemble.compile"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="BootstrapFinetune.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.teleprompt.BootstrapFinetune.compile"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="KNNFewShot.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.teleprompt.KNNFewShot.compile"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="MIPRO.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.teleprompt.MIPRO.compile"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="BootstrapFewShotWithRandomSearch.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper(
+            "dspy.teleprompt.BootstrapFewShotWithRandomSearch.compile"
+        ),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="SignatureOptimizer.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.teleprompt.SignatureOptimizer.compile"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="BayesianSignatureOptimizer.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper(
+            "dspy.teleprompt.BayesianSignatureOptimizer.compile"
+        ),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module(
             "dspy.teleprompt.signature_opt_typed"
         ),
         attribute_name="optimize_signature",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper(
+            "dspy.teleprompt.signature_opt_typed.optimize_signature"
+        ),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="BootstrapFewShotWithOptuna.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper(
+            "dspy.teleprompt.BootstrapFewShotWithOptuna.compile"
+        ),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="LabeledFewShot.compile",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.teleprompt.LabeledFewShot.compile"),
     ),
 ]
 
@@ -167,22 +185,22 @@ patched_functions += [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Databricks.basic_request",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.Databricks.basic_request"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Databricks.__call__",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.Databricks.__call__"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="ColBERTv2.__call__",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.ColBERTv2.__call__"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Pyserini.__call__",
-        make_new_value=weave.op(),
+        make_new_value=dspy_wrapper("dspy.Pyserini.__call__"),
     ),
 ]
 
