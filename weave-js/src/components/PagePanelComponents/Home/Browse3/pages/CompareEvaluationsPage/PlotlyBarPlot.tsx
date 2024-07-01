@@ -9,7 +9,7 @@ export const PlotlyBarPlot: React.FC<{
   data: RadarPlotData;
 }> = props => {
   const divRef = useRef<HTMLDivElement>(null);
-  const plotlyData: Plotly.Data = useMemo(() => {
+  const plotlyData: Plotly.Data[] = useMemo(() => {
     return Object.keys(props.data).map((key, i) => {
       const {metrics, name, color} = props.data[key];
       return {

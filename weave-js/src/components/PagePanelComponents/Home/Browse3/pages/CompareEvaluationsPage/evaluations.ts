@@ -4,6 +4,7 @@ import {useMemo} from 'react';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {EvaluationComparisonState} from './compareEvaluationsContext';
 
 type BinarySummaryScore = {
   true_count: number;
@@ -96,8 +97,11 @@ export type ComparisonMetric = {
 };
 
 export const evaluationMetrics = (
-  evaluationCalls: EvaluationEvaluateCallSchema[]
+  state: EvaluationComparisonState
 ): ComparisonMetric[] => {
+  const evaluationCalls = Object.values(state.data.evaluationCalls).map(
+    e => e._rawEvaluationTraceData
+  );
   // There are a few hard-coded possible metrics, then a handful of custom metrics:
 
   // Tokens
@@ -105,9 +109,10 @@ export const evaluationMetrics = (
     path: 'total_tokens',
     unit: ' tokens',
     values: Object.fromEntries(
-      evaluationCalls.map(call =>
-        ([call.id, sum(Object.values(call.summary.usage).map(v => v.total_tokens))])
-      )
+      evaluationCalls.map(call => [
+        call.id,
+        sum(Object.values(call.summary.usage).map(v => v.total_tokens)),
+      ])
     ),
     lowerIsBetter: true,
   };
@@ -145,14 +150,12 @@ export const evaluationMetrics = (
         };
       }
       if (hasFraction) {
-        allScorers[scorerKey].values[call.id] = flattenedOutput[fractionKey]
+        allScorers[scorerKey].values[call.id] = flattenedOutput[fractionKey];
       } else {
-        allScorers[scorerKey].values[call.id] = flattenedOutput[meanKey]
+        allScorers[scorerKey].values[call.id] = flattenedOutput[meanKey];
       }
     });
   });
 
   return [tokensMetric, ...Object.values(allScorers)];
 };
-
-
