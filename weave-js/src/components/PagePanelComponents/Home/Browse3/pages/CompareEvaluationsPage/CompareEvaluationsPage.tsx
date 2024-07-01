@@ -322,7 +322,7 @@ const ComparisonDefinition: React.FC<{
         paddingLeft: STANDARD_PADDING,
         paddingRight: STANDARD_PADDING,
       }}>
-      {Object.keys(props.state.data.evaluations).map((key, ndx) => {
+      {Object.keys(props.state.data.evaluationCalls).map((key, ndx) => {
         return (
           <React.Fragment key={key}>
             {ndx !== 0 && <SwapPositionsButton />}
@@ -402,6 +402,7 @@ const EvaluationCallLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;
 }> = props => {
+  // console.log(props.state, props.callId);
   const evaluationCall = props.state.data.evaluationCalls[props.callId];
   const [entity, project] =
     evaluationCall._rawEvaluationTraceData.project_id.split('/');
@@ -462,15 +463,15 @@ const EvaluationModelLink: React.FC<{
 }> = props => {
   const evaluationCall = props.state.data.evaluationCalls[props.callId];
   const modelObj = props.state.data.models[evaluationCall.modelRef];
-  const [entity, project] =
-    modelObj._rawModelObjectVersionData.project_id.split('/');
+  console.log({modelObj});
+
   return (
     <ObjectVersionLink
-      entityName={entity}
-      projectName={project}
-      objectName={modelObj._rawModelObjectVersionData.object_id}
-      version={modelObj._rawModelObjectVersionData.digest}
-      versionIndex={modelObj._rawModelObjectVersionData.version_index}
+      entityName={modelObj.entity}
+      projectName={modelObj.project}
+      objectName={modelObj._rawModelObject.object_id}
+      version={modelObj._rawModelObject.digest}
+      versionIndex={modelObj._rawModelObject.version_index}
       color={MOON_800}
       icon={<ModelIcon />}
     />

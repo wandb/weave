@@ -1,3 +1,4 @@
+import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
   TraceCallSchema,
@@ -34,7 +35,9 @@ type EvaluationObj = {
   ref: string;
   datasetRef: string;
   scorerRefs: string[];
-  _rawEvaluationObjectVersionData: TraceObjSchema;
+  project: string;
+  entity: string;
+  _rawEvaluationObject: TraceObjSchema;
 };
 
 //   type Scorer = {
@@ -65,7 +68,9 @@ type ModelObj = {
   ref: string;
   predictOpRef: string;
   properties: {[prop: string]: any};
-  _rawModelObjectVersionData: TraceObjSchema;
+  project: string;
+  entity: string;
+  _rawModelObject: TraceObjSchema;
 };
 
 type ScoreResults = {
@@ -109,6 +114,12 @@ export type EvaluationComparisonData = {
   };
 };
 
+const generateColorFromId = (id: string) => {
+  const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hue = hash % 360;
+  return `hsl(${hue}, 100%, 50%)`;
+};
+
 export const fetchEvaluationComparisonData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
   entity: string,
@@ -150,7 +161,7 @@ export const fetchEvaluationComparisonData = async (
         // TODO: Get user-defined name for the evaluation
         name: 'Evaluation',
         // TODO: Get user-defined color for the evaluation
-        color: `hsl(${(ndx * 360) / evalRes.calls.length}, 100%, 50%)`,
+        color: generateColorFromId(call.id),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
         scores: Object.fromEntries(
@@ -163,36 +174,66 @@ export const fetchEvaluationComparisonData = async (
     ])
   );
 
+  // UGG! Move to backend
+  const objReadMany = (refs: string[]) => {
+    const proms = refs.map(ref => {
+      const parsed = parseRef(ref) as WeaveObjectRef;
+      return traceServerClient.objRead({
+        project_id: projectIdFromParts({
+          entity: parsed.entityName,
+          project: parsed.projectName,
+        }),
+        object_id: parsed.artifactName,
+        digest: parsed.artifactVersion,
+      });
+    });
+    return Promise.all(proms);
+  };
+
   // 2. populate the actual evaluation objects
   const evalRefs = evalRes.calls.map(call => call.inputs.self);
-  const evalObjRes = await traceServerClient.readBatch({refs: evalRefs});
+  const evalObjRes = await objReadMany(evalRefs);
   result.evaluations = Object.fromEntries(
-    evalObjRes.vals.map((obj, objNdx) => [
-      evalRefs[objNdx],
-      {
-        ref: evalRefs[objNdx],
-        datasetRef: obj.dataset,
-        scorerRefs: obj.scorers,
-        _rawEvaluationObjectVersionData: obj,
-      },
-    ])
+    evalObjRes.map((objRes, objNdx) => {
+      const ref = evalRefs[objNdx];
+      const parsed = parseRef(ref) as WeaveObjectRef;
+      const objData = objRes.obj.val;
+      return [
+        ref,
+        {
+          ref,
+          datasetRef: objData.dataset,
+          scorerRefs: objData.scorers,
+          entity: parsed.entityName,
+          project: parsed.projectName,
+          _rawEvaluationObject: objRes.obj,
+        },
+      ];
+    })
   );
 
   // 3. populate the model objects
   const modelRefs = evalRes.calls.map(call => call.inputs.model);
-  const modelObjRes = await traceServerClient.readBatch({refs: modelRefs});
+  const modelObjRes = await objReadMany(modelRefs);
   result.models = Object.fromEntries(
-    modelObjRes.vals.map((obj, objNdx) => [
-      modelRefs[objNdx],
-      {
-        ref: modelRefs[objNdx],
-        properties: Object.fromEntries(
-          Object.entries(obj as any).filter(([key]) => key !== 'predict')
-        ) as any,
-        predictOpRef: obj.predict,
-        _rawEvaluationObjectVersionData: obj,
-      },
-    ])
+    modelObjRes.map((objRes, objNdx) => {
+      const ref = modelRefs[objNdx];
+      const parsed = parseRef(ref) as WeaveObjectRef;
+      const objData = objRes.obj.val;
+      return [
+        ref,
+        {
+          ref,
+          properties: Object.fromEntries(
+            Object.entries(objData as any).filter(([key]) => key !== 'predict')
+          ) as any,
+          predictOpRef: objData.predict,
+          entity: parsed.entityName,
+          project: parsed.projectName,
+          _rawModelObject: objRes.obj,
+        },
+      ];
+    })
   );
 
   // 4. Populate the predictions and scores

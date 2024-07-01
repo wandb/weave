@@ -29,7 +29,7 @@ export const PlotlyRadarPlot: React.FC<{
       };
     });
   }, [props.data]);
-  console.log(plotlyData);
+  // console.log(plotlyData);
   const plotlyLayout = useMemo(() => {
     return {
       height: props.height,

@@ -139,7 +139,7 @@ export const ScoreCard: React.FC<{
         {/* Model Rows */}
         {Object.entries(modelProps).map(([prop, modelData]) => {
           return (
-            <>
+            <React.Fragment key={prop}>
               <div></div>
               <div
                 style={{
@@ -149,17 +149,17 @@ export const ScoreCard: React.FC<{
                 }}>
                 {prop}
               </div>
-              {modelRefs.map(model => {
-                return <div>{modelData[model]}</div>;
+              {modelRefs.map((model, mNdx) => {
+                return <div key={mNdx}>{modelData[model]}</div>;
               })}
               <div></div>
-            </>
+            </React.Fragment>
           );
         })}
         {/* Score Rows */}
         {Object.entries(scoreDefs).map(([key, def]) => {
           return (
-            <>
+            <React.Fragment key={key}>
               <div
                 key={key}
                 style={{
@@ -172,16 +172,17 @@ export const ScoreCard: React.FC<{
               </div>
               {def.metrics.map((metric, metricNdx) => {
                 return (
-                  <>
+                  <React.Fragment key={metricNdx}>
                     <div
                       style={{
                         borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
                       }}>
                       {metric.key}
                     </div>
-                    {modelRefs.map(model => {
+                    {modelRefs.map((model, mNdx) => {
                       return (
                         <div
+                          key={mNdx}
                           style={{
                             borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
                           }}>
@@ -206,10 +207,10 @@ export const ScoreCard: React.FC<{
                       />
                       {metric.unit}
                     </div>
-                  </>
+                  </React.Fragment>
                 );
               })}
-            </>
+            </React.Fragment>
           );
         })}
       </div>
