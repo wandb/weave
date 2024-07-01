@@ -28,7 +28,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 27 Jun 2024 07:18:06 GMT
+      - Thu, 27 Jun 2024 20:41:38 GMT
       Transfer-Encoding:
       - chunked
       Vary:
@@ -74,7 +74,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 27 Jun 2024 07:18:06 GMT
+      - Thu, 27 Jun 2024 20:41:39 GMT
       Transfer-Encoding:
       - chunked
       Vary:
@@ -86,7 +86,7 @@ interactions:
       X-Ratelimit-Limit:
       - '750'
       X-Ratelimit-Remaining:
-      - '746'
+      - '747'
     status:
       code: 200
       message: OK
@@ -119,7 +119,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 27 Jun 2024 07:18:07 GMT
+      - Thu, 27 Jun 2024 20:41:39 GMT
       Transfer-Encoding:
       - chunked
       Vary:
@@ -159,13 +159,13 @@ interactions:
       content-type:
       - application/json
       date:
-      - Thu, 27 Jun 2024 07:18:07 GMT
+      - Thu, 27 Jun 2024 20:41:39 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google, 1.1 google
       x-cloud-trace-context:
-      - d716a17bc7d4c40b4abb8699372d147c
+      - 4991f95edfa846ef8134b74d33b534f9
     status:
       code: 200
       message: OK
@@ -528,7 +528,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 27 Jun 2024 07:18:08 GMT
+      - Thu, 27 Jun 2024 20:41:40 GMT
       ETag:
       - '"2xPZ+1EfE5dxE5IxEwqmMQ"'
       Permissions-Policy:
@@ -542,7 +542,7 @@ interactions:
       X-Cache:
       - HIT, HIT
       X-Cache-Hits:
-      - 94, 4
+      - 94, 1
       X-Content-Type-Options:
       - nosniff
       X-Frame-Options:
@@ -552,9 +552,9 @@ interactions:
       X-PyPI-Last-Serial:
       - '23830056'
       X-Served-By:
-      - cache-iad-kjyo7100097-IAD, cache-mrs10543-MRS
+      - cache-iad-kjyo7100097-IAD, cache-mrs1050094-MRS
       X-Timer:
-      - S1719472688.095715,VS0,VE0
+      - S1719520900.009382,VS0,VE2
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -706,7 +706,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 27 Jun 2024 07:18:08 GMT
+      - Thu, 27 Jun 2024 20:41:40 GMT
       ETag:
       - '"FY1Jcy2ROSXQKUeFOLyD8g"'
       Permissions-Policy:
@@ -730,16 +730,16 @@ interactions:
       X-PyPI-Last-Serial:
       - '23864519'
       X-Served-By:
-      - cache-iad-kiad7000161-IAD, cache-mrs10524-MRS
+      - cache-iad-kiad7000161-IAD, cache-mrs10576-MRS
       X-Timer:
-      - S1719472688.173709,VS0,VE1
+      - S1719520900.079865,VS0,VE90
       X-XSS-Protection:
       - 1; mode=block
     status:
       code: 200
       message: OK
 - request:
-    body: "--3ca6935e20377c16943f3db154c4dea7\r\nContent-Disposition: form-data; name=\"project_id\"\r\n\r\ncapecape/dev_testing\r\n--3ca6935e20377c16943f3db154c4dea7\r\nContent-Disposition:
+    body: "--d743d2c3b67d066d5b405f475fc3a41e\r\nContent-Disposition: form-data; name=\"project_id\"\r\n\r\ncapecape/dev_testing\r\n--d743d2c3b67d066d5b405f475fc3a41e\r\nContent-Disposition:
       form-data; name=\"file\"; filename=\"obj.py\"\r\n\r\nimport weave\nimport typing\nfrom
       typing import Annotatedas Message\nfrom typing import Unionas ChatRequestPromptTruncation\nfrom
       cohere.types.chat_connector import ChatConnector\nfrom typing import Dictas
@@ -973,7 +973,7 @@ interactions:
       type: ignore\n        )\n    try:\n        _response_json = _response.json()\n
       \   except JSONDecodeError:\n        raise ApiError(status_code=_response.status_code,
       body=_response.text)\n    raise ApiError(status_code=_response.status_code,
-      body=_response_json)\n\r\n--3ca6935e20377c16943f3db154c4dea7--\r\n"
+      body=_response_json)\n\r\n--d743d2c3b67d066d5b405f475fc3a41e--\r\n"
     headers:
       Accept:
       - '*/*'
@@ -984,7 +984,7 @@ interactions:
       Content-Length:
       - '19467'
       Content-Type:
-      - multipart/form-data; boundary=3ca6935e20377c16943f3db154c4dea7
+      - multipart/form-data; boundary=d743d2c3b67d066d5b405f475fc3a41e
       User-Agent:
       - python-requests/2.32.3
     method: POST
@@ -1000,13 +1000,13 @@ interactions:
       content-type:
       - application/json
       date:
-      - Thu, 27 Jun 2024 07:18:08 GMT
+      - Thu, 27 Jun 2024 20:41:40 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google, 1.1 google
       x-cloud-trace-context:
-      - e05e2172e1ef9374fa9941810a976292
+      - 9adab3abf091ccabc46810834e59fe91
     status:
       code: 200
       message: OK
@@ -1036,19 +1036,19 @@ interactions:
       content-type:
       - application/json
       date:
-      - Thu, 27 Jun 2024 07:18:08 GMT
+      - Thu, 27 Jun 2024 20:41:40 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google, 1.1 google
       x-cloud-trace-context:
-      - 067c8838db24ac5ed72f02e3552f78b6
+      - 08b2e7fd3062be02a0add06d9862ec23
     status:
       code: 200
       message: OK
 - request:
-    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"capecape/dev_testing","id":"0e0e1d94-33d8-4db2-a6f9-96e86372e00c","op_name":"weave:///capecape/dev_testing/op/Client.chat:FMYT2THHdkMeeVdSraYkidlMLetwlgrJiRVYBT78Nx0","display_name":null,"trace_id":"f55ab6a0-469b-4bc4-8276-cc8a278d113f","parent_id":null,"started_at":"2024-06-27T07:18:09.049755Z","attributes":{},"inputs":{"self":"<cohere.client.Client
-      object at 0x3092aa410>","message":"Hello, Cohere!","model":"command","max_tokens":1024,"preamble":"Ellipsis","chat_history":"Ellipsis","conversation_id":"Ellipsis","prompt_truncation":"Ellipsis","connectors":"Ellipsis","search_queries_only":"Ellipsis","documents":"Ellipsis","citation_quality":"Ellipsis","temperature":"Ellipsis","max_input_tokens":"Ellipsis","k":"Ellipsis","p":"Ellipsis","seed":"Ellipsis","stop_sequences":"Ellipsis","frequency_penalty":"Ellipsis","presence_penalty":"Ellipsis","raw_prompting":"Ellipsis","return_prompt":"Ellipsis","tools":"Ellipsis","tool_results":"Ellipsis","force_single_step":"Ellipsis"},"wb_user_id":null,"wb_run_id":null}}}]}'
+    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"capecape/dev_testing","id":"a1375a72-b0bb-4c36-813c-9e3481e7d9c2","op_name":"weave:///capecape/dev_testing/op/Client.chat:FMYT2THHdkMeeVdSraYkidlMLetwlgrJiRVYBT78Nx0","display_name":null,"trace_id":"84d2f2b1-635b-4902-8cc6-0912da2e7566","parent_id":null,"started_at":"2024-06-27T20:41:41.029482Z","attributes":{},"inputs":{"self":"<cohere.client.Client
+      object at 0x31c4b2350>","message":"Hello, Cohere!","model":"command","max_tokens":1024,"preamble":"Ellipsis","chat_history":"Ellipsis","conversation_id":"Ellipsis","prompt_truncation":"Ellipsis","connectors":"Ellipsis","search_queries_only":"Ellipsis","documents":"Ellipsis","citation_quality":"Ellipsis","temperature":"Ellipsis","max_input_tokens":"Ellipsis","k":"Ellipsis","p":"Ellipsis","seed":"Ellipsis","stop_sequences":"Ellipsis","frequency_penalty":"Ellipsis","presence_penalty":"Ellipsis","raw_prompting":"Ellipsis","return_prompt":"Ellipsis","tools":"Ellipsis","tool_results":"Ellipsis","force_single_step":"Ellipsis"},"wb_user_id":null,"wb_run_id":null}}}]}'
     headers:
       Accept:
       - '*/*'
@@ -1064,7 +1064,7 @@ interactions:
     uri: https://trace.wandb.ai/call/upsert_batch
   response:
     body:
-      string: '{"res":[{"id":"0e0e1d94-33d8-4db2-a6f9-96e86372e00c","trace_id":"f55ab6a0-469b-4bc4-8276-cc8a278d113f"}]}'
+      string: '{"res":[{"id":"a1375a72-b0bb-4c36-813c-9e3481e7d9c2","trace_id":"84d2f2b1-635b-4902-8cc6-0912da2e7566"}]}'
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
@@ -1073,13 +1073,13 @@ interactions:
       content-type:
       - application/json
       date:
-      - Thu, 27 Jun 2024 07:18:10 GMT
+      - Thu, 27 Jun 2024 20:41:42 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google, 1.1 google
       x-cloud-trace-context:
-      - b7786964929d4edbe4ae7dbc1db2ac57;o=1
+      - 58da437cfeb2af77c5317831291706a9
     status:
       code: 200
       message: OK
@@ -1111,33 +1111,34 @@ interactions:
     uri: https://api.cohere.com/v1/chat
   response:
     body:
-      string: '{"response_id":"fc411839-5495-43de-8c11-99ce15530aac","text":"Hello!
-        It''s lovely to meet you. If you have any questions, let me know and I''ll
-        do everything that I can to assist you today. \n\nHow can I help you today?","generation_id":"3f97780f-6fd7-4587-8da7-732430a7bbd9","chat_history":[{"role":"USER","message":"Hello,
-        Cohere!"},{"role":"CHATBOT","message":"Hello! It''s lovely to meet you. If
-        you have any questions, let me know and I''ll do everything that I can to
-        assist you today. \n\nHow can I help you today?"}],"finish_reason":"COMPLETE","meta":{"api_version":{"version":"1"},"billed_units":{"input_tokens":5,"output_tokens":40},"tokens":{"input_tokens":67,"output_tokens":41}}}'
+      string: '{"response_id":"d3494222-cd42-4499-a165-119b90e72782","text":"Hey there,
+        good to meet you, I''m Cohere! How can I help you today? \n\nLet me know if
+        you need assistance with a specific topic, or just want to chat! I''m here
+        to help in any way I can.","generation_id":"c84562eb-cd81-4abb-a0c5-3b80b33f3f4a","chat_history":[{"role":"USER","message":"Hello,
+        Cohere!"},{"role":"CHATBOT","message":"Hey there, good to meet you, I''m Cohere!
+        How can I help you today? \n\nLet me know if you need assistance with a specific
+        topic, or just want to chat! I''m here to help in any way I can."}],"finish_reason":"COMPLETE","meta":{"api_version":{"version":"1"},"billed_units":{"input_tokens":5,"output_tokens":51},"tokens":{"input_tokens":67,"output_tokens":51}}}'
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '748'
       Via:
       - 1.1 google
       access-control-expose-headers:
       - X-Debug-Trace-ID
       cache-control:
       - no-cache, no-store, no-transform, must-revalidate, private, max-age=0
-      content-length:
-      - '688'
       content-type:
       - application/json
       date:
-      - Thu, 27 Jun 2024 07:18:10 GMT
+      - Thu, 27 Jun 2024 20:41:43 GMT
       expires:
       - Thu, 01 Jan 1970 00:00:00 UTC
       num_chars:
       - '307'
       num_tokens:
-      - '45'
+      - '56'
       pragma:
       - no-cache
       server:
@@ -1147,15 +1148,274 @@ interactions:
       x-accel-expires:
       - '0'
       x-debug-trace-id:
-      - fe3c220fc6d45e0f989521d38ae070f0
+      - 361223e969da7d93a04e143cf669f858
       x-endpoint-monthly-call-limit:
       - '1000'
       x-envoy-upstream-service-time:
-      - '1644'
+      - '1881'
       x-trial-endpoint-call-limit:
       - '40'
       x-trial-endpoint-call-remaining:
       - '39'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"capecape/dev_testing","object_id":"Message_User","val":{"_type":"Message_User","message":"Hello,
+      Cohere!","tool_calls":null,"role":"USER","_class_name":"Message_User","_bases":["UncheckedBaseModel","BaseModel","Representation"]}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '252'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"bGCw8SJhxtephXFisHExPLTVQWSRExxurbydgvYCQH0"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Thu, 27 Jun 2024 20:41:43 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google, 1.1 google
+      x-cloud-trace-context:
+      - 99b5308fdcdb00f3688bafd7d5ed4914
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"capecape/dev_testing","object_id":"Message_Chatbot","val":{"_type":"Message_Chatbot","message":"Hey
+      there, good to meet you, I''m Cohere! How can I help you today? \n\nLet me know
+      if you need assistance with a specific topic, or just want to chat! I''m here
+      to help in any way I can.","tool_calls":null,"role":"CHATBOT","_class_name":"Message_Chatbot","_bases":["UncheckedBaseModel","BaseModel","Representation"]}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '435'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"IfRvJNYJy9Yuvqk5Qi5rw0rDFQQwCgeAaouSJyqXAqs"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Thu, 27 Jun 2024 20:41:43 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google, 1.1 google
+      x-cloud-trace-context:
+      - dd1845caa35086bf2efee70e0eba072b
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"capecape/dev_testing","object_id":"ApiMetaApiVersion","val":{"_type":"ApiMetaApiVersion","version":"1","is_deprecated":null,"is_experimental":null,"_class_name":"ApiMetaApiVersion","_bases":["UncheckedBaseModel","BaseModel","Representation"]}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '266'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"8hEJPK42YVaG8t3uE7xPkyElVhTH0sHhijU3iL23fPY"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Thu, 27 Jun 2024 20:41:44 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google, 1.1 google
+      x-cloud-trace-context:
+      - d682f7170d8e7d72d541c914175a28bc;o=1
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"capecape/dev_testing","object_id":"ApiMetaBilledUnits","val":{"_type":"ApiMetaBilledUnits","input_tokens":5,"output_tokens":51,"search_units":null,"classifications":null,"_class_name":"ApiMetaBilledUnits","_bases":["UncheckedBaseModel","BaseModel","Representation"]}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '290'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"X1UYLAt6qc6JQeALvI0pGNCXtkGXfDBmFBjrwS43ouw"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Thu, 27 Jun 2024 20:41:44 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google, 1.1 google
+      x-cloud-trace-context:
+      - ad7a12f2177d845f46ed8beb12dbad94
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"capecape/dev_testing","object_id":"ApiMetaTokens","val":{"_type":"ApiMetaTokens","input_tokens":67,"output_tokens":51,"_class_name":"ApiMetaTokens","_bases":["UncheckedBaseModel","BaseModel","Representation"]}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '233'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"3xIY8FWyRH6PORYtqBjTYpcxrY1i2SoUQ7WfW5duFcQ"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Thu, 27 Jun 2024 20:41:44 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google, 1.1 google
+      x-cloud-trace-context:
+      - 08785dcccec2112020a18a88e88d777c
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"capecape/dev_testing","object_id":"ApiMeta","val":{"_type":"ApiMeta","api_version":"weave:///capecape/dev_testing/object/ApiMetaApiVersion:8hEJPK42YVaG8t3uE7xPkyElVhTH0sHhijU3iL23fPY","billed_units":"weave:///capecape/dev_testing/object/ApiMetaBilledUnits:X1UYLAt6qc6JQeALvI0pGNCXtkGXfDBmFBjrwS43ouw","tokens":"weave:///capecape/dev_testing/object/ApiMetaTokens:3xIY8FWyRH6PORYtqBjTYpcxrY1i2SoUQ7WfW5duFcQ","warnings":null,"_class_name":"ApiMeta","_bases":["UncheckedBaseModel","BaseModel","Representation"]}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '532'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"pv1jsSUreiP0DTrQPCNFKVPgaSzKTMWg7dr2vr12n8Y"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Thu, 27 Jun 2024 20:41:45 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google, 1.1 google
+      x-cloud-trace-context:
+      - 568eac7c15e1509b4f13b79db75a644c
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"capecape/dev_testing","object_id":"NonStreamedChatResponse","val":{"_type":"NonStreamedChatResponse","text":"Hey
+      there, good to meet you, I''m Cohere! How can I help you today? \n\nLet me know
+      if you need assistance with a specific topic, or just want to chat! I''m here
+      to help in any way I can.","generation_id":"c84562eb-cd81-4abb-a0c5-3b80b33f3f4a","citations":null,"documents":null,"is_search_required":null,"search_queries":null,"search_results":null,"finish_reason":"COMPLETE","tool_calls":null,"chat_history":["weave:///capecape/dev_testing/object/Message_User:bGCw8SJhxtephXFisHExPLTVQWSRExxurbydgvYCQH0","weave:///capecape/dev_testing/object/Message_Chatbot:IfRvJNYJy9Yuvqk5Qi5rw0rDFQQwCgeAaouSJyqXAqs"],"prompt":null,"meta":"weave:///capecape/dev_testing/object/ApiMeta:pv1jsSUreiP0DTrQPCNFKVPgaSzKTMWg7dr2vr12n8Y","_class_name":"NonStreamedChatResponse","_bases":["UncheckedBaseModel","BaseModel","Representation"]}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '949'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"odmpoNWahmJai3yinzIqYzOWldUvuM4AORY7ITyDXXw"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Thu, 27 Jun 2024 20:41:45 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google, 1.1 google
+      x-cloud-trace-context:
+      - 3eac778b31f3c06058e8e7bab4d00f07
     status:
       code: 200
       message: OK
@@ -1259,22 +1519,39 @@ interactions:
         to chat. I''m here to help however I can and look forward to speaking with
         you. \\n\\nDon''t hesitate to ask no matter how big or small the query might
         be.\", tool_calls=None, role=''CHATBOT'')], prompt=None, meta=ApiMet...","summary":{},"wb_user_id":"capecape","wb_run_id":null,"deleted_at":null},{"id":"0e0e1d94-33d8-4db2-a6f9-96e86372e00c","project_id":"capecape/dev_testing","op_name":"weave:///capecape/dev_testing/op/Client.chat:FMYT2THHdkMeeVdSraYkidlMLetwlgrJiRVYBT78Nx0","display_name":null,"trace_id":"f55ab6a0-469b-4bc4-8276-cc8a278d113f","parent_id":null,"started_at":"2024-06-27T07:18:09.049000Z","attributes":{},"inputs":{"self":"<cohere.client.Client
-        object at 0x3092aa410>","message":"Hello, Cohere!","model":"command","max_tokens":1024,"preamble":"Ellipsis","chat_history":"Ellipsis","conversation_id":"Ellipsis","prompt_truncation":"Ellipsis","connectors":"Ellipsis","search_queries_only":"Ellipsis","documents":"Ellipsis","citation_quality":"Ellipsis","temperature":"Ellipsis","max_input_tokens":"Ellipsis","k":"Ellipsis","p":"Ellipsis","seed":"Ellipsis","stop_sequences":"Ellipsis","frequency_penalty":"Ellipsis","presence_penalty":"Ellipsis","raw_prompting":"Ellipsis","return_prompt":"Ellipsis","tools":"Ellipsis","tool_results":"Ellipsis","force_single_step":"Ellipsis"},"ended_at":null,"exception":null,"output":null,"summary":null,"wb_user_id":"capecape","wb_run_id":null,"deleted_at":null}]}'
+        object at 0x3092aa410>","message":"Hello, Cohere!","model":"command","max_tokens":1024,"preamble":"Ellipsis","chat_history":"Ellipsis","conversation_id":"Ellipsis","prompt_truncation":"Ellipsis","connectors":"Ellipsis","search_queries_only":"Ellipsis","documents":"Ellipsis","citation_quality":"Ellipsis","temperature":"Ellipsis","max_input_tokens":"Ellipsis","k":"Ellipsis","p":"Ellipsis","seed":"Ellipsis","stop_sequences":"Ellipsis","frequency_penalty":"Ellipsis","presence_penalty":"Ellipsis","raw_prompting":"Ellipsis","return_prompt":"Ellipsis","tools":"Ellipsis","tool_results":"Ellipsis","force_single_step":"Ellipsis"},"ended_at":"2024-06-27T07:18:10.925000Z","exception":null,"output":"NonStreamedChatResponse(text=\"Hello!
+        It''s lovely to meet you. If you have any questions, let me know and I''ll
+        do everything that I can to assist you today. \\n\\nHow can I help you today?\",
+        generation_id=''3f97780f-6fd7-4587-8da7-732430a7bbd9'', citations=None, documents=None,
+        is_search_required=None, search_queries=None, search_results=None, finish_reason=''COMPLETE'',
+        tool_calls=None, chat_history=[Message_User(message=''Hello, Cohere!'', tool_calls=None,
+        role=''USER''), Message_Chatbot(message=\"Hello! It''s lovely to meet you.
+        If you have any questions, let me know and I''ll do everything that I can
+        to assist you today. \\n\\nHow can I help you today?\", tool_calls=None, role=''CHATBOT'')],
+        prompt=None, meta=ApiMeta(api_version=ApiMetaApiVersion(version=''1'', is_deprecated=None,
+        is_experimental=None), billed_units=ApiMetaBilledUnits(input_tokens=5, output_tokens=40,
+        search_units=None, classifications=None), tokens=ApiMetaTokens(input_tokens=67,
+        output_tokens=41), warnings=None), response_id=''fc411839...","summary":{},"wb_user_id":"capecape","wb_run_id":null,"deleted_at":null},{"id":"98482daf-bfb2-48be-9b43-5b67c00e32be","project_id":"capecape/dev_testing","op_name":"weave:///capecape/dev_testing/op/Client.chat:FMYT2THHdkMeeVdSraYkidlMLetwlgrJiRVYBT78Nx0","display_name":null,"trace_id":"bd8d8f33-1d93-46a1-b16b-cccd3dd2f25d","parent_id":null,"started_at":"2024-06-27T20:17:34.602000Z","attributes":{},"inputs":{"self":"<cohere.client.Client
+        object at 0x3232fad10>","message":"Hello, Cohere!","model":"command","max_tokens":1024,"preamble":"Ellipsis","chat_history":"Ellipsis","conversation_id":"Ellipsis","prompt_truncation":"Ellipsis","connectors":"Ellipsis","search_queries_only":"Ellipsis","documents":"Ellipsis","citation_quality":"Ellipsis","temperature":"Ellipsis","max_input_tokens":"Ellipsis","k":"Ellipsis","p":"Ellipsis","seed":"Ellipsis","stop_sequences":"Ellipsis","frequency_penalty":"Ellipsis","presence_penalty":"Ellipsis","raw_prompting":"Ellipsis","return_prompt":"Ellipsis","tools":"Ellipsis","tool_results":"Ellipsis","force_single_step":"Ellipsis"},"ended_at":"2024-06-27T20:17:43.181000Z","exception":null,"output":"weave:///capecape/dev_testing/object/NonStreamedChatResponse:wxMLHbnbdQfymlTJ5J68gLpNhxQJE4JIbdXoTG9RWmo","summary":{},"wb_user_id":"capecape","wb_run_id":null,"deleted_at":null},{"id":"0116bc95-21e2-4158-b440-3d1026562494","project_id":"capecape/dev_testing","op_name":"weave:///capecape/dev_testing/op/HttpClient.request:dkngaOaGYYgWSIzKdL2dIQpCMM4sqOeSA3FXosSgvTA","display_name":null,"trace_id":"bd8d8f33-1d93-46a1-b16b-cccd3dd2f25d","parent_id":"98482daf-bfb2-48be-9b43-5b67c00e32be","started_at":"2024-06-27T20:17:35.384000Z","attributes":{},"inputs":{"self":"<cohere.core.http_client.HttpClient
+        object at 0x323525050>","path":"chat","method":"POST","json":{"message":"Hello,
+        Cohere!","model":"command","preamble":"Ellipsis","chat_history":"Ellipsis","conversation_id":"Ellipsis","prompt_truncation":"Ellipsis","connectors":"Ellipsis","search_queries_only":"Ellipsis","documents":"Ellipsis","citation_quality":"Ellipsis","temperature":"Ellipsis","max_tokens":1024,"max_input_tokens":"Ellipsis","k":"Ellipsis","p":"Ellipsis","seed":"Ellipsis","stop_sequences":"Ellipsis","frequency_penalty":"Ellipsis","presence_penalty":"Ellipsis","raw_prompting":"Ellipsis","return_prompt":"Ellipsis","tools":"Ellipsis","tool_results":"Ellipsis","force_single_step":"Ellipsis","stream":false},"request_options":null,"omit":"Ellipsis","retries":0},"ended_at":"2024-06-27T20:17:40.166000Z","exception":null,"output":"<Response
+        [200 OK]>","summary":{},"wb_user_id":"capecape","wb_run_id":null,"deleted_at":null},{"id":"a1375a72-b0bb-4c36-813c-9e3481e7d9c2","project_id":"capecape/dev_testing","op_name":"weave:///capecape/dev_testing/op/Client.chat:FMYT2THHdkMeeVdSraYkidlMLetwlgrJiRVYBT78Nx0","display_name":null,"trace_id":"84d2f2b1-635b-4902-8cc6-0912da2e7566","parent_id":null,"started_at":"2024-06-27T20:41:41.029000Z","attributes":{},"inputs":{"self":"<cohere.client.Client
+        object at 0x31c4b2350>","message":"Hello, Cohere!","model":"command","max_tokens":1024,"preamble":"Ellipsis","chat_history":"Ellipsis","conversation_id":"Ellipsis","prompt_truncation":"Ellipsis","connectors":"Ellipsis","search_queries_only":"Ellipsis","documents":"Ellipsis","citation_quality":"Ellipsis","temperature":"Ellipsis","max_input_tokens":"Ellipsis","k":"Ellipsis","p":"Ellipsis","seed":"Ellipsis","stop_sequences":"Ellipsis","frequency_penalty":"Ellipsis","presence_penalty":"Ellipsis","raw_prompting":"Ellipsis","return_prompt":"Ellipsis","tools":"Ellipsis","tool_results":"Ellipsis","force_single_step":"Ellipsis"},"ended_at":null,"exception":null,"output":null,"summary":null,"wb_user_id":"capecape","wb_run_id":null,"deleted_at":null}]}'
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
       Content-Length:
-      - '31732'
+      - '36445'
       content-type:
       - application/json
       date:
-      - Thu, 27 Jun 2024 07:18:11 GMT
+      - Thu, 27 Jun 2024 20:41:46 GMT
       server:
       - Google Frontend
       via:
       - 1.1 google, 1.1 google
       x-cloud-trace-context:
-      - e57c9d456b915186ab0aff8b2712aef2
+      - 0116dbbc92c6aef2429e3ddf0de4f2d6
     status:
       code: 200
       message: OK
