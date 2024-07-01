@@ -1,27 +1,10 @@
 import os
-from collections.abc import Callable
-from typing import Any, Generator, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import pytest
-
 import weave
-from weave.autopatch import autopatch, autopatch_openai, reset_autopatch
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
-
-from .langchain import langchain_patcher
-
-
-@pytest.fixture
-def only_patch_langchain() -> Generator[None, None, None]:
-    reset_autopatch()
-    langchain_patcher.attempt_patch()
-    autopatch_openai()
-
-    try:
-        yield  # This is where the test using this fixture will run
-    finally:
-        autopatch()  # Ensures future tests have the patch applied
 
 
 def filter_body(r: Any) -> Any:
@@ -69,7 +52,7 @@ def assert_correct_calls_for_chain_invoke(calls: list[tsi.CallSchema]) -> None:
     before_record_request=filter_body,
 )
 def test_simple_chain_invoke(
-    client: WeaveClient, only_patch_langchain: Callable
+    client: WeaveClient,
 ) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
@@ -95,7 +78,7 @@ def test_simple_chain_invoke(
     before_record_request=filter_body,
 )
 def test_simple_chain_stream(
-    client: WeaveClient, only_patch_langchain: Callable
+    client: WeaveClient,
 ) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
@@ -142,7 +125,7 @@ def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
     before_record_request=filter_body,
 )
 def test_simple_chain_batch(
-    client: WeaveClient, only_patch_langchain: Callable
+    client: WeaveClient,
 ) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
@@ -189,7 +172,7 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[tsi.CallSchema]) ->
     before_record_request=filter_body,
 )
 def test_simple_chain_batch_inside_op(
-    client: WeaveClient, only_patch_langchain: Callable
+    client: WeaveClient,
 ) -> None:
     # This test is the same as test_simple_chain_batch, but ensures things work when nested in an op
     from langchain_core.prompts import PromptTemplate
@@ -241,7 +224,9 @@ def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_rag_chain(client: WeaveClient, only_patch_langchain: Callable) -> None:
+def test_simple_rag_chain(
+    client: WeaveClient,
+) -> None:
     from typing import List
 
     from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -326,7 +311,7 @@ def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> Non
     before_record_request=filter_body,
 )
 def test_agent_run_with_tools(
-    client: WeaveClient, only_patch_langchain: Callable
+    client: WeaveClient,
 ) -> None:
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages
@@ -421,7 +406,7 @@ def test_agent_run_with_tools(
     before_record_request=filter_body,
 )
 def test_agent_run_with_function_call(
-    client: WeaveClient, only_patch_langchain: Callable
+    client: WeaveClient,
 ) -> None:
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages

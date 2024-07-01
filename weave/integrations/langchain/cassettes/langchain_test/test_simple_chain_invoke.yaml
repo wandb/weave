@@ -686,7 +686,8 @@ interactions:
         0.00263,\n        \"output_cost_per_audio_per_second\": 0.00025,\n        \"litellm_provider\":
         \"vertex_ai-language-models\",\n        \"mode\": \"chat\",\n        \"supports_system_messages\":
         true,\n        \"supports_function_calling\": true,\n        \"supports_tool_choice\":
-        true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
+        true, \n        \"supports_response_schema\": true, \n        \"source\":
+        \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini-1.5-pro-001\": { \n        \"max_tokens\": 8192,\n        \"max_input_tokens\":
         1000000,\n        \"max_output_tokens\": 8192,\n        \"input_cost_per_image\":
         0.001315,\n        \"input_cost_per_audio_per_second\": 0.000125,\n        \"input_cost_per_video_per_second\":
@@ -699,7 +700,8 @@ interactions:
         0.00263,\n        \"output_cost_per_audio_per_second\": 0.00025,\n        \"litellm_provider\":
         \"vertex_ai-language-models\",\n        \"mode\": \"chat\",\n        \"supports_system_messages\":
         true,\n        \"supports_function_calling\": true,\n        \"supports_tool_choice\":
-        true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
+        true, \n        \"supports_response_schema\": true, \n        \"source\":
+        \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini-1.5-pro-preview-0514\": { \n        \"max_tokens\": 8192,\n
         \       \"max_input_tokens\": 1000000,\n        \"max_output_tokens\": 8192,\n
         \       \"input_cost_per_image\": 0.001315,\n        \"input_cost_per_audio_per_second\":
@@ -712,7 +714,8 @@ interactions:
         0.00263,\n        \"output_cost_per_video_per_second\": 0.00263,\n        \"output_cost_per_audio_per_second\":
         0.00025,\n        \"litellm_provider\": \"vertex_ai-language-models\",\n        \"mode\":
         \"chat\",\n        \"supports_system_messages\": true,\n        \"supports_function_calling\":
-        true,\n        \"supports_tool_choice\": true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
+        true,\n        \"supports_tool_choice\": true, \n        \"supports_response_schema\":
+        true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini-1.5-pro-preview-0215\": { \n        \"max_tokens\": 8192,\n
         \       \"max_input_tokens\": 1000000,\n        \"max_output_tokens\": 8192,\n
         \       \"input_cost_per_image\": 0.001315,\n        \"input_cost_per_audio_per_second\":
@@ -725,7 +728,8 @@ interactions:
         0.00263,\n        \"output_cost_per_video_per_second\": 0.00263,\n        \"output_cost_per_audio_per_second\":
         0.00025,\n        \"litellm_provider\": \"vertex_ai-language-models\",\n        \"mode\":
         \"chat\",\n        \"supports_system_messages\": true,\n        \"supports_function_calling\":
-        true,\n        \"supports_tool_choice\": true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
+        true,\n        \"supports_tool_choice\": true, \n        \"supports_response_schema\":
+        true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini-1.5-pro-preview-0409\": {\n        \"max_tokens\": 8192,\n
         \       \"max_input_tokens\": 1000000,\n        \"max_output_tokens\": 8192,\n
         \       \"input_cost_per_image\": 0.001315,\n        \"input_cost_per_audio_per_second\":
@@ -738,7 +742,7 @@ interactions:
         0.00263,\n        \"output_cost_per_video_per_second\": 0.00263,\n        \"output_cost_per_audio_per_second\":
         0.00025,\n        \"litellm_provider\": \"vertex_ai-language-models\",\n        \"mode\":
         \"chat\",\n        \"supports_function_calling\": true,\n        \"supports_tool_choice\":
-        true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
+        true,\n        \"supports_response_schema\": true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini-1.5-flash\": {\n        \"max_tokens\": 8192,\n        \"max_input_tokens\":
         1000000,\n        \"max_output_tokens\": 8192,\n        \"max_images_per_prompt\":
         3000,\n        \"max_videos_per_prompt\": 10,\n        \"max_video_length\":
@@ -941,7 +945,8 @@ interactions:
         0.0000021, \n        \"litellm_provider\": \"gemini\",\n        \"mode\":
         \"chat\",\n        \"supports_system_messages\": true,\n        \"supports_function_calling\":
         true,\n        \"supports_vision\": true,\n        \"supports_tool_choice\":
-        true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
+        true, \n        \"supports_response_schema\": true, \n        \"source\":
+        \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini/gemini-1.5-pro-latest\": {\n        \"max_tokens\": 8192,\n
         \       \"max_input_tokens\": 1048576,\n        \"max_output_tokens\": 8192,\n
         \       \"input_cost_per_token\": 0.00000035, \n        \"input_cost_per_token_above_128k_tokens\":
@@ -949,11 +954,11 @@ interactions:
         0.0000021, \n        \"litellm_provider\": \"gemini\",\n        \"mode\":
         \"chat\",\n        \"supports_system_messages\": true,\n        \"supports_function_calling\":
         true,\n        \"supports_vision\": true,\n        \"supports_tool_choice\":
-        true, \n        \"source\": \"https://ai.google.dev/models/gemini\"\n    },\n
-        \   \"gemini/gemini-pro-vision\": {\n        \"max_tokens\": 2048,\n        \"max_input_tokens\":
-        30720,\n        \"max_output_tokens\": 2048,\n        \"input_cost_per_token\":
-        0.00000035, \n        \"input_cost_per_token_above_128k_tokens\": 0.0000007,
-        \n        \"output_cost_per_token\": 0.00000105, \n        \"output_cost_per_token_above_128k_tokens\":
+        true, \n        \"supports_response_schema\": true, \n        \"source\":
+        \"https://ai.google.dev/models/gemini\"\n    },\n    \"gemini/gemini-pro-vision\":
+        {\n        \"max_tokens\": 2048,\n        \"max_input_tokens\": 30720,\n        \"max_output_tokens\":
+        2048,\n        \"input_cost_per_token\": 0.00000035, \n        \"input_cost_per_token_above_128k_tokens\":
+        0.0000007, \n        \"output_cost_per_token\": 0.00000105, \n        \"output_cost_per_token_above_128k_tokens\":
         0.0000021, \n        \"litellm_provider\": \"gemini\",\n        \"mode\":
         \"chat\",\n        \"supports_function_calling\": true,\n        \"supports_vision\":
         true,\n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
@@ -1969,7 +1974,7 @@ interactions:
       Content-Encoding:
       - gzip
       Content-Length:
-      - '8008'
+      - '8033'
       Content-Security-Policy:
       - default-src 'none'; style-src 'unsafe-inline'; sandbox
       Content-Type:
@@ -1977,13 +1982,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Fri, 28 Jun 2024 05:48:21 GMT
+      - Mon, 01 Jul 2024 13:38:34 GMT
       ETag:
-      - W/"8fe283c036e648a9aca52f437291fbf913202c16fb10a6464c9c555607cc17e8"
+      - W/"acdd36963641f3925f59f19bd1cd84563b6134afb3cf9916d3716d467aac36a2"
       Expires:
-      - Fri, 28 Jun 2024 05:53:21 GMT
+      - Mon, 01 Jul 2024 13:43:34 GMT
       Source-Age:
-      - '101'
+      - '193'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -1997,15 +2002,15 @@ interactions:
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - a3ed85e59f79754df23f63dfe7f68cbbc56b0021
+      - ca174b924c6f291929c9b8a136220e3e358c0fa4
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - 5247:D600:1D3AD8:239040:667E4365
+      - 8F8C:1C8834:15E10C:1DB024:6680CEA5
       X-Served-By:
-      - cache-maa10235-MAA
+      - cache-maa10226-MAA
       X-Timer:
-      - S1719553701.108142,VS0,VE0
+      - S1719841114.021188,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -2047,17 +2052,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA1SQy07DMBBF9/kKa9ZNlTSNSrNnAYhNQUUCocp1ponB8Vj2RKJU/XfkNH2w8eLe
-        nOvjHBIhQNdQCVCtZNU5ky5xb+b361f/tu727/LxLn/6XbWr7KG3L88wiQRtv1DxmZoq6pxB1mRP
-        tfIoGeNqvsiXZVksstlQdFSjiVjjOC2mZcq931Ka5bNyJFvSCgNU4iMRQojDcEZHW+MPVCKbnJMO
-        Q5ANQnX5SAjwZGICMgQdWFqGybVUZBntoF3AGB8ve4Ya52kb77a9MZd8p60O7cajDGQjG5jcCT8m
-        QnwO3v0/FXCeOscbpm+0cTAvTnNw/VM35dgxsTQ38TwZ9SDsA2O32WnboHdeD2+Ikskx+QMAAP//
-        AwCDz7I+wgEAAA==
+        H4sIAAAAAAAAA1SQPW/CMBRF9/wK680Jwg20JVs7dEEMLao6VBVynEcwOH6W/ZDaIv575RA+uni4
+        N+f6OIdMCDANVAL0RrHuvC1m7fOHfXK/i/mr2S3mb1QvX7ZL+36/I+8hTwTVW9R8pkaaOm+RDblT
+        rQMqxrQqH+TscSKlnPZFRw3ahLWei3I0LXgfairG8m46kBsyGiNU4jMTQohDfyZH1+A3VGKcn5MO
+        Y1QtQnX5SAgIZFMCKkYTWTmG/Fpqcoyu1y5hiI+XPUutD1Snu93e2ku+Ns7EzSqgiuQSG5n8CT9m
+        Qnz13vt/KuADdZ5XTDt0aVCWpzm4/qmbcuiYWNmbeJINehB/ImO3WhvXYvDB9G9Iktkx+wMAAP//
+        AwA5zDy/wgEAAA==
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 89ab632f8eac9141-MAA
+      - 89c6cc19cd333c07-BLR
       Connection:
       - keep-alive
       Content-Encoding:
@@ -2065,14 +2070,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Fri, 28 Jun 2024 05:48:22 GMT
+      - Mon, 01 Jul 2024 13:38:35 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=xncPHhcV5fVuUbsk3Pu7NWGTxmVoLGEWQKfVe75f0ZY-1719553702-1.0.1.1-hQqkWfiZHSQaff1w2k3IyVCq4xTqnsDwCmpDBGgiQozfi70PA9VkMagtz1QYpSmjY.VujaLeZ76gurCnwX5qrQ;
-        path=/; expires=Fri, 28-Jun-24 06:18:22 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=E6_xQnPcZiUlpYJDwMmRkCblM7pPU_ASnRh0XXiE_GM-1719841115-1.0.1.1-1OA0BashmGgfABLqZD_cFt1dy1CnEI579qAKT48axE48hytnoy5JxLuzWZm8KHZiBHzFgcMehNWeXinsHGFM8g;
+        path=/; expires=Mon, 01-Jul-24 14:08:35 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=dLt6U16WsYOP9M2p0YQE5fAt0o5Aj0IYsiN.YbFC7Xw-1719553702878-0.0.1.1-604800000;
+      - _cfuvid=8OePie3e1XxcVgJpmrnZUOeRcuuJPEi.4Q6xVIzaNvA-1719841115655-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -2081,7 +2086,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '94'
+      - '88'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -2099,7 +2104,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_0a3e2baf95d1dbccdf2b3f42294c11c6
+      - req_8fdc26d5c1e29e0cc0b78ccbf920f5c6
     status:
       code: 200
       message: OK
