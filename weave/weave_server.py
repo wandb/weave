@@ -395,19 +395,24 @@ def execute_v2():
 def send_local_file(path):
     try:
         # Retrieve and normalize the local artifacts path
-        local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).resolve(strict=True)
-        
+        local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).resolve(
+            strict=True
+        )
+
         # Construct the full absolute path of the requested file
         requested_path = (local_artifacts_path / path).resolve(strict=True)
-        
+
         # Ensure the requested path is within the local artifacts directory
         if not str(requested_path).startswith(str(local_artifacts_path)):
             abort(403)
-        
+
         # Send the file from the directory
-        return send_from_directory(local_artifacts_path, str(requested_path.relative_to(local_artifacts_path)))
+        return send_from_directory(
+            local_artifacts_path, str(requested_path.relative_to(local_artifacts_path))
+        )
     except (errors.WeaveAccessDeniedError, FileNotFoundError):
         abort(403)
+
 
 @blueprint.before_request
 def _disable_eager_mode():
