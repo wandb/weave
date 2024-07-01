@@ -5,3 +5,4 @@ The Weave ecosystem contains automatic logging integrations for popular AI libra
 - [openai](/guides/integrations/openai): the `openai` library.
 - [anthropic](/guides/integrations/anthropic): the `anthropic-sdk-python` library.
 - [mistralai](/guides/integrations/mistral): the `mistralai` library.
+- [llamaIndex](/guides/integrations/llamaindex): the `llamaIndex` library.
