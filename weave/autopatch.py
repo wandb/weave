@@ -35,7 +35,7 @@ def unpatch_openai() -> None:
 
 
 def autopatch() -> None:
-    autopatch_openai()
+    # autopatch_openai()
 
     from .integrations.anthropic.anthropic_sdk import anthropic_patcher
     from .integrations.litellm.litellm import litellm_patcher
