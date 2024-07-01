@@ -206,13 +206,16 @@ def test_score_with_errors(client):
         return pred
 
     result = asyncio.run(evaluation.evaluate(return_pred))
-    assert result == {
-        "model_output": {"mean": 2.5},
-        "model_latency": {"mean": pytest.approx(0, abs=0.05)},
-        "raise_above_2_score": {
-            "errors": [
-                {"error": "actual is too big", "example": {"actual": 3, "pred": 3}},
-                {"error": "actual is too big", "example": {"actual": 4, "pred": 4}},
-            ]
-        },
-    }
+
+    expected_errors = [
+        {"error": "actual is too big", "example": {"actual": 3, "pred": 3}},
+        {"error": "actual is too big", "example": {"actual": 4, "pred": 4}},
+    ]
+
+    assert result["model_output"] == {"mean": 2.5}
+    assert result["model_latency"] == {"mean": pytest.approx(0, abs=0.05)}
+
+    # Errors may be in a different order because they are processed in parallel
+    errors = result["raise_above_2_score"]["errors"]
+    for expected_error in expected_errors:
+        assert expected_error in errors
