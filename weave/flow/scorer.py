@@ -41,7 +41,9 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
     Returns:
       dict of summary stats, with structure matching input dict structure.
     """
-    if not (data := [x for x in data if x is not None]):
+    data = [x for x in data if x is not None]
+
+    if not data:
         return {}
 
     val = data[0]
