@@ -17,10 +17,6 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     return call_output
 
 
-def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
-
-
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
@@ -71,3 +67,74 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     assert output_3["usage"]["total_tokens"] == 30
     assert output_2["id"] == output_3["id"]
     assert output_2["created"] == output_3["created"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_dspy_inline_signatures(client: WeaveClient) -> None:
+    import dspy
+
+    turbo = dspy.OpenAI(model="gpt-3.5-turbo")
+    dspy.settings.configure(lm=turbo)
+    classify = dspy.Predict("sentence -> sentiment")
+    prediction = classify(
+        sentence="it's a charming and often affecting journey."
+    ).sentiment
+    expected_prediction = "Positive"
+    assert prediction == expected_prediction
+    weave_server_respose = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client._project_id())
+    )
+    assert len(weave_server_respose.calls) >= 5
+
+    call_1 = weave_server_respose.calls[0]
+    assert call_1.exception is None and call_1.ended_at is not None
+    output_1 = _get_call_output(call_1)
+    assert (
+        output_1
+        == """Prediction(
+    sentiment='Positive'
+)"""
+    )
+
+    call_2 = weave_server_respose.calls[1]
+    assert call_2.exception is None and call_2.ended_at is not None
+    output_2 = _get_call_output(call_2)
+    assert (
+        output_2
+        == """Prediction(
+    sentiment='Positive'
+)"""
+    )
+
+    call_3 = weave_server_respose.calls[2]
+    assert call_3.exception is None and call_3.ended_at is not None
+    output_3 = _get_call_output(call_3)
+    assert output_3[0] == expected_prediction
+
+    call_4 = weave_server_respose.calls[3]
+    assert call_4.exception is None and call_4.ended_at is not None
+    output_4 = _get_call_output(call_4)
+    assert output_4["choices"][0]["finish_reason"] == "stop"
+    assert output_4["choices"][0]["message"]["content"] == expected_prediction
+    assert output_4["choices"][0]["message"]["role"] == "assistant"
+    assert output_4["model"] == "gpt-3.5-turbo-0125"
+    assert output_4["usage"]["completion_tokens"] == 1
+    assert output_4["usage"]["prompt_tokens"] == 53
+    assert output_4["usage"]["total_tokens"] == 54
+
+    call_5 = weave_server_respose.calls[4]
+    assert call_5.exception is None and call_5.ended_at is not None
+    output_5 = _get_call_output(call_5)
+    assert output_5["choices"][0]["finish_reason"] == "stop"
+    assert output_5["choices"][0]["message"]["content"] == expected_prediction
+    assert output_5["choices"][0]["message"]["role"] == "assistant"
+    assert output_5["model"] == "gpt-3.5-turbo-0125"
+    assert output_5["usage"]["completion_tokens"] == 1
+    assert output_5["usage"]["prompt_tokens"] == 53
+    assert output_5["usage"]["total_tokens"] == 54
+    assert output_5["id"] == output_4["id"]
+    assert output_5["created"] == output_4["created"]
