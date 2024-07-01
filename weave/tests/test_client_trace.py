@@ -1,24 +1,30 @@
-from contextlib import contextmanager
+import asyncio
 import dataclasses
-from collections import namedtuple
 import datetime
 import os
 import typing
-import pytest
+from collections import defaultdict, namedtuple
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from contextvars import copy_context
 
-from pydantic import BaseModel, ValidationError
+import pytest
 import wandb
+from pydantic import BaseModel, ValidationError
+
 import weave
 from weave import weave_client
-from weave import context_state
+from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, TraceObject
+from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+
+from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
     generate_id,
 )
-from ..trace_server import trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace
 
@@ -49,7 +55,7 @@ def test_simple_op(client):
     assert my_op(5) == 6
 
     op_ref = weave_client.get_ref(my_op)
-    # assert client.ref_is_own(op_ref)
+    # assert client._ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
     calls = list(client.calls())
@@ -69,6 +75,7 @@ def test_simple_op(client):
         exception=None,
         output=6,
         summary={},
+        attributes={},
     )
 
 
@@ -139,6 +146,8 @@ def test_trace_server_call_start_and_end(client):
         "summary": None,
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "deleted_at": None,
+        "display_name": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -176,6 +185,8 @@ def test_trace_server_call_start_and_end(client):
         "summary": {"c": 5},
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "deleted_at": None,
+        "display_name": None,
     }
 
 
@@ -231,9 +242,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> (
-        int
-    ):  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
@@ -680,7 +689,7 @@ def test_trace_call_sort(client):
     for i in range(3):
         basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
 
-    for (first, last, sort_by) in [
+    for first, last, sort_by in [
         (2, 0, [tsi._SortBy(field="started_at", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.prim", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.list.0", direction="desc")]),
@@ -698,6 +707,448 @@ def test_trace_call_sort(client):
 
         assert inner_res.calls[0].inputs["in_val"]["prim"] == first
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
+
+
+def test_trace_call_sort_with_mixed_types(client):
+    is_sqlite = client_is_sqlite(client)
+    if is_sqlite:
+        # SQLite does not support sorting over mixed types in a column, so we skip this test
+        return
+
+    @weave.op()
+    def basic_op(in_val: dict) -> dict:
+        import time
+
+        time.sleep(1 / 10)
+        return in_val
+
+    basic_op({"prim": None})
+    basic_op({"not_prim": 1})
+    basic_op({"prim": 100})
+    basic_op({"prim": 2})
+    basic_op({"prim": "b"})
+    basic_op({"prim": "a"})
+
+    for direction, seq in [
+        ("desc", [100, 2, "b", "a", None, None]),
+        (
+            "asc",
+            [
+                2,
+                100,
+                "a",
+                "b",
+                None,
+                None,
+            ],
+        ),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi._SortBy(field="inputs.in_val.prim", direction=direction)],
+            )
+        )
+
+        for i, call in enumerate(inner_res.calls):
+            assert call.inputs["in_val"].get("prim") == seq[i]
+
+
+def client_is_sqlite(client):
+    return isinstance(client.server._internal_trace_server, SqliteTraceServer)
+
+
+def test_trace_call_filter(client):
+    is_sqlite = client_is_sqlite(client)
+
+    @weave.op()
+    def basic_op(in_val: dict, delay) -> dict:
+        return in_val
+
+    for i in range(10):
+        basic_op(
+            {"prim": i, "list": [i], "dict": {"inner": i}, "str": "str_" + str(i)},
+            i / 10,
+        )
+
+    # Adding a row of a different type here to make sure we safely exclude it without it messing up other things
+    basic_op(
+        {
+            "prim": "Different Type",
+            "list": "Different Type",
+            "dict": "Different Type",
+            "str": False,
+        },
+        0.1,
+    )
+
+    basic_op("simple_primitive", 0.1)
+    basic_op(42, 0.1)
+
+    failed_cases = []
+    for count, query in [
+        # Base Case - simple True
+        (
+            13,
+            {"$eq": [{"$literal": 1}, {"$literal": 1}]},
+        ),
+        # Base Case - simple false
+        (
+            0,
+            {"$eq": [{"$literal": 1}, {"$literal": 2}]},
+        ),
+        # eq
+        (
+            1,
+            {
+                "$eq": [
+                    {"$literal": 5},
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
+                            "to": "int",
+                        }
+                    },
+                ]
+            },
+        ),
+        # eq - string
+        (
+            1,
+            {
+                "$eq": [
+                    {"$literal": "simple_primitive"},
+                    {"$getField": "inputs.in_val"},
+                ]
+            },
+        ),
+        # eq - string out
+        (
+            1,
+            {"$eq": [{"$literal": "simple_primitive"}, {"$getField": "output"}]},
+        ),
+        # gt
+        (
+            4,
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        # gte
+        (
+            5,
+            {
+                "$gte": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        # not gt = lte
+        (
+            6
+            + (
+                1 if is_sqlite else 0
+            ),  # SQLite casting transforms strings to 0, instead of NULL
+            {
+                "$not": [
+                    {
+                        "$gt": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "inputs.in_val.prim"},
+                                    "to": "int",
+                                }
+                            },
+                            {"$literal": 5},
+                        ]
+                    }
+                ]
+            },
+        ),
+        # not gte = lt
+        (
+            5
+            + (
+                1 if is_sqlite else 0
+            ),  # SQLite casting transforms strings to 0, instead of NULL
+            {
+                "$not": [
+                    {
+                        "$gte": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "inputs.in_val.prim"},
+                                    "to": "int",
+                                }
+                            },
+                            {"$literal": 5},
+                        ]
+                    }
+                ]
+            },
+        ),
+        # like all
+        (
+            13
+            + (
+                -2 if is_sqlite else 0
+            ),  # SQLite returns NULL for non-existent fields rather than ''.
+            {
+                "$contains": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": ""},
+                }
+            },
+        ),
+        # like select
+        (
+            10,
+            {
+                "$contains": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": "str"},
+                }
+            },
+        ),
+        (
+            0,
+            {
+                "$contains": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": "STR"},
+                }
+            },
+        ),
+        (
+            10,
+            {
+                "$contains": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": "STR"},
+                    "case_insensitive": True,
+                }
+            },
+        ),
+        # and
+        (
+            3,
+            {
+                "$and": [
+                    {
+                        "$not": [
+                            {
+                                "$gt": [
+                                    {
+                                        "$convert": {
+                                            "input": {
+                                                "$getField": "inputs.in_val.prim"
+                                            },
+                                            "to": "int",
+                                        }
+                                    },
+                                    {"$literal": 7},
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "$gte": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "inputs.in_val.prim"},
+                                    "to": "int",
+                                }
+                            },
+                            {"$literal": 5},
+                        ]
+                    },
+                ]
+            },
+        ),
+        # or
+        (
+            5
+            + (
+                1 if is_sqlite else 0
+            ),  # SQLite casting transforms strings to 0, instead of NULL
+            {
+                "$or": [
+                    {
+                        "$not": [
+                            {
+                                "$gt": [
+                                    {
+                                        "$convert": {
+                                            "input": {
+                                                "$getField": "inputs.in_val.prim"
+                                            },
+                                            "to": "int",
+                                        }
+                                    },
+                                    {"$literal": 3},
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "$gte": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "inputs.in_val.prim"},
+                                    "to": "int",
+                                }
+                            },
+                            {"$literal": 9},
+                        ]
+                    },
+                ]
+            },
+        ),
+        # Invalid type - safely return none
+        (
+            0,
+            {
+                "$eq": [
+                    {"$literal": 5},
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.str"},
+                            "to": "int",
+                        }
+                    },
+                ]
+            },
+        ),
+        # Cast across type
+        (
+            1,
+            {
+                "$eq": [
+                    {"$literal": "5"},
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
+                            "to": "string",
+                        }
+                    },
+                ]
+            },
+        ),
+        # Different key access
+        (
+            4,
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {
+                                "$getField": "inputs.in_val.list.0"
+                            },  # changing this to a dot instead of [0]
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        (
+            4,
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.dict.inner"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        (
+            4,
+            {
+                "$gt": [
+                    {"$convert": {"input": {"$getField": "output.prim"}, "to": "int"}},
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        (
+            4,
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "output.list.0"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        (
+            4,
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "output.dict.inner"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+    ]:
+        print(f"TEST CASE [{count}]", query)
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        if len(inner_res.calls) != count:
+            failed_cases.append(
+                f"(ALL) Query {query} expected {count}, but found {len(inner_res.calls)}"
+            )
+        inner_res = get_client_trace_server(client).calls_query_stats(
+            tsi.CallsQueryStatsReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        if inner_res.count != count:
+            failed_cases.append(
+                f"(Stats) Query {query} expected {count}, but found {inner_res.count}"
+            )
+
+    if failed_cases:
+        raise AssertionError(
+            f"Failed {len(failed_cases)} cases:\n" + "\n".join(failed_cases)
+        )
 
 
 def test_ops_with_default_params(client):
@@ -894,7 +1345,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:PHOGkwSOn7DqLgIUNgUAq7d2vXpOmG8NGLltn6slzeU/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -1072,11 +1523,12 @@ def test_ref_get_no_client(trace_init_client):
 
 @contextmanager
 def _no_graph_client():
-    token = context_state._graph_client.set(None)
+    client = weave.client_context.weave_client.get_weave_client()
+    weave.client_context.weave_client.set_weave_client_global(None)
     try:
         yield
     finally:
-        context_state._graph_client.reset(token)
+        weave.client_context.weave_client.set_weave_client_global(client)
 
 
 @contextmanager
@@ -1140,3 +1592,615 @@ def test_single_primitive_output(client):
     assert inner_res.calls[1].output == True
     assert inner_res.calls[2].output == None
     assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
+
+
+def map_simple(fn, vals):
+    return [fn(v) for v in vals]
+
+
+max_workers = 3
+
+
+# This is a standard way to execute a map operation with thread executor.
+def map_with_thread_executor(fn, vals):
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor.map(fn, vals)
+
+
+# This is how Langchain executes batches (with a manual context copy)
+def map_with_copying_thread_executor(fn, vals):
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        contexts = [copy_context() for _ in range(len(vals))]
+
+        def _wrapped_fn(*args):
+            return contexts.pop().run(fn, *args)
+
+        executor.map(_wrapped_fn, vals)
+
+
+# TODO: Make an async version of this
+@pytest.mark.parametrize(
+    "mapper",
+    [
+        map_simple,
+        # map_with_thread_executor, # <-- Currently this is failing! Fix me (:
+        # map_with_copying_thread_executor, # <-- Flakes in CI
+    ],
+)
+def test_mapped_execution(client, mapper):
+    import time
+
+    events = []
+
+    @weave.op()
+    def op_a(a: int) -> int:
+        events.append("A(S):" + str(a))
+        time.sleep(0.3)
+        events.append("A(E):" + str(a))
+        return a
+
+    @weave.op()
+    def op_b(b: int) -> int:
+        events.append("B(S):" + str(b))
+        time.sleep(0.2)
+        res = op_a(b)
+        events.append("B(E):" + str(b))
+        return res
+
+    @weave.op()
+    def op_c(c: int) -> int:
+        events.append("C(S):" + str(c))
+        time.sleep(0.1)
+        res = op_b(c)
+        events.append("C(E):" + str(c))
+        return res
+
+    @weave.op()
+    def op_mapper(vals):
+        return mapper(op_c, vals)
+
+    map_vals = list(range(12))
+    first_val = map_vals[0]
+    last_val = map_vals[-1]
+    middle_vals = map_vals[1:-1]
+    split = len(middle_vals) // 2
+    middle_vals_outer = middle_vals[:split]
+    middle_vals_inner = middle_vals[split:]
+    op_c(first_val)
+    mapper(op_c, middle_vals_outer)
+    op_mapper(middle_vals_inner)
+    op_c(last_val)
+
+    # Make sure that the events are in the right (or wrong!) order
+    sequential_expected_order = []
+    for i in map_vals:
+        for event in ["S", "E"]:
+            order = ["A", "B", "C"]
+            if event == "S":
+                order = order[::-1]
+            for op in order:
+                sequential_expected_order.append(f"{op}({event}):{i}")
+    if mapper == map_simple:
+        assert events == sequential_expected_order
+    else:
+        assert events != sequential_expected_order
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == (len(map_vals) * 3) + 1
+
+    # Now, we want to assert that the calls are in the right topological order - while
+    # it is possible that their timestamps are not in order
+    # First some helpers:
+    roots = [c for c in inner_res.calls if c.parent_id is None]
+
+    def assert_input_of_call(call, input_val):
+        assert call.inputs == input_val
+
+    def get_children_of_call(call):
+        return [c for c in inner_res.calls if c.parent_id == call.id]
+
+    def assert_valid_trace(root_call, val):
+        assert_input_of_call(root_call, {"c": val})
+        children = get_children_of_call(root_call)
+        assert len(children) == 1
+        assert_input_of_call(children[0], {"b": val})
+        children = get_children_of_call(children[0])
+        assert len(children) == 1
+        assert_input_of_call(children[0], {"a": val})
+
+    def assert_valid_batched_trace(root_call):
+        val = int(root_call.inputs["c"])
+        assert_valid_trace(root_call, val)
+
+    # First, ensure that there are 5 roots
+    assert len(roots) == 3 + len(middle_vals_outer)
+
+    # Now we can validate the shape of the calls within their traces.
+    # The first and last roots are not batched and therefore deterministic
+    # The middle 3 roots are batched and therefore non-deterministic
+    root_ndx = 0
+    assert_valid_trace(roots[root_ndx], first_val)
+    root_ndx += 1
+    for outer in middle_vals_outer:
+        assert_valid_trace(roots[root_ndx], outer)
+        root_ndx += 1
+
+    children = get_children_of_call(roots[root_ndx])
+    root_ndx += 1
+    assert len(children) == len(middle_vals_inner)
+    for child in children:
+        assert_valid_batched_trace(child)
+    assert_valid_trace(roots[root_ndx], last_val)
+
+
+def call_structure(calls):
+    parent_to_children_map = defaultdict(list)
+    roots = []
+    for call in calls:
+        parent_to_children_map[call.parent_id].append(call.id)
+        if call.parent_id is None:
+            roots.append(call.id)
+
+    found_structure = {}
+
+    def build_structure(parent_id):
+        if parent_id is None:
+            return {}
+        children = parent_to_children_map[parent_id]
+        return {child: build_structure(child) for child in children}
+
+    for root in roots:
+        found_structure[root] = build_structure(root)
+
+    return found_structure
+
+
+def test_call_stack_order_implicit_depth_first(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+
+    # This version of the call sequence matches the happy path
+    # without any out-of-order calls
+    call_1 = client.create_call("op", {})
+    call_2 = client.create_call("op", {})
+    call_3 = client.create_call("op", {})
+    client.finish_call(call_3)
+    call_4 = client.create_call("op", {})
+    client.finish_call(call_4)
+    client.finish_call(call_2)
+    call_5 = client.create_call("op", {})
+    call_6 = client.create_call("op", {})
+    client.finish_call(call_6)
+    call_7 = client.create_call("op", {})
+    client.finish_call(call_7)
+    client.finish_call(call_5)
+    client.finish_call(call_1)
+
+    terminal_root_call = client.create_call("op", {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {}},
+            call_5.id: {call_6.id: {}, call_7.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_stack_order_explicit_depth_first(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This version of the call sequence matches the happy path
+    # without any out-of-order calls, but with explicit parentage
+    # specified.
+    call_1 = client.create_call("op", {})
+    call_2 = client.create_call("op", {}, call_1)
+    call_3 = client.create_call("op", {}, call_2)
+    client.finish_call(call_3)
+    call_4 = client.create_call("op", {}, call_2)
+    client.finish_call(call_4)
+    client.finish_call(call_2)
+    call_5 = client.create_call("op", {}, call_1)
+    call_6 = client.create_call("op", {}, call_5)
+    client.finish_call(call_6)
+    call_7 = client.create_call("op", {}, call_5)
+    client.finish_call(call_7)
+    client.finish_call(call_5)
+    client.finish_call(call_1)
+
+    terminal_root_call = client.create_call("op", {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {}},
+            call_5.id: {call_6.id: {}, call_7.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_stack_order_langchain_batch(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This sequence is pretty much exactly what langchain does when handling
+    # a batch of calls. Specifically (prompt | llm).batch([1,2])
+    call_1 = client.create_call("op", {})  # <- Implicit Parent, no stack = root
+    call_2 = client.create_call("op", {}, call_1)  # <- RunnableSequence1
+    call_5 = client.create_call("op", {}, call_1)  # <- RunnableSequence2
+    call_3 = client.create_call("op", {}, call_2)  # <- Prompt1
+    client.finish_call(call_3)
+    call_4 = client.create_call("op", {}, call_2)  # <- LLM1
+    call_4gpt = client.create_call("op", {})  # <- Openai
+    client.finish_call(call_4gpt)
+    client.finish_call(call_4)
+    call_6 = client.create_call("op", {}, call_5)  # <- Prompt2
+    client.finish_call(call_6)
+    call_7 = client.create_call("op", {}, call_5)  # <- LLM2
+    call_7gpt = client.create_call("op", {})  # <- Openai
+    client.finish_call(call_7gpt)
+    client.finish_call(call_7)
+    client.finish_call(call_2)
+    client.finish_call(call_5)
+    client.finish_call(call_1)
+
+    terminal_root_call = client.create_call("op", {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {call_4gpt.id: {}}},
+            call_5.id: {call_6.id: {}, call_7.id: {call_7gpt.id: {}}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+POP_REORDERS_STACK = False
+
+
+def test_call_stack_order_out_of_order_pop(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This ordering is a specifically challenging case where we return to
+    # a parent that that was not the top of stack
+    call_1 = client.create_call("op", {})
+    call_2 = client.create_call("op", {})
+    call_3 = client.create_call("op", {})
+    # Purposely swap 4 & 5
+    call_5 = client.create_call("op", {}, call_1)  # <- Explicit Parent (call_1)
+    call_4 = client.create_call("op", {}, call_2)  # <- Explicit Parent (call_2)
+    call_6 = client.create_call("op", {}, call_5)  # <- Explicit Parent (call_5)
+    client.finish_call(call_6)  # <- Finish call_6
+    # (should change stack to call_6.parent which is call_5)
+    call_7 = client.create_call("op", {})  # <- Implicit Parent (call_5)
+    # (current stack implementation will think this is 4)
+
+    # Finish them in completely reverse order, because why not?
+    client.finish_call(call_1)
+    client.finish_call(call_2)
+    client.finish_call(call_3)
+    client.finish_call(call_4)
+    client.finish_call(call_5)
+    client.finish_call(call_7)
+
+    terminal_root_call = client.create_call("op", {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    if POP_REORDERS_STACK:
+        # In my (Tim) opinion, this is the correct ordering.
+        # However, the current implementation results in the
+        # "else" branch here. The key difference is when we
+        # finish call_6. Since call_6 was started immediately after
+        # call_4, we currently will believe the top of the stack is
+        # call_4. However, call_6's parent is call_5, so in my
+        # opinion, we should pop the stack back to call_5. We
+        # can debate this more and change the test/implementation
+        # as needed.
+        exp = {
+            call_1.id: {
+                call_2.id: {call_3.id: {}, call_4.id: {}},
+                call_5.id: {call_6.id: {}, call_7.id: {}},
+            },
+            terminal_root_call.id: {},
+        }
+    else:
+        exp = {
+            call_1.id: {
+                call_2.id: {call_3.id: {}, call_4.id: {call_7.id: {}}},
+                call_5.id: {
+                    call_6.id: {},
+                },
+            },
+            terminal_root_call.id: {},
+        }
+
+    assert call_structure(inner_res.calls) == exp
+
+
+def test_call_stack_order_height_ordering(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This ordering calls ops in the order of their height in the tree
+    call_1 = client.create_call("op", {})
+    call_2 = client.create_call("op", {}, call_1)
+    call_5 = client.create_call("op", {}, call_1)
+    call_3 = client.create_call("op", {}, call_2)
+    call_6 = client.create_call("op", {}, call_5)
+    call_4 = client.create_call("op", {}, call_2)
+    call_7 = client.create_call("op", {}, call_5)
+
+    # Finish them in completely reverse order
+    client.finish_call(call_1)
+    client.finish_call(call_2)
+    client.finish_call(call_3)
+    client.finish_call(call_4)
+    client.finish_call(call_5)
+    client.finish_call(call_7)
+
+    terminal_root_call = client.create_call("op", {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {}},
+            call_5.id: {call_6.id: {}, call_7.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_stack_order_mixed(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This ordering is as mixed up as I could make it
+    call_1 = client.create_call("op", {})
+    call_5 = client.create_call("op", {}, call_1)
+    call_7 = client.create_call("op", {}, call_5)
+    client.finish_call(call_7)
+    call_6 = client.create_call("op", {}, call_5)
+    client.finish_call(call_5)
+    call_2 = client.create_call("op", {}, call_1)
+    client.finish_call(call_1)
+    call_4 = client.create_call("op", {}, call_2)
+    call_3 = client.create_call("op", {}, call_2)
+    client.finish_call(call_2)
+    client.finish_call(call_3)
+    client.finish_call(call_4)
+
+    terminal_root_call = client.create_call("op", {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_5.id: {call_7.id: {}, call_6.id: {}},
+            call_2.id: {call_4.id: {}, call_3.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_query_stream_equality(client):
+    @weave.op
+    def calculate(a: int, b: int) -> int:
+        return a + b
+
+    for i in range(10):
+        calculate(i, i * i)
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    calls_stream = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    i = 0
+    for call in calls_stream:
+        assert call == calls.calls[i]
+        i += 1
+
+    assert i == len(calls.calls)
+
+
+@pytest.mark.skip("Not implemented: filter / sort through refs")
+def test_sort_and_filter_through_refs(client):
+    @weave.op()
+    def test_op(label, val):
+        return val
+
+    class TestObj(weave.Object):
+        val: typing.Any
+
+    def test_obj(val):
+        return weave.publish(TestObj(val=val))
+
+    import random
+
+    # Purposely shuffled and contains values that would not sort correctly as strings
+    values = [3, 9, 15, 21, 0, 12, 6, 18]
+    random.shuffle(values)
+
+    test_op(values[0], {"a": {"b": {"c": {"d": values[0]}}}})
+
+    # Ref at A
+    test_op(values[1], {"a": test_obj({"b": {"c": {"d": values[1]}}})})
+    # Ref at B
+    test_op(values[2], {"a": {"b": test_obj({"c": {"d": values[2]}})}})
+    # Ref at C
+    test_op(values[3], {"a": {"b": {"c": test_obj({"d": values[3]})}}})
+
+    # Ref at A and B
+    test_op(values[4], {"a": test_obj({"b": test_obj({"c": {"d": values[4]}})})})
+    # Ref at A and C
+    test_op(values[5], {"a": test_obj({"b": {"c": test_obj({"d": values[5]})}})})
+    # Ref at B and C
+    test_op(values[6], {"a": {"b": test_obj({"c": test_obj({"d": values[6]})})}})
+
+    # Ref at A, B and C
+    test_op(
+        values[7], {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})}
+    )
+
+    for first, last, sort_by in [
+        (0, 21, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
+        (0, 21, [tsi._SortBy(field="output.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi._SortBy(field="output.a.b.c.d", direction="desc")]),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=sort_by,
+            )
+        )
+
+        assert inner_res.calls[0].inputs["label"] == first
+        assert inner_res.calls[1].inputs["label"] == first
+
+    for first, last, count, query in [
+        (
+            6,
+            21,
+            6,
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.val.a.b.c.d"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        (
+            0,
+            3,
+            2,
+            {
+                "$not": [
+                    {
+                        "$gt": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "output.a.b.c.d"},
+                                    "to": "int",
+                                }
+                            },
+                            {"$literal": 5},
+                        ]
+                    }
+                ]
+            },
+        ),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    sort_by=[tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")],
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        assert len(inner_res.calls) == count
+        inner_res = get_client_trace_server(client).calls_query_stats(
+            tsi.CallsQueryStatsReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        assert inner_res.count == count

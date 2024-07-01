@@ -1,10 +1,9 @@
 import typing
 
-from . import context_state
-from . import weave_internal
-from . import graph
-from . import weave_types as types
+from weave.legacy import context_state, graph
 
+from . import weave_internal
+from . import weave_types as types
 
 WeaveIterObjectType = typing.TypeVar("WeaveIterObjectType")
 
@@ -30,12 +29,10 @@ class WeaveIter(
             return count
 
     @typing.overload
-    def __getitem__(self, index: int) -> WeaveIterObjectType:
-        ...
+    def __getitem__(self, index: int) -> WeaveIterObjectType: ...
 
     @typing.overload
-    def __getitem__(self, index: slice) -> "WeaveIter[WeaveIterObjectType]":
-        ...
+    def __getitem__(self, index: slice) -> "WeaveIter[WeaveIterObjectType]": ...
 
     def __getitem__(
         self, index: typing.Union[int, slice]
@@ -64,7 +61,9 @@ class WeaveIter(
             count_node = self.node.count()  # type: ignore
             count = weave_internal.use(count_node)
             while True:
-                limited_offset_node = self.select_node.offset(page_num * page_size).limit(page_size)  # type: ignore
+                limited_offset_node = self.select_node.offset(  # type: ignore
+                    page_num * page_size
+                ).limit(page_size)  # type: ignore
                 page = weave_internal.use(limited_offset_node)
                 if not page:
                     break
@@ -82,7 +81,7 @@ class WeaveIter(
 def select_all(node: graph.Node) -> graph.Node:
     if not types.TypedDict().assign_type(node.type):
         raise ValueError("only TypedDict supported for now")
-    from .ops_primitives import dict_
+    from weave.legacy.ops_primitives import dict_
 
     node_type = typing.cast(types.TypedDict, node.type)
     return dict_(**{k: node[k] for k in node_type.property_types})  # type: ignore

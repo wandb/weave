@@ -1,25 +1,25 @@
+import contextlib
 import dataclasses
 import os
 import platform
 import secrets
 import string
 import subprocess
-
 import time
 import unittest.mock
 import urllib.parse
+from typing import Any, Generator, Literal, Optional, Union
 
-from typing import Any, Generator, Optional, Union, Literal
-
+import filelock
 import pytest
 import requests
 import wandb
 
-from weave.wandb_api import from_environment, wandb_api_context, WandbApiContext
-import contextlib
-import os
-
-import filelock
+from weave.legacy.wandb_api import (
+    WandbApiContext,
+    from_environment,
+    wandb_api_context,
+)
 
 
 # The following code snippet was copied from:
@@ -367,7 +367,7 @@ class AddAdminAndEnsureNoDefaultUser:
 @pytest.fixture(scope="session")
 def fixture_fn(base_url, wandb_server_tag, wandb_server_pull):
     def fixture_util(
-        cmd: Union[UserFixtureCommand, AddAdminAndEnsureNoDefaultUser]
+        cmd: Union[UserFixtureCommand, AddAdminAndEnsureNoDefaultUser],
     ) -> bool:
         endpoint = urllib.parse.urljoin(
             base_url.replace(LOCAL_BASE_PORT, cmd.port),

@@ -1,11 +1,14 @@
 import React from 'react';
 import styled from 'styled-components';
 
-import {CallId} from '../common/CallId';
-import {opNiceName} from '../common/Links';
+import {makeRefCall} from '../../../../../../util/refs';
+import {Reactions} from '../../feedback/Reactions';
+import {EditableCallName} from '../common/EditableCallName';
+import {CopyableId} from '../common/Id';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ExceptionAlert} from './Exceptions';
+import {OverflowMenu} from './OverflowMenu';
 
 export const Overview = styled.div`
   display: flex;
@@ -25,19 +28,36 @@ export const CallName = styled.div`
 `;
 CallName.displayName = 'S.CallName';
 
+export const Spacer = styled.div`
+  flex: 1 1 auto;
+`;
+Spacer.displayName = 'S.Spacer';
+
+export const OverflowBin = styled.div`
+  align-items: right;
+  margin-left: auto;
+`;
+OverflowBin.displayName = 'S.OverflowBin';
+
 export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
-  const opName = opNiceName(call.spanName);
-
   const statusCode = call.rawSpan.status_code;
+  const refCall = makeRefCall(call.entity, call.project, call.callId);
 
   return (
     <>
       <Overview>
-        <CallName>{opName}</CallName>
-        <CallId callId={call.callId} />
+        <CallName>
+          <EditableCallName call={call} />
+        </CallName>
+        <CopyableId id={call.callId} type="Call" />
         <StatusChip value={statusCode} iconOnly />
+        <Spacer />
+        <Reactions weaveRef={refCall} forceVisible={true} />
+        <OverflowBin>
+          <OverflowMenu selectedCalls={[call]} />
+        </OverflowBin>
       </Overview>
       {call.rawSpan.exception && (
         <ExceptionAlert exception={call.rawSpan.exception} />

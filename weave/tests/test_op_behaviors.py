@@ -5,32 +5,33 @@
 # "binary commutative ops should be produce None when vectorized with a null
 # scalar as the other argument".
 
+import dataclasses
 import itertools
 import typing
-import dataclasses
-import pytest
-import weave
 
-from .concrete_tagged_value import (
-    TaggedValue,
-    concrete_to_tagstore,
-    concrete_from_tagstore,
+import pytest
+
+import weave
+from weave.legacy import (
+    graph,
+    graph_debug,
+    language_nullability,
+    op_def,
+    ops_arrow,
+    ops_primitives,
 )
-from ..language_features.tagging.tagged_value_type import (
+from weave.legacy.language_features.tagging import make_tag_getter_op
+from weave.legacy.language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
-from ..language_features.tagging import make_tag_getter_op
-from .. import language_nullability
-from .. import op_def
-from .. import ops_arrow
-from .. import ops_primitives
-from .. import graph
-from .. import graph_debug
-from .. import weave_internal
-from .. import registry_mem
-from .. import storage
 
-from .op_specs import OpSpec, OpSpecTestCase, OP_TEST_SPECS
+from .. import registry_mem, storage, weave_internal
+from .concrete_tagged_value import (
+    TaggedValue,
+    concrete_from_tagstore,
+    concrete_to_tagstore,
+)
+from .op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
 
 
 def assert_equal_with_tags(node: graph.Node, v: typing.Any, expected: typing.Any):
@@ -80,7 +81,7 @@ def check_case(called: graph.Node, result_type: weave.types.Type, result: typing
     ), f"Expected op output type: {result_type}, but got {called.type}"
 
     # This is a way to save the final output, preserving tags.
-    result_ref = weave.use(weave.ops.save_to_ref(called, None))
+    result_ref = weave.use(weave.legacy.ops.save_to_ref(called, None))
     if result_ref == None:
         actual_result = None
     else:

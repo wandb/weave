@@ -1,10 +1,11 @@
-import os
-import pytest
-import time
-from weave.monitoring import monitor
-import weave
 import contextlib
+import os
+import time
 
+import pytest
+
+import weave
+from weave.legacy.monitoring import monitor
 
 ### Skipping some tests here. They are for features that no longer exist. Since we're
 # iterating on the API, I'm not removing them yet.
@@ -56,7 +57,6 @@ def test_monitoring_basic(user_by_api_key_in_env):
 @pytest.mark.skip("Feature removed")
 def test_monitoring_auto_false(user_by_api_key_in_env):
     with async_disabled():
-
         # @monitoring.monitor(
         #     entity_name=user_by_api_key_in_env.username,
         #     project_name="test",
@@ -88,7 +88,6 @@ def test_monitoring_auto_false(user_by_api_key_in_env):
 @pytest.mark.skip("Feature removed")
 def test_monitoring_capture_errors(user_by_api_key_in_env):
     with async_disabled():
-
         # @monitoring.monitor(
         #     entity_name=user_by_api_key_in_env.username,
         #     project_name="test",
@@ -129,7 +128,6 @@ def test_monitoring_capture_errors(user_by_api_key_in_env):
 @pytest.mark.skip("Feature removed")
 def test_monitoring_processors(user_by_api_key_in_env):
     with async_disabled():
-
         # @monitoring.monitor(
         #     entity_name=user_by_api_key_in_env.username,
         #     project_name="test",

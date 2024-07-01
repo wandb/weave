@@ -1,4 +1,5 @@
 import pytest
+
 import weave
 
 ops = weave.registry_mem.memory_registry.list_ops()

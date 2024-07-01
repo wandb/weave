@@ -7,13 +7,15 @@ hide_table_of_contents: true
 
 # Introduction
 
-Weave is a lightweight toolkit for tracking and evaluating LLM applications, built by Weights & Biases.
+**Weave** is a lightweight toolkit for tracking and evaluating LLM applications, built by Weights & Biases.
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing AI applications, without introducing cognitive overhead.
 
-[Get started](/quickstart) by decorating Python functions with `@weave.op()`. 
+**[Get started](/quickstart)** by decorating Python functions with `@weave.op()`. 
 
-Seriously, try the 🍪 [quickstart](/quickstart) 🍪 first.
+![Weave Hero](../static/img/weave-hero.png)
+
+Seriously, try the 🍪 **[quickstart](/quickstart)** 🍪 or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 You can use Weave to:
 - Log and debug language model inputs, outputs, and traces
@@ -36,9 +38,9 @@ Weave's **tracking** layer brings immutable tracing and versioning to your progr
   - **[Ops](/guides/tracking/ops)**: Versioned, reproducible functions, with automatic tracing.
   - **[Tracing](/guides/tracking/tracing)**: Automatic organization of function calls and data lineage.
 
-Weave's **ecosystem** is batteries included for other libraries, systems, and best practices.
+Weave's **integrations** is a batteries-included experience for other libraries, systems, and best practices.
 
-  - **[OpenAI](/guides/ecosystem/openai)**: automatic tracking for openai api calls
+  - **[OpenAI](/guides/integrations/openai)**: automatic tracking for openai api calls
   - [soon] Langchain auto-logging
   - [soon] llama-index auto-logging
 

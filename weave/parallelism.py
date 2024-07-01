@@ -1,17 +1,18 @@
-from concurrent.futures import ThreadPoolExecutor
 import contextlib
 import contextvars
-from typing import Optional, Callable, TypeVar, Iterator, Generator
+from concurrent.futures import ThreadPoolExecutor
+from typing import Callable, Generator, Iterator, Optional, TypeVar
 
-from . import context
-from . import cache
-from . import context_state
-from . import graph_client_context
-from . import run_context
-from . import execute
-from . import forward_graph
-from . import memo
-from . import wandb_api
+from weave import call_context
+from weave.legacy import (
+    cache,
+    context,
+    context_state,
+    execute,
+    forward_graph,
+    memo,
+    wandb_api,
+)
 
 # Must be power of 2
 MAX_PARALLELISM = 16
@@ -57,8 +58,7 @@ def do_in_parallel(
     result_store = forward_graph.get_node_result_store()
     top_level_stats = execute.get_top_level_stats()
     eager_mode = context_state.eager_mode()
-    graph_client = graph_client_context.get_graph_client()
-    run_stack = run_context.get_run_stack()
+    run_stack = call_context.get_call_stack()
     cache_prefix = cache.get_cache_prefix_context()
 
     def do_one_with_memo_and_parallel_budget(x: ItemType) -> ResultType:
@@ -67,17 +67,18 @@ def do_in_parallel(
         thread_top_level_stats = None
         try:
             with parallel_budget_ctx(remaining_budget_per_thread):
-                with graph_client_context.set_graph_client(graph_client):
-                    with run_context.set_run_stack(run_stack):
-                        with context_state.set_eager_mode(eager_mode):
-                            with wandb_api.wandb_api_context(wandb_api_ctx):
-                                with cache.time_interval_cache_prefix(cache_prefix):
-                                    with context.execution_client():
-                                        with forward_graph.node_result_store(
-                                            result_store
-                                        ) as thread_result_store:
-                                            with execute.top_level_stats() as thread_top_level_stats:
-                                                return do_one(x)
+                with call_context.set_call_stack(run_stack):
+                    with context_state.set_eager_mode(eager_mode):
+                        with wandb_api.wandb_api_context(wandb_api_ctx):
+                            with cache.time_interval_cache_prefix(cache_prefix):
+                                with context.execution_client():
+                                    with forward_graph.node_result_store(
+                                        result_store
+                                    ) as thread_result_store:
+                                        with (
+                                            execute.top_level_stats() as thread_top_level_stats
+                                        ):
+                                            return do_one(x)
         finally:
             memo._memo_storage.reset(memo_token)
             if thread_result_store is not None:

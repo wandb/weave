@@ -12,13 +12,12 @@ __all__ = ("Sentry",)
 
 import atexit
 import functools
-import pathlib
-import sys
 import os
+import pathlib
+import site
+import sys
 from types import TracebackType
 from typing import Any, Callable, Dict, Optional, Tuple, Type, Union
-import site
-
 
 if sys.version_info >= (3, 8):
     from typing import Literal

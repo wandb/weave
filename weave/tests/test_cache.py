@@ -2,8 +2,8 @@ import datetime
 import os
 import time
 
-from .. import cache
-from .. import environment
+from weave import environment
+from weave.legacy import cache
 
 
 def test_lru_time_window_cache():

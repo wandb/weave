@@ -1,16 +1,17 @@
 import os
-from pathlib import Path
-import sys
 import shutil
 import string
 import subprocess
-import typing
+import sys
 import tempfile
+import typing
+from pathlib import Path
 
+from weave import __version__, environment
 from weave.artifact_wandb import WeaveWBArtifactURI
+from weave.trace.refs import ObjectRef, parse_uri
+
 from ..util import execute, safe_name
-from weave import environment, __version__
-from weave.trace.refs import parse_uri, ObjectRef
 
 
 def generate_dockerfile(
@@ -299,7 +300,6 @@ def develop(
     base_image: typing.Optional[str] = "python:3.11",
     auth_entity: typing.Optional[str] = None,
 ) -> None:
-
     dir = compile(
         model_ref,
         model_method=model_method,

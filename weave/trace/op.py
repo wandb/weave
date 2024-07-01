@@ -1,24 +1,29 @@
-from typing import Callable, Any, Mapping, Optional
-import inspect
 import functools
+import inspect
 import typing
-from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine, Dict
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Coroutine,
+    Dict,
+    Mapping,
+    Optional,
+    TypeVar,
+)
+
 from typing_extensions import ParamSpec
 
+from weave import call_context, client_context
+from weave.legacy import box, context_state
+from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
-from weave.trace.context import call_attributes
-from weave import graph_client_context
-from weave import run_context
-from weave import box
 
-from weave import context_state
-
-from weave.trace.op_type import OpType
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
-    from weave.weave_client import Call, WeaveClient, CallsIter
+    from weave.weave_client import Call, CallsIter, WeaveClient
 
 
 def print_call_link(call: "Call") -> None:
@@ -39,7 +44,7 @@ class Op:
     # the value it wishes to send back to the user. The finish callback should
     # be called exactly once and can optionally take an exception as a second
     # argument to indicate an error. If the finish callback is not called, the
-    # op will not finish and the run will not complete. This is useful for cases
+    # op will not finish and the call will not complete. This is useful for cases
     # where the output of the op is not immediately available or the op needs to
     # do some processing before it can be returned. If we decide to make this a
     # public API, we will likely add this to the constructor of the op. For now
@@ -60,10 +65,15 @@ class Op:
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        maybe_client = graph_client_context.get_graph_client()
+        maybe_client = client_context.weave_client.get_weave_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
-        client = typing.cast("WeaveClient", maybe_client)
+
+        call = self._create_call(*args, **kwargs)
+        return self._execute_call(call, *args, **kwargs)
+
+    def _create_call(self, *args: Any, **kwargs: Any) -> Any:
+        client = client_context.weave_client.require_weave_client()
 
         try:
             inputs = self.signature.bind(*args, **kwargs).arguments
@@ -77,13 +87,19 @@ class Op:
 
         # If/When we do memoization, this would be a good spot
 
-        parent_run = run_context.get_current_run()
-        client.save_nested_objects(inputs_with_defaults)
+        parent_call = call_context.get_current_call()
+        client._save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
-        run = client.create_call(
-            self, parent_run, inputs_with_defaults, attributes=attributes
+
+        return client.create_call(
+            self,
+            inputs_with_defaults,
+            parent_call,
+            attributes=attributes,
         )
 
+    def _execute_call(self, call: Any, *args: Any, **kwargs: Any) -> Any:
+        client = client_context.weave_client.require_weave_client()
         has_finished = False
 
         def finish(
@@ -92,13 +108,13 @@ class Op:
             nonlocal has_finished
             if has_finished:
                 raise ValueError("Should not call finish more than once")
-            client.finish_call(run, output, exception)
-            if not parent_run:
-                print_call_link(run)
+            client.finish_call(call, output, exception)
+            if not call_context.get_current_call():
+                print_call_link(call)
 
         def on_output(output: Any) -> Any:
             if self._on_output_handler:
-                return self._on_output_handler(output, finish, inputs)
+                return self._on_output_handler(output, finish, call.inputs)
             finish(output)
             return output
 
@@ -117,20 +133,25 @@ class Op:
             res = res.val
         if inspect.iscoroutine(res):
 
-            async def _run_async() -> Coroutine[Any, Any, Any]:
+            async def _call_async() -> Coroutine[Any, Any, Any]:
                 try:
                     awaited_res = res
-                    run_context.push_call(run)
+                    call_context.push_call(call)
                     output = await awaited_res
                     return on_output(output)
                 except BaseException as e:
                     finish(exception=e)
                     raise
 
-            run_context.pop_call(run.id)
-            return _run_async()
+            call_context.pop_call(call.id)
+            return _call_async()
         else:
             return on_output(res)
+
+    def call(self, *args: Any, **kwargs: Any) -> "Call":
+        _call = self._create_call(*args, **kwargs)
+        self._execute_call(_call, *args, **kwargs)
+        return _call
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name})"
@@ -144,17 +165,14 @@ class Op:
         self.__ref = ref
 
     def calls(self) -> "CallsIter":
-        client = graph_client_context.require_graph_client()
-        return client.op_calls(self)
+        client = client_context.weave_client.require_weave_client()
+        return client._op_calls(self)
 
     def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
         """This is an experimental API and may change in the future intended for use by internal Weave code."""
         if self._on_output_handler is not None:
             raise ValueError("Cannot set on_output_handler multiple times")
         self._on_output_handler = on_output
-
-
-OpType.instance_classes = Op
 
 
 class BoundOp(Op):
@@ -195,7 +213,7 @@ R = TypeVar("R")
 # The decorator!
 def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
     if context_state.get_loading_built_ins():
-        from weave.decorator_op import op
+        from weave.legacy.decorator_op import op
 
         return op(*args, **kwargs)
 

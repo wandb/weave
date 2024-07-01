@@ -1,8 +1,9 @@
-from .. import api as weave
 from PIL import Image
-from .. import context_state
 
-from ..ops_primitives import geom as media_user
+from weave.legacy import context_state
+from weave.legacy.ops_primitives import geom as media_user
+
+from .. import api as weave
 
 
 def test_im_with_metadata():

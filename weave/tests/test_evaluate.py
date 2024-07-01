@@ -1,9 +1,10 @@
 import asyncio
+
 import pytest
+
 import weave
-from weave import ref_base
+from weave import Dataset, Evaluation, Model, ref_base
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
-from weave import Dataset, Model, Evaluation
 
 pytestmark = pytest.mark.webtest
 
@@ -12,18 +13,10 @@ dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}
 dataset = Dataset(rows=dataset_rows)
 
 
-class Nearly:
-    def __init__(self, v):
-        self.v = v
-
-    def __eq__(self, other):
-        return abs(self.v - other) < 0.01
-
-
 expected_eval_result = {
     "model_output": {"mean": 9.5},
     "score": {"true_count": 1, "true_fraction": 0.5},
-    "model_latency": {"mean": Nearly(0)},
+    "model_latency": {"mean": pytest.approx(0, abs=0.05)},
 }
 
 
@@ -70,7 +63,7 @@ def test_predict_can_receive_other_params(client):
         "model_output": {"mean": 18.5},
         "score": {"true_count": 0, "true_fraction": 0.0},
         "model_latency": {
-            "mean": Nearly(0),
+            "mean": pytest.approx(0, abs=0.05),
         },
     }
 
@@ -134,7 +127,7 @@ def test_score_as_class(client):
         "model_output": {"mean": 9.5},
         "MyScorer": {"true_count": 1, "true_fraction": 0.5},
         "model_latency": {
-            "mean": Nearly(0),
+            "mean": pytest.approx(0, abs=0.05),
         },
     }
 
@@ -160,7 +153,7 @@ def test_score_with_custom_summarize(client):
         "model_output": {"mean": 9.5},
         "MyScorer": {"awesome": 3},
         "model_latency": {
-            "mean": Nearly(0),
+            "mean": pytest.approx(0, abs=0.05),
         },
     }
 
@@ -186,6 +179,6 @@ def test_multiclass_f1_score(client):
             "b": {"f1": 0, "precision": 0, "recall": 0.0},
         },
         "model_latency": {
-            "mean": Nearly(0),
+            "mean": pytest.approx(0, abs=0.05),
         },
     }

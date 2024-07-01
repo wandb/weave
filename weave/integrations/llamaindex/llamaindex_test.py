@@ -1,8 +1,11 @@
 import typing
+from typing import Any, Generator, List, Optional
+
 import pytest
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
-from typing import Any, Generator, List, Optional
+
 from .llamaindex import llamaindex_patcher
 
 
@@ -74,6 +77,7 @@ def fake_api_key() -> Generator[None, None, None]:
             os.environ["OPENAI_API_KEY"] = orig_key
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -83,7 +87,7 @@ def test_llamaindex_quickstart(
     client: weave.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
-    from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
 
     documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
     index = VectorStoreIndex.from_documents(documents)
@@ -95,6 +99,7 @@ def test_llamaindex_quickstart(
     assert_calls_correct_for_quickstart(res.calls)
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -105,7 +110,7 @@ async def test_llamaindex_quickstart_async(
     client: weave.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
-    from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
 
     documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
     index = VectorStoreIndex.from_documents(documents)

@@ -10,21 +10,19 @@
 # to this interface.
 
 import asyncio
-import time
-import typing
 import contextlib
 import os
+import time
+import typing
+
 import aiofiles
 import aiofiles.os as aiofiles_os
-from aiofiles.threadpool import text as aiofiles_text
 from aiofiles.threadpool import binary as aiofiles_binary
+from aiofiles.threadpool import text as aiofiles_text
 
-from . import engine_trace
-from . import errors
-from . import util
-from . import environment
-from . import cache
+from weave.legacy import cache
 
+from . import engine_trace, environment, errors, util
 
 tracer = engine_trace.tracer()  # type: ignore
 async_utime = aiofiles_os.wrap(os.utime)  # type: ignore
@@ -120,16 +118,14 @@ class FilesystemAsync:
         self,
         path: str,
         mode: typing.Literal["w"],
-    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]: ...
 
     @typing.overload
     def open_write(
         self,
         path: str,
         mode: typing.Literal["wb"] = "wb",
-    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]: ...
 
     @contextlib.asynccontextmanager
     async def open_write(
@@ -150,16 +146,14 @@ class FilesystemAsync:
         self,
         path: str,
         mode: typing.Literal["r"],
-    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_text.AsyncTextIOWrapper]: ...
 
     @typing.overload
     def open_read(
         self,
         path: str,
         mode: typing.Literal["rb"] = "rb",
-    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]:
-        ...
+    ) -> typing.AsyncContextManager[aiofiles_binary.AsyncBufferedIOBase]: ...
 
     @contextlib.asynccontextmanager
     async def open_read(
