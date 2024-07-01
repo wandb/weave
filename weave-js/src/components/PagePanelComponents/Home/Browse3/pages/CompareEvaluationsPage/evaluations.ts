@@ -28,7 +28,7 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
     model_latency: number;
   };
   summary: TraceCallSchema['summary'] & {
-    usage: {
+    usage?: {
       [model: string]: {
         requests?: number;
         completion_tokens?: number;
@@ -111,7 +111,7 @@ export const evaluationMetrics = (
     values: Object.fromEntries(
       evaluationCalls.map(call => [
         call.id,
-        sum(Object.values(call.summary.usage).map(v => v.total_tokens)),
+        sum(Object.values(call.summary.usage ?? {}).map(v => v.total_tokens)),
       ])
     ),
     lowerIsBetter: true,

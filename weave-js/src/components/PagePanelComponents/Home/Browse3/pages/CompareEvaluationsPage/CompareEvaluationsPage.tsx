@@ -36,7 +36,7 @@ import {
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
 import {evaluationMetrics} from './evaluations';
-import {PlotlyBarPlot} from './PlotlyBarPlot';
+// import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {ScoreCard} from './Scorecard';
 
@@ -46,7 +46,7 @@ const CIRCLE_SIZE = '16px';
 const BOX_RADIUS = '6px';
 const STANDARD_BORDER = `1px solid ${MOON_300}`;
 const PLOT_HEIGHT = 300;
-const PLOT_PADDING = 30;
+// const PLOT_PADDING = 30;
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -235,18 +235,19 @@ const SummaryPlots: React.FC<{state: EvaluationComparisonState}> = props => {
       }}>
       <Box
         sx={{
-          flex: '0 0 auto',
+          flex: '1 0 auto',
           height: PLOT_HEIGHT,
-          width: PLOT_HEIGHT * 2,
+          // width: PLOT_HEIGHT * 2,
           borderRadius: BOX_RADIUS,
           border: STANDARD_BORDER,
           overflow: 'hidden',
+          alignContent: 'center',
         }}>
         <PlotlyRadarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
         {/* <PlotlyRadarPlot /> */}
         {/* // <PlotlyRadialPlot /> */}
       </Box>
-      <Box
+      {/* <Box
         sx={{
           flex: '1 1 auto',
           height: PLOT_HEIGHT,
@@ -257,7 +258,7 @@ const SummaryPlots: React.FC<{state: EvaluationComparisonState}> = props => {
           padding: PLOT_PADDING,
         }}>
         <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
-      </Box>
+      </Box> */}
       {/* <RadarPlot plotlyRadarData={plotlyRadarData} />
       <BarPlots plotlyRadarData={plotlyRadarData}} /> */}
     </HorizontalBox>
@@ -330,6 +331,8 @@ const ComparisonDefinition: React.FC<{
           </React.Fragment>
         );
       })}
+      <DefinitionText text="target metric " />
+      <DimensionPicker {...props} />
     </HorizontalBox>
   );
 };
@@ -463,7 +466,6 @@ const EvaluationModelLink: React.FC<{
 }> = props => {
   const evaluationCall = props.state.data.evaluationCalls[props.callId];
   const modelObj = props.state.data.models[evaluationCall.modelRef];
-  console.log({modelObj});
 
   return (
     <ObjectVersionLink
