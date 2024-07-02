@@ -23,13 +23,18 @@ export type ContinuousSummaryScore = {
 export const isBinarySummaryScore = (
   score: any
 ): score is BinarySummaryScore => {
-  return typeof score == 'object' && score != null && 'true_count' in score && 'true_fraction' in score;
+  return (
+    typeof score === 'object' &&
+    score != null &&
+    'true_count' in score &&
+    'true_fraction' in score
+  );
 };
 
 export const isContinuousSummaryScore = (
   score: any
 ): score is ContinuousSummaryScore => {
-  return typeof score == 'object' && score != null && 'mean' in score;
+  return typeof score === 'object' && score != null && 'mean' in score;
 };
 
 type EvaluationCall = {
@@ -198,16 +203,16 @@ export const fetchEvaluationComparisonData = async (
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
         scores: Object.fromEntries(
-          Object.entries(call.output as any).filter(([key]) => key !== 'model_latency').map(
-            ([key, val]) => {
+          Object.entries(call.output as any)
+            .filter(([key]) => key !== 'model_latency')
+            .map(([key, val]) => {
               // return [key, val];
               if (isBinarySummaryScore(val) || isContinuousSummaryScore(val)) {
                 return [key, {'': val}] as any; // no nesting. probably something we should fix more generally
               }
               return [key, val];
-            }
-          )
-        ) ,
+            })
+        ),
         _rawEvaluationTraceData: call as EvaluationEvaluateCallSchema,
       },
     ])
@@ -414,12 +419,15 @@ export const fetchEvaluationComparisonData = async (
               };
             } else if (isProbablyScoreCall) {
               let results = traceCall.output as any;
-              if (isBinarySummaryScore(results) || isContinuousSummaryScore(results)) {
+              if (
+                isBinarySummaryScore(results) ||
+                isContinuousSummaryScore(results)
+              ) {
                 results = {'': results}; // no nesting. probably something we should fix more generally
               }
               predictAndScoreFinal.scores[traceCall.op_name] = {
                 callId: traceCall.id,
-                results: results,
+                results,
                 _rawScoreTraceData: traceCall,
               };
             } else {

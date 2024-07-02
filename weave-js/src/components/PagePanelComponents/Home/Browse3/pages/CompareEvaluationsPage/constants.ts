@@ -1,6 +1,6 @@
 import {MOON_300} from '../../../../../../common/css/color.styles';
 
-export const EVAL_DEF_HEIGHT = '45px';
+export const EVAL_DEF_HEIGHT = 45;
 export const STANDARD_PADDING = '16px';
 export const CIRCLE_SIZE = '16px';
 export const BOX_RADIUS = '6px';

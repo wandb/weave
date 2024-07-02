@@ -6,6 +6,8 @@ import {MOON_300} from '../../../../../../common/css/color.styles';
 export type ScatterPlotData = Array<{x: number[]; y: number[]; color: string}>;
 export const PlotlyScatterPlot: React.FC<{
   height: number;
+  xColor: string;
+  yColor: string;
   data: ScatterPlotData;
 }> = props => {
   const divRef = useRef<HTMLDivElement>(null);
@@ -34,23 +36,27 @@ export const PlotlyScatterPlot: React.FC<{
   const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
       height: props.height,
-      showlegend: false,
+      // showlegend: true,
       margin: {
         l: 20, // legend
         r: 0,
-        b: 30, // legend
+        b: 20, // legend
         t: 0,
         pad: 0,
       },
       xaxis: {
         // fixedrange: true,
+        // title: props.xTitle,
         gridcolor: MOON_300,
-        linecolor: MOON_300,
+        linecolor: props.xColor,
+        linewidth: 2,
       },
       yaxis: {
         // fixedrange: true,
+        // title: props.yTitle,
         gridcolor: MOON_300,
-        linecolor: MOON_300,
+        linecolor: props.yColor,
+        linewidth: 2,
       },
       shapes: [
         {
@@ -67,7 +73,7 @@ export const PlotlyScatterPlot: React.FC<{
         },
       ],
     };
-  }, [props.height]);
+  }, [lowerBound, props.height, props.xColor, props.yColor, upperBound]);
   const plotlyConfig = useMemo(() => {
     return {
       displayModeBar: false,

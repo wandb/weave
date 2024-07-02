@@ -18,7 +18,7 @@ import {
 } from './evaluationResults';
 import {HorizontalBox} from './Layout';
 
-const FIXED_SCORE_LABEL_WIDTH = 'inherit'; //'150px';
+const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
 
 const moveItemToFront = (arr: any[], item: any) => {
   const index = arr.indexOf(item);
@@ -278,9 +278,6 @@ export const ScoreCard: React.FC<{
                   modelProps[prop][model]
                 ) as WeaveObjectRef;
                 if (parsed) {
-                  const parsed = parseRef(
-                    modelProps[prop][model]
-                  ) as WeaveObjectRef;
                   return (
                     <GridCell key={mNdx}>
                       <SmallRef objRef={parsed} />

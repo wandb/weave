@@ -3,7 +3,6 @@ import {Autocomplete} from '@mui/material';
 import React, {FC, useCallback, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {MOON_500} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {
   useWeaveflowCurrentRouteContext,
@@ -30,7 +29,7 @@ import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 // import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
-import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
+import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 
 type CompareEvaluationsPageProps = {
@@ -138,50 +137,6 @@ const CompareEvaluationsPageInner: React.FC = props => {
         <CompareEvaluationsCallsTable state={state} />
       </VerticalBox>
     </Box>
-  );
-};
-
-const ScatterFilter: React.FC<{state: EvaluationComparisonState}> = props => {
-  const data = useMemo(() => {
-    // const primaryDimension = 'model_latency';
-    const series: ScatterPlotData[number] = {
-      x: [],
-      y: [],
-      color: MOON_500,
-    };
-    const modelRefs = Object.keys(props.state.data.models);
-    const modelX = modelRefs[0];
-    const modelY = modelRefs[1];
-    Object.values(props.state.data.resultRows).forEach(row => {
-      Object.values(row.models[modelX].predictAndScores).forEach(score => {
-        series.x.push(score.predictCall?.latencyMs ?? 0);
-      });
-      Object.values(row.models[modelY].predictAndScores).forEach(score => {
-        series.y.push(score.predictCall?.latencyMs ?? 0);
-      });
-    });
-    return [series];
-  }, [props.state]);
-  console.log(data, props.state);
-  return (
-    <VerticalBox
-      sx={{
-        width: '100%',
-        paddingLeft: STANDARD_PADDING,
-        paddingRight: STANDARD_PADDING,
-      }}>
-      <VerticalBox
-        sx={{
-          width: '100%',
-          paddingLeft: STANDARD_PADDING,
-          paddingRight: STANDARD_PADDING,
-          borderRadius: BOX_RADIUS,
-          border: STANDARD_BORDER,
-        }}>
-        {/* <ScatterDefinition {...props} /> */}
-        <PlotlyScatterPlot height={PLOT_HEIGHT} data={data} />
-      </VerticalBox>
-    </VerticalBox>
   );
 };
 
@@ -413,7 +368,9 @@ const CompareEvaluationsCallsTable: React.FC<{
  * - [ ] Build grouping
  * - [ ] Add scorer links in scorecard
  * - [ ] Definition header does not scale small enough
+ * - [ ] The data model has gotten messy - figure out a good way to include costs
  * - [ ] Auto-expand first-level properties (see prompt here: https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22bf5188ba-48cd-4c6d-91ea-e25464570c13%22%2C%222f4544f3-9649-487e-b083-df6985e21b12%22%2C%228cbeccd6-6ff7-4eac-a305-6fb6450530f1%22%5D)
+ * - [ ] The damn thing is slow with all the upfront loading
  * TEST:
  * - [ ] Single Case
  * - [ ] Dual Case
