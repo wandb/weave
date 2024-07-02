@@ -14,6 +14,7 @@ from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union
 
 from weave.legacy import artifact_fs, context_state
+from weave.trace.ipython import get_class_source, is_running_interactively
 from weave.trace.refs import ObjectRef
 
 from .. import environment, errors, storage
@@ -190,6 +191,15 @@ class GetCodeDepsResult(typing.TypedDict):
     warnings: list[str]
 
 
+def get_source_notebook_safe(fn: typing.Callable) -> str:
+    # In ipython, we can't use inspect.getsource on classes defined in the notebook
+    if is_running_interactively() and inspect.isclass(fn):
+        src = get_class_source(fn)
+    else:
+        src = inspect.getsource(fn)
+    return textwrap.dedent(src)
+
+
 def get_code_deps(
     fn: Union[typing.Callable, type],  # A function or a class
     artifact: artifact_fs.FilesystemArtifact,
@@ -224,7 +234,7 @@ def get_code_deps(
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
 
-    source = textwrap.dedent(inspect.getsource(fn))
+    source = get_source_notebook_safe(fn)
     try:
         parsed = ast.parse(source)
     except SyntaxError:
@@ -271,7 +281,7 @@ def get_code_deps(
                 import_code += fn_import_code
 
                 code += fn_code
-                code.append(textwrap.dedent(inspect.getsource(var_value)))
+                code.append(get_source_notebook_safe(var_value))
 
                 warnings += fn_warnings
             else:
@@ -388,7 +398,7 @@ def save_instance(
             # print(message)
             pass
 
-    op_function_code = textwrap.dedent(inspect.getsource(obj.resolve_fn))
+    op_function_code = get_source_notebook_safe(obj.resolve_fn)
 
     if not WEAVE_OP_PATTERN.search(op_function_code):
         op_function_code = "@weave.op()\n" + op_function_code
