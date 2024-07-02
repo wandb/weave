@@ -1,23 +1,30 @@
 import {Box, FormControl} from '@material-ui/core';
+import {Circle} from '@mui/icons-material';
 import {Autocomplete} from '@mui/material';
 import {
-  DataGridProProps,
   GridColDef,
+  GridColumnGroup,
+  GridColumnGroupingModel,
   GridValueGetterParams,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {FC, useCallback, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {Button} from '../../../../../Button';
+import {Icon, IconNames} from '../../../../../Icon';
 import {flattenObject} from '../../../Browse2/browse2Util';
+import {SmallRef} from '../../../Browse2/SmallRef';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
+import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {useEvaluationsFilter} from '../CallsPage/CallsPage';
+import {CallLink} from '../common/Links';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
@@ -26,8 +33,10 @@ import {
 } from './compareEvaluationsContext';
 import {
   BOX_RADIUS,
+  CIRCLE_SIZE,
   PLOT_HEIGHT,
   PLOT_PADDING,
+  SIGNIFICANT_DIGITS,
   STANDARD_BORDER,
   STANDARD_PADDING,
 } from './constants';
@@ -377,6 +386,7 @@ type FlattenedRow = {
   id: string;
   evaluationCallId: string;
   inputDigest: string;
+  inputRef: string;
   input: {[inputKey: string]: any};
   output: {[outputKey: string]: any};
   scores: {[scoreId: string]: number | boolean};
@@ -388,6 +398,7 @@ type FlattenedRow = {
 type PivotedRow = {
   id: string;
   inputDigest: string;
+  inputRef: string;
   input: {[inputKey: string]: any};
   evaluationCallId: {[callId: string]: string};
   output: {[outputKey: string]: {[callId: string]: any}};
@@ -465,10 +476,11 @@ const filterNones = (list: any[]) => {
 const CompareEvaluationsCallsTable: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  // TODO: Grouping / Nesting
-
-  // useTraceUpdate('CompareEvaluationsCallsTable', props);
-
+  const leafDims = useMemo(() => {
+    const initial = Object.keys(props.state.data.evaluationCalls);
+    moveItemToFront(initial, props.state.baselineEvaluationCallId);
+    return initial;
+  }, [props.state.baselineEvaluationCallId, props.state.data.evaluationCalls]);
   const scores = useEvaluationCallDimensions(props.state);
   const scoreMap = useMemo(() => {
     return Object.fromEntries(
@@ -492,6 +504,7 @@ const CompareEvaluationsCallsTable: React.FC<{
                   id: predictAndScoreRes.callId,
                   evaluationCallId: predictAndScoreRes.evaluationCallId,
                   inputDigest: datasetRow.digest,
+                  inputRef: predictAndScoreRes.firstExampleRef,
                   input: flattenObject({input: datasetRow.val}),
                   output: flattenObject({output}),
                   latency: predictAndScoreRes.predictCall?.latencyMs ?? 0,
@@ -532,7 +545,6 @@ const CompareEvaluationsCallsTable: React.FC<{
 
   // console.log({flattenedRows, scoreMap});
   const pivotedRows = useMemo(() => {
-    const leafDims = Object.keys(props.state.data.evaluationCalls);
     // Ok, so in this step we are going to pivot -
     // id: string; - no change
     // inputDigest: string; - no change
@@ -572,7 +584,7 @@ const CompareEvaluationsCallsTable: React.FC<{
         totalTokens: expandPrimitive(row.totalTokens, row.evaluationCallId),
       };
     }) as PivotedRow[];
-  }, [flattenedRows, props.state.data.evaluationCalls]);
+  }, [flattenedRows, leafDims]);
 
   const aggregatedRows = useMemo(() => {
     const grouped = _.groupBy(pivotedRows, row => row.inputDigest);
@@ -581,8 +593,10 @@ const CompareEvaluationsCallsTable: React.FC<{
         return [
           inputDigest,
           {
+            id: inputDigest, // required for the data grid
             count: rows.length,
             inputDigest,
+            inputRef: rows[0].inputRef, // Should be the same for all,
             input: rows[0].input, // Should be the same for all
             output: aggregateGroupedNestedRows(
               rows,
@@ -614,9 +628,8 @@ const CompareEvaluationsCallsTable: React.FC<{
     );
   }, [pivotedRows]);
 
-  // console.log({aggregatedRows});
-
   const filteredRows = useMemo(() => {
+    const aggregatedAsList = Object.values(aggregatedRows);
     if (props.state.rangeSelection) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
         const values =
@@ -629,14 +642,16 @@ const CompareEvaluationsCallsTable: React.FC<{
           }
         );
       });
-      return flattenedRows.filter(row =>
+      return aggregatedAsList.filter(row =>
         allowedDigests.includes(row.inputDigest)
       );
     }
-    return flattenedRows;
-  }, [flattenedRows, props.state.rangeSelection]);
-
-  // console.log(flattenedRows);
+    return aggregatedAsList;
+  }, [
+    aggregatedRows,
+    props.state.comparisonDimension,
+    props.state.rangeSelection,
+  ]);
 
   const inputColumnKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -654,9 +669,9 @@ const CompareEvaluationsCallsTable: React.FC<{
     return keys;
   }, [flattenedRows]);
 
-  const columns = useMemo(() => {
+  const {cols: columns, grouping: groupingModel} = useMemo(() => {
     const cols: Array<GridColDef<(typeof flattenedRows)[number]>> = [];
-
+    const grouping: GridColumnGroupingModel = [];
     // Columns:
     // 1. dataset row identifier
     // 2. dataset row contents (input)
@@ -671,6 +686,27 @@ const CompareEvaluationsCallsTable: React.FC<{
     // 6.(s) Each scoring key (average)
     // 6.(s).(n) -> split for each comparison
 
+    const headerMap = Object.fromEntries(
+      leafDims.map(dim => {
+        const evalCall = props.state.data.evaluationCalls[dim];
+        return [
+          dim,
+          <CallLink
+            entityName={
+              evalCall._rawEvaluationTraceData.project_id.split('/')[0]
+            }
+            projectName={
+              evalCall._rawEvaluationTraceData.project_id.split('/')[1]
+            }
+            opName={evalCall._rawEvaluationTraceData.op_name}
+            callId={dim}
+            icon={<Circle sx={{color: evalCall.color, height: CIRCLE_SIZE}} />}
+            noName
+          />,
+        ];
+      })
+    );
+
     const recursiveGetChildren = (
       params: GridValueGetterParams<(typeof flattenedRows)[number]>
     ) => {
@@ -681,81 +717,204 @@ const CompareEvaluationsCallsTable: React.FC<{
       return params.api.getRow(rowNode.id);
     };
 
+    const removePrefix = (key: string, prefix: string) => {
+      if (key.startsWith(prefix)) {
+        return key.slice(prefix.length);
+      }
+      return key;
+    };
+
+    const inputGroup: GridColumnGroup = {
+      groupId: 'input',
+      children: [],
+    };
+
     cols.push({
       field: 'rowDigest',
-      headerName: 'Row ID',
+      headerName: '',
+      sortable: false,
+      width: 30,
+      renderHeader: params => {
+        return (
+          <HorizontalBox
+            sx={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+            }}>
+            <Icon name={IconNames.LinkAlt} />
+          </HorizontalBox>
+        );
+      },
       valueGetter: params => {
-        return recursiveGetChildren(params).inputDigest;
+        return recursiveGetChildren(params).inputRef;
+      },
+      renderCell: params => {
+        const refStr = params.value;
+        const refParsed = parseRef(refStr) as WeaveObjectRef;
+        return (
+          <HorizontalBox
+            sx={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+            }}>
+            <SmallRef objRef={refParsed} iconOnly />
+          </HorizontalBox>
+        );
       },
     });
 
-    cols.push({
-      field: 'evaluationCallId',
-      headerName: 'Eval ID',
-      valueGetter: params => {
-        return recursiveGetChildren(params).evaluationCallId;
-      },
-    });
+    inputGroup.children.push({field: 'rowDigest'});
 
-    // cols.push({
-    //   field: 'rowContent',
-    //   headerName: 'Row ID',
-    //   valueGetter: params => {
-    //     // TODO: This needs to be flattened...
-    //     return params.row.input;
-    //   },
-    // });
     inputColumnKeys.forEach(key => {
       cols.push({
         field: 'input.' + key,
-        headerName: key,
+        headerName: removePrefix(key, 'input.'),
         valueGetter: params => {
           return recursiveGetChildren(params).input[key];
         },
       });
+      inputGroup.children.push({field: 'input.' + key});
     });
+    grouping.push(inputGroup);
 
+    const outputGroup: GridColumnGroup = {
+      groupId: 'output',
+      renderHeaderGroup: params => {
+        return 'Output  (Last)';
+      },
+      children: [],
+    };
     outputColumnKeys.forEach(key => {
+      const outputSubGroup: GridColumnGroup = {
+        groupId: 'output.' + key,
+        renderHeaderGroup: params => {
+          return removePrefix(key, 'output.');
+        },
+        children: [],
+      };
+      leafDims.forEach(dim => {
+        cols.push({
+          field: 'output.' + key + '.' + dim,
+          flex: 1,
+          // headerName: key + ' (Last)',
+          // headerName: removePrefix(key, 'output.'),
+          renderHeader: params => headerMap[dim],
+          valueGetter: params => {
+            return recursiveGetChildren(params).output[key][dim];
+          },
+        });
+        outputSubGroup.children.push({field: 'output.' + key + '.' + dim});
+      });
+      outputGroup.children.push(outputSubGroup);
+    });
+    grouping.push(outputGroup);
+
+    const latencyGroup: GridColumnGroup = {
+      groupId: 'modelLatency',
+      renderHeaderGroup: params => {
+        return 'Latency (Avg)';
+      },
+      children: [],
+    };
+    leafDims.forEach(dim => {
       cols.push({
-        field: 'output.' + key,
-        headerName: key,
+        field: 'modelLatency.' + dim,
+        renderHeader: params => headerMap[dim],
         valueGetter: params => {
-          return recursiveGetChildren(params).output[key];
+          return recursiveGetChildren(params).latency[dim];
+        },
+        renderCell: params => {
+          return (
+            <ValueViewNumber
+              fractionDigits={SIGNIFICANT_DIGITS}
+              value={params.value}
+            />
+          );
         },
       });
+      latencyGroup.children.push({field: 'modelLatency.' + dim});
     });
+    grouping.push(latencyGroup);
 
-    cols.push({
-      field: 'modelLatency',
-      headerName: 'Latency',
-      valueGetter: params => {
-        return recursiveGetChildren(params).latency;
+    const tokenGroup: GridColumnGroup = {
+      groupId: 'totalTokens',
+      renderHeaderGroup: params => {
+        return 'Tokens (Avg)';
       },
+      children: [],
+    };
+    leafDims.forEach(dim => {
+      cols.push({
+        field: 'totalTokens.' + dim,
+        renderHeader: params => headerMap[dim],
+        valueGetter: params => {
+          return recursiveGetChildren(params).totalTokens[dim];
+        },
+        renderCell: params => {
+          return (
+            <ValueViewNumber
+              fractionDigits={SIGNIFICANT_DIGITS}
+              value={params.value}
+            />
+          );
+        },
+      });
+      tokenGroup.children.push({field: 'totalTokens.' + dim});
     });
+    grouping.push(tokenGroup);
 
-    cols.push({
-      field: 'totalTokens',
-      headerName: 'Tokens',
-      valueGetter: params => {
-        return recursiveGetChildren(params).totalTokens;
+    const scoresGroup: GridColumnGroup = {
+      groupId: 'scores',
+      renderHeaderGroup: params => {
+        return 'Scores';
       },
-    });
-
+      children: [],
+    };
     Object.keys(scoreMap).forEach(scoreId => {
-      // HAXS!
-      cols.push({
-        field: 'scorer.' + scoreId,
-        headerName: scoreMap[scoreId].scoreKeyPath,
-        valueGetter: params => {
-          return recursiveGetChildren(params).scores[scoreId];
+      const scoresSubGroup: GridColumnGroup = {
+        groupId: 'scorer.' + scoreId,
+        renderHeaderGroup: params => {
+          const scorer = scoreMap[scoreId];
+          const scorerRefParsed = parseRef(scorer.scorerRef) as WeaveObjectRef;
+
+          return <SmallRef objRef={scorerRefParsed} />;
         },
+        children: [],
+      };
+      leafDims.forEach(dim => {
+        cols.push({
+          field: 'scorer.' + scoreId + '.' + dim,
+          renderHeader: params => headerMap[dim],
+          valueGetter: params => {
+            return recursiveGetChildren(params).scores[scoreId][dim];
+          },
+          renderCell: params => {
+            return (
+              <ValueViewNumber
+                fractionDigits={SIGNIFICANT_DIGITS}
+                value={params.value}
+              />
+            );
+          },
+        });
+        scoresSubGroup.children.push({field: 'scorer.' + scoreId + '.' + dim});
       });
+      scoresGroup.children.push(scoresSubGroup);
     });
+    grouping.push(scoresGroup);
 
-    return cols;
-  }, [inputColumnKeys, outputColumnKeys, scoreMap]);
+    return {cols, grouping};
+  }, [
+    inputColumnKeys,
+    leafDims,
+    outputColumnKeys,
+    props.state.data.evaluationCalls,
+    scoreMap,
+  ]);
 
-  const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row => row.path;
+  // const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row => row.path;
 
   return (
     <Box sx={{height: '500px', width: '100%', overflow: 'hidden'}}>
@@ -770,7 +929,7 @@ const CompareEvaluationsCallsTable: React.FC<{
         disableColumnFilter={true}
         disableMultipleColumnsFiltering={true}
         // ColumnPinning seems to be required in DataGridPro, else it crashes.
-        disableColumnPinning={true}
+        disableColumnPinning={false}
         // There is no need to reorder the 2 columns in this context.
         disableColumnReorder={true}
         // Resizing columns might be helpful to show more data
@@ -789,8 +948,11 @@ const CompareEvaluationsCallsTable: React.FC<{
         // }}
         columnHeaderHeight={38}
         rowHeight={30}
-        treeData
-        getTreeDataPath={getTreeDataPath}
+        experimentalFeatures={{columnGrouping: true}}
+        columnGroupingModel={groupingModel}
+        // groupingColDef={}
+        // treeData
+        // getTreeDataPath={getTreeDataPath}
         // getRowHeight={(params: GridRowHeightParams) => {
         //   const isNonRefString =
         //     params.model.valueType === 'string' && !isRef(params.model.value);

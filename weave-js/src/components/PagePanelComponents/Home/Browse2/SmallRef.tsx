@@ -159,8 +159,8 @@ export const SmallRef: FC<{
         mr="4px"
         bgcolor={hexToRGB(MOON_300, 0.48)}
         sx={{
-          height: '22px',
-          width: '22px',
+          // height: '22px',
+          // width: '22px',
           borderRadius: '16px',
           display: 'flex',
           flex: '0 0 22px',
@@ -172,7 +172,7 @@ export const SmallRef: FC<{
       {!iconOnly && (
         <Box
           sx={{
-            height: '22px',
+            // height: '22px',
             flex: 1,
             minWidth: 0,
             overflow: 'hidden',

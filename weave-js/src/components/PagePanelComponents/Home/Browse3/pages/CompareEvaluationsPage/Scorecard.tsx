@@ -11,6 +11,7 @@ import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {EvaluationComparisonState} from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './constants';
+import {SIGNIFICANT_DIGITS} from './constants';
 import {EvaluationCallLink, EvaluationModelLink} from './EvaluationDefinition';
 import {
   isBinarySummaryScore,
@@ -19,7 +20,6 @@ import {
 import {HorizontalBox} from './Layout';
 
 const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
-
 export const moveItemToFront = (arr: any[], item: any) => {
   const index = arr.indexOf(item);
   if (index > -1) {
@@ -382,7 +382,7 @@ export const ScoreCard: React.FC<{
 
                       const diffFixed = Number.isInteger(diff)
                         ? diff.toLocaleString()
-                        : diff.toFixed(6);
+                        : diff.toFixed(SIGNIFICANT_DIGITS);
 
                       return (
                         <GridCell
@@ -400,7 +400,7 @@ export const ScoreCard: React.FC<{
                                   minWidth: '100px',
                                 }}>
                                 <ValueViewNumber
-                                  fractionDigits={4}
+                                  fractionDigits={SIGNIFICANT_DIGITS}
                                   value={value}
                                 />
                                 {def.metrics[metricKey].unit}
@@ -430,7 +430,7 @@ export const ScoreCard: React.FC<{
                         borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
                       }}>
                       <ValueViewNumber
-                        fractionDigits={4}
+                        fractionDigits={SIGNIFICANT_DIGITS}
                         value={
                           ((scores as any)[metric.key] as any)[modelRefs[0]] -
                           ((scores as any)[metric.key] as any)[modelRefs[1]]
