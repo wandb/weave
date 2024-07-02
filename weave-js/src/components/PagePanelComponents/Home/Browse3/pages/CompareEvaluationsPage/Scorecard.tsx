@@ -220,21 +220,25 @@ export const ScoreCard: React.FC<{
         }}>
         {/* Header Row */}
         <GridCell></GridCell>
-        <GridCell
-          style={{
-            fontWeight: 'bold',
-            paddingRight: '10px',
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: '4px',
-          }}>
-          <span>Show All</span>
-          <Checkbox
-            checked={showDifferences}
-            onClick={() => setShowDifferences(v => !v)}
-          />
+        <GridCell>
+          <div
+            style={{
+              fontWeight: 'bold',
+              // paddingRight: '10px',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '8px',
+              // border: '1px solid #ccc',
+              // borderRadius: '6px',
+            }}>
+            <span>Show all properties</span>
+            <Checkbox
+              checked={showDifferences}
+              onClick={() => setShowDifferences(v => !v)}
+            />
+          </div>
         </GridCell>
         {evalCallIds.map(evalCallId => {
           const modelRef =
