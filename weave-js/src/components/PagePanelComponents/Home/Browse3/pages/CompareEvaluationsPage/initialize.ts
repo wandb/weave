@@ -21,7 +21,8 @@ export const useInitialState = (
   evaluationCallIds: string[],
   baselineEvaluationCallId?: string,
   comparisonDimension?: ScoreDimension,
-  rangeSelection?: RangeSelection
+  rangeSelection?: RangeSelection,
+  selectedInputDigest?: string
 ): Loadable<EvaluationComparisonState> => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonData | null>(null);
@@ -57,15 +58,10 @@ export const useInitialState = (
           baselineEvaluationCallId ?? evaluationCallIds[0],
         comparisonDimension: comparisonDimension ?? dimensions[0],
         rangeSelection: rangeSelection ?? {},
+        selectedInputDigest: selectedInputDigest,
       },
     };
-  }, [
-    data,
-    baselineEvaluationCallId,
-    evaluationCallIds,
-    comparisonDimension,
-    rangeSelection,
-  ]);
+  }, [data, baselineEvaluationCallId, evaluationCallIds, comparisonDimension, rangeSelection, selectedInputDigest]);
 
   return value;
 };

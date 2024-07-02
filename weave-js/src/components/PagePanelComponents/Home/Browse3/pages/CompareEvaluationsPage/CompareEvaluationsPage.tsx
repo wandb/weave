@@ -48,6 +48,7 @@ import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {ScatterFilter} from './ScatterFilter';
 import {moveItemToFront, ScoreCard} from './Scorecard';
+import {CallsTable} from '../CallsPage/CallsTable';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -66,8 +67,29 @@ export const CompareEvaluationsPage: React.FC<
   const [comparisonDimension, setComparisonDimension] =
     React.useState<ScoreDimension | null>(null);
 
+  const [selectedInputDigest, setSelectedInputDigest] = React.useState<
+    string | null
+  >(null);
+
   const [rangeSelection, setRangeSelection] = React.useState<RangeSelection>(
     {}
+  );
+
+  // Wow this cascading state is getting out of hand
+
+  const setRangeSelectionAndClearSelectedInputDigest = useCallback(
+    (
+      newRangeSelection:
+        | RangeSelection
+        | ((prev: RangeSelection) => RangeSelection)
+    ) => {
+      if (typeof newRangeSelection === 'function') {
+        newRangeSelection = newRangeSelection(rangeSelection);
+      }
+      setRangeSelection(newRangeSelection);
+      setSelectedInputDigest(null);
+    },
+    [rangeSelection]
   );
 
   const setComparisonDimensionAndClearRange = useCallback(
@@ -81,9 +103,9 @@ export const CompareEvaluationsPage: React.FC<
         dim = dim(comparisonDimension);
       }
       setComparisonDimension(dim);
-      setRangeSelection({});
+      setRangeSelectionAndClearSelectedInputDigest({});
     },
-    [comparisonDimension]
+    [comparisonDimension, setRangeSelectionAndClearSelectedInputDigest]
   );
 
   if (props.evaluationCallIds.length === 0) {
@@ -107,7 +129,9 @@ export const CompareEvaluationsPage: React.FC<
               rangeSelection={rangeSelection}
               setBaselineEvaluationCallId={setBaselineEvaluationCallId}
               setComparisonDimension={setComparisonDimensionAndClearRange}
-              setRangeSelection={setRangeSelection}>
+              setRangeSelection={setRangeSelectionAndClearSelectedInputDigest}
+              selectedInputDigest={selectedInputDigest}
+              setSelectedInputDigest={setSelectedInputDigest ?? undefined}>
               <CompareEvaluationsPageInner />
             </CompareEvaluationsProvider>
           ),
@@ -186,6 +210,7 @@ const CompareEvaluationsPageInner: React.FC = props => {
           <ScatterFilter state={state} />
         )}
         <CompareEvaluationsCallsTable state={state} />
+        <RowComparison state={state} />
       </VerticalBox>
     </Box>
   );
@@ -914,6 +939,8 @@ const CompareEvaluationsCallsTable: React.FC<{
     scoreMap,
   ]);
 
+  const {setSelectedInputDigest} = useCompareEvaluationsState();
+
   // const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row => row.path;
 
   return (
@@ -974,17 +1001,50 @@ const CompareEvaluationsCallsTable: React.FC<{
         // hideFooter
         // rowSelection={false}
         // groupingColDef={groupingColDef}
-        rowSelection={false}
+        rowSelection={true}
+        rowSelectionModel={
+          props.state.selectedInputDigest
+            ? [props.state.selectedInputDigest]
+            : []
+        }
+        disableMultipleRowSelection
+        onRowSelectionModelChange={newSelection => {
+          setSelectedInputDigest(newSelection[0].toString() ?? null);
+        }}
         sx={{}}
       />
-      {/* COMING SOON */}
-      {/* <CallsTable
-        entity={props.entity}
-        project={props.project}
-        frozenFilter={callsFilter}
-        hideControls
-      /> */}
     </Box>
+  );
+};
+
+const RowComparison: React.FC<{state: EvaluationComparisonState}> = props => {
+  const selectedCallIds = useMemo(() => {
+    if (props.state.selectedInputDigest == null) {
+      return [];
+    }
+    const selectedRow =
+      props.state.data.resultRows[props.state.selectedInputDigest];
+    if (selectedRow == null) {
+      return [];
+    }
+    return Object.values(selectedRow.evaluations)
+      .map(evaluation => Object.keys(evaluation.predictAndScores))
+      .flat();
+  }, [props.state.data.resultRows, props.state.selectedInputDigest]);
+
+  if (props.state.selectedInputDigest == null) {
+    return null;
+  }
+
+  return (
+    <CallsTable
+      entity={props.state.data.entity}
+      project={props.state.data.project}
+      frozenFilter={{
+        callIds: selectedCallIds,
+      }}
+      hideControls
+    />
   );
 };
 

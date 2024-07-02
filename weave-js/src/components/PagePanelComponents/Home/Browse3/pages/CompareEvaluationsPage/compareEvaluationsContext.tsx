@@ -13,6 +13,7 @@ const CompareEvaluationsContext = React.createContext<{
     React.SetStateAction<ScoreDimension | null>
   >;
   setRangeSelection: React.Dispatch<React.SetStateAction<RangeSelection>>;
+  setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
 } | null>(null);
 
 export type EvaluationComparisonState = {
@@ -20,6 +21,7 @@ export type EvaluationComparisonState = {
   baselineEvaluationCallId: string;
   comparisonDimension: ScoreDimension;
   rangeSelection: RangeSelection;
+  selectedInputDigest?: string;
 };
 
 export const useCompareEvaluationsState = () => {
@@ -41,9 +43,11 @@ export const CompareEvaluationsProvider: React.FC<{
     React.SetStateAction<ScoreDimension | null>
   >;
   setRangeSelection: React.Dispatch<React.SetStateAction<RangeSelection>>;
+  setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
   rangeSelection?: RangeSelection;
   baselineEvaluationCallId?: string;
   comparisonDimension?: ScoreDimension;
+  selectedInputDigest?: string;
 }> = ({
   entity,
   project,
@@ -51,9 +55,11 @@ export const CompareEvaluationsProvider: React.FC<{
   setBaselineEvaluationCallId,
   setComparisonDimension,
   setRangeSelection,
+  setSelectedInputDigest,
   rangeSelection,
   baselineEvaluationCallId,
   comparisonDimension,
+  selectedInputDigest,
   children,
 }) => {
   const initialState = useInitialState(
@@ -62,7 +68,8 @@ export const CompareEvaluationsProvider: React.FC<{
     evaluationCallIds,
     baselineEvaluationCallId,
     comparisonDimension,
-    rangeSelection
+    rangeSelection,
+    selectedInputDigest
   );
 
   const value = useMemo(() => {
@@ -74,6 +81,7 @@ export const CompareEvaluationsProvider: React.FC<{
       setBaselineEvaluationCallId,
       setComparisonDimension,
       setRangeSelection,
+      setSelectedInputDigest,
     };
   }, [
     initialState.loading,
@@ -81,6 +89,7 @@ export const CompareEvaluationsProvider: React.FC<{
     setBaselineEvaluationCallId,
     setComparisonDimension,
     setRangeSelection,
+    setSelectedInputDigest,
   ]);
 
   if (!value) {
