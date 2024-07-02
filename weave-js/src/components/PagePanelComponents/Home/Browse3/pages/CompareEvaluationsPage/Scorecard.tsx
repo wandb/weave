@@ -125,31 +125,33 @@ export const ScoreCard: React.FC<{
           };
         }
 
-        Object.keys(evaluationCall.scores[scoreName]).forEach(metricKey => {
-          const summaryValue = evaluationCall.scores[scoreName][metricKey];
-          let value = 0;
-          let unit = '';
-          if (isContinuousSummaryScore(summaryValue)) {
-            value = summaryValue.mean;
-          } else if (isBinarySummaryScore(summaryValue)) {
-            value = summaryValue.true_fraction;
-            unit = '%';
-          } else {
-            console.error('Unknown score type', summaryValue);
-            return;
-          }
-          if (!res[scoreName].metrics[metricKey]) {
-            res[scoreName].metrics[metricKey] = {
-              displayName: metricKey,
-              unit,
-              lowerIsBetter: false,
-              modelScores: {},
-            };
-          }
-          res[scoreName].metrics[metricKey].modelScores[
-            evaluationCall.modelRef
-          ] = value;
-        });
+        if (evaluationCall.scores[scoreName]) {
+          Object.keys(evaluationCall.scores[scoreName]).forEach(metricKey => {
+            const summaryValue = evaluationCall.scores[scoreName][metricKey];
+            let value = 0;
+            let unit = '';
+            if (isContinuousSummaryScore(summaryValue)) {
+              value = summaryValue.mean;
+            } else if (isBinarySummaryScore(summaryValue)) {
+              value = summaryValue.true_fraction;
+              unit = '%';
+            } else {
+              console.error('Unknown score type', summaryValue);
+              return;
+            }
+            if (!res[scoreName].metrics[metricKey]) {
+              res[scoreName].metrics[metricKey] = {
+                displayName: metricKey,
+                unit,
+                lowerIsBetter: false,
+                modelScores: {},
+              };
+            }
+            res[scoreName].metrics[metricKey].modelScores[
+              evaluationCall.modelRef
+            ] = value;
+          });
+        }
       });
     });
 
@@ -403,16 +405,19 @@ export const ScoreCard: React.FC<{
                                 />
                                 {def.metrics[metricKey].unit}
                               </span>
-                              {modelRef !== baselineRef && diff !== 0 && (
-                                <Pill
-                                  label={
-                                    (diff > 0 ? '+' : '') +
-                                    diffFixed +
-                                    def.metrics[metricKey].unit
-                                  }
-                                  color={color}
-                                />
-                              )}
+                              {modelRef !== baselineRef &&
+                                diff !== 0 &&
+                                value != null &&
+                                baseline != null && (
+                                  <Pill
+                                    label={
+                                      (diff > 0 ? '+' : '') +
+                                      diffFixed +
+                                      def.metrics[metricKey].unit
+                                    }
+                                    color={color}
+                                  />
+                                )}
                             </HorizontalBox>
                           ) : (
                             <NotApplicable />

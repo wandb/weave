@@ -1,13 +1,16 @@
 import {Box, FormControl} from '@material-ui/core';
 import {Autocomplete} from '@mui/material';
+import {DataGridProProps, GridColDef} from '@mui/x-data-grid-pro';
 import React, {FC, useCallback, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {Button} from '../../../../../Button';
+import {flattenObject} from '../../../Browse2/browse2Util';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {useEvaluationsFilter} from '../CallsPage/CallsPage';
 import {SimplePageLayout} from '../common/SimplePageLayout';
@@ -24,6 +27,7 @@ import {
   STANDARD_PADDING,
 } from './constants';
 import {EvaluationDefinition} from './EvaluationDefinition';
+import {PredictAndScoreCall} from './evaluationResults';
 import {evaluationMetrics, ScoreDimension} from './evaluations';
 import {RangeSelection, useEvaluationCallDimensions} from './initialize';
 import {HorizontalBox, VerticalBox} from './Layout';
@@ -53,6 +57,22 @@ export const CompareEvaluationsPage: React.FC<
     {}
   );
 
+  const setComparisonDimensionAndClearRange = useCallback(
+    (
+      dim:
+        | ScoreDimension
+        | null
+        | ((prev: ScoreDimension | null) => ScoreDimension | null)
+    ) => {
+      if (typeof dim === 'function') {
+        dim = dim(comparisonDimension);
+      }
+      setComparisonDimension(dim);
+      setRangeSelection({});
+    },
+    [comparisonDimension]
+  );
+
   if (props.evaluationCallIds.length === 0) {
     return <div>No evaluations to compare</div>;
   }
@@ -73,7 +93,7 @@ export const CompareEvaluationsPage: React.FC<
               comparisonDimension={comparisonDimension ?? undefined}
               rangeSelection={rangeSelection}
               setBaselineEvaluationCallId={setBaselineEvaluationCallId}
-              setComparisonDimension={setComparisonDimension}
+              setComparisonDimension={setComparisonDimensionAndClearRange}
               setRangeSelection={setRangeSelection}>
               <CompareEvaluationsPageInner />
             </CompareEvaluationsProvider>
@@ -292,7 +312,7 @@ const DimensionPicker: React.FC<{state: EvaluationComparisonState}> = props => {
   const currDimension = props.state.comparisonDimension;
   const dimensions = useEvaluationCallDimensions(props.state);
   const {setComparisonDimension} = useCompareEvaluationsState();
-  console.log(dimensions);
+  // console.log(dimensions);
   const dimensionMap = useMemo(() => {
     return Object.fromEntries(
       dimensions.map(dim => [dimensionToText(dim), dim])
@@ -348,26 +368,248 @@ const SwapPositionsButton: React.FC<{callId: string}> = props => {
 const CompareEvaluationsCallsTable: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  // const calls = useEvaluationCalls(
-  //   props.entity,
-  //   props.project,
-  //   useMemo(() => [props.evaluationCallId1, props.evaluationCallId2], [props])
-  // );
-  // const callsFilter = useMemo(() => {
-  //   return {
-  //     parentId: calls[0] ? calls[0].id : null,
-  //     opVersionRefs: [
-  //       opVersionKeyToRefUri({
-  //         entity: props.entity,
-  //         project: props.project,
-  //         opId: PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
-  //         versionHash: '*',
-  //       }),
-  //     ],
-  //   };
-  // }, [calls, props.entity, props.project]);
+  // TODO: Grouping / Nesting
+
+  const flattenedRows = useMemo(() => {
+    const rows: Array<
+      PredictAndScoreCall & {
+        id: string;
+        input: any;
+        output: any;
+        path: string[];
+      }
+    > = [];
+    Object.entries(props.state.data.resultRows).forEach(
+      ([rowDigest, rowCollection]) => {
+        Object.entries(rowCollection.models).forEach(
+          ([modelRef, modelCollection]) => {
+            Object.values(modelCollection.predictAndScores).forEach(
+              predictAndScoreRes => {
+                const datasetRow =
+                  props.state.data.inputs[predictAndScoreRes.rowDigest];
+                if (datasetRow != null) {
+                  const output = predictAndScoreRes.predictCall?.output;
+                  rows.push({
+                    ...predictAndScoreRes,
+                    id: predictAndScoreRes.callId,
+                    input: flattenObject({input: datasetRow.val}),
+                    output: flattenObject({output}),
+                    path: [rowDigest, predictAndScoreRes.callId],
+                  });
+                }
+              }
+            );
+          }
+        );
+      }
+    );
+    return rows;
+  }, [props.state.data.inputs, props.state.data.resultRows]);
+
+  const pivotedRows = useMemo(() => {
+    const leafDims = Object.keys(props.state.data.evaluationCalls);
+  }, []);
+
+  const filteredRows = useMemo(() => {
+    if (props.state.rangeSelection) {
+      // Do something special to determine if this row qualifies
+      // throw new Error('Not implemented');
+      console.log(props.state.rangeSelection);
+    }
+  }, [props.state.rangeSelection]);
+
+  // console.log(flattenedRows);
+
+  const inputColumnKeys = useMemo(() => {
+    const keys = new Set<string>();
+    flattenedRows.forEach(row => {
+      Object.keys(row.input).forEach(key => keys.add(key));
+    });
+    return keys;
+  }, [flattenedRows]);
+
+  const outputColumnKeys = useMemo(() => {
+    const keys = new Set<string>();
+    flattenedRows.forEach(row => {
+      Object.keys(row.output).forEach(key => keys.add(key));
+    });
+    return keys;
+  }, [flattenedRows]);
+
+  const dimensions = useEvaluationCallDimensions(props.state);
+
+  const columns = useMemo(() => {
+    const cols: Array<GridColDef<(typeof flattenedRows)[number]>> = [];
+
+    // Columns:
+    // 1. dataset row identifier
+    // 2. dataset row contents (input)
+    // (Grouped Aggregates - Model Outputs)
+    // 3. Model Output (Grouping here is odd - likely just take last?)
+    // 3.(n) -> split for each comparison
+    // 4. Model Latency (average)
+    // 4.(n) -> split for each comparison
+    // 5. Model Tokens (average)
+    // 5.(n) -> split for each comparison
+    // (Grouped Aggregates - Scoring Function)
+    // 6.(s) Each scoring key (average)
+    // 6.(s).(n) -> split for each comparison
+
+    cols.push({
+      field: 'rowDigest',
+      headerName: 'Row ID',
+      valueGetter: params => {
+        if (params.rowNode.type === 'group') {
+          const childrenRows = params.rowNode.children.map(params.api.getRow);
+          return childrenRows[0].rowDigest;
+        }
+        return params.row.rowDigest;
+      },
+    });
+
+    // cols.push({
+    //   field: 'rowContent',
+    //   headerName: 'Row ID',
+    //   valueGetter: params => {
+    //     // TODO: This needs to be flattened...
+    //     return params.row.input;
+    //   },
+    // });
+    inputColumnKeys.forEach(key => {
+      cols.push({
+        field: 'input.' + key,
+        headerName: key,
+        valueGetter: params => {
+          if (params.rowNode.type === 'group') {
+            const childrenRows = params.rowNode.children.map(params.api.getRow);
+            return childrenRows[0].input[key];
+          }
+          return params.row.input[key];
+        },
+      });
+    });
+
+    outputColumnKeys.forEach(key => {
+      cols.push({
+        field: 'output.' + key,
+        headerName: key,
+        valueGetter: params => {
+          if (params.rowNode.type === 'group') {
+            const childrenRows = params.rowNode.children.map(params.api.getRow);
+            return childrenRows[0].output[key];
+          }
+          return params.row.output[key];
+        },
+      });
+    });
+
+    cols.push({
+      field: 'modelLatency',
+      headerName: 'Latency',
+      valueGetter: params => {
+        if (params.rowNode.type === 'group') {
+          const childrenRows = params.rowNode.children.map(params.api.getRow);
+          return childrenRows[0].predictCall?.latencyMs;
+        }
+        return params.row.predictCall?.latencyMs;
+      },
+    });
+
+    cols.push({
+      field: 'totalTokens',
+      headerName: 'Tokens',
+      valueGetter: params => {
+        if (params.rowNode.type === 'group') {
+          const childrenRows = params.rowNode.children.map(params.api.getRow);
+          return childrenRows[0].predictCall?.totalUsageTokens;
+        }
+        return params.row.predictCall?.totalUsageTokens;
+      },
+    });
+
+    dimensions.forEach(dim => {
+      cols.push({
+        field: 'scorer.' + dim.scorerRef + '.' + dim.scoreKeyPath,
+        headerName: dim.scoreKeyPath,
+        valueGetter: params => {
+          // HAXS!
+          const scorerKey = dim.scoreKeyPath.split('.').splice(1).join('.');
+          if (params.rowNode.type === 'group') {
+            const childrenRows = params.rowNode.children.map(params.api.getRow);
+            return flattenObject(
+              childrenRows[0].scores[dim.scorerRef]?.results ?? {}
+            )[scorerKey];
+          }
+          return flattenObject(params.row.scores[dim.scorerRef]?.results ?? {})[
+            scorerKey
+          ];
+        },
+      });
+    });
+
+    return cols;
+  }, [dimensions, inputColumnKeys, outputColumnKeys]);
+
+  const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row => row.path;
+
   return (
     <Box sx={{height: '500px', width: '100%', overflow: 'hidden'}}>
+      <StyledDataGrid
+        // Start Column Menu
+        // ColumnMenu is only needed when we have other actions
+        // such as filtering.
+        disableColumnMenu={true}
+        // In this context, we don't need to filter columns. I suppose
+        // we can add this in the future, but we should be intentional
+        // about what we enable.
+        disableColumnFilter={true}
+        disableMultipleColumnsFiltering={true}
+        // ColumnPinning seems to be required in DataGridPro, else it crashes.
+        disableColumnPinning={true}
+        // There is no need to reorder the 2 columns in this context.
+        disableColumnReorder={true}
+        // Resizing columns might be helpful to show more data
+        disableColumnResize={false}
+        // There are only 2 columns, let's not confuse the user.
+        disableColumnSelector={true}
+        // We don't need to sort multiple columns.
+        disableMultipleColumnsSorting={true}
+        // End Column Menu
+        // treeData
+        // getTreeDataPath={row => row.path.toStringArray()}
+        rows={flattenedRows}
+        columns={columns}
+        // isGroupExpandedByDefault={node => {
+        //   return expandedIds.includes(node.id);
+        // }}
+        columnHeaderHeight={38}
+        rowHeight={30}
+        // treeData
+        // getTreeDataPath={getTreeDataPath}
+        // getRowHeight={(params: GridRowHeightParams) => {
+        //   const isNonRefString =
+        //     params.model.valueType === 'string' && !isRef(params.model.value);
+        //   const isArray = params.model.valueType === 'array';
+        //   const isTableRef =
+        //     isRef(params.model.value) &&
+        //     (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
+        //   const {isCode} = params.model;
+        //   if (
+        //     isNonRefString ||
+        //     (isArray && USE_TABLE_FOR_ARRAYS) ||
+        //     isTableRef ||
+        //     isCode
+        //   ) {
+        //     return 'auto';
+        //   }
+        //   return 38;
+        // }}
+        // hideFooter
+        // rowSelection={false}
+        // groupingColDef={groupingColDef}
+        rowSelection={false}
+        sx={{}}
+      />
       COMING SOON
       {/* <CallsTable
         entity={props.entity}
@@ -392,6 +634,7 @@ const CompareEvaluationsCallsTable: React.FC<{
  * - [ ] The damn thing is slow with all the upfront loading
  * - [ ] // TODO: find all cases of the `_raw*` cases and remove them!'
  * - [ ] Support arbitrarily nested scorers
+ * - [ ] Add latency and tokens (and cost) to the scoring / plotting system more generally
  * TEST:
  * - [ ] Single Case
  * - [ ] Dual Case

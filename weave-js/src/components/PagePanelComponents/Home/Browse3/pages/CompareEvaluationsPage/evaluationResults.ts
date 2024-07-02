@@ -1,3 +1,5 @@
+import {sum} from 'lodash';
+
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
@@ -79,10 +81,10 @@ type EvaluationObj = {
 //   _rawPredictTraceData: TraceCallSchema;
 // };
 
-//   type Input = {
-//     digest: string;
-//     data: any;
-//   };
+export type DatasetRow = {
+  digest: string;
+  val: any;
+};
 
 type ModelObj = {
   ref: string;
@@ -114,9 +116,9 @@ export type EvaluationComparisonData = {
   //   scorers: {
   //     [objectRef: string]: Scorer;
   //   };
-  //   inputs: {
-  //     [rowDigest: string]: Input;
-  //   };
+  inputs: {
+    [rowDigest: string]: DatasetRow;
+  };
   models: {
     [modelRef: string]: ModelObj;
   };
@@ -133,9 +135,10 @@ export type EvaluationComparisonData = {
   };
 };
 
-type PredictAndScoreCall = {
+export type PredictAndScoreCall = {
   callId: string;
-  exampleRef: string;
+  firstExampleRef: string;
+  rowDigest: string;
   modelRef: string;
   predictCall?: {
     callId: string;
@@ -173,7 +176,7 @@ export const fetchEvaluationComparisonData = async (
     evaluations: {},
     // datasets: {},
     // scorers: {},
-    // inputs: {},
+    inputs: {},
     models: {},
     resultRows: {},
   };
@@ -287,6 +290,35 @@ export const fetchEvaluationComparisonData = async (
     })
   );
 
+  // 3.5 Populate the inputs
+  // We only ned 1 since we are going to effectively do an inner join on the rowDigest
+  const datasetRef = Object.values(result.evaluations)[0].datasetRef as string;
+  const parsedDatasetRef = parseRef(datasetRef) as WeaveObjectRef;
+  const datasetObjRes = await traceServerClient.objRead({
+    project_id: projectIdFromParts({
+      entity: parsedDatasetRef.entityName,
+      project: parsedDatasetRef.projectName,
+    }),
+    digest: parsedDatasetRef.artifactVersion,
+    object_id: parsedDatasetRef.artifactName,
+  });
+  const rowsRef = datasetObjRes.obj.val.rows;
+  const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
+  const rowsQuery = await traceServerClient.tableQuery({
+    project_id: projectIdFromParts({
+      entity: parsedRowsRef.entityName,
+      project: parsedRowsRef.projectName,
+    }),
+    digest: parsedRowsRef.artifactVersion,
+  });
+  console.log(parsedDatasetRef);
+  rowsQuery.rows.forEach(row => {
+    result.inputs[row.digest] = {
+      digest: row.digest,
+      val: row.val,
+    };
+  });
+
   // 4. Populate the predictions and scores
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
   const evalTraceRes = await traceServerClient.callsQuery({
@@ -390,7 +422,8 @@ export const fetchEvaluationComparisonData = async (
                 parentPredictAndScore.id
               ] = {
                 callId: parentPredictAndScore.id,
-                exampleRef,
+                firstExampleRef: exampleRef,
+                rowDigest,
                 modelRef,
                 predictCall: undefined,
                 scores: {},
@@ -404,6 +437,11 @@ export const fetchEvaluationComparisonData = async (
               ];
 
             if (isProbablyPredictCall) {
+              const totalTokens = sum(
+                Object.values(traceCall.summary?.usage).map(
+                  (x: any) => x?.total_tokens ?? 0
+                )
+              );
               predictAndScoreFinal.predictCall = {
                 callId: traceCall.id,
                 output: traceCall.output as any,
@@ -413,16 +451,12 @@ export const fetchEvaluationComparisonData = async (
                   ).getTime() -
                     convertISOToDate(traceCall.started_at).getTime()) /
                   1000, // why is this different than the predictandscore model latency?
-                totalUsageTokens:
-                  traceCall.summary?.usage?.totalUsageTokens || 0,
+                totalUsageTokens: totalTokens,
                 _rawPredictTraceData: traceCall,
               };
             } else if (isProbablyScoreCall) {
               let results = traceCall.output as any;
-              if (
-                isBinarySummaryScore(results) ||
-                isContinuousSummaryScore(results)
-              ) {
+              if (typeof results !== 'object') {
                 results = {'': results}; // no nesting. probably something we should fix more generally
               }
               predictAndScoreFinal.scores[traceCall.op_name] = {

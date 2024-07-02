@@ -9,6 +9,12 @@ export const PlotlyScatterPlot: React.FC<{
   xColor: string;
   yColor: string;
   data: ScatterPlotData;
+  onRangeChange: (
+    xMin?: number,
+    xMax?: number,
+    yMin?: number,
+    yMax?: number
+  ) => void;
 }> = props => {
   const divRef = useRef<HTMLDivElement>(null);
   const plotlyData: Plotly.Data[] = useMemo(() => {
@@ -82,13 +88,27 @@ export const PlotlyScatterPlot: React.FC<{
   }, []);
 
   useEffect(() => {
-    Plotly.newPlot(
-      divRef.current as any,
-      plotlyData,
-      plotlyLayout,
-      plotlyConfig
-    );
-  }, [plotlyConfig, plotlyData, plotlyLayout]);
+    if (divRef.current) {
+      const current = divRef.current;
+      Plotly.newPlot(current, plotlyData, plotlyLayout, plotlyConfig);
+
+      // Set up event listener for relayout (zoom and range change)
+      (current as any).on('plotly_relayout', (eventData: any) => {
+        const newXMin = eventData['xaxis.range[0]'];
+        const newXMax = eventData['xaxis.range[1]'];
+        const newYMin = eventData['yaxis.range[0]'];
+        const newYMax = eventData['yaxis.range[1]'];
+        props.onRangeChange(newXMin, newXMax, newYMin, newYMax);
+        // Reset to original range
+      });
+
+      // Clean up event listener on unmount
+      return () => {
+        (current as any).removeAllListeners('plotly_relayout');
+      };
+    }
+    return () => {};
+  }, [plotlyConfig, plotlyData, plotlyLayout, props]);
 
   return <div ref={divRef}></div>;
 };
