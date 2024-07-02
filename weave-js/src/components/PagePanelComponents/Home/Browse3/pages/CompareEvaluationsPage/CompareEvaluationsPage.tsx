@@ -130,8 +130,8 @@ export const CompareEvaluationsPage: React.FC<
               setBaselineEvaluationCallId={setBaselineEvaluationCallId}
               setComparisonDimension={setComparisonDimensionAndClearRange}
               setRangeSelection={setRangeSelectionAndClearSelectedInputDigest}
-              selectedInputDigest={selectedInputDigest}
-              setSelectedInputDigest={setSelectedInputDigest ?? undefined}>
+              selectedInputDigest={selectedInputDigest ?? undefined}
+              setSelectedInputDigest={setSelectedInputDigest}>
               <CompareEvaluationsPageInner />
             </CompareEvaluationsProvider>
           ),
@@ -1066,8 +1066,30 @@ const RowComparison: React.FC<{state: EvaluationComparisonState}> = props => {
  * - [ ] Objects/Arrays/Refs are not suppported. see https://app.wandb.test/wandb-smle/weave-rag-lc-demo/weave/compare-evaluations?evaluationCallIds=%5B%2221e8ea02-3109-434c-95d0-cb2c7c542f74%22%5D&peekPath=%2Fwandb-smle%2Fweave-rag-lc-demo%2Fcalls%2F21e8ea02-3109-434c-95d0-cb2c7c542f74
  * - [ ] Big: empty selection
  * - [ ] Selection Filter seems to reset periodically? on data refresh
+ * - [ ] Plots do not respect the ordering
  * TEST:
  * - [ ] Single Case
  * - [ ] Dual Case
  * - [ ] Multi Case
+ * 
+ * * Move Target Metric Below
+* Hover tooltip on charts to show values
+* Axis labels are a bit confusing
+* Filter chart does not have a name
+
+* Plotly select only, no zoom
+* Stretching of the plot not ideal
+
+* Let the user select a list of metrics
+* Allow the user to provide an ordering of metrics?
+
+* Need to add model latency
+
+* use baseline model input as input, not full input
+---
+
+---
+              // for infer_method_names in ("predict", "infer", "forward"):
+              // TODO: make this more robust
+Vertical space on the table - More of a string viewer and avoid secondary drill down
  */

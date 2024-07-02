@@ -54,6 +54,21 @@ export const PlotlyRadarPlot: React.FC<{
           gridcolor: MOON_300,
         },
       },
+      // legend: {
+      //   x: 1,
+      //   xanchor: 'left',
+      //   y: 1,
+      //   title: {
+      //     text: 'Legend',
+      //     font: {
+      //       size: 12,
+      //     },
+      //   },
+      //   font: {
+      //     size: 10,
+      //   },
+      //   orientation: 'v',
+      // },
     };
   }, [props.height]);
   const plotlyConfig = useMemo(() => {

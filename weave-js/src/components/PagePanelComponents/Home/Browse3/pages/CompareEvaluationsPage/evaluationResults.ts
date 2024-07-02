@@ -367,6 +367,8 @@ export const fetchEvaluationComparisonData = async (
           if (maybeDigest != null && !maybeDigest.includes('/')) {
             const rowDigest = maybeDigest;
             const isProbablyPredictCall =
+              // for infer_method_names in ("predict", "infer", "forward"):
+              // TODO: make this more robust
               traceCall.op_name.includes('.predict:') &&
               modelRefs.includes(traceCall.inputs.self);
 
