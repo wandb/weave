@@ -9,13 +9,13 @@ OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
 TABLE_ROW_ID_EDGE_NAME = refs_internal.TABLE_ROW_ID_EDGE_NAME
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class TableRef(Ref):
     entity: str
     project: str
@@ -25,7 +25,7 @@ class TableRef(Ref):
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class RefWithExtra(Ref):
     def with_extra(self, extra: list[str]) -> "RefWithExtra":
         params = dataclasses.asdict(self)
@@ -45,7 +45,7 @@ class RefWithExtra(Ref):
         return self.with_extra([TABLE_ROW_ID_EDGE_NAME, f"{item_digest}"])
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class ObjectRef(RefWithExtra):
     entity: str
     project: str
@@ -101,7 +101,7 @@ class ObjectRef(RefWithExtra):
         )
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class OpRef(ObjectRef):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
@@ -110,7 +110,7 @@ class OpRef(ObjectRef):
         return u
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class CallRef(RefWithExtra):
     entity: str
     project: str
