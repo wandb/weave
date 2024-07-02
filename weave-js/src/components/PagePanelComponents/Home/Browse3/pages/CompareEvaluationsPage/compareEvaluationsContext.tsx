@@ -1,20 +1,25 @@
 import React, {useMemo} from 'react';
 
 import {EvaluationComparisonData} from './evaluationResults';
-import {useInitialState} from './initialize';
+import {ScoreDimension} from './evaluations';
+import {RangeSelection, useInitialState} from './initialize';
 
 const CompareEvaluationsContext = React.createContext<{
   state: EvaluationComparisonState;
   setBaselineEvaluationCallId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
-  setComparisonDimension: React.Dispatch<React.SetStateAction<string | null>>;
+  setComparisonDimension: React.Dispatch<
+    React.SetStateAction<ScoreDimension | null>
+  >;
+  setRangeSelection: React.Dispatch<React.SetStateAction<RangeSelection>>;
 } | null>(null);
 
 export type EvaluationComparisonState = {
   data: EvaluationComparisonData;
   baselineEvaluationCallId: string;
-  comparisonDimension: string;
+  comparisonDimension: ScoreDimension;
+  rangeSelection: RangeSelection;
 };
 
 export const useCompareEvaluationsState = () => {
@@ -32,15 +37,21 @@ export const CompareEvaluationsProvider: React.FC<{
   setBaselineEvaluationCallId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
-  setComparisonDimension: React.Dispatch<React.SetStateAction<string | null>>;
+  setComparisonDimension: React.Dispatch<
+    React.SetStateAction<ScoreDimension | null>
+  >;
+  setRangeSelection: React.Dispatch<React.SetStateAction<RangeSelection>>;
+  rangeSelection?: RangeSelection;
   baselineEvaluationCallId?: string;
-  comparisonDimension?: string;
+  comparisonDimension?: ScoreDimension;
 }> = ({
   entity,
   project,
   evaluationCallIds,
   setBaselineEvaluationCallId,
   setComparisonDimension,
+  setRangeSelection,
+  rangeSelection,
   baselineEvaluationCallId,
   comparisonDimension,
   children,
@@ -50,7 +61,8 @@ export const CompareEvaluationsProvider: React.FC<{
     project,
     evaluationCallIds,
     baselineEvaluationCallId,
-    comparisonDimension
+    comparisonDimension,
+    rangeSelection
   );
 
   const value = useMemo(() => {
@@ -61,8 +73,15 @@ export const CompareEvaluationsProvider: React.FC<{
       state: initialState.result,
       setBaselineEvaluationCallId,
       setComparisonDimension,
+      setRangeSelection,
     };
-  }, [initialState, setBaselineEvaluationCallId, setComparisonDimension]);
+  }, [
+    initialState.loading,
+    initialState.result,
+    setBaselineEvaluationCallId,
+    setComparisonDimension,
+    setRangeSelection,
+  ]);
 
   if (!value) {
     return <div>Loading...</div>;

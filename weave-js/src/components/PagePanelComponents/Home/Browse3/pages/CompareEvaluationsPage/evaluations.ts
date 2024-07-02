@@ -15,6 +15,11 @@ type ContinuousSummaryScore = {
   mean: number;
 };
 
+export type ScoreDimension = {
+  scorerRef: string;
+  scoreKeyPath: string;
+};
+
 export type EvaluationEvaluateCallSchema = TraceCallSchema & {
   inputs: TraceCallSchema['inputs'] & {
     self: string;

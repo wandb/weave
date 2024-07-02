@@ -8,13 +8,17 @@ import {
   EvaluationComparisonData,
   fetchEvaluationComparisonData,
 } from './evaluationResults';
+import {ScoreDimension} from './evaluations';
+
+export type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
 
 export const useInitialState = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
   baselineEvaluationCallId?: string,
-  comparisonDimension?: string
+  comparisonDimension?: ScoreDimension,
+  rangeSelection?: RangeSelection
 ): Loadable<EvaluationComparisonState> => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonData | null>(null);
@@ -49,16 +53,23 @@ export const useInitialState = (
         baselineEvaluationCallId:
           baselineEvaluationCallId ?? evaluationCallIds[0],
         comparisonDimension: comparisonDimension ?? dimensions[0],
+        rangeSelection: rangeSelection ?? {},
       },
     };
-  }, [data, baselineEvaluationCallId, evaluationCallIds, comparisonDimension]);
+  }, [
+    data,
+    baselineEvaluationCallId,
+    evaluationCallIds,
+    comparisonDimension,
+    rangeSelection,
+  ]);
 
   return value;
 };
 
 const evaluationCallDimensions = (
   evaluationCalls: EvaluationComparisonData['evaluationCalls']
-): string[] => {
+): ScoreDimension[] => {
   const availableScorers = Object.values(evaluationCalls)
     .map(evalCall =>
       Object.entries(evalCall.scores)
@@ -76,7 +87,7 @@ const evaluationCallDimensions = (
 
 export const useEvaluationCallDimensions = (
   state: EvaluationComparisonState
-): string[] => {
+): ScoreDimension[] => {
   return useMemo(() => {
     return evaluationCallDimensions(state.data.evaluationCalls);
   }, [state.data.evaluationCalls]);

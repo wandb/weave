@@ -24,8 +24,8 @@ import {
   STANDARD_PADDING,
 } from './constants';
 import {EvaluationDefinition} from './EvaluationDefinition';
-import {evaluationMetrics} from './evaluations';
-import {useEvaluationCallDimensions} from './initialize';
+import {evaluationMetrics, ScoreDimension} from './evaluations';
+import {RangeSelection, useEvaluationCallDimensions} from './initialize';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
@@ -46,9 +46,12 @@ export const CompareEvaluationsPage: React.FC<
       props.evaluationCallIds.length > 0 ? props.evaluationCallIds[0] : null
     );
   // console.log(baselineEvaluationCallId);
-  const [comparisonDimension, setComparisonDimension] = React.useState<
-    string | null
-  >(null);
+  const [comparisonDimension, setComparisonDimension] =
+    React.useState<ScoreDimension | null>(null);
+
+  const [rangeSelection, setRangeSelection] = React.useState<RangeSelection>(
+    {}
+  );
 
   if (props.evaluationCallIds.length === 0) {
     return <div>No evaluations to compare</div>;
@@ -68,8 +71,10 @@ export const CompareEvaluationsPage: React.FC<
               evaluationCallIds={props.evaluationCallIds}
               baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
               comparisonDimension={comparisonDimension ?? undefined}
+              rangeSelection={rangeSelection}
               setBaselineEvaluationCallId={setBaselineEvaluationCallId}
-              setComparisonDimension={setComparisonDimension}>
+              setComparisonDimension={setComparisonDimension}
+              setRangeSelection={setRangeSelection}>
               <CompareEvaluationsPageInner />
             </CompareEvaluationsProvider>
           ),
@@ -293,7 +298,9 @@ const DimensionPicker: React.FC<{state: EvaluationComparisonState}> = props => {
         value={currDimension}
         onChange={(event, newValue) => {
           // console.log('onChange', newValue);
-          setComparisonDimension(newValue);
+          // TODO: THis is incorrect!
+          throw new Error('Not implemented');
+          // setComparisonDimension(newValue);
         }}
         options={dimensions}
         renderInput={renderParams => (
