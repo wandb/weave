@@ -21,7 +21,7 @@ Following init, calls of weave.op() decorated functions will be logged to the sp
 
 **Args:**
  
- - <b>`project_name`</b>:  The name of the Weights & Biases project to log to. 
+ - <b>`project_name`</b>:  The name of the Weights & Biases project to log to. To log to a specific W&B entity or team use the form `<entity>/<project>` otherwise a project connected to your user will be generated.
 
 
 
