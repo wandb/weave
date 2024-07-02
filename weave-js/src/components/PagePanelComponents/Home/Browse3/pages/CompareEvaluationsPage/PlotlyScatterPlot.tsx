@@ -110,5 +110,14 @@ export const PlotlyScatterPlot: React.FC<{
     return () => {};
   }, [plotlyConfig, plotlyData, plotlyLayout, props]);
 
+  useEffect(() => {
+    if (props.data && divRef.current != null) {
+      Plotly.relayout(divRef.current, {
+        'xaxis.autorange': true,
+        'yaxis.autorange': true,
+      });
+    }
+  }, [props.data]);
+
   return <div ref={divRef}></div>;
 };
