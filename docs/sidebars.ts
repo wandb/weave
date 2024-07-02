@@ -45,6 +45,7 @@ const sidebars: SidebarsConfig = {
             "guides/tracking/objects",
             "guides/tracking/ops",
             "guides/tracking/tracing",
+            "guides/tracking/feedback",
           ],
         },
         {
@@ -55,6 +56,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/openai",
             "guides/integrations/anthropic",
             "guides/integrations/mistral",
+            "guides/integrations/llamaindex",
           ],
         },
         {

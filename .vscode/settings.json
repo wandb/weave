@@ -8,5 +8,6 @@
   },
   "files.insertFinalNewline": true,
   "black-formatter.importStrategy": "fromEnvironment",
-  "cSpell.words": ["Weaveflow"]
+  "cSpell.words": ["Weaveflow"],
+  "python.testing.pytestArgs": ["weave", "-v", "--pyargs"]
 }
