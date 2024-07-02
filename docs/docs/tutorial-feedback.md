@@ -62,7 +62,7 @@ st.title("Add feedback")
 @weave.op
 def chat_response(prompt):
     stream = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4o",
         messages=[
             {"role": "user", "content": prompt},
             *[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
@@ -94,7 +94,7 @@ def get_and_process_prompt():
                 st.session_state.messages.append({"role": "assistant", "content": call.output})
         
 def init_weave():
-    client = weave.init('streamlit-feedback')
+    client = weave.init('feedback-example')
 
 def init_chat_history():
     if "messages" not in st.session_state:
@@ -120,5 +120,18 @@ Visit the Weave UI to see the attached feedback.
 
 ### Retrieving calls
 
+```python
+import weave
+client = weave.init('feedback-example')
+thumbs_down = client.feedback(reaction="👎")
+calls = thumbs_down.refs().calls()
+```
+
 ### Setting up Evaluation
 
+```python
+dataset_examples = [call.inputs['prompt'] for call in calls] # prompt is the input argument to our chat_response call
+dataset = weave.Dataset(name='good_examples', rows=dataset_examples)
+
+
+```
