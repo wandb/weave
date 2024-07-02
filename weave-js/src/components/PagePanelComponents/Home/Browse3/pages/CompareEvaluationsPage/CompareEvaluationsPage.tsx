@@ -57,11 +57,13 @@ import {ComparisonDefinition} from './ComparisonDefinitionHeader';
 import {STANDARD_PADDING} from './constants';
 import {ScoreDimension} from './evaluations';
 import {CompareEvaluationsCallsTable} from './ExampleComparisonTable';
+import {CompareEvaluationsCallsTableBig} from './ExampleComparisonTableBig';
 import {RangeSelection} from './initialize';
 import {VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 import {SummaryPlots} from './SummaryPlots';
+import {ToggleButton} from '@mui/material';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -203,6 +205,7 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC = props => {
   const {state} = useCompareEvaluationsState();
+  const [bigRows, setBigRows] = React.useState(false);
 
   return (
     <Box
@@ -222,8 +225,15 @@ const CompareEvaluationsPageInner: React.FC = props => {
         {Object.keys(state.data.models).length === 2 && (
           <ScatterFilter state={state} />
         )}
-        <CompareEvaluationsCallsTable state={state} />
-        <RowComparison state={state} />
+        <ToggleButton value={bigRows} onChange={() => setBigRows(!bigRows)}>
+          Toggle Big Rows
+        </ToggleButton>
+        {bigRows ? (
+          <CompareEvaluationsCallsTableBig state={state} />
+        ) : (
+          <CompareEvaluationsCallsTable state={state} />
+        )}
+        {/* <RowComparison state={state} /> */}
       </VerticalBox>
     </Box>
   );

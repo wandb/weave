@@ -1,5 +1,5 @@
 import {Box} from '@material-ui/core';
-import {Circle} from '@mui/icons-material';
+import {BorderTop, Circle} from '@mui/icons-material';
 import {
   GridColDef,
   GridColumnGroup,
@@ -115,7 +115,7 @@ const aggregateGroupedRows = (
 const filterNones = (list: any[]) => {
   return list.filter(v => v != null);
 };
-export const CompareEvaluationsCallsTable: React.FC<{
+export const CompareEvaluationsCallsTableBig: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const leafDims = useMemo(() => {
@@ -296,22 +296,34 @@ export const CompareEvaluationsCallsTable: React.FC<{
 
   const inputColumnKeys = useMemo(() => {
     const keys = new Set<string>();
+    const keysList: string[] = [];
     flattenedRows.forEach(row => {
-      Object.keys(row.input).forEach(key => keys.add(key));
+      Object.keys(row.input).forEach(key => {
+        if (!keys.has(key)) {
+          keys.add(key);
+          keysList.push(key);
+        }
+      });
     });
-    return keys;
+    return keysList;
   }, [flattenedRows]);
 
   const outputColumnKeys = useMemo(() => {
     const keys = new Set<string>();
+    const keysList: string[] = [];
     flattenedRows.forEach(row => {
-      Object.keys(row.output).forEach(key => keys.add(key));
+      Object.keys(row.output).forEach(key => {
+        if (!keys.has(key)) {
+          keys.add(key);
+          keysList.push(key);
+        }
+      });
     });
-    return keys;
+    return keysList;
   }, [flattenedRows]);
 
   const {cols: columns, grouping: groupingModel} = useMemo(() => {
-    const cols: Array<GridColDef<(typeof flattenedRows)[number]>> = [];
+    const cols: Array<GridColDef<(typeof filteredRows)[number]>> = [];
     const grouping: GridColumnGroupingModel = [];
     // Columns:
     // 1. dataset row identifier
@@ -398,6 +410,8 @@ export const CompareEvaluationsCallsTable: React.FC<{
               alignItems: 'center',
               justifyContent: 'center',
               width: '100%',
+              // bgcolor: '#FAFAFA',
+              height: '100%',
             }}>
             <SmallRef objRef={refParsed} iconOnly />
           </HorizontalBox>
@@ -407,152 +421,359 @@ export const CompareEvaluationsCallsTable: React.FC<{
 
     inputGroup.children.push({field: 'rowDigest'});
 
-    inputColumnKeys.forEach(key => {
-      cols.push({
-        field: 'input.' + key,
-        headerName: removePrefix(key, 'input.'),
-        valueGetter: params => {
-          return recursiveGetChildren(params).input[key];
-        },
-      });
-      inputGroup.children.push({field: 'input.' + key});
-    });
-    grouping.push(inputGroup);
+    // inputColumnKeys.forEach(key => {
+    //   cols.push({
+    //     field: 'input.' + key,
+    //     width: 400,
+    //     headerName: removePrefix(key, 'input.'),
+    //     valueGetter: params => {
+    //       return recursiveGetChildren(params).input[key];
+    //     },
+    //   });
+    //   inputGroup.children.push({field: 'input.' + key});
+    // });
+    // grouping.push(inputGroup);
 
-    const outputGroup: GridColumnGroup = {
-      groupId: 'output',
-      renderHeaderGroup: params => {
-        return 'Output  (Last)';
-      },
-      children: [],
+    const KeyValTable: React.FC<{
+      entries: Array<{key: React.ReactNode; val: React.ReactNode}>;
+      noKey?: boolean;
+      noPadding?: boolean;
+      evenHeight?: boolean;
+    }> = ({entries, noKey, noPadding, evenHeight}) => {
+      return (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: noKey ? '1rf' : 'min-content 1fr',
+            gridTemplateRows: (evenHeight ? '1fr ' : 'auto ').repeat(
+              entries.length
+            ),
+            height: '100%',
+            width: '100%',
+          }}>
+          {entries.map(({key, val}) => {
+            return (
+              <React.Fragment key={key}>
+                {!noKey && (
+                  <div
+                    style={{
+                      borderTop: '1px solid rgba(224, 224, 224, 1)',
+                      fontWeight: 'bold',
+                      // backgroundColor: '#FAFAFA',
+                      padding: 8,
+                      color: '#79808A',
+                      borderRight: '1px solid rgba(224, 224, 224, 1)',
+                      textAlign: 'right',
+                    }}>
+                    {key}
+                  </div>
+                )}
+                <div
+                  style={{
+                    borderTop: '1px solid rgba(224, 224, 224, 1)',
+                    // '&:first-child': {
+                    //   borderTop: 'none',
+                    // },
+                    padding: noPadding ? 0 : 8,
+                    textWrap: 'wrap',
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'break-word',
+                    overflow: 'auto',
+                  }}>
+                  {val}
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      );
     };
-    outputColumnKeys.forEach(key => {
-      const outputSubGroup: GridColumnGroup = {
-        groupId: 'output.' + key,
-        renderHeaderGroup: params => {
-          return removePrefix(key, 'output.');
-        },
-        children: [],
-      };
-      leafDims.forEach(dim => {
-        cols.push({
-          field: 'output.' + key + '.' + dim,
-          flex: 1,
-          // headerName: key + ' (Last)',
-          // headerName: removePrefix(key, 'output.'),
-          renderHeader: params => headerMap[dim],
-          valueGetter: params => {
-            return recursiveGetChildren(params).output[key][dim];
-          },
-        });
-        outputSubGroup.children.push({field: 'output.' + key + '.' + dim});
-      });
-      outputGroup.children.push(outputSubGroup);
-    });
-    grouping.push(outputGroup);
 
-    const latencyGroup: GridColumnGroup = {
-      groupId: 'modelLatency',
-      renderHeaderGroup: params => {
-        return 'Latency (Avg)';
+    cols.push({
+      field: 'allInput',
+      minWidth: 300,
+      flex: 1,
+      headerName: 'Input',
+      renderCell: params => {
+        return (
+          <KeyValTable
+            entries={Object.entries(params.row.input).map(([key, val]) => {
+              return {key: removePrefix(key, 'input.'), val};
+            })}
+          />
+        );
       },
-      children: [],
-    };
-    leafDims.forEach(dim => {
-      cols.push({
-        field: 'modelLatency.' + dim,
-        renderHeader: params => headerMap[dim],
-        valueGetter: params => {
-          return recursiveGetChildren(params).latency[dim];
-        },
-        renderCell: params => {
-          return (
-            <ValueViewNumber
-              fractionDigits={SIGNIFICANT_DIGITS}
-              value={params.value}
-            />
-          );
-        },
-      });
-      latencyGroup.children.push({field: 'modelLatency.' + dim});
     });
-    grouping.push(latencyGroup);
 
-    const tokenGroup: GridColumnGroup = {
-      groupId: 'totalTokens',
-      renderHeaderGroup: params => {
-        return 'Tokens (Avg)';
+    // const outputGroup: GridColumnGroup = {
+    //   groupId: 'output',
+    //   renderHeaderGroup: params => {
+    //     return 'Output  (Last)';
+    //   },
+    //   children: [],
+    // };
+    // outputColumnKeys.forEach(key => {
+    //   const outputSubGroup: GridColumnGroup = {
+    //     groupId: 'output.' + key,
+    //     renderHeaderGroup: params => {
+    //       return removePrefix(key, 'output.');
+    //     },
+    //     children: [],
+    //   };
+    //   leafDims.forEach(dim => {
+    //     cols.push({
+    //       field: 'output.' + key + '.' + dim,
+    //       flex: 1,
+    //       // headerName: key + ' (Last)',
+    //       // headerName: removePrefix(key, 'output.'),
+    //       renderHeader: params => headerMap[dim],
+    //       valueGetter: params => {
+    //         return recursiveGetChildren(params).output[key][dim];
+    //       },
+    //     });
+    //     outputSubGroup.children.push({field: 'output.' + key + '.' + dim});
+    //   });
+    //   outputGroup.children.push(outputSubGroup);
+    // });
+    // grouping.push(outputGroup);
+
+    cols.push({
+      field: 'allOutput',
+      minWidth: 500,
+      flex: 2,
+      headerName: 'Output (Last)',
+      renderCell: params => {
+        return (
+          <KeyValTable
+            evenHeight
+            noPadding
+            entries={leafDims.map(dim => {
+              return {
+                key: headerMap[dim],
+                val: (
+                  <KeyValTable
+                    entries={outputColumnKeys.map(oKey => {
+                      return {
+                        key: removePrefix(oKey, 'output.'),
+                        val: params.row.output[oKey][dim].toString(),
+                      };
+                    })}
+                  />
+                ),
+              };
+            })}
+          />
+        );
       },
-      children: [],
-    };
-    leafDims.forEach(dim => {
-      cols.push({
-        field: 'totalTokens.' + dim,
-        renderHeader: params => headerMap[dim],
-        valueGetter: params => {
-          return recursiveGetChildren(params).totalTokens[dim];
-        },
-        renderCell: params => {
-          return (
-            <ValueViewNumber
-              fractionDigits={SIGNIFICANT_DIGITS}
-              value={params.value}
-            />
-          );
-        },
-      });
-      tokenGroup.children.push({field: 'totalTokens.' + dim});
     });
-    grouping.push(tokenGroup);
 
-    const scoresGroup: GridColumnGroup = {
-      groupId: 'scores',
-      renderHeaderGroup: params => {
-        return 'Scores';
+    // const latencyGroup: GridColumnGroup = {
+    //   groupId: 'modelLatency',
+    //   renderHeaderGroup: params => {
+    //     return 'Latency (Avg)';
+    //   },
+    //   children: [],
+    // };
+    // leafDims.forEach(dim => {
+    //   cols.push({
+    //     field: 'modelLatency.' + dim,
+    //     renderHeader: params => headerMap[dim],
+    //     valueGetter: params => {
+    //       return recursiveGetChildren(params).latency[dim];
+    //     },
+    //     renderCell: params => {
+    //       return (
+    //         <ValueViewNumber
+    //           fractionDigits={SIGNIFICANT_DIGITS}
+    //           value={params.value}
+    //         />
+    //       );
+    //     },
+    //   });
+    //   latencyGroup.children.push({field: 'modelLatency.' + dim});
+    // });
+    // grouping.push(latencyGroup);
+
+    cols.push({
+      field: 'modelLatency',
+      headerName: 'Latency (Avg)',
+      minWidth: 75,
+      renderCell: params => {
+        return (
+          <KeyValTable
+            noKey
+            evenHeight
+            entries={leafDims.map(dim => {
+              return {
+                key: dim,
+                val: (
+                  <ValueViewNumber
+                    fractionDigits={SIGNIFICANT_DIGITS}
+                    value={params.row.latency[dim]}
+                  />
+                ),
+              };
+            })}
+          />
+        );
       },
-      children: [],
-    };
+    });
+
+    // const tokenGroup: GridColumnGroup = {
+    //   groupId: 'totalTokens',
+    //   renderHeaderGroup: params => {
+    //     return 'Tokens (Avg)';
+    //   },
+    //   children: [],
+    // };
+    // leafDims.forEach(dim => {
+    //   cols.push({
+    //     field: 'totalTokens.' + dim,
+    //     renderHeader: params => headerMap[dim],
+    //     valueGetter: params => {
+    //       return recursiveGetChildren(params).totalTokens[dim];
+    //     },
+    //     renderCell: params => {
+    //       return (
+    //         <ValueViewNumber
+    //           fractionDigits={SIGNIFICANT_DIGITS}
+    //           value={params.value}
+    //         />
+    //       );
+    //     },
+    //   });
+    //   tokenGroup.children.push({field: 'totalTokens.' + dim});
+    // });
+    // grouping.push(tokenGroup);
+    cols.push({
+      field: 'totalTokens',
+      headerName: 'Tokens (Avg)',
+      minWidth: 75,
+      renderCell: params => {
+        return (
+          <KeyValTable
+            noKey
+            evenHeight
+            entries={leafDims.map(dim => {
+              return {
+                key: dim,
+                val: (
+                  <ValueViewNumber
+                    fractionDigits={SIGNIFICANT_DIGITS}
+                    value={params.row.totalTokens[dim]}
+                  />
+                ),
+              };
+            })}
+          />
+        );
+      },
+    });
+
+    // const scoresGroup: GridColumnGroup = {
+    //   groupId: 'scores',
+    //   renderHeaderGroup: params => {
+    //     return 'Scores';
+    //   },
+    //   children: [],
+    // };
+    // Object.keys(scoreMap).forEach(scoreId => {
+    //   const scoresSubGroup: GridColumnGroup = {
+    //     groupId: 'scorer.' + scoreId,
+    //     renderHeaderGroup: params => {
+    //       const scorer = scoreMap[scoreId];
+    //       const scorerRefParsed = parseRef(scorer.scorerRef) as WeaveObjectRef;
+
+    //       return <SmallRef objRef={scorerRefParsed} />;
+    //     },
+    //     children: [],
+    //   };
+    //   leafDims.forEach(dim => {
+    //     cols.push({
+    //       field: 'scorer.' + scoreId + '.' + dim,
+    //       renderHeader: params => headerMap[dim],
+    //       valueGetter: params => {
+    //         return recursiveGetChildren(params).scores[scoreId][dim];
+    //       },
+    //       renderCell: params => {
+    //         return (
+    //           <ValueViewNumber
+    //             fractionDigits={SIGNIFICANT_DIGITS}
+    //             value={params.value}
+    //           />
+    //         );
+    //       },
+    //     });
+    //     scoresSubGroup.children.push({field: 'scorer.' + scoreId + '.' + dim});
+    //   });
+    //   scoresGroup.children.push(scoresSubGroup);
+    // });
+    // grouping.push(scoresGroup);
+
+    // const scoresGroup: GridColumnGroup = {
+    //   groupId: 'scores',
+    //   renderHeaderGroup: params => {
+    //     return 'Scores';
+    //   },
+    //   children: [],
+    // };
     Object.keys(scoreMap).forEach(scoreId => {
-      const scoresSubGroup: GridColumnGroup = {
-        groupId: 'scorer.' + scoreId,
-        renderHeaderGroup: params => {
+      // const scoresSubGroup: GridColumnGroup = {
+      //   groupId: 'scorer.' + scoreId,
+      //   renderHeaderGroup: params => {
+      //     const scorer = scoreMap[scoreId];
+      //     const scorerRefParsed = parseRef(scorer.scorerRef) as WeaveObjectRef;
+
+      //     return <SmallRef objRef={scorerRefParsed} />;
+      //   },
+      //   children: [],
+      // };
+      // leafDims.forEach(dim => {
+      cols.push({
+        minWidth: 50,
+        flex: 1,
+        maxWidth: 150,
+        field: 'scorer.' + scoreId,
+        renderHeader: params => {
           const scorer = scoreMap[scoreId];
           const scorerRefParsed = parseRef(scorer.scorerRef) as WeaveObjectRef;
 
           return <SmallRef objRef={scorerRefParsed} />;
         },
-        children: [],
-      };
-      leafDims.forEach(dim => {
-        cols.push({
-          field: 'scorer.' + scoreId + '.' + dim,
-          renderHeader: params => headerMap[dim],
-          valueGetter: params => {
-            return recursiveGetChildren(params).scores[scoreId][dim];
-          },
-          renderCell: params => {
-            return (
-              <ValueViewNumber
-                fractionDigits={SIGNIFICANT_DIGITS}
-                value={params.value}
-              />
-            );
-          },
-        });
-        scoresSubGroup.children.push({field: 'scorer.' + scoreId + '.' + dim});
+        renderCell: params => {
+          return (
+            <KeyValTable
+              noKey
+              evenHeight
+              entries={leafDims.map(dim => {
+                return {
+                  key: dim,
+                  val: (
+                    <ValueViewNumber
+                      fractionDigits={SIGNIFICANT_DIGITS}
+                      value={params.row.scores[scoreId][dim]}
+                    />
+                  ),
+                };
+              })}
+            />
+          );
+          // return (
+          //   <ValueViewNumber
+          //     fractionDigits={SIGNIFICANT_DIGITS}
+          //     value={params.value}
+          //   />
+          // );
+        },
       });
-      scoresGroup.children.push(scoresSubGroup);
+      // scoresSubGroup.children.push({field: 'scorer.' + scoreId + '.' + dim});
+      // });
+      // scoresGroup.children.push(scoresSubGroup);
     });
-    grouping.push(scoresGroup);
+    // grouping.push(scoresGroup);
 
     return {cols, grouping};
-  }, [
-    inputColumnKeys,
-    leafDims,
-    outputColumnKeys,
-    props.state.data.evaluationCalls,
-    scoreMap,
-  ]);
+  }, [leafDims, outputColumnKeys, props.state.data.evaluationCalls, scoreMap]);
 
   const {setSelectedInputDigest} = useCompareEvaluationsState();
 
@@ -560,6 +781,7 @@ export const CompareEvaluationsCallsTable: React.FC<{
   return (
     <Box
       sx={{
+        // height: '50vh',
         height: 'calc(100vh - 114px)',
         width: '100%',
         overflow: 'hidden',
@@ -593,7 +815,7 @@ export const CompareEvaluationsCallsTable: React.FC<{
         //   return expandedIds.includes(node.id);
         // }}
         columnHeaderHeight={38}
-        rowHeight={60}
+        rowHeight={inputColumnKeys.length * 150}
         experimentalFeatures={{columnGrouping: true}}
         columnGroupingModel={groupingModel}
         // groupingColDef={}
@@ -620,7 +842,7 @@ export const CompareEvaluationsCallsTable: React.FC<{
         // hideFooter
         // rowSelection={false}
         // groupingColDef={groupingColDef}
-        // rowSelection={true}
+        rowSelection={false}
         // rowSelectionModel={
         //   props.state.selectedInputDigest
         //     ? [props.state.selectedInputDigest]
@@ -632,11 +854,7 @@ export const CompareEvaluationsCallsTable: React.FC<{
         // }}
         sx={{
           '& .MuiDataGrid-cell': {
-            textWrap: 'wrap !important',
-            // whiteSpace: 'normal',
-            overflow: 'auto !important',
-            alignItems: 'flex-start',
-            // textOverflow: 'ellipsis',
+            padding: '0px',
           },
         }}
       />
