@@ -1,7 +1,6 @@
 import typing
 
 from weave import client_context
-from weave.legacy import context_state
 
 from . import autopatch, errors, init_message, trace_sentry, weave_client
 from .trace_server import remote_http_trace_server, sqlite_trace_server
@@ -13,17 +12,9 @@ class InitializedClient:
     def __init__(self, client: weave_client.WeaveClient):
         self.client = client
         client_context.weave_client.set_weave_client_global(client)
-        self.ref_tracking_token = context_state._ref_tracking_enabled.set(True)
-        self.eager_mode_token = context_state._eager_mode.set(True)
-        self.serverless_io_service_token = context_state._serverless_io_service.set(
-            True
-        )
 
     def reset(self) -> None:
         client_context.weave_client.set_weave_client_global(None)
-        context_state._ref_tracking_enabled.reset(self.ref_tracking_token)
-        context_state._eager_mode.reset(self.eager_mode_token)
-        context_state._serverless_io_service.reset(self.serverless_io_service_token)
 
 
 def get_username() -> typing.Optional[str]:
