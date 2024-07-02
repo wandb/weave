@@ -39,8 +39,7 @@ const config: Config = {
           breadcrumbs: false,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl:
-            "https://github.com/wandb/weave/blob/master/docs/",
+          editUrl: "https://github.com/wandb/weave/blob/master/docs/",
           routeBasePath: "/",
         },
         theme: {
@@ -52,7 +51,7 @@ const config: Config = {
 
   themeConfig: {
     // Replace with your project's social card
-    image: "img/logo.svg",
+    image: "img/logo-large-padded.png",
     navbar: {
       title: "Weave",
       logo: {
