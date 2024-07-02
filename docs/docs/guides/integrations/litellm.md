@@ -11,22 +11,24 @@ Weave automatically tracks and logs LLM calls made via LiteLLM, after `weave.ini
 
 It's important to store traces of LLM applications in a central database, both during development and in production. You'll use these traces for debugging, and as a dataset that will help you improve your application.
 
+> **Note:** When using LiteLLM, make sure to import the library using `import litellm` and call the completion function with `litellm.completion` instead of `from litellm import completion`. This ensures that all functions and attributes are correctly referenced.
+
 Weave will automatically capture traces for LiteLLM. You can use the library as usual, start by calling `weave.init()`:
 
 ```python
+import litellm
 import weave
-from litellm import completion
 
 weave.init("litellm_project")
 
-openai_response = completion(
+openai_response = litellm.completion(
     model="gpt-3.5-turbo", 
     messages=[{"role": "user", "content": "Translate 'Hello, how are you?' to French"}],
     max_tokens=1024
 )
 print(openai_response.choices[0].message.content)
 
-claude_response = completion(
+claude_response = litellm.completion(
     model="claude-3-5-sonnet-20240620", 
     messages=[{"role": "user", "content": "Translate 'Hello, how are you?' to French"}],
     max_tokens=1024
@@ -41,15 +43,14 @@ Weave will now track and log all LLM calls made through LiteLLM. You can view th
 Weave ops make results reproducible by automatically versioning code as you experiment, and they capture their inputs and outputs. Simply create a function decorated with `@weave.op()` that calls into LiteLLM's completion function and Weave will track the inputs and outputs for you. Here's an example:
 
 ```python
+import litellm
 import weave
-import os
-from litellm import completion
 
 weave.init("litellm_project")
 
 @weave.op()
 def translate(text: str, target_language: str, model: str) -> str:
-    response = completion(
+    response = litellm.completion(
         model=model,
         messages=[{"role": "user", "content": f"Translate '{text}' to {target_language}"}],
         max_tokens=1024
@@ -69,11 +70,10 @@ In addition to versioning code and capturing inputs/outputs, Models capture stru
 In the example below, you can experiment with different models and temperatures:
 
 ```python
+import litellm
 import weave
-import os
-from litellm import completion
 
-weave.init('translator-litellm')
+weave.init('litellm_project')
 
 class TranslatorModel(weave.Model):
     model: str
@@ -81,7 +81,7 @@ class TranslatorModel(weave.Model):
   
     @weave.op()
     def predict(self, text: str, target_language: str):
-        response = completion(
+        response = litellm.completion(
             model=self.model,
             messages=[
                 {"role": "system", "content": f"You are a translator. Translate the given text to {target_language}."},
@@ -102,7 +102,7 @@ english_text = "Hello, how are you today?"
 print("GPT-3.5 Translation to French:")
 print(gpt_translator.predict(english_text, "French"))
 
-print("\nClaude-3.5-Sonnet Translation to Spanish:")
+print("\nClaude-3.5 Sonnet Translation to Spanish:")
 print(claude_translator.predict(english_text, "Spanish"))
 ```
 
@@ -111,9 +111,12 @@ print(claude_translator.predict(english_text, "Spanish"))
 LiteLLM supports function calling for compatible models. Weave will automatically track these function calls.
 
 ```python
-from litellm import completion
+import litellm
+import weave
 
-response = completion(
+weave.init("litellm_project")
+
+response = litellm.completion(
     model="gpt-3.5-turbo",
     messages=[{"role": "user", "content": "Translate 'Hello, how are you?' to French"}],
     functions=[
