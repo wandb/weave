@@ -11,12 +11,13 @@ import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
 export const ScatterFilter: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
+  const targetDimension = props.state.comparisonDimension;
   // const primaryDimension: string =
   //   'weave:///shawn/weave-hooman1/op/llm_score:9yF4LQ63Dg1DSWbGX3H6nEqQcFus5hFlWYnZRadF0eA';
-  const primaryDimension: string = 'llm_score.ai_response_correctness';
-  const scorerName =
-    'weave:///shawn/weave-hooman1/op/llm_score:9yF4LQ63Dg1DSWbGX3H6nEqQcFus5hFlWYnZRadF0eA';
-  const scorerKey = 'ai_response_correctness';
+
+  const scorerName = targetDimension.scorerRef;
+  // HAXS!
+  const scorerKey = targetDimension.scoreKeyPath.split('.').splice(1).join('.');
   // const modelRefs = Object.keys(props.state.data.models);
   const baselineCallId = props.state.baselineEvaluationCallId;
   const baselineModelId =
@@ -37,7 +38,7 @@ export const ScatterFilter: React.FC<{
       color: MOON_500,
     };
 
-    if (primaryDimension === 'model_latency') {
+    if (scorerName === 'model_latency') {
       Object.values(props.state.data.resultRows).forEach(row => {
         const xVals: number[] = [];
         Object.values(row.models[modelX].predictAndScores).forEach(score => {
@@ -66,6 +67,7 @@ export const ScatterFilter: React.FC<{
         const xVals: number[] = [];
         Object.values(row.models[modelX].predictAndScores).forEach(score => {
           const val = score.scores[scorerName].results[scorerKey];
+          console.log(val, scorerKey, score.scores[scorerName]);
           if (typeof val === 'boolean') {
             xVals.push(val ? 1 : 0);
           } else {
@@ -86,7 +88,7 @@ export const ScatterFilter: React.FC<{
       });
     }
     return [series];
-  }, [modelX, modelY, props.state.data.resultRows]);
+  }, [modelX, modelY, props.state.data.resultRows, scorerKey, scorerName]);
   // console.log(data, props.state);
   const xColor = props.state.data.evaluationCalls[baselineCallId].color;
   const yColor = props.state.data.evaluationCalls[compareCallId].color;
