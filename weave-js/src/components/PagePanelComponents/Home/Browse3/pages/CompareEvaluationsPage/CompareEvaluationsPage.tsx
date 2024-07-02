@@ -1064,6 +1064,8 @@ const RowComparison: React.FC<{state: EvaluationComparisonState}> = props => {
  * - [ ] Add latency and tokens (and cost) to the scoring / plotting system more generally
  * - [ ] Failed evals break!
  * - [ ] Objects/Arrays/Refs are not suppported. see https://app.wandb.test/wandb-smle/weave-rag-lc-demo/weave/compare-evaluations?evaluationCallIds=%5B%2221e8ea02-3109-434c-95d0-cb2c7c542f74%22%5D&peekPath=%2Fwandb-smle%2Fweave-rag-lc-demo%2Fcalls%2F21e8ea02-3109-434c-95d0-cb2c7c542f74
+ * - [ ] Big: empty selection
+ * - [ ] Selection Filter seems to reset periodically? on data refresh
  * TEST:
  * - [ ] Single Case
  * - [ ] Dual Case
