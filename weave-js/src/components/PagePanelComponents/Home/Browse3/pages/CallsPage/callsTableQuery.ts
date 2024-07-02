@@ -132,7 +132,7 @@ const convertHighLevelFilterToLowLevelFilter = (
     parentIds: effectiveFilter.parentId
       ? [effectiveFilter.parentId]
       : undefined,
-    callIds: effectiveFilter.callIds
+    callIds: effectiveFilter.callIds,
   };
 };
 

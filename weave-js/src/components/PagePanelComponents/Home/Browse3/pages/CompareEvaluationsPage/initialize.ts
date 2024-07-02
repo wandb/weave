@@ -58,10 +58,17 @@ export const useInitialState = (
           baselineEvaluationCallId ?? evaluationCallIds[0],
         comparisonDimension: comparisonDimension ?? dimensions[0],
         rangeSelection: rangeSelection ?? {},
-        selectedInputDigest: selectedInputDigest,
+        selectedInputDigest,
       },
     };
-  }, [data, baselineEvaluationCallId, evaluationCallIds, comparisonDimension, rangeSelection, selectedInputDigest]);
+  }, [
+    data,
+    baselineEvaluationCallId,
+    evaluationCallIds,
+    comparisonDimension,
+    rangeSelection,
+    selectedInputDigest,
+  ]);
 
   return value;
 };

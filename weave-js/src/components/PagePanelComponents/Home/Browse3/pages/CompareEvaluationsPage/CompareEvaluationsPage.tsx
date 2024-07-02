@@ -24,6 +24,7 @@ import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {useEvaluationsFilter} from '../CallsPage/CallsPage';
+import {CallsTable} from '../CallsPage/CallsTable';
 import {CallLink} from '../common/Links';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
@@ -48,7 +49,6 @@ import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {ScatterFilter} from './ScatterFilter';
 import {moveItemToFront, ScoreCard} from './Scorecard';
-import {CallsTable} from '../CallsPage/CallsTable';
 
 type CompareEvaluationsPageProps = {
   entity: string;

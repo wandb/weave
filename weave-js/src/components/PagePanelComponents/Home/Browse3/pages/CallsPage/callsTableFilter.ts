@@ -91,7 +91,8 @@ export const filterShouldUseTraceRootsOnly = (
     !opVersionRefsSet &&
     !inputObjectVersionRefsSet &&
     !outputObjectVersionRefsSet &&
-    !parentIdSet && !filter.callIds
+    !parentIdSet &&
+    !filter.callIds
   );
 };
 export const useInputObjectVersionOptions = (

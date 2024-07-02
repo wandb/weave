@@ -203,7 +203,9 @@ export const ScoreCard: React.FC<{
   let gridTemplateColumns = '';
   gridTemplateColumns += 'min-content '; // Scorer Name
   gridTemplateColumns += 'min-content '; // Metric/Property Name
-  gridTemplateColumns += evalCallIds.map(() => 'auto ').join(' '); // each model
+  gridTemplateColumns += evalCallIds
+    .map(() => 'minmax(200px, auto) ')
+    .join(' '); // each model
 
   return (
     <Box
@@ -290,7 +292,17 @@ export const ScoreCard: React.FC<{
                     </GridCell>
                   );
                 } else {
-                  return <GridCell key={mNdx}>{modelData[model]}</GridCell>;
+                  return (
+                    <GridCell
+                      key={mNdx}
+                      style={{
+                        lineBreak: 'anywhere',
+                        maxHeight: '100px',
+                        overflow: 'auto',
+                      }}>
+                      {modelData[model]}
+                    </GridCell>
+                  );
                 }
               })}
               {/* <GridCell></GridCell> */}
