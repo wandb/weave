@@ -1,6 +1,10 @@
 import {Box, FormControl} from '@material-ui/core';
 import {Autocomplete} from '@mui/material';
-import {DataGridProProps, GridColDef} from '@mui/x-data-grid-pro';
+import {
+  DataGridProProps,
+  GridColDef,
+  GridValueGetterParams,
+} from '@mui/x-data-grid-pro';
 import React, {FC, useCallback, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -35,6 +39,7 @@ import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {ScatterFilter} from './ScatterFilter';
 import {moveItemToFront, ScoreCard} from './Scorecard';
+import {useTraceUpdate} from '../../../../../../common/util/hooks';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -374,6 +379,8 @@ const CompareEvaluationsCallsTable: React.FC<{
 }> = props => {
   // TODO: Grouping / Nesting
 
+  // useTraceUpdate('CompareEvaluationsCallsTable', props);
+
   const scores = useEvaluationCallDimensions(props.state);
   const scoreMap = useMemo(() => {
     return Object.fromEntries(
@@ -384,13 +391,14 @@ const CompareEvaluationsCallsTable: React.FC<{
   const flattenedRows = useMemo(() => {
     const rows: Array<{
       id: string;
+      evaluationCallId: string;
       inputDigest: string;
       input: {[inputKey: string]: any};
       output: {[outputKey: string]: any};
       scores: {[scoreId: string]: number | boolean};
       latency: number;
       totalTokens: number;
-      // path: string[];
+      path: string[];
     }> = [];
     Object.entries(props.state.data.resultRows).forEach(
       ([rowDigest, rowCollection]) => {
@@ -404,6 +412,7 @@ const CompareEvaluationsCallsTable: React.FC<{
                 rows.push({
                   // ...predictAndScoreRes,
                   id: predictAndScoreRes.callId,
+                  evaluationCallId: predictAndScoreRes.evaluationCallId,
                   inputDigest: datasetRow.digest,
                   input: flattenObject({input: datasetRow.val}),
                   output: flattenObject({output}),
@@ -425,7 +434,11 @@ const CompareEvaluationsCallsTable: React.FC<{
                       ];
                     })
                   ),
-                  // path: [rowDigest, predictAndScoreRes.callId],
+                  path: [
+                    rowDigest,
+                    predictAndScoreRes.evaluationCallId,
+                    predictAndScoreRes.callId,
+                  ],
                 });
               }
             }
@@ -439,6 +452,7 @@ const CompareEvaluationsCallsTable: React.FC<{
   console.log({flattenedRows, scoreMap});
   const pivotedRows = useMemo(() => {
     const leafDims = Object.keys(props.state.data.evaluationCalls);
+    // Ok, so in this step we are going to pivot
   }, []);
 
   const filteredRows = useMemo(() => {
@@ -484,15 +498,29 @@ const CompareEvaluationsCallsTable: React.FC<{
     // 6.(s) Each scoring key (average)
     // 6.(s).(n) -> split for each comparison
 
+    const recursiveGetChildren = (
+      params: GridValueGetterParams<(typeof flattenedRows)[number]>
+    ) => {
+      let rowNode = params.rowNode;
+      while (rowNode.type === 'group') {
+        rowNode = params.api.getRowNode(rowNode.children[0])!;
+      }
+      return params.api.getRow(rowNode.id);
+    };
+
     cols.push({
       field: 'rowDigest',
       headerName: 'Row ID',
       valueGetter: params => {
-        if (params.rowNode.type === 'group') {
-          const childrenRows = params.rowNode.children.map(params.api.getRow);
-          return childrenRows[0].rowDigest;
-        }
-        return params.row.inputDigest;
+        return recursiveGetChildren(params).inputDigest;
+      },
+    });
+
+    cols.push({
+      field: 'evaluationCallId',
+      headerName: 'Eval ID',
+      valueGetter: params => {
+        return recursiveGetChildren(params).evaluationCallId;
       },
     });
 
@@ -509,11 +537,7 @@ const CompareEvaluationsCallsTable: React.FC<{
         field: 'input.' + key,
         headerName: key,
         valueGetter: params => {
-          if (params.rowNode.type === 'group') {
-            const childrenRows = params.rowNode.children.map(params.api.getRow);
-            return childrenRows[0].input[key];
-          }
-          return params.row.input[key];
+          return recursiveGetChildren(params).input[key];
         },
       });
     });
@@ -523,11 +547,7 @@ const CompareEvaluationsCallsTable: React.FC<{
         field: 'output.' + key,
         headerName: key,
         valueGetter: params => {
-          if (params.rowNode.type === 'group') {
-            const childrenRows = params.rowNode.children.map(params.api.getRow);
-            return childrenRows[0].output[key];
-          }
-          return params.row.output[key];
+          return recursiveGetChildren(params).output[key];
         },
       });
     });
@@ -536,11 +556,7 @@ const CompareEvaluationsCallsTable: React.FC<{
       field: 'modelLatency',
       headerName: 'Latency',
       valueGetter: params => {
-        if (params.rowNode.type === 'group') {
-          const childrenRows = params.rowNode.children.map(params.api.getRow);
-          return childrenRows[0].latency;
-        }
-        return params.row.latency;
+        return recursiveGetChildren(params).latency;
       },
     });
 
@@ -548,11 +564,7 @@ const CompareEvaluationsCallsTable: React.FC<{
       field: 'totalTokens',
       headerName: 'Tokens',
       valueGetter: params => {
-        if (params.rowNode.type === 'group') {
-          const childrenRows = params.rowNode.children.map(params.api.getRow);
-          return childrenRows[0].totalTokens;
-        }
-        return params.row.totalTokens;
+        return recursiveGetChildren(params).totalTokens;
       },
     });
 
@@ -562,12 +574,7 @@ const CompareEvaluationsCallsTable: React.FC<{
         field: 'scorer.' + scoreId,
         headerName: scoreMap[scoreId].scoreKeyPath,
         valueGetter: params => {
-          // console.log({fullKey, params});
-          if (params.rowNode.type === 'group') {
-            const childrenRows = params.rowNode.children.map(params.api.getRow);
-            return childrenRows[0].scores[scoreId];
-          }
-          return params.row.scores[scoreId];
+          return recursiveGetChildren(params).scores[scoreId];
         },
       });
     });
@@ -609,8 +616,8 @@ const CompareEvaluationsCallsTable: React.FC<{
         // }}
         columnHeaderHeight={38}
         rowHeight={30}
-        // treeData
-        // getTreeDataPath={getTreeDataPath}
+        treeData
+        getTreeDataPath={getTreeDataPath}
         // getRowHeight={(params: GridRowHeightParams) => {
         //   const isNonRefString =
         //     params.model.valueType === 'string' && !isRef(params.model.value);
@@ -635,7 +642,7 @@ const CompareEvaluationsCallsTable: React.FC<{
         rowSelection={false}
         sx={{}}
       />
-      COMING SOON
+      {/* COMING SOON */}
       {/* <CallsTable
         entity={props.entity}
         project={props.project}
