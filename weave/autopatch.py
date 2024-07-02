@@ -38,6 +38,7 @@ def autopatch() -> None:
     autopatch_openai()
 
     from .integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from .integrations.groq.groq import groq_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
     from .integrations.mistral.mistral import mistral_patcher
@@ -46,12 +47,14 @@ def autopatch() -> None:
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
     anthropic_patcher.attempt_patch()
+    groq_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
     unpatch_openai()
 
     from .integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from .integrations.groq.groq import groq_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
     from .integrations.mistral.mistral import mistral_patcher
@@ -60,3 +63,4 @@ def reset_autopatch() -> None:
     litellm_patcher.undo_patch()
     llamaindex_patcher.undo_patch()
     anthropic_patcher.undo_patch()
+    groq_patcher.undo_patch()

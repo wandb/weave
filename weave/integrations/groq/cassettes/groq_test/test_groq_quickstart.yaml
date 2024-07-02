@@ -1,0 +1,92 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "What is the capital of India?"}],
+      "model": "llama3-8b-8192", "seed": 42}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '115'
+      content-type:
+      - application/json
+      host:
+      - api.groq.com
+      user-agent:
+      - Groq/Python 0.9.0
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 0.9.0
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.12
+    method: POST
+    uri: https://api.groq.com/openai/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SRu27cMBRE+3yFcGtqQepFirWbNKnSBYFAUVcrrvkySTtrLPTvgYysgLSDOZgZ
+        zAPMAhL0pop20dZatMOKaqjHuevrrhFLLXrKa96Ni2Kcc6oZEAjzDXX5B150cNFiMcEDAZ1QFVxA
+        Ms7Gthl6wQm4sKAFCdYqp9pazLVgY3O4t2A0ZpC/HmD8gneQlIDDnNUVQT4gBYsgQeVsclG+HEzw
+        Bf2R/nPDSqtoirJVWKvvfjGqMrn6gX+qF7SbucBOwIZrTGHOIP27tQRW403epoQqBw8ScgkR9t8E
+        3p+hMQUXy1TCK/p8LCGnZByCpBdKO0o7wfujznP9CYz/qyczdJyyThAooSh72pvhVJ5WRjve06bd
+        CeTPXNBNq/FXTDGZr+VrnARvVT/QkbdA4D5dU3g7un/9mfBtouzG+P11mf16i+NHo4e+/0yD+0DY
+        929/AQAA//8DAKiGeAH5AQAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8995ba572f273f9d-BOM
+      Cache-Control:
+      - private, max-age=0, no-store, no-cache, must-revalidate
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 25 Jun 2024 14:43:07 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=wlwhN8bLQCfykGqdLgoSm0NnsrUALlj0Az8.chNbrCk-1719326587-1.0.1.1-nShf8GyAVWwJOL_oDAzHNPYkNODRxTAzlHyr5Rg.PFKxYUGb7cmXVkHOV8N1erjtJxWCZhh1A9Vl7kirvWTKBQ;
+        path=/; expires=Tue, 25-Jun-24 15:13:07 GMT; domain=.groq.com; HttpOnly; Secure;
+        SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      vary:
+      - Origin
+      via:
+      - 1.1 google
+      x-ratelimit-limit-requests:
+      - '100000'
+      x-ratelimit-limit-tokens:
+      - '70000'
+      x-ratelimit-remaining-requests:
+      - '99999'
+      x-ratelimit-remaining-tokens:
+      - '69988'
+      x-ratelimit-reset-requests:
+      - 864ms
+      x-ratelimit-reset-tokens:
+      - 10.285714ms
+      x-request-id:
+      - req_01j17xkdbnfjp9v2c655yr6mve
+    status:
+      code: 200
+      message: OK
+version: 1
