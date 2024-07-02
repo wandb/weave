@@ -1,8 +1,10 @@
+import warnings
 from typing import Any, Optional
 
 from pydantic import (
     BaseModel,
     ConfigDict,
+    Field,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
     model_validator,
@@ -10,14 +12,14 @@ from pydantic import (
 
 # import pydantic
 from weave.legacy import box
+from weave.trace.metadata import Metadata
 from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import ObjectRecord, TraceObject, pydantic_getattribute
 from weave.weave_client import get_ref
 
 
 class Object(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
+    metadata: Metadata = Field(default_factory=Metadata, repr=False)
 
     # Allow Op attributes
     model_config = ConfigDict(
@@ -36,6 +38,8 @@ class Object(BaseModel):
     def handle_relocatable_object(
         cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
     ) -> Any:
+        if isinstance(v, Metadata):
+            return handler(v)
         if isinstance(v, ObjectRef):
             return v.get()
         if isinstance(v, TraceObject):
@@ -51,11 +55,20 @@ class Object(BaseModel):
                     val = None
                 fields[k] = val
 
+            # For legacy compat where metadata were stored directly on the obj itself
+            if "metadata" not in fields:
+                metadata = Metadata(
+                    name=fields.pop("name", None),
+                    description=fields.pop("description", None),
+                )
+                fields["metadata"] = metadata
+
             # pydantic validation will construct a new pydantic object
             def is_ignored_type(v: type) -> bool:
                 return isinstance(v, cls.model_config["ignored_types"])
 
             allowed_fields = {k: v for k, v in fields.items() if not is_ignored_type(v)}
+            allowed_fields.pop("metadata", None)
             new_obj = handler(allowed_fields)
             for k, kv in fields.items():
                 if is_ignored_type(kv):

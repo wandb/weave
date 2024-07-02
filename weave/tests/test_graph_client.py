@@ -40,7 +40,7 @@ def test_flask_server(flask_server):
     assert response.text == "mKjx6QUaOQ3cDTRubJUAVQ2I6n0bOn8I4RK2ETbKzvk"
 
 
-def test_weave_client_global_accessible_in_thread(client):
+def test_graph_client_global_accessible_in_thread(client):
     def thread_func(q: queue.Queue):
         try:
             d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
