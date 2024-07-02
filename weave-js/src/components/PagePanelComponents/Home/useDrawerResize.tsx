@@ -2,6 +2,8 @@ import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 
+export const SIDEBAR_WIDTH = 56;
+
 const setDrawerSize = (
   newSize: number,
   setSize: (value: number) => void,
@@ -68,8 +70,9 @@ export const useDrawerResize = () => {
       const minWidth = (300 / windowSize.width) * 100;
       e.preventDefault();
 
-      const newWidth =
-        ((windowSize.width - e.clientX) * 100) / windowSize.width;
+      // subtract the sidebar width
+      const totalWidth = windowSize.width - SIDEBAR_WIDTH;
+      const newWidth = ((totalWidth - e.clientX) * 100) / totalWidth;
       setDrawerSize(newWidth, setWidth, minWidth, maxWidth);
     },
     [windowSize.width, setWidth]

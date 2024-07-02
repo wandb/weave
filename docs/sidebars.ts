@@ -45,13 +45,19 @@ const sidebars: SidebarsConfig = {
             "guides/tracking/objects",
             "guides/tracking/ops",
             "guides/tracking/tracing",
+            "guides/tracking/feedback",
           ],
         },
         {
           type: "category",
-          label: "Ecosystem",
-          link: { type: "doc", id: "guides/ecosystem/index" },
-          items: ["guides/ecosystem/openai", "guides/ecosystem/anthropic", "guides/ecosystem/mistral"],
+          label: "Integrations",
+          link: { type: "doc", id: "guides/integrations/index" },
+          items: [
+            "guides/integrations/openai",
+            "guides/integrations/anthropic",
+            "guides/integrations/mistral",
+            "guides/integrations/llamaindex",
+          ],
         },
         {
           type: "category",
@@ -60,7 +66,8 @@ const sidebars: SidebarsConfig = {
           items: ["guides/tools/serve", "guides/tools/deploy"],
         },
         {
-          type: "doc", id: "guides/platform/index",
+          type: "doc",
+          id: "guides/platform/index",
         },
       ],
     },

@@ -67,26 +67,26 @@ def test_output_of(client):
 
     result = add_5(10)
 
-    run = weave.output_of(result)
-    assert run is not None
-    assert "add_5" in run.op_name
-    assert run.inputs["v"] == 10
+    call = weave.output_of(result)
+    assert call is not None
+    assert "add_5" in call.op_name
+    assert call.inputs["v"] == 10
 
     result2 = add_5(result)
-    run = weave.output_of(result2)
-    assert run is not None
-    assert "add_5" in run.op_name
+    call = weave.output_of(result2)
+    assert call is not None
+    assert "add_5" in call.op_name
 
     # v_input is a ref here and we have to deref it
     # TODO: this is not consistent. Shouldn't it already be
     # dereffed recursively when we get it from weave.output_of() ?
-    v_input = run.inputs["v"].get()
+    v_input = call.inputs["v"].get()
     assert v_input == 15
 
-    run = weave.output_of(v_input)
-    assert run is not None
-    assert "add_5" in run.op_name
-    assert run.inputs["v"] == 10
+    call = weave.output_of(v_input)
+    assert call is not None
+    assert "add_5" in call.op_name
+    assert call.inputs["v"] == 10
 
 
 def test_weaveflow_op_wandb(client):

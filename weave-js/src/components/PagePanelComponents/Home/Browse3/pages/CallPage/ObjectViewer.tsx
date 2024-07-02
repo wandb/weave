@@ -33,6 +33,10 @@ import {
   WeaveCHTableSourceRefContext,
 } from './DataTableView';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
+import {
+  getKnownImageDictContexts,
+  isKnownImageDictFormat,
+} from './objectViewerUtilities';
 import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
@@ -188,6 +192,14 @@ export const ObjectViewer = ({
             value: '',
             valueType: 'undefined',
           });
+        } else if (
+          context.valueType === 'object' &&
+          isKnownImageDictFormat(context.value)
+        ) {
+          // If we detect an object with base64 encoded image data in a known schema,
+          // replace it with a patched version that can be rendered as a thumbnail.
+          contexts.push(...getKnownImageDictContexts(context));
+          return 'skip';
         } else {
           contexts.push(context);
         }
