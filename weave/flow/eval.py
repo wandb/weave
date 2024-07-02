@@ -234,7 +234,16 @@ class Evaluation(Object):
                 raise OpCallError(message)
             # this is a catchall in case the user's scorer function throws
             except Exception as e:
-                result = {"error": str(e), "example": example}
+                exc_type = type(e).__name__
+                exc_val = str(e)
+                exc_traceback = traceback.format_exc()
+
+                result = {
+                    "exception_type": exc_type,
+                    "exception_value": exc_val,
+                    "exception_traceback": exc_traceback,
+                    "example": example,
+                }
             scores[scorer_name] = result
 
         return {
@@ -257,7 +266,9 @@ class Evaluation(Object):
                     score_table = scorer_stats[scorer_name]
 
                     if errs := [
-                        s for s in score_table if isinstance(s, dict) and "error" in s
+                        s
+                        for s in score_table
+                        if isinstance(s, dict) and "exception_type" in s
                     ]:
                         summary[scorer_name] = {"errors": errs}
                     else:
