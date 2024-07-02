@@ -1,9 +1,25 @@
 import asyncio
+import inspect
 import multiprocessing
-from typing import Any, AsyncIterator, Awaitable, Callable, Iterable, Tuple, TypeVar
+from typing import Any, AsyncIterator, Awaitable, Callable, Coroutine, Iterable, Tuple, TypeVar, Union
+
+from weave.trace.op import Op
 
 T = TypeVar("T")
 U = TypeVar("U")
+
+
+def async_call(
+    func: Union[Callable, Op], *args: Any, **kwargs: Any
+) -> Coroutine:
+    is_async = False
+    if isinstance(func, Op):
+        is_async = inspect.iscoroutinefunction(func.resolve_fn)
+    else:
+        is_async = inspect.iscoroutinefunction(func)
+    if is_async:
+        return func(*args, **kwargs)  # type: ignore
+    return asyncio.to_thread(func, *args, **kwargs)
 
 
 async def async_foreach(
