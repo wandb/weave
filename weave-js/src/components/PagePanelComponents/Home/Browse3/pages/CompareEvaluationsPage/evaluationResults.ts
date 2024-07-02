@@ -371,6 +371,10 @@ export const fetchEvaluationComparisonData = async (
               modelRefs.includes(traceCall.inputs.self);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
+            // WOW - super hacky. we have to do this b/c we support both instances and ops for scorers!
+            const isProbablyBoundScoreCall = scorerRefs.has(
+              traceCall.inputs.self
+            );
 
             if (result.resultRows[rowDigest] == null) {
               result.resultRows[rowDigest] = {
@@ -442,7 +446,7 @@ export const fetchEvaluationComparisonData = async (
 
             if (isProbablyPredictCall) {
               const totalTokens = sum(
-                Object.values(traceCall.summary?.usage).map(
+                Object.values(traceCall.summary?.usage ?? {}).map(
                   (x: any) => x?.total_tokens ?? 0
                 )
               );
@@ -458,12 +462,16 @@ export const fetchEvaluationComparisonData = async (
                 totalUsageTokens: totalTokens,
                 _rawPredictTraceData: traceCall,
               };
-            } else if (isProbablyScoreCall) {
+            } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
               let results = traceCall.output as any;
               if (typeof results !== 'object') {
                 results = {'': results}; // no nesting. probably something we should fix more generally
               }
-              predictAndScoreFinal.scores[traceCall.op_name] = {
+              let scorerName = traceCall.op_name;
+              if (isProbablyBoundScoreCall) {
+                scorerName = traceCall.inputs.self;
+              }
+              predictAndScoreFinal.scores[scorerName] = {
                 callId: traceCall.id,
                 results,
                 _rawScoreTraceData: traceCall,

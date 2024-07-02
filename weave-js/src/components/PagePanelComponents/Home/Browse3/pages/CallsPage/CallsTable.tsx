@@ -360,6 +360,9 @@ export const CallsTable: FC<{
           const rowId = params.id as string;
           return (
             <Checkbox
+              disabled={
+                params.row.exception != null || params.row.ended_at == null
+              }
               checked={compareSelection.includes(rowId)}
               onChange={() => {
                 if (compareSelection.includes(rowId)) {
