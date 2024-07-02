@@ -312,7 +312,7 @@ export const fetchEvaluationComparisonData = async (
     }),
     digest: parsedRowsRef.artifactVersion,
   });
-  console.log(parsedDatasetRef);
+  // console.log(parsedDatasetRef);
   rowsQuery.rows.forEach(row => {
     result.inputs[row.digest] = {
       digest: row.digest,
@@ -357,7 +357,7 @@ export const fetchEvaluationComparisonData = async (
       // console.log(traceCall)
       const exampleRef = parentPredictAndScore.inputs.example;
       const modelRef = parentPredictAndScore.inputs.model;
-      const evaluationCallId = parentPredictAndScore.parent_id!
+      const evaluationCallId = parentPredictAndScore.parent_id!;
 
       const split = '/attr/rows/id/';
       if (exampleRef.includes(split)) {
@@ -413,7 +413,8 @@ export const fetchEvaluationComparisonData = async (
               };
             }
 
-            const modelForDigestCollection = digestCollection.evaluations[evaluationCallId];
+            const modelForDigestCollection =
+              digestCollection.evaluations[evaluationCallId];
 
             if (
               modelForDigestCollection.predictAndScores[

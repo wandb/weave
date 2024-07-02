@@ -365,20 +365,33 @@ const SwapPositionsButton: React.FC<{callId: string}> = props => {
   );
 };
 
+const scoreIdFromScoreDimension = (dim: ScoreDimension): string => {
+  return dim.scorerRef + '@' + dim.scoreKeyPath;
+};
+
 const CompareEvaluationsCallsTable: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   // TODO: Grouping / Nesting
 
+  const scores = useEvaluationCallDimensions(props.state);
+  const scoreMap = useMemo(() => {
+    return Object.fromEntries(
+      scores.map(score => [scoreIdFromScoreDimension(score), score])
+    );
+  }, [scores]);
+
   const flattenedRows = useMemo(() => {
-    const rows: Array<
-      PredictAndScoreCall & {
-        id: string;
-        input: any;
-        output: any;
-        path: string[];
-      }
-    > = [];
+    const rows: Array<{
+      id: string;
+      inputDigest: string;
+      input: {[inputKey: string]: any};
+      output: {[outputKey: string]: any};
+      scores: {[scoreId: string]: number | boolean};
+      latency: number;
+      totalTokens: number;
+      // path: string[];
+    }> = [];
     Object.entries(props.state.data.resultRows).forEach(
       ([rowDigest, rowCollection]) => {
         Object.values(rowCollection.evaluations).forEach(modelCollection => {
@@ -389,11 +402,30 @@ const CompareEvaluationsCallsTable: React.FC<{
               if (datasetRow != null) {
                 const output = predictAndScoreRes.predictCall?.output;
                 rows.push({
-                  ...predictAndScoreRes,
+                  // ...predictAndScoreRes,
                   id: predictAndScoreRes.callId,
+                  inputDigest: datasetRow.digest,
                   input: flattenObject({input: datasetRow.val}),
                   output: flattenObject({output}),
-                  path: [rowDigest, predictAndScoreRes.callId],
+                  latency: predictAndScoreRes.predictCall?.latencyMs ?? 0,
+                  totalTokens:
+                    predictAndScoreRes.predictCall?.totalUsageTokens ?? 0,
+                  scores: Object.fromEntries(
+                    Object.entries(scoreMap).map(([scoreKey, scoreVal]) => {
+                      const hackKey = scoreVal.scoreKeyPath
+                        .split('.')
+                        .splice(1)
+                        .join('.');
+                      return [
+                        scoreKey,
+                        flattenObject(
+                          predictAndScoreRes.scores[scoreVal.scorerRef]
+                            ?.results ?? {}
+                        )[hackKey],
+                      ];
+                    })
+                  ),
+                  // path: [rowDigest, predictAndScoreRes.callId],
                 });
               }
             }
@@ -402,8 +434,9 @@ const CompareEvaluationsCallsTable: React.FC<{
       }
     );
     return rows;
-  }, [props.state.data.inputs, props.state.data.resultRows]);
+  }, [props.state.data.inputs, props.state.data.resultRows, scoreMap]);
 
+  console.log({flattenedRows, scoreMap});
   const pivotedRows = useMemo(() => {
     const leafDims = Object.keys(props.state.data.evaluationCalls);
   }, []);
@@ -434,8 +467,6 @@ const CompareEvaluationsCallsTable: React.FC<{
     return keys;
   }, [flattenedRows]);
 
-  const dimensions = useEvaluationCallDimensions(props.state);
-
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof flattenedRows)[number]>> = [];
 
@@ -461,7 +492,7 @@ const CompareEvaluationsCallsTable: React.FC<{
           const childrenRows = params.rowNode.children.map(params.api.getRow);
           return childrenRows[0].rowDigest;
         }
-        return params.row.rowDigest;
+        return params.row.inputDigest;
       },
     });
 
@@ -507,9 +538,9 @@ const CompareEvaluationsCallsTable: React.FC<{
       valueGetter: params => {
         if (params.rowNode.type === 'group') {
           const childrenRows = params.rowNode.children.map(params.api.getRow);
-          return childrenRows[0].predictCall?.latencyMs;
+          return childrenRows[0].latency;
         }
-        return params.row.predictCall?.latencyMs;
+        return params.row.latency;
       },
     });
 
@@ -519,34 +550,30 @@ const CompareEvaluationsCallsTable: React.FC<{
       valueGetter: params => {
         if (params.rowNode.type === 'group') {
           const childrenRows = params.rowNode.children.map(params.api.getRow);
-          return childrenRows[0].predictCall?.totalUsageTokens;
+          return childrenRows[0].totalTokens;
         }
-        return params.row.predictCall?.totalUsageTokens;
+        return params.row.totalTokens;
       },
     });
 
-    dimensions.forEach(dim => {
+    Object.keys(scoreMap).forEach(scoreId => {
+      // HAXS!
       cols.push({
-        field: 'scorer.' + dim.scorerRef + '.' + dim.scoreKeyPath,
-        headerName: dim.scoreKeyPath,
+        field: 'scorer.' + scoreId,
+        headerName: scoreMap[scoreId].scoreKeyPath,
         valueGetter: params => {
-          // HAXS!
-          const scorerKey = dim.scoreKeyPath.split('.').splice(1).join('.');
+          // console.log({fullKey, params});
           if (params.rowNode.type === 'group') {
             const childrenRows = params.rowNode.children.map(params.api.getRow);
-            return flattenObject(
-              childrenRows[0].scores[dim.scorerRef]?.results ?? {}
-            )[scorerKey];
+            return childrenRows[0].scores[scoreId];
           }
-          return flattenObject(params.row.scores[dim.scorerRef]?.results ?? {})[
-            scorerKey
-          ];
+          return params.row.scores[scoreId];
         },
       });
     });
 
     return cols;
-  }, [dimensions, inputColumnKeys, outputColumnKeys]);
+  }, [inputColumnKeys, outputColumnKeys, scoreMap]);
 
   const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row => row.path;
 
