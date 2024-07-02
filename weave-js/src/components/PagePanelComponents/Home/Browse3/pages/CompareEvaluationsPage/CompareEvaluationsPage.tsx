@@ -25,7 +25,6 @@
  * Styling / UX:
  * - [ ] Add a better loading state
  * - [ ] Header controls don't scale well to smaller sized
- * - [ ] Use Shawn's color Pallet
  * - [ ] Should pull in EvaluationCall display name if it exists
  * - [ ] Hover tooltip on charts to show values
  * - Scatterplot Filter UX
@@ -37,6 +36,7 @@
  */
 
 import {Box} from '@material-ui/core';
+import {ToggleButton} from '@mui/material';
 import React, {FC, useCallback, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -63,7 +63,6 @@ import {VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 import {SummaryPlots} from './SummaryPlots';
-import {ToggleButton} from '@mui/material';
 
 type CompareEvaluationsPageProps = {
   entity: string;

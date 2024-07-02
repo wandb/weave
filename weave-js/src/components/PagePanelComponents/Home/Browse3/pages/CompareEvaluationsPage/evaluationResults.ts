@@ -12,6 +12,7 @@ import {
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {EvaluationEvaluateCallSchema} from './evaluations';
+import { WB_RUN_COLORS } from '../../../../../../common/css/color.styles';
 
 export type BinarySummaryScore = {
   true_count: number;
@@ -162,6 +163,10 @@ const generateColorFromId = (id: string) => {
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };
 
+const pickColor = (ndx: number) => {
+  return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
+}
+
 export const fetchEvaluationComparisonData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
   entity: string,
@@ -203,7 +208,8 @@ export const fetchEvaluationComparisonData = async (
         // TODO: Get user-defined name for the evaluation
         name: 'Evaluation',
         // TODO: Get user-defined color for the evaluation
-        color: generateColorFromId(call.id),
+        color: pickColor(ndx),
+        // color: generateColorFromId(call.id),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
         scores: Object.fromEntries(
