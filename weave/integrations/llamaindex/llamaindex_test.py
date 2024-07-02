@@ -1,12 +1,9 @@
-import typing
-from typing import Any, Generator, List, Optional
+from typing import Any, Generator, Optional
 
 import pytest
 
 import weave
 from weave.trace_server import trace_server_interface as tsi
-
-from .llamaindex import llamaindex_patcher
 
 
 def filter_body(r: Any) -> Any:
@@ -119,3 +116,7 @@ async def test_llamaindex_quickstart_async(
     response = await query_engine.aquery("What did the author do growing up?")
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_calls_correct_for_quickstart(res.calls)
+
+
+def test_nothing(client: weave.weave_client.WeaveClient) -> None:
+    assert True

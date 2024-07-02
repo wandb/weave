@@ -1,5 +1,5 @@
 import os
-from typing import Any, Generator
+from typing import Any
 
 import pytest
 from mistralai.async_client import MistralAsyncClient
@@ -7,8 +7,6 @@ from mistralai.client import MistralClient
 
 import weave
 from weave.trace_server import trace_server_interface as tsi
-
-from .mistral import mistral_patcher
 
 
 def _get_call_output(call: tsi.CallSchema) -> Any:
@@ -232,3 +230,9 @@ async def test_mistral_quickstart_with_stream_async(
     assert output.usage.completion_tokens == model_usage["completion_tokens"] == 242
     assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
     assert output.usage.total_tokens == model_usage["total_tokens"] == 252
+
+
+def test_nothing(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    assert True
