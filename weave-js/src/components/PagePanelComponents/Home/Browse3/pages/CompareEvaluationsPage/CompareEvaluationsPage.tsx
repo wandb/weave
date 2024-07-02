@@ -5,6 +5,7 @@ import {
   GridColDef,
   GridValueGetterParams,
 } from '@mui/x-data-grid-pro';
+import _ from 'lodash';
 import React, {FC, useCallback, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -31,7 +32,6 @@ import {
   STANDARD_PADDING,
 } from './constants';
 import {EvaluationDefinition} from './EvaluationDefinition';
-import {PredictAndScoreCall} from './evaluationResults';
 import {evaluationMetrics, ScoreDimension} from './evaluations';
 import {RangeSelection, useEvaluationCallDimensions} from './initialize';
 import {HorizontalBox, VerticalBox} from './Layout';
@@ -39,7 +39,6 @@ import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {ScatterFilter} from './ScatterFilter';
 import {moveItemToFront, ScoreCard} from './Scorecard';
-import {useTraceUpdate} from '../../../../../../common/util/hooks';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -374,6 +373,95 @@ const scoreIdFromScoreDimension = (dim: ScoreDimension): string => {
   return dim.scorerRef + '@' + dim.scoreKeyPath;
 };
 
+type FlattenedRow = {
+  id: string;
+  evaluationCallId: string;
+  inputDigest: string;
+  input: {[inputKey: string]: any};
+  output: {[outputKey: string]: any};
+  scores: {[scoreId: string]: number | boolean};
+  latency: number;
+  totalTokens: number;
+  path: string[];
+};
+
+type PivotedRow = {
+  id: string;
+  inputDigest: string;
+  input: {[inputKey: string]: any};
+  evaluationCallId: {[callId: string]: string};
+  output: {[outputKey: string]: {[callId: string]: any}};
+  scores: {[scoreId: string]: {[callId: string]: number | boolean}};
+  latency: {[callId: string]: number};
+  totalTokens: {[callId: string]: number};
+  path: string[];
+};
+
+const aggregateGroupedNestedRows = (
+  rows: PivotedRow[],
+  field: keyof PivotedRow,
+  aggFunc: (vals: any[]) => any
+) => {
+  return Object.fromEntries(
+    Object.entries(
+      rows.reduce<{
+        [flatKey: string]: {[callId: string]: any[]};
+      }>((acc, row) => {
+        Object.entries(row[field]).forEach(([key, val]) => {
+          Object.entries(val).forEach(([subKey, subVal]) => {
+            if (acc[key] == null) {
+              acc[key] = {};
+            }
+            if (acc[key][subKey] == null) {
+              acc[key][subKey] = [];
+            }
+            acc[key][subKey].push(subVal);
+          });
+        });
+        return acc;
+      }, {})
+    ).map(([key, val]) => {
+      return [
+        key,
+        Object.fromEntries(
+          Object.entries(val).map(([subKey, subVal]) => {
+            return [subKey, aggFunc(subVal)];
+          })
+        ),
+      ];
+    })
+  );
+};
+
+const aggregateGroupedRows = (
+  rows: PivotedRow[],
+  field: keyof PivotedRow,
+  aggFunc: (vals: any[]) => any
+) => {
+  return Object.fromEntries(
+    Object.entries(
+      rows.reduce<{
+        [flatKey: string]: any[];
+      }>((acc, row) => {
+        Object.entries(row[field]).forEach(([key, val]) => {
+          if (acc[key] == null) {
+            acc[key] = [];
+          }
+          acc[key].push(val);
+        });
+
+        return acc;
+      }, {})
+    ).map(([key, val]) => {
+      return [key, aggFunc(val)];
+    })
+  );
+};
+
+const filterNones = (list: any[]) => {
+  return list.filter(v => v != null);
+};
+
 const CompareEvaluationsCallsTable: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
@@ -389,17 +477,7 @@ const CompareEvaluationsCallsTable: React.FC<{
   }, [scores]);
 
   const flattenedRows = useMemo(() => {
-    const rows: Array<{
-      id: string;
-      evaluationCallId: string;
-      inputDigest: string;
-      input: {[inputKey: string]: any};
-      output: {[outputKey: string]: any};
-      scores: {[scoreId: string]: number | boolean};
-      latency: number;
-      totalTokens: number;
-      path: string[];
-    }> = [];
+    const rows: FlattenedRow[] = [];
     Object.entries(props.state.data.resultRows).forEach(
       ([rowDigest, rowCollection]) => {
         Object.values(rowCollection.evaluations).forEach(modelCollection => {
@@ -449,19 +527,114 @@ const CompareEvaluationsCallsTable: React.FC<{
     return rows;
   }, [props.state.data.inputs, props.state.data.resultRows, scoreMap]);
 
-  console.log({flattenedRows, scoreMap});
+  // const filteredDigests = useMemo(() => {
+  // }, []);
+
+  // console.log({flattenedRows, scoreMap});
   const pivotedRows = useMemo(() => {
     const leafDims = Object.keys(props.state.data.evaluationCalls);
-    // Ok, so in this step we are going to pivot
-  }, []);
+    // Ok, so in this step we are going to pivot -
+    // id: string; - no change
+    // inputDigest: string; - no change
+    // input: {[inputKey: string]: any}; - no change
+    // evaluationCallId: string; - Each key will be divided into new leafs
+    // output: {[outputKey: string]: any}; - Each key will be divided into new leafs
+    // scores: {[scoreId: string]: number | boolean}; - Each key will be divided into new leafs
+    // latency: number; - Each key will be divided into new leafs
+    // totalTokens: number; - Each key will be divided into new leafs
+    // path: string[]; - no change
+    const expandPrimitive = (obj: any, evaluationCallId: string) => {
+      return Object.fromEntries(
+        leafDims.map(d => {
+          return [d, evaluationCallId === d ? obj : null];
+        })
+      );
+    };
+
+    const expandDict = (obj: any, evaluationCallId: string) => {
+      return Object.fromEntries(
+        Object.entries(obj).map(([key, val]) => {
+          return [key, expandPrimitive(val, evaluationCallId)];
+        })
+      );
+    };
+
+    return flattenedRows.map(row => {
+      return {
+        ...row,
+        evaluationCallId: expandPrimitive(
+          row.evaluationCallId,
+          row.evaluationCallId
+        ),
+        output: expandDict(row.output, row.evaluationCallId),
+        scores: expandDict(row.scores, row.evaluationCallId),
+        latency: expandPrimitive(row.latency, row.evaluationCallId),
+        totalTokens: expandPrimitive(row.totalTokens, row.evaluationCallId),
+      };
+    }) as PivotedRow[];
+  }, [flattenedRows, props.state.data.evaluationCalls]);
+
+  const aggregatedRows = useMemo(() => {
+    const grouped = _.groupBy(pivotedRows, row => row.inputDigest);
+    return Object.fromEntries(
+      Object.entries(grouped).map(([inputDigest, rows]) => {
+        return [
+          inputDigest,
+          {
+            count: rows.length,
+            inputDigest,
+            input: rows[0].input, // Should be the same for all
+            output: aggregateGroupedNestedRows(
+              rows,
+              'output',
+              vals => filterNones(vals)[0]
+            ),
+            scores: aggregateGroupedNestedRows(rows, 'scores', vals =>
+              _.mean(
+                filterNones(vals).map(v => {
+                  if (typeof v === 'number') {
+                    return v;
+                  } else if (typeof v === 'boolean') {
+                    return v ? 1 : 0;
+                  } else {
+                    return 0;
+                  }
+                })
+              )
+            ),
+            latency: aggregateGroupedRows(rows, 'latency', vals =>
+              _.mean(filterNones(vals))
+            ),
+            totalTokens: aggregateGroupedRows(rows, 'totalTokens', vals =>
+              _.mean(filterNones(vals))
+            ),
+          },
+        ];
+      })
+    );
+  }, [pivotedRows]);
+
+  // console.log({aggregatedRows});
 
   const filteredRows = useMemo(() => {
     if (props.state.rangeSelection) {
-      // Do something special to determine if this row qualifies
-      // throw new Error('Not implemented');
-      console.log(props.state.rangeSelection);
+      const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
+        const values =
+          aggregatedRows[digest].scores[
+            scoreIdFromScoreDimension(props.state.comparisonDimension)
+          ];
+        return Object.entries(props.state.rangeSelection).every(
+          ([key, val]) => {
+            return val.min <= values[key] && values[key] <= val.max;
+          }
+        );
+      });
+      return flattenedRows.filter(row =>
+        allowedDigests.includes(row.inputDigest)
+      );
     }
-  }, [props.state.rangeSelection]);
+    return flattenedRows;
+  }, [flattenedRows, props.state.rangeSelection]);
 
   // console.log(flattenedRows);
 
@@ -609,7 +782,7 @@ const CompareEvaluationsCallsTable: React.FC<{
         // End Column Menu
         // treeData
         // getTreeDataPath={row => row.path.toStringArray()}
-        rows={flattenedRows}
+        rows={filteredRows}
         columns={columns}
         // isGroupExpandedByDefault={node => {
         //   return expandedIds.includes(node.id);
