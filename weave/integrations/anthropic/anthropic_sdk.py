@@ -71,7 +71,7 @@ def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Calla
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
-            anthropic_accumulator,
+            make_accumulator=lambda inputs: anthropic_accumulator,
             should_accumulate=should_use_accumulator,
         )
 

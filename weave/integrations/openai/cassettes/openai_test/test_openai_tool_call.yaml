@@ -1,0 +1,104 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "Can you name a cricket player
+      along with team name and highest score?"}], "model": "gpt-4o", "max_tokens":
+      64, "temperature": 0.0, "tool_choice": "required", "tools": [{"type": "function",
+      "function": {"name": "cricket_player_names", "description": "store the name
+      of players", "parameters": {"type": "object", "properties": {"name": {"type":
+      "string", "description": "The name of the player"}, "team:": {"type": "string",
+      "description": "The team of the player"}, "highest_score": {"type": "number",
+      "description": "The highest score of the player"}}, "required": ["name", "team",
+      "highest_score"]}}}], "top_p": 1}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '658'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.29.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.29.0
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.12
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA2xSXYvbMBB8968Q+xwX2/HVid96bQ7au9LAHbS0OYxOXttK9FVJhqYh/73I8cW5
+        UD+IZcYzs1rtISIEeA0lAdZRz6QR8RIfVtn2R367/olftrd6l7UfV+ruXq6KTwizoNAvW2T+VfWO
+        aWkEeq7ViWYWqcfgmhbpMk/SYr4YCKlrFEHWGh/nOs6SLI+Tmzidj8JOc4YOSvIrIoSQw3CGFlWN
+        f6AkyewVkegcbRHK80+EgNUiIECd485T5WE2kUwrjyp0rXohLgivtagYFWIKPn2Hi3qaExWievz+
+        tb9f7zn1v/ki+/vhbl7w9UP37SLvZL03Q0NNr9h5Phf8GS+vwggBReWgZZazHfrKCLpHWwXYXfkQ
+        AtS2vUTlwx3gsBnUGyg38EhZxxV5QlX3YkftBmYb8EjlwH5WNacD1PG2Q+crx7QNyixfHOFNyjH6
+        X/08Vsfz0wjdGqtf3NWkoeGKu66ySN1wY3Bem1NEsHseVqB/86pgrJbGV17vUAXD5bgBMO3cRGbF
+        SHrtqZjwNC2isUFwe+dRVg1XLVpj+bAQ0Jiqvinez5OiWSYQHaN/AAAA//8DANd7fhAZAwAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 899ce520fe447a07-PAT
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 26 Jun 2024 11:35:39 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=B8xx2ndM_oEJUdgHWb.fTJ_oL_fySX.ewgKuC7JAlfE-1719401739-1.0.1.1-4p_3gV5hQu.JaOndkGcFVQoNE8Nf6A0d2LSsCvAepVkFxEF7eDx5C.wBGFNOp6gBBYWCiUtX0muNMp1_HnvJ2g;
+        path=/; expires=Wed, 26-Jun-24 12:05:39 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=d1VuUUKXCteguKAkH37P149uFzFObConY3tfJI_S1dw-1719401739414-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '497'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '16000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '15999916'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - b0c879b73695fb6d2e5024a6a0576be5
+    status:
+      code: 200
+      message: OK
+version: 1

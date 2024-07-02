@@ -111,7 +111,7 @@ def test_op_return_sync_generator(client):
             size -= 1
             yield size
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     for item in fn():
         pass
@@ -138,7 +138,7 @@ async def test_op_return_async_generator(client):
             size -= 1
             yield size
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     async for item in fn():
         pass
@@ -173,7 +173,7 @@ def test_op_return_sync_iterator(client):
     def fn():
         return MyIterator()
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     for item in fn():
         pass
@@ -209,7 +209,7 @@ async def test_op_return_async_iterator(client):
     def fn():
         return MyAsyncIterator()
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     async for item in fn():
         pass
@@ -235,7 +235,7 @@ def test_op_return_sync_generator_never_iter(client):
             size -= 1
             yield size
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     fn()
 
@@ -261,7 +261,7 @@ async def test_op_return_async_generator_never_iter(client):
             size -= 1
             yield size
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     fn()
 
@@ -295,7 +295,7 @@ def test_op_return_sync_iterator_never_iter(client):
     def fn():
         return MyIterator()
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     fn()
 
@@ -330,7 +330,7 @@ async def test_op_return_async_iterator_never_iter(client):
     def fn():
         return MyAsyncIterator()
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     fn()
 
@@ -355,7 +355,7 @@ def test_op_return_sync_generator_partial(client):
             size -= 1
             yield size
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     for item in fn():
         if item == 5:
@@ -383,7 +383,7 @@ async def test_op_return_async_generator_partial(client):
             size -= 1
             yield size
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     async for item in fn():
         if item == 5:
@@ -419,7 +419,7 @@ def test_op_return_sync_iterator_partial(client):
     def fn():
         return MyIterator()
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     for item in fn():
         if item == 5:
@@ -456,7 +456,7 @@ async def test_op_return_async_iterator_partial(client):
     def fn():
         return MyAsyncIterator()
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     async for item in fn():
         if item == 5:
@@ -485,7 +485,7 @@ def test_op_return_sync_generator_exception(client):
             if size == 5:
                 raise Exception("test")
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         for item in fn():
@@ -518,7 +518,7 @@ async def test_op_return_async_generator_exception(client):
             if size == 5:
                 raise Exception("test")
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         async for item in fn():
@@ -559,7 +559,7 @@ def test_op_return_sync_iterator_exception(client):
     def fn():
         return MyIterator()
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         for item in fn():
@@ -601,7 +601,7 @@ async def test_op_return_async_iterator_exception(client):
     def fn():
         return MyAsyncIterator()
 
-    add_accumulator(fn, simple_list_accumulator)
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
 
     try:
         async for item in fn():

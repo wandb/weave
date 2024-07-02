@@ -74,7 +74,7 @@ def mistral_accumulator(
 
 def mistral_stream_wrapper(fn: typing.Callable) -> typing.Callable:
     op = weave.op()(fn)
-    acc_op = add_accumulator(op, mistral_accumulator)  # type: ignore
+    acc_op = add_accumulator(op, lambda inputs: mistral_accumulator)  # type: ignore
     return acc_op
 
 
