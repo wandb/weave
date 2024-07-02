@@ -15,7 +15,12 @@ from weave.flow import util
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
-from weave.flow.scorer import Scorer, auto_summarize, get_scorer_attributes, stderr
+from weave.flow.scorer import (
+    Scorer,
+    auto_summarize,
+    get_scorer_attributes,
+    transpose,
+)
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.op import BoundOp, Op
@@ -252,24 +257,24 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: typing.Union[weave.WeaveList, list]) -> dict:
+    async def summarize(self, eval_table: list) -> dict:
+        cols = transpose(eval_table)
         summary = {}
-        if not isinstance(eval_table, weave.WeaveList):
-            eval_table = weave.WeaveList(eval_table)
-        model_output_summary = auto_summarize(eval_table.column("model_output"))
-        if model_output_summary:
-            summary["model_output"] = model_output_summary
-        scorers = self.scorers or []
-        for scorer in scorers:
-            scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
-            scorer_scores = eval_table.column("scores").column(scorer_name)
-            summary[scorer_name] = summarize_fn(scorer_scores)  # type: ignore
-        latency_col = eval_table.column("model_latency")
-        non_none_latencies = [l for l in latency_col if l is not None]
-        summary["model_latency"] = {
-            "mean": float(np.mean(non_none_latencies)),
-            # "stderr": stderr(list(eval_table.column("model_latency"))),
-        }
+
+        for name, vals in cols.items():
+            if name == "scores":
+                scorers = self.scorers or []
+                for scorer in scorers:
+                    scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
+                    scorer_stats = transpose(vals)
+                    score_table = scorer_stats[scorer_name]
+                    scored = summarize_fn(score_table)
+                    summary[scorer_name] = scored
+            else:
+                model_output_summary = auto_summarize(vals)
+                if model_output_summary:
+                    summary[name] = model_output_summary
+
         return summary
 
     @weave.op()
@@ -312,8 +317,6 @@ class Evaluation(Object):
                 if scorer_name not in eval_row["scores"]:
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
-
-        # eval_table: weave.WeaveList = weave.WeaveList(eval_rows)
 
         summary = await self.summarize(eval_rows)
 
