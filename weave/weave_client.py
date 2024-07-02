@@ -343,7 +343,8 @@ class WeaveClient:
         #
         # However, we always want to resolve the ref to the digest. So
         # here, we just directly assign the digest.
-        ref.digest = read_res.obj.digest
+        # ref.digest = read_res.obj.digest
+        ref = ObjectRef(ref.entity, ref.project, ref.name, read_res.obj.digest)
 
         data = read_res.obj.val
 
