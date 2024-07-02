@@ -82,7 +82,7 @@ export const SimplePageLayout: FC<{
           borderBottom: '1px solid #e0e0e0',
           display: 'flex',
           flexDirection: 'row',
-          alignItems: 'flex-end',
+          alignItems: 'center',
           justifyContent: 'space-between',
           flex: '0 0 auto',
         }}>
@@ -118,7 +118,15 @@ export const SimplePageLayout: FC<{
           </Box>
           {simplePageLayoutContextValue.headerSuffix}
         </Box>
-        {props.headerExtra}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            flex: '0 0 auto',
+          }}>
+          {props.headerExtra}
+        </Box>
         {(!props.hideTabsIfSingle || tabs.length > 1) && (
           <Tabs.Root
             value={tabs[tabValue].label}

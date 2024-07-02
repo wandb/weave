@@ -42,7 +42,7 @@ import {
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
-const projectIdFromParts = ({
+export const projectIdFromParts = ({
   entity,
   project,
 }: {
