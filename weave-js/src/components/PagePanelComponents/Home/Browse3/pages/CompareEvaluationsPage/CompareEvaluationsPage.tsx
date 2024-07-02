@@ -25,12 +25,12 @@ import {
 } from './constants';
 import {EvaluationDefinition} from './EvaluationDefinition';
 import {evaluationMetrics} from './evaluations';
+import {useEvaluationCallDimensions} from './initialize';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
-// import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {ScatterFilter} from './ScatterFilter';
-import {ScoreCard} from './Scorecard';
+import {moveItemToFront, ScoreCard} from './Scorecard';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -41,9 +41,19 @@ type CompareEvaluationsPageProps = {
 export const CompareEvaluationsPage: React.FC<
   CompareEvaluationsPageProps
 > = props => {
+  const [baselineEvaluationCallId, setBaselineEvaluationCallId] =
+    React.useState(
+      props.evaluationCallIds.length > 0 ? props.evaluationCallIds[0] : null
+    );
+  // console.log(baselineEvaluationCallId);
+  const [comparisonDimension, setComparisonDimension] = React.useState<
+    string | null
+  >(null);
+
   if (props.evaluationCallIds.length === 0) {
     return <div>No evaluations to compare</div>;
   }
+
   return (
     <SimplePageLayout
       title={'Compare Evaluations'}
@@ -56,7 +66,10 @@ export const CompareEvaluationsPage: React.FC<
               entity={props.entity}
               project={props.project}
               evaluationCallIds={props.evaluationCallIds}
-              baselineEvaluationCallId={props.evaluationCallIds[0]}>
+              baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
+              comparisonDimension={comparisonDimension ?? undefined}
+              setBaselineEvaluationCallId={setBaselineEvaluationCallId}
+              setComparisonDimension={setComparisonDimension}>
               <CompareEvaluationsPageInner />
             </CompareEvaluationsProvider>
           ),
@@ -114,7 +127,7 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 };
 
 const CompareEvaluationsPageInner: React.FC = props => {
-  const state = useCompareEvaluationsState();
+  const {state} = useCompareEvaluationsState();
 
   return (
     <Box
@@ -139,23 +152,6 @@ const CompareEvaluationsPageInner: React.FC = props => {
     </Box>
   );
 };
-
-// const ScatterDefinition: React.FC<{
-//   state: EvaluationComparisonState;
-// }> = props => {
-//   return (
-//     <HorizontalBox
-//       sx={{
-//         alignItems: 'center',
-//         paddingTop: STANDARD_PADDING,
-//       }}>
-//       <DefinitionText text="Plot" />
-//       <DimensionPicker {...props} />
-//       <DefinitionText text="against" />
-//       <DimensionPicker {...props} />
-//     </HorizontalBox>
-//   );
-// };
 
 const SummaryPlots: React.FC<{state: EvaluationComparisonState}> = props => {
   const plotlyRadarData = useNormalizedRadarPlotDataFromMetrics(props.state);
@@ -251,6 +247,13 @@ const useNormalizedRadarPlotDataFromMetrics = (
 const ComparisonDefinition: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
+  const evalCallIds = useMemo(() => {
+    const all = Object.keys(props.state.data.evaluationCalls);
+    // Make sure the baseline model is first
+    moveItemToFront(all, props.state.baselineEvaluationCallId);
+    return all;
+  }, [props.state.baselineEvaluationCallId, props.state.data.evaluationCalls]);
+
   return (
     <HorizontalBox
       sx={{
@@ -258,10 +261,10 @@ const ComparisonDefinition: React.FC<{
         paddingLeft: STANDARD_PADDING,
         paddingRight: STANDARD_PADDING,
       }}>
-      {Object.keys(props.state.data.evaluationCalls).map((key, ndx) => {
+      {evalCallIds.map((key, ndx) => {
         return (
           <React.Fragment key={key}>
-            {ndx !== 0 && <SwapPositionsButton />}
+            {ndx !== 0 && <SwapPositionsButton callId={key} />}
             <EvaluationDefinition state={props.state} callId={key} />
           </React.Fragment>
         );
@@ -277,15 +280,20 @@ const DefinitionText: React.FC<{text: string}> = props => {
 };
 
 const DimensionPicker: React.FC<{state: EvaluationComparisonState}> = props => {
+  const currDimension = props.state.comparisonDimension;
   const dimensions = useEvaluationCallDimensions(props.state);
+  const {setComparisonDimension} = useCompareEvaluationsState();
+
   return (
     <FormControl>
       <Autocomplete
         size="small"
+        disableClearable
         limitTags={1}
-        value={dimensions[0]}
+        value={currDimension}
         onChange={(event, newValue) => {
           // console.log('onChange', newValue);
+          setComparisonDimension(newValue);
         }}
         options={dimensions}
         renderInput={renderParams => (
@@ -300,29 +308,18 @@ const DimensionPicker: React.FC<{state: EvaluationComparisonState}> = props => {
   );
 };
 
-const useEvaluationCallDimensions = (
-  state: EvaluationComparisonState
-): string[] => {
-  return useMemo(() => {
-    const availableScorers = Object.values(state.data.evaluationCalls)
-      .map(evalCall =>
-        Object.entries(evalCall.scores)
-          .map(([k, v]) => Object.keys(v).map(innerKey => k + '.' + innerKey))
-          .flat()
-      )
-      .flat();
-
-    return [
-      ...Array.from(new Set(availableScorers)),
-      'model_latency',
-      'total_tokens',
-    ];
-  }, [state.data.evaluationCalls]);
-};
-
-const SwapPositionsButton: React.FC = () => {
+const SwapPositionsButton: React.FC<{callId: string}> = props => {
+  const {setBaselineEvaluationCallId} = useCompareEvaluationsState();
   return (
-    <Button size="medium" variant="quiet" onClick={console.log} icon="retry" />
+    <Button
+      size="medium"
+      variant="quiet"
+      onClick={() => {
+        // console.log('setting', props.callId);
+        setBaselineEvaluationCallId(props.callId);
+      }}
+      icon="retry"
+    />
   );
 };
 

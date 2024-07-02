@@ -20,7 +20,7 @@ import {HorizontalBox} from './Layout';
 
 const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
 
-const moveItemToFront = (arr: any[], item: any) => {
+export const moveItemToFront = (arr: any[], item: any) => {
   const index = arr.indexOf(item);
   if (index > -1) {
     arr.splice(index, 1);
@@ -50,7 +50,7 @@ const GridCell = styled.div`
 export const ScoreCard: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  console.log(props);
+  // console.log(props);
   const baselineRef =
     props.state.data.evaluationCalls[props.state.baselineEvaluationCallId]
       .modelRef;
@@ -358,7 +358,7 @@ export const ScoreCard: React.FC<{
                         def.metrics[metricKey].modelScores[baselineRef];
                       const value =
                         def.metrics[metricKey].modelScores[modelRef];
-                      console.log({value});
+                      // console.log({value});
                       // console.log({baseline, value});
                       let color: TagColorName = 'moon';
                       const diff = value - baseline;

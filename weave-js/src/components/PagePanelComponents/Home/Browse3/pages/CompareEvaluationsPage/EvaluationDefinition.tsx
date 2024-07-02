@@ -39,34 +39,6 @@ export const EvaluationDefinition: React.FC<{
     </HorizontalBox>
   );
 };
-// export const EvaluationDefinitionVertical: React.FC<{
-//   state: EvaluationComparisonState;
-//   callId: string;
-// }> = props => {
-//   return (
-//     <div
-//       style={{
-//         transform: 'translate(50%, 0%) rotate(-90deg)',
-//         transformOrigin: 'center',
-//         position: 'relative',
-//       }}>
-//       <VerticalBox
-//         sx={{
-//           height: EVAL_DEF_HEIGHT * 2 + 26,
-//           borderRadius: BOX_RADIUS,
-//           border: STANDARD_BORDER,
-//           padding: '12px',
-//           alignItems: 'center',
-//           justifyContent: 'space-between',
-//         }}>
-//         <EvaluationCallLink {...props} />
-//         <HorizontalBar />
-//         <EvaluationModelLink {...props} />
-//       </VerticalBox>
-//     </div>
-//   );
-// };
-
 export const EvaluationCallLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;

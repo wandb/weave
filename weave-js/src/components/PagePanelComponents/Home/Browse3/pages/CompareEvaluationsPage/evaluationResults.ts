@@ -431,7 +431,7 @@ export const fetchEvaluationComparisonData = async (
                 _rawScoreTraceData: traceCall,
               };
             } else {
-              console.log(traceCall);
+              // console.log(traceCall);
             }
           }
         }

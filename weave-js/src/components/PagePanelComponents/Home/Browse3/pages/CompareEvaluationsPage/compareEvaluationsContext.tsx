@@ -1,18 +1,20 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 
-import {useDeepMemo} from '../../../../../../hookUtils';
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
-import {
-  EvaluationComparisonData,
-  fetchEvaluationComparisonData,
-} from './evaluationResults';
+import {EvaluationComparisonData} from './evaluationResults';
+import {useInitialState} from './initialize';
 
-const CompareEvaluationsContext =
-  React.createContext<EvaluationComparisonState | null>(null);
+const CompareEvaluationsContext = React.createContext<{
+  state: EvaluationComparisonState;
+  setBaselineEvaluationCallId: React.Dispatch<
+    React.SetStateAction<string | null>
+  >;
+  setComparisonDimension: React.Dispatch<React.SetStateAction<string | null>>;
+} | null>(null);
 
 export type EvaluationComparisonState = {
   data: EvaluationComparisonData;
   baselineEvaluationCallId: string;
+  comparisonDimension: string;
 };
 
 export const useCompareEvaluationsState = () => {
@@ -27,43 +29,42 @@ export const CompareEvaluationsProvider: React.FC<{
   entity: string;
   project: string;
   evaluationCallIds: string[];
-  baselineEvaluationCallId: string;
+  setBaselineEvaluationCallId: React.Dispatch<
+    React.SetStateAction<string | null>
+  >;
+  setComparisonDimension: React.Dispatch<React.SetStateAction<string | null>>;
+  baselineEvaluationCallId?: string;
+  comparisonDimension?: string;
 }> = ({
   entity,
   project,
   evaluationCallIds,
+  setBaselineEvaluationCallId,
+  setComparisonDimension,
   baselineEvaluationCallId,
+  comparisonDimension,
   children,
 }) => {
-  const getTraceServerClient = useGetTraceServerClientContext();
-  const [data, setData] = useState<EvaluationComparisonData | null>(null);
-  const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
-  useEffect(() => {
-    setData(null);
-    let mounted = true;
-    fetchEvaluationComparisonData(
-      getTraceServerClient(),
-      entity,
-      project,
-      evaluationCallIdsMemo
-    ).then(dataRes => {
-      if (mounted) {
-        setData(dataRes);
-      }
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [entity, evaluationCallIdsMemo, project, getTraceServerClient]);
+  const initialState = useInitialState(
+    entity,
+    project,
+    evaluationCallIds,
+    baselineEvaluationCallId,
+    comparisonDimension
+  );
 
   const value = useMemo(() => {
-    if (data == null) {
+    if (initialState.loading || initialState.result == null) {
       return null;
     }
-    return {data, baselineEvaluationCallId};
-  }, [data, baselineEvaluationCallId]);
+    return {
+      state: initialState.result,
+      setBaselineEvaluationCallId,
+      setComparisonDimension,
+    };
+  }, [initialState, setBaselineEvaluationCallId, setComparisonDimension]);
 
-  if (value == null) {
+  if (!value) {
     return <div>Loading...</div>;
   }
 
