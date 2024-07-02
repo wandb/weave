@@ -18,6 +18,8 @@ type ContinuousSummaryScore = {
 export type ScoreDimension = {
   scorerRef: string;
   scoreKeyPath: string;
+  scoreType: 'binary' | 'continuous';
+  minimize?: boolean;
 };
 
 export type EvaluationEvaluateCallSchema = TraceCallSchema & {

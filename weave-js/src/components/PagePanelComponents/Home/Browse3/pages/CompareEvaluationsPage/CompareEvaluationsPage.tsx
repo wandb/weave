@@ -288,6 +288,7 @@ const DimensionPicker: React.FC<{state: EvaluationComparisonState}> = props => {
   const currDimension = props.state.comparisonDimension;
   const dimensions = useEvaluationCallDimensions(props.state);
   const {setComparisonDimension} = useCompareEvaluationsState();
+  console.log(dimensions);
 
   return (
     <FormControl>
@@ -375,6 +376,8 @@ const CompareEvaluationsCallsTable: React.FC<{
  * - [ ] The data model has gotten messy - figure out a good way to include costs
  * - [ ] Auto-expand first-level properties (see prompt here: https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22bf5188ba-48cd-4c6d-91ea-e25464570c13%22%2C%222f4544f3-9649-487e-b083-df6985e21b12%22%2C%228cbeccd6-6ff7-4eac-a305-6fb6450530f1%22%5D)
  * - [ ] The damn thing is slow with all the upfront loading
+ * - [ ] // TODO: find all cases of the `_raw*` cases and remove them!'
+ * - [ ] Support arbitrarily nested scorers
  * TEST:
  * - [ ] Single Case
  * - [ ] Dual Case
