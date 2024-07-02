@@ -24,16 +24,9 @@ export const ScatterFilter: React.FC<{
   const scorerKey = targetDimension.scoreKeyPath.split('.').splice(1).join('.');
   // const modelRefs = Object.keys(props.state.data.models);
   const baselineCallId = props.state.baselineEvaluationCallId;
-  const baselineModelId =
-    props.state.data.evaluationCalls[baselineCallId].modelRef;
   const compareCallId = Object.keys(props.state.data.evaluationCalls).find(
     callId => callId !== baselineCallId
   )!;
-  const compareModelId =
-    props.state.data.evaluationCalls[compareCallId].modelRef;
-
-  const modelX = baselineModelId;
-  const modelY = compareModelId;
 
   const data = useMemo(() => {
     const series: ScatterPlotData[number] = {
@@ -45,38 +38,9 @@ export const ScatterFilter: React.FC<{
     if (scorerName === 'model_latency') {
       Object.values(props.state.data.resultRows).forEach(row => {
         const xVals: number[] = [];
-        Object.values(row.models[modelX].predictAndScores).forEach(score => {
-          const val = score.predictCall?.latencyMs;
-          if (typeof val === 'boolean') {
-            xVals.push(val ? 1 : 0);
-          } else {
-            xVals.push(val ?? 0);
-          }
-        });
-        series.x.push(mean(xVals));
-        const yVals: number[] = [];
-        Object.values(row.models[modelY].predictAndScores).forEach(score => {
-          const val = score.predictCall?.latencyMs;
-          if (typeof val === 'boolean') {
-            yVals.push(val ? 1 : 0);
-          } else {
-            yVals.push(val ?? 0);
-          }
-        });
-        series.y.push(mean(yVals));
-      });
-    } else {
-      // const [scorerName, scorerKey] = primaryDimension.split('.');
-      Object.values(props.state.data.resultRows).forEach(row => {
-        const xVals: number[] = [];
-        Object.values(row.models[modelX]?.predictAndScores ?? {}).forEach(
+        Object.values(row.evaluations[baselineCallId].predictAndScores).forEach(
           score => {
-            const results = score.scores[scorerName]?.results;
-            if (!results) {
-              return;
-            }
-            const val = results[scorerKey];
-            // console.log(val, scorerKey, score.scores[scorerName]);
+            const val = score.predictCall?.latencyMs;
             if (typeof val === 'boolean') {
               xVals.push(val ? 1 : 0);
             } else {
@@ -84,14 +48,11 @@ export const ScatterFilter: React.FC<{
             }
           }
         );
+        series.x.push(mean(xVals));
         const yVals: number[] = [];
-        Object.values(row.models[modelY]?.predictAndScores ?? {}).forEach(
+        Object.values(row.evaluations[compareCallId].predictAndScores).forEach(
           score => {
-            const results = score.scores[scorerName]?.results;
-            if (!results) {
-              return;
-            }
-            const val = results[scorerKey];
+            const val = score.predictCall?.latencyMs;
             if (typeof val === 'boolean') {
               yVals.push(val ? 1 : 0);
             } else {
@@ -99,6 +60,42 @@ export const ScatterFilter: React.FC<{
             }
           }
         );
+        series.y.push(mean(yVals));
+      });
+    } else {
+      // const [scorerName, scorerKey] = primaryDimension.split('.');
+      Object.values(props.state.data.resultRows).forEach(row => {
+        const xVals: number[] = [];
+        Object.values(
+          row.evaluations[baselineCallId]?.predictAndScores ?? {}
+        ).forEach(score => {
+          const results = score.scores[scorerName]?.results;
+          if (!results) {
+            return;
+          }
+          const val = results[scorerKey];
+          // console.log(val, scorerKey, score.scores[scorerName]);
+          if (typeof val === 'boolean') {
+            xVals.push(val ? 1 : 0);
+          } else {
+            xVals.push(val ?? 0);
+          }
+        });
+        const yVals: number[] = [];
+        Object.values(
+          row.evaluations[compareCallId]?.predictAndScores ?? {}
+        ).forEach(score => {
+          const results = score.scores[scorerName]?.results;
+          if (!results) {
+            return;
+          }
+          const val = results[scorerKey];
+          if (typeof val === 'boolean') {
+            yVals.push(val ? 1 : 0);
+          } else {
+            yVals.push(val ?? 0);
+          }
+        });
         if (xVals.length === 0 || yVals.length === 0) {
           return;
         }
@@ -107,7 +104,13 @@ export const ScatterFilter: React.FC<{
       });
     }
     return [series];
-  }, [modelX, modelY, props.state.data.resultRows, scorerKey, scorerName]);
+  }, [
+    baselineCallId,
+    compareCallId,
+    props.state.data.resultRows,
+    scorerKey,
+    scorerName,
+  ]);
   // console.log(data, props.state);
   const xColor = props.state.data.evaluationCalls[baselineCallId].color;
   const yColor = props.state.data.evaluationCalls[compareCallId].color;

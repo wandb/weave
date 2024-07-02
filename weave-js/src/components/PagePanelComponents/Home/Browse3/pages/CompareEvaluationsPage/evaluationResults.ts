@@ -124,8 +124,8 @@ export type EvaluationComparisonData = {
   };
   resultRows: {
     [rowDigest: string]: {
-      models: {
-        [modelRef: string]: {
+      evaluations: {
+        [evaluationCallId: string]: {
           predictAndScores: {
             [predictAndScoreCallId: string]: PredictAndScoreCall;
           };
@@ -140,6 +140,7 @@ export type PredictAndScoreCall = {
   firstExampleRef: string;
   rowDigest: string;
   modelRef: string;
+  evaluationCallId: string;
   predictCall?: {
     callId: string;
     output: any;
@@ -356,6 +357,7 @@ export const fetchEvaluationComparisonData = async (
       // console.log(traceCall)
       const exampleRef = parentPredictAndScore.inputs.example;
       const modelRef = parentPredictAndScore.inputs.model;
+      const evaluationCallId = parentPredictAndScore.parent_id!
 
       const split = '/attr/rows/id/';
       if (exampleRef.includes(split)) {
@@ -372,7 +374,7 @@ export const fetchEvaluationComparisonData = async (
 
             if (result.resultRows[rowDigest] == null) {
               result.resultRows[rowDigest] = {
-                models: {},
+                evaluations: {},
               };
             }
             const digestCollection = result.resultRows[rowDigest];
@@ -405,13 +407,13 @@ export const fetchEvaluationComparisonData = async (
             //   };
             //   _rawPredictAndScoreTraceData: TraceCallSchema;
             // };
-            if (digestCollection.models[modelRef] == null) {
-              digestCollection.models[modelRef] = {
+            if (digestCollection.evaluations[evaluationCallId] == null) {
+              digestCollection.evaluations[evaluationCallId] = {
                 predictAndScores: {},
               };
             }
 
-            const modelForDigestCollection = digestCollection.models[modelRef];
+            const modelForDigestCollection = digestCollection.evaluations[evaluationCallId];
 
             if (
               modelForDigestCollection.predictAndScores[
@@ -425,6 +427,7 @@ export const fetchEvaluationComparisonData = async (
                 firstExampleRef: exampleRef,
                 rowDigest,
                 modelRef,
+                evaluationCallId,
                 predictCall: undefined,
                 scores: {},
                 _rawPredictAndScoreTraceData: parentPredictAndScore,

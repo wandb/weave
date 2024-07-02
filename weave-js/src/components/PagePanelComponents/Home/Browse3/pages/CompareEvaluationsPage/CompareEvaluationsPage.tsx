@@ -381,26 +381,24 @@ const CompareEvaluationsCallsTable: React.FC<{
     > = [];
     Object.entries(props.state.data.resultRows).forEach(
       ([rowDigest, rowCollection]) => {
-        Object.entries(rowCollection.models).forEach(
-          ([modelRef, modelCollection]) => {
-            Object.values(modelCollection.predictAndScores).forEach(
-              predictAndScoreRes => {
-                const datasetRow =
-                  props.state.data.inputs[predictAndScoreRes.rowDigest];
-                if (datasetRow != null) {
-                  const output = predictAndScoreRes.predictCall?.output;
-                  rows.push({
-                    ...predictAndScoreRes,
-                    id: predictAndScoreRes.callId,
-                    input: flattenObject({input: datasetRow.val}),
-                    output: flattenObject({output}),
-                    path: [rowDigest, predictAndScoreRes.callId],
-                  });
-                }
+        Object.values(rowCollection.evaluations).forEach(modelCollection => {
+          Object.values(modelCollection.predictAndScores).forEach(
+            predictAndScoreRes => {
+              const datasetRow =
+                props.state.data.inputs[predictAndScoreRes.rowDigest];
+              if (datasetRow != null) {
+                const output = predictAndScoreRes.predictCall?.output;
+                rows.push({
+                  ...predictAndScoreRes,
+                  id: predictAndScoreRes.callId,
+                  input: flattenObject({input: datasetRow.val}),
+                  output: flattenObject({output}),
+                  path: [rowDigest, predictAndScoreRes.callId],
+                });
               }
-            );
-          }
-        );
+            }
+          );
+        });
       }
     );
     return rows;
