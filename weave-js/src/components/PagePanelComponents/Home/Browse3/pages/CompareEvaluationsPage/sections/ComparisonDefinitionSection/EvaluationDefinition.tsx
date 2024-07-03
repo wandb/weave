@@ -105,7 +105,7 @@ const ModelIcon: React.FC = () => {
     </Box>
   );
 };
-export const VerticalBar: React.FC = () => {
+const VerticalBar: React.FC = () => {
   return (
     <div
       style={{
