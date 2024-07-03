@@ -141,6 +141,7 @@ export const InputComparison2: React.FC<{
           display: 'grid',
           overflow: 'auto',
           gridTemplateColumns: `repeat(2, min-content) auto`,
+          gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) min-content repeat(${NUM_OUTPUT_KEYS}, auto) min-content repeat(${NUM_METRICS}, min-content)`,
           //   gridTemplateColumns: `repeat(${FREE_TEXT_COL_NDX}, min-content) 1fr repeat(${
           //     NUM_COLS - FREE_TEXT_COL_NDX - 1
           //   }, min-content`,
@@ -152,7 +153,12 @@ export const InputComparison2: React.FC<{
         {_.range(NUM_INPUT_PROPS).map(ii => {
           return (
             <React.Fragment>
-              <GridCell>{removePrefix(inputColumnKeys[ii], 'input.')}</GridCell>
+              <GridCell
+                style={{
+                  whiteSpace: 'nowrap',
+                }}>
+                {removePrefix(inputColumnKeys[ii], 'input.')}
+              </GridCell>
               <GridCell>
                 <ICValueView value={target.input[inputColumnKeys[ii]]} />
               </GridCell>
@@ -369,7 +375,11 @@ export const InputComparison2: React.FC<{
           return (
             <React.Fragment>
               <GridCell></GridCell>
-              <GridCell cols={1}>
+              <GridCell
+                cols={1}
+                style={{
+                  whiteSpace: 'nowrap',
+                }}>
                 {removePrefix(outputColumnKeys[oi], 'output.')}
               </GridCell>
             </React.Fragment>
@@ -390,7 +400,10 @@ export const InputComparison2: React.FC<{
               {_.range(NUM_METRICS_IN_SCORER).map(mi => {
                 return (
                   <React.Fragment>
-                    <GridCell>
+                    <GridCell
+                      style={{
+                        whiteSpace: 'nowrap',
+                      }}>
                       {
                         scorersForThisRef[mi].scorerDim.scoreKeyPath
                           .split('.')
