@@ -55,6 +55,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/openai",
             "guides/integrations/anthropic",
             "guides/integrations/mistral",
+            "guides/integrations/llamaindex",
           ],
         },
         {
