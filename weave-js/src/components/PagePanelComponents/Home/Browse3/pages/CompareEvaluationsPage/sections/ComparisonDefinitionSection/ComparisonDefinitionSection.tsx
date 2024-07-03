@@ -2,17 +2,17 @@ import {FormControl} from '@material-ui/core';
 import {Autocomplete} from '@mui/material';
 import React, {useMemo} from 'react';
 
-import {Button} from '../../../../../Button';
-import {StyledTextField} from '../../StyledTextField';
-import {useCompareEvaluationsState} from './compareEvaluationsContext';
-import {STANDARD_PADDING} from './ecpConstants';
-import {getOrderedCallIds} from './ecpState';
-import {ScoreDimension} from './ecpTypes';
-import {EvaluationComparisonState} from './ecpTypes';
+import {Button} from '../../../../../../../Button';
+import {StyledTextField} from '../../../../StyledTextField';
+import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
+import {STANDARD_PADDING} from '../../ecpConstants';
+import {getOrderedCallIds} from '../../ecpState';
+import {ScoreDimension} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpTypes';
+import {HorizontalBox} from '../../Layout';
 import {EvaluationDefinition} from './EvaluationDefinition';
-import {HorizontalBox} from './Layout';
 
-export const ComparisonDefinition: React.FC<{
+export const ComparisonDefinitionSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const evalCallIds = useMemo(

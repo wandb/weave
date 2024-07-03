@@ -1,9 +1,9 @@
 import {sum} from 'lodash';
 
-import {flattenObject} from '../../../Browse2/browse2Util';
-import {ComparisonMetric, EvaluationComparisonState} from './ecpTypes';
+import {flattenObject} from '../../../../../Browse2/browse2Util';
+import {ComparisonMetric, EvaluationComparisonState} from '../../ecpTypes';
 
-export const evaluationComparisonMetrics = (
+export const summaryMetrics = (
   state: EvaluationComparisonState
 ): ComparisonMetric[] => {
   const evaluationCalls = Object.values(state.data.evaluationCalls).map(

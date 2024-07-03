@@ -1,7 +1,7 @@
 import * as Plotly from 'plotly.js';
 import React, {useEffect, useMemo, useRef} from 'react';
 
-import {MOON_300} from '../../../../../../common/css/color.styles';
+import {MOON_300} from '../../../../../../../../common/css/color.styles';
 
 export type ScatterPlotData = Array<{x: number[]; y: number[]; color: string}>;
 export const PlotlyScatterPlot: React.FC<{

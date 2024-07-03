@@ -6,18 +6,18 @@ import {
   MOON_300,
   MOON_600,
   MOON_800,
-} from '../../../../../../common/css/color.styles';
-import {hexToRGB} from '../../../../../../common/css/utils';
-import {Icon, IconNames} from '../../../../../Icon';
-import {CallLink, ObjectVersionLink} from '../common/Links';
+} from '../../../../../../../../common/css/color.styles';
+import {hexToRGB} from '../../../../../../../../common/css/utils';
+import {Icon, IconNames} from '../../../../../../../Icon';
+import {CallLink, ObjectVersionLink} from '../../../common/Links';
 import {
   BOX_RADIUS,
   CIRCLE_SIZE,
   EVAL_DEF_HEIGHT,
   STANDARD_BORDER,
-} from './ecpConstants';
-import {EvaluationComparisonState} from './ecpTypes';
-import {HorizontalBox, VerticalBar} from './Layout';
+} from '../../ecpConstants';
+import {EvaluationComparisonState} from '../../ecpTypes';
+import {HorizontalBox} from '../../Layout';
 
 export const EvaluationDefinition: React.FC<{
   state: EvaluationComparisonState;
@@ -103,5 +103,16 @@ const ModelIcon: React.FC = () => {
       }}>
       <Icon name={IconNames.Model} width={14} height={14} />
     </Box>
+  );
+};
+export const VerticalBar: React.FC = () => {
+  return (
+    <div
+      style={{
+        width: '2px',
+        height: '100%',
+        backgroundColor: MOON_300,
+      }}
+    />
   );
 };

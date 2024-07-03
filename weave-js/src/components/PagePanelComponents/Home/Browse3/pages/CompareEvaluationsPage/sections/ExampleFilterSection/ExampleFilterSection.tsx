@@ -2,15 +2,15 @@ import {Box} from '@material-ui/core';
 import {mean} from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
-import {MOON_500} from '../../../../../../common/css/color.styles';
-import {useCompareEvaluationsState} from './compareEvaluationsContext';
-import {DimensionPicker} from './ComparisonDefinitionHeader';
-import {PLOT_HEIGHT, STANDARD_PADDING} from './ecpConstants';
-import {EvaluationComparisonState} from './ecpTypes';
-import {HorizontalBox, VerticalBox} from './Layout';
+import {MOON_500} from '../../../../../../../../common/css/color.styles';
+import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
+import {PLOT_HEIGHT, STANDARD_PADDING} from '../../ecpConstants';
+import {EvaluationComparisonState} from '../../ecpTypes';
+import {HorizontalBox, VerticalBox} from '../../Layout';
+import {DimensionPicker} from '../ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
 
-export const ScatterFilter: React.FC<{
+export const ExampleFilterSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const {setRangeSelection} = useCompareEvaluationsState();

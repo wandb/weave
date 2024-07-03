@@ -9,20 +9,27 @@ import {
   // MOON_400,
   MOON_600,
   // MOON_800,
-} from '../../../../../../common/css/color.styles';
-import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import {Checkbox} from '../../../../..';
-import {Pill, TagColorName} from '../../../../../Tag';
-import {NotApplicable} from '../../../Browse2/NotApplicable';
-import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {ValueViewNumber} from '../CallPage/ValueViewNumber';
-import {BOX_RADIUS, STANDARD_BORDER, STANDARD_PADDING} from './ecpConstants';
-import {SIGNIFICANT_DIGITS} from './ecpConstants';
-import {getOrderedCallIds, getOrderedModelRefs} from './ecpState';
-import {isBinarySummaryScore, isContinuousSummaryScore} from './ecpTypes';
-import {EvaluationComparisonState} from './ecpTypes';
-import {EvaluationCallLink, EvaluationModelLink} from './EvaluationDefinition';
-import {HorizontalBox} from './Layout';
+} from '../../../../../../../../common/css/color.styles';
+import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
+import {Checkbox} from '../../../../../../..';
+import {Pill, TagColorName} from '../../../../../../../Tag';
+import {NotApplicable} from '../../../../../Browse2/NotApplicable';
+import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
+import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
+import {
+  BOX_RADIUS,
+  STANDARD_BORDER,
+  STANDARD_PADDING,
+} from '../../ecpConstants';
+import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
+import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
+import {isBinarySummaryScore, isContinuousSummaryScore} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpTypes';
+import {HorizontalBox} from '../../Layout';
+import {
+  EvaluationCallLink,
+  EvaluationModelLink,
+} from '../ComparisonDefinitionSection/EvaluationDefinition';
 
 // const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
 
@@ -49,7 +56,7 @@ const GridCell = styled.div`
   min-width: 100px;
 `;
 
-export const ScoreCard: React.FC<{
+export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   // console.log(props);

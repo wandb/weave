@@ -1,7 +1,6 @@
 import {Box, BoxProps} from '@material-ui/core';
 import React from 'react';
 
-import {MOON_300} from '../../../../../../common/css/color.styles';
 import {STANDARD_PADDING} from './ecpConstants';
 
 export const VerticalBox: React.FC<BoxProps> = props => {
@@ -31,17 +30,6 @@ export const HorizontalBox: React.FC<BoxProps> = props => {
         overflow: 'hidden',
         flex: '0 0 auto',
         ...props.sx,
-      }}
-    />
-  );
-};
-export const VerticalBar: React.FC = () => {
-  return (
-    <div
-      style={{
-        width: '2px',
-        height: '100%',
-        backgroundColor: MOON_300,
       }}
     />
   );

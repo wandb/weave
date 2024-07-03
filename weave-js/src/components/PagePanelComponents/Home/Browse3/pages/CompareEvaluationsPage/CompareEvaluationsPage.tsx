@@ -58,16 +58,16 @@ import {
   CompareEvaluationsProvider,
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
-import {ComparisonDefinition} from './ComparisonDefinitionHeader';
 import {STANDARD_PADDING} from './ecpConstants';
 import {RangeSelection} from './ecpTypes';
 import {ScoreDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
-import {ExampleComparer} from './ExampleComparer';
 import {HorizontalBox, VerticalBox} from './Layout';
-import {ScatterFilter} from './ScatterFilter';
-import {ScoreCard} from './Scorecard';
-import {SummaryPlots} from './SummaryPlots';
+import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
+import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
+import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
+import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
+import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -223,11 +223,11 @@ const CompareEvaluationsPageInner: React.FC = props => {
           alignItems: 'flex-start',
           gridGap: STANDARD_PADDING * 2,
         }}>
-        <ComparisonDefinition state={state} />
+        <ComparisonDefinitionSection state={state} />
         <SummaryPlots state={state} />
-        <ScoreCard state={state} />
+        <ScorecardSection state={state} />
         {Object.keys(state.data.models).length === 2 && (
-          <ScatterFilter state={state} />
+          <ExampleFilterSection state={state} />
         )}
         {/* <ResultsSection state={state} /> */}
         <ResultExplorer state={state} />
@@ -268,7 +268,7 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
           height: 'calc(100vh - 114px)',
           overflow: 'auto',
         }}>
-        <ExampleComparer state={state} />
+        <ExampleCompareSection state={state} />
       </Box>
     </VerticalBox>
   );

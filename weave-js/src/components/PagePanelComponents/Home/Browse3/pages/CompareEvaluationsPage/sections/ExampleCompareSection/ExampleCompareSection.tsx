@@ -3,21 +3,24 @@ import _ from 'lodash';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
-import {MOON_100, MOON_300} from '../../../../../../common/css/color.styles';
-import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import {Button} from '../../../../../Button';
-import {Pill, TagColorName} from '../../../../../Tag';
-import {CellValue} from '../../../Browse2/CellValue';
-import {NotApplicable} from '../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../Browse2/SmallRef';
-import {ValueViewNumber} from '../CallPage/ValueViewNumber';
-import {isRef} from '../common/util';
-import {useCompareEvaluationsState} from './compareEvaluationsContext';
-import {useFilteredAggregateRows} from './comparisonTableUtil';
-import {SIGNIFICANT_DIGITS} from './ecpConstants';
-import {EvaluationComparisonState} from './ecpTypes';
-import {EvaluationCallLink} from './EvaluationDefinition';
-import {HorizontalBox, VerticalBox} from './Layout';
+import {
+  MOON_100,
+  MOON_300,
+} from '../../../../../../../../common/css/color.styles';
+import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
+import {Button} from '../../../../../../../Button';
+import {Pill, TagColorName} from '../../../../../../../Tag';
+import {CellValue} from '../../../../../Browse2/CellValue';
+import {NotApplicable} from '../../../../../Browse2/NotApplicable';
+import {SmallRef} from '../../../../../Browse2/SmallRef';
+import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
+import {isRef} from '../../../common/util';
+import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
+import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
+import {EvaluationComparisonState} from '../../ecpTypes';
+import {HorizontalBox, VerticalBox} from '../../Layout';
+import {EvaluationCallLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
+import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 
 const MIN_OUTPUT_WIDTH = 500;
 
@@ -35,7 +38,7 @@ const GridContainer = styled.div<{numColumns: number}>`
   /* grid-gap: 10px; */
 `;
 
-export const ExampleComparer: React.FC<{
+export const ExampleCompareSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const {filteredRows, inputColumnKeys, outputColumnKeys, scoreMap, leafDims} =

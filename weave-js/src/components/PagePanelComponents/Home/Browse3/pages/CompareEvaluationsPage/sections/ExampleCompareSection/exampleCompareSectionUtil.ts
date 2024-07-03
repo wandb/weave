@@ -1,10 +1,10 @@
 import _ from 'lodash';
 import {useMemo} from 'react';
 
-import {flattenObject} from '../../../Browse2/browse2Util';
-import { getOrderedCallIds } from './ecpState';
-import {EvaluationComparisonState} from './ecpTypes';
-import { scoreIdFromScoreDimension } from './ecpUtil';
+import {flattenObject} from '../../../../../Browse2/browse2Util';
+import { getOrderedCallIds } from '../../ecpState';
+import {EvaluationComparisonState} from '../../ecpTypes';
+import { scoreIdFromScoreDimension } from '../../ecpUtil';
 
 type FlattenedRow = {
   id: string;
