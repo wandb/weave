@@ -1,6 +1,6 @@
 import {sum} from 'lodash';
 
-import { WB_RUN_COLORS } from '../../../../../../common/css/color.styles';
+import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
@@ -13,7 +13,7 @@ import {
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {EvaluationEvaluateCallSchema} from './evaluations';
-import { EvaluationComparisonState } from './types';
+import {EvaluationComparisonState} from './types';
 
 export type BinarySummaryScore = {
   true_count: number;
@@ -156,17 +156,17 @@ export type PredictAndScoreCall = {
   _rawPredictAndScoreTraceData: TraceCallSchema;
 };
 
-const generateColorFromId = (id: string) => {
-  const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const hue = hash % 360;
-  const saturation = 70 + (hash % 30); // Saturation between 70% and 100%
-  const lightness = 40 + (hash % 20); // Lightness between 40% and 60%
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-};
+// const generateColorFromId = (id: string) => {
+//   const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+//   const hue = hash % 360;
+//   const saturation = 70 + (hash % 30); // Saturation between 70% and 100%
+//   const lightness = 40 + (hash % 20); // Lightness between 40% and 60%
+//   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+// };
 
 const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
-}
+};
 
 export const fetchEvaluationComparisonData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
@@ -508,16 +508,14 @@ export const getOrderedCallIds = (state: EvaluationComparisonState) => {
   const initial = Object.keys(state.data.evaluationCalls);
   moveItemToFront(initial, state.baselineEvaluationCallId);
   return initial;
-}
+};
 
 export const getOrderedModelRefs = (state: EvaluationComparisonState) => {
   const baselineRef =
-    state.data.evaluationCalls[state.baselineEvaluationCallId]
-      .modelRef;
-      const refs = Object.keys(state.data.models);
-      // Make sure the baseline model is first
-  
-      moveItemToFront(refs, baselineRef);
-      return refs;
-}
+    state.data.evaluationCalls[state.baselineEvaluationCallId].modelRef;
+  const refs = Object.keys(state.data.models);
+  // Make sure the baseline model is first
 
+  moveItemToFront(refs, baselineRef);
+  return refs;
+};

@@ -27,6 +27,8 @@ export const ComparisonDefinition: React.FC<{
         alignItems: 'center',
         paddingLeft: STANDARD_PADDING,
         paddingRight: STANDARD_PADDING,
+        width: '100%',
+        overflow: 'auto',
       }}>
       {evalCallIds.map((key, ndx) => {
         return (

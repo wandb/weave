@@ -1,5 +1,5 @@
 import {Box} from '@material-ui/core';
-import {BorderTop, Circle} from '@mui/icons-material';
+import {Circle} from '@mui/icons-material';
 import {
   GridColDef,
   GridColumnGroup,
@@ -16,7 +16,7 @@ import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {CallLink} from '../common/Links';
-import {useCompareEvaluationsState} from './compareEvaluationsContext';
+// import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from './constants';
 import {getOrderedCallIds} from './evaluationResults';
 import {ScoreDimension} from './evaluations';
@@ -354,7 +354,7 @@ export const CompareEvaluationsCallsTableBig: React.FC<{
     );
 
     const recursiveGetChildren = (
-      params: GridValueGetterParams<(typeof flattenedRows)[number]>
+      params: GridValueGetterParams<(typeof filteredRows)[number]>
     ) => {
       let rowNode = params.rowNode;
       while (rowNode.type === 'group') {
@@ -445,9 +445,9 @@ export const CompareEvaluationsCallsTableBig: React.FC<{
             height: '100%',
             width: '100%',
           }}>
-          {entries.map(({key, val}) => {
+          {entries.map(({key, val}, ndx) => {
             return (
-              <React.Fragment key={key}>
+              <React.Fragment key={ndx}>
                 {!noKey && (
                   <div
                     style={{
@@ -469,7 +469,7 @@ export const CompareEvaluationsCallsTableBig: React.FC<{
                     //   borderTop: 'none',
                     // },
                     padding: noPadding ? 0 : 8,
-                    textWrap: 'wrap',
+                    // textWrap: 'wrap' as any,
                     whiteSpace: 'pre-wrap',
                     overflowWrap: 'break-word',
                     overflow: 'auto',
@@ -769,7 +769,7 @@ export const CompareEvaluationsCallsTableBig: React.FC<{
     return {cols, grouping};
   }, [leafDims, outputColumnKeys, props.state.data.evaluationCalls, scoreMap]);
 
-  const {setSelectedInputDigest} = useCompareEvaluationsState();
+  // const {setSelectedInputDigest} = useCompareEvaluationsState();
 
   // const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row => row.path;
   return (

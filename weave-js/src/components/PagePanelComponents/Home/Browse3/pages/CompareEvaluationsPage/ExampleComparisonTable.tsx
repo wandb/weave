@@ -16,7 +16,7 @@ import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {CallLink} from '../common/Links';
-import {useCompareEvaluationsState} from './compareEvaluationsContext';
+// import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from './constants';
 import {getOrderedCallIds} from './evaluationResults';
 import {ScoreDimension} from './evaluations';
@@ -305,7 +305,7 @@ export const CompareEvaluationsCallsTable: React.FC<{
   }, [flattenedRows]);
 
   const {cols: columns, grouping: groupingModel} = useMemo(() => {
-    const cols: Array<GridColDef<(typeof flattenedRows)[number]>> = [];
+    const cols: Array<GridColDef<(typeof filteredRows)[number]>> = [];
     const grouping: GridColumnGroupingModel = [];
     // Columns:
     // 1. dataset row identifier
@@ -342,7 +342,7 @@ export const CompareEvaluationsCallsTable: React.FC<{
     );
 
     const recursiveGetChildren = (
-      params: GridValueGetterParams<(typeof flattenedRows)[number]>
+      params: GridValueGetterParams<(typeof filteredRows)[number]>
     ) => {
       let rowNode = params.rowNode;
       while (rowNode.type === 'group') {
@@ -548,7 +548,7 @@ export const CompareEvaluationsCallsTable: React.FC<{
     scoreMap,
   ]);
 
-  const {setSelectedInputDigest} = useCompareEvaluationsState();
+  // const {setSelectedInputDigest} = useCompareEvaluationsState();
 
   // const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row => row.path;
   return (

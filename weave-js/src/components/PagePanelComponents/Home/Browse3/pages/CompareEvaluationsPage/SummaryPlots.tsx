@@ -8,12 +8,12 @@ import {
   STANDARD_BORDER,
   STANDARD_PADDING,
 } from './constants';
+import {getOrderedCallIds} from './evaluationResults';
 import {evaluationMetrics} from './evaluations';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {EvaluationComparisonState} from './types';
-import {getOrderedCallIds} from './evaluationResults';
 
 export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
@@ -42,16 +42,20 @@ export const SummaryPlots: React.FC<{
           Summary Metrics
         </Box>
       </HorizontalBox>
-      <HorizontalBox>
+      <HorizontalBox
+        sx={{
+          flexWrap: 'wrap',
+        }}>
         <Box
           sx={{
-            flex: '1 0 auto',
+            flex: '1 1 ' + PLOT_HEIGHT + 'px',
             height: PLOT_HEIGHT,
             // width: PLOT_HEIGHT * 2,
             borderRadius: BOX_RADIUS,
             border: STANDARD_BORDER,
             overflow: 'hidden',
             alignContent: 'center',
+            width: PLOT_HEIGHT,
           }}>
           <PlotlyRadarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
           {/* <PlotlyRadarPlot /> */}
@@ -59,13 +63,13 @@ export const SummaryPlots: React.FC<{
         </Box>
         <Box
           sx={{
-            flex: '1 1 auto',
+            flex: '1 1 ' + PLOT_HEIGHT + 'px',
             height: PLOT_HEIGHT,
-            width: '100%',
             overflow: 'hidden',
             borderRadius: BOX_RADIUS,
             border: STANDARD_BORDER,
             padding: PLOT_PADDING,
+            width: PLOT_HEIGHT,
           }}>
           <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
         </Box>
@@ -123,5 +127,5 @@ const useNormalizedRadarPlotDataFromMetrics = (
         ];
       })
     );
-  }, [metrics, state.data.evaluationCalls]);
+  }, [callIds, metrics, state.data.evaluationCalls]);
 };

@@ -4,7 +4,7 @@ import {useMemo} from 'react';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
-import { EvaluationComparisonState } from './types';
+import {EvaluationComparisonState} from './types';
 
 type BinarySummaryScore = {
   true_count: number;

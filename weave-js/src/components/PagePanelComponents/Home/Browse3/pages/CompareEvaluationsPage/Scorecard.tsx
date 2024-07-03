@@ -3,6 +3,13 @@ import {sum} from 'lodash';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
+import {
+  MOON_100,
+  // MOON_200,
+  // MOON_400,
+  MOON_600,
+  // MOON_800,
+} from '../../../../../../common/css/color.styles';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {Checkbox} from '../../../../..';
 import {Pill, TagColorName} from '../../../../../Tag';
@@ -20,15 +27,8 @@ import {
 } from './evaluationResults';
 import {HorizontalBox} from './Layout';
 import {EvaluationComparisonState} from './types';
-import {
-  MOON_100,
-  MOON_200,
-  MOON_400,
-  MOON_600,
-  MOON_800,
-} from '../../../../../../common/css/color.styles';
 
-const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
+// const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
 
 type BetterScoresType = {
   [scorerId: string]: {
@@ -338,7 +338,7 @@ export const ScoreCard: React.FC<{
                   gridColumnEnd: 'span 2',
                   fontWeight: 'bold',
                   textAlign: 'right',
-                  paddingRight: '10px',
+                  // paddingRight: '10px',
                   // width: FIXED_SCORE_LABEL_WIDTH,
                   textOverflow: 'ellipsis',
                 }}>

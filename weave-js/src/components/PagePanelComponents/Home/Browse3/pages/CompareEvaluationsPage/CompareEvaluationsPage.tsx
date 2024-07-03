@@ -23,11 +23,9 @@
  * - [ ] Change "Target Metric" to an ordered list of metrics. Default to first metric + latency
  * Styling / UX:
  * - [ ] Add a better loading state
- * - [ ] Header controls don't scale well to smaller sized
  * - [ ] Should pull in EvaluationCall display name if it exists
  * - [ ] Hover tooltip on charts to show values
  * - Scatterplot Filter UX
- *    - [ ] Move the dimension selector closer to the plot of interest
  *    - [ ] Scatterplot filter should have 1-1 aspect ratio
  *    - [ ] Scatterplot Filter dimensions are not quite obvious
  *    - [ ] Scatterplot filter would benefit from a title / help text
@@ -35,8 +33,8 @@
  */
 
 import {Box, Checkbox} from '@material-ui/core';
-import {ToggleButton} from '@mui/material';
-import React, {FC, useCallback, useContext, useMemo} from 'react';
+// import {ToggleButton} from '@mui/material';
+import React, {FC, useCallback, useContext} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {Button} from '../../../../../Button';
@@ -45,7 +43,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {useEvaluationsFilter} from '../CallsPage/CallsPage';
-import {CallsTable} from '../CallsPage/CallsTable';
+// import {CallsTable} from '../CallsPage/CallsTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
@@ -282,33 +280,33 @@ const ResultsSection: React.FC<{state: EvaluationComparisonState}> = ({
   );
 };
 
-const RowComparison: React.FC<{state: EvaluationComparisonState}> = props => {
-  const selectedCallIds = useMemo(() => {
-    if (props.state.selectedInputDigest == null) {
-      return [];
-    }
-    const selectedRow =
-      props.state.data.resultRows[props.state.selectedInputDigest];
-    if (selectedRow == null) {
-      return [];
-    }
-    return Object.values(selectedRow.evaluations)
-      .map(evaluation => Object.keys(evaluation.predictAndScores))
-      .flat();
-  }, [props.state.data.resultRows, props.state.selectedInputDigest]);
+// const RowComparison: React.FC<{state: EvaluationComparisonState}> = props => {
+//   const selectedCallIds = useMemo(() => {
+//     if (props.state.selectedInputDigest == null) {
+//       return [];
+//     }
+//     const selectedRow =
+//       props.state.data.resultRows[props.state.selectedInputDigest];
+//     if (selectedRow == null) {
+//       return [];
+//     }
+//     return Object.values(selectedRow.evaluations)
+//       .map(evaluation => Object.keys(evaluation.predictAndScores))
+//       .flat();
+//   }, [props.state.data.resultRows, props.state.selectedInputDigest]);
 
-  if (props.state.selectedInputDigest == null) {
-    return null;
-  }
+//   if (props.state.selectedInputDigest == null) {
+//     return null;
+//   }
 
-  return (
-    <CallsTable
-      entity={props.state.data.entity}
-      project={props.state.data.project}
-      frozenFilter={{
-        callIds: selectedCallIds,
-      }}
-      hideControls
-    />
-  );
-};
+//   return (
+//     <CallsTable
+//       entity={props.state.data.entity}
+//       project={props.state.data.project}
+//       frozenFilter={{
+//         callIds: selectedCallIds,
+//       }}
+//       hideControls
+//     />
+//   );
+// };
