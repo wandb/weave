@@ -1,6 +1,6 @@
 import {Box} from '@material-ui/core';
 import _ from 'lodash';
-import React, {useEffect, useMemo} from 'react';
+import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
 import {MOON_100, MOON_300} from '../../../../../../common/css/color.styles';

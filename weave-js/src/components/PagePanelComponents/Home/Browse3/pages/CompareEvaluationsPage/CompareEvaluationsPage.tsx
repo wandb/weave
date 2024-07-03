@@ -2,32 +2,35 @@
  * This is the entrypoint for the Evaluation Comparison Page.
  *
  * TODO:
- * - [ ] Reflect local state in URL (dimension, range, & selection)
- * - [ ] Code Cleanup: There is a lot of dead / messy code
- * - [ ] Refs in Model Property table should be expanded. Example:  https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22bf5188ba-48cd-4c6d-91ea-e25464570c13%22%2C%222f4544f3-9649-487e-b083-df6985e21b12%22%2C%228cbeccd6-6ff7-4eac-a305-6fb6450530f1%22%5D
- * - [ ] Refs in Call Table should be links
- * - [ ] Arrays are not supported well in the model property table or the call table. Example: https://app.wandb.test/wandb-smle/weave-rag-lc-demo/weave/compare-evaluations?evaluationCallIds=%5B%2221e8ea02-3109-434c-95d0-cb2c7c542f74%22%5D&peekPath=%2Fwandb-smle%2Fweave-rag-lc-demo%2Fcalls%2F21e8ea02-3109-434c-95d0-cb2c7c542f74
- * - [ ] "Comparison Table" should use Baseline model input for input fields, NOT the dataset input
- * - [ ] Comparison table needs more vertical space allocated to focus on text (look at langsmith)
- * Bugs:
- * - [ ] Empty selection filter causes crash
- * - [ ] Selection Filter seems to reset periodically? on data refresh - also on page resize?
- * - [ ] `isProbablyXCall` is incorrect - at least the predict one (eg. for infer_method_names in ("predict", "infer", "forward"):)
- * Performance:
- * - [ ] Audit the queries to determine areas of improvement and parallelization
  * Data Model:
- * - [ ] Audit the data model to correctly reflect ScoreDimensions (this is too loose right now)
- * - [ ] find all cases of the `_raw*` cases and remove them, this is an example of insufficient data model
- * - [ ] Latency, Tokens, and Cost are should "feel" like first class ScoringDimensions
- * - [ ] Verify that nested scorers are supported
- * - [ ] Change "Target Metric" to an ordered list of metrics. Default to first metric + latency
+ * - [ ] (MUST) Audit the data model to correctly reflect ScoreDimensions (this is too loose right now)
+ * - [ ] (MUST) Latency, Tokens, and Cost are should "feel" like first class ScoringDimensions
+ * - [ ] (probably) find all cases of the `_raw*` cases and remove them, this is an example of insufficient data model
+ * - [ ] (probably) Change "Target Metric" to an ordered list of metrics. Default to first metric + latency
+ * - [ ] (maybe) Verify that nested scorers are supported
+ * - [ ] (maybe) "Comparison Table" should use Baseline model input for input fields, NOT the dataset input
+ * Bugs:
+ * - [ ] (MUST) Empty selection filter causes crash
+ * - [ ] (MUST)`isProbablyXCall` is incorrect - at least the predict one (eg. for infer_method_names in ("predict", "infer", "forward"):)
+ * - [ ] (Probably) Selection Filter seems to reset periodically? on data refresh - also on page resize?
+ * Bigger Features:
+ * Comparison Table:
+ * - [ ] (MUST) Need to finalize how to handle the comparison table - I have a few options, settle on one
+ * Smaller Features:
+ * - [ ] (MUST) Reflect local state in URL (dimension, range, & selection)
+ * - [ ] (maybe) Refs in Model Property table should be expanded. Example:  https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22bf5188ba-48cd-4c6d-91ea-e25464570c13%22%2C%222f4544f3-9649-487e-b083-df6985e21b12%22%2C%228cbeccd6-6ff7-4eac-a305-6fb6450530f1%22%5D
+ * - [ ] (maybe) Arrays are not supported well in the model property table or the call table. Example: https://app.wandb.test/wandb-smle/weave-rag-lc-demo/weave/compare-evaluations?evaluationCallIds=%5B%2221e8ea02-3109-434c-95d0-cb2c7c542f74%22%5D&peekPath=%2Fwandb-smle%2Fweave-rag-lc-demo%2Fcalls%2F21e8ea02-3109-434c-95d0-cb2c7c542f74
+ * Performance:
+ * - [ ] (probably) Audit the queries to determine areas of improvement and parallelization
  * Styling / UX:
- * - [ ] Should pull in EvaluationCall display name if it exists
- * - [ ] Hover tooltip on charts to show values
+ * - [ ] (probably) Hover tooltip on charts to show values
+ * - [ ] (maybe) Should pull in EvaluationCall display name if it exists
  * - Scatterplot Filter UX
- *    - [ ] Scatterplot filter should have 1-1 aspect ratio
- *    - [ ] Scatterplot Filter dimensions are not quite obvious
- *    - [ ] Scatterplot filter would benefit from a title / help text
+ *    - [ ] (probably) Scatterplot Filter dimensions are not quite obvious
+ *    - [ ] (probably) Scatterplot filter would benefit from a title / help text
+ *    - [ ] (maybe) Scatterplot filter should have 1-1 aspect ratio
+ * Implementation Tasks:
+ * - [ ] (MUST) Code Cleanup: There is a lot of dead / messy code
  */
 
 import {Box} from '@material-ui/core';

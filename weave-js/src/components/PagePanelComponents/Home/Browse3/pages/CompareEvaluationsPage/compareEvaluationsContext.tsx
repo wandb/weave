@@ -1,10 +1,10 @@
+import {Box, LinearProgress} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
+import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
 import {ScoreDimension} from './evaluations';
 import {RangeSelection, useInitialState} from './initialize';
 import {EvaluationComparisonState} from './types';
-import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
-import {Box, LinearProgress} from '@material-ui/core';
 // import FullScreenLoader from './FullscreenLoader';
 
 const CompareEvaluationsContext = React.createContext<{
