@@ -1,7 +1,7 @@
 import {sum} from 'lodash';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
-import {ComparisonMetric,EvaluationComparisonState} from './ecpTypes';
+import {ComparisonMetric, EvaluationComparisonState} from './ecpTypes';
 
 export const evaluationComparisonMetrics = (
   state: EvaluationComparisonState

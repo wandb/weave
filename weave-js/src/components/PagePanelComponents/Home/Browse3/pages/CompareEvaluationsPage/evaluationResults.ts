@@ -3,14 +3,18 @@ import {sum} from 'lodash';
 import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
-import {
-  TraceServerClient,
-} from '../wfReactInterface/traceServerClient';
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {
   convertISOToDate,
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
-import {EvaluationComparisonData, EvaluationComparisonState, EvaluationEvaluateCallSchema, isBinarySummaryScore, isContinuousSummaryScore } from './ecpTypes';
+import {
+  EvaluationComparisonData,
+  EvaluationComparisonState,
+  EvaluationEvaluateCallSchema,
+  isBinarySummaryScore,
+  isContinuousSummaryScore,
+} from './ecpTypes';
 
 const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];

@@ -1,4 +1,7 @@
-import { TraceCallSchema, TraceObjSchema } from '../wfReactInterface/traceServerClient';
+import {
+  TraceCallSchema,
+  TraceObjSchema,
+} from '../wfReactInterface/traceServerClient';
 import {RangeSelection} from './initialize';
 
 export type EvaluationComparisonState = {
@@ -50,7 +53,7 @@ export type ComparisonMetric = {
   path: string;
   unit: string;
   lowerIsBetter: boolean;
-  values: { [callId: string]: number; };
+  values: {[callId: string]: number};
 };
 
 export const isBinarySummaryScore = (
@@ -97,14 +100,14 @@ type DatasetRow = {
 type ModelObj = {
   ref: string;
   predictOpRef: string;
-  properties: { [prop: string]: any; };
+  properties: {[prop: string]: any};
   project: string;
   entity: string;
   _rawModelObject: TraceObjSchema;
 };
 type ScoreResults = {
   callId: string;
-  results: { [path: string]: number | boolean; };
+  results: {[path: string]: number | boolean};
   _rawScoreTraceData: TraceCallSchema;
 };
 
@@ -153,4 +156,3 @@ type PredictAndScoreCall = {
   };
   _rawPredictAndScoreTraceData: TraceCallSchema;
 };
-

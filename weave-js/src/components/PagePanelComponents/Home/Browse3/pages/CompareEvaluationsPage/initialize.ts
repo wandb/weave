@@ -5,14 +5,13 @@ import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
-  EvaluationComparisonData, isBinarySummaryScore,
-  isContinuousSummaryScore
+  EvaluationComparisonData,
+  isBinarySummaryScore,
+  isContinuousSummaryScore,
 } from './ecpTypes';
-import { ScoreDimension } from './ecpTypes';
+import {ScoreDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
-import {
-  fetchEvaluationComparisonData,
-} from './evaluationResults';
+import {fetchEvaluationComparisonData} from './evaluationResults';
 
 export type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
 
