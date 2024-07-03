@@ -14,9 +14,19 @@ dataset = Dataset(rows=dataset_rows)
 
 
 expected_eval_result = {
-    "model_output": {"mean": 9.5},
-    "score": {"true_count": 1, "true_fraction": 0.5},
-    "model_latency": {"mean": pytest.approx(0, abs=0.05)},
+    "model_output": {
+        "mean": 9.5,
+        "none_proportion": 0.0,
+    },
+    "score": {
+        "true_count": 1,
+        "true_proportion": 0.5,
+        "none_proportion": 0.0,
+    },
+    "model_latency": {
+        "mean": pytest.approx(0, abs=0.05),
+        "none_proportion": 0.0,
+    },
 }
 
 
@@ -60,10 +70,18 @@ def test_predict_can_receive_other_params(client):
     )
     result = asyncio.run(evaluation.evaluate(model_predict))
     assert result == {
-        "model_output": {"mean": 18.5},
-        "score": {"true_count": 0, "true_fraction": 0.0},
+        "model_output": {
+            "mean": 18.5,
+            "none_proportion": 0.0,
+        },
+        "score": {
+            "true_count": 0,
+            "true_proportion": 0.0,
+            "none_proportion": 0.0,
+        },
         "model_latency": {
             "mean": pytest.approx(0, abs=0.05),
+            "none_proportion": 0.0,
         },
     }
 
@@ -124,10 +142,18 @@ def test_score_as_class(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result == {
-        "model_output": {"mean": 9.5},
-        "MyScorer": {"true_count": 1, "true_fraction": 0.5},
+        "model_output": {
+            "mean": 9.5,
+            "none_proportion": 0.0,
+        },
+        "MyScorer": {
+            "true_count": 1,
+            "true_proportion": 0.5,
+            "none_proportion": 0.0,
+        },
         "model_latency": {
             "mean": pytest.approx(0, abs=0.05),
+            "none_proportion": 0.0,
         },
     }
 
@@ -150,10 +176,14 @@ def test_score_with_custom_summarize(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result == {
-        "model_output": {"mean": 9.5},
+        "model_output": {
+            "mean": 9.5,
+            "none_proportion": 0.0,
+        },
         "MyScorer": {"awesome": 3},
         "model_latency": {
             "mean": pytest.approx(0, abs=0.05),
+            "none_proportion": 0.0,
         },
     }
 
@@ -171,8 +201,16 @@ def test_multiclass_f1_score(client):
     result = asyncio.run(evaluation.evaluate(return_pred))
     assert result == {
         "model_output": {
-            "a": {"true_count": 1, "true_fraction": 1.0},
-            "b": {"true_count": 0, "true_fraction": 0.0},
+            "a": {
+                "true_count": 1,
+                "true_proportion": 1.0,
+                "none_proportion": 0.0,
+            },
+            "b": {
+                "true_count": 0,
+                "true_proportion": 0.0,
+                "none_proportion": 0.0,
+            },
         },
         "MultiTaskBinaryClassificationF1": {
             "a": {"f1": 0, "precision": 0.0, "recall": 0},
@@ -180,6 +218,7 @@ def test_multiclass_f1_score(client):
         },
         "model_latency": {
             "mean": pytest.approx(0, abs=0.05),
+            "none_proportion": 0.0,
         },
     }
 
@@ -207,15 +246,20 @@ def test_score_with_errors(client):
 
     result = asyncio.run(evaluation.evaluate(return_pred))
 
-    expected_errors = [
-        {"error": "actual is too big", "example": {"actual": 3, "pred": 3}},
-        {"error": "actual is too big", "example": {"actual": 4, "pred": 4}},
-    ]
-
-    assert result["model_output"] == {"mean": 2.5}
-    assert result["model_latency"] == {"mean": pytest.approx(0, abs=0.1)}
-
-    # Errors may be in a different order because they are processed in parallel
-    errors = result["raise_above_2_score"]["errors"]
-    for expected_error in expected_errors:
-        assert expected_error in errors
+    assert result == {
+        "model_output": {
+            "mean": 2.5,
+            "none_proportion": 0.0,
+        },
+        "raise_above_2_score": {
+            "actual": {
+                "true_count": 2,
+                "true_proportion": 0.5,
+                "none_proportion": 0.5,  # for cases 3,4 which raise because they are > 2
+            }
+        },
+        "model_latency": {
+            "mean": pytest.approx(0, abs=0.1),
+            "none_proportion": 0.0,
+        },
+    }

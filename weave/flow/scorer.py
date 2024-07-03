@@ -35,8 +35,8 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     """Automatically summarize a list of (potentially nested) dicts.
 
     Computes:
-        - avg for numeric cols
-        - count and fraction for boolean cols
+        - avg and none fraction for numeric cols
+        - count, true fraction, and none fraction for boolean cols
         - other col types are ignored
 
     If col is all None, result is None
@@ -44,8 +44,6 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     Returns:
       dict of summary stats, with structure matching input dict structure.
     """
-    data = [x for x in data if x is not None]
-
     if not data:
         return {}
 
@@ -54,10 +52,14 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     if isinstance(val, (bool, box.BoxedBool)):
         return {
             "true_count": (true_count := sum(1 for x in data if x)),
-            "true_fraction": true_count / len(data),
+            "true_proportion": true_count / len(data),
+            "none_proportion": sum(1 for x in data if x is None) / len(data),
         }
     elif isinstance(val, Number):
-        return {"mean": np.mean(data).item()}
+        return {
+            "mean": np.mean(data).item(),
+            "none_proportion": sum(1 for x in data if x is None) / len(data),
+        }
     elif isinstance(val, dict):
         result = {}
         for k in val:
