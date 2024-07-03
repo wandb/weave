@@ -58,7 +58,7 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
     elif isinstance(val, dict):
         result = {}
         for k in val:
-            if (summary := auto_summarize([x[k] for x in data])) is not None:
+            if (summary := auto_summarize([x.get(k) for x in data])) is not None:
                 if k in summary:
                     result.update(summary)
                 else:
