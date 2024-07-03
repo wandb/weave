@@ -116,7 +116,7 @@ export const InputComparison2: React.FC<{
           bgcolor: MOON_100,
           padding: '16px',
         }}>
-        {`Viewing Result ${targetIndex + 1} of ${filteredRows.length}`}
+        {`Viewing example ${targetIndex + 1} of ${filteredRows.length}`}
         <Box>
           <Button
             className="mx-16"

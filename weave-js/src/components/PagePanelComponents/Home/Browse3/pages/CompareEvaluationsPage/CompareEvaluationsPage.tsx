@@ -267,31 +267,15 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
             fontSize: '1.5em',
             fontWeight: 'bold',
           }}>
-          Browse Results (Experiments)
+          Browse Model Outputs on Examples
         </Box>
       </HorizontalBox>
-      <Tabs
-        style={{
-          flex: '0 0 auto',
-        }}
-        value={selectedTab}
-        onChange={(event, newValue) => {
-          setSelectedTab(newValue);
-        }}>
-        <Tab label="Dense Table with Child Table" value={0} />
-        <Tab label="Hacked Multi-Row Big Table" value={1} />
-        <Tab label="Report Card Pager" value={2} />
-        <Tab label="Report Card Pager (Different Layout)" value={3} />
-      </Tabs>
       <Box
         sx={{
           height: 'calc(100vh - 114px)',
           overflow: 'auto',
         }}>
-        {selectedTab === 0 && <CompareEvaluationsCallsTable state={state} />}
-        {selectedTab === 1 && <CompareEvaluationsCallsTableBig state={state} />}
-        {selectedTab === 2 && <InputComparison state={state} />}
-        {selectedTab === 3 && <InputComparison2 state={state} />}
+        <InputComparison2 state={state} />
       </Box>
     </VerticalBox>
   );
