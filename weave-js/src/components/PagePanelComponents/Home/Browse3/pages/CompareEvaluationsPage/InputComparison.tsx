@@ -4,6 +4,9 @@ import styled from 'styled-components';
 
 import {HorizontalBox, VerticalBox} from './Layout';
 import {EvaluationComparisonState} from './types';
+import {useFilteredAggregateRows} from './comparisonTableUtil';
+import {WeaveObjectRef, parseRef} from '../../../../../../react';
+import {SmallRef} from '../../../Browse2/SmallRef';
 
 const GridCell = styled.div<{cols?: number; rows?: number}>`
   border: 1px solid black;
@@ -39,9 +42,20 @@ const GridContainer = styled.div<{numColumns: number}>`
   /* grid-gap: 10px; */
 `;
 
+const verticalStyle: React.CSSProperties = {
+  writingMode: 'vertical-rl',
+  transform: 'rotate(180deg)',
+};
+
 export const InputComparison: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
+  const {filteredRows, inputColumnKeys, outputColumnKeys, scoreMap, leafDims} =
+    useFilteredAggregateRows(props.state);
+
+  const target = Object.values(filteredRows)[0];
+  const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
+
   const NUM_SCORERS = 2;
   const NUM_METRICS_PER_SCORER = 2;
   const NUM_METRICS = NUM_SCORERS * NUM_METRICS_PER_SCORER;
@@ -50,7 +64,7 @@ export const InputComparison: React.FC<{
     1 + // Input / Eval Title
     2 + // Input Prop Key / Val
     NUM_METRIC_COLS;
-  const NUM_INPUT_PROPS = 3;
+  const NUM_INPUT_PROPS = inputColumnKeys.length;
   const NUM_OUTPUT_KEYS = 3;
   const NUM_EVALS = 3;
   const FREE_TEXT_COL_NDX = 2;
@@ -61,14 +75,7 @@ export const InputComparison: React.FC<{
     <VerticalBox>
       <HorizontalBox
         sx={{
-          height: '40px',
-          bgcolor: 'red',
-        }}>
-        Header
-      </HorizontalBox>
-      <HorizontalBox
-        sx={{
-          height: 'calc(100vh - 115px)',
+          height: 'calc(100vh - 116px)',
           //   bgcolor: 'blue',
         }}>
         <GridContainer
@@ -81,12 +88,16 @@ export const InputComparison: React.FC<{
             display: 'grid',
             overflow: 'auto',
           }}>
-          <GridCell rows={NUM_INPUT_PROPS}>Input</GridCell>
+          <GridCell rows={NUM_INPUT_PROPS}>
+            <SmallRef objRef={inputRef} iconOnly />
+          </GridCell>
           {_.range(NUM_INPUT_PROPS).map(i => {
             return (
-              <>
-                <GridCell>Input Prop {i} Key</GridCell>
-                <GridCell>Input Prop {i} Val</GridCell>
+              <React.Fragment key={inputColumnKeys[i]}>
+                <GridCell>{inputColumnKeys[i]}</GridCell>
+                <GridCell>
+                  {target.input[inputColumnKeys[i]].toString()}
+                </GridCell>
                 {i === 0 && (
                   <GridCell
                     cols={NUM_METRIC_COLS}
@@ -98,8 +109,7 @@ export const InputComparison: React.FC<{
                     <GridCell
                       rows={2}
                       style={{
-                        writingMode: 'vertical-rl',
-                        transform: 'rotate(180deg)',
+                        ...verticalStyle,
                         // position: 'sticky',
                         //   top: HEADER_HEIGHT,
                         // top: 0,
@@ -127,8 +137,7 @@ export const InputComparison: React.FC<{
                         <GridCell
                           //   rows={NUM_INPUT_PROPS}
                           style={{
-                            writingMode: 'vertical-rl',
-                            transform: 'rotate(180deg)',
+                            ...verticalStyle,
                             // position: 'sticky',
                             //   top: HEADER_HEIGHT,
                             // top: 0,
@@ -141,7 +150,7 @@ export const InputComparison: React.FC<{
                     })}
                   </GridCell>
                 )}
-              </>
+              </React.Fragment>
             );
           })}
           {_.range(NUM_EVALS).map(ei => {
