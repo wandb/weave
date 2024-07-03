@@ -191,7 +191,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     return flattenedRows.map(row => {
       return {
         ...row,
-        
+
         // evaluationCallId: expandPrimitive(
         //   row.evaluationCallId,
         //   row.evaluationCallId
@@ -249,7 +249,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
 
   const filteredRows = useMemo(() => {
     const aggregatedAsList = Object.values(aggregatedRows);
-    if (state.rangeSelection) {
+    if (state.rangeSelection && Object.keys(state.rangeSelection).length > 0) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
         const values =
           aggregatedRows[digest].scores[
@@ -259,6 +259,13 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
           return val.min <= values[key] && values[key] <= val.max;
         });
       });
+      // console.log(
+      //   'Filtering',
+      //   state.comparisonDimension,
+      //   state.rangeSelection,
+      //   aggregatedRows,
+      //   allowedDigests
+      // );
       return aggregatedAsList.filter(row =>
         allowedDigests.includes(row.inputDigest)
       );

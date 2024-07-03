@@ -41,7 +41,7 @@ export const ScatterFilter: React.FC<{
           score => {
             const val = score.predictCall?.latencyMs;
             if (typeof val === 'boolean') {
-              xVals.push(val ? 1 : 0);
+              xVals.push(val ? 100 : 0);
             } else {
               xVals.push(val ?? 0);
             }
@@ -53,7 +53,7 @@ export const ScatterFilter: React.FC<{
           score => {
             const val = score.predictCall?.latencyMs;
             if (typeof val === 'boolean') {
-              yVals.push(val ? 1 : 0);
+              yVals.push(val ? 100 : 0);
             } else {
               yVals.push(val ?? 0);
             }
@@ -75,7 +75,7 @@ export const ScatterFilter: React.FC<{
           const val = results[scorerKey];
           // console.log(val, scorerKey, score.scores[scorerName]);
           if (typeof val === 'boolean') {
-            xVals.push(val ? 1 : 0);
+            xVals.push(val ? 100 : 0);
           } else {
             xVals.push(val ?? 0);
           }
@@ -90,7 +90,7 @@ export const ScatterFilter: React.FC<{
           }
           const val = results[scorerKey];
           if (typeof val === 'boolean') {
-            yVals.push(val ? 1 : 0);
+            yVals.push(val ? 100 : 0);
           } else {
             yVals.push(val ?? 0);
           }

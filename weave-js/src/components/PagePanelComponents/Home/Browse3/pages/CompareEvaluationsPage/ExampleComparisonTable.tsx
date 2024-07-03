@@ -13,10 +13,12 @@ import {Icon, IconNames} from '../../../../../Icon';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
+import {CallsTable} from '../CallsPage/CallsTable';
 import {CallLink} from '../common/Links';
+import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {useFilteredAggregateRows} from './comparisonTableUtil';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from './constants';
-import {HorizontalBox} from './Layout';
+import {HorizontalBox, VerticalBox} from './Layout';
 import {EvaluationComparisonState} from './types';
 
 export const CompareEvaluationsCallsTable: React.FC<{
@@ -269,92 +271,136 @@ export const CompareEvaluationsCallsTable: React.FC<{
     scoreMap,
   ]);
 
-  // const {setSelectedInputDigest} = useCompareEvaluationsState();
+  const {setSelectedInputDigest} = useCompareEvaluationsState();
 
   // const getTreeDataPath: DataGridProProps['getTreeDataPath'] = row => row.path;
   return (
-    <Box
+    <VerticalBox
       sx={{
-        height: 'calc(100vh - 114px)',
+        height: '100%', // 'calc(100vh - 114px)',
         width: '100%',
         overflow: 'hidden',
       }}>
-      <StyledDataGrid
-        // Start Column Menu
-        // ColumnMenu is only needed when we have other actions
-        // such as filtering.
-        disableColumnMenu={true}
-        // In this context, we don't need to filter columns. I suppose
-        // we can add this in the future, but we should be intentional
-        // about what we enable.
-        disableColumnFilter={true}
-        disableMultipleColumnsFiltering={true}
-        // ColumnPinning seems to be required in DataGridPro, else it crashes.
-        disableColumnPinning={false}
-        // There is no need to reorder the 2 columns in this context.
-        disableColumnReorder={true}
-        // Resizing columns might be helpful to show more data
-        disableColumnResize={false}
-        // There are only 2 columns, let's not confuse the user.
-        disableColumnSelector={true}
-        // We don't need to sort multiple columns.
-        disableMultipleColumnsSorting={true}
-        // End Column Menu
-        // treeData
-        // getTreeDataPath={row => row.path.toStringArray()}
-        rows={filteredRows}
-        columns={columns}
-        // isGroupExpandedByDefault={node => {
-        //   return expandedIds.includes(node.id);
-        // }}
-        columnHeaderHeight={38}
-        rowHeight={60}
-        experimentalFeatures={{columnGrouping: true}}
-        columnGroupingModel={groupingModel}
-        // groupingColDef={}
-        // treeData
-        // getTreeDataPath={getTreeDataPath}
-        // getRowHeight={(params: GridRowHeightParams) => {
-        //   const isNonRefString =
-        //     params.model.valueType === 'string' && !isRef(params.model.value);
-        //   const isArray = params.model.valueType === 'array';
-        //   const isTableRef =
-        //     isRef(params.model.value) &&
-        //     (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
-        //   const {isCode} = params.model;
-        //   if (
-        //     isNonRefString ||
-        //     (isArray && USE_TABLE_FOR_ARRAYS) ||
-        //     isTableRef ||
-        //     isCode
-        //   ) {
-        //     return 'auto';
-        //   }
-        //   return 38;
-        // }}
-        // hideFooter
-        // rowSelection={false}
-        // groupingColDef={groupingColDef}
-        // rowSelection={true}
-        // rowSelectionModel={
-        //   props.state.selectedInputDigest
-        //     ? [props.state.selectedInputDigest]
-        //     : []
-        // }
-        // disableMultipleRowSelection
-        // onRowSelectionModelChange={newSelection => {
-        //   setSelectedInputDigest(newSelection[0].toString() ?? null);
-        // }}
+      <Box
         sx={{
-          '& .MuiDataGrid-cell': {
-            textWrap: 'wrap !important',
-            // whiteSpace: 'normal',
-            overflow: 'auto !important',
-            alignItems: 'flex-start',
-            // textOverflow: 'ellipsis',
-          },
-        }}
-      />
-    </Box>
+          flex: '1 1 auto',
+        }}>
+        <StyledDataGrid
+          // Start Column Menu
+          // ColumnMenu is only needed when we have other actions
+          // such as filtering.
+          disableColumnMenu={true}
+          // In this context, we don't need to filter columns. I suppose
+          // we can add this in the future, but we should be intentional
+          // about what we enable.
+          disableColumnFilter={true}
+          disableMultipleColumnsFiltering={true}
+          // ColumnPinning seems to be required in DataGridPro, else it crashes.
+          disableColumnPinning={false}
+          // There is no need to reorder the 2 columns in this context.
+          disableColumnReorder={true}
+          // Resizing columns might be helpful to show more data
+          disableColumnResize={false}
+          // There are only 2 columns, let's not confuse the user.
+          disableColumnSelector={true}
+          // We don't need to sort multiple columns.
+          disableMultipleColumnsSorting={true}
+          // End Column Menu
+          // treeData
+          // getTreeDataPath={row => row.path.toStringArray()}
+          rows={filteredRows}
+          columns={columns}
+          // isGroupExpandedByDefault={node => {
+          //   return expandedIds.includes(node.id);
+          // }}
+          columnHeaderHeight={38}
+          rowHeight={30}
+          experimentalFeatures={{columnGrouping: true}}
+          columnGroupingModel={groupingModel}
+          // groupingColDef={}
+          // treeData
+          // getTreeDataPath={getTreeDataPath}
+          // getRowHeight={(params: GridRowHeightParams) => {
+          //   const isNonRefString =
+          //     params.model.valueType === 'string' && !isRef(params.model.value);
+          //   const isArray = params.model.valueType === 'array';
+          //   const isTableRef =
+          //     isRef(params.model.value) &&
+          //     (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
+          //   const {isCode} = params.model;
+          //   if (
+          //     isNonRefString ||
+          //     (isArray && USE_TABLE_FOR_ARRAYS) ||
+          //     isTableRef ||
+          //     isCode
+          //   ) {
+          //     return 'auto';
+          //   }
+          //   return 38;
+          // }}
+          // hideFooter
+          // rowSelection={false}
+          // groupingColDef={groupingColDef}
+          rowSelection={true}
+          rowSelectionModel={
+            props.state.selectedInputDigest
+              ? [props.state.selectedInputDigest]
+              : []
+          }
+          disableMultipleRowSelection
+          onRowSelectionModelChange={newSelection => {
+            setSelectedInputDigest(newSelection[0].toString() ?? null);
+          }}
+          sx={{
+            '& .MuiDataGrid-cell': {
+              // textWrap: 'wrap !important',
+              // whiteSpace: 'normal',
+              // overflow: 'auto !important',
+              // alignItems: 'flex-start',
+              // textOverflow: 'ellipsis',
+            },
+          }}
+        />
+      </Box>
+      {props.state.selectedInputDigest && (
+        <Box
+          sx={{
+            flex: '1 1 auto',
+          }}>
+          <RowComparison state={props.state} />
+        </Box>
+      )}
+    </VerticalBox>
+  );
+};
+
+const RowComparison: React.FC<{state: EvaluationComparisonState}> = props => {
+  const selectedCallIds = useMemo(() => {
+    if (props.state.selectedInputDigest == null) {
+      return [];
+    }
+    const selectedRow =
+      props.state.data.resultRows[props.state.selectedInputDigest];
+    if (selectedRow == null) {
+      return [];
+    }
+    return Object.values(selectedRow.evaluations)
+      .map(evaluation => Object.keys(evaluation.predictAndScores))
+      .flat();
+  }, [props.state.data.resultRows, props.state.selectedInputDigest]);
+
+  if (props.state.selectedInputDigest == null) {
+    return null;
+  }
+
+  return (
+    <CallsTable
+      entity={props.state.data.entity}
+      project={props.state.data.project}
+      frozenFilter={{
+        callIds: selectedCallIds,
+      }}
+      hideControls
+    />
   );
 };

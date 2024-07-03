@@ -32,7 +32,8 @@
  *    - [ ] Scatterplot Filter should not zoom, just show selection range
  */
 
-import {Box, Checkbox} from '@material-ui/core';
+import {Box} from '@material-ui/core';
+import {Tab, Tabs} from '@mui/material';
 // import {ToggleButton} from '@mui/material';
 import React, {FC, useCallback, useContext} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -55,12 +56,12 @@ import {ScoreDimension} from './evaluations';
 import {CompareEvaluationsCallsTable} from './ExampleComparisonTable';
 import {CompareEvaluationsCallsTableBig} from './ExampleComparisonTableBig';
 import {RangeSelection} from './initialize';
+import {InputComparison} from './InputComparison';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 import {SummaryPlots} from './SummaryPlots';
 import {EvaluationComparisonState} from './types';
-import {InputComparison} from './InputComparison';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -222,26 +223,26 @@ const CompareEvaluationsPageInner: React.FC = props => {
         {Object.keys(state.data.models).length === 2 && (
           <ScatterFilter state={state} />
         )}
-        <ResultsSection state={state} />
-        {/* <RowComparison state={state} /> */}
+        {/* <ResultsSection state={state} /> */}
+        <ResultExplorer state={state} />
       </VerticalBox>
     </Box>
   );
 };
 
-const ResultsSection: React.FC<{state: EvaluationComparisonState}> = ({
+const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
   state,
 }) => {
-  const [bigRows, setBigRows] = React.useState(false);
+  const [selectedTab, setSelectedTab] = React.useState(0);
   return (
     <VerticalBox
       sx={{
         width: '100%',
-        // paddingLeft: STANDARD_PADDING,
-        // paddingRight: STANDARD_PADDING,
+        overflow: 'hidden',
       }}>
       <HorizontalBox
         sx={{
+          flex: '0 0 auto',
           paddingLeft: STANDARD_PADDING,
           paddingRight: STANDARD_PADDING,
           width: '100%',
@@ -254,62 +255,30 @@ const ResultsSection: React.FC<{state: EvaluationComparisonState}> = ({
             fontSize: '1.5em',
             fontWeight: 'bold',
           }}>
-          Browse Results
+          Browse Results (Experiments)
         </Box>
-        {/* <div
-          style={{
-            // fontWeight: 'bold',
-            // paddingRight: '10px',
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: '8px',
-            // border: '1px solid #ccc',
-            // borderRadius: '6px',
-          }}>
-          <span>Toggle Big Rows</span>
-          <Checkbox checked={bigRows} onClick={() => setBigRows(v => !v)} />
-        </div> */}
       </HorizontalBox>
-      <InputComparison state={state} />
-
-      {/* {bigRows ? (
-        <CompareEvaluationsCallsTableBig state={state} />
-      ) : (
-        <CompareEvaluationsCallsTable state={state} />
-      )} */}
+      <Tabs
+        style={{
+          flex: '0 0 auto',
+        }}
+        value={selectedTab}
+        onChange={(event, newValue) => {
+          setSelectedTab(newValue);
+        }}>
+        <Tab label="Dense Table with Child Table" value={0} />
+        <Tab label="Hacked Multi-Row Big Table" value={1} />
+        <Tab label="Report Card Pager" value={2} />
+      </Tabs>
+      <Box
+        sx={{
+          height: 'calc(100vh - 114px)',
+          overflow: 'auto',
+        }}>
+        {selectedTab === 0 && <CompareEvaluationsCallsTable state={state} />}
+        {selectedTab === 1 && <CompareEvaluationsCallsTableBig state={state} />}
+        {selectedTab === 2 && <InputComparison state={state} />}
+      </Box>
     </VerticalBox>
   );
 };
-
-// const RowComparison: React.FC<{state: EvaluationComparisonState}> = props => {
-//   const selectedCallIds = useMemo(() => {
-//     if (props.state.selectedInputDigest == null) {
-//       return [];
-//     }
-//     const selectedRow =
-//       props.state.data.resultRows[props.state.selectedInputDigest];
-//     if (selectedRow == null) {
-//       return [];
-//     }
-//     return Object.values(selectedRow.evaluations)
-//       .map(evaluation => Object.keys(evaluation.predictAndScores))
-//       .flat();
-//   }, [props.state.data.resultRows, props.state.selectedInputDigest]);
-
-//   if (props.state.selectedInputDigest == null) {
-//     return null;
-//   }
-
-//   return (
-//     <CallsTable
-//       entity={props.state.data.entity}
-//       project={props.state.data.project}
-//       frozenFilter={{
-//         callIds: selectedCallIds,
-//       }}
-//       hideControls
-//     />
-//   );
-// };

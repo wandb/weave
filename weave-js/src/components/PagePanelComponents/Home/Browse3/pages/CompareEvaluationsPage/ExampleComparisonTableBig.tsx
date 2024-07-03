@@ -492,7 +492,7 @@ export const CompareEvaluationsCallsTableBig: React.FC<{
     <Box
       sx={{
         // height: '50vh',
-        height: 'calc(100vh - 114px)',
+        height: '100%', // 'calc(100vh - 114px)',
         width: '100%',
         overflow: 'hidden',
       }}>
