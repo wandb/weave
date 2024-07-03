@@ -60,6 +60,7 @@ import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 import {SummaryPlots} from './SummaryPlots';
 import {EvaluationComparisonState} from './types';
+import {InputComparison} from './InputComparison';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -255,7 +256,7 @@ const ResultsSection: React.FC<{state: EvaluationComparisonState}> = ({
           }}>
           Browse Results
         </Box>
-        <div
+        {/* <div
           style={{
             // fontWeight: 'bold',
             // paddingRight: '10px',
@@ -269,13 +270,15 @@ const ResultsSection: React.FC<{state: EvaluationComparisonState}> = ({
           }}>
           <span>Toggle Big Rows</span>
           <Checkbox checked={bigRows} onClick={() => setBigRows(v => !v)} />
-        </div>
+        </div> */}
       </HorizontalBox>
-      {bigRows ? (
+      <InputComparison state={state} />
+
+      {/* {bigRows ? (
         <CompareEvaluationsCallsTableBig state={state} />
       ) : (
         <CompareEvaluationsCallsTable state={state} />
-      )}
+      )} */}
     </VerticalBox>
   );
 };
