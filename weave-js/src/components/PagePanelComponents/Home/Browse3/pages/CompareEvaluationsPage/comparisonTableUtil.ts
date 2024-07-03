@@ -27,7 +27,8 @@ export type PivotedRow = {
   inputDigest: string;
   inputRef: string;
   input: {[inputKey: string]: any};
-  evaluationCallId: {[callId: string]: string};
+  evaluationCallId: string;
+  // evaluationCallId: {[callId: string]: string};
   output: {[outputKey: string]: {[callId: string]: any}};
   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
   latency: {[callId: string]: number};
@@ -190,10 +191,11 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     return flattenedRows.map(row => {
       return {
         ...row,
-        evaluationCallId: expandPrimitive(
-          row.evaluationCallId,
-          row.evaluationCallId
-        ),
+        
+        // evaluationCallId: expandPrimitive(
+        //   row.evaluationCallId,
+        //   row.evaluationCallId
+        // ),
         output: expandDict(row.output, row.evaluationCallId),
         scores: expandDict(row.scores, row.evaluationCallId),
         latency: expandPrimitive(row.latency, row.evaluationCallId),
@@ -225,7 +227,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   if (typeof v === 'number') {
                     return v;
                   } else if (typeof v === 'boolean') {
-                    return v ? 1 : 0;
+                    return v ? 100 : 0;
                   } else {
                     return 0;
                   }
@@ -238,6 +240,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
             totalTokens: aggregateGroupedRows(rows, 'totalTokens', vals =>
               _.mean(filterNones(vals))
             ),
+            originalRows: rows,
           },
         ];
       })
@@ -300,4 +303,11 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       leafDims,
     };
   }, [filteredRows, inputColumnKeys, leafDims, outputColumnKeys, scoreMap]);
+};
+
+export const removePrefix = (key: string, prefix: string) => {
+  if (key.startsWith(prefix)) {
+    return key.slice(prefix.length);
+  }
+  return key;
 };
