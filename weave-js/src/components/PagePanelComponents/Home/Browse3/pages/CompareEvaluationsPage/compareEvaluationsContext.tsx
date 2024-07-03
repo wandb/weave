@@ -3,6 +3,7 @@ import React, {useMemo} from 'react';
 import {ScoreDimension} from './evaluations';
 import {RangeSelection, useInitialState} from './initialize';
 import {EvaluationComparisonState} from './types';
+// import FullScreenLoader from './FullscreenLoader';
 
 const CompareEvaluationsContext = React.createContext<{
   state: EvaluationComparisonState;
@@ -85,7 +86,7 @@ export const CompareEvaluationsProvider: React.FC<{
   ]);
 
   if (!value) {
-    return <div>Loading...</div>;
+    return <>Loading...</>;
   }
 
   return (

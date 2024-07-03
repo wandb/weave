@@ -20,6 +20,13 @@ import {
 } from './evaluationResults';
 import {HorizontalBox} from './Layout';
 import {EvaluationComparisonState} from './types';
+import {
+  MOON_100,
+  MOON_200,
+  MOON_400,
+  MOON_600,
+  MOON_800,
+} from '../../../../../../common/css/color.styles';
 
 const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
 
@@ -39,7 +46,11 @@ type BetterScoresType = {
 };
 
 const GridCell = styled.div`
-  padding: 8px;
+  padding: 6px 16px;
+  /* white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; */
+  min-width: 100px;
 `;
 
 export const ScoreCard: React.FC<{
@@ -246,11 +257,46 @@ export const ScoreCard: React.FC<{
           gridTemplateColumns,
           border: STANDARD_BORDER,
           borderRadius: BOX_RADIUS,
+          overflow: 'auto',
           // gap: '16px',
         }}>
         {/* Header Row */}
-        <GridCell></GridCell>
-        <GridCell></GridCell>
+        <GridCell
+          style={{
+            fontWeight: 'bold',
+            textAlign: 'right',
+            gridColumnEnd: 'span 2',
+          }}>
+          Evaluation
+        </GridCell>
+        {/* <GridCell></GridCell> */}
+        {evalCallIds.map(evalCallId => {
+          const modelRef =
+            props.state.data.evaluationCalls[evalCallId].modelRef;
+          return (
+            <GridCell
+              key={modelRef}
+              style={{
+                fontWeight: 'bold',
+                // borderTopLeftRadius: '6px',
+                // borderTop: '1px solid #ccc',
+                // borderLeft: '1px solid #ccc',
+              }}>
+              <EvaluationCallLink callId={evalCallId} state={props.state} />
+            </GridCell>
+          );
+        })}
+        {/* <GridCell></GridCell> */}
+        {/* Header Row */}
+        <GridCell
+          style={{
+            fontWeight: 'bold',
+            textAlign: 'right',
+            gridColumnEnd: 'span 2',
+          }}>
+          Model
+        </GridCell>
+        {/* <GridCell></GridCell> */}
         {evalCallIds.map(evalCallId => {
           const modelRef =
             props.state.data.evaluationCalls[evalCallId].modelRef;
@@ -268,6 +314,18 @@ export const ScoreCard: React.FC<{
           );
         })}
         {/* <GridCell></GridCell> */}
+        <GridCell
+          style={{
+            gridColumnEnd: 'span ' + (evalCallIds.length + 2),
+            backgroundColor: MOON_100,
+            color: MOON_600,
+            fontWeight: 'bold',
+            borderTop: '1px solid #ccc',
+            borderBottom: '1px solid #ccc',
+          }}>
+          Properties
+        </GridCell>
+
         {/* Model Rows */}
         {Object.entries(modelProps).map(([prop, modelData]) => {
           if (!showDifferences && !propsWithDifferences.includes(prop)) {
@@ -275,13 +333,13 @@ export const ScoreCard: React.FC<{
           }
           return (
             <React.Fragment key={prop}>
-              <GridCell></GridCell>
               <GridCell
                 style={{
+                  gridColumnEnd: 'span 2',
                   fontWeight: 'bold',
                   textAlign: 'right',
                   paddingRight: '10px',
-                  width: FIXED_SCORE_LABEL_WIDTH,
+                  // width: FIXED_SCORE_LABEL_WIDTH,
                   textOverflow: 'ellipsis',
                 }}>
                 {prop}
@@ -316,26 +374,17 @@ export const ScoreCard: React.FC<{
             </React.Fragment>
           );
         })}
-        {/* Header Row */}
-        <GridCell></GridCell>
-        <GridCell></GridCell>
-        {evalCallIds.map(evalCallId => {
-          const modelRef =
-            props.state.data.evaluationCalls[evalCallId].modelRef;
-          return (
-            <GridCell
-              key={modelRef}
-              style={{
-                fontWeight: 'bold',
-                // borderTopLeftRadius: '6px',
-                // borderTop: '1px solid #ccc',
-                // borderLeft: '1px solid #ccc',
-              }}>
-              <EvaluationCallLink callId={evalCallId} state={props.state} />
-            </GridCell>
-          );
-        })}
-        {/* <GridCell></GridCell> */}
+        <GridCell
+          style={{
+            gridColumnEnd: 'span ' + (evalCallIds.length + 2),
+            backgroundColor: MOON_100,
+            color: MOON_600,
+            fontWeight: 'bold',
+            borderTop: '1px solid #ccc',
+            borderBottom: '1px solid #ccc',
+          }}>
+          Metrics
+        </GridCell>
         {/* Score Rows */}
         {Object.entries(betterScores).map(([key, def]) => {
           // TODO: this might be wrong if the scorers change between evals with the same name!! Need to revisit
@@ -344,29 +393,51 @@ export const ScoreCard: React.FC<{
           ) as WeaveObjectRef | null;
           return (
             <React.Fragment key={key}>
-              <GridCell
-                style={{
-                  // vertical span length of metric
-                  gridRowEnd: `span ${Object.keys(def.metrics).length}`,
-                  borderTop: '1px solid #ccc',
-                  fontWeight: 'bold',
-                  textAlign: 'right',
-                }}>
-                {scorerRefParsed ? (
-                  <SmallRef objRef={scorerRefParsed} />
-                ) : (
-                  def.scorerName ?? ''
-                )}
-              </GridCell>
+              {def.scorerName && (
+                <>
+                  <GridCell
+                    style={{
+                      // vertical span length of metric
+                      // gridColumnEnd: 'span ' + (evalCallIds.length + 2),
+                      gridColumnEnd: 'span 2',
+                      // gridRowEnd: `span ${Object.keys(def.metrics).length}`,
+                      borderTop: '1px solid #ccc',
+                      fontWeight: 'bold',
+                      textAlign: 'left',
+                    }}>
+                    {scorerRefParsed ? (
+                      <SmallRef objRef={scorerRefParsed} />
+                    ) : (
+                      def.scorerName ?? ''
+                    )}
+                  </GridCell>
+                  <GridCell
+                    style={{
+                      borderTop: '1px solid #ccc',
+                      gridColumnEnd: 'span ' + evalCallIds.length,
+                    }}></GridCell>
+                </>
+              )}
               {Object.keys(def.metrics).map((metricKey, metricNdx) => {
+                console.log(
+                  def.metrics,
+                  Object.keys(def.metrics).length,
+                  metricKey,
+                  metricNdx
+                );
                 return (
                   <React.Fragment key={metricKey}>
                     <GridCell
                       style={{
-                        borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
+                        gridColumnEnd: 'span 2',
+                        // gridColumnEnd: def.scorerName ? 'span 1' : 'span 2',
+                        borderBottom:
+                          metricNdx === Object.keys(def.metrics).length - 1
+                            ? '1px solid #ccc'
+                            : '',
                         fontWeight: 'bold',
                         textAlign: 'right',
-                        width: FIXED_SCORE_LABEL_WIDTH,
+                        // width: FIXED_SCORE_LABEL_WIDTH,
                         textOverflow: 'ellipsis',
                       }}>
                       {def.metrics[metricKey].displayName}
@@ -407,7 +478,11 @@ export const ScoreCard: React.FC<{
                         <GridCell
                           key={modelRef}
                           style={{
-                            borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
+                            borderBottom:
+                              metricNdx === Object.keys(def.metrics).length - 1
+                                ? '1px solid #ccc'
+                                : '',
+                            // borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
                           }}>
                           {value != null ? (
                             <HorizontalBox
@@ -416,7 +491,8 @@ export const ScoreCard: React.FC<{
                               }}>
                               <span
                                 style={{
-                                  minWidth: '100px',
+                                  minWidth: '70px',
+                                  // flex: '1 1 auto',
                                 }}>
                                 <ValueViewNumber
                                   fractionDigits={SIGNIFICANT_DIGITS}
