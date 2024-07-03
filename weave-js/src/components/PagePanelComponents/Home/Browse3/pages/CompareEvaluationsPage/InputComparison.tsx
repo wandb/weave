@@ -16,10 +16,11 @@ import {EvaluationCallLink} from './EvaluationDefinition';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {EvaluationComparisonState} from './types';
 
-const GridCell = styled.div<{cols?: number; rows?: number}>`
+const GridCell = styled.div<{cols?: number; rows?: number; noPad?: boolean}>`
   border: 1px solid ${MOON_300};
   grid-column-end: span ${props => props.cols || 1};
   grid-row-end: span ${props => props.rows || 1};
+  padding: ${props => (props.noPad ? '0px' : '8px')};
   /* min-width: 100px; */
 `;
 
@@ -168,6 +169,7 @@ export const InputComparison: React.FC<{
                 <GridCell
                   cols={NUM_METRIC_COLS}
                   rows={NUM_INPUT_PROPS}
+                  noPad
                   style={{
                     display: 'grid',
                     gridTemplateColumns: 'subgrid',
@@ -273,6 +275,7 @@ export const InputComparison: React.FC<{
                       <GridCell
                         rows={NUM_OUTPUT_KEYS}
                         cols={NUM_METRIC_COLS}
+                        noPad
                         style={{
                           display: 'grid',
                           gridTemplateColumns: 'subgrid',
