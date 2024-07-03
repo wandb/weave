@@ -258,7 +258,7 @@ export const ExampleCompareSection: React.FC<{
                 <GridCell cols={2}>
                   <ICValueView
                     value={
-                      (selectedTrial.output[outputColumnKeys[oi]] ?? {})[
+                      (selectedTrial?.output?.[outputColumnKeys[oi]] ?? {})[
                         currEvalCallId
                       ]
                     }
