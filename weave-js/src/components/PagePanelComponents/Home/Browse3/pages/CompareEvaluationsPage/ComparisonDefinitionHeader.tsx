@@ -5,13 +5,13 @@ import React, {useMemo} from 'react';
 import {Button} from '../../../../../Button';
 import {StyledTextField} from '../../StyledTextField';
 import {useCompareEvaluationsState} from './compareEvaluationsContext';
-import {STANDARD_PADDING} from './constants';
+import {STANDARD_PADDING} from './ecpConstants';
+import {ScoreDimension} from './ecpTypes';
+import {EvaluationComparisonState} from './ecpTypes';
 import {EvaluationDefinition} from './EvaluationDefinition';
 import {getOrderedCallIds} from './evaluationResults';
-import {ScoreDimension} from './evaluations';
 import {useEvaluationCallDimensions} from './initialize';
 import {HorizontalBox} from './Layout';
-import {EvaluationComparisonState} from './types';
 
 export const ComparisonDefinition: React.FC<{
   state: EvaluationComparisonState;

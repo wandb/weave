@@ -16,17 +16,13 @@ import {Pill, TagColorName} from '../../../../../Tag';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
-import {BOX_RADIUS, STANDARD_BORDER, STANDARD_PADDING} from './constants';
-import {SIGNIFICANT_DIGITS} from './constants';
+import {BOX_RADIUS, STANDARD_BORDER, STANDARD_PADDING} from './ecpConstants';
+import {SIGNIFICANT_DIGITS} from './ecpConstants';
+import {isBinarySummaryScore, isContinuousSummaryScore} from './ecpTypes';
+import {EvaluationComparisonState} from './ecpTypes';
 import {EvaluationCallLink, EvaluationModelLink} from './EvaluationDefinition';
-import {
-  getOrderedCallIds,
-  getOrderedModelRefs,
-  isBinarySummaryScore,
-  isContinuousSummaryScore,
-} from './evaluationResults';
+import {getOrderedCallIds, getOrderedModelRefs} from './evaluationResults';
 import {HorizontalBox} from './Layout';
-import {EvaluationComparisonState} from './types';
 
 // const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
 

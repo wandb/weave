@@ -1,57 +1,9 @@
 import {sum} from 'lodash';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
-import {EvaluationComparisonState} from './types';
+import {ComparisonMetric,EvaluationComparisonState} from './ecpTypes';
 
-type BinarySummaryScore = {
-  true_count: number;
-  true_fraction: number;
-};
-
-type ContinuousSummaryScore = {
-  mean: number;
-};
-
-export type ScoreDimension = {
-  scorerRef: string;
-  scoreKeyPath: string;
-  scoreType: 'binary' | 'continuous';
-  minimize?: boolean;
-};
-
-export type EvaluationEvaluateCallSchema = TraceCallSchema & {
-  inputs: TraceCallSchema['inputs'] & {
-    self: string;
-    model: string;
-  };
-  output: TraceCallSchema['output'] & {
-    [scorer: string]: {
-      [score: string]: BinarySummaryScore | ContinuousSummaryScore;
-    };
-  } & {
-    model_latency: ContinuousSummaryScore;
-  };
-  summary: TraceCallSchema['summary'] & {
-    usage?: {
-      [model: string]: {
-        requests?: number;
-        completion_tokens?: number;
-        prompt_tokens?: number;
-        total_tokens?: number;
-      };
-    };
-  };
-};
-
-type ComparisonMetric = {
-  path: string;
-  unit: string;
-  lowerIsBetter: boolean;
-  values: {[callId: string]: number};
-};
-
-export const evaluationMetrics = (
+export const evaluationComparisonMetrics = (
   state: EvaluationComparisonState
 ): ComparisonMetric[] => {
   const evaluationCalls = Object.values(state.data.evaluationCalls).map(

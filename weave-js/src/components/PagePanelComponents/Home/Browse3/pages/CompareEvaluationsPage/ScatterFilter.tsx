@@ -5,10 +5,10 @@ import React, {useCallback, useMemo} from 'react';
 import {MOON_500} from '../../../../../../common/css/color.styles';
 import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {DimensionPicker} from './ComparisonDefinitionHeader';
-import {PLOT_HEIGHT, STANDARD_PADDING} from './constants';
+import {PLOT_HEIGHT, STANDARD_PADDING} from './ecpConstants';
+import {EvaluationComparisonState} from './ecpTypes';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
-import {EvaluationComparisonState} from './types';
 
 export const ScatterFilter: React.FC<{
   state: EvaluationComparisonState;

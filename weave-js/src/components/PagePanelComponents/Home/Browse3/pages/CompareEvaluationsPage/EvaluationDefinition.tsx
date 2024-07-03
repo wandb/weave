@@ -15,9 +15,9 @@ import {
   CIRCLE_SIZE,
   EVAL_DEF_HEIGHT,
   STANDARD_BORDER,
-} from './constants';
+} from './ecpConstants';
+import {EvaluationComparisonState} from './ecpTypes';
 import {HorizontalBox, VerticalBar} from './Layout';
-import {EvaluationComparisonState} from './types';
 
 export const EvaluationDefinition: React.FC<{
   state: EvaluationComparisonState;

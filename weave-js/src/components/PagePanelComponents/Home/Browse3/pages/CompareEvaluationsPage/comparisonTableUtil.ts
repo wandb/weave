@@ -2,10 +2,10 @@ import _ from 'lodash';
 import {useMemo} from 'react';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
+import { ScoreDimension } from './ecpTypes';
+import {EvaluationComparisonState} from './ecpTypes';
 import {getOrderedCallIds} from './evaluationResults';
-import {ScoreDimension} from './evaluations';
 import {useEvaluationCallDimensions} from './initialize';
-import {EvaluationComparisonState} from './types';
 
 const scoreIdFromScoreDimension = (dim: ScoreDimension): string => {
   return dim.scorerRef + '@' + dim.scoreKeyPath;

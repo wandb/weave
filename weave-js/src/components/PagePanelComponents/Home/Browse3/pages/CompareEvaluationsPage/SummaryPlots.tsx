@@ -7,13 +7,13 @@ import {
   PLOT_PADDING,
   STANDARD_BORDER,
   STANDARD_PADDING,
-} from './constants';
+} from './ecpConstants';
+import {EvaluationComparisonState} from './ecpTypes';
+import {evaluationComparisonMetrics} from './evaluationComparisonMetrics';
 import {getOrderedCallIds} from './evaluationResults';
-import {evaluationMetrics} from './evaluations';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
-import {EvaluationComparisonState} from './types';
 
 export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
@@ -91,7 +91,7 @@ const useNormalizedRadarPlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): RadarPlotData => {
   const metrics = useMemo(() => {
-    return evaluationMetrics(state);
+    return evaluationComparisonMetrics(state);
   }, [state]);
   const callIds = useMemo(() => {
     return getOrderedCallIds(state);

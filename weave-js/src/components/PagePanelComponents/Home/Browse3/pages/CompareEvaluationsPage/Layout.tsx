@@ -2,7 +2,7 @@ import {Box, BoxProps} from '@material-ui/core';
 import React from 'react';
 
 import {MOON_300} from '../../../../../../common/css/color.styles';
-import {STANDARD_PADDING} from './constants';
+import {STANDARD_PADDING} from './ecpConstants';
 
 export const VerticalBox: React.FC<BoxProps> = props => {
   return (

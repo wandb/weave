@@ -61,15 +61,15 @@ import {
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
 import {ComparisonDefinition} from './ComparisonDefinitionHeader';
-import {STANDARD_PADDING} from './constants';
-import {ScoreDimension} from './evaluations';
+import {STANDARD_PADDING} from './ecpConstants';
+import {ScoreDimension} from './ecpTypes';
+import {EvaluationComparisonState} from './ecpTypes';
 import {RangeSelection} from './initialize';
 import {InputComparison2} from './InputComparison2';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 import {SummaryPlots} from './SummaryPlots';
-import {EvaluationComparisonState} from './types';
 
 type CompareEvaluationsPageProps = {
   entity: string;

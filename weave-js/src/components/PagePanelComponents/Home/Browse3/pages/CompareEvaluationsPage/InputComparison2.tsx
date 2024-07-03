@@ -13,11 +13,11 @@ import {SmallRef} from '../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {removePrefix, useFilteredAggregateRows} from './comparisonTableUtil';
-import {SIGNIFICANT_DIGITS} from './constants';
+import {SIGNIFICANT_DIGITS} from './ecpConstants';
+import {EvaluationComparisonState} from './ecpTypes';
 import {EvaluationCallLink} from './EvaluationDefinition';
 import {ICValueView} from './InputComparison';
 import {HorizontalBox, VerticalBox} from './Layout';
-import {EvaluationComparisonState} from './types';
 
 const MIN_OUTPUT_WIDTH = 500;
 
