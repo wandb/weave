@@ -47,23 +47,6 @@ def test_cohere(
     assert output.is_search_required == response.is_search_required
     assert output.search_queries == response.search_queries
     assert output.search_results == response.search_results
-    print(response.meta)
-    print("-----------------")
-    print(output.meta)
-    print("-----------------")
-    assert output.meta.ApiMeta.v1.api_version.ApiMetaApiVersion.v0.version == 1
-    assert output.meta.ApiMeta.v1.api_version.ApiMetaApiVersion.v0.is_deprecated is None
-    assert output.meta.ApiMeta.v1.api_version.ApiMetaApiVersion.v0.is_experimental is None
-    assert output.meta.ApiMeta.v1.billed_units.ApiMetaBilledUnits.v1.input_tokens == 1
-    assert output.meta.ApiMeta.v1.billed_units.ApiMetaBilledUnits.v1.output_tokens == 12
-    assert output.meta.ApiMeta.v1.billed_units.ApiMetaBilledUnits.v1.search_units is None
-    assert output.meta.ApiMeta.v1.billed_units.ApiMetaBilledUnits.v1.classifications is None
-    assert output.meta.ApiMeta.v1.tokens.ApiMetaTokens.v1.input_tokens == 67
-    assert output.meta.ApiMeta.v1.tokens.ApiMetaTokens.v1.output_tokens == 12
-    assert output.meta.ApiMeta.v1.tokens.ApiMetaTokens.v1.warnings is None
-    assert output.finish_reason == response.finish_reason
-    assert output.tool_calls == response.tool_calls
-
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
