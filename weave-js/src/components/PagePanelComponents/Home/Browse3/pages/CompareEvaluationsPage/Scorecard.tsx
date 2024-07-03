@@ -271,11 +271,9 @@ export const ScoreCard: React.FC<{
         </GridCell>
         {/* <GridCell></GridCell> */}
         {evalCallIds.map(evalCallId => {
-          const modelRef =
-            props.state.data.evaluationCalls[evalCallId].modelRef;
           return (
             <GridCell
-              key={modelRef}
+              key={evalCallId}
               style={{
                 fontWeight: 'bold',
                 // borderTopLeftRadius: '6px',
@@ -298,11 +296,9 @@ export const ScoreCard: React.FC<{
         </GridCell>
         {/* <GridCell></GridCell> */}
         {evalCallIds.map(evalCallId => {
-          const modelRef =
-            props.state.data.evaluationCalls[evalCallId].modelRef;
           return (
             <GridCell
-              key={modelRef}
+              key={evalCallId}
               style={{
                 fontWeight: 'bold',
                 // borderTopLeftRadius: '6px',
@@ -352,14 +348,14 @@ export const ScoreCard: React.FC<{
                 ) as WeaveObjectRef;
                 if (parsed) {
                   return (
-                    <GridCell key={mNdx}>
+                    <GridCell key={evalCallId}>
                       <SmallRef objRef={parsed} />
                     </GridCell>
                   );
                 } else {
                   return (
                     <GridCell
-                      key={mNdx}
+                      key={evalCallId}
                       style={{
                         lineBreak: 'anywhere',
                         maxHeight: '100px',
@@ -419,12 +415,6 @@ export const ScoreCard: React.FC<{
                 </>
               )}
               {Object.keys(def.metrics).map((metricKey, metricNdx) => {
-                console.log(
-                  def.metrics,
-                  Object.keys(def.metrics).length,
-                  metricKey,
-                  metricNdx
-                );
                 return (
                   <React.Fragment key={metricKey}>
                     <GridCell
@@ -476,7 +466,7 @@ export const ScoreCard: React.FC<{
 
                       return (
                         <GridCell
-                          key={modelRef}
+                          key={evalCallId}
                           style={{
                             borderBottom:
                               metricNdx === Object.keys(def.metrics).length - 1
