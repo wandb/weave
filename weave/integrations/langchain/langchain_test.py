@@ -399,6 +399,31 @@ def test_agent_run_with_tools(
     assert_correct_calls_for_agent_with_tool(res.calls)
 
 
+def assert_correct_calls_for_agent_with_function_call(
+    calls: list[tsi.CallSchema],
+) -> None:
+    assert len(calls) == 11
+
+    flattened = flatten_calls(calls)
+
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+
+    exp = [
+        ("langchain.Chain.AgentExecutor", 0),
+        ("langchain.Chain.RunnableSequence", 1),
+        ("langchain.Chain.RunnableParallel input chat_history agent_scratchpad ", 2),
+        ("langchain.Chain.RunnableLambda", 3),
+        ("langchain.Chain.RunnableLambda", 3),
+        ("langchain.Chain.RunnableLambda", 3),
+        ("langchain.Prompt.ChatPromptTemplate", 2),
+        ("langchain.Llm.ChatOpenAI", 2),
+        ("openai.chat.completions.create", 3),
+        ("langchain.Parser.OpenAIFunctionsAgentOutputParser", 2),
+        ("langchain.Tool.Calculator", 1),
+    ]
+    assert got == exp
+
+
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
@@ -491,4 +516,4 @@ def test_agent_run_with_function_call(
         {"input": "What is 3 times 4 ?", "chat_history": []},
     )
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_agent_with_tool(res.calls)
+    assert_correct_calls_for_agent_with_function_call(res.calls)
