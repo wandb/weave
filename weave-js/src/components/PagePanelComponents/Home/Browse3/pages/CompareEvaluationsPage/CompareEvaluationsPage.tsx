@@ -11,7 +11,7 @@
  * - [ ] Comparison table needs more vertical space allocated to focus on text (look at langsmith)
  * Bugs:
  * - [ ] Empty selection filter causes crash
- * - [ ] Selection Filter seems to reset periodically? on data refresh
+ * - [ ] Selection Filter seems to reset periodically? on data refresh - also on page resize?
  * - [ ] `isProbablyXCall` is incorrect - at least the predict one (eg. for infer_method_names in ("predict", "infer", "forward"):)
  * Performance:
  * - [ ] Audit the queries to determine areas of improvement and parallelization

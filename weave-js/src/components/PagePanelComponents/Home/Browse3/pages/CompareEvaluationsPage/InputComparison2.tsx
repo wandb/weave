@@ -16,6 +16,9 @@ import {EvaluationCallLink} from './EvaluationDefinition';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {EvaluationComparisonState} from './types';
 import {ICValueView} from './InputComparison';
+import {SIGNIFICANT_DIGITS} from './constants';
+import {Pill, TagColorName} from '../../../../../Tag';
+import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 
 const GridCell = styled.div<{cols?: number; rows?: number; noPad?: boolean}>`
   border: 1px solid ${MOON_300};
@@ -160,36 +163,62 @@ export const InputComparison2: React.FC<{
         {_.range(NUM_INPUT_PROPS).map(ii => {
           return (
             <React.Fragment>
-              <GridCell>Input Key {ii}</GridCell>
-              <GridCell>Input Val {ii}</GridCell>
+              <GridCell>{removePrefix(inputColumnKeys[ii], 'input.')}</GridCell>
+              <GridCell>
+                <ICValueView value={target.input[inputColumnKeys[ii]]} />
+              </GridCell>
             </React.Fragment>
           );
         })}
-        <GridCell cols={2}>Eval Outputs</GridCell>
+        <GridCell cols={2}></GridCell>
         <GridCell
           noPad
           style={{
             display: 'grid',
             gridTemplateRows: 'subgrid',
-            gridTemplateColumns: `repeat(${NUM_EVALS}, min-content, auto)`,
+            gridTemplateColumns: `repeat(${NUM_EVALS}, min-content auto)`,
             overflowX: 'auto',
           }}
           rows={NUM_OUTPUT_KEYS + 2 + NUM_METRICS}>
           {_.range(NUM_EVALS).map(ei => {
-            return <GridCell cols={2}>Eval {ei}</GridCell>;
+            const currEvalCallId = leafDims[ei];
+            return (
+              <GridCell cols={2}>
+                <EvaluationCallLink
+                  callId={currEvalCallId}
+                  state={props.state}
+                />
+              </GridCell>
+            );
           })}
           {_.range(NUM_OUTPUT_KEYS).map(oi => {
             return _.range(NUM_EVALS).map(ei => {
+              const currEvalCallId = leafDims[ei];
+              const trialsForThisEval = target.originalRows.filter(
+                row => row.evaluationCallId === currEvalCallId
+              );
+              const selectedTrial =
+                trialsForThisEval[selectedTrials[currEvalCallId] || 0];
+
               return (
                 <GridCell cols={2}>
-                  Output Val {ei}.{oi} this is a long string that should wrap to
-                  the next line if it is too long
+                  <ICValueView
+                    value={
+                      selectedTrial.output[outputColumnKeys[oi]][currEvalCallId]
+                    }
+                  />
                 </GridCell>
               );
             });
           })}
           {_.range(NUM_EVALS).map(ei => {
-            const NUM_TRIALS = 3;
+            const currEvalCallId = leafDims[ei];
+            const trialsForThisEval = target.originalRows.filter(
+              row => row.evaluationCallId === currEvalCallId
+            );
+            const selectedTrialNdx = selectedTrials[currEvalCallId] || 0;
+            const NUM_TRIALS = trialsForThisEval.length;
+
             return (
               <GridCell
                 cols={2}
@@ -208,32 +237,133 @@ export const InputComparison2: React.FC<{
                     zIndex: 1,
                     backgroundColor: MOON_100,
                   }}>
-                  AGG
+                  Aggregate Metrics
                 </GridCell>
                 {_.range(NUM_TRIALS).map(ti => {
-                  return <GridCell> Trial {ti}</GridCell>;
+                  return (
+                    <GridCell
+                      style={{
+                        textAlign: 'center',
+                      }}>
+                      <Button
+                        size="small"
+                        variant={
+                          selectedTrialNdx === ti ? 'primary' : 'secondary'
+                        }
+                        onClick={() => {
+                          //   console.log('selecting');
+                          setSelectedTrials(curr => {
+                            return {
+                              ...curr,
+                              [currEvalCallId]: ti,
+                            };
+                          });
+                        }}
+                        icon="show-visible">
+                        {ti.toString()}
+                      </Button>
+                    </GridCell>
+                  );
                 })}
                 {_.range(NUM_SCORERS).map(si => {
                   const NUM_METRICS_IN_SCORER = 1;
                   return (
                     <React.Fragment>
-                      <GridCell
-                        style={{
-                          position: 'sticky',
-                          left: 0,
-                          zIndex: 1,
-                          backgroundColor: MOON_100,
-                        }}>
-                        si{si}.Agg
-                      </GridCell>
                       {_.range(NUM_METRICS_IN_SCORER).map(mi => {
-                        return _.range(NUM_TRIALS).map(ti => {
-                          return (
-                            <GridCell>
-                              si{si}.mi{mi}.ti{ti}
+                        const isBaseline = ei === 0;
+                        const scorersForThisRef = sortedScorers.filter(
+                          s => s.scorerDim.scorerRef === uniqueScorerRefs[si]
+                        );
+                        const summaryMetric =
+                          target.scores[scorersForThisRef[mi].scoreId][
+                            currEvalCallId
+                          ];
+                        const unit =
+                          scorersForThisRef[mi].scorerDim.scoreType === 'binary'
+                            ? '%'
+                            : '';
+                        let color: TagColorName = 'moon';
+                        const baseline =
+                          target.scores[scorersForThisRef[mi].scoreId][
+                            leafDims[0]
+                          ];
+                        const diff = summaryMetric - baseline;
+                        const lowerIsBetter = false;
+                        if (diff > 0) {
+                          if (!lowerIsBetter) {
+                            color = 'green';
+                          } else {
+                            color = 'red';
+                          }
+                        } else if (diff < 0) {
+                          if (!lowerIsBetter) {
+                            color = 'red';
+                          } else {
+                            color = 'green';
+                          }
+                        } else {
+                          color = 'moon';
+                        }
+
+                        const diffFixed = Number.isInteger(diff)
+                          ? diff.toLocaleString()
+                          : diff.toFixed(SIGNIFICANT_DIGITS);
+                        return (
+                          <React.Fragment>
+                            <GridCell
+                              style={{
+                                position: 'sticky',
+                                left: 0,
+                                zIndex: 1,
+                                backgroundColor: MOON_100,
+                                display: 'flex',
+                                flexDirection: 'row',
+                                justifyContent: 'space-between  ',
+                              }}>
+                              <span>
+                                {summaryMetric != null ? (
+                                  <ValueViewNumber
+                                    value={summaryMetric}
+                                    fractionDigits={SIGNIFICANT_DIGITS}
+                                  />
+                                ) : (
+                                  <NotApplicable />
+                                )}
+                                {unit}
+                              </span>
+                              {!isBaseline &&
+                                diff !== 0 &&
+                                summaryMetric != null &&
+                                baseline != null && (
+                                  <Pill
+                                    label={
+                                      (diff > 0 ? '+' : '') + diffFixed + unit
+                                    }
+                                    color={color}
+                                  />
+                                )}
                             </GridCell>
-                          );
-                        });
+                            {_.range(NUM_TRIALS).map(ti => {
+                              const metricValue =
+                                trialsForThisEval[ti].scores[
+                                  scorersForThisRef[mi].scoreId
+                                ][currEvalCallId];
+                              if (metricValue == null) {
+                                return (
+                                  <GridCell>
+                                    <NotApplicable />
+                                  </GridCell>
+                                );
+                              }
+
+                              return (
+                                <GridCell>
+                                  <CellValue value={metricValue} />
+                                </GridCell>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
                       })}
                     </React.Fragment>
                   );
@@ -245,20 +375,35 @@ export const InputComparison2: React.FC<{
         {_.range(NUM_OUTPUT_KEYS).map(oi => {
           return (
             <React.Fragment>
-              <GridCell cols={2}>Output Key {oi}</GridCell>
+              <GridCell></GridCell>
+              <GridCell cols={1}>
+                {removePrefix(outputColumnKeys[oi], 'output.')}
+              </GridCell>
             </React.Fragment>
           );
         })}
-        <GridCell cols={2}></GridCell>
+        <GridCell cols={2}>Metrics</GridCell>
         {_.range(NUM_SCORERS).map(si => {
-          const NUM_METRICS_IN_SCORER = 1;
+          const scorersForThisRef = sortedScorers.filter(
+            s => s.scorerDim.scorerRef === uniqueScorerRefs[si]
+          );
+          const NUM_METRICS_IN_SCORER = scorersForThisRef.length;
+          const scorerRef = uniqueScorerRefs[si];
           return (
             <React.Fragment>
-              <GridCell rows={NUM_METRICS_IN_SCORER}>Scorer {si}</GridCell>
+              <GridCell rows={NUM_METRICS_IN_SCORER}>
+                <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} />
+              </GridCell>
               {_.range(NUM_METRICS_IN_SCORER).map(mi => {
                 return (
                   <React.Fragment>
-                    <GridCell>Metric {mi}</GridCell>
+                    <GridCell>
+                      {
+                        scorersForThisRef[mi].scorerDim.scoreKeyPath
+                          .split('.')
+                          .slice(-1)[0]
+                      }
+                    </GridCell>
                   </React.Fragment>
                 );
               })}
