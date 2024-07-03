@@ -1,7 +1,6 @@
 import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
-import {EvaluationComparisonState} from './compareEvaluationsContext';
 import {
   BOX_RADIUS,
   PLOT_HEIGHT,
@@ -13,6 +12,8 @@ import {evaluationMetrics} from './evaluations';
 import {HorizontalBox} from './Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
+import {EvaluationComparisonState} from './types';
+import {getOrderedCallIds} from './evaluationResults';
 
 export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
@@ -72,6 +73,9 @@ const useNormalizedRadarPlotDataFromMetrics = (
   const metrics = useMemo(() => {
     return evaluationMetrics(state);
   }, [state]);
+  const callIds = useMemo(() => {
+    return getOrderedCallIds(state);
+  }, [state]);
 
   return useMemo(() => {
     const normalizedMetrics = metrics.map(metric => {
@@ -87,7 +91,8 @@ const useNormalizedRadarPlotDataFromMetrics = (
       };
     });
     return Object.fromEntries(
-      Object.values(state.data.evaluationCalls).map(evalCall => {
+      callIds.map(callId => {
+        const evalCall = state.data.evaluationCalls[callId];
         return [
           evalCall.callId,
           {
