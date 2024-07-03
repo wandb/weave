@@ -11,12 +11,12 @@ import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
+import {isRef} from '../common/util';
 import {useCompareEvaluationsState} from './compareEvaluationsContext';
-import {removePrefix, useFilteredAggregateRows} from './comparisonTableUtil';
+import {useFilteredAggregateRows} from './comparisonTableUtil';
 import {SIGNIFICANT_DIGITS} from './ecpConstants';
 import {EvaluationComparisonState} from './ecpTypes';
 import {EvaluationCallLink} from './EvaluationDefinition';
-import {ICValueView} from './InputComparison';
 import {HorizontalBox, VerticalBox} from './Layout';
 
 const MIN_OUTPUT_WIDTH = 500;
@@ -35,7 +35,7 @@ const GridContainer = styled.div<{numColumns: number}>`
   /* grid-gap: 10px; */
 `;
 
-export const InputComparison2: React.FC<{
+export const ExampleComparer: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const {filteredRows, inputColumnKeys, outputColumnKeys, scoreMap, leafDims} =
@@ -488,4 +488,41 @@ export const InputComparison2: React.FC<{
       </GridContainer>
     </VerticalBox>
   );
+};
+
+const removePrefix = (key: string, prefix: string) => {
+  if (key.startsWith(prefix)) {
+    return key.slice(prefix.length);
+  }
+  return key;
+};
+
+const ICValueView: React.FC<{value: any}> = ({value}) => {
+  let text = '';
+  if (value == null) {
+    return <NotApplicable />;
+  } else if (typeof value === 'object') {
+    text = JSON.stringify(value || {}, null, 2);
+  } else if (typeof value === 'string' && isRef(value)) {
+    return <SmallRef objRef={parseRef(value)} allowShrink />;
+  } else {
+    text = value.toString();
+  }
+
+  text = trimWhitespace(text);
+
+  return (
+    <pre
+      style={{
+        whiteSpace: 'pre-wrap',
+        textAlign: 'left',
+        wordBreak: 'break-all',
+      }}>
+      {text}
+    </pre>
+  );
+};
+const trimWhitespace = (str: string) => {
+  // Trim leading and trailing whitespace
+  return str.replace(/^\s+|\s+$/g, '');
 };

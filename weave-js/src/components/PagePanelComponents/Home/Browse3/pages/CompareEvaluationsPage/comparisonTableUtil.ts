@@ -3,7 +3,6 @@ import {useMemo} from 'react';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
 import { getOrderedCallIds } from './ecpState';
-import {useEvaluationCallDimensions} from './ecpState';
 import {EvaluationComparisonState} from './ecpTypes';
 import { scoreIdFromScoreDimension } from './ecpUtil';
 
@@ -309,9 +308,3 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   }, [filteredRows, inputColumnKeys, leafDims, outputColumnKeys, scoreMap]);
 };
 
-export const removePrefix = (key: string, prefix: string) => {
-  if (key.startsWith(prefix)) {
-    return key.slice(prefix.length);
-  }
-  return key;
-};

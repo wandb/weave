@@ -7,7 +7,6 @@ import {StyledTextField} from '../../StyledTextField';
 import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
 import {getOrderedCallIds} from './ecpState';
-import {useEvaluationCallDimensions} from './ecpState';
 import {ScoreDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
 import {EvaluationDefinition} from './EvaluationDefinition';

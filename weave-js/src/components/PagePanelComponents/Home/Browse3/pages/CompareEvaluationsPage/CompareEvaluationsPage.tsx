@@ -63,7 +63,7 @@ import {STANDARD_PADDING} from './ecpConstants';
 import {RangeSelection} from './ecpTypes';
 import {ScoreDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
-import {InputComparison2} from './InputComparison2';
+import {ExampleComparer} from './ExampleComparer';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
@@ -268,7 +268,7 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
           height: 'calc(100vh - 114px)',
           overflow: 'auto',
         }}>
-        <InputComparison2 state={state} />
+        <ExampleComparer state={state} />
       </Box>
     </VerticalBox>
   );

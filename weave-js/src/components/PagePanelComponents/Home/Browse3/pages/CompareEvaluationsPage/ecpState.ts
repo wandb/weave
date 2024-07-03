@@ -133,19 +133,12 @@ const evaluationCallDimensions = (
   ];
 };
 
-export const useEvaluationCallDimensions = (
-  state: EvaluationComparisonState
-): ScoreDimension[] => {
-  return useMemo(() => {
-    return evaluationCallDimensions(state.data);
-  }, [state.data]);
-};
 
 const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
 };
 
-export const useEvaluationComparisonData = (
+const useEvaluationComparisonData = (
   entity: string,
   project: string,
   evaluationCallIds: string[]
