@@ -19,6 +19,7 @@ const GridHeaderCell = styled.div<{cols?: number; rows?: number}>`
   top: 0;
   grid-column-end: span ${props => props.cols || 1};
   grid-row-end: span ${props => props.rows || 1};
+  z-index: 1;
 `;
 // _.range(NUM_METRIC_COLS).map(i => {
 //     return (
@@ -41,8 +42,10 @@ const GridContainer = styled.div<{numColumns: number}>`
 export const InputComparison: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const NUM_SCORES = 4;
-  const NUM_METRIC_COLS = NUM_SCORES + 1;
+  const NUM_SCORERS = 2;
+  const NUM_METRICS_PER_SCORER = 2;
+  const NUM_METRICS = NUM_SCORERS * NUM_METRICS_PER_SCORER;
+  const NUM_METRIC_COLS = NUM_METRICS + 1;
   const NUM_COLS =
     // 1 + // Input / Eval Title
     2 + // Input Prop Key / Val
@@ -92,54 +95,66 @@ export const InputComparison: React.FC<{
           })}
           <GridHeaderCell
             cols={NUM_METRIC_COLS}
-            style={
-              {
-                //   height: HEADER_HEIGHT,
-              }
-            }>
+            style={{
+              zIndex: 2,
+              //   height: HEADER_HEIGHT,
+            }}>
             Metrics
           </GridHeaderCell>
-          <GridCell cols={NUM_COLS}>Input</GridCell>
+          <GridCell cols={NUM_COLS - NUM_METRIC_COLS}>Input</GridCell>
+          <>
+            <GridCell
+              rows={NUM_INPUT_PROPS + 1}
+              style={{
+                writingMode: 'vertical-rl',
+                transform: 'rotate(180deg)',
+                // position: 'sticky',
+                //   top: HEADER_HEIGHT,
+                // top: 0,
+                backgroundColor: 'lightgray',
+                // zIndex: 1,
+              }}>
+              Trials
+            </GridCell>
+            {_.range(NUM_SCORERS).map(si => {
+              return (
+                <>
+                  <GridCell
+                    cols={NUM_METRICS_PER_SCORER}
+                    // rows={NUM_INPUT_PROPS + 1}
+                    style={{
+                      backgroundColor: 'lightgray',
+                    }}>
+                    Scorer {si}
+                  </GridCell>
+                </>
+              );
+            })}
+          </>
           {/* <GridCell rows={NUM_INPUT_PROPS}>Input</GridCell> */}
           {_.range(NUM_INPUT_PROPS).map(i => {
             return (
               <>
                 <GridCell>Input Prop {i} Key</GridCell>
                 <GridCell>Input Prop {i} Val</GridCell>
-                {i === 0 && (
-                  <>
-                    <GridCell
-                      rows={NUM_INPUT_PROPS}
-                      style={{
-                        writingMode: 'vertical-rl',
-                        transform: 'rotate(180deg)',
-                        position: 'sticky',
-                        //   top: HEADER_HEIGHT,
-                        top: 0,
-                        backgroundColor: 'lightgray',
-                        zIndex: 1,
-                      }}>
-                      Trials
-                    </GridCell>
-                    {_.range(NUM_METRIC_COLS - 1).map(i => {
-                      return (
-                        <GridCell
-                          rows={NUM_INPUT_PROPS}
-                          style={{
-                            writingMode: 'vertical-rl',
-                            transform: 'rotate(180deg)',
-                            position: 'sticky',
-                            //   top: HEADER_HEIGHT,
-                            top: 0,
-                            backgroundColor: 'lightgray',
-                            zIndex: 1,
-                          }}>
-                          Scoring Function {i}
-                        </GridCell>
-                      );
-                    })}
-                  </>
-                )}
+                {i === 0 &&
+                  _.range(NUM_METRICS_PER_SCORER * NUM_SCORERS).map(i => {
+                    return (
+                      <GridCell
+                        rows={NUM_INPUT_PROPS}
+                        style={{
+                          writingMode: 'vertical-rl',
+                          transform: 'rotate(180deg)',
+                          // position: 'sticky',
+                          //   top: HEADER_HEIGHT,
+                          // top: 0,
+                          backgroundColor: 'lightgray',
+                          // zIndex: 1,
+                        }}>
+                        Metric {i}
+                      </GridCell>
+                    );
+                  })}
               </>
             );
           })}
@@ -164,14 +179,14 @@ export const InputComparison: React.FC<{
                             overflow: 'auto',
                           }}>
                           <GridHeaderCell>5</GridHeaderCell>
-                          {_.range(NUM_SCORES).map(i => {
+                          {_.range(NUM_METRICS).map(i => {
                             return <GridHeaderCell>V{i} +/-123</GridHeaderCell>;
                           })}
                           {_.range(NUM_TRIALS).map(i => {
                             return (
                               <>
                                 <GridCell>{i}</GridCell>
-                                {_.range(NUM_SCORES).map(i => {
+                                {_.range(NUM_METRICS).map(i => {
                                   return <GridCell>S{i}</GridCell>;
                                 })}
                               </>
