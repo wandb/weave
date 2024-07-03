@@ -76,12 +76,9 @@ if not import_failed:
             run_dict = _run_to_dict(run, as_input=True)
             run_name = make_valid_run_name(run.name)
 
-            """
-            Now we must determine the parent_run to associate this call with. 
-            
-            In most 
-            cases, it is very straight forward - we just look up the parent_run_id in the
-            call map and associate it with the parent call.
+            """Now we must determine the parent_run to associate this call with.
+            In most cases, it is very straight forward - we just look up the
+            parent_run_id in the call map and associate it with the parent call.
 
             However, there is a very specific case with `RunnableSequence`. The way that
             `RunnableSequence::batch` is implemented, Langchain will fire off two runs
@@ -113,7 +110,7 @@ if not import_failed:
             end RunnableSequence2
             ```
 
-            In these cases, RunnableSequence2 is started, but our stack context will have 
+            In these cases, RunnableSequence2 is started, but our stack context will have
             `RunnableSequence1` popped onto the stack. To solve for this, we need to send
             `False` as the `parent_id`, telling the system: "trust me, this is a root".
             """
