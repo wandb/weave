@@ -50,7 +50,6 @@ import {CallsTable} from '../CallsPage/CallsTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
-  EvaluationComparisonState,
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
 import {ComparisonDefinition} from './ComparisonDefinitionHeader';
@@ -63,6 +62,7 @@ import {VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 import {SummaryPlots} from './SummaryPlots';
+import {EvaluationComparisonState} from './types';
 
 type CompareEvaluationsPageProps = {
   entity: string;

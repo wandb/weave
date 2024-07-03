@@ -9,24 +9,19 @@ import {Pill, TagColorName} from '../../../../../Tag';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
-import {EvaluationComparisonState} from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './constants';
 import {SIGNIFICANT_DIGITS} from './constants';
 import {EvaluationCallLink, EvaluationModelLink} from './EvaluationDefinition';
 import {
+  getOrderedCallIds,
+  getOrderedModelRefs,
   isBinarySummaryScore,
   isContinuousSummaryScore,
 } from './evaluationResults';
 import {HorizontalBox} from './Layout';
+import {EvaluationComparisonState} from './types';
 
 const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
-export const moveItemToFront = (arr: any[], item: any) => {
-  const index = arr.indexOf(item);
-  if (index > -1) {
-    arr.splice(index, 1);
-    arr.unshift(item);
-  }
-};
 
 type BetterScoresType = {
   [scorerId: string]: {
@@ -54,19 +49,15 @@ export const ScoreCard: React.FC<{
   const baselineRef =
     props.state.data.evaluationCalls[props.state.baselineEvaluationCallId]
       .modelRef;
-  const modelRefs = useMemo(() => {
-    const refs = Object.keys(props.state.data.models);
-    // Make sure the baseline model is first
 
-    moveItemToFront(refs, baselineRef);
-    return refs;
-  }, [baselineRef, props.state.data.models]);
-  const evalCallIds = useMemo(() => {
-    const all = Object.keys(props.state.data.evaluationCalls);
-    // Make sure the baseline model is first
-    moveItemToFront(all, props.state.baselineEvaluationCallId);
-    return all;
-  }, [props.state.baselineEvaluationCallId, props.state.data.evaluationCalls]);
+  const modelRefs = useMemo(
+    () => getOrderedModelRefs(props.state),
+    [props.state]
+  );
+  const evalCallIds = useMemo(
+    () => getOrderedCallIds(props.state),
+    [props.state]
+  );
 
   const modelProps = useMemo(() => {
     const propsRes: {[prop: string]: {[ref: string]: any}} = {};

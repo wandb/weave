@@ -4,7 +4,6 @@ import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
-import {EvaluationComparisonState} from './compareEvaluationsContext';
 import {
   EvaluationComparisonData,
   fetchEvaluationComparisonData,
@@ -12,6 +11,7 @@ import {
   isContinuousSummaryScore,
 } from './evaluationResults';
 import {ScoreDimension} from './evaluations';
+import { EvaluationComparisonState } from './types';
 
 export type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
 

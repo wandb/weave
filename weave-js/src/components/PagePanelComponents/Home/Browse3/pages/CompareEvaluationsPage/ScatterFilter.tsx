@@ -2,14 +2,12 @@ import {mean} from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
 import {MOON_500} from '../../../../../../common/css/color.styles';
-import {
-  EvaluationComparisonState,
-  useCompareEvaluationsState,
-} from './compareEvaluationsContext';
+import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {PLOT_HEIGHT, STANDARD_PADDING} from './constants';
 import {EvaluationDefinition} from './EvaluationDefinition';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
+import {EvaluationComparisonState} from './types';
 
 export const ScatterFilter: React.FC<{
   state: EvaluationComparisonState;

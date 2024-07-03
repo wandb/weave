@@ -10,7 +10,6 @@ import {
 import {hexToRGB} from '../../../../../../common/css/utils';
 import {Icon, IconNames} from '../../../../../Icon';
 import {CallLink, ObjectVersionLink} from '../common/Links';
-import {EvaluationComparisonState} from './compareEvaluationsContext';
 import {
   BOX_RADIUS,
   CIRCLE_SIZE,
@@ -18,6 +17,7 @@ import {
   STANDARD_BORDER,
 } from './constants';
 import {HorizontalBox, VerticalBar} from './Layout';
+import {EvaluationComparisonState} from './types';
 
 export const EvaluationDefinition: React.FC<{
   state: EvaluationComparisonState;

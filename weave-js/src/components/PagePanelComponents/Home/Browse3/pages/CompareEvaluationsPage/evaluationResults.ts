@@ -1,5 +1,6 @@
 import {sum} from 'lodash';
 
+import { WB_RUN_COLORS } from '../../../../../../common/css/color.styles';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
@@ -12,7 +13,7 @@ import {
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {EvaluationEvaluateCallSchema} from './evaluations';
-import { WB_RUN_COLORS } from '../../../../../../common/css/color.styles';
+import { EvaluationComparisonState } from './types';
 
 export type BinarySummaryScore = {
   true_count: number;
@@ -495,3 +496,28 @@ export const fetchEvaluationComparisonData = async (
 
   return result;
 };
+const moveItemToFront = (arr: any[], item: any) => {
+  const index = arr.indexOf(item);
+  if (index > -1) {
+    arr.splice(index, 1);
+    arr.unshift(item);
+  }
+};
+
+export const getOrderedCallIds = (state: EvaluationComparisonState) => {
+  const initial = Object.keys(state.data.evaluationCalls);
+  moveItemToFront(initial, state.baselineEvaluationCallId);
+  return initial;
+}
+
+export const getOrderedModelRefs = (state: EvaluationComparisonState) => {
+  const baselineRef =
+    state.data.evaluationCalls[state.baselineEvaluationCallId]
+      .modelRef;
+      const refs = Object.keys(state.data.models);
+      // Make sure the baseline model is first
+  
+      moveItemToFront(refs, baselineRef);
+      return refs;
+}
+

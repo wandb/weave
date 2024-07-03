@@ -16,15 +16,13 @@ import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {CallLink} from '../common/Links';
-import {
-  EvaluationComparisonState,
-  useCompareEvaluationsState,
-} from './compareEvaluationsContext';
+import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from './constants';
+import {getOrderedCallIds} from './evaluationResults';
 import {ScoreDimension} from './evaluations';
 import {useEvaluationCallDimensions} from './initialize';
 import {HorizontalBox} from './Layout';
-import {moveItemToFront} from './Scorecard';
+import {EvaluationComparisonState} from './types';
 
 const scoreIdFromScoreDimension = (dim: ScoreDimension): string => {
   return dim.scorerRef + '@' + dim.scoreKeyPath;
@@ -118,11 +116,7 @@ const filterNones = (list: any[]) => {
 export const CompareEvaluationsCallsTableBig: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const leafDims = useMemo(() => {
-    const initial = Object.keys(props.state.data.evaluationCalls);
-    moveItemToFront(initial, props.state.baselineEvaluationCallId);
-    return initial;
-  }, [props.state.baselineEvaluationCallId, props.state.data.evaluationCalls]);
+  const leafDims = useMemo(() => getOrderedCallIds(props.state), [props.state]);
   const scores = useEvaluationCallDimensions(props.state);
   const scoreMap = useMemo(() => {
     return Object.fromEntries(

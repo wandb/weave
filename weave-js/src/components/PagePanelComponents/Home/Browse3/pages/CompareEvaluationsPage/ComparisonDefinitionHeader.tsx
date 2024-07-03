@@ -4,26 +4,22 @@ import React, {useMemo} from 'react';
 
 import {Button} from '../../../../../Button';
 import {StyledTextField} from '../../StyledTextField';
-import {
-  EvaluationComparisonState,
-  useCompareEvaluationsState,
-} from './compareEvaluationsContext';
+import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './constants';
 import {EvaluationDefinition} from './EvaluationDefinition';
+import {getOrderedCallIds} from './evaluationResults';
 import {ScoreDimension} from './evaluations';
 import {useEvaluationCallDimensions} from './initialize';
 import {HorizontalBox} from './Layout';
-import {moveItemToFront} from './Scorecard';
+import {EvaluationComparisonState} from './types';
 
 export const ComparisonDefinition: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const evalCallIds = useMemo(() => {
-    const all = Object.keys(props.state.data.evaluationCalls);
-    // Make sure the baseline model is first
-    moveItemToFront(all, props.state.baselineEvaluationCallId);
-    return all;
-  }, [props.state.baselineEvaluationCallId, props.state.data.evaluationCalls]);
+  const evalCallIds = useMemo(
+    () => getOrderedCallIds(props.state),
+    [props.state]
+  );
 
   return (
     <HorizontalBox

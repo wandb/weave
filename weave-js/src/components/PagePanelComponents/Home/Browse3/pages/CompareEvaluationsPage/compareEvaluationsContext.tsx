@@ -1,8 +1,8 @@
 import React, {useMemo} from 'react';
 
-import {EvaluationComparisonData} from './evaluationResults';
 import {ScoreDimension} from './evaluations';
 import {RangeSelection, useInitialState} from './initialize';
+import {EvaluationComparisonState} from './types';
 
 const CompareEvaluationsContext = React.createContext<{
   state: EvaluationComparisonState;
@@ -15,14 +15,6 @@ const CompareEvaluationsContext = React.createContext<{
   setRangeSelection: React.Dispatch<React.SetStateAction<RangeSelection>>;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
 } | null>(null);
-
-export type EvaluationComparisonState = {
-  data: EvaluationComparisonData;
-  baselineEvaluationCallId: string;
-  comparisonDimension: ScoreDimension;
-  rangeSelection: RangeSelection;
-  selectedInputDigest?: string;
-};
 
 export const useCompareEvaluationsState = () => {
   const ctx = React.useContext(CompareEvaluationsContext);
