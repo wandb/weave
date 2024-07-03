@@ -15,17 +15,17 @@ import {
   isBinarySummaryScore,
   isContinuousSummaryScore,
 } from './ecpTypes';
-import {ScoreDimension} from './ecpTypes';
+import {EvaluationMetricDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
 import { RangeSelection } from './ecpTypes';
-import { scoreIdFromScoreDimension } from './ecpUtil';
+import { dimensionId } from './ecpUtil';
 
 export const useEvaluationComparisonState = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
   baselineEvaluationCallId?: string,
-  comparisonDimension?: ScoreDimension,
+  comparisonDimension?: EvaluationMetricDimension,
   rangeSelection?: RangeSelection,
   selectedInputDigest?: string
 ): Loadable<EvaluationComparisonState> => {
@@ -40,13 +40,17 @@ export const useEvaluationComparisonState = (
       return {loading: true, result: null};
     }
 
+    const scorerDimensions = Object.values(data.result.scorerMetricDimensions);
+    const derivedDimensions = Object.values(data.result.derivedMetricDimensions);
+    const defaultComparisonDimension = scorerDimensions.length > 0 ? scorerDimensions[0] : derivedDimensions[0];
+
     return {
       loading: false,
       result: {
         data: data.result,
         baselineEvaluationCallId:
           baselineEvaluationCallId ?? evaluationCallIds[0],
-        comparisonDimension: comparisonDimension ?? Object.values(data.result.scoreDimensions)[0],
+        comparisonDimension: comparisonDimension ?? defaultComparisonDimension,
         rangeSelection: rangeSelection ?? {},
         selectedInputDigest,
       },
@@ -63,75 +67,75 @@ export const useEvaluationComparisonState = (
   return value;
 };
 
-const evaluationCallDimensions = (
-  data: EvaluationComparisonData
-): ScoreDimension[] => {
-  // const availableScorers = Object.values(evaluationCalls)
-  //   .map(evalCall =>
-  //     Object.entries(evalCall.scores)
-  //       .map(([k, v]) => Object.keys(v).map(innerKey => k + '.' + innerKey))
-  //       .flat()
-  //   )
-  //   .flat();
-  const availableScorersMap: {[ref: string]: {[path: string]: ScoreDimension}} =
-    {};
-  const recordScorer = (scoreDim: ScoreDimension) => {
-    if (!availableScorersMap[scoreDim.scorerRef]) {
-      availableScorersMap[scoreDim.scorerRef] = {};
-    }
-    availableScorersMap[scoreDim.scorerRef][scoreDim.scoreKeyPath] = scoreDim;
-  };
+// const evaluationCallDimensions = (
+//   data: EvaluationComparisonData
+// ): EvaluationMetricDimension[] => {
+//   // const availableScorers = Object.values(evaluationCalls)
+//   //   .map(evalCall =>
+//   //     Object.entries(evalCall.scores)
+//   //       .map(([k, v]) => Object.keys(v).map(innerKey => k + '.' + innerKey))
+//   //       .flat()
+//   //   )
+//   //   .flat();
+//   const availableScorersMap: {[ref: string]: {[path: string]: EvaluationMetricDimension}} =
+//     {};
+//   const recordScorer = (scoreDim: EvaluationMetricDimension) => {
+//     if (!availableScorersMap[scoreDim.scorerOpOrObjRef]) {
+//       availableScorersMap[scoreDim.scorerOpOrObjRef] = {};
+//     }
+//     availableScorersMap[scoreDim.scorerOpOrObjRef][scoreDim.scoreKeyPath] = scoreDim;
+//   };
 
-  const addScore = (score: any, scoreRef: string, scoreKeyPath: string) => {
-    // Two types of scores: single value and dict
-    if (isBinarySummaryScore(score)) {
-      recordScorer({
-        scorerRef: scoreRef,
-        scoreKeyPath,
-        scoreType: 'binary',
-        minimize: false,
-      });
-    } else if (isContinuousSummaryScore(score)) {
-      recordScorer({
-        scorerRef: scoreRef,
-        scoreKeyPath,
-        scoreType: 'continuous',
-        minimize: false,
-      });
-    } else if (
-      score != null &&
-      typeof score === 'object' &&
-      !Array.isArray(score)
-    ) {
-      Object.entries(score).forEach(([key, value]) => {
-        addScore(value, scoreRef, scoreKeyPath + '.' + key);
-      });
-    }
-  };
+//   const addScore = (score: any, scoreRef: string, scoreKeyPath: string) => {
+//     // Two types of scores: single value and dict
+//     if (isBinarySummaryScore(score)) {
+//       recordScorer({
+//         scorerOpOrObjRef: scoreRef,
+//         scoreKeyPath,
+//         scoreType: 'binary',
+//         minimize: false,
+//       });
+//     } else if (isContinuousSummaryScore(score)) {
+//       recordScorer({
+//         scorerOpOrObjRef: scoreRef,
+//         scoreKeyPath,
+//         scoreType: 'continuous',
+//         minimize: false,
+//       });
+//     } else if (
+//       score != null &&
+//       typeof score === 'object' &&
+//       !Array.isArray(score)
+//     ) {
+//       Object.entries(score).forEach(([key, value]) => {
+//         addScore(value, scoreRef, scoreKeyPath + '.' + key);
+//       });
+//     }
+//   };
 
-  Object.values(data.evaluationCalls).forEach(evalCall => {
-    const evalObject = data.evaluations[evalCall.evaluationRef];
-    evalObject.scorerRefs.forEach(scoreRef => {
-      const scorerKey = (parseRef(scoreRef) as WeaveObjectRef).artifactName;
-      // TODO: Should put scores at the top level using the ref, not name as the key!
-      const score = evalCall._rawEvaluationTraceData.output[scorerKey];
-      addScore(score, scoreRef, scorerKey);
-    });
-  });
+//   Object.values(data.evaluationCalls).forEach(evalCall => {
+//     const evalObject = data.evaluations[evalCall.evaluationRef];
+//     evalObject.scorerRefs.forEach(scoreRef => {
+//       const scorerKey = (parseRef(scoreRef) as WeaveObjectRef).artifactName;
+//       // TODO(Metric Refactor): Should put scores at the top level using the ref, not name as the key!
+//       const score = evalCall._rawEvaluationTraceData.output[scorerKey];
+//       addScore(score, scoreRef, scorerKey);
+//     });
+//   });
 
-  // recordScorer({
-  //   scorerRef: ,
-  //   scoreKeyPath: scoreKeyPath,
-  //   scoreType: 'continuous',
-  //   minimize: false,
-  // })
+//   // recordScorer({
+//   //   scorerRef: ,
+//   //   scoreKeyPath: scoreKeyPath,
+//   //   scoreType: 'continuous',
+//   //   minimize: false,
+//   // })
 
-  return [
-    ...Object.values(availableScorersMap).map(Object.values).flat(),
-    // 'model_latency',
-    // 'total_tokens',
-  ];
-};
+//   return [
+//     ...Object.values(availableScorersMap).map(Object.values).flat(),
+//     // 'model_latency',
+//     // 'total_tokens',
+//   ];
+// };
 
 
 const pickColor = (ndx: number) => {
@@ -188,7 +192,8 @@ const fetchEvaluationComparisonData = async (
     inputs: {},
     models: {},
     resultRows: {},
-    scoreDimensions: {},
+    derivedMetricDimensions: {},
+    scorerMetricDimensions: {},
   };
   // 1. Fetch the evaluation calls
   // 2. For each evaluation:
@@ -210,22 +215,23 @@ const fetchEvaluationComparisonData = async (
         callId: call.id,
         // TODO: Get user-defined name for the evaluation
         name: 'Evaluation',
-        // TODO: Get user-defined color for the evaluation
         color: pickColor(ndx),
         // color: generateColorFromId(call.id),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
-        scores: Object.fromEntries(
-          Object.entries(call.output as any)
-            .filter(([key]) => key !== 'model_latency')
-            .map(([key, val]) => {
-              // return [key, val];
-              if (isBinarySummaryScore(val) || isContinuousSummaryScore(val)) {
-                return [key, { '': val }] as any; // no nesting. probably something we should fix more generally
-              }
-              return [key, val];
-            })
-        ),
+        summaryMetrics: {},
+        // TODO(Metric Refactor): This needs to be much more sophisticated
+        // Object.fromEntries(
+        //   Object.entries(call.output as any)
+        //     .filter(([key]) => key !== 'model_latency')
+        //     .map(([key, val]) => {
+        //       // return [key, val];
+        //       if (isBinarySummaryScore(val) || isContinuousSummaryScore(val)) {
+        //         return [key, { '': val }] as any; // no nesting. probably something we should fix more generally
+        //       }
+        //       return [key, val];
+        //     })
+        // ),
         _rawEvaluationTraceData: call as EvaluationEvaluateCallSchema,
       },
     ])
@@ -433,7 +439,8 @@ const fetchEvaluationComparisonData = async (
                 modelRef,
                 evaluationCallId,
                 predictCall: undefined,
-                scores: {},
+                scorerMetrics: {},
+                derivedMetrics: {},
                 _rawPredictAndScoreTraceData: parentPredictAndScore,
               };
             }
@@ -466,11 +473,14 @@ const fetchEvaluationComparisonData = async (
               if (isProbablyBoundScoreCall) {
                 scorerName = traceCall.inputs.self;
               }
-              predictAndScoreFinal.scores[scorerName] = {
-                callId: traceCall.id,
-                results,
-                _rawScoreTraceData: traceCall,
-              };
+              // TODO(Metric Refactor): THIS IS WRONG NOW
+              // predictAndScoreFinal.scorerMetrics[scorerName] = {
+              //   sourceCall: {
+              //     callId: traceCall.id,
+              //     _rawScoreTraceData: traceCall,
+              //   },
+              //   results,
+              // };
             } else {
               // console.log(traceCall);
             }
@@ -481,12 +491,13 @@ const fetchEvaluationComparisonData = async (
   });
 
   
-  result.scoreDimensions = Object.fromEntries(evaluationCallDimensions(result).map(dim => {
-    return [
-      scoreIdFromScoreDimension(dim),
-      dim,
-    ]
-  }))
+              // TODO(Metric Refactor): THIS IS WRONG NOW
+  // result.metricDimensions = Object.fromEntries(evaluationCallDimensions(result).map(dim => {
+  //   return [
+  //     dimensionId(dim),
+  //     dim,
+  //   ]
+  // }))
 
   return result;
 };

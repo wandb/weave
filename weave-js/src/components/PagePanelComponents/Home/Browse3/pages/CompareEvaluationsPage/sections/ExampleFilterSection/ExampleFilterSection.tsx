@@ -5,7 +5,12 @@ import React, {useCallback, useMemo} from 'react';
 import {MOON_500} from '../../../../../../../../common/css/color.styles';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {PLOT_HEIGHT, STANDARD_PADDING} from '../../ecpConstants';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {
+  EvaluationComparisonState,
+  isBinaryScore,
+  isContinuousScore,
+} from '../../ecpTypes';
+import {resolveDimensionMetricResultForPASCall} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {DimensionPicker} from '../ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
@@ -15,13 +20,6 @@ export const ExampleFilterSection: React.FC<{
 }> = props => {
   const {setRangeSelection} = useCompareEvaluationsState();
   const targetDimension = props.state.comparisonDimension;
-  // const primaryDimension: string =
-  //   'weave:///shawn/weave-hooman1/op/llm_score:9yF4LQ63Dg1DSWbGX3H6nEqQcFus5hFlWYnZRadF0eA';
-
-  const scorerName = targetDimension.scorerRef;
-  // HAXS!
-  const scorerKey = targetDimension.scoreKeyPath.split('.').splice(1).join('.');
-  // const modelRefs = Object.keys(props.state.data.models);
   const baselineCallId = props.state.baselineEvaluationCallId;
   const compareCallId = Object.keys(props.state.data.evaluationCalls).find(
     callId => callId !== baselineCallId
@@ -33,68 +31,40 @@ export const ExampleFilterSection: React.FC<{
       y: [],
       color: MOON_500,
     };
-
-    if (scorerName === 'model_latency') {
+    if (targetDimension != null) {
       Object.values(props.state.data.resultRows).forEach(row => {
         const xVals: number[] = [];
+        const yVals: number[] = [];
         Object.values(row.evaluations[baselineCallId].predictAndScores).forEach(
           score => {
-            const val = score.predictCall?.latencyMs;
-            if (typeof val === 'boolean') {
-              xVals.push(val ? 100 : 0);
-            } else {
-              xVals.push(val ?? 0);
+            const val = resolveDimensionMetricResultForPASCall(
+              targetDimension,
+              score
+            );
+            if (val === undefined) {
+              return;
+            } else if (isBinaryScore(val.value)) {
+              xVals.push(val.value ? 1 : 0);
+            } else if (isContinuousScore(val.value)) {
+              xVals.push(val.value);
             }
           }
         );
-        series.x.push(mean(xVals));
-        const yVals: number[] = [];
         Object.values(row.evaluations[compareCallId].predictAndScores).forEach(
           score => {
-            const val = score.predictCall?.latencyMs;
-            if (typeof val === 'boolean') {
-              yVals.push(val ? 100 : 0);
-            } else {
-              yVals.push(val ?? 0);
+            const val = resolveDimensionMetricResultForPASCall(
+              targetDimension,
+              score
+            );
+            if (val === undefined) {
+              return;
+            } else if (isBinaryScore(val.value)) {
+              yVals.push(val.value ? 1 : 0);
+            } else if (isContinuousScore(val.value)) {
+              yVals.push(val.value);
             }
           }
         );
-        series.y.push(mean(yVals));
-      });
-    } else {
-      // const [scorerName, scorerKey] = primaryDimension.split('.');
-      Object.values(props.state.data.resultRows).forEach(row => {
-        const xVals: number[] = [];
-        Object.values(
-          row.evaluations[baselineCallId]?.predictAndScores ?? {}
-        ).forEach(score => {
-          const results = score.scores[scorerName]?.results;
-          if (!results) {
-            return;
-          }
-          const val = results[scorerKey];
-          // console.log(val, scorerKey, score.scores[scorerName]);
-          if (typeof val === 'boolean') {
-            xVals.push(val ? 100 : 0);
-          } else {
-            xVals.push(val ?? 0);
-          }
-        });
-        const yVals: number[] = [];
-        Object.values(
-          row.evaluations[compareCallId]?.predictAndScores ?? {}
-        ).forEach(score => {
-          const results = score.scores[scorerName]?.results;
-          if (!results) {
-            return;
-          }
-          const val = results[scorerKey];
-          if (typeof val === 'boolean') {
-            yVals.push(val ? 100 : 0);
-          } else {
-            yVals.push(val ?? 0);
-          }
-        });
         if (xVals.length === 0 || yVals.length === 0) {
           return;
         }
@@ -102,13 +72,13 @@ export const ExampleFilterSection: React.FC<{
         series.y.push(mean(yVals));
       });
     }
+
     return [series];
   }, [
     baselineCallId,
     compareCallId,
     props.state.data.resultRows,
-    scorerKey,
-    scorerName,
+    targetDimension,
   ]);
   // console.log(data, props.state);
   const xColor = props.state.data.evaluationCalls[baselineCallId].color;
@@ -155,23 +125,13 @@ export const ExampleFilterSection: React.FC<{
           }}>
           Result Filter
         </Box>
-        {/* <DefinitionText text="target metric " /> */}
         <DimensionPicker {...props} />
       </HorizontalBox>
-      {/* <Alert>Select a region to narrow the data</Alert> */}
       <VerticalBox
         sx={{
           flex: '1 1 auto',
           width: '100%',
-          // border: STANDARD_BORDER,
         }}>
-        {/* <ScatterDefinition {...props} /> */}
-        {/* <HorizontalBox
-          sx={{
-            justifyContent: 'flex-start',
-          }}>
-          <EvaluationDefinition state={props.state} callId={compareCallId} />
-        </HorizontalBox> */}
         <PlotlyScatterPlot
           onRangeChange={onRangeChange}
           height={PLOT_HEIGHT}
@@ -179,12 +139,6 @@ export const ExampleFilterSection: React.FC<{
           xColor={xColor}
           yColor={yColor}
         />
-        {/* <HorizontalBox
-          sx={{
-            justifyContent: 'flex-end',
-          }}>
-          <EvaluationDefinition state={props.state} callId={baselineCallId} />
-        </HorizontalBox> */}
       </VerticalBox>
     </VerticalBox>
   );

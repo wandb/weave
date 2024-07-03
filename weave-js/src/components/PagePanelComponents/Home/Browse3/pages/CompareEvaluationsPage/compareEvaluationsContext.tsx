@@ -4,7 +4,7 @@ import React, {useMemo} from 'react';
 import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
 import {useEvaluationComparisonState} from './ecpState';
 import {RangeSelection} from './ecpTypes';
-import {ScoreDimension} from './ecpTypes';
+import {EvaluationMetricDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
 
 const CompareEvaluationsContext = React.createContext<{
@@ -13,7 +13,7 @@ const CompareEvaluationsContext = React.createContext<{
     React.SetStateAction<string | null>
   >;
   setComparisonDimension: React.Dispatch<
-    React.SetStateAction<ScoreDimension | null>
+    React.SetStateAction<EvaluationMetricDimension | null>
   >;
   setRangeSelection: React.Dispatch<React.SetStateAction<RangeSelection>>;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
@@ -35,13 +35,13 @@ export const CompareEvaluationsProvider: React.FC<{
     React.SetStateAction<string | null>
   >;
   setComparisonDimension: React.Dispatch<
-    React.SetStateAction<ScoreDimension | null>
+    React.SetStateAction<EvaluationMetricDimension | null>
   >;
   setRangeSelection: React.Dispatch<React.SetStateAction<RangeSelection>>;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
   rangeSelection?: RangeSelection;
   baselineEvaluationCallId?: string;
-  comparisonDimension?: ScoreDimension;
+  comparisonDimension?: EvaluationMetricDimension;
   selectedInputDigest?: string;
 }> = ({
   entity,

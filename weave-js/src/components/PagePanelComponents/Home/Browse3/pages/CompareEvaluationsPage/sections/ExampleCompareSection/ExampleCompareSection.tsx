@@ -18,6 +18,7 @@ import {isRef} from '../../../common/util';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpTypes';
+import {dimensionId, dimensionLabel} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {EvaluationCallLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
@@ -41,7 +42,7 @@ const GridContainer = styled.div<{numColumns: number}>`
 export const ExampleCompareSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const {filteredRows, inputColumnKeys, outputColumnKeys, scoreMap, leafDims} =
+  const {filteredRows, inputColumnKeys, outputColumnKeys, leafDims} =
     useFilteredAggregateRows(props.state);
   const {setSelectedInputDigest} = useCompareEvaluationsState();
   const targetIndex = useMemo(() => {
@@ -63,21 +64,18 @@ export const ExampleCompareSection: React.FC<{
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
 
-  //   console.log('target', target);
-
-  const scores = Object.entries(scoreMap).map(v => {
-    return {
-      scoreId: v[0],
-      scorerDim: v[1],
-    };
-  });
-  const sortedScorers = _.sortBy(scores, k => k.scorerDim.scorerRef);
+  const sortedScorers = _.sortBy(
+    Object.values(props.state.data.scorerMetricDimensions),
+    k => k.scorerDef.scorerOpOrObjRef
+  );
   const uniqueScorerRefs = _.uniq(
-    sortedScorers.map(v => v.scorerDim.scorerRef)
+    sortedScorers.map(v => v.scorerDef.scorerOpOrObjRef)
   );
 
   const NUM_SCORERS = uniqueScorerRefs.length;
-  const NUM_METRICS = sortedScorers.length;
+  const NUM_METRICS =
+    // Object.values(props.state.data.derivedMetricDimensions).length + // these are not supported yet
+    Object.values(props.state.data.scorerMetricDimensions).length;
   const NUM_METRIC_COLS = NUM_METRICS + 1;
   const NUM_COLS =
     1 + // Input / Eval Title
@@ -87,18 +85,6 @@ export const ExampleCompareSection: React.FC<{
   const NUM_OUTPUT_KEYS = outputColumnKeys.length;
   const NUM_EVALS = leafDims.length;
   const leftRef = React.useRef<HTMLDivElement>(null);
-  //   const [leftPadding, setLeftPadding] = React.useState<number>(0);
-  //   //   console.log(leftRef.current);
-  //   useEffect(() => {
-  //     // console.log(Object.keys(leftRef.current));
-  //     if (leftRef.current) {
-  //       setLeftPadding(leftRef.current.offsetWidth);
-  //     }
-  //   }, [leftRef]);
-  //   console.log(leftPadding);
-  //   const NUM_COLS = 3
-  //   const FREE_TEXT_COL_NDX = 2;
-  //   const TOTAL_ROWS = NUM_INPUT_PROPS + NUM_OUTPUT_KEYS * NUM_EVALS;
 
   const [selectedTrials, setSelectedTrials] = React.useState<{
     [evalCallId: string]: number;
@@ -107,13 +93,12 @@ export const ExampleCompareSection: React.FC<{
   return (
     <VerticalBox
       sx={{
-        height: '100%', // 'calc(100vh - 116px)',
-        //   bgcolor: 'blue',
+        height: '100%',
+
         gridGap: '0px',
       }}>
       <HorizontalBox
         sx={{
-          //   height: '50px',
           justifyContent: 'space-between',
           alignItems: 'center',
           bgcolor: MOON_100,
@@ -317,21 +302,19 @@ export const ExampleCompareSection: React.FC<{
                       {_.range(NUM_METRICS_IN_SCORER).map(mi => {
                         const isBaseline = ei === 0;
                         const scorersForThisRef = sortedScorers.filter(
-                          s => s.scorerDim.scorerRef === uniqueScorerRefs[si]
+                          s =>
+                            s.scorerDef.scorerOpOrObjRef ===
+                            uniqueScorerRefs[si]
                         );
+                        const scoreId = dimensionId(scorersForThisRef[mi]);
                         const summaryMetric =
-                          target.scores[scorersForThisRef[mi].scoreId][
-                            currEvalCallId
-                          ];
+                          target.scores[scoreId][currEvalCallId];
                         const unit =
-                          scorersForThisRef[mi].scorerDim.scoreType === 'binary'
+                          scorersForThisRef[mi].scoreType === 'binary'
                             ? '%'
                             : '';
                         let color: TagColorName = 'moon';
-                        const baseline =
-                          target.scores[scorersForThisRef[mi].scoreId][
-                            leafDims[0]
-                          ];
+                        const baseline = target.scores[scoreId][leafDims[0]];
                         const diff = summaryMetric - baseline;
                         const lowerIsBetter = false;
                         if (diff > 0) {
@@ -390,9 +373,9 @@ export const ExampleCompareSection: React.FC<{
                             </GridCell>
                             {_.range(NUM_TRIALS).map(ti => {
                               const metricValue =
-                                trialsForThisEval[ti].scores[
-                                  scorersForThisRef[mi].scoreId
-                                ][currEvalCallId];
+                                trialsForThisEval[ti].scores[scoreId][
+                                  currEvalCallId
+                                ];
                               if (metricValue == null) {
                                 return (
                                   <GridCell>
@@ -459,7 +442,7 @@ export const ExampleCompareSection: React.FC<{
           <GridCell cols={2}>Metrics</GridCell>
           {_.range(NUM_SCORERS).map(si => {
             const scorersForThisRef = sortedScorers.filter(
-              s => s.scorerDim.scorerRef === uniqueScorerRefs[si]
+              s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
             );
             const NUM_METRICS_IN_SCORER = scorersForThisRef.length;
             const scorerRef = uniqueScorerRefs[si];
@@ -475,11 +458,7 @@ export const ExampleCompareSection: React.FC<{
                         style={{
                           whiteSpace: 'nowrap',
                         }}>
-                        {
-                          scorersForThisRef[mi].scorerDim.scoreKeyPath
-                            .split('.')
-                            .slice(-1)[0]
-                        }
+                        {dimensionLabel(scorersForThisRef[mi])}
                       </GridCell>
                     </React.Fragment>
                   );

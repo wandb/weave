@@ -4,7 +4,7 @@ import {useMemo} from 'react';
 import {flattenObject} from '../../../../../Browse2/browse2Util';
 import { getOrderedCallIds } from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
-import { scoreIdFromScoreDimension } from '../../ecpUtil';
+import { dimensionId, resolveDimensionValueForPASCall } from '../../ecpUtil';
 
 type FlattenedRow = {
   id: string;
@@ -13,7 +13,7 @@ type FlattenedRow = {
   inputRef: string;
   input: {[inputKey: string]: any};
   output: {[outputKey: string]: any};
-  scores: {[scoreId: string]: number | boolean};
+  scores: {[scoreId: string]: number | boolean | undefined};
   latency: number;
   totalTokens: number;
   path: string[];
@@ -95,12 +95,7 @@ const filterNones = (list: any[]) => {
 };
 export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
-  const scores = Object.values(state.data.scoreDimensions);
-  const scoreMap = useMemo(() => {
-    return Object.fromEntries(
-      scores.map(score => [scoreIdFromScoreDimension(score), score])
-    );
-  }, [scores]);
+
 
   const flattenedRows = useMemo(() => {
     const rows: FlattenedRow[] = [];
@@ -125,17 +120,12 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   totalTokens:
                     predictAndScoreRes.predictCall?.totalUsageTokens ?? 0,
                   scores: Object.fromEntries(
-                    Object.entries(scoreMap).map(([scoreKey, scoreVal]) => {
-                      const hackKey = scoreVal.scoreKeyPath
-                        .split('.')
-                        .splice(1)
-                        .join('.');
+                    Object.entries(state.data.scorerMetricDimensions).map(([scoreKey, scoreVal]) => {
                       return [
                         scoreKey,
-                        flattenObject(
-                          predictAndScoreRes.scores[scoreVal.scorerRef]
-                            ?.results ?? {}
-                        )[hackKey],
+                        resolveDimensionValueForPASCall(
+                          scoreVal, predictAndScoreRes
+                        )
                       ];
                     })
                   ),
@@ -152,7 +142,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       }
     );
     return rows;
-  }, [state.data.inputs, state.data.resultRows, scoreMap]);
+  }, [state.data.resultRows, state.data.inputs, state.data.scorerMetricDimensions]);
 
   // const filteredDigests = useMemo(() => {
   // }, []);
@@ -245,11 +235,12 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
 
   const filteredRows = useMemo(() => {
     const aggregatedAsList = Object.values(aggregatedRows);
-    if (state.rangeSelection && Object.keys(state.rangeSelection).length > 0) {
+    const compareDim = state.comparisonDimension;
+    if (state.rangeSelection && Object.keys(state.rangeSelection).length > 0 && compareDim != null) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
         const values =
           aggregatedRows[digest].scores[
-            scoreIdFromScoreDimension(state.comparisonDimension)
+            dimensionId(compareDim)
           ];
         return Object.entries(state.rangeSelection).every(([key, val]) => {
           return val.min <= values[key] && values[key] <= val.max;
@@ -302,9 +293,8 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       filteredRows,
       inputColumnKeys,
       outputColumnKeys,
-      scoreMap,
       leafDims,
     };
-  }, [filteredRows, inputColumnKeys, leafDims, outputColumnKeys, scoreMap]);
+  }, [filteredRows, inputColumnKeys, leafDims, outputColumnKeys]);
 };
 

@@ -60,7 +60,7 @@ import {
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
 import {RangeSelection} from './ecpTypes';
-import {ScoreDimension} from './ecpTypes';
+import {EvaluationMetricDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
@@ -84,7 +84,7 @@ export const CompareEvaluationsPage: React.FC<
     );
 
   const [comparisonDimension, setComparisonDimension] =
-    React.useState<ScoreDimension | null>(null);
+    React.useState<EvaluationMetricDimension | null>(null);
 
   const [selectedInputDigest, setSelectedInputDigest] = React.useState<
     string | null
@@ -114,9 +114,11 @@ export const CompareEvaluationsPage: React.FC<
   const setComparisonDimensionAndClearRange = useCallback(
     (
       dim:
-        | ScoreDimension
+        | EvaluationMetricDimension
         | null
-        | ((prev: ScoreDimension | null) => ScoreDimension | null)
+        | ((
+            prev: EvaluationMetricDimension | null
+          ) => EvaluationMetricDimension | null)
     ) => {
       if (typeof dim === 'function') {
         dim = dim(comparisonDimension);

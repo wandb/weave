@@ -7,8 +7,8 @@ import {StyledTextField} from '../../../../StyledTextField';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {STANDARD_PADDING} from '../../ecpConstants';
 import {getOrderedCallIds} from '../../ecpState';
-import {ScoreDimension} from '../../ecpTypes';
 import {EvaluationComparisonState} from '../../ecpTypes';
+import {dimensionId, dimensionLabel} from '../../ecpUtil';
 import {HorizontalBox} from '../../Layout';
 import {EvaluationDefinition} from './EvaluationDefinition';
 
@@ -40,20 +40,24 @@ export const ComparisonDefinitionSection: React.FC<{
     </HorizontalBox>
   );
 };
-const dimensionToText = (dim: ScoreDimension): string => {
-  return dim.scorerRef + '/' + dim.scoreKeyPath;
-};
+
 export const DimensionPicker: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const currDimension = props.state.comparisonDimension;
-  const dimensions = Object.values(props.state.data.scoreDimensions);
+  const dimensions = useMemo(() => {
+    return [
+      ...Object.values(props.state.data.derivedMetricDimensions),
+      ...Object.values(props.state.data.scorerMetricDimensions),
+    ];
+  }, [
+    props.state.data.derivedMetricDimensions,
+    props.state.data.scorerMetricDimensions,
+  ]);
   const {setComparisonDimension} = useCompareEvaluationsState();
   // console.log(dimensions);
   const dimensionMap = useMemo(() => {
-    return Object.fromEntries(
-      dimensions.map(dim => [dimensionToText(dim), dim])
-    );
+    return Object.fromEntries(dimensions.map(dim => [dimensionId(dim), dim]));
   }, [dimensions]);
 
   return (
@@ -62,22 +66,18 @@ export const DimensionPicker: React.FC<{
         size="small"
         disableClearable
         limitTags={1}
-        value={dimensionToText(currDimension)}
+        value={currDimension ? dimensionId(currDimension) : undefined}
         onChange={(event, newValue) => {
-          // console.log('onChange', newValue);
-          // TODO: THis is incorrect!
-          // throw new Error('Not implemented');
           setComparisonDimension(dimensionMap[newValue]!);
         }}
         getOptionLabel={option => {
-          // Not quite correct since there could be multiple scorers with the same name
-          return dimensionMap[option]?.scoreKeyPath ?? option;
+          return dimensionLabel(dimensionMap[option]!);
         }}
         options={Object.keys(dimensionMap)}
         renderInput={renderParams => (
           <StyledTextField
             {...renderParams}
-            value={dimensionToText(currDimension)}
+            value={currDimension ? dimensionLabel(currDimension) : ''}
             label={'Dimension'}
             sx={{width: '300px'}}
           />
@@ -93,7 +93,6 @@ const SwapPositionsButton: React.FC<{callId: string}> = props => {
       size="medium"
       variant="quiet"
       onClick={() => {
-        // console.log('setting', props.callId);
         setBaselineEvaluationCallId(props.callId);
       }}
       icon="retry"

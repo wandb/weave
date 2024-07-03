@@ -1,16 +1,12 @@
 import {Box} from '@material-ui/core';
-import {sum} from 'lodash';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
 import {
   MOON_100,
-  // MOON_200,
-  // MOON_400,
   MOON_600,
-  // MOON_800,
 } from '../../../../../../../../common/css/color.styles';
-import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
+import {WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
@@ -23,8 +19,11 @@ import {
 } from '../../ecpConstants';
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
-import {isBinarySummaryScore, isContinuousSummaryScore} from '../../ecpTypes';
 import {EvaluationComparisonState} from '../../ecpTypes';
+import {
+  dimensionLabel,
+  resolveDimensionValueForEvaluateCall,
+} from '../../ecpUtil';
 import {HorizontalBox} from '../../Layout';
 import {
   EvaluationCallLink,
@@ -42,7 +41,7 @@ type BetterScoresType = {
         displayName: string;
         unit: string;
         lowerIsBetter: boolean;
-        modelScores: {[modelRef: string]: number};
+        modelScores: {[modelRef: string]: number | undefined};
       };
     };
   };
@@ -106,102 +105,182 @@ export const ScorecardSection: React.FC<{
 
   const betterScores: BetterScoresType = useMemo(() => {
     const res: BetterScoresType = {};
-    Object.values(props.state.data.evaluationCalls).forEach(evaluationCall => {
-      Object.keys(evaluationCall.scores).forEach(scoreName => {
-        const scoreRefsParsed = props.state.data.evaluations[
-          evaluationCall.evaluationRef
-        ].scorerRefs.map(ref => ({
-          parsed: parseRef(ref) as WeaveObjectRef,
-          ref,
-        }));
-        const scorerRef = scoreRefsParsed.find(
-          ref => ref.parsed.artifactName === scoreName
-        )?.ref;
-        if (!scorerRef) {
-          console.error('No score ref found for', scoreName);
-          return;
-        }
-        const parsed = parseRef(scorerRef) as WeaveObjectRef;
-        if (!res[scoreName]) {
-          res[scoreName] = {
-            scorerRef,
-            scorerName: parsed.artifactName,
-            metrics: {},
-          };
-        }
+    Object.entries(props.state.data.evaluationCalls).forEach(
+      ([evalCallId, evaluationCall]) => {
+        Object.entries(evaluationCall.summaryMetrics).forEach(
+          ([metricDimensionId, metricDimension]) => {
+            const scorerMetricsDimension =
+              props.state.data.scorerMetricDimensions[metricDimensionId];
+            const derivedMetricsDimension =
+              props.state.data.derivedMetricDimensions[metricDimensionId];
+            if (scorerMetricsDimension != null) {
+              const scorerRef =
+                scorerMetricsDimension.scorerDef.scorerOpOrObjRef;
+              const scorerName =
+                scorerMetricsDimension.scorerDef.likelyTopLevelKeyName;
+              const unit =
+                scorerMetricsDimension.scoreType === 'continuous' ? '' : '%';
+              const lowerIsBetter = false;
+              if (res[scorerRef] == null) {
+                res[scorerRef] = {
+                  scorerRef,
+                  scorerName,
+                  metrics: {},
+                };
+              }
+              if (res[scorerRef].metrics[metricDimensionId] == null) {
+                res[scorerRef].metrics[metricDimensionId] = {
+                  displayName: dimensionLabel(scorerMetricsDimension),
+                  unit,
+                  lowerIsBetter,
+                  modelScores: {},
+                };
+              }
 
-        if (evaluationCall.scores[scoreName]) {
-          Object.keys(evaluationCall.scores[scoreName]).forEach(metricKey => {
-            const summaryValue = evaluationCall.scores[scoreName][metricKey];
-            let value = 0;
-            let unit = '';
-            if (isContinuousSummaryScore(summaryValue)) {
-              value = summaryValue.mean;
-            } else if (isBinarySummaryScore(summaryValue)) {
-              value = summaryValue.true_fraction;
-              unit = '%';
+              res[scorerRef].metrics[metricDimensionId].modelScores[
+                evaluationCall.modelRef
+              ] = resolveDimensionValueForEvaluateCall(
+                scorerMetricsDimension,
+                evaluationCall
+              );
+            } else if (derivedMetricsDimension != null) {
+              const scorerRef = '__DERIVED__';
+              const scorerName = derivedMetricsDimension.derivedMetricName;
+              const unit = derivedMetricsDimension.unit ?? '';
+              const lowerIsBetter =
+                derivedMetricsDimension.shouldMinimize ?? false;
+              if (res[scorerRef] == null) {
+                res[scorerRef] = {
+                  scorerRef,
+                  scorerName,
+                  metrics: {},
+                };
+              }
+              if (res[scorerRef].metrics[metricDimensionId] == null) {
+                res[scorerRef].metrics[metricDimensionId] = {
+                  displayName: dimensionLabel(scorerMetricsDimension),
+                  unit,
+                  lowerIsBetter,
+                  modelScores: {},
+                };
+              }
+
+              res[scorerRef].metrics[metricDimensionId].modelScores[
+                evaluationCall.modelRef
+              ] = resolveDimensionValueForEvaluateCall(
+                scorerMetricsDimension,
+                evaluationCall
+              );
             } else {
-              console.error('Unknown score type', summaryValue);
-              return;
+              throw new Error('Unknown metric dimension type');
             }
-            if (!res[scoreName].metrics[metricKey]) {
-              res[scoreName].metrics[metricKey] = {
-                displayName: metricKey,
-                unit,
-                lowerIsBetter: false,
-                modelScores: {},
-              };
-            }
-            res[scoreName].metrics[metricKey].modelScores[
-              evaluationCall.modelRef
-            ] = value;
-          });
-        }
-      });
-    });
-
-    // Add tokens and latency last
-    Object.values(props.state.data.evaluationCalls).forEach(evaluationCall => {
-      const scorerKey = '__computed__';
-      if (!res[scorerKey]) {
-        res[scorerKey] = {
-          scorerRef: scorerKey,
-          scorerName: '',
-          metrics: {},
-        };
-      }
-
-      const tokenMetric = 'Total Tokens';
-      if (!res[scorerKey].metrics[tokenMetric]) {
-        res[scorerKey].metrics[tokenMetric] = {
-          displayName: tokenMetric,
-          unit: '',
-          lowerIsBetter: true,
-          modelScores: {},
-        };
-      }
-      res[scorerKey].metrics[tokenMetric].modelScores[evaluationCall.modelRef] =
-        sum(
-          Object.values(
-            evaluationCall._rawEvaluationTraceData.summary.usage ?? {}
-          ).map(v => v.total_tokens)
+          }
         );
-
-      const meanLatency = 'Avg. Latency';
-      if (!res[scorerKey].metrics[meanLatency]) {
-        res[scorerKey].metrics[meanLatency] = {
-          displayName: meanLatency,
-          unit: ' ms',
-          lowerIsBetter: true,
-          modelScores: {},
-        };
       }
-      res[scorerKey].metrics[meanLatency].modelScores[evaluationCall.modelRef] =
-        evaluationCall._rawEvaluationTraceData.output.model_latency.mean ?? 0;
-    });
+    );
+    // Object.values(props.state.data.evaluationCalls).forEach(evaluationCall => {
+    //   Object.keys(evaluationCall.summaryMetrics).forEach(scoreName => {
+    //     const scoreRefsParsed = props.state.data.evaluations[
+    //       evaluationCall.evaluationRef
+    //     ].scorerRefs.map(ref => ({
+    //       parsed: parseRef(ref) as WeaveObjectRef,
+    //       ref,
+    //     }));
+    //     const scorerRef = scoreRefsParsed.find(
+    //       ref => ref.parsed.artifactName === scoreName
+    //     )?.ref;
+    //     if (!scorerRef) {
+    //       console.error('No score ref found for', scoreName);
+    //       return;
+    //     }
+    //     const parsed = parseRef(scorerRef) as WeaveObjectRef;
+    //     if (!res[scoreName]) {
+    //       res[scoreName] = {
+    //         scorerRef,
+    //         scorerName: parsed.artifactName,
+    //         metrics: {},
+    //       };
+    //     }
+
+    //     if (evaluationCall.summaryMetrics[scoreName]) {
+    //       Object.keys(evaluationCall.summaryMetrics[scoreName]).forEach(
+    //         metricKey => {
+    //           const summaryValue = resolveDimensionValueForEvaluateCall(dim, evaluationCall);
+    //           evaluationCall.summaryMetrics[scoreName][metricKey];
+    //           let value = 0;
+    //           let unit = '';
+    //           if (isContinuousSummaryScore(summaryValue)) {
+    //             value = summaryValue.mean;
+    //           } else if (isBinarySummaryScore(summaryValue)) {
+    //             value = summaryValue.true_fraction;
+    //             unit = '%';
+    //           } else {
+    //             console.error('Unknown score type', summaryValue);
+    //             return;
+    //           }
+    //           if (!res[scoreName].metrics[metricKey]) {
+    //             res[scoreName].metrics[metricKey] = {
+    //               displayName: metricKey,
+    //               unit,
+    //               lowerIsBetter: false,
+    //               modelScores: {},
+    //             };
+    //           }
+    //           res[scoreName].metrics[metricKey].modelScores[
+    //             evaluationCall.modelRef
+    //           ] = value;
+    //         }
+    //       );
+    //     }
+    //   });
+    // });
+
+    // // Add tokens and latency last
+    // Object.values(props.state.data.evaluationCalls).forEach(evaluationCall => {
+    //   const scorerKey = '__computed__';
+    //   if (!res[scorerKey]) {
+    //     res[scorerKey] = {
+    //       scorerRef: scorerKey,
+    //       scorerName: '',
+    //       metrics: {},
+    //     };
+    //   }
+
+    //   const tokenMetric = 'Total Tokens';
+    //   if (!res[scorerKey].metrics[tokenMetric]) {
+    //     res[scorerKey].metrics[tokenMetric] = {
+    //       displayName: tokenMetric,
+    //       unit: '',
+    //       lowerIsBetter: true,
+    //       modelScores: {},
+    //     };
+    //   }
+    //   res[scorerKey].metrics[tokenMetric].modelScores[evaluationCall.modelRef] =
+    //     sum(
+    //       Object.values(
+    //         evaluationCall._rawEvaluationTraceData.summary.usage ?? {}
+    //       ).map(v => v.total_tokens)
+    //     );
+
+    //   const meanLatency = 'Avg. Latency';
+    //   if (!res[scorerKey].metrics[meanLatency]) {
+    //     res[scorerKey].metrics[meanLatency] = {
+    //       displayName: meanLatency,
+    //       unit: ' ms',
+    //       lowerIsBetter: true,
+    //       modelScores: {},
+    //     };
+    //   }
+    //   res[scorerKey].metrics[meanLatency].modelScores[evaluationCall.modelRef] =
+    //     evaluationCall._rawEvaluationTraceData.output.model_latency.mean ?? 0;
+    // });
 
     return res;
-  }, [props.state.data.evaluationCalls, props.state.data.evaluations]);
+  }, [
+    props.state.data.derivedMetricDimensions,
+    props.state.data.evaluationCalls,
+    props.state.data.scorerMetricDimensions,
+  ]);
 
   // console.log(betterScores);
 
@@ -446,7 +525,7 @@ export const ScorecardSection: React.FC<{
                       // console.log({value});
                       // console.log({baseline, value});
                       let color: TagColorName = 'moon';
-                      const diff = value - baseline;
+                      const diff = (value ?? 0) - (baseline ?? 0);
                       if (diff > 0) {
                         if (!def.metrics[metricKey].lowerIsBetter) {
                           color = 'green';
