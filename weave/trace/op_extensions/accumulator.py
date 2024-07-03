@@ -9,6 +9,7 @@ from typing import (
     Generic,
     Iterator,
     Optional,
+    Type,
     TypeVar,
     Union,
 )
@@ -209,3 +210,16 @@ class _IteratorWrapper(Generic[V]):
         ]:
             return object.__getattribute__(self, name)
         return getattr(self._iterator, name)
+
+    def __enter__(self) -> "_IteratorWrapper":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[Exception],
+        exc_value: Optional[BaseException],
+        traceback: Optional[Any],
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        self._call_on_close_once()
