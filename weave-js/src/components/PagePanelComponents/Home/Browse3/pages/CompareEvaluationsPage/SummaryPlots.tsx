@@ -8,9 +8,9 @@ import {
   STANDARD_BORDER,
   STANDARD_PADDING,
 } from './ecpConstants';
+import {getOrderedCallIds} from './ecpState';
 import {EvaluationComparisonState} from './ecpTypes';
 import {evaluationComparisonMetrics} from './evaluationComparisonMetrics';
-import {getOrderedCallIds} from './evaluationResults';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';

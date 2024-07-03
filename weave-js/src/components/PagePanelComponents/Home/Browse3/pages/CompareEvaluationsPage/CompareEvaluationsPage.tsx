@@ -44,7 +44,6 @@
  */
 
 import {Box} from '@material-ui/core';
-// import {ToggleButton} from '@mui/material';
 import React, {FC, useCallback, useContext} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -54,7 +53,6 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {useEvaluationsFilter} from '../CallsPage/CallsPage';
-// import {CallsTable} from '../CallsPage/CallsTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
@@ -62,9 +60,9 @@ import {
 } from './compareEvaluationsContext';
 import {ComparisonDefinition} from './ComparisonDefinitionHeader';
 import {STANDARD_PADDING} from './ecpConstants';
+import {RangeSelection} from './ecpState';
 import {ScoreDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
-import {RangeSelection} from './initialize';
 import {InputComparison2} from './InputComparison2';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
@@ -84,7 +82,7 @@ export const CompareEvaluationsPage: React.FC<
     React.useState(
       props.evaluationCallIds.length > 0 ? props.evaluationCallIds[0] : null
     );
-  // console.log(baselineEvaluationCallId);
+
   const [comparisonDimension, setComparisonDimension] =
     React.useState<ScoreDimension | null>(null);
 

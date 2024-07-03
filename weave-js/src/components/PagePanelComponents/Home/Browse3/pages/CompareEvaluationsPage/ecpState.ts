@@ -1,22 +1,160 @@
-import {sum} from 'lodash';
+import { sum } from 'lodash';
+import {useEffect, useMemo, useState} from 'react';
 
-import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
+import { WB_RUN_COLORS } from '../../../../../../common/css/color.styles';
+import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
-import {TraceServerClient} from '../wfReactInterface/traceServerClient';
-import {
-  convertISOToDate,
-  projectIdFromParts,
-} from '../wfReactInterface/tsDataModelHooks';
+import { PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC } from '../common/heuristics';
+import { TraceServerClient } from '../wfReactInterface/traceServerClient';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import { convertISOToDate,projectIdFromParts } from '../wfReactInterface/tsDataModelHooks';
+import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
   EvaluationComparisonData,
-  EvaluationComparisonState,
   EvaluationEvaluateCallSchema,
   isBinarySummaryScore,
   isContinuousSummaryScore,
 } from './ecpTypes';
+import {ScoreDimension} from './ecpTypes';
+import {EvaluationComparisonState} from './ecpTypes';
 
-const pickColor = (ndx: number) => {
+export type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
+
+export const useEvaluationComparisonState = (
+  entity: string,
+  project: string,
+  evaluationCallIds: string[],
+  baselineEvaluationCallId?: string,
+  comparisonDimension?: ScoreDimension,
+  rangeSelection?: RangeSelection,
+  selectedInputDigest?: string
+): Loadable<EvaluationComparisonState> => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const [data, setData] = useState<EvaluationComparisonData | null>(null);
+  const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
+  useEffect(() => {
+    setData(null);
+    let mounted = true;
+    fetchEvaluationComparisonData(
+      getTraceServerClient(),
+      entity,
+      project,
+      evaluationCallIdsMemo
+    ).then(dataRes => {
+      if (mounted) {
+        setData(dataRes);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [entity, evaluationCallIdsMemo, project, getTraceServerClient]);
+
+  const value = useMemo(() => {
+    if (data == null) {
+      return {loading: true, result: null};
+    }
+    const dimensions = evaluationCallDimensions(data);
+    return {
+      loading: false,
+      result: {
+        data,
+        baselineEvaluationCallId:
+          baselineEvaluationCallId ?? evaluationCallIds[0],
+        comparisonDimension: comparisonDimension ?? dimensions[0],
+        rangeSelection: rangeSelection ?? {},
+        selectedInputDigest,
+      },
+    };
+  }, [
+    data,
+    baselineEvaluationCallId,
+    evaluationCallIds,
+    comparisonDimension,
+    rangeSelection,
+    selectedInputDigest,
+  ]);
+
+  return value;
+};
+
+const evaluationCallDimensions = (
+  data: EvaluationComparisonData
+): ScoreDimension[] => {
+  // const availableScorers = Object.values(evaluationCalls)
+  //   .map(evalCall =>
+  //     Object.entries(evalCall.scores)
+  //       .map(([k, v]) => Object.keys(v).map(innerKey => k + '.' + innerKey))
+  //       .flat()
+  //   )
+  //   .flat();
+  const availableScorersMap: {[ref: string]: {[path: string]: ScoreDimension}} =
+    {};
+  const recordScorer = (scoreDim: ScoreDimension) => {
+    if (!availableScorersMap[scoreDim.scorerRef]) {
+      availableScorersMap[scoreDim.scorerRef] = {};
+    }
+    availableScorersMap[scoreDim.scorerRef][scoreDim.scoreKeyPath] = scoreDim;
+  };
+
+  const addScore = (score: any, scoreRef: string, scoreKeyPath: string) => {
+    // Two types of scores: single value and dict
+    if (isBinarySummaryScore(score)) {
+      recordScorer({
+        scorerRef: scoreRef,
+        scoreKeyPath,
+        scoreType: 'binary',
+        minimize: false,
+      });
+    } else if (isContinuousSummaryScore(score)) {
+      recordScorer({
+        scorerRef: scoreRef,
+        scoreKeyPath,
+        scoreType: 'continuous',
+        minimize: false,
+      });
+    } else if (
+      score != null &&
+      typeof score === 'object' &&
+      !Array.isArray(score)
+    ) {
+      Object.entries(score).forEach(([key, value]) => {
+        addScore(value, scoreRef, scoreKeyPath + '.' + key);
+      });
+    }
+  };
+
+  Object.values(data.evaluationCalls).forEach(evalCall => {
+    const evalObject = data.evaluations[evalCall.evaluationRef];
+    evalObject.scorerRefs.forEach(scoreRef => {
+      const scorerKey = (parseRef(scoreRef) as WeaveObjectRef).artifactName;
+      // TODO: Should put scores at the top level using the ref, not name as the key!
+      const score = evalCall._rawEvaluationTraceData.output[scorerKey];
+      addScore(score, scoreRef, scorerKey);
+    });
+  });
+
+  // recordScorer({
+  //   scorerRef: ,
+  //   scoreKeyPath: scoreKeyPath,
+  //   scoreType: 'continuous',
+  //   minimize: false,
+  // })
+
+  return [
+    ...Object.values(availableScorersMap).map(Object.values).flat(),
+    // 'model_latency',
+    // 'total_tokens',
+  ];
+};
+
+export const useEvaluationCallDimensions = (
+  state: EvaluationComparisonState
+): ScoreDimension[] => {
+  return useMemo(() => {
+    return evaluationCallDimensions(state.data);
+  }, [state.data]);
+};const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
 };
 
@@ -27,7 +165,7 @@ export const fetchEvaluationComparisonData = async (
   evaluationCallIds: string[]
 ): Promise<EvaluationComparisonData> => {
   //   const [result, setResult] = useState<EvaluationComparisonState | null>(null);
-  const projectId = projectIdFromParts({entity, project});
+  const projectId = projectIdFromParts({ entity, project });
   const result: EvaluationComparisonData = {
     entity,
     project,
@@ -47,11 +185,10 @@ export const fetchEvaluationComparisonData = async (
   //        2.3.1: Fetch the rows. For each row:
   //            2.3.1.1: Fetch the prediction
   //            2.3.1.1: Fetch the scores
-
   // 1: populate the evaluationCalls
   const evalRes = await traceServerClient.callsQuery({
     project_id: projectId,
-    filter: {call_ids: evaluationCallIds},
+    filter: { call_ids: evaluationCallIds },
   });
   result.evaluationCalls = Object.fromEntries(
     evalRes.calls.map((call, ndx) => [
@@ -71,7 +208,7 @@ export const fetchEvaluationComparisonData = async (
             .map(([key, val]) => {
               // return [key, val];
               if (isBinarySummaryScore(val) || isContinuousSummaryScore(val)) {
-                return [key, {'': val}] as any; // no nesting. probably something we should fix more generally
+                return [key, { '': val }] as any; // no nesting. probably something we should fix more generally
               }
               return [key, val];
             })
@@ -134,8 +271,7 @@ export const fetchEvaluationComparisonData = async (
           ref,
           properties: Object.fromEntries(
             Object.entries(objData as any).filter(
-              ([key]) =>
-                key !== 'predict' &&
+              ([key]) => key !== 'predict' &&
                 !key.startsWith('_') &&
                 key !== 'name' &&
                 key !== 'description'
@@ -183,7 +319,7 @@ export const fetchEvaluationComparisonData = async (
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
   const evalTraceRes = await traceServerClient.callsQuery({
     project_id: projectId,
-    filter: {trace_ids: evalTraceIds},
+    filter: { trace_ids: evalTraceIds },
   });
 
   // Create a set of all of the scorer refs
@@ -196,8 +332,7 @@ export const fetchEvaluationComparisonData = async (
   // Create a map of all the predict_and_score_ops
   const predictAndScoreOps = Object.fromEntries(
     evalTraceRes.calls
-      .filter(call =>
-        call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
+      .filter(call => call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
       )
       .map(call => [call.id, call])
   );
@@ -208,10 +343,8 @@ export const fetchEvaluationComparisonData = async (
     // We are looking for 2 types of calls:
     // 1. Predict calls
     // 2. Score calls.
-    if (
-      traceCall.parent_id != null &&
-      predictAndScoreOps[traceCall.parent_id] != null
-    ) {
+    if (traceCall.parent_id != null &&
+      predictAndScoreOps[traceCall.parent_id] != null) {
       const parentPredictAndScore = predictAndScoreOps[traceCall.parent_id];
       // console.log(traceCall)
       const exampleRef = parentPredictAndScore.inputs.example;
@@ -254,7 +387,6 @@ export const fetchEvaluationComparisonData = async (
             //     };
             //   };
             // };
-
             // type PredictAndScoreCall = {
             //   callId: string;
             //   exampleRef: string;
@@ -278,17 +410,10 @@ export const fetchEvaluationComparisonData = async (
               };
             }
 
-            const modelForDigestCollection =
-              digestCollection.evaluations[evaluationCallId];
+            const modelForDigestCollection = digestCollection.evaluations[evaluationCallId];
 
-            if (
-              modelForDigestCollection.predictAndScores[
-                parentPredictAndScore.id
-              ] == null
-            ) {
-              modelForDigestCollection.predictAndScores[
-                parentPredictAndScore.id
-              ] = {
+            if (modelForDigestCollection.predictAndScores[parentPredictAndScore.id] == null) {
+              modelForDigestCollection.predictAndScores[parentPredictAndScore.id] = {
                 callId: parentPredictAndScore.id,
                 firstExampleRef: exampleRef,
                 rowDigest,
@@ -300,10 +425,7 @@ export const fetchEvaluationComparisonData = async (
               };
             }
 
-            const predictAndScoreFinal =
-              modelForDigestCollection.predictAndScores[
-                parentPredictAndScore.id
-              ];
+            const predictAndScoreFinal = modelForDigestCollection.predictAndScores[parentPredictAndScore.id];
 
             if (isProbablyPredictCall) {
               const totalTokens = sum(
@@ -314,11 +436,10 @@ export const fetchEvaluationComparisonData = async (
               predictAndScoreFinal.predictCall = {
                 callId: traceCall.id,
                 output: traceCall.output as any,
-                latencyMs:
-                  (convertISOToDate(
-                    traceCall.ended_at ?? traceCall.started_at
-                  ).getTime() -
-                    convertISOToDate(traceCall.started_at).getTime()) /
+                latencyMs: (convertISOToDate(
+                  traceCall.ended_at ?? traceCall.started_at
+                ).getTime() -
+                  convertISOToDate(traceCall.started_at).getTime()) /
                   1000, // why is this different than the predictandscore model latency?
                 totalUsageTokens: totalTokens,
                 _rawPredictTraceData: traceCall,
@@ -326,7 +447,7 @@ export const fetchEvaluationComparisonData = async (
             } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
               let results = traceCall.output as any;
               if (typeof results !== 'object') {
-                results = {'': results}; // no nesting. probably something we should fix more generally
+                results = { '': results }; // no nesting. probably something we should fix more generally
               }
               let scorerName = traceCall.op_name;
               if (isProbablyBoundScoreCall) {
@@ -363,11 +484,10 @@ export const getOrderedCallIds = (state: EvaluationComparisonState) => {
 };
 
 export const getOrderedModelRefs = (state: EvaluationComparisonState) => {
-  const baselineRef =
-    state.data.evaluationCalls[state.baselineEvaluationCallId].modelRef;
+  const baselineRef = state.data.evaluationCalls[state.baselineEvaluationCallId].modelRef;
   const refs = Object.keys(state.data.models);
   // Make sure the baseline model is first
-
   moveItemToFront(refs, baselineRef);
   return refs;
 };
+

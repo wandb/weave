@@ -18,10 +18,10 @@ import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {BOX_RADIUS, STANDARD_BORDER, STANDARD_PADDING} from './ecpConstants';
 import {SIGNIFICANT_DIGITS} from './ecpConstants';
+import {getOrderedCallIds, getOrderedModelRefs} from './ecpState';
 import {isBinarySummaryScore, isContinuousSummaryScore} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
 import {EvaluationCallLink, EvaluationModelLink} from './EvaluationDefinition';
-import {getOrderedCallIds, getOrderedModelRefs} from './evaluationResults';
 import {HorizontalBox} from './Layout';
 
 // const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';

@@ -2,7 +2,7 @@ import {
   TraceCallSchema,
   TraceObjSchema,
 } from '../wfReactInterface/traceServerClient';
-import {RangeSelection} from './initialize';
+import {RangeSelection} from './ecpState';
 
 export type EvaluationComparisonState = {
   data: EvaluationComparisonData;
