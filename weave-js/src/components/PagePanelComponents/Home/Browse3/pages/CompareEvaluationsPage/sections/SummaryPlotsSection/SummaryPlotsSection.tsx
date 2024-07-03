@@ -79,13 +79,13 @@ export const SummaryPlots: React.FC<{
     </VerticalBox>
   );
 };
-const normalizeValues = (values: number[]): number[] => {
+const normalizeValues = (values: Array<number | undefined>): number[] => {
   // find the max value
   // find the power of 2 that is greater than the max value
   // divide all values by that power of 2
-  const maxVal = Math.max(...values);
+  const maxVal = Math.max(...(values.filter(v => v !== undefined) as number[]));
   const maxPower = Math.ceil(Math.log2(maxVal));
-  return values.map(val => val / 2 ** maxPower);
+  return values.map(val => (val ? val / 2 ** maxPower : 0));
 };
 const useNormalizedRadarPlotDataFromMetrics = (
   state: EvaluationComparisonState

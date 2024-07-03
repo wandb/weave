@@ -11,6 +11,27 @@ export const dimensionLabel = (dim: EvaluationMetricDimension): string => {
   }
 };
 
+export const dimensionUnit = (dim: EvaluationMetricDimension): string => {
+  if (isScorerMetricDimension(dim)) {
+    return '';
+  } else if (isDerivedMetricDefinition(dim)) {
+    return dim.unit ?? '';
+  } else {
+    throw new Error('Unknown dimension type');
+  }
+};
+
+export const dimensionShouldMinimize = (dim: EvaluationMetricDimension): boolean => {
+  if (isScorerMetricDimension(dim)) {
+    return false
+  } else if (isDerivedMetricDefinition(dim)) {
+    return dim.shouldMinimize ?? false;
+  } else {
+    throw new Error('Unknown dimension type');
+  }
+};
+
+
 
 export const dimensionId = (dim: EvaluationMetricDimension): string => {
   if (isScorerMetricDimension(dim)) {

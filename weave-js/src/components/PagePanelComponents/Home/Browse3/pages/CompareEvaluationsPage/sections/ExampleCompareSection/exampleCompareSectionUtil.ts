@@ -107,7 +107,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
               const datasetRow =
                 state.data.inputs[predictAndScoreRes.rowDigest];
               if (datasetRow != null) {
-                const output = predictAndScoreRes.predictCall?.output;
+                const output = predictAndScoreRes._legacy_predictCall?.output;
                 rows.push({
                   // ...predictAndScoreRes,
                   id: predictAndScoreRes.callId,
@@ -116,9 +116,9 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   inputRef: predictAndScoreRes.firstExampleRef,
                   input: flattenObject({input: datasetRow.val}),
                   output: flattenObject({output}),
-                  latency: predictAndScoreRes.predictCall?.latencyMs ?? 0,
+                  latency: predictAndScoreRes._legacy_predictCall?.latencyMs ?? 0,
                   totalTokens:
-                    predictAndScoreRes.predictCall?.totalUsageTokens ?? 0,
+                    predictAndScoreRes._legacy_predictCall?.totalUsageTokens ?? 0,
                   scores: Object.fromEntries(
                     Object.entries(state.data.scorerMetricDimensions).map(([scoreKey, scoreVal]) => {
                       return [

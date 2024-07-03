@@ -1,69 +1,47 @@
-import {sum} from 'lodash';
 
-import {flattenObject} from '../../../../../Browse2/browse2Util';
-import {ComparisonMetric, EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpTypes';
+import { dimensionLabel, dimensionShouldMinimize, dimensionUnit, resolveDimensionValueForEvaluateCall } from '../../ecpUtil';
+
+
+export type SummaryPlotsLegacyComparisonMetric = {
+  path: string;
+  unit: string;
+  lowerIsBetter: boolean;
+  values: {[callId: string]: number | undefined};
+};
 
 export const summaryMetrics = (
   state: EvaluationComparisonState
-): ComparisonMetric[] => {
-  const evaluationCalls = Object.values(state.data.evaluationCalls).map(
-    e => e._rawEvaluationTraceData
-  );
-  // There are a few hard-coded possible metrics, then a handful of custom metrics:
+): SummaryPlotsLegacyComparisonMetric[] => {
+  const results:SummaryPlotsLegacyComparisonMetric[] = []
+  const allEntries = [
+    ...Object.entries(state.data.scorerMetricDimensions),
+    ...Object.entries(state.data.derivedMetricDimensions), 
+  ]
+  allEntries.forEach(([metricId, metric]) => {
+    results.push({
+      path: dimensionLabel(metric),
+      unit: dimensionUnit(metric),
+      lowerIsBetter: dimensionShouldMinimize(metric),
+      values: Object.fromEntries(
+        Object.entries(state.data.evaluationCalls).map(([callId, call]) => [
+          callId,
+          resolveDimensionValueForEvaluateCall(
+            metric,
+            call
+          )
+        ])
+      ),
+    })
 
-  // Tokens
-  const tokensMetric: ComparisonMetric = {
-    path: 'total_tokens',
-    unit: ' tokens',
-    values: Object.fromEntries(
-      evaluationCalls.map(call => [
-        call.id,
-        sum(Object.values(call.summary.usage ?? {}).map(v => v.total_tokens)),
-      ])
-    ),
-    lowerIsBetter: true,
-  };
+  })
 
-  // scorers
-  const allScorers: {[scorer: string]: ComparisonMetric} = {};
-  const allCallIds = evaluationCalls.map(call => call.id);
-  evaluationCalls.forEach(call => {
-    const flattenedOutput = flattenObject(call.output);
-    const scorerKeys: string[] = [];
-    Object.keys(flattenedOutput).forEach(scorerKey => {
-      const allButLastKey = scorerKey.split('.').slice(0, -1).join('.');
-      if (scorerKeys.includes(allButLastKey)) {
-        return;
-      }
-      scorerKeys.push(allButLastKey);
-    });
-    scorerKeys.forEach(scorerKey => {
-      const fractionKey = `${scorerKey}.true_fraction`;
-      const meanKey = `${scorerKey}.mean`;
-      const hasFraction = flattenedOutput[fractionKey] !== undefined;
-      if (allScorers[scorerKey] === undefined) {
-        let unit = '';
-        let lowerIsBetter = false;
-        if (scorerKey === 'model_latency') {
-          unit = 'ms';
-          lowerIsBetter = true;
-        } else if (hasFraction) {
-          unit = '%';
-        }
-        allScorers[scorerKey] = {
-          path: scorerKey,
-          unit,
-          values: Object.fromEntries(allCallIds.map(id => [id, 0])),
-          lowerIsBetter,
-        };
-      }
-      if (hasFraction) {
-        allScorers[scorerKey].values[call.id] = flattenedOutput[fractionKey];
-      } else {
-        allScorers[scorerKey].values[call.id] = flattenedOutput[meanKey];
-      }
-    });
-  });
+  
 
-  return [...Object.values(allScorers), tokensMetric];
+  return results
+
+
+
+
+
 };

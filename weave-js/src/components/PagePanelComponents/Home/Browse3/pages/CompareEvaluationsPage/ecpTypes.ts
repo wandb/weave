@@ -47,7 +47,7 @@ export const isContinuousScore = (score: any): score is ContinuousScore => {
 };
 
 
-type ScorerDefinition = {
+export type ScorerDefinition = {
   scorerOpOrObjRef: string;
   likelyTopLevelKeyName: string;
 }
@@ -59,7 +59,7 @@ export type ScorerMetricDimension = {
   scoreType: 'binary' | 'continuous';
 };
 
-type DerivedMetricDefinition = {
+export type DerivedMetricDefinition = {
   dimensionType: 'derivedMetric';
   derivedMetricName: string;
   scoreType: 'binary' | 'continuous';
@@ -103,12 +103,6 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
       };
     };
   };
-};
-export type ComparisonMetric = {
-  path: string;
-  unit: string;
-  lowerIsBetter: boolean;
-  values: {[callId: string]: number};
 };
 
 
@@ -190,7 +184,7 @@ export type PredictAndScoreCall = {
   rowDigest: string;
   modelRef: string;
   evaluationCallId: string;
-  predictCall?: {
+  _legacy_predictCall?: {
     callId: string;
     output: any;
     latencyMs: number;

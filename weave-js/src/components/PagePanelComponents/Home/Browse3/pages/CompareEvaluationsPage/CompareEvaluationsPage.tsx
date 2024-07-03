@@ -10,6 +10,8 @@
  * - [ ] (maybe) Verify that nested scorers are supported
  * - [ ] (maybe) "Comparison Table" should use Baseline model input for input fields, NOT the dataset input
  * Bugs:
+ * - [ ] (MUST) Lots of Warning: Each child in a list should have a unique "key" prop.
+ * - [ ] (MUST) Total Tokens is empty
  * - [ ] (MUST) Bug: https://app.wandb.test/shawn/weave-hooman1/weave/compare-evaluations?evaluationCallIds=%5B%228e207ad2-272c-4a6b-851a-fecb0049eec2%22%2C%228dd66257-df66-471f-92ab-bf97ce9662e5%22%5D
  * - [ ] (MUST) Empty selection filter causes crash
  * - [ ] (MUST)`isProbablyXCall` is incorrect - at least the predict one (eg. for infer_method_names in ("predict", "infer", "forward"):)

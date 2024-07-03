@@ -32,7 +32,7 @@ import {
 
 // const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
 
-type BetterScoresType = {
+type ScorecardSpecificLegacyScoresType = {
   [scorerId: string]: {
     scorerRef?: string;
     scorerName?: string;
@@ -103,8 +103,8 @@ export const ScorecardSection: React.FC<{
   }, [modelProps]);
   const [showDifferences, setShowDifferences] = React.useState(false);
 
-  const betterScores: BetterScoresType = useMemo(() => {
-    const res: BetterScoresType = {};
+  const betterScores: ScorecardSpecificLegacyScoresType = useMemo(() => {
+    const res: ScorecardSpecificLegacyScoresType = {};
     Object.entries(props.state.data.evaluationCalls).forEach(
       ([evalCallId, evaluationCall]) => {
         Object.entries(evaluationCall.summaryMetrics).forEach(
@@ -158,7 +158,7 @@ export const ScorecardSection: React.FC<{
               }
               if (res[scorerRef].metrics[metricDimensionId] == null) {
                 res[scorerRef].metrics[metricDimensionId] = {
-                  displayName: dimensionLabel(scorerMetricsDimension),
+                  displayName: dimensionLabel(derivedMetricsDimension),
                   unit,
                   lowerIsBetter,
                   modelScores: {},
@@ -168,7 +168,7 @@ export const ScorecardSection: React.FC<{
               res[scorerRef].metrics[metricDimensionId].modelScores[
                 evaluationCall.modelRef
               ] = resolveDimensionValueForEvaluateCall(
-                scorerMetricsDimension,
+                derivedMetricsDimension,
                 evaluationCall
               );
             } else {
