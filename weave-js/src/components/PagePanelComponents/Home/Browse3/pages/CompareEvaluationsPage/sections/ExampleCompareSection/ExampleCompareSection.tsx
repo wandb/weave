@@ -47,8 +47,9 @@ const GridContainer = styled.div<{numColumns: number}>`
 export const ExampleCompareSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const {filteredRows, inputColumnKeys, outputColumnKeys, leafDims} =
-    useFilteredAggregateRows(props.state);
+  const {filteredRows, outputColumnKeys, leafDims} = useFilteredAggregateRows(
+    props.state
+  );
   const {setSelectedInputDigest} = useCompareEvaluationsState();
   const targetIndex = useMemo(() => {
     const selectedDigest = props.state.selectedInputDigest;
@@ -84,6 +85,23 @@ export const ExampleCompareSection: React.FC<{
     [evalCallId: string]: number;
   }>({});
 
+  // const targetInputColumnKeys = useMemo(() => {
+  //   if (target == null) {
+  //     return []
+  //   }
+  //   const keys = new Set<string>();
+  //   const keysList: string[] = [];
+  //   flattenedRows.forEach(row => {
+  //     Object.keys(row.input).forEach(key => {
+  //       if (!keys.has(key)) {
+  //         keys.add(key);
+  //         keysList.push(key);
+  //       }
+  //     });
+  //   });
+  //   return keysList;
+  // }, [flattenedRows]);
+
   if (target == null) {
     return <div>Filter resulted in 0 rows</div>;
   }
@@ -96,6 +114,8 @@ export const ExampleCompareSection: React.FC<{
   const NUM_COLS =
     1 + // Input / Eval Title
     2; // Input Prop Key / Val
+
+  const inputColumnKeys = Object.keys(target.input);
   const NUM_INPUT_PROPS = inputColumnKeys.length;
   const NUM_OUTPUT_KEYS = outputColumnKeys.length;
   const NUM_EVALS = leafDims.length;
@@ -238,7 +258,9 @@ export const ExampleCompareSection: React.FC<{
                 <GridCell cols={2}>
                   <ICValueView
                     value={
-                      selectedTrial.output[outputColumnKeys[oi]][currEvalCallId]
+                      (selectedTrial.output[outputColumnKeys[oi]] ?? {})[
+                        currEvalCallId
+                      ]
                     }
                   />
                 </GridCell>
