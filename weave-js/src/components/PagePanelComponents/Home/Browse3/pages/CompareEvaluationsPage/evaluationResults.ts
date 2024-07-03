@@ -15,12 +15,12 @@ import {
 import {EvaluationEvaluateCallSchema} from './evaluations';
 import {EvaluationComparisonState} from './types';
 
-export type BinarySummaryScore = {
+type BinarySummaryScore = {
   true_count: number;
   true_fraction: number;
 };
 
-export type ContinuousSummaryScore = {
+type ContinuousSummaryScore = {
   mean: number;
 };
 
@@ -83,7 +83,7 @@ type EvaluationObj = {
 //   _rawPredictTraceData: TraceCallSchema;
 // };
 
-export type DatasetRow = {
+type DatasetRow = {
   digest: string;
   val: any;
 };
@@ -137,7 +137,7 @@ export type EvaluationComparisonData = {
   };
 };
 
-export type PredictAndScoreCall = {
+type PredictAndScoreCall = {
   callId: string;
   firstExampleRef: string;
   rowDigest: string;

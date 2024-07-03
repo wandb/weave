@@ -1,8 +1,6 @@
 import {sum} from 'lodash';
-import {useMemo} from 'react';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
-import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {EvaluationComparisonState} from './types';
 
@@ -46,57 +44,7 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
   };
 };
 
-export const useEvaluationCalls = (
-  entity: string,
-  project: string,
-  evaluationCallIds: string[]
-): EvaluationEvaluateCallSchema[] => {
-  const {useCalls} = useWFHooks();
-  const calls = useCalls(entity, project, {callIds: evaluationCallIds});
-  return useMemo(() => {
-    // TODO: Should validate that these are EvaluationEvaluateCallSchema
-    return (
-      calls.result?.map(c => c.traceCall as EvaluationEvaluateCallSchema) || []
-    );
-  }, [calls.result]);
-};
-
-export const useEvaluationCall = (
-  entity: string,
-  project: string,
-  evaluationCallId: string
-): EvaluationEvaluateCallSchema | null => {
-  const calls = useEvaluationCalls(entity, project, [evaluationCallId]);
-  return useMemo(() => {
-    if (calls.length === 0) {
-      return null;
-    }
-    return calls[0];
-  }, [calls]);
-};
-
-type EvaluationModel = {
-  ref: string;
-  data: any;
-};
-
-export const useModelsFromEvaluationCalls = (
-  evaluationCalls: EvaluationEvaluateCallSchema[]
-): EvaluationModel[] => {
-  const {useRefsData} = useWFHooks();
-  const modelRefs = useMemo(() => {
-    return evaluationCalls.map(call => call.inputs.model);
-  }, [evaluationCalls]);
-  const modelData = useRefsData(modelRefs);
-  return useMemo(() => {
-    if (!modelData.result || modelData.result.length !== modelRefs.length) {
-      return [];
-    }
-    return modelRefs.map((ref, i) => ({ref, data: modelData.result![i]}));
-  }, [modelData.result, modelRefs]);
-};
-
-export type ComparisonMetric = {
+type ComparisonMetric = {
   path: string;
   unit: string;
   lowerIsBetter: boolean;

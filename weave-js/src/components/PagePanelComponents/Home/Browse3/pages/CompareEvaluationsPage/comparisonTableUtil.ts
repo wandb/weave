@@ -7,10 +7,10 @@ import {ScoreDimension} from './evaluations';
 import {useEvaluationCallDimensions} from './initialize';
 import {EvaluationComparisonState} from './types';
 
-export const scoreIdFromScoreDimension = (dim: ScoreDimension): string => {
+const scoreIdFromScoreDimension = (dim: ScoreDimension): string => {
   return dim.scorerRef + '@' + dim.scoreKeyPath;
 };
-export type FlattenedRow = {
+type FlattenedRow = {
   id: string;
   evaluationCallId: string;
   inputDigest: string;
@@ -22,7 +22,7 @@ export type FlattenedRow = {
   totalTokens: number;
   path: string[];
 };
-export type PivotedRow = {
+type PivotedRow = {
   id: string;
   inputDigest: string;
   inputRef: string;
@@ -35,7 +35,7 @@ export type PivotedRow = {
   totalTokens: {[callId: string]: number};
   path: string[];
 };
-export const aggregateGroupedNestedRows = (
+const aggregateGroupedNestedRows = (
   rows: PivotedRow[],
   field: keyof PivotedRow,
   aggFunc: (vals: any[]) => any
@@ -70,7 +70,7 @@ export const aggregateGroupedNestedRows = (
     })
   );
 };
-export const aggregateGroupedRows = (
+const aggregateGroupedRows = (
   rows: PivotedRow[],
   field: keyof PivotedRow,
   aggFunc: (vals: any[]) => any
@@ -94,7 +94,7 @@ export const aggregateGroupedRows = (
     })
   );
 };
-export const filterNones = (list: any[]) => {
+const filterNones = (list: any[]) => {
   return list.filter(v => v != null);
 };
 export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {

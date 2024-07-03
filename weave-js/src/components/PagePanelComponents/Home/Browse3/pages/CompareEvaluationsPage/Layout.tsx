@@ -46,15 +46,3 @@ export const VerticalBar: React.FC = () => {
     />
   );
 };
-
-export const HorizontalBar: React.FC = () => {
-  return (
-    <div
-      style={{
-        height: '2px',
-        width: '100%',
-        backgroundColor: MOON_300,
-      }}
-    />
-  );
-};

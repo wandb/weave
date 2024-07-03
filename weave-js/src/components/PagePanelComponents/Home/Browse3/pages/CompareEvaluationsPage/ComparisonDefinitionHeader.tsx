@@ -1,4 +1,4 @@
-import {Box, FormControl} from '@material-ui/core';
+import {FormControl} from '@material-ui/core';
 import {Autocomplete} from '@mui/material';
 import React, {useMemo} from 'react';
 
@@ -40,9 +40,6 @@ export const ComparisonDefinition: React.FC<{
       })}
     </HorizontalBox>
   );
-};
-export const DefinitionText: React.FC<{text: string}> = props => {
-  return <Box>{props.text}</Box>;
 };
 const dimensionToText = (dim: ScoreDimension): string => {
   return dim.scorerRef + '/' + dim.scoreKeyPath;
