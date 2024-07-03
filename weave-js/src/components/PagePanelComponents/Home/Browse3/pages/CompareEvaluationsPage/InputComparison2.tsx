@@ -147,206 +147,122 @@ export const InputComparison2: React.FC<{
         numColumns={NUM_COLS}
         style={{
           height: '100%', // 'calc(100vh - 116px)',
-          gridTemplateColumns: `repeat(${FREE_TEXT_COL_NDX}, min-content) 1fr repeat(${
-            NUM_COLS - FREE_TEXT_COL_NDX - 1
-          }, min-content`,
-          gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) repeat(${TOTAL_ROWS} 1fr) `,
           flex: 1,
           display: 'grid',
           overflow: 'auto',
+          gridTemplateColumns: `repeat(2, min-content) auto`,
+          //   gridTemplateColumns: `repeat(${FREE_TEXT_COL_NDX}, min-content) 1fr repeat(${
+          //     NUM_COLS - FREE_TEXT_COL_NDX - 1
+          //   }, min-content`,
+          //   gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) repeat(${TOTAL_ROWS} 1fr) `,
         }}>
-        <GridCell rows={NUM_INPUT_PROPS} style={{...verticalStyle}}>
-          <SmallRef objRef={inputRef} iconOnly />
-        </GridCell>
-        {_.range(NUM_INPUT_PROPS).map(i => {
+        <GridCell rows={NUM_INPUT_PROPS}>Input Ref</GridCell>
+        {_.range(NUM_INPUT_PROPS).map(ii => {
           return (
-            <React.Fragment key={inputColumnKeys[i]}>
-              <GridCell>{removePrefix(inputColumnKeys[i], 'input.')}</GridCell>
-              <GridCell>
-                {/* <CellValue value={target.input[inputColumnKeys[i]]} /> */}
-                <ICValueView value={target.input[inputColumnKeys[i]]} />
-              </GridCell>
-              {i === 0 && (
-                <GridCell
-                  cols={NUM_METRIC_COLS}
-                  rows={NUM_INPUT_PROPS}
-                  noPad
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'subgrid',
-                  }}>
-                  <GridCell
-                    rows={2}
-                    style={{
-                      ...verticalStyle,
-                      backgroundColor: MOON_100,
-                    }}>
-                    Trials
-                  </GridCell>
-                  {_.range(NUM_SCORERS).map(si => {
-                    const scorerRef = uniqueScorerRefs[si];
-                    const numMetrics = sortedScorers.filter(
-                      k => k.scorerDim.scorerRef === scorerRef
-                    ).length;
-                    return (
-                      <>
-                        <GridCell
-                          cols={numMetrics}
-                          style={{
-                            //   ...verticalStyle,
-                            backgroundColor: MOON_100,
-                          }}>
-                          <SmallRef
-                            objRef={parseRef(scorerRef) as WeaveObjectRef}
-                            iconOnly
-                          />
-                        </GridCell>
-                      </>
-                    );
-                  })}
-                  {_.range(NUM_METRICS).map(mi => {
-                    return (
-                      <GridCell
-                        style={{
-                          ...verticalStyle,
-                          backgroundColor: MOON_100,
-                        }}>
-                        {sortedScorers[mi].scorerDim.scoreKeyPath}
-                      </GridCell>
-                    );
-                  })}
-                </GridCell>
-              )}
+            <React.Fragment>
+              <GridCell>Input Key {ii}</GridCell>
+              <GridCell>Input Val {ii}</GridCell>
             </React.Fragment>
           );
         })}
-        {_.range(NUM_EVALS).map(ei => {
-          const currEvalCallId = leafDims[ei];
-          const isBaseline = ei === 0;
-          const trialsForThisEval = target.originalRows.filter(
-            row => row.evaluationCallId === currEvalCallId
-          );
-          const NUM_TRIALS = trialsForThisEval.length;
-          //   console.log({selectedTrials});
-          const selectedTrial =
-            trialsForThisEval[selectedTrials[currEvalCallId] || 0];
-          //   console.log(selectedTrials[currEvalCallId], {selectedTrial});
-          // console.log(
-          //   trialsForThisEval,
-          //   currEvalCallId,
-          //   sortedScorers[0][0],
-          //   trialsForThisEval[i].scores[sortedScorers[i][0]]
-          // );
-          return (
-            <>
-              {/* <GridCell cols={NUM_COLS}>Eval Title {ei}</GridCell> */}
+        <GridCell cols={2}>Eval Outputs</GridCell>
+        <GridCell
+          noPad
+          style={{
+            display: 'grid',
+            gridTemplateRows: 'subgrid',
+            gridTemplateColumns: `repeat(${NUM_EVALS}, min-content, auto)`,
+            overflowX: 'auto',
+          }}
+          rows={NUM_OUTPUT_KEYS + 2 + NUM_METRICS}>
+          {_.range(NUM_EVALS).map(ei => {
+            return <GridCell cols={2}>Eval {ei}</GridCell>;
+          })}
+          {_.range(NUM_OUTPUT_KEYS).map(oi => {
+            return _.range(NUM_EVALS).map(ei => {
+              return (
+                <GridCell cols={2}>
+                  Output Val {ei}.{oi} this is a long string that should wrap to
+                  the next line if it is too long
+                </GridCell>
+              );
+            });
+          })}
+          {_.range(NUM_EVALS).map(ei => {
+            const NUM_TRIALS = 3;
+            return (
               <GridCell
-                rows={NUM_OUTPUT_KEYS}
+                cols={2}
+                rows={NUM_METRICS + 1}
+                noPad
                 style={{
-                  ...verticalStyle,
+                  display: 'grid',
+                  gridTemplateRows: 'subgrid',
+                  gridTemplateColumns: `repeat(${NUM_TRIALS + 1}, auto)`,
+                  overflowX: 'auto',
                 }}>
-                <EvaluationCallLink
-                  callId={currEvalCallId}
-                  state={props.state}
-                />
-              </GridCell>
-              {_.range(NUM_OUTPUT_KEYS).map(oi => {
-                return (
-                  <>
-                    <GridCell>
-                      {removePrefix(outputColumnKeys[oi], 'output.')}
-                    </GridCell>
-                    <GridCell>
-                      {/* <CellValue
-                            value={
-                              selectedTrial.output[outputColumnKeys[oi]][
-                                currEvalCallId
-                              ]
-                            }
-                          /> */}
-                      <ICValueView
-                        value={
-                          selectedTrial.output[outputColumnKeys[oi]][
-                            currEvalCallId
-                          ]
-                        }
-                      />
-                    </GridCell>
-                    {oi === 0 && (
+                <GridCell
+                  style={{
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 1,
+                    backgroundColor: MOON_100,
+                  }}>
+                  AGG
+                </GridCell>
+                {_.range(NUM_TRIALS).map(ti => {
+                  return <GridCell> Trial {ti}</GridCell>;
+                })}
+                {_.range(NUM_SCORERS).map(si => {
+                  const NUM_METRICS_IN_SCORER = 1;
+                  return (
+                    <React.Fragment>
                       <GridCell
-                        rows={NUM_OUTPUT_KEYS}
-                        cols={NUM_METRIC_COLS}
-                        noPad
                         style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'subgrid',
-                          // maxHeight: '300px',
-                          overflow: 'auto',
-                          gridTemplateRows: `repeat(${
-                            NUM_TRIALS + 1
-                          }, min-content)`,
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 1,
+                          backgroundColor: MOON_100,
                         }}>
-                        <GridHeaderCell></GridHeaderCell>
-                        {_.range(NUM_METRICS).map(mi => {
-                          const summaryMetric =
-                            target.scores[sortedScorers[mi].scoreId][
-                              currEvalCallId
-                            ];
-                          // console.log(summaryMetric, sortedScorers[mi]);
-                          return (
-                            <GridHeaderCell>
-                              {summaryMetric}
-                              {sortedScorers[mi].scorerDim.scoreType ===
-                              'binary'
-                                ? '%'
-                                : ''}
-                              {!isBaseline ? '+/-123' : ''}
-                            </GridHeaderCell>
-                          );
-                        })}
-                        {_.range(NUM_TRIALS).map(ti => {
-                          return (
-                            <>
-                              <GridCell
-                                onClick={() => {
-                                  //   console.log('selecting');
-                                  setSelectedTrials(curr => {
-                                    return {
-                                      ...curr,
-                                      [currEvalCallId]: ti,
-                                    };
-                                  });
-                                }}>
-                                {ti}
-                              </GridCell>
-                              {_.range(NUM_METRICS).map(mi => {
-                                const metricValue =
-                                  trialsForThisEval[ti].scores[
-                                    sortedScorers[mi].scoreId
-                                  ][currEvalCallId];
-                                if (metricValue == null) {
-                                  return (
-                                    <GridCell>
-                                      <NotApplicable />
-                                    </GridCell>
-                                  );
-                                }
-
-                                return (
-                                  <GridCell>
-                                    <CellValue value={metricValue} />
-                                  </GridCell>
-                                );
-                              })}
-                            </>
-                          );
-                        })}
+                        si{si}.Agg
                       </GridCell>
-                    )}
-                  </>
+                      {_.range(NUM_METRICS_IN_SCORER).map(mi => {
+                        return _.range(NUM_TRIALS).map(ti => {
+                          return (
+                            <GridCell>
+                              si{si}.mi{mi}.ti{ti}
+                            </GridCell>
+                          );
+                        });
+                      })}
+                    </React.Fragment>
+                  );
+                })}
+              </GridCell>
+            );
+          })}
+        </GridCell>
+        {_.range(NUM_OUTPUT_KEYS).map(oi => {
+          return (
+            <React.Fragment>
+              <GridCell cols={2}>Output Key {oi}</GridCell>
+            </React.Fragment>
+          );
+        })}
+        <GridCell cols={2}></GridCell>
+        {_.range(NUM_SCORERS).map(si => {
+          const NUM_METRICS_IN_SCORER = 1;
+          return (
+            <React.Fragment>
+              <GridCell rows={NUM_METRICS_IN_SCORER}>Scorer {si}</GridCell>
+              {_.range(NUM_METRICS_IN_SCORER).map(mi => {
+                return (
+                  <React.Fragment>
+                    <GridCell>Metric {mi}</GridCell>
+                  </React.Fragment>
                 );
               })}
-            </>
+            </React.Fragment>
           );
         })}
       </GridContainer>
