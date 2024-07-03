@@ -3,7 +3,7 @@ import {EvaluationComparisonState} from '../../ecpTypes';
 import { dimensionLabel, dimensionShouldMinimize, dimensionUnit, resolveDimensionValueForEvaluateCall } from '../../ecpUtil';
 
 
-export type SummaryPlotsLegacyComparisonMetric = {
+type SummaryPlotsLegacyComparisonMetric = {
   path: string;
   unit: string;
   lowerIsBetter: boolean;

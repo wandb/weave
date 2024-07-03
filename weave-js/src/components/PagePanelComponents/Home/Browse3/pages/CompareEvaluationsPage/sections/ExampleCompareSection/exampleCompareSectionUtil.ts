@@ -142,7 +142,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       }
     );
     return rows;
-  }, [state.data.resultRows, state.data.inputs, state.data.scorerMetricDimensions]);
+  }, [state.data.resultRows, state.data.inputs, state.data.scorerMetricDimensions, state.data.derivedMetricDimensions]);
 
   // const filteredDigests = useMemo(() => {
   // }, []);

@@ -68,7 +68,7 @@ export const resolveDimensionValueForPASCall = (
 };
 
 
-export const resolveDimensionSummaryScoreForEvaluateCall = (
+const resolveDimensionSummaryScoreForEvaluateCall = (
   dim: EvaluationMetricDimension,
   evaluateCall: EvaluationCall
 ): SummaryScore | undefined => {
