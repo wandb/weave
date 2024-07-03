@@ -204,7 +204,7 @@ def reconstruct_signature(fn: typing.Callable) -> str:
     sig = inspect.signature(fn)
     module = sys.modules[fn.__module__]
 
-    def make_annotation(annotation):
+    def make_annotation_str(annotation: Any) -> str:
         print(f"{annotation=}")
         if isinstance(annotation, str):
             return annotation
@@ -213,7 +213,7 @@ def reconstruct_signature(fn: typing.Callable) -> str:
 
         if (origin := get_origin(annotation)) is not None:
             args = get_args(annotation)
-            replaced_args = [make_annotation(arg) for arg in args]
+            replaced_args = [make_annotation_str(arg) for arg in args]
             replaced_args_str = ", ".join(replaced_args)
 
             print(replaced_args)
@@ -233,22 +233,21 @@ def reconstruct_signature(fn: typing.Callable) -> str:
                         return f"{name}.{annotation.__name__}"
         return str(annotation)
 
-    def quote_default_str(default):
+    def quote_default_str(default: Any) -> Any:
         if isinstance(default, str):
             return f'"{default}"'
         return default
 
     params = []
     for name, param in sig.parameters.items():
-        annotation = make_annotation(param.annotation)
-        default = (
-            f" = {quote_default_str(param.default)}"
-            if param.default is not param.empty
-            else ""
-        )
-        params.append(f"{name}: {annotation}{default}")
+        annotation_str = make_annotation_str(param.annotation)
+        if param.default is param.empty:
+            default = ""
+        else:
+            default = f" = {quote_default_str(param.default)}"
+        params.append(f"{name}: {annotation_str}{default}")
 
-    return_annotation = make_annotation(sig.return_annotation)
+    return_annotation = make_annotation_str(sig.return_annotation)
 
     sig_str = f"({', '.join(params)})"
     if return_annotation:
