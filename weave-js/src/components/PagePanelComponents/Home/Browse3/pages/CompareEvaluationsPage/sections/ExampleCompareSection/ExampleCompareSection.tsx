@@ -62,8 +62,6 @@ export const ExampleCompareSection: React.FC<{
     return filteredRows[targetIndex];
   }, [filteredRows, targetIndex]);
 
-  const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
-
   const sortedScorers = _.sortBy(
     Object.values(props.state.data.scorerMetricDimensions),
     k => k.scorerDef.scorerOpOrObjRef
@@ -71,24 +69,31 @@ export const ExampleCompareSection: React.FC<{
   const uniqueScorerRefs = _.uniq(
     sortedScorers.map(v => v.scorerDef.scorerOpOrObjRef)
   );
+  const derivedScorers = Object.values(
+    props.state.data.derivedMetricDimensions
+  );
 
-  const NUM_SCORERS = uniqueScorerRefs.length;
-  const NUM_METRICS =
-    // Object.values(props.state.data.derivedMetricDimensions).length + // these are not supported yet
-    Object.values(props.state.data.scorerMetricDimensions).length;
-  const NUM_METRIC_COLS = NUM_METRICS + 1;
-  const NUM_COLS =
-    1 + // Input / Eval Title
-    2 + // Input Prop Key / Val
-    NUM_METRIC_COLS;
-  const NUM_INPUT_PROPS = inputColumnKeys.length;
-  const NUM_OUTPUT_KEYS = outputColumnKeys.length;
-  const NUM_EVALS = leafDims.length;
   const leftRef = React.useRef<HTMLDivElement>(null);
 
   const [selectedTrials, setSelectedTrials] = React.useState<{
     [evalCallId: string]: number;
   }>({});
+
+  if (target == null) {
+    return <div>Filter resulted in 0 rows</div>;
+  }
+
+  const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
+  const NUM_SCORERS = uniqueScorerRefs.length;
+  const NUM_DERIVED = derivedScorers.length;
+  const NUM_METRICS =
+    NUM_DERIVED + Object.values(props.state.data.scorerMetricDimensions).length;
+  const NUM_COLS =
+    1 + // Input / Eval Title
+    2; // Input Prop Key / Val
+  const NUM_INPUT_PROPS = inputColumnKeys.length;
+  const NUM_OUTPUT_KEYS = outputColumnKeys.length;
+  const NUM_EVALS = leafDims.length;
 
   return (
     <VerticalBox
@@ -296,16 +301,17 @@ export const ExampleCompareSection: React.FC<{
                   );
                 })}
                 {_.range(NUM_SCORERS).map(si => {
-                  const NUM_METRICS_IN_SCORER = 1;
+                  // TODO: Add the derived metrics
+                  // TODO: Pill logic should be shared now
+                  const scorersForThisRef = sortedScorers.filter(
+                    s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
+                  );
+                  const NUM_METRICS_IN_SCORER = scorersForThisRef.length;
                   return (
                     <React.Fragment>
                       {_.range(NUM_METRICS_IN_SCORER).map(mi => {
                         const isBaseline = ei === 0;
-                        const scorersForThisRef = sortedScorers.filter(
-                          s =>
-                            s.scorerDef.scorerOpOrObjRef ===
-                            uniqueScorerRefs[si]
-                        );
+
                         const scoreId = dimensionId(scorersForThisRef[mi]);
                         const summaryMetric =
                           target.scores[scoreId][currEvalCallId];
@@ -463,6 +469,15 @@ export const ExampleCompareSection: React.FC<{
                     </React.Fragment>
                   );
                 })}
+              </React.Fragment>
+            );
+          })}
+          {_.range(NUM_DERIVED).map(di => {
+            const derivedMetric = derivedScorers[di];
+            return (
+              <React.Fragment>
+                <GridCell></GridCell>
+                <GridCell>{derivedMetric.derivedMetricName}</GridCell>
               </React.Fragment>
             );
           })}

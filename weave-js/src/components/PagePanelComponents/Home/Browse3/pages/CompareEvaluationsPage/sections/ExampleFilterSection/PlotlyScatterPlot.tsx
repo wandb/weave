@@ -96,12 +96,15 @@ export const PlotlyScatterPlot: React.FC<{
 
       // Set up event listener for relayout (zoom and range change)
       (current as any).on('plotly_selected', (eventData: any) => {
-        console.log('plotly_selected', eventData);
-        const newXMin = eventData.range.x[0];
-        const newXMax = eventData.range.x[1];
-        const newYMin = eventData.range.y[0];
-        const newYMax = eventData.range.y[1];
-        props.onRangeChange(newXMin, newXMax, newYMin, newYMax);
+        if (eventData == null) {
+          props.onRangeChange();
+        } else {
+          const newXMin = eventData.range.x[0];
+          const newXMax = eventData.range.x[1];
+          const newYMin = eventData.range.y[0];
+          const newYMax = eventData.range.y[1];
+          props.onRangeChange(newXMin, newXMax, newYMin, newYMax);
+        }
       });
 
       // Clean up event listener on unmount

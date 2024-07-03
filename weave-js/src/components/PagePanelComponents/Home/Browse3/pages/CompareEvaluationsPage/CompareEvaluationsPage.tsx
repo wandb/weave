@@ -6,6 +6,7 @@
  * - [ ] (MUST) Audit the data model to correctly reflect ScoreDimensions (this is too loose right now)
  * - [ ] (MUST) Latency, Tokens, and Cost are should "feel" like first class ScoringDimensions
  * - [ ] (probably) find all cases of the `_raw*` cases and remove them, this is an example of insufficient data model
+ * - [ ] (probably) find all cases of the `_legacy_*` cases and remove them, this is an example of insufficient data model
  * - [ ] (probably) Change "Target Metric" to an ordered list of metrics. Default to first metric + latency
  * - [ ] (maybe) Verify that nested scorers are supported
  * - [ ] (maybe) "Comparison Table" should use Baseline model input for input fields, NOT the dataset input
@@ -41,8 +42,10 @@
  *    - [ ] (probably) Scatterplot Filter dimensions are not quite obvious
  *    - [ ] (probably) Scatterplot filter would benefit from a title / help text
  *    - [ ] (maybe) Scatterplot filter should have 1-1 aspect ratio
+ *    - [ ] Double click does not clear the box boudnary
  * Implementation Tasks:
  * - [ ] (MUST) Code Cleanup: There is a lot of dead / messy code
+ * - [ ] (MUST) Code Cleanup: Pill logic should be shared now
  */
 
 import {Box} from '@material-ui/core';
