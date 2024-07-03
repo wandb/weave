@@ -11,7 +11,7 @@ import textwrap
 import types as py_types
 import typing
 from _ast import AsyncFunctionDef, ExceptHandler
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from weave.legacy import artifact_fs, context_state
 from weave.trace.ipython import get_class_source, is_running_interactively
@@ -200,13 +200,73 @@ def get_source_notebook_safe(fn: typing.Callable) -> str:
     return textwrap.dedent(src)
 
 
+def reconstruct_signature(fn: typing.Callable) -> str:
+    sig = inspect.signature(fn)
+    module = sys.modules[fn.__module__]
+
+    def make_annotation(annotation):
+        print(f"{annotation=}")
+        if isinstance(annotation, str):
+            return annotation
+        if annotation is inspect.Parameter.empty:
+            return ""
+
+        if (origin := get_origin(annotation)) is not None:
+            args = get_args(annotation)
+            replaced_args = [make_annotation(arg) for arg in args]
+            replaced_args_str = ", ".join(replaced_args)
+
+            print(replaced_args)
+
+            if origin_name := getattr(origin, "__name__", None):
+                return f"{origin_name}[{replaced_args_str}]"
+            return f"{origin}[{replaced_args_str}]"
+
+        if isinstance(annotation, type):
+            # For builtins, just use the name
+            if annotation.__module__ == "builtins":
+                return annotation.__name__
+            # Otherwise, check if the type is imported and use the alias if given
+            for name, obj in module.__dict__.items():
+                if isinstance(obj, py_types.ModuleType):
+                    if annotation.__module__ == obj.__name__:
+                        return f"{name}.{annotation.__name__}"
+        return str(annotation)
+
+    def quote_default_str(default):
+        if isinstance(default, str):
+            return f'"{default}"'
+        return default
+
+    params = []
+    for name, param in sig.parameters.items():
+        annotation = make_annotation(param.annotation)
+        default = (
+            f" = {quote_default_str(param.default)}"
+            if param.default is not param.empty
+            else ""
+        )
+        params.append(f"{name}: {annotation}{default}")
+
+    return_annotation = make_annotation(sig.return_annotation)
+
+    sig_str = f"({', '.join(params)})"
+    if return_annotation:
+        sig_str += f" -> {return_annotation}"
+
+    return sig_str
+
+
 def get_source_or_fallback(fn: typing.Callable) -> str:
     if isinstance(fn, Op):
         fn = fn.resolve_fn
 
     func_name = fn.__name__
-    sig = inspect.signature(fn)
-    sig_str = str(sig)
+    try:
+        sig_str = reconstruct_signature(fn)
+    except Exception as e:
+        print(f"Failed to reconstruct signature {e=}")
+        sig_str = "(*args, **kwargs)"
     missing_code_template = textwrap.dedent(
         f"""
         def {func_name}{sig_str}:

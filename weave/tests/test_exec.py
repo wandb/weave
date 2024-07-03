@@ -1,4 +1,6 @@
 import textwrap
+import typing
+from typing import Union
 
 import numpy as np
 import pytest
@@ -37,8 +39,8 @@ import pytest
         (
             textwrap.dedent(
                 """
-                import numpy as np
                 import weave
+                import numpy as np
 
                 @weave.op()
                 def softmax(x: np.ndarray) -> np.ndarray:
@@ -51,8 +53,8 @@ import pytest
             ),
             textwrap.dedent(
                 """
-                import numpy as np
                 import weave
+                import numpy as np
 
                 @weave.op()
                 def softmax(x: np.ndarray) -> np.ndarray:
@@ -60,14 +62,31 @@ import pytest
                 """
             ),
         ),
-        # With default values
+        # default values, complex types
         (
             textwrap.dedent(
                 """
+                import weave
+                import numpy as np
+                import typing
+
+                @weave.op()
+                def func(x: np.ndarray, y: int, greeting: str = "Hello friend!") -> dict[str, typing.Union[np.float64, str]]:
+                    return {"mean": mean(x + y), "greeting": greeting}
+
+                    
+                ref = weave.publish(func)
                 """
             ),
             textwrap.dedent(
                 """
+                import weave
+                import numpy as np
+                import typing
+
+                @weave.op()
+                def func(x: np.ndarray, y: int, greeting: str = "Hello friend!") -> dict[str, typing.Union[np.float64, str]]:
+                    ... # Code-capture unavailable for this op
                 """
             ),
         ),
