@@ -1,6 +1,6 @@
 import {Box} from '@material-ui/core';
 import _ from 'lodash';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import styled from 'styled-components';
 
 import {MOON_100, MOON_300} from '../../../../../../common/css/color.styles';
@@ -83,6 +83,17 @@ export const InputComparison2: React.FC<{
   const NUM_INPUT_PROPS = inputColumnKeys.length;
   const NUM_OUTPUT_KEYS = outputColumnKeys.length;
   const NUM_EVALS = leafDims.length;
+  const leftRef = React.useRef<HTMLDivElement>(null);
+  //   const [leftPadding, setLeftPadding] = React.useState<number>(0);
+  //   //   console.log(leftRef.current);
+  //   useEffect(() => {
+  //     // console.log(Object.keys(leftRef.current));
+  //     if (leftRef.current) {
+  //       setLeftPadding(leftRef.current.offsetWidth);
+  //     }
+  //   }, [leftRef]);
+  //   console.log(leftPadding);
+  //   const NUM_COLS = 3
   //   const FREE_TEXT_COL_NDX = 2;
   //   const TOTAL_ROWS = NUM_INPUT_PROPS + NUM_OUTPUT_KEYS * NUM_EVALS;
 
@@ -142,12 +153,20 @@ export const InputComparison2: React.FC<{
           overflow: 'auto',
           gridTemplateColumns: `repeat(2, min-content) auto`,
           gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) min-content repeat(${NUM_OUTPUT_KEYS}, auto) min-content repeat(${NUM_METRICS}, min-content)`,
+          //   overflowY: 'auto',
           //   gridTemplateColumns: `repeat(${FREE_TEXT_COL_NDX}, min-content) 1fr repeat(${
           //     NUM_COLS - FREE_TEXT_COL_NDX - 1
           //   }, min-content`,
           //   gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) repeat(${TOTAL_ROWS} 1fr) `,
         }}>
-        <GridCell rows={NUM_INPUT_PROPS}>
+        <GridCell
+          rows={NUM_INPUT_PROPS}
+          style={{
+            position: 'sticky',
+            left: 0,
+            zIndex: 1,
+            backgroundColor: 'white',
+          }}>
           <SmallRef objRef={inputRef} allowShrink />
         </GridCell>
         {_.range(NUM_INPUT_PROPS).map(ii => {
@@ -156,6 +175,11 @@ export const InputComparison2: React.FC<{
               <GridCell
                 style={{
                   whiteSpace: 'nowrap',
+
+                  position: 'sticky',
+                  left: leftRef.current?.offsetWidth ?? 'unset',
+                  zIndex: 1,
+                  backgroundColor: 'white',
                 }}>
                 {removePrefix(inputColumnKeys[ii], 'input.')}
               </GridCell>
@@ -165,14 +189,23 @@ export const InputComparison2: React.FC<{
             </React.Fragment>
           );
         })}
-        <GridCell cols={2}></GridCell>
+        <GridCell
+          cols={2}
+          style={{
+            position: 'sticky',
+            left: 0,
+            top: 0,
+            zIndex: 2,
+            backgroundColor: MOON_100,
+          }}></GridCell>
         <GridCell
           noPad
           style={{
+            border: 'none',
             display: 'grid',
             gridTemplateRows: 'subgrid',
             gridTemplateColumns: `repeat(${NUM_EVALS}, min-content auto)`,
-            overflowX: 'auto',
+            // overflowY: 'auto',
           }}
           rows={NUM_OUTPUT_KEYS + 2 + NUM_METRICS}>
           {_.range(NUM_EVALS).map(ei => {
@@ -182,6 +215,10 @@ export const InputComparison2: React.FC<{
                 cols={2}
                 style={{
                   minWidth: MIN_OUTPUT_WIDTH,
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 1,
+                  backgroundColor: MOON_100,
                 }}>
                 <EvaluationCallLink
                   callId={currEvalCallId}
@@ -228,6 +265,12 @@ export const InputComparison2: React.FC<{
                   gridTemplateRows: 'subgrid',
                   gridTemplateColumns: `repeat(${NUM_TRIALS + 1}, auto)`,
                   overflowX: 'auto',
+                  position: 'sticky',
+                  bottom: 0,
+                  //   left: leftRef.current?.offsetWidth ?? 'unset',
+                  zIndex: 1,
+                  backgroundColor: 'white',
+                  border: 'none',
                 }}>
                 <GridCell
                   style={{
@@ -374,48 +417,74 @@ export const InputComparison2: React.FC<{
         {_.range(NUM_OUTPUT_KEYS).map(oi => {
           return (
             <React.Fragment>
-              <GridCell></GridCell>
+              <GridCell
+                style={{
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 1,
+                  backgroundColor: 'white',
+                }}></GridCell>
               <GridCell
                 cols={1}
                 style={{
                   whiteSpace: 'nowrap',
+                  position: 'sticky',
+                  left: leftRef.current?.offsetWidth ?? 'unset',
+                  zIndex: 1,
+                  backgroundColor: 'white',
                 }}>
                 {removePrefix(outputColumnKeys[oi], 'output.')}
               </GridCell>
             </React.Fragment>
           );
         })}
-        <GridCell cols={2}>Metrics</GridCell>
-        {_.range(NUM_SCORERS).map(si => {
-          const scorersForThisRef = sortedScorers.filter(
-            s => s.scorerDim.scorerRef === uniqueScorerRefs[si]
-          );
-          const NUM_METRICS_IN_SCORER = scorersForThisRef.length;
-          const scorerRef = uniqueScorerRefs[si];
-          return (
-            <React.Fragment>
-              <GridCell rows={NUM_METRICS_IN_SCORER}>
-                <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} />
-              </GridCell>
-              {_.range(NUM_METRICS_IN_SCORER).map(mi => {
-                return (
-                  <React.Fragment>
-                    <GridCell
-                      style={{
-                        whiteSpace: 'nowrap',
-                      }}>
-                      {
-                        scorersForThisRef[mi].scorerDim.scoreKeyPath
-                          .split('.')
-                          .slice(-1)[0]
-                      }
-                    </GridCell>
-                  </React.Fragment>
-                );
-              })}
-            </React.Fragment>
-          );
-        })}
+        <GridCell
+          cols={2}
+          rows={NUM_METRICS + 1}
+          noPad
+          style={{
+            display: 'grid',
+            gridTemplateRows: 'subgrid',
+            gridTemplateColumns: 'subgrid',
+            position: 'sticky',
+            bottom: 0,
+            left: 0,
+            zIndex: 1,
+            backgroundColor: 'white',
+            border: 'none',
+          }}>
+          <GridCell cols={2}>Metrics</GridCell>
+          {_.range(NUM_SCORERS).map(si => {
+            const scorersForThisRef = sortedScorers.filter(
+              s => s.scorerDim.scorerRef === uniqueScorerRefs[si]
+            );
+            const NUM_METRICS_IN_SCORER = scorersForThisRef.length;
+            const scorerRef = uniqueScorerRefs[si];
+            return (
+              <React.Fragment>
+                <GridCell ref={leftRef} rows={NUM_METRICS_IN_SCORER}>
+                  <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} />
+                </GridCell>
+                {_.range(NUM_METRICS_IN_SCORER).map(mi => {
+                  return (
+                    <React.Fragment>
+                      <GridCell
+                        style={{
+                          whiteSpace: 'nowrap',
+                        }}>
+                        {
+                          scorersForThisRef[mi].scorerDim.scoreKeyPath
+                            .split('.')
+                            .slice(-1)[0]
+                        }
+                      </GridCell>
+                    </React.Fragment>
+                  );
+                })}
+              </React.Fragment>
+            );
+          })}
+        </GridCell>
       </GridContainer>
     </VerticalBox>
   );

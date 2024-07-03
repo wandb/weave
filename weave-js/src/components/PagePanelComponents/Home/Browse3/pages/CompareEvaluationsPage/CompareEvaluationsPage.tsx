@@ -29,7 +29,6 @@
  *    - [ ] Scatterplot filter should have 1-1 aspect ratio
  *    - [ ] Scatterplot Filter dimensions are not quite obvious
  *    - [ ] Scatterplot filter would benefit from a title / help text
- *    - [ ] Scatterplot Filter should not zoom, just show selection range
  */
 
 import {Box} from '@material-ui/core';

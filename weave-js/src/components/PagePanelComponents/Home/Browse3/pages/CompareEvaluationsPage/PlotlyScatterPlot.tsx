@@ -42,6 +42,7 @@ export const PlotlyScatterPlot: React.FC<{
   const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
       height: props.height,
+      // width: props.height,
       // showlegend: true,
       margin: {
         l: 20, // legend
@@ -50,6 +51,7 @@ export const PlotlyScatterPlot: React.FC<{
         t: 0,
         pad: 0,
       },
+      dragmode: 'select',
       xaxis: {
         // fixedrange: true,
         // title: props.xTitle,
@@ -93,18 +95,18 @@ export const PlotlyScatterPlot: React.FC<{
       Plotly.newPlot(current, plotlyData, plotlyLayout, plotlyConfig);
 
       // Set up event listener for relayout (zoom and range change)
-      (current as any).on('plotly_relayout', (eventData: any) => {
-        const newXMin = eventData['xaxis.range[0]'];
-        const newXMax = eventData['xaxis.range[1]'];
-        const newYMin = eventData['yaxis.range[0]'];
-        const newYMax = eventData['yaxis.range[1]'];
+      (current as any).on('plotly_selected', (eventData: any) => {
+        console.log('plotly_selected', eventData);
+        const newXMin = eventData.range.x[0];
+        const newXMax = eventData.range.x[1];
+        const newYMin = eventData.range.y[0];
+        const newYMax = eventData.range.y[1];
         props.onRangeChange(newXMin, newXMax, newYMin, newYMax);
-        // Reset to original range
       });
 
       // Clean up event listener on unmount
       return () => {
-        (current as any).removeAllListeners('plotly_relayout');
+        (current as any).removeAllListeners('plotly_selected');
       };
     }
     return () => {};
@@ -113,8 +115,10 @@ export const PlotlyScatterPlot: React.FC<{
   useEffect(() => {
     if (props.data && divRef.current != null) {
       Plotly.relayout(divRef.current, {
-        'xaxis.autorange': true,
-        'yaxis.autorange': true,
+        dragmode: 'zoom',
+      });
+      Plotly.relayout(divRef.current, {
+        dragmode: 'select',
       });
     }
   }, [props.data]);
