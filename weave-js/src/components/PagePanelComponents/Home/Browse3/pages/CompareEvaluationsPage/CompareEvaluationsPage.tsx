@@ -10,22 +10,22 @@
  * - [ ] (maybe) Verify that nested scorers are supported
  * - [ ] (maybe) "Comparison Table" should use Baseline model input for input fields, NOT the dataset input
  * Bugs:
+ * - [ ] (MUST) Bug: https://app.wandb.test/shawn/weave-hooman1/weave/compare-evaluations?evaluationCallIds=%5B%228e207ad2-272c-4a6b-851a-fecb0049eec2%22%2C%228dd66257-df66-471f-92ab-bf97ce9662e5%22%5D
  * - [ ] (MUST) Empty selection filter causes crash
  * - [ ] (MUST)`isProbablyXCall` is incorrect - at least the predict one (eg. for infer_method_names in ("predict", "infer", "forward"):)
  * - [ ] (Probably) Selection Filter seems to reset periodically? on data refresh - also on page resize?
- * - [ ] Bug: https://app.wandb.test/shawn/weave-hooman1/weave/compare-evaluations?evaluationCallIds=%5B%228e207ad2-272c-4a6b-851a-fecb0049eec2%22%2C%228dd66257-df66-471f-92ab-bf97ce9662e5%22%5D
  * Bigger Features:
  * Comparison Table:
  * - [ ] (MUST) Need to finalize how to handle the comparison table - I have a few options, settle on one
- * - [ ] Add a trace link
- * - [ ] Big table pinning of the output
- * - [ ] Add link to scorer in the compare table
- *
+ * - [ ] (MUST) Add a trace link
+ * - [ ] (MUST) Add link to scorer in the compare table
+ * - [ ] (MUST) Evaluation pinning pushes summary off screen
  * Smaller Features:
+ * - [ ] (MUST) Move toggle to the properties section similar to run comparer
  * - [ ] (MUST) Reflect local state in URL (dimension, range, & selection)
+ * - [ ] (MUST) Sort example results to be absolute value of difference of primary metric
  * - [ ] (maybe) Refs in Model Property table should be expanded. Example:  https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22bf5188ba-48cd-4c6d-91ea-e25464570c13%22%2C%222f4544f3-9649-487e-b083-df6985e21b12%22%2C%228cbeccd6-6ff7-4eac-a305-6fb6450530f1%22%5D
  * - [ ] (maybe) Arrays are not supported well in the model property table or the call table. Example: https://app.wandb.test/wandb-smle/weave-rag-lc-demo/weave/compare-evaluations?evaluationCallIds=%5B%2221e8ea02-3109-434c-95d0-cb2c7c542f74%22%5D&peekPath=%2Fwandb-smle%2Fweave-rag-lc-demo%2Fcalls%2F21e8ea02-3109-434c-95d0-cb2c7c542f74
- * - [ ] Sort inputs be absolute value of difference
  * Performance:
  * - [ ] (probably) Audit the queries to determine areas of improvement and parallelization
  * Styling / UX:
@@ -33,16 +33,14 @@
  * - [ ] (maybe) Should pull in EvaluationCall display name if it exists
  * - Scatterplot Filter UX
  *    - [ ] (MUST) Scatterplot Scale dot to number of points
- *    - [ ] Axis dimension needs unit
- *    - [ ] Dimension Lables
- *    - [ ] Half Width (and add latency as a second)
+ *    - [ ] (MUST) Axis dimension needs unit
+ *    - [ ] (MUST) Axis Labels
+ *    - [ ] (MUST) Half Width (and add latency as a second)
  *    - [ ] (probably) Scatterplot Filter dimensions are not quite obvious
  *    - [ ] (probably) Scatterplot filter would benefit from a title / help text
  *    - [ ] (maybe) Scatterplot filter should have 1-1 aspect ratio
  * Implementation Tasks:
  * - [ ] (MUST) Code Cleanup: There is a lot of dead / messy code
- * Shawn Feedback
- * - Move toggle to the properties section similar to run comparer
  */
 
 import {Box} from '@material-ui/core';
