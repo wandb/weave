@@ -6,19 +6,20 @@ import styled from 'styled-components';
 import {MOON_100, MOON_300} from '../../../../../../common/css/color.styles';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {Button} from '../../../../../Button';
+import {Pill, TagColorName} from '../../../../../Tag';
 import {CellValue} from '../../../Browse2/CellValue';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../Browse2/SmallRef';
-import {isRef} from '../common/util';
+import {ValueViewNumber} from '../CallPage/ValueViewNumber';
 import {useCompareEvaluationsState} from './compareEvaluationsContext';
 import {removePrefix, useFilteredAggregateRows} from './comparisonTableUtil';
+import {SIGNIFICANT_DIGITS} from './constants';
 import {EvaluationCallLink} from './EvaluationDefinition';
+import {ICValueView} from './InputComparison';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {EvaluationComparisonState} from './types';
-import {ICValueView} from './InputComparison';
-import {SIGNIFICANT_DIGITS} from './constants';
-import {Pill, TagColorName} from '../../../../../Tag';
-import {ValueViewNumber} from '../CallPage/ValueViewNumber';
+
+const MIN_OUTPUT_WIDTH = 500;
 
 const GridCell = styled.div<{cols?: number; rows?: number; noPad?: boolean}>`
   border: 1px solid ${MOON_300};
@@ -28,25 +29,11 @@ const GridCell = styled.div<{cols?: number; rows?: number; noPad?: boolean}>`
   /* min-width: 100px; */
 `;
 
-const GridHeaderCell = styled.div<{cols?: number; rows?: number}>`
-  border: 1px solid ${MOON_300};
-  background-color: ${MOON_100};
-  position: sticky;
-  top: 0;
-  grid-column-end: span ${props => props.cols || 1};
-  grid-row-end: span ${props => props.rows || 1};
-  z-index: 1;
-`;
 const GridContainer = styled.div<{numColumns: number}>`
   display: grid;
   /* grid-template-columns: ${props => '1fr '.repeat(props.numColumns)}; */
   /* grid-gap: 10px; */
 `;
-
-const verticalStyle: React.CSSProperties = {
-  writingMode: 'vertical-rl',
-  transform: 'rotate(180deg)',
-};
 
 export const InputComparison2: React.FC<{
   state: EvaluationComparisonState;
@@ -96,8 +83,8 @@ export const InputComparison2: React.FC<{
   const NUM_INPUT_PROPS = inputColumnKeys.length;
   const NUM_OUTPUT_KEYS = outputColumnKeys.length;
   const NUM_EVALS = leafDims.length;
-  const FREE_TEXT_COL_NDX = 2;
-  const TOTAL_ROWS = NUM_INPUT_PROPS + NUM_OUTPUT_KEYS * NUM_EVALS;
+  //   const FREE_TEXT_COL_NDX = 2;
+  //   const TOTAL_ROWS = NUM_INPUT_PROPS + NUM_OUTPUT_KEYS * NUM_EVALS;
 
   const [selectedTrials, setSelectedTrials] = React.useState<{
     [evalCallId: string]: number;
@@ -159,7 +146,9 @@ export const InputComparison2: React.FC<{
           //   }, min-content`,
           //   gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) repeat(${TOTAL_ROWS} 1fr) `,
         }}>
-        <GridCell rows={NUM_INPUT_PROPS}>Input Ref</GridCell>
+        <GridCell rows={NUM_INPUT_PROPS}>
+          <SmallRef objRef={inputRef} allowShrink />
+        </GridCell>
         {_.range(NUM_INPUT_PROPS).map(ii => {
           return (
             <React.Fragment>
@@ -183,7 +172,11 @@ export const InputComparison2: React.FC<{
           {_.range(NUM_EVALS).map(ei => {
             const currEvalCallId = leafDims[ei];
             return (
-              <GridCell cols={2}>
+              <GridCell
+                cols={2}
+                style={{
+                  minWidth: MIN_OUTPUT_WIDTH,
+                }}>
                 <EvaluationCallLink
                   callId={currEvalCallId}
                   state={props.state}

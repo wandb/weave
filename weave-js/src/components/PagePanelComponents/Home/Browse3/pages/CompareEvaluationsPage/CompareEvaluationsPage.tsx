@@ -57,12 +57,12 @@ import {CompareEvaluationsCallsTable} from './ExampleComparisonTable';
 import {CompareEvaluationsCallsTableBig} from './ExampleComparisonTableBig';
 import {RangeSelection} from './initialize';
 import {InputComparison} from './InputComparison';
+import {InputComparison2} from './InputComparison2';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 import {SummaryPlots} from './SummaryPlots';
 import {EvaluationComparisonState} from './types';
-import {InputComparison2} from './InputComparison2';
 
 type CompareEvaluationsPageProps = {
   entity: string;
