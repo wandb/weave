@@ -62,6 +62,7 @@ import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 import {SummaryPlots} from './SummaryPlots';
 import {EvaluationComparisonState} from './types';
+import {InputComparison2} from './InputComparison2';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -269,6 +270,7 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
         <Tab label="Dense Table with Child Table" value={0} />
         <Tab label="Hacked Multi-Row Big Table" value={1} />
         <Tab label="Report Card Pager" value={2} />
+        <Tab label="Report Card Pager (Different Layout)" value={3} />
       </Tabs>
       <Box
         sx={{
@@ -278,6 +280,7 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
         {selectedTab === 0 && <CompareEvaluationsCallsTable state={state} />}
         {selectedTab === 1 && <CompareEvaluationsCallsTableBig state={state} />}
         {selectedTab === 2 && <InputComparison state={state} />}
+        {selectedTab === 3 && <InputComparison2 state={state} />}
       </Box>
     </VerticalBox>
   );

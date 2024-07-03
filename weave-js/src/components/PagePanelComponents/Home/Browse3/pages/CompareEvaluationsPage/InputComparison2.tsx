@@ -15,6 +15,7 @@ import {removePrefix, useFilteredAggregateRows} from './comparisonTableUtil';
 import {EvaluationCallLink} from './EvaluationDefinition';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {EvaluationComparisonState} from './types';
+import {ICValueView} from './InputComparison';
 
 const GridCell = styled.div<{cols?: number; rows?: number; noPad?: boolean}>`
   border: 1px solid ${MOON_300};
@@ -44,7 +45,7 @@ const verticalStyle: React.CSSProperties = {
   transform: 'rotate(180deg)',
 };
 
-export const InputComparison: React.FC<{
+export const InputComparison2: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const {filteredRows, inputColumnKeys, outputColumnKeys, scoreMap, leafDims} =
@@ -279,11 +280,11 @@ export const InputComparison: React.FC<{
                         style={{
                           display: 'grid',
                           gridTemplateColumns: 'subgrid',
+                          // maxHeight: '300px',
+                          overflow: 'auto',
                           gridTemplateRows: `repeat(${
                             NUM_TRIALS + 1
                           }, min-content)`,
-                          // maxHeight: '300px',
-                          overflow: 'auto',
                         }}>
                         <GridHeaderCell></GridHeaderCell>
                         {_.range(NUM_METRICS).map(mi => {
@@ -351,56 +352,4 @@ export const InputComparison: React.FC<{
       </GridContainer>
     </VerticalBox>
   );
-};
-
-// {_.range(NUM_COLS - NUM_METRIC_COLS).map(i => {
-//     return (
-//       <GridHeaderCell
-//         style={
-//           {
-//             //   height: HEADER_HEIGHT,
-//           }
-//         }>
-//         {/* Cell {i} */}
-//       </GridHeaderCell>
-//     );
-//   })}
-//   <GridHeaderCell
-//     cols={NUM_METRIC_COLS}
-//     style={{
-//       zIndex: 2,
-//       //   height: HEADER_HEIGHT,
-//     }}>
-//     Metrics
-//   </GridHeaderCell>
-
-export const ICValueView: React.FC<{value: any}> = ({value}) => {
-  let text = '';
-  if (value == null) {
-    return <NotApplicable />;
-  } else if (typeof value === 'object') {
-    text = JSON.stringify(value || {}, null, 2);
-  } else if (typeof value === 'string' && isRef(value)) {
-    return <SmallRef objRef={parseRef(value)} allowShrink />;
-  } else {
-    text = value.toString();
-  }
-
-  text = trimWhitespace(text);
-
-  return (
-    <pre
-      style={{
-        whiteSpace: 'pre-wrap',
-        textAlign: 'left',
-        wordBreak: 'break-all',
-      }}>
-      {text}
-    </pre>
-  );
-};
-
-const trimWhitespace = (str: string) => {
-  // Trim leading and trailing whitespace
-  return str.replace(/^\s+|\s+$/g, '');
 };
