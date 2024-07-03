@@ -160,6 +160,7 @@ export const CallDetails: FC<{
               }}
               entity={call.entity}
               project={call.project}
+              filters={[]}
             />
           );
           if (isPeeking) {

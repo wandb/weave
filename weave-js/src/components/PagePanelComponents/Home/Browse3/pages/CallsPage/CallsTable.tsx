@@ -6,10 +6,11 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {Autocomplete, Chip, FormControl, ListItem} from '@mui/material';
+import {Autocomplete, Chip} from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
-  GridApiPro,
+  GRID_CHECKBOX_SELECTION_COL_DEF,
+  GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
   GridPinnedColumns,
@@ -31,7 +32,9 @@ import React, {
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
-import {WeaveHeaderExtrasContext} from '../../context';
+import {useClosePeek, WeaveHeaderExtrasContext} from '../../context';
+import {FilterBar} from '../../filters/FilterBar';
+import {Filters} from '../../filters/types';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
@@ -50,6 +53,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {useCallsTableColumns} from './callsTableColumns';
 import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
@@ -60,6 +64,7 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
+import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 
@@ -71,6 +76,13 @@ export const CallsTable: FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
+
+  filters: Filters;
+  onSetFilters: (filters: Filters) => void;
+
+  columnVisibilityModel: GridColumnVisibilityModel;
+  setColumnVisibilityModel: (newModel: GridColumnVisibilityModel) => void;
+
   hideControls?: boolean;
 }> = ({
   entity,
@@ -79,20 +91,15 @@ export const CallsTable: FC<{
   onFilterUpdate,
   frozenFilter,
   hideControls,
+  filters,
+  onSetFilters,
+  columnVisibilityModel,
+  setColumnVisibilityModel,
 }) => {
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
-
-  // Register Export Button
-  useEffect(() => {
-    addExtra('exportRunsTableButton', {
-      node: <ExportRunsTableButton tableRef={apiRef} />,
-    });
-
-    return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, addExtra, removeExtra]);
 
   // Table State consists of:
   // 1. Filter (Structured Filter)
@@ -283,7 +290,9 @@ export const CallsTable: FC<{
 
   // DataGrid Model Management
   const [pinnedColumnsModel, setPinnedColumnsModel] =
-    useState<GridPinnedColumns>({left: ['op_name', 'feedback']});
+    useState<GridPinnedColumns>({
+      left: [GRID_CHECKBOX_SELECTION_COL_DEF.field, 'op_name', 'feedback'],
+    });
 
   // END OF CPR FACTORED CODE
 
@@ -316,6 +325,17 @@ export const CallsTable: FC<{
     }
   }, [rowIds, peekId]);
 
+  const closePeek = useClosePeek();
+  const onRowSelectionModelChange = (
+    newRowSelectionModel: GridRowSelectionModel
+  ) => {
+    console.log({newRowSelectionModel});
+    setRowSelectionModel(newRowSelectionModel);
+    if (newRowSelectionModel.length !== 1) {
+      closePeek();
+    }
+  };
+
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
     setFilter({});
@@ -330,6 +350,13 @@ export const CallsTable: FC<{
     project
   );
 
+  // Called in reaction to Hide column menu
+  const onColumnVisibilityModelChange = (
+    newModel: GridColumnVisibilityModel
+  ) => {
+    setColumnVisibilityModel(newModel);
+  };
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -339,49 +366,50 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <>
-          <ListItem sx={{minWidth: '190px'}}>
-            <FormControl fullWidth>
-              <Autocomplete
-                PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-                size="small"
-                // Temp disable multiple for simplicity - may want to re-enable
-                // multiple
-                limitTags={1}
-                disabled={Object.keys(frozenFilter ?? {}).includes(
-                  'opVersions'
-                )}
-                value={selectedOpVersionOption}
-                onChange={(event, newValue) => {
-                  if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
-                    setFilter({
-                      ...filter,
-                      opVersionRefs: [],
-                    });
-                  } else {
-                    setFilter({
-                      ...filter,
-                      opVersionRefs: newValue ? [newValue] : [],
-                    });
-                  }
-                }}
-                renderInput={renderParams => (
-                  <StyledTextField
-                    {...renderParams}
-                    label={OP_FILTER_GROUP_HEADER}
-                    sx={{maxWidth: '350px'}}
-                  />
-                )}
-                getOptionLabel={option => {
-                  return opVersionOptions[option]?.title ?? 'loading...';
-                }}
-                disableClearable={
-                  selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
+          <div style={{minWidth: 190, width: 320}}>
+            <Autocomplete
+              PaperComponent={paperProps => <StyledPaper {...paperProps} />}
+              size="small"
+              // Temp disable multiple for simplicity - may want to re-enable
+              // multiple
+              limitTags={1}
+              disabled={Object.keys(frozenFilter ?? {}).includes('opVersions')}
+              value={selectedOpVersionOption}
+              onChange={(event, newValue) => {
+                if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
+                  setFilter({
+                    ...filter,
+                    opVersionRefs: [],
+                  });
+                } else {
+                  setFilter({
+                    ...filter,
+                    opVersionRefs: newValue ? [newValue] : [],
+                  });
                 }
-                groupBy={option => opVersionOptions[option]?.group}
-                options={Object.keys(opVersionOptions)}
-              />
-            </FormControl>
-          </ListItem>
+              }}
+              renderInput={renderParams => (
+                <StyledTextField
+                  {...renderParams}
+                  label={OP_FILTER_GROUP_HEADER}
+                  sx={{maxWidth: '350px'}}
+                />
+              )}
+              getOptionLabel={option => {
+                return opVersionOptions[option]?.title ?? 'loading...';
+              }}
+              disableClearable={
+                selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
+              }
+              groupBy={option => opVersionOptions[option]?.group}
+              options={Object.keys(opVersionOptions)}
+            />
+          </div>
+          <FilterBar
+            filters={filters}
+            columnInfo={columns}
+            onSetFilters={onSetFilters}
+          />
           {selectedInputObjectVersion && (
             <Chip
               label={`Input: ${objectVersionNiceString(
@@ -419,6 +447,32 @@ export const CallsTable: FC<{
               }}
             />
           )}
+          <div style={{flex: '1 1 auto'}} />
+          <div>
+            <ManageColumnsButton
+              columnInfo={columns}
+              columnVisibilityModel={columnVisibilityModel}
+              setColumnVisibilityModel={setColumnVisibilityModel}
+            />
+            <Button
+              variant="ghost"
+              icon="share-export"
+              tooltip="Export"
+              onClick={() => apiRef.current?.exportDataAsCsv()}
+            />
+            <Button
+              variant="ghost"
+              icon="database-artifacts"
+              tooltip="Add to dataset"
+              disabled={rowSelectionModel.length === 0}
+            />
+            <Button
+              variant="ghost"
+              icon="delete"
+              tooltip="Delete selected"
+              disabled={rowSelectionModel.length === 0}
+            />
+          </div>
         </>
       }>
       <StyledDataGrid
@@ -447,10 +501,8 @@ export const CallsTable: FC<{
         loading={callsLoading}
         rows={tableData}
         // initialState={initialState}
-        // onColumnVisibilityModelChange={newModel =>
-        //   setColumnVisibilityModel(newModel)
-        // }
-        // columnVisibilityModel={columnVisibilityModel}
+        columnVisibilityModel={columnVisibilityModel}
+        onColumnVisibilityModelChange={onColumnVisibilityModelChange}
         // SORT SECTION START
         sortingMode="server"
         sortModel={sortModel}
@@ -474,9 +526,9 @@ export const CallsTable: FC<{
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
+        onRowSelectionModelChange={onRowSelectionModelChange}
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
-        hideFooterSelectedRowCount
         onColumnWidthChange={newCol => {
           setUserDefinedColumnWidths(curr => {
             return {
@@ -490,6 +542,7 @@ export const CallsTable: FC<{
         sx={{
           borderRadius: 0,
         }}
+        checkboxSelection={true}
         slots={{
           noRowsOverlay: () => {
             if (callsLoading) {
@@ -541,6 +594,7 @@ export const CallsTable: FC<{
               </Box>
             );
           },
+          columnMenu: CallsCustomColumnMenu,
         }}
       />
     </FilterLayoutTemplate>
@@ -609,25 +663,3 @@ const getPeekId = (peekPath: string | null): string | null => {
   const {pathname} = url;
   return pathname.split('/').pop() ?? null;
 };
-
-const ExportRunsTableButton = ({
-  tableRef,
-}: {
-  tableRef: React.MutableRefObject<GridApiPro>;
-}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className="mx-16"
-      size="medium"
-      variant="secondary"
-      onClick={() => tableRef.current?.exportDataAsCsv()}
-      icon="export-share-upload">
-      Export to CSV
-    </Button>
-  </Box>
-);

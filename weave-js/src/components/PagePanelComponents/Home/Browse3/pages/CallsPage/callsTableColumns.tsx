@@ -223,7 +223,7 @@ function buildCallsTableColumns(
       headerName: 'Feedback',
       width: 150,
       sortable: false,
-      filterable: false,
+      // filterable: false,
       renderCell: (rowParams: GridRenderCellParams) => {
         const rowIndex = rowParams.api.getRowIndexRelativeToVisibleRows(
           rowParams.id
@@ -276,11 +276,11 @@ function buildCallsTableColumns(
       headerName: 'Status',
       headerAlign: 'center',
       sortable: false,
-      disableColumnMenu: true,
-      resizable: false,
+      // disableColumnMenu: true,
+      // resizable: false,
       // Again, the underlying value is not obvious to the user,
       // so the default free-form filter is likely more confusing than helpful.
-      filterable: false,
+      // filterable: false,
       // type: 'singleSelect',
       // valueOptions: ['SUCCESS', 'ERROR', 'PENDING'],
       width: 59,
@@ -434,11 +434,11 @@ function buildCallsTableColumns(
     width: 50,
     // Might be confusing to enable as-is, because the user sees name /
     // email but the underlying data is userId.
-    filterable: false,
+    // filterable: false,
     align: 'center',
     sortable: false,
-    resizable: false,
-    disableColumnMenu: true,
+    // resizable: false,
+    // disableColumnMenu: true,
     renderCell: cellParams => {
       const userId = cellParams.row.wb_user_id;
       if (userId == null) {

@@ -9,6 +9,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
+import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {Loading} from '@wandb/weave/components/Loading';
@@ -50,6 +51,8 @@ import {
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
 } from './Browse3/context';
+import {Filters} from './Browse3/filters/types';
+import {parseFilters} from './Browse3/filters/util';
 import {FullPageButton} from './Browse3/FullPageButton';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
@@ -630,7 +633,7 @@ const CallPageBinding = () => {
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParams<Browse3TabParams>();
   const query = useURLSearchParamsDict();
-  const filters = useMemo(() => {
+  const initialFilters = useMemo(() => {
     if (tab === 'evaluations') {
       return {
         frozen: true,
@@ -654,7 +657,44 @@ const CallsPageBinding = () => {
       return {};
     }
   }, [query.filter, entity, project, tab]);
+
   const history = useHistory();
+
+  const filters = useMemo(() => {
+    return parseFilters(query.filters);
+  }, [query.filters]);
+
+  const onSetFilters = (filters: Filters) => {
+    const newQuery = new URLSearchParams(location.search);
+    if (filters.length === 0) {
+      newQuery.delete('filters');
+    } else {
+      newQuery.set('filters', JSON.stringify(filters));
+    }
+    history.push({search: newQuery.toString()});
+  };
+
+  const columnVisibilityModel = useMemo(() => {
+    try {
+      return JSON.parse(query.show);
+    } catch (e) {
+      return {};
+    }
+  }, [query.show]);
+  const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    newQuery.set('show', JSON.stringify(newModel));
+    history.push({search: newQuery.toString()});
+  };
+
+  // +  //   const newQuery = new URLSearchParams(location.search);
+  // +  //   if (newFilterModel.items.length === 0) {
+  // +  //     newQuery.delete('filter');
+  // +  //   } else {
+  // +  //     newQuery.set('filter', JSON.stringify(newFilterModel));
+  // +  //   }
+  // +  //   history.push({search: newQuery.toString()});
+
   const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
@@ -666,8 +706,12 @@ const CallsPageBinding = () => {
     <CallsPage
       entity={entity}
       project={project}
-      initialFilter={filters}
+      initialFilter={initialFilters}
       onFilterUpdate={onFilterUpdate}
+      filters={filters}
+      onSetFilters={onSetFilters}
+      columnVisibilityModel={columnVisibilityModel}
+      setColumnVisibilityModel={setColumnVisibilityModel}
     />
   );
 };
