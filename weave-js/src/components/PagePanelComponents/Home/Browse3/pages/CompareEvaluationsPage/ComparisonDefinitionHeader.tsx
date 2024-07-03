@@ -48,7 +48,7 @@ export const DimensionPicker: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const currDimension = props.state.comparisonDimension;
-  const dimensions = useEvaluationCallDimensions(props.state);
+  const dimensions = Object.values(props.state.data.scoreDimensions);
   const {setComparisonDimension} = useCompareEvaluationsState();
   // console.log(dimensions);
   const dimensionMap = useMemo(() => {

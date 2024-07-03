@@ -4,12 +4,9 @@ import {useMemo} from 'react';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import { getOrderedCallIds } from './ecpState';
 import {useEvaluationCallDimensions} from './ecpState';
-import {ScoreDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
+import { scoreIdFromScoreDimension } from './ecpUtil';
 
-const scoreIdFromScoreDimension = (dim: ScoreDimension): string => {
-  return dim.scorerRef + '@' + dim.scoreKeyPath;
-};
 type FlattenedRow = {
   id: string;
   evaluationCallId: string;
@@ -99,7 +96,7 @@ const filterNones = (list: any[]) => {
 };
 export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
-  const scores = useEvaluationCallDimensions(state);
+  const scores = Object.values(state.data.scoreDimensions);
   const scoreMap = useMemo(() => {
     return Object.fromEntries(
       scores.map(score => [scoreIdFromScoreDimension(score), score])

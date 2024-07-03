@@ -2,7 +2,6 @@ import {
   TraceCallSchema,
   TraceObjSchema,
 } from '../wfReactInterface/traceServerClient';
-import {RangeSelection} from './ecpState';
 
 export type EvaluationComparisonState = {
   data: EvaluationComparisonData;
@@ -137,6 +136,7 @@ export type EvaluationComparisonData = {
       };
     };
   };
+  scoreDimensions: {[scoreDimensionId: string]: ScoreDimension}
 };
 type PredictAndScoreCall = {
   callId: string;
@@ -155,4 +155,5 @@ type PredictAndScoreCall = {
     [scorerRef: string]: ScoreResults;
   };
   _rawPredictAndScoreTraceData: TraceCallSchema;
-};
+};export type RangeSelection = { [evalCallId: string]: { min: number; max: number; }; };
+

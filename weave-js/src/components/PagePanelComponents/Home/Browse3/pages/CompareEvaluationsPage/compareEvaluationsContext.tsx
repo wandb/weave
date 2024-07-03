@@ -2,7 +2,8 @@ import {Box, LinearProgress} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
 import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
-import {RangeSelection, useEvaluationComparisonState} from './ecpState';
+import {useEvaluationComparisonState} from './ecpState';
+import {RangeSelection} from './ecpTypes';
 import {ScoreDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
 

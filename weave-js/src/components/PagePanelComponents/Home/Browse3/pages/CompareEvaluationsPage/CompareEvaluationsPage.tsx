@@ -60,7 +60,7 @@ import {
 } from './compareEvaluationsContext';
 import {ComparisonDefinition} from './ComparisonDefinitionHeader';
 import {STANDARD_PADDING} from './ecpConstants';
-import {RangeSelection} from './ecpState';
+import {RangeSelection} from './ecpTypes';
 import {ScoreDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
 import {InputComparison2} from './InputComparison2';

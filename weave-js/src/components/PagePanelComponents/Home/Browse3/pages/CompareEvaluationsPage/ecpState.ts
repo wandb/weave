@@ -17,8 +17,8 @@ import {
 } from './ecpTypes';
 import {ScoreDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
-
-export type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
+import { RangeSelection } from './ecpTypes';
+import { scoreIdFromScoreDimension } from './ecpUtil';
 
 export const useEvaluationComparisonState = (
   entity: string,
@@ -29,39 +29,24 @@ export const useEvaluationComparisonState = (
   rangeSelection?: RangeSelection,
   selectedInputDigest?: string
 ): Loadable<EvaluationComparisonState> => {
-  const getTraceServerClient = useGetTraceServerClientContext();
-  const [data, setData] = useState<EvaluationComparisonData | null>(null);
-  const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
-  useEffect(() => {
-    setData(null);
-    let mounted = true;
-    fetchEvaluationComparisonData(
-      getTraceServerClient(),
-      entity,
-      project,
-      evaluationCallIdsMemo
-    ).then(dataRes => {
-      if (mounted) {
-        setData(dataRes);
-      }
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [entity, evaluationCallIdsMemo, project, getTraceServerClient]);
+  const data = useEvaluationComparisonData(
+    entity,
+    project,
+    evaluationCallIds
+  )
 
   const value = useMemo(() => {
-    if (data == null) {
+    if (data.result == null || data.loading) {
       return {loading: true, result: null};
     }
-    const dimensions = evaluationCallDimensions(data);
+
     return {
       loading: false,
       result: {
-        data,
+        data: data.result,
         baselineEvaluationCallId:
           baselineEvaluationCallId ?? evaluationCallIds[0],
-        comparisonDimension: comparisonDimension ?? dimensions[0],
+        comparisonDimension: comparisonDimension ?? Object.values(data.result.scoreDimensions)[0],
         rangeSelection: rangeSelection ?? {},
         selectedInputDigest,
       },
@@ -154,11 +139,47 @@ export const useEvaluationCallDimensions = (
   return useMemo(() => {
     return evaluationCallDimensions(state.data);
   }, [state.data]);
-};const pickColor = (ndx: number) => {
+};
+
+const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
 };
 
-export const fetchEvaluationComparisonData = async (
+export const useEvaluationComparisonData = (
+  entity: string,
+  project: string,
+  evaluationCallIds: string[]
+): Loadable<EvaluationComparisonData> => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const [data, setData] = useState<EvaluationComparisonData | null>(null);
+  const evaluationCallIdsMemo = useDeepMemo(evaluationCallIds);
+  useEffect(() => {
+    setData(null);
+    let mounted = true;
+    fetchEvaluationComparisonData(
+      getTraceServerClient(),
+      entity,
+      project,
+      evaluationCallIdsMemo
+    ).then(dataRes => {
+      if (mounted) {
+        setData(dataRes);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [entity, evaluationCallIdsMemo, project, getTraceServerClient]);
+
+  return useMemo(() => {
+    if (data == null) {
+      return {loading: true, result: null};
+    }
+    return {loading: false, result: data};
+  }, [data]);
+}
+
+const fetchEvaluationComparisonData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
   entity: string,
   project: string,
@@ -171,11 +192,10 @@ export const fetchEvaluationComparisonData = async (
     project,
     evaluationCalls: {},
     evaluations: {},
-    // datasets: {},
-    // scorers: {},
     inputs: {},
     models: {},
     resultRows: {},
+    scoreDimensions: {},
   };
   // 1. Fetch the evaluation calls
   // 2. For each evaluation:
@@ -466,6 +486,14 @@ export const fetchEvaluationComparisonData = async (
       }
     }
   });
+
+  
+  result.scoreDimensions = Object.fromEntries(evaluationCallDimensions(result).map(dim => {
+    return [
+      scoreIdFromScoreDimension(dim),
+      dim,
+    ]
+  }))
 
   return result;
 };
