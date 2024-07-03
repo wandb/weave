@@ -3,6 +3,8 @@ import React, {useMemo} from 'react';
 import {ScoreDimension} from './evaluations';
 import {RangeSelection, useInitialState} from './initialize';
 import {EvaluationComparisonState} from './types';
+import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
+import {Box, LinearProgress} from '@material-ui/core';
 // import FullScreenLoader from './FullscreenLoader';
 
 const CompareEvaluationsContext = React.createContext<{
@@ -86,7 +88,12 @@ export const CompareEvaluationsProvider: React.FC<{
   ]);
 
   if (!value) {
-    return <>Loading...</>;
+    return (
+      <Box>
+        <WeaveLoader />
+        <LinearProgress variant="indeterminate" />
+      </Box>
+    );
   }
 
   return (

@@ -22,7 +22,6 @@
  * - [ ] Verify that nested scorers are supported
  * - [ ] Change "Target Metric" to an ordered list of metrics. Default to first metric + latency
  * Styling / UX:
- * - [ ] Add a better loading state
  * - [ ] Should pull in EvaluationCall display name if it exists
  * - [ ] Hover tooltip on charts to show values
  * - Scatterplot Filter UX
