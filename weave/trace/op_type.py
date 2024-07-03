@@ -201,15 +201,18 @@ def get_source_notebook_safe(fn: typing.Callable) -> str:
 
 
 def get_source_or_fallback(fn: typing.Callable) -> str:
-    missing_code_template = textwrap.dedent(
-        """
-        def op_fn(*args, **kwargs):  # type: ignore
-            # Code-capture unavailable for this op
-            pass
-        """
-    )
     if isinstance(fn, Op):
         fn = fn.resolve_fn
+
+    func_name = fn.__name__
+    sig = inspect.signature(fn)
+    sig_str = str(sig)
+    missing_code_template = textwrap.dedent(
+        f"""
+        def {func_name}{sig_str}:
+            ... # Code-capture unavailable for this op
+        """
+    )[1:]  # skip first newline char
 
     try:
         return get_source_notebook_safe(fn)

@@ -165,4 +165,6 @@ def decode_custom_obj(
         metadata={},
     )
     with artifact_fs.loading_artifact(art):
-        return load_instance_op(art, "obj")
+        res = load_instance_op(art, "obj")
+        res.art = art
+        return res
