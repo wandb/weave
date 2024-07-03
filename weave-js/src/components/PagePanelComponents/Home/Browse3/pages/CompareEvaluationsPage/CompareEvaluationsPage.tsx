@@ -44,7 +44,6 @@
  */
 
 import {Box} from '@material-ui/core';
-import {Tab, Tabs} from '@mui/material';
 // import {ToggleButton} from '@mui/material';
 import React, {FC, useCallback, useContext} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -64,10 +63,7 @@ import {
 import {ComparisonDefinition} from './ComparisonDefinitionHeader';
 import {STANDARD_PADDING} from './constants';
 import {ScoreDimension} from './evaluations';
-import {CompareEvaluationsCallsTable} from './ExampleComparisonTable';
-import {CompareEvaluationsCallsTableBig} from './ExampleComparisonTableBig';
 import {RangeSelection} from './initialize';
-import {InputComparison} from './InputComparison';
 import {InputComparison2} from './InputComparison2';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
@@ -245,7 +241,6 @@ const CompareEvaluationsPageInner: React.FC = props => {
 const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
   state,
 }) => {
-  const [selectedTab, setSelectedTab] = React.useState(0);
   return (
     <VerticalBox
       sx={{
