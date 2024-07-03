@@ -120,7 +120,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   totalTokens:
                     predictAndScoreRes._legacy_predictCall?.totalUsageTokens ?? 0,
                   scores: Object.fromEntries(
-                    Object.entries(state.data.scorerMetricDimensions).map(([scoreKey, scoreVal]) => {
+                    ([...Object.entries(state.data.scorerMetricDimensions), ...Object.entries(state.data.derivedMetricDimensions)]).map(([scoreKey, scoreVal]) => {
                       return [
                         scoreKey,
                         resolveDimensionValueForPASCall(
@@ -213,7 +213,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   if (typeof v === 'number') {
                     return v;
                   } else if (typeof v === 'boolean') {
-                    return v ? 100 : 0;
+                    return v ? 1 : 0;
                   } else {
                     return 0;
                   }

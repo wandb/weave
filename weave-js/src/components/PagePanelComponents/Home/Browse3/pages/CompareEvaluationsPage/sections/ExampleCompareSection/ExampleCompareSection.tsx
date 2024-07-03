@@ -18,7 +18,12 @@ import {isRef} from '../../../common/util';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpTypes';
-import {dimensionId, dimensionLabel} from '../../ecpUtil';
+import {
+  dimensionId,
+  dimensionLabel,
+  dimensionShouldMinimize,
+  dimensionUnit,
+} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {EvaluationCallLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
@@ -300,29 +305,32 @@ export const ExampleCompareSection: React.FC<{
                     </GridCell>
                   );
                 })}
-                {_.range(NUM_SCORERS).map(si => {
-                  // TODO: Add the derived metrics
-                  // TODO: Pill logic should be shared now
-                  const scorersForThisRef = sortedScorers.filter(
-                    s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
-                  );
-                  const NUM_METRICS_IN_SCORER = scorersForThisRef.length;
+                {_.range(NUM_SCORERS + 1).map(si => {
+                  const isScorerMetric = si < NUM_SCORERS;
+
+                  const dimensionsForThisScorer = isScorerMetric
+                    ? sortedScorers.filter(
+                        s =>
+                          s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
+                      )
+                    : derivedScorers;
+                  const NUM_METRICS_IN_SCORER = dimensionsForThisScorer.length;
                   return (
                     <React.Fragment>
                       {_.range(NUM_METRICS_IN_SCORER).map(mi => {
                         const isBaseline = ei === 0;
+                        const dimension = dimensionsForThisScorer[mi];
 
-                        const scoreId = dimensionId(scorersForThisRef[mi]);
+                        // TODO: Pill logic should be shared now
+                        const scoreId = dimensionId(dimension);
                         const summaryMetric =
                           target.scores[scoreId][currEvalCallId];
-                        const unit =
-                          scorersForThisRef[mi].scoreType === 'binary'
-                            ? '%'
-                            : '';
+                        const unit = dimensionUnit(dimension);
                         let color: TagColorName = 'moon';
                         const baseline = target.scores[scoreId][leafDims[0]];
                         const diff = summaryMetric - baseline;
-                        const lowerIsBetter = false;
+                        const lowerIsBetter =
+                          dimensionShouldMinimize(dimension);
                         if (diff > 0) {
                           if (!lowerIsBetter) {
                             color = 'green';
@@ -441,21 +449,26 @@ export const ExampleCompareSection: React.FC<{
             position: 'sticky',
             bottom: 0,
             left: 0,
-            zIndex: 1,
+            zIndex: 3,
             backgroundColor: 'white',
             border: 'none',
           }}>
           <GridCell cols={2}>Metrics</GridCell>
-          {_.range(NUM_SCORERS).map(si => {
-            const scorersForThisRef = sortedScorers.filter(
-              s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
-            );
-            const NUM_METRICS_IN_SCORER = scorersForThisRef.length;
+          {_.range(NUM_SCORERS + 1).map(si => {
+            const isScorerMetric = si < NUM_SCORERS;
+            const dimensionsForThisScorer = isScorerMetric
+              ? sortedScorers.filter(
+                  s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
+                )
+              : derivedScorers;
+            const NUM_METRICS_IN_SCORER = dimensionsForThisScorer.length;
             const scorerRef = uniqueScorerRefs[si];
             return (
               <React.Fragment>
                 <GridCell ref={leftRef} rows={NUM_METRICS_IN_SCORER}>
-                  <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} />
+                  {isScorerMetric && (
+                    <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} />
+                  )}
                 </GridCell>
                 {_.range(NUM_METRICS_IN_SCORER).map(mi => {
                   return (
@@ -464,7 +477,7 @@ export const ExampleCompareSection: React.FC<{
                         style={{
                           whiteSpace: 'nowrap',
                         }}>
-                        {dimensionLabel(scorersForThisRef[mi])}
+                        {dimensionLabel(dimensionsForThisScorer[mi])}
                       </GridCell>
                     </React.Fragment>
                   );
