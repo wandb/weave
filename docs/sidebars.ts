@@ -45,6 +45,7 @@ const sidebars: SidebarsConfig = {
             "guides/tracking/objects",
             "guides/tracking/ops",
             "guides/tracking/tracing",
+            "guides/tracking/feedback",
           ],
         },
         {
