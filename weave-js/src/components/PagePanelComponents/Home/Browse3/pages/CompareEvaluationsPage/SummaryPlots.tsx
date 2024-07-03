@@ -9,7 +9,7 @@ import {
   STANDARD_PADDING,
 } from './constants';
 import {evaluationMetrics} from './evaluations';
-import {HorizontalBox} from './Layout';
+import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 import {EvaluationComparisonState} from './types';
@@ -21,42 +21,58 @@ export const SummaryPlots: React.FC<{
   const plotlyRadarData = useNormalizedRadarPlotDataFromMetrics(props.state);
 
   return (
-    <HorizontalBox
+    <VerticalBox
       sx={{
         paddingLeft: STANDARD_PADDING,
         paddingRight: STANDARD_PADDING,
         flex: '1 1 auto',
         width: '100%',
       }}>
-      <Box
+      <HorizontalBox
         sx={{
-          flex: '1 0 auto',
-          height: PLOT_HEIGHT,
-          // width: PLOT_HEIGHT * 2,
-          borderRadius: BOX_RADIUS,
-          border: STANDARD_BORDER,
-          overflow: 'hidden',
-          alignContent: 'center',
-        }}>
-        <PlotlyRadarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
-        {/* <PlotlyRadarPlot /> */}
-        {/* // <PlotlyRadialPlot /> */}
-      </Box>
-      <Box
-        sx={{
-          flex: '1 1 auto',
-          height: PLOT_HEIGHT,
           width: '100%',
-          overflow: 'hidden',
-          borderRadius: BOX_RADIUS,
-          border: STANDARD_BORDER,
-          padding: PLOT_PADDING,
+          alignItems: 'center',
+          justifyContent: 'flex-start',
         }}>
-        <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
-      </Box>
+        <Box
+          sx={{
+            fontSize: '1.5em',
+            fontWeight: 'bold',
+          }}>
+          Summary Metrics
+        </Box>
+      </HorizontalBox>
+      <HorizontalBox>
+        <Box
+          sx={{
+            flex: '1 0 auto',
+            height: PLOT_HEIGHT,
+            // width: PLOT_HEIGHT * 2,
+            borderRadius: BOX_RADIUS,
+            border: STANDARD_BORDER,
+            overflow: 'hidden',
+            alignContent: 'center',
+          }}>
+          <PlotlyRadarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+          {/* <PlotlyRadarPlot /> */}
+          {/* // <PlotlyRadialPlot /> */}
+        </Box>
+        <Box
+          sx={{
+            flex: '1 1 auto',
+            height: PLOT_HEIGHT,
+            width: '100%',
+            overflow: 'hidden',
+            borderRadius: BOX_RADIUS,
+            border: STANDARD_BORDER,
+            padding: PLOT_PADDING,
+          }}>
+          <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+        </Box>
+      </HorizontalBox>
       {/* <RadarPlot plotlyRadarData={plotlyRadarData} />
             <BarPlots plotlyRadarData={plotlyRadarData}} /> */}
-    </HorizontalBox>
+    </VerticalBox>
   );
 };
 const normalizeValues = (values: number[]): number[] => {

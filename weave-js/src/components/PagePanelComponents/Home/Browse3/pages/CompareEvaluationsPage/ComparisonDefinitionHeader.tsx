@@ -36,18 +36,18 @@ export const ComparisonDefinition: React.FC<{
           </React.Fragment>
         );
       })}
-      <DefinitionText text="target metric " />
-      <DimensionPicker {...props} />
     </HorizontalBox>
   );
 };
-const DefinitionText: React.FC<{text: string}> = props => {
+export const DefinitionText: React.FC<{text: string}> = props => {
   return <Box>{props.text}</Box>;
 };
 const dimensionToText = (dim: ScoreDimension): string => {
   return dim.scorerRef + '/' + dim.scoreKeyPath;
 };
-const DimensionPicker: React.FC<{state: EvaluationComparisonState}> = props => {
+export const DimensionPicker: React.FC<{
+  state: EvaluationComparisonState;
+}> = props => {
   const currDimension = props.state.comparisonDimension;
   const dimensions = useEvaluationCallDimensions(props.state);
   const {setComparisonDimension} = useCompareEvaluationsState();

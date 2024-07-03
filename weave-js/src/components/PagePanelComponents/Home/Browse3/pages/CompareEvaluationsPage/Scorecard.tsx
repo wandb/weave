@@ -9,7 +9,7 @@ import {Pill, TagColorName} from '../../../../../Tag';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../CallPage/ValueViewNumber';
-import {STANDARD_PADDING} from './constants';
+import {BOX_RADIUS, STANDARD_BORDER, STANDARD_PADDING} from './constants';
 import {SIGNIFICANT_DIGITS} from './constants';
 import {EvaluationCallLink, EvaluationModelLink} from './EvaluationDefinition';
 import {
@@ -207,34 +207,50 @@ export const ScoreCard: React.FC<{
         paddingRight: STANDARD_PADDING,
         overflow: 'auto',
       }}>
+      <HorizontalBox
+        sx={{
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          marginBottom: '8px',
+        }}>
+        <Box
+          sx={{
+            fontSize: '1.5em',
+            fontWeight: 'bold',
+          }}>
+          Model Comparison
+        </Box>
+        <div
+          style={{
+            // fontWeight: 'bold',
+            // paddingRight: '10px',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            justifyContent: 'flex-end',
+            gap: '8px',
+            // border: '1px solid #ccc',
+            // borderRadius: '6px',
+          }}>
+          <span>Show all properties</span>
+          <Checkbox
+            checked={showDifferences}
+            onClick={() => setShowDifferences(v => !v)}
+          />
+        </div>
+      </HorizontalBox>
       <div
         style={{
           display: 'grid',
           gridTemplateColumns,
+          border: STANDARD_BORDER,
+          borderRadius: BOX_RADIUS,
           // gap: '16px',
         }}>
         {/* Header Row */}
         <GridCell></GridCell>
-        <GridCell>
-          <div
-            style={{
-              fontWeight: 'bold',
-              // paddingRight: '10px',
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: '8px',
-              // border: '1px solid #ccc',
-              // borderRadius: '6px',
-            }}>
-            <span>Show all properties</span>
-            <Checkbox
-              checked={showDifferences}
-              onClick={() => setShowDifferences(v => !v)}
-            />
-          </div>
-        </GridCell>
+        <GridCell></GridCell>
         {evalCallIds.map(evalCallId => {
           const modelRef =
             props.state.data.evaluationCalls[evalCallId].modelRef;

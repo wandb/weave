@@ -12,7 +12,6 @@
  * Bugs:
  * - [ ] Empty selection filter causes crash
  * - [ ] Selection Filter seems to reset periodically? on data refresh
- * - [ ] Plots do not respect the evaluation ordering
  * - [ ] `isProbablyXCall` is incorrect - at least the predict one (eg. for infer_method_names in ("predict", "infer", "forward"):)
  * Performance:
  * - [ ] Audit the queries to determine areas of improvement and parallelization
@@ -35,7 +34,7 @@
  *    - [ ] Scatterplot Filter should not zoom, just show selection range
  */
 
-import {Box} from '@material-ui/core';
+import {Box, Checkbox} from '@material-ui/core';
 import {ToggleButton} from '@mui/material';
 import React, {FC, useCallback, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -58,7 +57,7 @@ import {ScoreDimension} from './evaluations';
 import {CompareEvaluationsCallsTable} from './ExampleComparisonTable';
 import {CompareEvaluationsCallsTableBig} from './ExampleComparisonTableBig';
 import {RangeSelection} from './initialize';
-import {VerticalBox} from './Layout';
+import {HorizontalBox, VerticalBox} from './Layout';
 import {ScatterFilter} from './ScatterFilter';
 import {ScoreCard} from './Scorecard';
 import {SummaryPlots} from './SummaryPlots';
@@ -204,7 +203,6 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC = props => {
   const {state} = useCompareEvaluationsState();
-  const [bigRows, setBigRows] = React.useState(false);
 
   return (
     <Box
@@ -217,6 +215,7 @@ const CompareEvaluationsPageInner: React.FC = props => {
         sx={{
           paddingTop: STANDARD_PADDING,
           alignItems: 'flex-start',
+          gridGap: STANDARD_PADDING * 2,
         }}>
         <ComparisonDefinition state={state} />
         <SummaryPlots state={state} />
@@ -224,17 +223,62 @@ const CompareEvaluationsPageInner: React.FC = props => {
         {Object.keys(state.data.models).length === 2 && (
           <ScatterFilter state={state} />
         )}
-        <ToggleButton value={bigRows} onChange={() => setBigRows(!bigRows)}>
-          Toggle Big Rows
-        </ToggleButton>
-        {bigRows ? (
-          <CompareEvaluationsCallsTableBig state={state} />
-        ) : (
-          <CompareEvaluationsCallsTable state={state} />
-        )}
+        <ResultsSection state={state} />
         {/* <RowComparison state={state} /> */}
       </VerticalBox>
     </Box>
+  );
+};
+
+const ResultsSection: React.FC<{state: EvaluationComparisonState}> = ({
+  state,
+}) => {
+  const [bigRows, setBigRows] = React.useState(false);
+  return (
+    <VerticalBox
+      sx={{
+        width: '100%',
+        // paddingLeft: STANDARD_PADDING,
+        // paddingRight: STANDARD_PADDING,
+      }}>
+      <HorizontalBox
+        sx={{
+          paddingLeft: STANDARD_PADDING,
+          paddingRight: STANDARD_PADDING,
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          // marginBottom: '8px',
+        }}>
+        <Box
+          sx={{
+            fontSize: '1.5em',
+            fontWeight: 'bold',
+          }}>
+          Browse Results
+        </Box>
+        <div
+          style={{
+            // fontWeight: 'bold',
+            // paddingRight: '10px',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: '8px',
+            // border: '1px solid #ccc',
+            // borderRadius: '6px',
+          }}>
+          <span>Toggle Big Rows</span>
+          <Checkbox checked={bigRows} onClick={() => setBigRows(v => !v)} />
+        </div>
+      </HorizontalBox>
+      {bigRows ? (
+        <CompareEvaluationsCallsTableBig state={state} />
+      ) : (
+        <CompareEvaluationsCallsTable state={state} />
+      )}
+    </VerticalBox>
   );
 };
 

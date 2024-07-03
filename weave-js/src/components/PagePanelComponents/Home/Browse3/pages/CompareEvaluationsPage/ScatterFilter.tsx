@@ -8,6 +8,8 @@ import {EvaluationDefinition} from './EvaluationDefinition';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
 import {EvaluationComparisonState} from './types';
+import {Box} from '@material-ui/core';
+import {DefinitionText, DimensionPicker} from './ComparisonDefinitionHeader';
 
 export const ScatterFilter: React.FC<{
   state: EvaluationComparisonState;
@@ -140,6 +142,23 @@ export const ScatterFilter: React.FC<{
         paddingLeft: STANDARD_PADDING,
         paddingRight: STANDARD_PADDING,
       }}>
+      <HorizontalBox
+        sx={{
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          marginBottom: '8px',
+        }}>
+        <Box
+          sx={{
+            fontSize: '1.5em',
+            fontWeight: 'bold',
+          }}>
+          Result Filter
+        </Box>
+        {/* <DefinitionText text="target metric " /> */}
+        <DimensionPicker {...props} />
+      </HorizontalBox>
       {/* <Alert>Select a region to narrow the data</Alert> */}
       <VerticalBox
         sx={{
@@ -148,12 +167,12 @@ export const ScatterFilter: React.FC<{
           // border: STANDARD_BORDER,
         }}>
         {/* <ScatterDefinition {...props} /> */}
-        <HorizontalBox
+        {/* <HorizontalBox
           sx={{
             justifyContent: 'flex-start',
           }}>
           <EvaluationDefinition state={props.state} callId={compareCallId} />
-        </HorizontalBox>
+        </HorizontalBox> */}
         <PlotlyScatterPlot
           onRangeChange={onRangeChange}
           height={PLOT_HEIGHT}
@@ -161,12 +180,12 @@ export const ScatterFilter: React.FC<{
           xColor={xColor}
           yColor={yColor}
         />
-        <HorizontalBox
+        {/* <HorizontalBox
           sx={{
             justifyContent: 'flex-end',
           }}>
           <EvaluationDefinition state={props.state} callId={baselineCallId} />
-        </HorizontalBox>
+        </HorizontalBox> */}
       </VerticalBox>
     </VerticalBox>
   );
