@@ -42,9 +42,7 @@ reader = SimpleDirectoryReader(input_dir=docs_path)
 documents = reader.load_data(num_workers=4, show_progress=True)
 ```
 
-## Building the Vector Store
-
-### The Vector Embedding Model
+## The Vector Embedding Model
 
 Vector embeddings are essential in a RAG pipeline enabling efficient and semantically meaningful information retrieval from large datasets. Llamaindex offers a bundle of embedding model options ranging from both open-sourced models & LLM vendors. In this recipe, we're going to use the `BAAI/bge-small-en-v1.5` model from HuggingFace Hub as our embedding model using [`HuggingFaceEmbedding`](https://docs.llamaindex.ai/en/stable/examples/embeddings/huggingface/) from Llamaindex.
 
@@ -53,7 +51,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 ```
-### Chunking
+## Chunking
 
 Chunking plays a crucial role in a RAG pipeline by breaking down large documents or texts into smaller, manageable pieces or "chunks." This process allows the retrieval system to efficiently handle and search through extensive information by focusing on these smaller units rather than entire documents.
 
@@ -69,4 +67,40 @@ splitter = SemanticSplitterNodeParser(
     embed_model=embed_model
 )
 nodes = splitter.get_nodes_from_documents(documents)
+```
+
+## Building the Vector Index
+
+Now that the data is loaded, chunked and embedded; we need to now store it in a vector database. We're going to use `VectorStoreIndex` from LlamaIndex to create our vector store index. 
+
+We're going to pass the nodes that we created by semantically splitting the documents to the vector store index.
+
+```python
+from llama_index.core import Settings, VectorStoreIndex
+
+
+Settings.embed_model = embed_model
+
+# build vector index
+vector_index = VectorStoreIndex.from_documents(
+    documents,
+    show_progress=True,
+    node_parser=nodes
+)
+
+# store vector index locally
+vector_index.storage_context.persist(
+    persist_dir="./vector_embedding_storage"
+)
+```
+
+The `vector_index.storage_context.persist` creates a bunch of JSON files with vector embedding chunks. We're going to store this as a W&B artifact of type `vector_index` which can be easily reused during the querying.
+
+```python
+artifact = wandb.Artifact(
+    name="ncert-flamingoes-prose-embeddings", type="vector_index"
+)
+artifact.add_dir(local_path="./vector_embedding_storage")
+wandb.log_artifact(artifact)
+wandb.finish()
 ```
