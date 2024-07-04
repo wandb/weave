@@ -30,6 +30,12 @@ try:
 except ImportError:
     OPENAI_NOT_GIVEN = None
 
+try:
+    from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
+except ImportError:
+    ANTHROPIC_NOT_GIVEN = None
+
+
 
 def print_call_link(call: "Call") -> None:
     print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
@@ -241,7 +247,7 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
 
 
 def value_is_sentinel(param: Any) -> bool:
-    return param.default is None or param.default is OPENAI_NOT_GIVEN
+    return param.default is None or param.default is OPENAI_NOT_GIVEN or param.default is ANTHROPIC_NOT_GIVEN
 
 
 def _apply_fn_defaults_to_inputs(
