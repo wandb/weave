@@ -64,3 +64,34 @@ index = load_index_from_storage(
     storage_context, service_context=service_context
 )
 ```
+## Building the Query Engine
+
+Now that the vector store index has been loaded, it can be referenced to query over user prompts and build our chatbot.
+
+```python
+query_engine = index.as_query_engine(
+    service_context=service_context,
+    similarity_top_k=10,
+)
+```
+
+We can now query this query engine to fetch answers for question.
+
+```python
+import rich
+
+query = """In the story \"The Last Lesson\",
+what was the mood in the classroom when M. Hamel gave his last French lesson?
+"""
+response = query_engine.query(query).response
+
+rich.print(response)
+```
+
+The output is:
+
+```
+The mood in the classroom was one of solemnity and quiet, a marked departure from the typical boisterousness and 
+clamor that usually accompanied the start of a school day. The students were unusually focused, and there was an 
+underlying current of sadness and wistfulness as M. Hamel conducted his final French lesson.
+```

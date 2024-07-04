@@ -7,6 +7,7 @@
 First, let us install all the libraries that we would need to build the application.
 
 ```shell
+pip install -qU rich
 pip install -qU wandb weave
 pip install -qU llama-index
 pip install -qU llama-index-embeddings-huggingface
