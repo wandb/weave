@@ -836,7 +836,9 @@ def test_openai_as_context_manager(
 
     inputs = call.inputs
     assert inputs["model"] == "gpt-4o"
-    assert inputs["messages"] == [{"role": "user", "content": "Hello, I am context manager!"}]
+    assert inputs["messages"] == [
+        {"role": "user", "content": "Hello, I am context manager!"}
+    ]
 
     # usage information should be available even if `stream_options` is not set
     usage = call.summary["usage"][output["model"]]  # type: ignore
