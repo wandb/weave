@@ -49,6 +49,19 @@ const config: Config = {
     ],
   ],
 
+  plugins: [
+    [
+      '@laxels/docusaurus-plugin-segment',
+      {
+        apiKey: process.env.DOCS_SEGMENT_API_KEY,
+        host: 'wandb.ai',
+        ajsPath: '/sa-docs.min.js',
+        page: false,
+        excludeUserAgents: ['GoogleSecurityScanner'],
+      },
+    ],
+  ],
+  
   themeConfig: {
     // Replace with your project's social card
     image: "img/logo-large-padded.png",
