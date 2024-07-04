@@ -107,3 +107,7 @@ artifact.add_dir(local_path="./vector_embedding_storage")
 wandb.log_artifact(artifact)
 wandb.finish()
 ```
+
+| ![](./images/lineage.png) |
+|---|
+| Using W&B Artifacts to manage our datasets and vector store index is that it lets us version our data and track their dependencies. |

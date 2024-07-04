@@ -14,7 +14,7 @@ weave.init(project_name="groq-rag")
 
 ## Using GroqCloud LLMs with LlamaIndex
 
-GroqCloud is an LLM cloud service provider that lets us use open-source LLMs like Llama3, Mixtral, Gemma, etc. The GroqCloud models run on their propreitary **Language Processing Unit** or **LPU** which has a deterministic, single core streaming architecture that sets the standard for genAI inference speed with predictable and repeatable performance for any given workload.
+[GroqCloud](https://groq.com/) is an LLM cloud service provider that lets us use open-source LLMs like Llama3, Mixtral, Gemma, etc. The GroqCloud models run on their propreitary **Language Processing Unit** or **LPU** which has a deterministic, single core streaming architecture that sets the standard for genAI inference speed with predictable and repeatable performance for any given workload.
 
 We can use GroqCloud models with LlamaIndex:
 
@@ -80,7 +80,7 @@ We can now query this query engine to fetch answers for question.
 ```python
 import rich
 
-query = """In the story \"The Last Lesson\",
+query = """
 what was the mood in the classroom when M. Hamel gave his last French lesson?
 """
 response = query_engine.query(query).response
@@ -95,3 +95,7 @@ The mood in the classroom was one of solemnity and quiet, a marked departure fro
 clamor that usually accompanied the start of a school day. The students were unusually focused, and there was an 
 underlying current of sadness and wistfulness as M. Hamel conducted his final French lesson.
 ```
+
+| ![](./images/weave_dashboard.png) |
+|---|
+| Tracing is a powerful feature in [Weave](https://wandb.github.io/weave/guides/tracking/tracing) that allows you to track the inputs and outputs of functions seamlessly. Weave being integrated with LlamaIndex ensures that all LlamaIndex calls are traced automatically by including `weave.init()` before the calls. |
