@@ -87,6 +87,7 @@ const sidebars: SidebarsConfig = {
           link: { type: "doc", id: "guides/cookbooks/llamaindex_rag_ncert/intro" },
           items: [
             "guides/cookbooks/llamaindex_rag_ncert/vector_index",
+            "guides/cookbooks/llamaindex_rag_ncert/query_engine",
           ],
         }
       ],
