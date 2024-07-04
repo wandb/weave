@@ -1,6 +1,6 @@
 import os, json
 from typing import Any, Generator
-
+import asyncio
 
 import pytest
 import cohere
@@ -12,15 +12,6 @@ from weave.trace_server import trace_server_interface as tsi
 
 cohere_model = "command"  # You can change this to a specific model if needed
 
-@pytest.fixture
-def only_patch_cohere() -> Generator[None, None, None]:
-    reset_autopatch() # unpatch all other integrations.
-    cohere_patcher.attempt_patch()
-
-    try:
-        yield  # This is where the test using this fixture will run
-    finally:
-        autopatch()  # Ensures future tests have the patch applied
 
 def _get_call_output(call: tsi.CallSchema) -> Any:
     call_output = call.output
@@ -38,9 +29,9 @@ def test_cohere(
     client: weave.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("COHERE_API_KEY", "DUMMY_API_KEY")
-    
+
     cohere_client = cohere.Client(api_key=api_key)
-    
+
     response = cohere_client.chat(
         model=cohere_model,
         message="Hello, Cohere!",
@@ -61,6 +52,23 @@ def test_cohere(
     assert output.is_search_required == response.is_search_required
     assert output.search_queries == response.search_queries
     assert output.search_results == response.search_results
+    assert (
+        output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
+    )
+    assert (
+        output.meta.billed_units.output_tokens
+        == response.meta.billed_units.output_tokens
+    )
+    assert (
+        output.meta.billed_units.search_units == response.meta.billed_units.search_units
+    )
+    assert (
+        output.meta.billed_units.classifications
+        == response.meta.billed_units.classifications
+    )
+    assert output.meta.tokens.input_tokens == response.meta.tokens.input_tokens
+    assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -72,29 +80,152 @@ def test_cohere_stream(
 ) -> None:
     api_key = os.environ.get("COHERE_API_KEY", "DUMMY_API_KEY")
     cohere_client = cohere.Client(api_key=api_key)
-    
-    stream = cohere_client.chat(
+
+    stream = cohere_client.chat_stream(
         model=cohere_model,
         message="Hello, Cohere!",
         max_tokens=1024,
-        stream=True,
     )
 
-    all_content = ""
+    # they accumulate for us in the last message
     for event in stream:
-        all_content += event.text
+        pass
 
-    assert all_content.strip() != ""
+    response = event.response  # the NonStreamedChatResponse
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    assert output.text == all_content
-    assert output.generation_id is not None
+    assert output.text == response.text
+    assert output.generation_id == response.generation_id
     summary = call.summary
     assert summary is not None
-    model_usage = summary["usage"][model]
-    assert model_usage["requests"] == 1
-    assert output.token_count["prompt_tokens"] == model_usage["prompt_tokens"]
-    assert output.token_count["response_tokens"] == model_usage["response_tokens"]
+    assert output.generation_id == response.generation_id
+    assert output.citations == response.citations
+    assert output.documents == response.documents
+    assert output.is_search_required == response.is_search_required
+    assert output.search_queries == response.search_queries
+    assert output.search_results == response.search_results
+    assert (
+        output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
+    )
+    assert (
+        output.meta.billed_units.output_tokens
+        == response.meta.billed_units.output_tokens
+    )
+    assert (
+        output.meta.billed_units.search_units == response.meta.billed_units.search_units
+    )
+    assert (
+        output.meta.billed_units.classifications
+        == response.meta.billed_units.classifications
+    )
+    assert output.meta.tokens.input_tokens == response.meta.tokens.input_tokens
+    assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+async def test_cohere_async(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    api_key = os.environ.get("COHERE_API_KEY", "DUMMY_API_KEY")
+
+    cohere_client = cohere.AsyncClient(api_key=api_key)
+
+    response = await cohere_client.chat(
+        model=cohere_model,
+        message="Hello, Async Cohere!",
+        max_tokens=1024,
+    )
+
+    exp = response.text
+    assert exp.strip() != ""
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.text == exp
+    assert output.generation_id == response.generation_id
+    assert output.citations == response.citations
+    assert output.documents == response.documents
+    assert output.is_search_required == response.is_search_required
+    assert output.search_queries == response.search_queries
+    assert output.search_results == response.search_results
+    assert (
+        output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
+    )
+    assert (
+        output.meta.billed_units.output_tokens
+        == response.meta.billed_units.output_tokens
+    )
+    assert (
+        output.meta.billed_units.search_units == response.meta.billed_units.search_units
+    )
+    assert (
+        output.meta.billed_units.classifications
+        == response.meta.billed_units.classifications
+    )
+    assert output.meta.tokens.input_tokens == response.meta.tokens.input_tokens
+    assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+async def test_cohere_async_stream(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    api_key = os.environ.get("COHERE_API_KEY", "DUMMY_API_KEY")
+    cohere_client = cohere.AsyncClient(api_key=api_key)
+
+    stream = cohere_client.chat_stream(
+        model=cohere_model,
+        message="Hello, Async Cohere Stream!",
+        max_tokens=1024,
+    )
+
+    async for event in stream:
+        pass
+
+    response = event.response  # the NonStreamedChatResponse
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.text == response.text
+    assert output.generation_id == response.generation_id
+    summary = call.summary
+    assert summary is not None
+    assert output.generation_id == response.generation_id
+    assert output.citations == response.citations
+    assert output.documents == response.documents
+    assert output.is_search_required == response.is_search_required
+    assert output.search_queries == response.search_queries
+    assert output.search_results == response.search_results
+    assert (
+        output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
+    )
+    assert (
+        output.meta.billed_units.output_tokens
+        == response.meta.billed_units.output_tokens
+    )
+    assert (
+        output.meta.billed_units.search_units == response.meta.billed_units.search_units
+    )
+    assert (
+        output.meta.billed_units.classifications
+        == response.meta.billed_units.classifications
+    )
+    assert output.meta.tokens.input_tokens == response.meta.tokens.input_tokens
+    assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens

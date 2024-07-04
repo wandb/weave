@@ -9,68 +9,60 @@ if typing.TYPE_CHECKING:
     from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
     from cohere.types.streamed_chat_response import StreamedChatResponse_TextGeneration
 
+
 def cohere_accumulator(
     acc: typing.Optional[dict],
     value: typing.Any,
-) -> dict:
+) -> "NonStreamedChatResponse":
+    from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
+
+    # don't need to accumulate, is build-in by cohere!
+    # https://docs.cohere.com/docs/streaming
+    # A stream-end event is the final event of the stream, and is returned only when streaming is finished.
+    # This event contains aggregated data from all the other events such as the complete text,
+    # as well as a finish_reason for why the stream ended (i.e. because of it was finished or there was an error).
     if acc is None:
-        acc = {
-            "text": [],
-            "generation_id": "",
-            "token_count": {"prompt_tokens": 0, "response_tokens": 0, "total_tokens": 0},
-            "meta": {},
-        }
+        acc = {}
 
-    if hasattr(value, 'event_type'):
-        if value.event_type == "text-generation":
-            acc["text"].append(value.text)
-            acc["token_count"]["response_tokens"] += 1
-            acc["token_count"]["total_tokens"] += 1
-        elif value.event_type == "stream-end":
-            acc["generation_id"] = getattr(value, 'generation_id', '')
-            acc["meta"] = getattr(value, 'meta', {})
-
+    # we wait for the last event
+    if hasattr(value, "event_type"):
+        if value.event_type == "stream-end" and value.is_finished:
+            if value.response:
+                acc = value.response
     return acc
+
 
 def cohere_wrapper(name: str) -> typing.Callable:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         op = weave.op()(fn)
-        op.name = name # type: ignore
+        op.name = name  # type: ignore
         print(f"Wrapping: {name} -> {op}")
         return op
+
     return wrapper
+
 
 def cohere_stream_wrapper(name: str) -> typing.Callable:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         op = weave.op()(fn)
-        op.name = name # type: ignore
-        
-        @weave.op()
-        def finalize_accumulator(acc: dict) -> "NonStreamedChatResponse":
-            from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
-            return NonStreamedChatResponse(
-                text="".join(acc["text"]),
-                generation_id=acc["generation_id"],
-                token_count=acc["token_count"],
-                meta=acc["meta"],
-            )
-        
-        return add_accumulator(op, cohere_accumulator, on_finish_post_processor=finalize_accumulator) # type: ignore
+        op.name = name  # type: ignore
+        return add_accumulator(op, cohere_accumulator)  # type: ignore
+
     return wrapper
 
-cohere_patcher = MultiPatcher([   
+
+cohere_patcher = MultiPatcher(
+    [
         SymbolPatcher(
             lambda: importlib.import_module("cohere.client"),
             "Client.chat",
             cohere_wrapper("cohere.Client.chat"),
-            # weave.op(),
         ),
         # Patch the async chat method
         SymbolPatcher(
             lambda: importlib.import_module("cohere"),
             "AsyncClient.chat",
             cohere_wrapper("cohere.AsyncClient.chat"),
-            # weave.op(),
         ),
         # Add patch for chat_stream method
         SymbolPatcher(
