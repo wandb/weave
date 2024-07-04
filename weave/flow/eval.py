@@ -1,36 +1,27 @@
+from __future__ import annotations
+
 import asyncio
 import inspect
 import textwrap
 import time
 import traceback
-import typing
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Coroutine, cast
 
-import numpy as np
 from rich import print
-from rich.console import Console
+from tqdm.asyncio import tqdm
 
 import weave
 from weave.flow import util
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model, get_infer_method
 from weave.flow.obj import Object
-from weave.flow.scorer import (
-    Scorer,
-    auto_summarize,
-    get_scorer_attributes,
-    transpose,
-)
+from weave.flow.scorer import Scorer, auto_summarize, get_scorer_attributes, transpose
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.op import BoundOp, Op
 
-console = Console()
 
-
-def async_call(
-    func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
-) -> typing.Coroutine:
+def async_call(func: Callable | Op, *args: Any, **kwargs: Any) -> Coroutine:
     is_async = False
     if isinstance(func, Op):
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
@@ -86,9 +77,9 @@ class Evaluation(Object):
     ```
     """
 
-    dataset: Union[Dataset, list]
-    scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
-    preprocess_model_input: Optional[Callable] = None
+    dataset: Dataset | list
+    scorers: list[Callable | Op | Scorer] | None = None
+    preprocess_model_input: Callable | None = None
     trials: int = 1
 
     def model_post_init(self, __context: Any) -> None:
@@ -116,9 +107,7 @@ class Evaluation(Object):
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
     @weave.op()
-    async def predict_and_score(
-        self, model: Union[Callable, Model], example: dict
-    ) -> dict:
+    async def predict_and_score(self, model: Callable | Model, example: dict) -> dict:
         if self.preprocess_model_input == None:
             model_input = example
         else:
@@ -191,7 +180,7 @@ class Evaluation(Object):
         model_latency = time.time() - model_start_time
 
         scores = {}
-        scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
+        scorers = cast(list[Op | Scorer], self.scorers or [])
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
             if isinstance(score_fn, Op):
@@ -282,7 +271,7 @@ class Evaluation(Object):
         return summary
 
     @weave.op()
-    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+    async def evaluate(self, model: Callable | Model) -> dict:
         eval_rows = []
 
         start_time = time.time()
@@ -300,27 +289,24 @@ class Evaluation(Object):
 
         n_complete = 0
         # with console.status("Evaluating...") as status:
-        dataset = typing.cast(Dataset, self.dataset)
+        dataset = cast(Dataset, self.dataset)
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
-        async for example, eval_row in util.async_foreach(
-            trial_rows, eval_example, get_weave_parallelism()
-        ):
-            n_complete += 1
-            duration = time.time() - start_time
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
-            # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
-            # )
-            if eval_row == None:
-                eval_row = {"model_output": None, "scores": {}}
-            if eval_row["scores"] == None:
-                eval_row["scores"] = {}
-            for scorer in self.scorers or []:
-                scorer_name, _, _ = get_scorer_attributes(scorer)
-                if scorer_name not in eval_row["scores"]:
-                    eval_row["scores"][scorer_name] = {}
-            eval_rows.append(eval_row)
+
+        pbar = util.async_foreach(trial_rows, eval_example, get_weave_parallelism())
+        with tqdm(pbar, desc="Evaluating", total=len(trial_rows)) as pbar:
+            async for example, eval_row in pbar:
+                n_complete += 1
+                duration = time.time() - start_time
+                if eval_row == None:
+                    eval_row = {"model_output": None, "scores": {}}
+                if eval_row["scores"] == None:
+                    eval_row["scores"] = {}
+                for scorer in self.scorers or []:
+                    scorer_name, _, _ = get_scorer_attributes(scorer)
+                    if scorer_name not in eval_row["scores"]:
+                        eval_row["scores"][scorer_name] = {}
+                eval_rows.append(eval_row)
 
         summary = await self.summarize(eval_rows)
 
@@ -330,10 +316,10 @@ class Evaluation(Object):
 
 
 def evaluate(
-    dataset: Union[Dataset, list],
-    model: Union[Callable, Model],
-    scores: Optional[list[Union[Callable, Scorer]]] = None,
-    preprocess_model_input: Optional[Callable] = None,
+    dataset: Dataset | list,
+    model: Callable | Model,
+    scores: list[Callable | Scorer] | None = None,
+    preprocess_model_input: Callable | None = None,
 ) -> dict:
     eval = Evaluation(
         dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
