@@ -36,7 +36,6 @@ def cohere_wrapper(name: str) -> typing.Callable:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
-        print(f"Wrapping: {name} -> {op}")
         return op
 
     return wrapper
@@ -54,7 +53,7 @@ def cohere_stream_wrapper(name: str) -> typing.Callable:
 cohere_patcher = MultiPatcher(
     [
         SymbolPatcher(
-            lambda: importlib.import_module("cohere.client"),
+            lambda: importlib.import_module("cohere"),
             "Client.chat",
             cohere_wrapper("cohere.Client.chat"),
         ),
