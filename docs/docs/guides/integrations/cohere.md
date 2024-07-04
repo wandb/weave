@@ -23,7 +23,7 @@ from weave.integrations.cohere import cohere_patcher
 cohere_patcher.attempt_patch()
 
 # Use the Cohere library as usual
-co = cohere.Client(os.environ["COHERE_API_KEY"])
+co = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
 
 # highlight-next-line
 weave.init("cohere_project")
@@ -57,7 +57,7 @@ from weave.integrations.cohere import cohere_patcher
 # we need to patch before we create the client
 cohere_patcher.attempt_patch()
 
-co = cohere.Client(os.environ["COHERE_API_KEY"])
+co = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
 
 weave.init("cohere_project")
 
@@ -102,7 +102,7 @@ class WeatherModel(weave.Model):
   
     @weave.op()
     def predict(self, location: str) -> str:
-        co = cohere.Client(os.environ["COHERE_API_KEY"])
+        co = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
         response = co.chat(
             message=f"How is the weather in {location}?",
             model=self.model,
