@@ -30,6 +30,37 @@ llm = Groq(
 
 ## Fetching and Loading the Vector Store Index
 
+First we create a service context for configuring the vector index store.
 
+```python
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
+embed_model = HuggingFaceEmbedding(
+    model_name="BAAI/bge-small-en-v1.5"
+)
 
+service_context = ServiceContext.from_defaults(
+    embed_model=embed_model, llm=llm
+)
+```
+
+Next, we fetch the W&B vector index artifact and load back the index.
+
+```python
+import wandb
+
+# We use `wandb.Api` to fetch the artifacts, this ensures that we don't
+# create a new W&B run for every query. The queries will be tracked by Weave.
+artifact = wandb.Api().artifact(
+    "geekyrakshit/groq-rag/ncert-flamingoes-prose-embeddings:latest"
+)
+artifact_dir = artifact.download()
+
+# Load the vector index from storage
+storage_context = StorageContext.from_defaults(
+    persist_dir=artifact_dir
+)
+index = load_index_from_storage(
+    storage_context, service_context=service_context
+)
+```
