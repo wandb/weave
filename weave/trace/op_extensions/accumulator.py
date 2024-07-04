@@ -9,6 +9,7 @@ from typing import (
     Generic,
     Iterator,
     Optional,
+    Type,
     TypeVar,
     Union,
 )
@@ -21,7 +22,7 @@ V = TypeVar("V")
 
 def add_accumulator(
     op: Op,
-    accumulator: Callable[[S, V], S],
+    make_accumulator: Callable[[Dict], Callable[[S, V], S]],
     *,
     should_accumulate: Optional[Callable[[Dict], bool]] = None,
     on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
@@ -62,6 +63,8 @@ def add_accumulator(
             on_finish(value, e)
 
         if should_accumulate is None or should_accumulate(inputs):
+            # we build the accumulator here dependent on the inputs (optional)
+            accumulator = make_accumulator(inputs)
             return _build_iterator_from_accumulator_for_op(
                 value, accumulator, wrapped_on_finish
             )
@@ -104,7 +107,14 @@ class _Accumulator(Generic[S, V]):
         self._state = initial_state
 
     def next(self, value: V) -> None:
-        self._state = self._accumulator(self._state, value)
+        # the try-except hack to catch `StopIteration` inside `<integration>_accumulator`
+        # this `StopIteration` is raised when some condition is met, for example, when
+        # we don't want to surface last chunk (with usage info) from openai integration.
+        try:
+            self._state = self._accumulator(self._state, value)
+        except StopIteration as e:
+            self._state = e.value
+            raise
 
     def get_state(self) -> Optional[S]:
         return self._state
@@ -136,7 +146,7 @@ class _IteratorWrapper(Generic[V]):
 
     def _call_on_close_once(self) -> None:
         if not self._on_finished_called:
-            self._on_close()
+            self._on_close()  # type: ignore
             self._on_finished_called = True
 
     def _call_on_error_once(self, e: Exception) -> None:
@@ -175,9 +185,9 @@ class _IteratorWrapper(Generic[V]):
             value = await self._iterator.__anext__()  # type: ignore
             self._on_yield(value)
             return value
-        except StopAsyncIteration:
+        except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
-            raise
+            raise StopAsyncIteration
         except Exception as e:
             self._call_on_error_once(e)
             raise
@@ -200,3 +210,29 @@ class _IteratorWrapper(Generic[V]):
         ]:
             return object.__getattribute__(self, name)
         return getattr(self._iterator, name)
+
+    def __enter__(self) -> "_IteratorWrapper":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[Exception],
+        exc_value: Optional[BaseException],
+        traceback: Optional[Any],
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        self._call_on_close_once()
+
+    async def __aenter__(self) -> "_IteratorWrapper":
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Exception],
+        exc_value: Optional[BaseException],
+        traceback: Optional[Any],
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        self._call_on_close_once()

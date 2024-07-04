@@ -1,0 +1,89 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '128'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.30.5
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.30.5
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.8
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1VRwU7rMBC89ysWX7gkqGkLTd7lSU8cKL+AUOXam8TgeP3sDVBQ/x27aam4WPLMznhm/TUDEEaLPyBUL1kN3paNfq/CY7+u3/5Xr5/NzrT3/p/ZLJquJSmKrKDdCyo+q24UJR2yITfRKqBkzK7VumqW81VdL4/EQBptlnWeyxWVi/liVc5vy2p5EvZkFMY08ZSuAF/HM0d0Gj8SPC/OyIAxyg4Tdh5KYCCbESFjNJGlY1FcSEWO0R1Tb64HeBkjg4ScfWQM4AN1QQ4FRIINaHLXDL18Q2gRrXFdLGA3MmRpjwFBOg2pp94DU0Kshz2NV/BA76CkSxZTiIymCS33f8Upy+GnhKUuPbvLhd1o7Q/eGmdiv032Me00BY5MfpIf0vl8XNb4q79IRoPnLdMrumxYVZOduPzOhVzUJ5KJpb3gy2Z2yifiPjIO2xSlw+CDmTbX+u0t3ql1pVeyFrPD7BvwWefAQgIAAA==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 899856a0be905ec3-PDX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 25 Jun 2024 22:19:19 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=Y7u4CN94.98luFHyETDM3N2EJcd9_eAbUdOYTblmcYg-1719353959-1.0.1.1-xT_pgqW5hqoVToK8TXPCdH_7vVfTsjTrBNZ.WA9lgNlyF.OcQP17RDREPj5bEU6.ruI.2PaDdsAb.1_VqN8llQ;
+        path=/; expires=Tue, 25-Jun-24 22:49:19 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=n4yFqicu7JLWAolFL5yh8XIvLtHTVHqdx7DiKy.piQs-1719353959311-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '649'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '16000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '15999931'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - f7236fad843e12a64c61647c768355cd
+    status:
+      code: 200
+      message: OK
+version: 1
