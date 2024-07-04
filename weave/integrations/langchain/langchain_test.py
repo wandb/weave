@@ -45,6 +45,25 @@ def assert_correct_calls_for_chain_invoke(calls: list[tsi.CallSchema]) -> None:
     assert got == exp
 
 
+def assert_correct_calls_for_chain_invoke_BAD_LC_BUG(
+    calls: list[tsi.CallSchema],
+) -> None:
+    assert len(calls) == 4
+
+    flattened = flatten_calls(calls)
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+    exp = [
+        ("langchain.Chain.RunnableSequence", 0),
+        ("langchain.Prompt.PromptTemplate", 1),
+        (
+            "openai.chat.completions.create",
+            2,
+        ),  # this is below PromptTemplate, but should be below ChatOpenAI
+        ("langchain.Llm.ChatOpenAI", 1),
+    ]
+    assert got == exp
+
+
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -95,7 +114,7 @@ async def test_simple_chain_ainvoke(
     _ = await llm_chain.ainvoke({"number": 2})
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_invoke(res.calls)
+    assert_correct_calls_for_chain_invoke_BAD_LC_BUG(res.calls)
 
 
 @pytest.mark.skip_clickhouse_client

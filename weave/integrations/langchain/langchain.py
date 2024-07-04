@@ -61,6 +61,8 @@ if not import_failed:
         return run_dict
 
     class WeaveTracer(BaseTracer):
+        run_inline: bool = True
+
         def __init__(self, **kwargs: Any) -> None:
             self._call_map: Dict[str, Call] = {}
             self.latest_run: Optional[Run] = None
