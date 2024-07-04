@@ -7,7 +7,6 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
     from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
-    from cohere.types.streamed_chat_response import StreamedChatResponse_TextGeneration
 
 
 def cohere_accumulator(
