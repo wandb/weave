@@ -59,12 +59,6 @@ def cohere_stream_wrapper(name: str) -> typing.Callable:
     return wrapper
 
 cohere_patcher = MultiPatcher([   
-        # SymbolPatcher(
-        #     lambda: importlib.import_module("cohere.core.http_client"),
-        #     "HttpClient.request",
-        #     weave.op(),
-        #     ),
-            # Patch the sync chat method
         SymbolPatcher(
             lambda: importlib.import_module("cohere.client"),
             "Client.chat",

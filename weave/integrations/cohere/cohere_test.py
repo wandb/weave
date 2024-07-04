@@ -1,13 +1,26 @@
 import os, json
-from typing import Any
+from typing import Any, Generator
+
 
 import pytest
 import cohere
 
 import weave
+from weave.autopatch import autopatch, reset_autopatch
+from weave.integrations.cohere.cohere_sdk import cohere_patcher
 from weave.trace_server import trace_server_interface as tsi
 
 cohere_model = "command"  # You can change this to a specific model if needed
+
+@pytest.fixture
+def only_patch_cohere() -> Generator[None, None, None]:
+    reset_autopatch() # unpatch all other integrations.
+    cohere_patcher.attempt_patch()
+
+    try:
+        yield  # This is where the test using this fixture will run
+    finally:
+        autopatch()  # Ensures future tests have the patch applied
 
 def _get_call_output(call: tsi.CallSchema) -> Any:
     call_output = call.output
@@ -25,6 +38,7 @@ def test_cohere(
     client: weave.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("COHERE_API_KEY", "DUMMY_API_KEY")
+    
     cohere_client = cohere.Client(api_key=api_key)
     
     response = cohere_client.chat(

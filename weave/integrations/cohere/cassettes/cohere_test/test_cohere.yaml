@@ -27,18 +27,20 @@ interactions:
     uri: https://api.cohere.com/v1/chat
   response:
     body:
-      string: '{"response_id":"3647f3f8-7561-41f6-91f6-5c8848ebdc38","text":"Hey there,
-        good to meet you, I''m Cohere! How can I help you today?\nLet me know if you
-        need assistance with a specific topic, or just want to chat. I''m here to
-        help in any way I can.","generation_id":"231154b8-ab6b-495e-b41d-ba1ff48e57ab","chat_history":[{"role":"USER","message":"Hello,
+      string: '{"response_id":"75567621-9496-49e3-a674-bb4246da02bf","text":"Hey there,
+        good to meet you, I''m Cohere! How can I help you today? \n\nLet me know if
+        you need assistance with a particular topic, or if there''s something specific
+        you''d like to know more about. I''ll be happy to provide you with thorough
+        responses and help in any way I can.","generation_id":"dc9bfdaa-3154-4819-8b11-89d77af0dd3d","chat_history":[{"role":"USER","message":"Hello,
         Cohere!"},{"role":"CHATBOT","message":"Hey there, good to meet you, I''m Cohere!
-        How can I help you today?\nLet me know if you need assistance with a specific
-        topic, or just want to chat. I''m here to help in any way I can."}],"finish_reason":"COMPLETE","meta":{"api_version":{"version":"1"},"billed_units":{"input_tokens":5,"output_tokens":50},"tokens":{"input_tokens":67,"output_tokens":51}}}'
+        How can I help you today? \n\nLet me know if you need assistance with a particular
+        topic, or if there''s something specific you''d like to know more about. I''ll
+        be happy to provide you with thorough responses and help in any way I can."}],"finish_reason":"COMPLETE","meta":{"api_version":{"version":"1"},"billed_units":{"input_tokens":5,"output_tokens":66},"tokens":{"input_tokens":67,"output_tokens":66}}}'
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
       Content-Length:
-      - '742'
+      - '926'
       Via:
       - 1.1 google
       access-control-expose-headers:
@@ -48,13 +50,13 @@ interactions:
       content-type:
       - application/json
       date:
-      - Wed, 03 Jul 2024 17:01:58 GMT
+      - Thu, 04 Jul 2024 09:24:58 GMT
       expires:
       - Thu, 01 Jan 1970 00:00:00 UTC
       num_chars:
-      - '308'
+      - '307'
       num_tokens:
-      - '55'
+      - '71'
       pragma:
       - no-cache
       server:
@@ -64,15 +66,16 @@ interactions:
       x-accel-expires:
       - '0'
       x-debug-trace-id:
-      - b101575be9da24445a337ccf8b2a0a4c
+      - ab1443bad20401c086b99f5b4f037a3b
       x-endpoint-monthly-call-limit:
       - '1000'
       x-envoy-upstream-service-time:
-      - '1850'
+      - '2227'
       x-trial-endpoint-call-limit:
       - '40'
       x-trial-endpoint-call-remaining:
-      - '39'
+      - '38'
     status:
       code: 200
       message: OK
+version: 1
