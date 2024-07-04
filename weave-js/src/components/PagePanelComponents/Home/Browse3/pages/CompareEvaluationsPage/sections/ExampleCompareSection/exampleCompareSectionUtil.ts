@@ -109,7 +109,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
               if (datasetRow != null) {
                 const output = predictAndScoreRes._legacy_predictCall?.output;
                 rows.push({
-                  // ...predictAndScoreRes,
                   id: predictAndScoreRes.callId,
                   evaluationCallId: predictAndScoreRes.evaluationCallId,
                   inputDigest: datasetRow.digest,
@@ -144,9 +143,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     return rows;
   }, [state.data.resultRows, state.data.inputs, state.data.scorerMetricDimensions, state.data.derivedMetricDimensions]);
 
-  // const filteredDigests = useMemo(() => {
-  // }, []);
-  // console.log({flattenedRows, scoreMap});
+  // const filteredDigests 
   const pivotedRows = useMemo(() => {
     // Ok, so in this step we are going to pivot -
     // id: string; - no change
