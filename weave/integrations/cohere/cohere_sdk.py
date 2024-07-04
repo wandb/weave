@@ -44,7 +44,7 @@ def cohere_stream_wrapper(name: str) -> typing.Callable:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
-        return add_accumulator(op, cohere_accumulator)  # type: ignore
+        return add_accumulator(op, lambda inputs: cohere_accumulator)  # type: ignore
 
     return wrapper
 
