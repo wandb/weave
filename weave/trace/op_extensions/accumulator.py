@@ -223,3 +223,16 @@ class _IteratorWrapper(Generic[V]):
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
         self._call_on_close_once()
+
+    async def __aenter__(self) -> "_IteratorWrapper":
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Exception],
+        exc_value: Optional[BaseException],
+        traceback: Optional[Any],
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        self._call_on_close_once()
