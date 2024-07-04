@@ -2,7 +2,6 @@ import os
 from typing import Any, List, Optional, Tuple
 
 import pytest
-
 import weave
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
@@ -78,6 +77,33 @@ def test_simple_chain_invoke(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
+@pytest.mark.asyncio
+async def test_simple_chain_ainvoke(
+    client: WeaveClient,
+) -> None:
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
+    prompt = PromptTemplate.from_template("1 + {number} = ")
+
+    llm_chain = prompt | llm
+    _ = await llm_chain.ainvoke({"number": 2})
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert_correct_calls_for_chain_invoke(res.calls)
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
 def test_simple_chain_stream(
     client: WeaveClient,
 ) -> None:
@@ -93,6 +119,34 @@ def test_simple_chain_stream(
 
     llm_chain = prompt | llm
     for _ in llm_chain.stream({"number": 2}):
+        pass
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert_correct_calls_for_chain_invoke(res.calls)
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+@pytest.mark.asyncio
+async def test_simple_chain_astream(
+    client: WeaveClient,
+) -> None:
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
+    prompt = PromptTemplate.from_template("1 + {number} = ")
+
+    llm_chain = prompt | llm
+    async for _ in llm_chain.astream({"number": 2}):
         pass
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
@@ -140,6 +194,33 @@ def test_simple_chain_batch(
 
     llm_chain = prompt | llm
     _ = llm_chain.batch([{"number": 2}, {"number": 3}])
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert_correct_calls_for_chain_batch(res.calls)
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+@pytest.mark.asyncio
+async def test_simple_chain_abatch(
+    client: WeaveClient,
+) -> None:
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
+    )
+    prompt = PromptTemplate.from_template("1 + {number} = ")
+
+    llm_chain = prompt | llm
+    _ = await llm_chain.abatch([{"number": 2}, {"number": 3}])
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_correct_calls_for_chain_batch(res.calls)
