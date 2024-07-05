@@ -1,6 +1,8 @@
 #!/bin/bash
-python3 -m venv ./test_venvs/venvs/base
-source ./test_venvs/venvs/base/bin/activate
+local venv_build_dir="./.test_venvs"
+
+python3 -m venv $venv_build_dir/base
+source $venv_build_dir/base/bin/activate
 
 pip install --upgrade pip
 
@@ -12,12 +14,14 @@ deactivate
 process_file() {
     local file="$1"
     local name=$(basename "$file" | awk -F. '{print $2}')
-    local venv_root="./test_venvs/venvs/derived_$name"
+    local venv_root="$venv_build_dir/derived_$name"
     echo "$name"
     echo "Creating test env $name for: $file in $venv_root"
 
-    source ./test_venvs/venvs/base/bin/activate
+    source $venv_build_dir/base/bin/activate
     python -m venv $venv_root
+
+    pip install -r $file
 
     base_site_packages="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
     derived_site_packages="$($venv_root/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"

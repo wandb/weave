@@ -27,4 +27,4 @@ weave/tests/zlib.txt
 weave/tests/execute.json
 weave-js/src/generated
 .integration-deps
-test_venvs/venvs
+.test_venvs
