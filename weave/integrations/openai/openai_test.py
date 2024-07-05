@@ -796,3 +796,110 @@ async def test_openai_tool_call_async_stream(
     assert inputs["max_tokens"] == 64
     assert inputs["temperature"] == 0.0
     assert inputs["top_p"] == 1
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+def test_openai_as_context_manager(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+
+    openai_client = OpenAI(api_key=api_key)
+
+    with openai_client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": "Hello, I am context manager!"}],
+        stream=True,
+    ) as response:
+        all_content = ""
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                all_content += chunk.choices[0].delta.content
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+
+    exp = "Hello! As a context manager, you play a crucial role in managing resources efficiently and ensuring proper setup and teardown in Python. You likely implement methods like `__enter__` and `__exit__` to manage contexts properly. How can I assist you today?"
+    assert all_content == exp
+
+    call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
+    assert call.started_at < call.ended_at  # type: ignore
+
+    output = _get_call_output(call)
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
+
+    inputs = call.inputs
+    assert inputs["model"] == "gpt-4o"
+    assert inputs["messages"] == [
+        {"role": "user", "content": "Hello, I am context manager!"}
+    ]
+
+    # usage information should be available even if `stream_options` is not set
+    usage = call.summary["usage"][output["model"]]  # type: ignore
+    assert usage["total_tokens"] == 67
+    assert usage["completion_tokens"] == 53
+    assert usage["prompt_tokens"] == 14
+
+    # since we are setting `stream_options`, the chunk should not have usage information
+    assert chunk.usage is None
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+@pytest.mark.asyncio
+async def test_openai_as_context_manager_async(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+
+    openai_client = AsyncOpenAI(api_key=api_key)
+
+    response = await openai_client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": "Hello, I am async context manager!"}],
+        stream=True,
+    )
+
+    async with response:
+        all_content = ""
+        async for chunk in response:
+            if chunk.choices[0].delta.content:
+                all_content += chunk.choices[0].delta.content
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+
+    exp = "Hello! It sounds like you're referring to the concept of an asynchronous context manager in programming, typically found in languages like Python. Asynchronous context managers are useful for managing resources that need to be setup and cleaned up, often in an asynchronous manner. Do you have any specific questions or scenarios you need help with regarding async context managers?"
+    assert all_content == exp
+
+    call = res.calls[0]
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    assert call.started_at is not None
+    assert call.started_at < call.ended_at  # type: ignore
+
+    output = _get_call_output(call)
+    assert output["model"] == "gpt-4o-2024-05-13"
+    assert output["object"] == "chat.completion"
+
+    inputs = call.inputs
+    assert inputs["model"] == "gpt-4o"
+    assert inputs["messages"] == [
+        {"role": "user", "content": "Hello, I am async context manager!"}
+    ]
+
+    # usage information should be available even if `stream_options` is not set
+    usage = call.summary["usage"][output["model"]]  # type: ignore
+    assert usage["total_tokens"] == 81
+    assert usage["completion_tokens"] == 66
+    assert usage["prompt_tokens"] == 15
+
+    # since we are setting `stream_options`, the chunk should not have usage information
+    assert chunk.usage is None

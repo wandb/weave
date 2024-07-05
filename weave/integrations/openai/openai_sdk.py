@@ -269,7 +269,7 @@ def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Calla
     return wrapper
 
 
-symbol_pathers = [
+symbol_patchers = [
     # Patch the Completions.create method
     SymbolPatcher(
         lambda: importlib.import_module("openai.resources.chat.completions"),
@@ -283,4 +283,4 @@ symbol_pathers = [
     ),
 ]
 
-openai_patcher = MultiPatcher(symbol_pathers)  # type: ignore
+openai_patcher = MultiPatcher(symbol_patchers)  # type: ignore
