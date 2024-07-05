@@ -36,7 +36,9 @@ class ObjectRecord:
     def map_values(self, fn: Callable) -> "ObjectRecord":
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
+
 PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
+
 
 def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
     if isinstance(obj, pydantic.BaseModel):
@@ -45,7 +47,7 @@ def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
         return obj.__fields__
     else:
         raise ValueError(f"{obj} is not a pydantic model")
-    
+
 
 def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
     return {k: getattr(obj, k) for k in pydantic_model_fields(obj)}

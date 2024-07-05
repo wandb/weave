@@ -13,7 +13,6 @@ def autopatch() -> None:
     from .integrations.mistral.mistral import mistral_patcher
     from .integrations.openai.openai_sdk import openai_patcher
 
-
     openai_patcher.attempt_patch()
     mistral_patcher.attempt_patch()
     litellm_patcher.attempt_patch()
