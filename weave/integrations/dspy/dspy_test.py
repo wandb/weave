@@ -24,10 +24,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_dspy_language_models(client: WeaveClient) -> None:
-    try:
-        import dspy
-    except ImportError:
-        return
+    import dspy
 
     gpt3_turbo = dspy.OpenAI(
         model="gpt-3.5-turbo-1106",
@@ -79,10 +76,7 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_dspy_inline_signatures(client: WeaveClient) -> None:
-    try:
-        import dspy
-    except ImportError:
-        return
+    import dspy
 
     turbo = dspy.OpenAI(model="gpt-3.5-turbo")
     dspy.settings.configure(lm=turbo)
