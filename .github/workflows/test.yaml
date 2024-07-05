@@ -93,6 +93,8 @@ jobs:
         job_num: [0, 1]
         weave_server:
           - name: sqlite
+          # This runner specifically runs the tests that use the `client` fixture (those that support clickhouse client tests)
+          # However, we skip tests marked with `skip_clickhouse_client`. These should be considered TODOs and an exception
           - name: clickhouse
             marks: "weave_client and not skip_clickhouse_client"
         test_subset:
@@ -147,21 +149,7 @@ jobs:
           DD_SERVICE: weave-python
           DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
-        # This runner specifically runs the tests that use the `client` fixture (those that support clickhouse client tests)
-        # However, we skip tests marked with `skip_clickhouse_client`. These should be considered TODOs and an exception
         run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/.test_venvs/${{ matrix.test_subset.venv_name }}/bin/activate && cd weave && pytest -m ${{ matrix.weave_server.marks }} --weave-server=${{ matrix.weave_server.name }} --job-num=${{ matrix.job_num }} --timeout=90  --ddtrace --durations=5 ${{ matrix.test_subset.test_pattern }}
-      - name: Run Python Unit Tests
-        env:
-          DD_SERVICE: weave-python
-          DD_ENV: ci
-          WEAVE_SENTRY_ENV: ci
-        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/.test_venvs/base/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
-      - name: Run Python Library Integration Unit Tests
-        env:
-          DD_SERVICE: weave-python
-          DD_ENV: ci
-          WEAVE_SENTRY_ENV: ci
-        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/.test_venvs/base/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 --ddtrace --durations=5 ./integrations
 
   # nbmake:
   #   name: Run notebooks with nbmake
