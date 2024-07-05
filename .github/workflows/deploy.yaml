@@ -1,10 +1,8 @@
-name: Deploy to GitHub Pages
+name: Build and Deploy Docs to GitHub Pages
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - master
     paths:
       - '.github/workflows/deploy.yaml'
       - 'docs/**'
@@ -14,7 +12,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to GitHub Pages
+    name: Build and Deploy to GitHub Pages
     runs-on: ubuntu-latest
 
     permissions:
@@ -36,10 +34,13 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Build website
         run: yarn build
+        env:
+          DOCS_SEGMENT_API_KEY: ${{ secrets.DOCS_SEGMENT_API_KEY }}
 
       # Popular action to deploy to GitHub Pages:
       # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
       - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/master'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
