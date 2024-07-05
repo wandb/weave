@@ -1,9 +1,10 @@
-import os, json
-from typing import Any, Generator
 import asyncio
+import json
+import os
+from typing import Any, Generator
 
-import pytest
 import cohere
+import pytest
 
 import weave
 from weave.autopatch import autopatch, reset_autopatch
