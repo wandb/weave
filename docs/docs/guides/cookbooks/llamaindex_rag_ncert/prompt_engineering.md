@@ -83,7 +83,7 @@ did Franz notice that was\nunusual about the school that\nday?\n3.What had been 
 the\nbulletin-board?\nReprint 2024-25'
 ```
 
-## Building a simple Doubt-clearing Assistant
+## Building a Simple Doubt-clearing Assistant
 
 We're going to use [`weave.Model`](https://wandb.github.io/weave/guides/core-types/models) to write our assitants. A `weave.Model` is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
 
@@ -153,9 +153,9 @@ rich.print(assistant.predict(question=query, context=context))
 |---|
 | A trace for `EnglishDoubtClearningAssistant.predict` showing the versioned `EnglishDoubtClearningAssistant` model object. |
 
-## Building a simple Assistant for Generating Student Response
+## Building a Simple Assistant for Generating Student Response
 
-Let's use another simple prompt template build a student response generating assistant that generates an ideal answer to a question dependening on the total marks that can be awarded for the question.
+Let's use another simple prompt template to build a student response generating assistant that generates an ideal answer to a question dependening on the total marks that can be awarded for the question.
 
 ```python
 class EnglishStudentResponseAssistant(weave.Model):
@@ -225,3 +225,113 @@ Answer the following question within {word_limit_min}-{word_limit_max} words:
 | ![](./images/weave_dashboard_student_response.png) |
 |---|
 | A trace for `EnglishStudentResponseAssistant.predict` showing the versioned `EnglishStudentResponseAssistant` model object. |
+
+## Building a Simple Answer-grading Assistant
+
+In order to get a holistic evaluation from our assistant, we would need to get the LLM response structured into a consistent schema like a `pydantic.BaseModel`. In order to acheive this we're going to use the [Instructor](https://python.useinstructor.com/) library with our LLM.
+
+Let's first install Instructor using
+
+```shell
+pip install -U instructor
+```
+
+Next, we are going to use another simple prompt template to build a answer grading assistant.
+
+```python
+import instructor
+from pydantic import BaseModel
+
+class GradeExtractor(BaseModel):
+    question: str
+    student_answer: str
+    marks: float
+    total_marks: float
+    feedback: str
+
+
+class EnglishGradingAssistant(EnglishStudentResponseAssistant):
+    model: str = "llama3-8b-8192"
+    _groq_client: Optional[Groq] = None
+    _instructor_groq_client: Optional[instructor.Instructor] = None
+
+    def __init__(self, model: Optional[str] = None):
+        super().__init__(model=model)
+        self.model = model if model is not None else self.model
+        self._instructor_groq_client = instructor.from_groq(
+            Groq(api_key=os.environ.get("GROQ_API_KEY"))
+        )
+    
+    @weave.op()
+    def get_prompt_for_grading(
+        self,
+        question: str,
+        context: str,
+        total_marks: int,
+        student_answer: Optional[str] = None,
+    ) -> Tuple[str, str]:
+        system_prompt = """
+You are a helpful assistant to an English teacher meant to grade the answer given by a student to a question.
+You have to extract the question , the student's answer, the marks awarded to the student out of total marks,
+the total marks and a contructive feedback to the student's answer with regards to how accurate it is with
+respect to the context.
+        """
+        student_answer = (
+            self.predict(question, total_marks)
+            if student_answer is None
+            else student_answer
+        )
+        user_prompt = f"""
+We have provided context information below. 
+
+---
+{context}
+---
+
+We have asked the following question to the student for total_marks={total_marks}:
+
+---
+{question}
+---
+
+The student has responded with the following answer:
+
+---
+{student_answer}
+---"""
+        return user_prompt, system_prompt
+    
+    @weave.op()
+    def grade_answer(
+        self, question: str, student_answer: str, total_marks: int
+    ) -> GradeExtractor:
+        user_prompt, system_prompt = self.get_prompt_for_grading(
+            question, student_answer, total_marks
+        )
+        return self._instructor_groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": user_prompt,
+                },
+            ],
+            model=self.model,
+            response_model=GradeExtractor,
+        )
+
+assistant = EnglishGradingAssistant()
+grade = assistant.grade_answer(
+    question=query,
+    student_answer=ideal_student_response,
+    total_marks=5
+)
+rich.print(grade)
+```
+
+| ![](./images/weave_dashboard_grading_response.png) |
+|---|
+| A trace for `EnglishGradingAssistant.grade_answer` showing the versioned `EnglishGradingAssistant` model object and the `GradeExtractor` object as its output which respresents the holistic grading of the student's answer in a structured manner. |

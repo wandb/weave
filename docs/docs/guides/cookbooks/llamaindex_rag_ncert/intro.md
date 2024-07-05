@@ -4,6 +4,7 @@ A lot of teachers in the education system have to spend a lot of time manually g
 
 - [LlamaIndex](https://www.llamaindex.ai/) as our data framework for building the RAG pipeline.
 - [GroqCloud](https://groq.com/) as our LLM vendor.
+- [Instructor](https://python.useinstructor.com/) to get structured data from the LLM.
 - [Weave](https://wandb.github.io/weave/) for tracking and evaluating LLM application.
 - [Weights & Biases Artifacts](https://docs.wandb.ai/guides/artifacts) to manage and version our vector store and evaluation dataset.
 
