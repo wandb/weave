@@ -100,14 +100,19 @@ jobs:
             venv_name: base
             test_pattern: ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace
           - name: anthropic
+            venv_name: anthropic
             test_pattern: ./integrations/anthropic
           - name: litellm
+            venv_name: litellm
             test_pattern: ./integrations/litellm
           - name: llamaindex
+            venv_name: llamaindex
             test_pattern: ./integrations/llamaindex
           - name: mistral
+            venv_name: mistral
             test_pattern: ./integrations/mistral
           - name: openai
+            venv_name: openai
             test_pattern: ./integrations/openai
     # runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
