@@ -78,7 +78,9 @@ def test_dspy_language_models(client: WeaveClient) -> None:
 def test_dspy_inline_signatures(client: WeaveClient) -> None:
     import dspy
 
-    turbo = dspy.OpenAI(model="gpt-3.5-turbo")
+    turbo = dspy.OpenAI(
+        model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    )
     dspy.settings.configure(lm=turbo)
     classify = dspy.Predict("sentence -> sentiment")
     prediction = classify(
