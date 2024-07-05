@@ -1,27 +1,29 @@
-# Assumes that the base virtual environment exists, activate it.
-. base/bin/activate
-
-# Create the derived virtual environment.
-python -m venv ./derived
-
-# Make the derived virtual environment import base's packages too.
-
-
-
 #!/bin/bash
+python3 -m venv ./test_venvs/venvs/base
+source ./test_venvs/venvs/base/bin/activate
+
+pip install --upgrade pip
+
+pip install -r requirements.test.txt
+
+deactivate
 
 # Function to process each file
 process_file() {
     local file="$1"
-    local name=$(basename "$filename" | awk -F. '{print $2}')
+    local name=$(basename "$file" | awk -F. '{print $2}')
     local venv_root="./test_venvs/venvs/derived_$name"
     echo "$name"
     echo "Creating test env $name for: $file in $venv_root"
-    python -m venv venv_root
+
+    source ./test_venvs/venvs/base/bin/activate
+    python -m venv $venv_root
 
     base_site_packages="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
-    derived_site_packages="$($venv_root -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+    derived_site_packages="$($venv_root/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
     echo "$base_site_packages" > "$derived_site_packages"/_base_packages.pth
+    
+    deactivate
 }
 
 # Check if directory is provided

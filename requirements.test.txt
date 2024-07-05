@@ -1,4 +1,6 @@
 -r requirements.txt
+-r requirements.engine.txt
+-r requirements.datadog.txt
 pytest>=8.2.0
 pytest-watch>=4.2.0
 pytest-timeout>=2.1.0

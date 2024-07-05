@@ -9,3 +9,6 @@ generate_panel_instructions:
 
 integration: .integration-deps
 	supervisord -c supervisord.conf
+
+build_test_venvs:
+	./initialize_test_venvs.sh test_envs
