@@ -49,7 +49,7 @@ jobs:
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
-      - run: source /root/venv/bin/activate && pre-commit run --hook-stage=pre-push --all-files
+      - run: source /root/.test_venvs/base/bin/activate && pre-commit run --hook-stage=pre-push --all-files
       - name: Show changes if pre-commit fails
         if: failure()
         run: |
@@ -91,7 +91,24 @@ jobs:
       fail-fast: false
       matrix:
         job_num: [0, 1]
-
+        weave_server:
+          - name: sqlite
+          - name: clickhouse
+            marks: "weave_client and not skip_clickhouse_client"
+        test_subset:
+          - name: base
+            venv_name: base
+            test_pattern: ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace
+          - name: anthropic
+            test_pattern: ./integrations/anthropic
+          - name: litellm
+            test_pattern: ./integrations/litellm
+          - name: llamaindex
+            test_pattern: ./integrations/llamaindex
+          - name: mistral
+            test_pattern: ./integrations/mistral
+          - name: openai
+            test_pattern: ./integrations/openai
     # runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
     services:
@@ -120,20 +137,26 @@ jobs:
       - uses: actions/checkout@v2
       - name: Verify wandb server is running
         run: curl -s http://wandbservice:8080/healthz
-      - name: Run Python Unit Tests (Clickhouse Client Only)
+      - name: Run Python Unit Tests
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
         # This runner specifically runs the tests that use the `client` fixture (those that support clickhouse client tests)
         # However, we skip tests marked with `skip_clickhouse_client`. These should be considered TODOs and an exception
-        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/.test_venvs/${{ matrix.test_subset.venv_name }}/bin/activate && cd weave && pytest -m ${{ matrix.weave_server.marks }} --weave-server=${{ matrix.weave_server.name }} --job-num=${{ matrix.job_num }} --timeout=90  --ddtrace --durations=5 ${{ matrix.test_subset.test_pattern }}
       - name: Run Python Unit Tests
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
-        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/.test_venvs/base/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+      - name: Run Python Library Integration Unit Tests
+        env:
+          DD_SERVICE: weave-python
+          DD_ENV: ci
+          WEAVE_SENTRY_ENV: ci
+        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/.test_venvs/base/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 --ddtrace --durations=5 ./integrations
 
   # nbmake:
   #   name: Run notebooks with nbmake
@@ -143,7 +166,7 @@ jobs:
   #     - uses: actions/checkout@v2
 
   #     - name: Run notebooks
-  #       run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=4 --nbmake --overwrite examples
+  #       run: source /root/.test_venvs/base/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=4 --nbmake --overwrite examples
   #     - name: Upload executed notebooks
   #       uses: actions/upload-artifact@v3
   #       if: always()
@@ -177,7 +200,7 @@ jobs:
       - name: Copy node_modules from container to checkout
         run: cp -R /root/integration_test/node_modules ./integration_test/
       - name: Activate venv
-        run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
+        run: source /root/.test_venvs/base/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
       - name: Make Log Dir
         run: mkdir -p /tmp/weave/log
       - name: Copy over built assets

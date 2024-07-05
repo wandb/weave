@@ -1,5 +1,5 @@
 #!/bin/bash
-local venv_build_dir="./.test_venvs"
+venv_build_dir="./.test_venvs"
 
 python3 -m venv $venv_build_dir/base
 source $venv_build_dir/base/bin/activate
@@ -20,6 +20,7 @@ process_file() {
 
     source $venv_build_dir/base/bin/activate
     python -m venv $venv_root
+    source $venv_root/bin/activate
 
     pip install -r $file
 
@@ -27,6 +28,7 @@ process_file() {
     derived_site_packages="$($venv_root/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
     echo "$base_site_packages" > "$derived_site_packages"/_base_packages.pth
     
+    deactivate
     deactivate
 }
 
