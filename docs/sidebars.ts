@@ -88,6 +88,7 @@ const sidebars: SidebarsConfig = {
           items: [
             "guides/cookbooks/llamaindex_rag_ncert/vector_index",
             "guides/cookbooks/llamaindex_rag_ncert/query_engine",
+            "guides/cookbooks/llamaindex_rag_ncert/prompt_engineering",
           ],
         }
       ],

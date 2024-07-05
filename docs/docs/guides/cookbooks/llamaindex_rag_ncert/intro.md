@@ -15,3 +15,4 @@ We demonstrate the RAG pipeline to act as an assistant to an English teacher tea
 |---|---|
 | [Building a data ingestion pipeline and vector store](./vector_index.md) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/docs/docs/guides/cookbooks/llamaindex_rag_ncert/notebooks/00_vector_index.ipynb) |
 | [Building the Query Engine](./vector_index.md) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/docs/docs/guides/cookbooks/llamaindex_rag_ncert/notebooks/01_rag_engine.ipynb) |
+| [Building a Better Assitant using Prompt Engineering](./vector_index.md) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/docs/docs/guides/cookbooks/llamaindex_rag_ncert/notebooks/03_prompt_engineering.ipynb) |
