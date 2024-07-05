@@ -6,10 +6,10 @@ RUN apt -y install python3-venv python3-dev gcc g++ xz-utils
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 COPY requirements.* /root/
 COPY /test_envs/requirements.* /root/test_envs/
-COPY Makefile /root/
+COPY initialize_test_venvs.sh /root/
 WORKDIR /root
 RUN python3 -m venv venv
-RUN --mount=type=cache,target=/root/.cache /bin/bash -c "make build_test_venvs"
+RUN --mount=type=cache,target=/root/.cache /bin/bash -c "./initialize_test_venvs.sh test_envs"
 
 ENTRYPOINT "/bin/bash"
 
