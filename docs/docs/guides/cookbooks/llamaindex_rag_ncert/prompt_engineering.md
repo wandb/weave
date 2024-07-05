@@ -82,3 +82,73 @@ window and his class in front of him,\n1.What was Franz expected to\nbe prepared
 did Franz notice that was\nunusual about the school that\nday?\n3.What had been put up on 
 the\nbulletin-board?\nReprint 2024-25'
 ```
+
+## Building a simple Doubt-clearing Assistant
+
+We're going to use [`weave.Model`](https://wandb.github.io/weave/guides/core-types/models) to write our assitants. A `weave.Model` is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
+
+Let's use a simple prompt template to build a doubt-clearning assistant:
+
+```python
+import weave
+
+class EnglishDoubtClearningAssistant(weave.Model):
+    model: str = "llama3-8b-8192"
+    _groq_client: Optional[Groq] = None
+    
+    def __init__(self, model: Optional[str] = None):
+        super().__init__()
+        self.model = model if model is not None else self.model
+        self._groq_client = Groq(
+            api_key=os.environ.get("GROQ_API_KEY")
+        )
+    
+    @weave.op()
+    def get_prompts(self, question: str, context: str):
+        system_prompt = """
+You are a student in a class and your teacher has asked you to answer the following question.
+You have to write the answer in the given word limit."""
+        user_prompt = f"""
+We have provided context information below. 
+
+---
+{context}
+---
+
+Answer the following question within 50-150 words:
+
+---
+{query}
+---
+"""
+        return system_prompt, user_prompt
+
+    @weave.op()
+    def predict(self, question: str, context: str):
+        system_prompt, user_prompt = self.get_prompts(question, context)
+        chat_completion = self._groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": user_prompt,
+                },
+            ],
+            model=self.model,
+        )
+        return chat_completion.choices[0].message.content
+
+
+weave.init(project_name="groq-rag")
+
+assistant = EnglishDoubtClearningAssistant()
+
+rich.print(assistant.predict(question=query, context=context))
+```
+
+| ![](./images/weave_dashboard_doubt_clearing.png) |
+|---|
+| A trace for `EnglishDoubtClearningAssistant.predict` showing the versioned `EnglishDoubtClearningAssistant` model object. |
