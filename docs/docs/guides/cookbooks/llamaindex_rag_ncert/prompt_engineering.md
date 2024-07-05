@@ -152,3 +152,76 @@ rich.print(assistant.predict(question=query, context=context))
 | ![](./images/weave_dashboard_doubt_clearing.png) |
 |---|
 | A trace for `EnglishDoubtClearningAssistant.predict` showing the versioned `EnglishDoubtClearningAssistant` model object. |
+
+## Building a simple Assistant for Generating Student Response
+
+Let's use another simple prompt template build a student response generating assistant that generates an ideal answer to a question dependening on the total marks that can be awarded for the question.
+
+```python
+class EnglishStudentResponseAssistant(weave.Model):
+    model: str = "llama3-8b-8192"
+    _groq_client: Optional[Groq] = None
+    
+    def __init__(self, model: Optional[str] = None):
+        super().__init__()
+        self.model = model if model is not None else self.model
+        self._groq_client = Groq(
+            api_key=os.environ.get("GROQ_API_KEY")
+        )
+    
+    @weave.op()
+    def get_prompt(
+        self, question: str, context: str, word_limit_min: int, word_limit_max: int
+    ) -> Tuple[str, str]:
+        system_prompt = """
+You are a student in a class and your teacher has asked you to answer the following question.
+You have to write the answer in the given word limit."""
+        user_prompt = f"""
+We have provided context information below. 
+
+---
+{context}
+---
+
+Answer the following question within {word_limit_min}-{word_limit_max} words:
+
+---
+{question}
+---"""
+        return system_prompt, user_prompt
+
+    @weave.op()
+    def predict(self, question: str, total_marks: int) -> str:
+        response = retreival_engine.retrieve(question)
+        context = response[0].node.text
+        if total_marks < 3:
+            word_limit_min = 5
+            word_limit_max = 50
+        elif total_marks < 5:
+            word_limit_min = 50
+            word_limit_max = 100
+        else:
+            word_limit_min = 100
+            word_limit_max = 200
+        system_prompt, user_prompt = self.get_prompt(
+            question, context, word_limit_min, word_limit_max
+        )
+        chat_completion = self._groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": user_prompt,
+                },
+            ],
+            model=self.model,
+        )
+        return chat_completion.choices[0].message.content
+```
+
+| ![](./images/weave_dashboard_student_response.png) |
+|---|
+| A trace for `EnglishStudentResponseAssistant.predict` showing the versioned `EnglishStudentResponseAssistant` model object. |
