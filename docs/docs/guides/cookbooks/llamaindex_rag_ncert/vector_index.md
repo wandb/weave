@@ -111,3 +111,9 @@ wandb.finish()
 | ![](./images/lineage.png) |
 |---|
 | Using W&B Artifacts to manage our datasets and vector store index is that it lets us version our data and track their dependencies. |
+
+## What's next?
+
+- [Building the Query Engine](./query_engine.md)
+- [Building a Better Assitant using Prompt Engineering](./prompt_engineering.md)
+- [Building an Evaluation Pipeline](./evaluation.md)

@@ -335,3 +335,7 @@ rich.print(grade)
 | ![](./images/weave_dashboard_grading_response.png) |
 |---|
 | A trace for `EnglishGradingAssistant.grade_answer` showing the versioned `EnglishGradingAssistant` model object and the `GradeExtractor` object as its output which respresents the holistic grading of the student's answer in a structured manner. |
+
+## What's next?
+
+- [Building an Evaluation Pipeline](./evaluation.md)

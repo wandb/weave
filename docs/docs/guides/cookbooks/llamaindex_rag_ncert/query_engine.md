@@ -23,7 +23,7 @@ import os
 from llama_index.llms.groq import Groq
 
 llm = Groq(
-    model="mixtral-8x7b-32768",
+    model="llama3-8b-8192",
     api_key=os.environ.get("GROQ_API_KEY")
 )
 ```
@@ -99,3 +99,8 @@ underlying current of sadness and wistfulness as M. Hamel conducted his final Fr
 | ![](./images/weave_dashboard.png) |
 |---|
 | Tracing is a powerful feature in [Weave](https://wandb.github.io/weave/guides/tracking/tracing) that allows you to track the inputs and outputs of functions seamlessly. Weave being integrated with LlamaIndex ensures that all LlamaIndex calls are traced automatically by including `weave.init()` before the calls. |
+
+## What's next?
+
+- [Building a Better Assitant using Prompt Engineering](./prompt_engineering.md)
+- [Building an Evaluation Pipeline](./evaluation.md)
