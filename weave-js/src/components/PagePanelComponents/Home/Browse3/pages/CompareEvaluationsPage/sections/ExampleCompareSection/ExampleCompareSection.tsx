@@ -12,7 +12,6 @@ import {
 } from '../../../../../../../../common/css/color.styles';
 import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
-import {Pill, TagColorName} from '../../../../../../../Tag';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
