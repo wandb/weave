@@ -64,9 +64,9 @@ export const CallOverview: React.FC<{
           <OverflowMenu
             selectedCalls={[call]}
             setIsRenaming={() => {
-              // TODO(gst): fix hack
-              const event = new Event('click') as unknown as SyntheticEvent;
-              editableCallDisplayNameRef.current?.startEditing(event);
+              editableCallDisplayNameRef.current?.startEditing(
+                new MouseEvent('click') as unknown as SyntheticEvent
+              );
             }}
           />
         </OverflowBin>
