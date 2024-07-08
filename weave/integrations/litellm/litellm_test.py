@@ -208,3 +208,42 @@ async def test_litellm_quickstart_stream_async(
     assert model_usage["completion_tokens"] == 41
     assert model_usage["prompt_tokens"] == 13
     assert model_usage["total_tokens"] == 54
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+@pytest.mark.asyncio
+def test_model_predict(
+    client: weave.weave_client.WeaveClient, patch_litellm: None
+) -> None:
+    class TranslatorModel(weave.Model):
+        model: str
+        temperature: float
+
+        @weave.op()
+        def predict(self, text: str, target_language: str):
+            response = litellm.completion(
+                api_key=os.environ.get("ANTHROPIC_API_KEY", "sk-ant-DUMMY_API_KEY"),
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"You are a translator. Translate the given text to {target_language}.",
+                    },
+                    {"role": "user", "content": text},
+                ],
+                max_tokens=1024,
+                temperature=self.temperature,
+            )
+            return response.choices[0].message.content
+
+    # Create instances with different models
+    claude_translator = TranslatorModel(
+        model="claude-3-5-sonnet-20240620", temperature=0.1
+    )
+
+    res = claude_translator.predict("There is a bug in my code!", "Spanish")
+
+    assert res != None
