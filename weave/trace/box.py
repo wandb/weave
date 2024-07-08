@@ -38,10 +38,12 @@ def box(
     | BoxedNDArray
     | BoxedDatetime
     | BoxedTimedelta
+    | None
 ):
     res = box_legacy(obj)
     if isinstance(res, BoxedNone):
         return None
+    return res
 
 
 def unbox(
