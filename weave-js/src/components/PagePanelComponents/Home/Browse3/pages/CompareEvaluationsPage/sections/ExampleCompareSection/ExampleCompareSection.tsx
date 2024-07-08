@@ -558,15 +558,6 @@ export const ExampleCompareSection: React.FC<{
               </React.Fragment>
             );
           })}
-          {_.range(NUM_DERIVED).map(di => {
-            const derivedMetric = derivedScorers[di];
-            return (
-              <React.Fragment key={di}>
-                <GridCell></GridCell>
-                <GridCell>{derivedMetric.derivedMetricName}</GridCell>
-              </React.Fragment>
-            );
-          })}
         </GridCell>
       </GridContainer>
     </VerticalBox>

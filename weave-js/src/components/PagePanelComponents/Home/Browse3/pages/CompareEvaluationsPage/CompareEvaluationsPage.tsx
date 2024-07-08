@@ -12,7 +12,6 @@
  * * Comparison Table:
  *    - [ ] (MUST) Add link to scorer in the compare table
  *    - [ ] (MUST) Evaluation pinning pushes summary off screen
- *    - [ ] (MUST) Comparison table has overlapping text: https://app.wandb.test/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%5D
  * - [ ] (MUST) Move toggle to the properties section similar to run comparer
  * - [ ] (MUST) Reflect local state in URL (dimension, range, & selection)
  * - [ ] (MUST) Sort example results to be absolute value of difference of primary metric

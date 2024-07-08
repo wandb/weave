@@ -149,7 +149,7 @@ export const ScorecardSection: React.FC<{
               );
             } else if (derivedMetricsDimension != null) {
               const scorerRef = '__DERIVED__';
-              const scorerName = derivedMetricsDimension.derivedMetricName;
+              const scorerName = '';
               const unit = dimensionUnit(derivedMetricsDimension, true);
               const lowerIsBetter =
                 derivedMetricsDimension.shouldMinimize ?? false;
