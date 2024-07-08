@@ -16,16 +16,16 @@ dataset = Dataset(rows=dataset_rows)
 expected_eval_result = {
     "model_output": {
         "mean": 9.5,
-        "none_proportion": 0.0,
+        "none_fraction": 0.0,
     },
     "score": {
         "true_count": 1,
-        "true_proportion": 0.5,
-        "none_proportion": 0.0,
+        "true_fraction": 0.5,
+        "none_fraction": 0.0,
     },
     "model_latency": {
         "mean": pytest.approx(0, abs=0.05),
-        "none_proportion": 0.0,
+        "none_fraction": 0.0,
     },
 }
 
@@ -72,16 +72,16 @@ def test_predict_can_receive_other_params(client):
     assert result == {
         "model_output": {
             "mean": 18.5,
-            "none_proportion": 0.0,
+            "none_fraction": 0.0,
         },
         "score": {
             "true_count": 0,
-            "true_proportion": 0.0,
-            "none_proportion": 0.0,
+            "true_fraction": 0.0,
+            "none_fraction": 0.0,
         },
         "model_latency": {
             "mean": pytest.approx(0, abs=0.05),
-            "none_proportion": 0.0,
+            "none_fraction": 0.0,
         },
     }
 
@@ -144,16 +144,16 @@ def test_score_as_class(client):
     assert result == {
         "model_output": {
             "mean": 9.5,
-            "none_proportion": 0.0,
+            "none_fraction": 0.0,
         },
         "MyScorer": {
             "true_count": 1,
-            "true_proportion": 0.5,
-            "none_proportion": 0.0,
+            "true_fraction": 0.5,
+            "none_fraction": 0.0,
         },
         "model_latency": {
             "mean": pytest.approx(0, abs=0.05),
-            "none_proportion": 0.0,
+            "none_fraction": 0.0,
         },
     }
 
@@ -178,12 +178,12 @@ def test_score_with_custom_summarize(client):
     assert result == {
         "model_output": {
             "mean": 9.5,
-            "none_proportion": 0.0,
+            "none_fraction": 0.0,
         },
         "MyScorer": {"awesome": 3},
         "model_latency": {
             "mean": pytest.approx(0, abs=0.05),
-            "none_proportion": 0.0,
+            "none_fraction": 0.0,
         },
     }
 
@@ -203,13 +203,13 @@ def test_multiclass_f1_score(client):
         "model_output": {
             "a": {
                 "true_count": 1,
-                "true_proportion": 1.0,
-                "none_proportion": 0.0,
+                "true_fraction": 1.0,
+                "none_fraction": 0.0,
             },
             "b": {
                 "true_count": 0,
-                "true_proportion": 0.0,
-                "none_proportion": 0.0,
+                "true_fraction": 0.0,
+                "none_fraction": 0.0,
             },
         },
         "MultiTaskBinaryClassificationF1": {
@@ -218,7 +218,7 @@ def test_multiclass_f1_score(client):
         },
         "model_latency": {
             "mean": pytest.approx(0, abs=0.05),
-            "none_proportion": 0.0,
+            "none_fraction": 0.0,
         },
     }
 
@@ -249,17 +249,17 @@ def test_score_with_errors(client):
     assert result == {
         "model_output": {
             "mean": 2.5,
-            "none_proportion": 0.0,
+            "none_fraction": 0.0,
         },
         "raise_above_2_score": {
             "actual": {
                 "true_count": 2,
-                "true_proportion": 0.5,
-                "none_proportion": 0.5,  # for cases 3,4 which raise because they are > 2
+                "true_fraction": 0.5,
+                "none_fraction": 0.5,  # for cases 3,4 which raise because they are > 2
             }
         },
         "model_latency": {
             "mean": pytest.approx(0, abs=0.1),
-            "none_proportion": 0.0,
+            "none_fraction": 0.0,
         },
     }
