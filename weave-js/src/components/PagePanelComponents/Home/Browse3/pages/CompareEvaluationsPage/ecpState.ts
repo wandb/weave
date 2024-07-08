@@ -1,14 +1,17 @@
-import { sum } from 'lodash';
+import {sum} from 'lodash';
 import _ from 'lodash';
 import {useEffect, useMemo, useState} from 'react';
 
-import { WB_RUN_COLORS } from '../../../../../../common/css/color.styles';
+import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import { PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC } from '../common/heuristics';
-import { TraceServerClient } from '../wfReactInterface/traceServerClient';
+import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
-import { convertISOToDate,projectIdFromParts } from '../wfReactInterface/tsDataModelHooks';
+import {
+  convertISOToDate,
+  projectIdFromParts,
+} from '../wfReactInterface/tsDataModelHooks';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
   DerivedMetricDefinition,
@@ -24,7 +27,7 @@ import {
 } from './ecpTypes';
 import {ComparisonDimensionsType} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
-import { dimensionId } from './ecpUtil';
+import {dimensionId} from './ecpUtil';
 
 export const useEvaluationComparisonState = (
   entity: string,
@@ -34,11 +37,7 @@ export const useEvaluationComparisonState = (
   comparisonDimensions?: ComparisonDimensionsType,
   selectedInputDigest?: string
 ): Loadable<EvaluationComparisonState> => {
-  const data = useEvaluationComparisonData(
-    entity,
-    project,
-    evaluationCallIds
-  )
+  const data = useEvaluationComparisonData(entity, project, evaluationCallIds);
 
   const value = useMemo(() => {
     if (data.result == null || data.loading) {
@@ -46,29 +45,31 @@ export const useEvaluationComparisonState = (
     }
 
     const scorerDimensions = Object.values(data.result.scorerMetricDimensions);
-    const derivedDimensions = Object.values(data.result.derivedMetricDimensions);
+    const derivedDimensions = Object.values(
+      data.result.derivedMetricDimensions
+    );
 
     let newComparisonDimensions = comparisonDimensions;
     if (newComparisonDimensions == null) {
       newComparisonDimensions = [];
       if (scorerDimensions.length > 0) {
         newComparisonDimensions.push({
-          dimension: scorerDimensions[0]
-        }); 
+          dimension: scorerDimensions[0],
+        });
         if (derivedDimensions.length > 0) {
           newComparisonDimensions.push({
-            dimension: derivedDimensions[0]
+            dimension: derivedDimensions[0],
           });
         }
       } else {
         if (derivedDimensions.length > 0) {
           newComparisonDimensions.push({
-            dimension: derivedDimensions[0]
+            dimension: derivedDimensions[0],
           });
         }
         if (derivedDimensions.length > 1) {
           newComparisonDimensions.push({
-            dimension: derivedDimensions[1]
+            dimension: derivedDimensions[1],
           });
         }
       }
@@ -82,9 +83,16 @@ export const useEvaluationComparisonState = (
           baselineEvaluationCallId ?? evaluationCallIds[0],
         comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
-      } 
+      },
     };
-  }, [data.result, data.loading, baselineEvaluationCallId, evaluationCallIds, comparisonDimensions, selectedInputDigest]);
+  }, [
+    data.result,
+    data.loading,
+    baselineEvaluationCallId,
+    evaluationCallIds,
+    comparisonDimensions,
+    selectedInputDigest,
+  ]);
 
   return value;
 };
@@ -159,7 +167,6 @@ export const useEvaluationComparisonState = (
 //   ];
 // };
 
-
 const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
 };
@@ -196,7 +203,7 @@ const useEvaluationComparisonData = (
     }
     return {loading: false, result: data};
   }, [data]);
-}
+};
 
 const fetchEvaluationComparisonData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
@@ -205,7 +212,7 @@ const fetchEvaluationComparisonData = async (
   evaluationCallIds: string[]
 ): Promise<EvaluationComparisonData> => {
   //   const [result, setResult] = useState<EvaluationComparisonState | null>(null);
-  const projectId = projectIdFromParts({ entity, project });
+  const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonData = {
     entity,
     project,
@@ -228,7 +235,7 @@ const fetchEvaluationComparisonData = async (
   // 1: populate the evaluationCalls
   const evalRes = await traceServerClient.callsQuery({
     project_id: projectId,
-    filter: { call_ids: evaluationCallIds },
+    filter: {call_ids: evaluationCallIds},
   });
   result.evaluationCalls = Object.fromEntries(
     evalRes.calls.map((call, ndx) => [
@@ -287,7 +294,7 @@ const fetchEvaluationComparisonData = async (
 
   // Backfill the evaluationCalls with the summary metrics
   Object.entries(result.evaluationCalls).forEach(([evalCallId, evalCall]) => {
-    const evalObj = result.evaluations[evalCall.evaluationRef]
+    const evalObj = result.evaluations[evalCall.evaluationRef];
     if (evalObj == null) {
       return;
     }
@@ -299,63 +306,70 @@ const fetchEvaluationComparisonData = async (
       const scorerDef: ScorerDefinition = {
         scorerOpOrObjRef: scorerRef,
         likelyTopLevelKeyName: scorerKey,
-      }
+      };
 
-        const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
-          if (isBinarySummaryScore(scoreVal)) {
-            const metricDimension: ScorerMetricDimension = {
-              dimensionType: 'scorerMetric',
-              scorerDef: {...scorerDef},
-              metricSubPath: currPath,
-              scoreType: 'binary',
-            }
-            const metricDimensionId = dimensionId(metricDimension);
-            result.scorerMetricDimensions[metricDimensionId] = metricDimension;
-            evalCall.summaryMetrics[metricDimensionId] = scoreVal;
-          } else if (isContinuousSummaryScore(scoreVal)) {
-            const metricDimension: ScorerMetricDimension = {
-              dimensionType: 'scorerMetric',
-              scorerDef: {...scorerDef},
-              metricSubPath: currPath,
-              scoreType: 'continuous',
-            }
-            const metricDimensionId = dimensionId(metricDimension);
-            result.scorerMetricDimensions[metricDimensionId] = metricDimension;
-            evalCall.summaryMetrics[metricDimensionId] = scoreVal;
-          } else if (scoreVal != null && typeof scoreVal === 'object' && !Array.isArray(scoreVal)) {
-            Object.entries(scoreVal).forEach(([key, val]) => {
-              recursiveAddScore(val, [...currPath, key]);
-            })
-          }
+      const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
+        if (isBinarySummaryScore(scoreVal)) {
+          const metricDimension: ScorerMetricDimension = {
+            dimensionType: 'scorerMetric',
+            scorerDef: {...scorerDef},
+            metricSubPath: currPath,
+            scoreType: 'binary',
+          };
+          const metricDimensionId = dimensionId(metricDimension);
+          result.scorerMetricDimensions[metricDimensionId] = metricDimension;
+          evalCall.summaryMetrics[metricDimensionId] = scoreVal;
+        } else if (isContinuousSummaryScore(scoreVal)) {
+          const metricDimension: ScorerMetricDimension = {
+            dimensionType: 'scorerMetric',
+            scorerDef: {...scorerDef},
+            metricSubPath: currPath,
+            scoreType: 'continuous',
+          };
+          const metricDimensionId = dimensionId(metricDimension);
+          result.scorerMetricDimensions[metricDimensionId] = metricDimension;
+          evalCall.summaryMetrics[metricDimensionId] = scoreVal;
+        } else if (
+          scoreVal != null &&
+          typeof scoreVal === 'object' &&
+          !Array.isArray(scoreVal)
+        ) {
+          Object.entries(scoreVal).forEach(([key, val]) => {
+            recursiveAddScore(val, [...currPath, key]);
+          });
         }
+      };
 
-        recursiveAddScore(score, []);
-    })
+      recursiveAddScore(score, []);
+    });
 
     // Add the derived metrics
     // Model latency
     const model_latency = evalCall._rawEvaluationTraceData.output.model_latency;
     if (model_latency != null) {
       const metricDimensionId = dimensionId(modelLatencyMetricDimension);
-      result.derivedMetricDimensions[metricDimensionId] = {...modelLatencyMetricDimension};
+      result.derivedMetricDimensions[metricDimensionId] = {
+        ...modelLatencyMetricDimension,
+      };
       evalCall.summaryMetrics[metricDimensionId] = model_latency;
     }
 
     // Total Tokens
-    // TODO: This "mean" is incorrect - really should average across all model 
+    // TODO: This "mean" is incorrect - really should average across all model
     // calls since this includes LLM scorers
     const totalTokens = sum(
-            Object.values(
-              evalCall._rawEvaluationTraceData.summary.usage ?? {}
-            ).map(v => v.total_tokens)
-          )
+      Object.values(evalCall._rawEvaluationTraceData.summary.usage ?? {}).map(
+        v => v.total_tokens
+      )
+    );
     if (totalTokens != null) {
-
       const metricDimensionId = dimensionId(totalTokensMetricDimension);
-      result.derivedMetricDimensions[metricDimensionId] = {...totalTokensMetricDimension};
-      evalCall.summaryMetrics[metricDimensionId] = { 'mean': totalTokens };
+      result.derivedMetricDimensions[metricDimensionId] = {
+        ...totalTokensMetricDimension,
+      };
+      evalCall.summaryMetrics[metricDimensionId] = {mean: totalTokens};
     }
-  })
+  });
 
   // 3. populate the model objects
   const modelRefs = evalRes.calls.map(call => call.inputs.model);
@@ -372,7 +386,8 @@ const fetchEvaluationComparisonData = async (
           ref,
           properties: Object.fromEntries(
             Object.entries(objData as any).filter(
-              ([key]) => key !== 'predict' &&
+              ([key]) =>
+                key !== 'predict' &&
                 !key.startsWith('_') &&
                 key !== 'name' &&
                 key !== 'description'
@@ -420,7 +435,7 @@ const fetchEvaluationComparisonData = async (
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
   const evalTraceRes = await traceServerClient.callsQuery({
     project_id: projectId,
-    filter: { trace_ids: evalTraceIds },
+    filter: {trace_ids: evalTraceIds},
   });
 
   // Create a set of all of the scorer refs
@@ -433,7 +448,8 @@ const fetchEvaluationComparisonData = async (
   // Create a map of all the predict_and_score_ops
   const predictAndScoreOps = Object.fromEntries(
     evalTraceRes.calls
-      .filter(call => call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
+      .filter(call =>
+        call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
       )
       .map(call => [call.id, call])
   );
@@ -444,8 +460,10 @@ const fetchEvaluationComparisonData = async (
     // We are looking for 2 types of calls:
     // 1. Predict calls
     // 2. Score calls.
-    if (traceCall.parent_id != null &&
-      predictAndScoreOps[traceCall.parent_id] != null) {
+    if (
+      traceCall.parent_id != null &&
+      predictAndScoreOps[traceCall.parent_id] != null
+    ) {
       const parentPredictAndScore = predictAndScoreOps[traceCall.parent_id];
       // console.log(traceCall)
       const exampleRef = parentPredictAndScore.inputs.example;
@@ -461,8 +479,9 @@ const fetchEvaluationComparisonData = async (
             const rowDigest = maybeDigest;
             const possiblePredictNames = ['predict', 'infer', 'forward'];
             const isProbablyPredictCall =
-              _.some(possiblePredictNames, name => traceCall.op_name.includes(`.${name}:`)) &&
-              modelRefs.includes(traceCall.inputs.self);
+              _.some(possiblePredictNames, name =>
+                traceCall.op_name.includes(`.${name}:`)
+              ) && modelRefs.includes(traceCall.inputs.self);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
             // WOW - super hacky. we have to do this b/c we support both instances and ops for scorers!
@@ -510,10 +529,17 @@ const fetchEvaluationComparisonData = async (
               };
             }
 
-            const modelForDigestCollection = digestCollection.evaluations[evaluationCallId];
+            const modelForDigestCollection =
+              digestCollection.evaluations[evaluationCallId];
 
-            if (modelForDigestCollection.predictAndScores[parentPredictAndScore.id] == null) {
-              modelForDigestCollection.predictAndScores[parentPredictAndScore.id] = {
+            if (
+              modelForDigestCollection.predictAndScores[
+                parentPredictAndScore.id
+              ] == null
+            ) {
+              modelForDigestCollection.predictAndScores[
+                parentPredictAndScore.id
+              ] = {
                 callId: parentPredictAndScore.id,
                 firstExampleRef: exampleRef,
                 rowDigest,
@@ -526,19 +552,26 @@ const fetchEvaluationComparisonData = async (
               };
             }
 
-            const predictAndScoreFinal = modelForDigestCollection.predictAndScores[parentPredictAndScore.id];
+            const predictAndScoreFinal =
+              modelForDigestCollection.predictAndScores[
+                parentPredictAndScore.id
+              ];
 
             if (isProbablyPredictCall) {
-              
               predictAndScoreFinal._rawPredictTraceData = traceCall;
 
               // Add model latency and tokens
-              const modelLatencyMetricDimensionId = dimensionId(modelLatencyMetricDimension);
-              predictAndScoreFinal.derivedMetrics[modelLatencyMetricDimensionId] = {
-                value:  (convertISOToDate(
-                  traceCall.ended_at ?? traceCall.started_at
-                ).getTime() -
-                  convertISOToDate(traceCall.started_at).getTime()) /
+              const modelLatencyMetricDimensionId = dimensionId(
+                modelLatencyMetricDimension
+              );
+              predictAndScoreFinal.derivedMetrics[
+                modelLatencyMetricDimensionId
+              ] = {
+                value:
+                  (convertISOToDate(
+                    traceCall.ended_at ?? traceCall.started_at
+                  ).getTime() -
+                    convertISOToDate(traceCall.started_at).getTime()) /
                   1000, // why is this different than the predictandscore model latency?
                 sourceCall: {
                   callId: traceCall.id,
@@ -547,13 +580,17 @@ const fetchEvaluationComparisonData = async (
               };
 
               // Add total tokens
-              const totalTokensMetricDimensionId = dimensionId(totalTokensMetricDimension);
+              const totalTokensMetricDimensionId = dimensionId(
+                totalTokensMetricDimension
+              );
               const totalTokens = sum(
                 Object.values(traceCall.summary?.usage ?? {}).map(
                   (x: any) => x?.total_tokens ?? 0
                 )
               );
-              predictAndScoreFinal.derivedMetrics[totalTokensMetricDimensionId] = {
+              predictAndScoreFinal.derivedMetrics[
+                totalTokensMetricDimensionId
+              ] = {
                 value: totalTokens,
                 sourceCall: {
                   callId: traceCall.id,
@@ -563,19 +600,16 @@ const fetchEvaluationComparisonData = async (
             } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
               const results = traceCall.output as any;
 
-
-               
-
               let scorerRef = traceCall.op_name;
               if (isProbablyBoundScoreCall) {
                 scorerRef = traceCall.inputs.self;
-              } 
+              }
 
               const likelyName = getScoreKeyNameFromScorerRef(scorerRef);
               const scorerDef: ScorerDefinition = {
                 scorerOpOrObjRef: scorerRef,
                 likelyTopLevelKeyName: likelyName,
-              }
+              };
 
               const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
                 if (isBinaryScore(scoreVal)) {
@@ -584,10 +618,13 @@ const fetchEvaluationComparisonData = async (
                     scorerDef: {...scorerDef},
                     metricSubPath: currPath,
                     scoreType: 'binary',
-                  }
+                  };
                   const metricDimensionId = dimensionId(metricDimension);
-                  if (result.scorerMetricDimensions[metricDimensionId] != null) {
-                    result.scorerMetricDimensions[metricDimensionId] = metricDimension;
+                  if (
+                    result.scorerMetricDimensions[metricDimensionId] != null
+                  ) {
+                    result.scorerMetricDimensions[metricDimensionId] =
+                      metricDimension;
                     predictAndScoreFinal.scorerMetrics[metricDimensionId] = {
                       sourceCall: {
                         callId: traceCall.id,
@@ -604,10 +641,13 @@ const fetchEvaluationComparisonData = async (
                     scorerDef: {...scorerDef},
                     metricSubPath: currPath,
                     scoreType: 'continuous',
-                  }
+                  };
                   const metricDimensionId = dimensionId(metricDimension);
-                  if (result.scorerMetricDimensions[metricDimensionId] != null) {
-                    result.scorerMetricDimensions[metricDimensionId] = metricDimension;
+                  if (
+                    result.scorerMetricDimensions[metricDimensionId] != null
+                  ) {
+                    result.scorerMetricDimensions[metricDimensionId] =
+                      metricDimension;
                     predictAndScoreFinal.scorerMetrics[metricDimensionId] = {
                       sourceCall: {
                         callId: traceCall.id,
@@ -618,15 +658,18 @@ const fetchEvaluationComparisonData = async (
                   } else {
                     console.error('Skipping metric', metricDimensionId);
                   }
-                } else if (scoreVal != null && typeof scoreVal === 'object' && !Array.isArray(scoreVal)) {
+                } else if (
+                  scoreVal != null &&
+                  typeof scoreVal === 'object' &&
+                  !Array.isArray(scoreVal)
+                ) {
                   Object.entries(scoreVal).forEach(([key, val]) => {
                     recursiveAddScore(val, [...currPath, key]);
-                  })
+                  });
                 }
-              }
+              };
 
               recursiveAddScore(results, []);
-
             } else {
               // console.log(traceCall);
             }
@@ -635,7 +678,6 @@ const fetchEvaluationComparisonData = async (
       }
     }
   });
-
 
   return result;
 };
@@ -654,7 +696,8 @@ export const getOrderedCallIds = (state: EvaluationComparisonState) => {
 };
 
 export const getOrderedModelRefs = (state: EvaluationComparisonState) => {
-  const baselineRef = state.data.evaluationCalls[state.baselineEvaluationCallId].modelRef;
+  const baselineRef =
+    state.data.evaluationCalls[state.baselineEvaluationCallId].modelRef;
   const refs = Object.keys(state.data.models);
   // Make sure the baseline model is first
   moveItemToFront(refs, baselineRef);
@@ -664,8 +707,7 @@ export const getOrderedModelRefs = (state: EvaluationComparisonState) => {
 const getScoreKeyNameFromScorerRef = (scorerRef: string) => {
   const parsed = parseRef(scorerRef) as WeaveObjectRef;
   return parsed.artifactName;
-}
-
+};
 
 const modelLatencyMetricDimension: DerivedMetricDefinition = {
   dimensionType: 'derivedMetric',
@@ -673,7 +715,7 @@ const modelLatencyMetricDimension: DerivedMetricDefinition = {
   derivedMetricName: 'Model Latency',
   shouldMinimize: true,
   unit: ' ms',
-}
+};
 
 const totalTokensMetricDimension: DerivedMetricDefinition = {
   dimensionType: 'derivedMetric',
@@ -681,4 +723,4 @@ const totalTokensMetricDimension: DerivedMetricDefinition = {
   derivedMetricName: 'Total Tokens',
   shouldMinimize: true,
   unit: '',
-}
+};

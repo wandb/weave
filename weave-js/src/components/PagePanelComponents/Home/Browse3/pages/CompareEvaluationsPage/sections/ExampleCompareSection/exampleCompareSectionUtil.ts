@@ -2,9 +2,9 @@ import _ from 'lodash';
 import {useMemo} from 'react';
 
 import {flattenObject} from '../../../../../Browse2/browse2Util';
-import { getOrderedCallIds } from '../../ecpState';
+import {getOrderedCallIds} from '../../ecpState';
 import {EvaluationComparisonState, PredictAndScoreCall} from '../../ecpTypes';
-import { dimensionId, resolveDimensionValueForPASCall } from '../../ecpUtil';
+import {dimensionId, resolveDimensionValueForPASCall} from '../../ecpUtil';
 
 type RowBase = {
   id: string;
@@ -14,7 +14,7 @@ type RowBase = {
   input: {[inputKey: string]: any};
   path: string[];
   predictAndScore: PredictAndScoreCall;
-}
+};
 
 type FlattenedRow = RowBase & {
   output: {[outputKey: string]: any};
@@ -33,7 +33,7 @@ type PivotedRow = RowBase & {
 //   totalTokens: {[callId: string]: number};
 // };
 
-const aggregateGroupedNestedRows = <T,>(
+const aggregateGroupedNestedRows = <T>(
   rows: PivotedRow[],
   field: keyof PivotedRow,
   aggFunc: (vals: any[]) => T
@@ -97,36 +97,34 @@ const filterNones = (list: any[]) => {
 };
 
 export const rowIsSelected = (
-
-    scores: {
-      [dimensionId: string]: {
-          [evaluationCallId: string]: number;
-      };
+  scores: {
+    [dimensionId: string]: {
+      [evaluationCallId: string]: number;
+    };
+  },
+  state: EvaluationComparisonState
+) => {
+  const compareDims = state.comparisonDimensions;
+  if (compareDims == null || compareDims.length === 0) {
+    return true;
   }
-  ,
-  state: EvaluationComparisonState) => {
-    const compareDims = state.comparisonDimensions;
-    if (compareDims == null || compareDims.length === 0) {
+  return compareDims.every(compareDim => {
+    if (
+      compareDim.rangeSelection == null ||
+      Object.entries(compareDim.rangeSelection).length === 0
+    ) {
       return true;
     }
-    return compareDims.every((compareDim) => {
-    if (compareDim.rangeSelection == null || Object.entries(compareDim.rangeSelection).length === 0) {
-      return true;
-    }
-    const values = scores[
-      dimensionId(compareDim.dimension)
-    ];
-  return Object.entries(compareDim.rangeSelection).every(([key, val]) => {
-    const rowVal = values[key] as number;
-    return val.min <= rowVal && rowVal <= val.max;
+    const values = scores[dimensionId(compareDim.dimension)];
+    return Object.entries(compareDim.rangeSelection).every(([key, val]) => {
+      const rowVal = values[key] as number;
+      return val.min <= rowVal && rowVal <= val.max;
+    });
   });
-  })
-  
-}
+};
 
 export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
-
 
   const flattenedRows = useMemo(() => {
     const rows: FlattenedRow[] = [];
@@ -147,12 +145,16 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   input: flattenObject({input: datasetRow.val}),
                   output: flattenObject({output}),
                   scores: Object.fromEntries(
-                    ([...Object.entries(state.data.scorerMetricDimensions), ...Object.entries(state.data.derivedMetricDimensions)]).map(([scoreKey, scoreVal]) => {
+                    [
+                      ...Object.entries(state.data.scorerMetricDimensions),
+                      ...Object.entries(state.data.derivedMetricDimensions),
+                    ].map(([scoreKey, scoreVal]) => {
                       return [
                         scoreKey,
                         resolveDimensionValueForPASCall(
-                          scoreVal, predictAndScoreRes
-                        )
+                          scoreVal,
+                          predictAndScoreRes
+                        ),
                       ];
                     })
                   ),
@@ -161,10 +163,8 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                     predictAndScoreRes.evaluationCallId,
                     predictAndScoreRes.callId,
                   ],
-                predictAndScore: predictAndScoreRes
-
+                  predictAndScore: predictAndScoreRes,
                 });
-                
               }
             }
           );
@@ -172,9 +172,14 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       }
     );
     return rows;
-  }, [state.data.resultRows, state.data.inputs, state.data.scorerMetricDimensions, state.data.derivedMetricDimensions]);
+  }, [
+    state.data.resultRows,
+    state.data.inputs,
+    state.data.scorerMetricDimensions,
+    state.data.derivedMetricDimensions,
+  ]);
 
-  // const filteredDigests 
+  // const filteredDigests
   const pivotedRows = useMemo(() => {
     // Ok, so in this step we are going to pivot -
     // id: string; - no change
@@ -253,8 +258,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     );
   }, [pivotedRows]);
 
-
-
   const filteredRows = useMemo(() => {
     const aggregatedAsList = Object.values(aggregatedRows);
     const compareDims = state.comparisonDimensions;
@@ -263,36 +266,32 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
         return rowIsSelected(aggregatedRows[digest].scores, state);
       });
-      
-       res = aggregatedAsList.filter(row =>
+
+      res = aggregatedAsList.filter(row =>
         allowedDigests.includes(row.inputDigest)
-      )
+      );
     }
-    if ( compareDims != null && compareDims.length > 0) {
+    if (compareDims != null && compareDims.length > 0) {
       // Sort by the difference between the max and min values
       const compareDim = compareDims[0];
-        res = _.sortBy(res,  row => {
-          const values =
-            aggregatedRows[row.inputDigest].scores[
-              dimensionId(compareDim.dimension)
-            ];
-            const valuesAsNumbers = Object.values(values).map(v => {
-              if (typeof v === 'number') {
-                return v;
-              } else if (typeof v === 'boolean') {
-                return v ? 1 : 0;
-              } else {
-                return 0;
-              }
-            }
-            )
-          return -(Math.max(...valuesAsNumbers) - Math.min(...valuesAsNumbers))
-        })
-
+      res = _.sortBy(res, row => {
+        const values =
+          aggregatedRows[row.inputDigest].scores[
+            dimensionId(compareDim.dimension)
+          ];
+        const valuesAsNumbers = Object.values(values).map(v => {
+          if (typeof v === 'number') {
+            return v;
+          } else if (typeof v === 'boolean') {
+            return v ? 1 : 0;
+          } else {
+            return 0;
+          }
+        });
+        return -(Math.max(...valuesAsNumbers) - Math.min(...valuesAsNumbers));
+      });
     }
-      return res;
-    
-
+    return res;
   }, [aggregatedRows, state]);
 
   const inputColumnKeys = useMemo(() => {
@@ -332,4 +331,3 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     };
   }, [filteredRows, inputColumnKeys, leafDims, outputColumnKeys]);
 };
-

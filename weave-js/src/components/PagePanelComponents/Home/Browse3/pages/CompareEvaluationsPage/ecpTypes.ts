@@ -3,7 +3,6 @@ import {
   TraceObjSchema,
 } from '../wfReactInterface/traceServerClient';
 
-
 export type EvaluationComparisonState = {
   data: EvaluationComparisonData;
   baselineEvaluationCallId: string;
@@ -17,8 +16,7 @@ type BinarySummaryScore = {
 type BinaryScore = boolean;
 export const isBinaryScore = (score: any): score is BinaryScore => {
   return typeof score === 'boolean';
-}
-
+};
 
 type ContinuousSummaryScore = {
   mean: number;
@@ -46,11 +44,10 @@ export const isContinuousScore = (score: any): score is ContinuousScore => {
   return typeof score === 'number';
 };
 
-
 export type ScorerDefinition = {
   scorerOpOrObjRef: string;
   likelyTopLevelKeyName: string;
-}
+};
 
 export type ScorerMetricDimension = {
   dimensionType: 'scorerMetric';
@@ -70,16 +67,18 @@ export type DerivedMetricDefinition = {
 export const isScorerMetricDimension = (
   dim: EvaluationMetricDimension
 ): dim is ScorerMetricDimension => {
-  return typeof dim === 'object' &&dim.dimensionType === 'scorerMetric';
-}
+  return typeof dim === 'object' && dim.dimensionType === 'scorerMetric';
+};
 
 export const isDerivedMetricDefinition = (
   dim: EvaluationMetricDimension
 ): dim is DerivedMetricDefinition => {
   return typeof dim === 'object' && dim.dimensionType === 'derivedMetric';
-}
+};
 
-export type EvaluationMetricDimension = ScorerMetricDimension | DerivedMetricDefinition
+export type EvaluationMetricDimension =
+  | ScorerMetricDimension
+  | DerivedMetricDefinition;
 
 export type EvaluationEvaluateCallSchema = TraceCallSchema & {
   inputs: TraceCallSchema['inputs'] & {
@@ -105,8 +104,7 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
   };
 };
 
-
-export type SummaryScore = BinarySummaryScore | ContinuousSummaryScore
+export type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
 export type EvaluationCall = {
   callId: string;
   name: string;
@@ -139,7 +137,7 @@ type ModelObj = {
   _rawModelObject: TraceObjSchema;
 };
 
-export type ScoreType = BinaryScore | ContinuousScore
+export type ScoreType = BinaryScore | ContinuousScore;
 export type MetricResult = {
   value: ScoreType;
   sourceCall: {
@@ -147,7 +145,6 @@ export type MetricResult = {
     _rawScoreTraceData: TraceCallSchema;
   };
 };
-
 
 export type EvaluationComparisonData = {
   entity: string;
@@ -175,8 +172,10 @@ export type EvaluationComparisonData = {
       };
     };
   };
-  derivedMetricDimensions: {[metricDimensionId: string]: DerivedMetricDefinition}
-  scorerMetricDimensions: {[metricDimensionId: string]: ScorerMetricDimension}
+  derivedMetricDimensions: {
+    [metricDimensionId: string]: DerivedMetricDefinition;
+  };
+  scorerMetricDimensions: {[metricDimensionId: string]: ScorerMetricDimension};
 };
 export type PredictAndScoreCall = {
   callId: string;
@@ -194,10 +193,9 @@ export type PredictAndScoreCall = {
   _rawPredictTraceData?: TraceCallSchema;
 };
 
-export type RangeSelection = { [evalCallId: string]: { min: number; max: number; }; };
+export type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
 
 export type ComparisonDimensionsType = Array<{
   dimension: EvaluationMetricDimension;
   rangeSelection?: RangeSelection;
 }>;
-

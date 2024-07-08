@@ -1,7 +1,10 @@
-
 import {EvaluationComparisonState} from '../../ecpTypes';
-import { dimensionLabel, dimensionShouldMinimize, dimensionUnit, resolveDimensionValueForEvaluateCall } from '../../ecpUtil';
-
+import {
+  dimensionLabel,
+  dimensionShouldMinimize,
+  dimensionUnit,
+  resolveDimensionValueForEvaluateCall,
+} from '../../ecpUtil';
 
 type SummaryPlotsLegacyComparisonMetric = {
   path: string;
@@ -13,11 +16,11 @@ type SummaryPlotsLegacyComparisonMetric = {
 export const summaryMetrics = (
   state: EvaluationComparisonState
 ): SummaryPlotsLegacyComparisonMetric[] => {
-  const results:SummaryPlotsLegacyComparisonMetric[] = []
+  const results: SummaryPlotsLegacyComparisonMetric[] = [];
   const allEntries = [
     ...Object.entries(state.data.scorerMetricDimensions),
-    ...Object.entries(state.data.derivedMetricDimensions), 
-  ]
+    ...Object.entries(state.data.derivedMetricDimensions),
+  ];
   allEntries.forEach(([metricId, metric]) => {
     results.push({
       path: dimensionLabel(metric),
@@ -26,22 +29,11 @@ export const summaryMetrics = (
       values: Object.fromEntries(
         Object.entries(state.data.evaluationCalls).map(([callId, call]) => [
           callId,
-          resolveDimensionValueForEvaluateCall(
-            metric,
-            call
-          )
+          resolveDimensionValueForEvaluateCall(metric, call),
         ])
       ),
-    })
+    });
+  });
 
-  })
-
-  
-
-  return results
-
-
-
-
-
+  return results;
 };

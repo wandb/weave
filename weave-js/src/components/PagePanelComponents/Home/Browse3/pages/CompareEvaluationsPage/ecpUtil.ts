@@ -1,6 +1,21 @@
-import { EvaluationCall, EvaluationMetricDimension, isBinaryScore, isBinarySummaryScore, isContinuousSummaryScore, isDerivedMetricDefinition, isScorerMetricDimension,MetricResult, PredictAndScoreCall, ScoreType, SummaryScore } from './ecpTypes';
+import {
+  EvaluationCall,
+  EvaluationMetricDimension,
+  isBinaryScore,
+  isBinarySummaryScore,
+  isContinuousSummaryScore,
+  isDerivedMetricDefinition,
+  isScorerMetricDimension,
+  MetricResult,
+  PredictAndScoreCall,
+  ScoreType,
+  SummaryScore,
+} from './ecpTypes';
 
-export const adjustValueForDisplay = (value: number | boolean | undefined, isBooleanAggregate?: boolean): number | undefined => {
+export const adjustValueForDisplay = (
+  value: number | boolean | undefined,
+  isBooleanAggregate?: boolean
+): number | undefined => {
   if (value === undefined) {
     return undefined;
   }
@@ -11,11 +26,11 @@ export const adjustValueForDisplay = (value: number | boolean | undefined, isBoo
   } else {
     return value;
   }
-}
+};
 
 export const dimensionLabel = (dim: EvaluationMetricDimension): string => {
   if (isScorerMetricDimension(dim)) {
-    const parts = [dim.scorerDef.likelyTopLevelKeyName , ...dim.metricSubPath];
+    const parts = [dim.scorerDef.likelyTopLevelKeyName, ...dim.metricSubPath];
     return parts.join('.');
   } else if (isDerivedMetricDefinition(dim)) {
     return dim.derivedMetricName;
@@ -24,7 +39,10 @@ export const dimensionLabel = (dim: EvaluationMetricDimension): string => {
   }
 };
 
-export const dimensionUnit = (dim: EvaluationMetricDimension, isAggregate?: boolean): string => {
+export const dimensionUnit = (
+  dim: EvaluationMetricDimension,
+  isAggregate?: boolean
+): string => {
   if (isScorerMetricDimension(dim)) {
     if (isAggregate && dim.scoreType === 'binary') {
       return '%';
@@ -37,17 +55,17 @@ export const dimensionUnit = (dim: EvaluationMetricDimension, isAggregate?: bool
   }
 };
 
-export const dimensionShouldMinimize = (dim: EvaluationMetricDimension): boolean => {
+export const dimensionShouldMinimize = (
+  dim: EvaluationMetricDimension
+): boolean => {
   if (isScorerMetricDimension(dim)) {
-    return false
+    return false;
   } else if (isDerivedMetricDefinition(dim)) {
     return dim.shouldMinimize ?? false;
   } else {
     throw new Error('Unknown dimension type');
   }
 };
-
-
 
 export const dimensionId = (dim: EvaluationMetricDimension): string => {
   if (isScorerMetricDimension(dim)) {
@@ -71,7 +89,6 @@ export const resolveDimensionMetricResultForPASCall = (
   }
 };
 
-
 export const resolveDimensionValueForPASCall = (
   dim: EvaluationMetricDimension,
   pasCall: PredictAndScoreCall
@@ -83,14 +100,12 @@ export const resolveDimensionValueForPASCall = (
   return undefined;
 };
 
-
 const resolveDimensionSummaryScoreForEvaluateCall = (
   dim: EvaluationMetricDimension,
   evaluateCall: EvaluationCall
 ): SummaryScore | undefined => {
   return evaluateCall.summaryMetrics[dimensionId(dim)];
 };
-
 
 export const resolveDimensionValueForEvaluateCall = (
   dim: EvaluationMetricDimension,
@@ -103,4 +118,4 @@ export const resolveDimensionValueForEvaluateCall = (
     return score.mean;
   }
   return undefined;
-}
+};
