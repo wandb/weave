@@ -97,76 +97,6 @@ export const useEvaluationComparisonState = (
   return value;
 };
 
-// const evaluationCallDimensions = (
-//   data: EvaluationComparisonData
-// ): EvaluationMetricDimension[] => {
-//   // const availableScorers = Object.values(evaluationCalls)
-//   //   .map(evalCall =>
-//   //     Object.entries(evalCall.scores)
-//   //       .map(([k, v]) => Object.keys(v).map(innerKey => k + '.' + innerKey))
-//   //       .flat()
-//   //   )
-//   //   .flat();
-//   const availableScorersMap: {[ref: string]: {[path: string]: EvaluationMetricDimension}} =
-//     {};
-//   const recordScorer = (scoreDim: EvaluationMetricDimension) => {
-//     if (!availableScorersMap[scoreDim.scorerOpOrObjRef]) {
-//       availableScorersMap[scoreDim.scorerOpOrObjRef] = {};
-//     }
-//     availableScorersMap[scoreDim.scorerOpOrObjRef][scoreDim.scoreKeyPath] = scoreDim;
-//   };
-
-//   const addScore = (score: any, scoreRef: string, scoreKeyPath: string) => {
-//     // Two types of scores: single value and dict
-//     if (isBinarySummaryScore(score)) {
-//       recordScorer({
-//         scorerOpOrObjRef: scoreRef,
-//         scoreKeyPath,
-//         scoreType: 'binary',
-//         minimize: false,
-//       });
-//     } else if (isContinuousSummaryScore(score)) {
-//       recordScorer({
-//         scorerOpOrObjRef: scoreRef,
-//         scoreKeyPath,
-//         scoreType: 'continuous',
-//         minimize: false,
-//       });
-//     } else if (
-//       score != null &&
-//       typeof score === 'object' &&
-//       !Array.isArray(score)
-//     ) {
-//       Object.entries(score).forEach(([key, value]) => {
-//         addScore(value, scoreRef, scoreKeyPath + '.' + key);
-//       });
-//     }
-//   };
-
-//   Object.values(data.evaluationCalls).forEach(evalCall => {
-//     const evalObject = data.evaluations[evalCall.evaluationRef];
-//     evalObject.scorerRefs.forEach(scoreRef => {
-//       const scorerKey = (parseRef(scoreRef) as WeaveObjectRef).artifactName;
-//       // TODO(Metric Refactor): Should put scores at the top level using the ref, not name as the key!
-//       const score = evalCall._rawEvaluationTraceData.output[scorerKey];
-//       addScore(score, scoreRef, scorerKey);
-//     });
-//   });
-
-//   // recordScorer({
-//   //   scorerRef: ,
-//   //   scoreKeyPath: scoreKeyPath,
-//   //   scoreType: 'continuous',
-//   //   minimize: false,
-//   // })
-
-//   return [
-//     ...Object.values(availableScorersMap).map(Object.values).flat(),
-//     // 'model_latency',
-//     // 'total_tokens',
-//   ];
-// };
-
 const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
 };
@@ -211,7 +141,6 @@ const fetchEvaluationComparisonData = async (
   project: string,
   evaluationCallIds: string[]
 ): Promise<EvaluationComparisonData> => {
-  //   const [result, setResult] = useState<EvaluationComparisonState | null>(null);
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonData = {
     entity,
@@ -245,7 +174,6 @@ const fetchEvaluationComparisonData = async (
         // TODO: Get user-defined name for the evaluation
         name: 'Evaluation',
         color: pickColor(ndx),
-        // color: generateColorFromId(call.id),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
         summaryMetrics: {}, // These cannot be filled out yet since we don't know the IDs yet
@@ -373,7 +301,6 @@ const fetchEvaluationComparisonData = async (
 
   // 3. populate the model objects
   const modelRefs = evalRes.calls.map(call => call.inputs.model);
-  // console.log(modelRefs)
   const modelObjRes = await objReadMany(modelRefs);
   result.models = Object.fromEntries(
     modelObjRes.map((objRes, objNdx) => {
@@ -423,7 +350,6 @@ const fetchEvaluationComparisonData = async (
     }),
     digest: parsedRowsRef.artifactVersion,
   });
-  // console.log(parsedDatasetRef);
   rowsQuery.rows.forEach(row => {
     result.inputs[row.digest] = {
       digest: row.digest,
@@ -454,7 +380,6 @@ const fetchEvaluationComparisonData = async (
       .map(call => [call.id, call])
   );
 
-  // console.log(evalTraceRes, predictAndScoreOps)
   // Next, we need to build the predictions object
   evalTraceRes.calls.forEach(traceCall => {
     // We are looking for 2 types of calls:
@@ -465,7 +390,6 @@ const fetchEvaluationComparisonData = async (
       predictAndScoreOps[traceCall.parent_id] != null
     ) {
       const parentPredictAndScore = predictAndScoreOps[traceCall.parent_id];
-      // console.log(traceCall)
       const exampleRef = parentPredictAndScore.inputs.example;
       const modelRef = parentPredictAndScore.inputs.model;
       const evaluationCallId = parentPredictAndScore.parent_id!;
@@ -495,34 +419,7 @@ const fetchEvaluationComparisonData = async (
               };
             }
             const digestCollection = result.resultRows[rowDigest];
-            // resultRows: {
-            //   [rowDigest: string]: {
-            //     models: {
-            //       [modelRef: string]: {
-            //         predictAndScores: {
-            //           [predictAndScoreCallId: string]: PredictAndScoreCall;
-            //         };
-            //       }
-            //     };
-            //   };
-            // };
-            // type PredictAndScoreCall = {
-            //   callId: string;
-            //   exampleRef: string;
-            //   modelRef: string;
-            //   predictCall?: {
-            //     callId: string;
-            //     exampleRef: string;
-            //     output: any
-            //     latencyMs: number;
-            //     totalUsageTokens: number;
-            //     _rawPredictTraceData: TraceCallSchema;
-            //   }
-            //   scores: {
-            //     [scorerRef: string]: ScoreResults;
-            //   };
-            //   _rawPredictAndScoreTraceData: TraceCallSchema;
-            // };
+
             if (digestCollection.evaluations[evaluationCallId] == null) {
               digestCollection.evaluations[evaluationCallId] = {
                 predictAndScores: {},
@@ -671,7 +568,7 @@ const fetchEvaluationComparisonData = async (
 
               recursiveAddScore(results, []);
             } else {
-              // console.log(traceCall);
+              // pass
             }
           }
         }

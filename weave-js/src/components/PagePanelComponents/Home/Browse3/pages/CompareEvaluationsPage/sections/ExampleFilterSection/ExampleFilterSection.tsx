@@ -67,7 +67,6 @@ export const ExampleFilterSection: React.FC<{
       <Alert
         severity="info"
         action={
-          // Expand icon - j
           <Button
             color="inherit"
             size="small"
@@ -121,11 +120,6 @@ const SingleDimensionFilter: React.FC<{
 
   const data = useMemo(() => {
     const series: ScatterPlotData = [];
-    // = {
-    //   x: [],
-    //   y: [],
-    //   color: MOON_500,
-    // };
     if (targetDimension != null) {
       Object.entries(props.state.data.resultRows).forEach(([digest, row]) => {
         const xVals: number[] = [];
@@ -173,15 +167,6 @@ const SingleDimensionFilter: React.FC<{
       });
     }
 
-    // const minSize = Math.min(...series.map(s => s.size));
-    // const maxSize = Math.max(...series.map(s => s.size));
-    // const targetRange = [12, 20];
-    // series.forEach(s => {
-    //   const targetRangeSize = targetRange[1] - targetRange[0];
-    //   const sizePct = (1 + (s.size - minSize)) / (1 + (maxSize - minSize));
-    //   s.size = targetRange[0] + targetRangeSize * sizePct;
-    // });
-
     return series;
   }, [
     baselineCallId,
@@ -190,7 +175,6 @@ const SingleDimensionFilter: React.FC<{
     props.state.data.resultRows,
     targetDimension,
   ]);
-  // console.log(data, props.state);
 
   const onRangeChange = useCallback(
     (xMin?: number, xMax?: number, yMin?: number, yMax?: number) => {
@@ -271,7 +255,7 @@ export const DimensionPicker: React.FC<{
     props.state.data.scorerMetricDimensions,
   ]);
   const {setComparisonDimensions} = useCompareEvaluationsState();
-  // console.log(dimensions);
+
   const dimensionMap = useMemo(() => {
     return Object.fromEntries(dimensions.map(dim => [dimensionId(dim), dim]));
   }, [dimensions]);

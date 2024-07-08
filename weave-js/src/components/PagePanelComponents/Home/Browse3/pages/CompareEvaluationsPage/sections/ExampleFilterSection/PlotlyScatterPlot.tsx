@@ -40,24 +40,11 @@ export const PlotlyScatterPlot: React.FC<{
         size: s.size,
         symbol: s.selected ? 'circle' : 'circle-open',
       },
-      // selected: {
-      //   marker: {
-      //     color: MOON_300,
-      //     opacity: 1,
-      //   },
-      // },
-      // unselected: {
-      //   marker: {
-      //     color: MOON_100,
-      //     opacity: 1,
-      //   },
-      // },
     }));
   }, [props.data]);
 
   const ranges = useMemo(() => {
     const vals = props.data.map(s => [s.x, s.y]).flat();
-    // const y = props.data.map(s => s.y).flat();
     return {
       x: [Math.min(...vals), Math.max(...vals)],
       y: [Math.min(...vals), Math.max(...vals)],
@@ -70,7 +57,6 @@ export const PlotlyScatterPlot: React.FC<{
   const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
       height: props.height,
-      // width: props.height,
       showlegend: false,
       margin: {
         l: 0, // legend
@@ -81,8 +67,6 @@ export const PlotlyScatterPlot: React.FC<{
       },
       dragmode: 'select',
       xaxis: {
-        // fixedrange: true,
-        // title: props.xTitle,
         tickformat: props.xIsPercentage ? '.0%' : '',
         gridcolor: MOON_300,
         linecolor: props.xColor,
@@ -90,27 +74,18 @@ export const PlotlyScatterPlot: React.FC<{
         title: {
           text: props.xTitle,
           standoff: 10,
-          // font: {
-          //   color: props.xColor,
-          // },
         },
         automargin: true,
       },
       yaxis: {
-        // fixedrange: true,
-        // title: props.yTitle,
         tickformat: props.yIsPercentage ? '.0%' : '',
         gridcolor: MOON_300,
         linecolor: props.yColor,
         linewidth: 2,
-        // title: 'Challenger',
         automargin: true,
         title: {
           text: props.yTitle,
           standoff: 10,
-          // font: {
-          //   color: props.yColor,
-          // },
         },
       },
       shapes: [

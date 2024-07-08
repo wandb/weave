@@ -32,8 +32,6 @@ import {
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
 
-// const FIXED_SCORE_LABEL_WIDTH = 'inherit'; // '150px';
-
 type ScorecardSpecificLegacyScoresType = {
   [scorerId: string]: {
     scorerRef?: string;
@@ -51,16 +49,12 @@ type ScorecardSpecificLegacyScoresType = {
 
 const GridCell = styled.div`
   padding: 6px 16px;
-  /* white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis; */
   min-width: 100px;
 `;
 
 export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  // console.log(props);
   const baselineRef =
     props.state.data.evaluationCalls[props.state.baselineEvaluationCallId]
       .modelRef;
@@ -185,111 +179,12 @@ export const ScorecardSection: React.FC<{
         );
       }
     );
-    // Object.values(props.state.data.evaluationCalls).forEach(evaluationCall => {
-    //   Object.keys(evaluationCall.summaryMetrics).forEach(scoreName => {
-    //     const scoreRefsParsed = props.state.data.evaluations[
-    //       evaluationCall.evaluationRef
-    //     ].scorerRefs.map(ref => ({
-    //       parsed: parseRef(ref) as WeaveObjectRef,
-    //       ref,
-    //     }));
-    //     const scorerRef = scoreRefsParsed.find(
-    //       ref => ref.parsed.artifactName === scoreName
-    //     )?.ref;
-    //     if (!scorerRef) {
-    //       console.error('No score ref found for', scoreName);
-    //       return;
-    //     }
-    //     const parsed = parseRef(scorerRef) as WeaveObjectRef;
-    //     if (!res[scoreName]) {
-    //       res[scoreName] = {
-    //         scorerRef,
-    //         scorerName: parsed.artifactName,
-    //         metrics: {},
-    //       };
-    //     }
-
-    //     if (evaluationCall.summaryMetrics[scoreName]) {
-    //       Object.keys(evaluationCall.summaryMetrics[scoreName]).forEach(
-    //         metricKey => {
-    //           const summaryValue = resolveDimensionValueForEvaluateCall(dim, evaluationCall);
-    //           evaluationCall.summaryMetrics[scoreName][metricKey];
-    //           let value = 0;
-    //           let unit = '';
-    //           if (isContinuousSummaryScore(summaryValue)) {
-    //             value = summaryValue.mean;
-    //           } else if (isBinarySummaryScore(summaryValue)) {
-    //             value = summaryValue.true_fraction;
-    //             unit = '%';
-    //           } else {
-    //             console.error('Unknown score type', summaryValue);
-    //             return;
-    //           }
-    //           if (!res[scoreName].metrics[metricKey]) {
-    //             res[scoreName].metrics[metricKey] = {
-    //               displayName: metricKey,
-    //               unit,
-    //               lowerIsBetter: false,
-    //               modelScores: {},
-    //             };
-    //           }
-    //           res[scoreName].metrics[metricKey].modelScores[
-    //             evaluationCall.modelRef
-    //           ] = value;
-    //         }
-    //       );
-    //     }
-    //   });
-    // });
-
-    // // Add tokens and latency last
-    // Object.values(props.state.data.evaluationCalls).forEach(evaluationCall => {
-    //   const scorerKey = '__computed__';
-    //   if (!res[scorerKey]) {
-    //     res[scorerKey] = {
-    //       scorerRef: scorerKey,
-    //       scorerName: '',
-    //       metrics: {},
-    //     };
-    //   }
-
-    //   const tokenMetric = 'Total Tokens';
-    //   if (!res[scorerKey].metrics[tokenMetric]) {
-    //     res[scorerKey].metrics[tokenMetric] = {
-    //       displayName: tokenMetric,
-    //       unit: '',
-    //       lowerIsBetter: true,
-    //       modelScores: {},
-    //     };
-    //   }
-    //   res[scorerKey].metrics[tokenMetric].modelScores[evaluationCall.modelRef] =
-    //     sum(
-    //       Object.values(
-    //         evaluationCall._rawEvaluationTraceData.summary.usage ?? {}
-    //       ).map(v => v.total_tokens)
-    //     );
-
-    //   const meanLatency = 'Avg. Latency';
-    //   if (!res[scorerKey].metrics[meanLatency]) {
-    //     res[scorerKey].metrics[meanLatency] = {
-    //       displayName: meanLatency,
-    //       unit: ' ms',
-    //       lowerIsBetter: true,
-    //       modelScores: {},
-    //     };
-    //   }
-    //   res[scorerKey].metrics[meanLatency].modelScores[evaluationCall.modelRef] =
-    //     evaluationCall._rawEvaluationTraceData.output.model_latency.mean ?? 0;
-    // });
-
     return res;
   }, [
     props.state.data.derivedMetricDimensions,
     props.state.data.evaluationCalls,
     props.state.data.scorerMetricDimensions,
   ]);
-
-  // console.log(betterScores);
 
   let gridTemplateColumns = '';
   gridTemplateColumns += 'min-content '; // Scorer Name
@@ -329,7 +224,6 @@ export const ScorecardSection: React.FC<{
           border: STANDARD_BORDER,
           borderRadius: BOX_RADIUS,
           overflow: 'auto',
-          // gap: '16px',
         }}>
         {/* Header Row */}
         <GridCell
@@ -340,23 +234,17 @@ export const ScorecardSection: React.FC<{
           }}>
           Evaluation
         </GridCell>
-        {/* <GridCell></GridCell> */}
         {evalCallIds.map(evalCallId => {
           return (
             <GridCell
               key={evalCallId}
               style={{
                 fontWeight: 'bold',
-                // borderTopLeftRadius: '6px',
-                // borderTop: '1px solid #ccc',
-                // borderLeft: '1px solid #ccc',
               }}>
               <EvaluationCallLink callId={evalCallId} state={props.state} />
             </GridCell>
           );
         })}
-        {/* <GridCell></GridCell> */}
-        {/* Header Row */}
         <GridCell
           style={{
             fontWeight: 'bold',
@@ -365,22 +253,17 @@ export const ScorecardSection: React.FC<{
           }}>
           Model
         </GridCell>
-        {/* <GridCell></GridCell> */}
         {evalCallIds.map(evalCallId => {
           return (
             <GridCell
               key={evalCallId}
               style={{
                 fontWeight: 'bold',
-                // borderTopLeftRadius: '6px',
-                // borderTop: '1px solid #ccc',
-                // borderLeft: '1px solid #ccc',
               }}>
               <EvaluationModelLink callId={evalCallId} state={props.state} />
             </GridCell>
           );
         })}
-        {/* <GridCell></GridCell> */}
         <GridCell
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
@@ -418,8 +301,6 @@ export const ScorecardSection: React.FC<{
                   gridColumnEnd: 'span 2',
                   fontWeight: 'bold',
                   textAlign: 'right',
-                  // paddingRight: '10px',
-                  // width: FIXED_SCORE_LABEL_WIDTH,
                   textOverflow: 'ellipsis',
                 }}>
                 {prop}
@@ -450,7 +331,6 @@ export const ScorecardSection: React.FC<{
                   );
                 }
               })}
-              {/* <GridCell></GridCell> */}
             </React.Fragment>
           );
         })}
@@ -467,7 +347,6 @@ export const ScorecardSection: React.FC<{
         </GridCell>
         {/* Score Rows */}
         {Object.entries(betterScores).map(([key, def]) => {
-          // TODO: this might be wrong if the scorers change between evals with the same name!! Need to revisit
           const scorerRefParsed = parseRefMaybe(
             def.scorerRef ?? ''
           ) as WeaveObjectRef | null;
@@ -477,10 +356,7 @@ export const ScorecardSection: React.FC<{
                 <>
                   <GridCell
                     style={{
-                      // vertical span length of metric
-                      // gridColumnEnd: 'span ' + (evalCallIds.length + 2),
                       gridColumnEnd: 'span 2',
-                      // gridRowEnd: `span ${Object.keys(def.metrics).length}`,
                       borderTop: '1px solid #ccc',
                       fontWeight: 'bold',
                       textAlign: 'left',
@@ -504,14 +380,12 @@ export const ScorecardSection: React.FC<{
                     <GridCell
                       style={{
                         gridColumnEnd: 'span 2',
-                        // gridColumnEnd: def.scorerName ? 'span 1' : 'span 2',
                         borderBottom:
                           metricNdx === Object.keys(def.metrics).length - 1
                             ? '1px solid #ccc'
                             : '',
                         fontWeight: 'bold',
                         textAlign: 'right',
-                        // width: FIXED_SCORE_LABEL_WIDTH,
                         textOverflow: 'ellipsis',
                       }}>
                       {def.metrics[metricKey].displayName}
@@ -540,7 +414,6 @@ export const ScorecardSection: React.FC<{
                               <span
                                 style={{
                                   minWidth: '70px',
-                                  // flex: '1 1 auto',
                                 }}>
                                 <ValueViewNumber
                                   fractionDigits={SIGNIFICANT_DIGITS}
@@ -563,20 +436,6 @@ export const ScorecardSection: React.FC<{
                         </GridCell>
                       );
                     })}
-                    {/* <GridCell
-                      style={{
-                        borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
-                      }}>
-                      <ValueViewNumber
-                        fractionDigits={SIGNIFICANT_DIGITS}
-                        value={
-                          ((scores as any)[metric.key] as any)[modelRefs[0]] -
-                          ((scores as any)[metric.key] as any)[modelRefs[1]]
-                        }
-                      />
-                      {metric.unit}
-                    </GridCell> */}
-                    {/* <GridCell></GridCell> */}
                   </React.Fragment>
                 );
               })}

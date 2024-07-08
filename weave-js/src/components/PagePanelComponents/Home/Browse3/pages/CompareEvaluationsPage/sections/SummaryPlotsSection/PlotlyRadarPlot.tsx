@@ -29,7 +29,6 @@ export const PlotlyRadarPlot: React.FC<{
       };
     });
   }, [props.data]);
-  // console.log(plotlyData);
   const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
       height: props.height,
@@ -46,14 +45,12 @@ export const PlotlyRadarPlot: React.FC<{
         radialaxis: {
           linecolor: MOON_300,
           visible: false,
-          // range: [0, 50],
           gridcolor: MOON_300,
         },
         angularaxis: {
           linecolor: MOON_300,
           gridcolor: MOON_300,
           ticklen: 3,
-          // tickangle: 90,
         },
       },
     };

@@ -343,9 +343,6 @@ export const CallsTable: FC<{
   );
 
   // Selection Management
-  // TODO: Limit this to 2
-  // TODO: by default, consider always including the peekId
-  // TODO: Add this state to the URL
   const [compareSelection, setCompareSelection] = useState<string[]>([]);
   const muiColumns = useMemo(() => {
     if (!isEvaluateTable) {

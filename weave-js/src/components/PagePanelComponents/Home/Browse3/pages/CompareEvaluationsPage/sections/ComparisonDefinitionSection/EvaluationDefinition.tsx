@@ -43,7 +43,6 @@ export const EvaluationCallLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;
 }> = props => {
-  // console.log(props.state, props.callId);
   const evaluationCall = props.state.data.evaluationCalls[props.callId];
   const [entity, project] =
     evaluationCall._rawEvaluationTraceData.project_id.split('/');

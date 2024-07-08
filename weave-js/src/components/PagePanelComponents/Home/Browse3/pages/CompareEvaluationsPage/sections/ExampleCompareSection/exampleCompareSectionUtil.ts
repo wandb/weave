@@ -26,13 +26,6 @@ type PivotedRow = RowBase & {
   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
 };
 
-// type AggregatedRow = RowBase & {
-//   output: {[outputKey: string]: {[callId: string]: any}};
-//   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
-//   latency: {[callId: string]: number};
-//   totalTokens: {[callId: string]: number};
-// };
-
 const aggregateGroupedNestedRows = <T>(
   rows: PivotedRow[],
   field: keyof PivotedRow,
@@ -68,30 +61,7 @@ const aggregateGroupedNestedRows = <T>(
     })
   );
 };
-// const aggregateGroupedRows = (
-//   rows: PivotedRow[],
-//   field: keyof PivotedRow,
-//   aggFunc: (vals: any[]) => any
-// ) => {
-//   return Object.fromEntries(
-//     Object.entries(
-//       rows.reduce<{
-//         [flatKey: string]: any[];
-//       }>((acc, row) => {
-//         Object.entries(row[field]).forEach(([key, val]) => {
-//           if (acc[key] == null) {
-//             acc[key] = [];
-//           }
-//           acc[key].push(val);
-//         });
 
-//         return acc;
-//       }, {})
-//     ).map(([key, val]) => {
-//       return [key, aggFunc(val)];
-//     })
-//   );
-// };
 const filterNones = (list: any[]) => {
   return list.filter(v => v != null);
 };
@@ -179,7 +149,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     state.data.derivedMetricDimensions,
   ]);
 
-  // const filteredDigests
   const pivotedRows = useMemo(() => {
     // Ok, so in this step we are going to pivot -
     // id: string; - no change
@@ -210,11 +179,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     return flattenedRows.map(row => {
       return {
         ...row,
-
-        // evaluationCallId: expandPrimitive(
-        //   row.evaluationCallId,
-        //   row.evaluationCallId
-        // ),
         output: expandDict(row.output, row.evaluationCallId),
         scores: expandDict(row.scores, row.evaluationCallId),
       };

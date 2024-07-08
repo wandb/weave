@@ -50,7 +50,6 @@ export const SummaryPlots: React.FC<{
           sx={{
             flex: '1 2 ' + PLOT_HEIGHT + 'px',
             height: PLOT_HEIGHT,
-            // width: PLOT_HEIGHT * 2,
             borderRadius: BOX_RADIUS,
             border: STANDARD_BORDER,
             overflow: 'hidden',
@@ -72,8 +71,6 @@ export const SummaryPlots: React.FC<{
           <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
         </Box>
       </HorizontalBox>
-      {/* <RadarPlot plotlyRadarData={plotlyRadarData} />
-            <BarPlots plotlyRadarData={plotlyRadarData}} /> */}
     </VerticalBox>
   );
 };

@@ -106,23 +106,6 @@ export const ExampleCompareSection: React.FC<{
     [evalCallId: string]: number;
   }>({});
 
-  // const targetInputColumnKeys = useMemo(() => {
-  //   if (target == null) {
-  //     return []
-  //   }
-  //   const keys = new Set<string>();
-  //   const keysList: string[] = [];
-  //   flattenedRows.forEach(row => {
-  //     Object.keys(row.input).forEach(key => {
-  //       if (!keys.has(key)) {
-  //         keys.add(key);
-  //         keysList.push(key);
-  //       }
-  //     });
-  //   });
-  //   return keysList;
-  // }, [flattenedRows]);
-
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
 
@@ -216,40 +199,13 @@ export const ExampleCompareSection: React.FC<{
       <GridContainer
         numColumns={NUM_COLS}
         style={{
-          height: '100%', // 'calc(100vh - 116px)',
+          height: '100%',
           flex: 1,
           display: 'grid',
           overflow: 'auto',
           gridTemplateColumns: `repeat(2, min-content) auto`,
           gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) min-content repeat(${NUM_OUTPUT_KEYS}, auto) min-content repeat(${NUM_METRICS}, min-content)`,
-          //   overflowY: 'auto',
-          //   gridTemplateColumns: `repeat(${FREE_TEXT_COL_NDX}, min-content) 1fr repeat(${
-          //     NUM_COLS - FREE_TEXT_COL_NDX - 1
-          //   }, min-content`,
-          //   gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) repeat(${TOTAL_ROWS} 1fr) `,
         }}>
-        {/* <GridCell
-          rows={NUM_INPUT_PROPS}
-          style={{
-            position: 'sticky',
-            left: 0,
-            zIndex: 1,
-            backgroundColor: 'white',
-          }}>
-          <SmallRef objRef={inputRef} allowShrink />
-        </GridCell> */}
-        {/* <GridCell
-          cols={NUM_COLS}
-          rows={NUM_INPUT_PROPS}
-          noPad
-          style={{
-            border: 'none',
-            display: 'grid',
-            gridTemplateRows: 'subgrid',
-            gridTemplateColumns: `subgrid`,
-            maxHeight: '45vh',
-            // overflowY: 'auto',
-          }}> */}
         {_.range(NUM_INPUT_PROPS).map(ii => {
           const inputColumnKey = inputColumnKeys[ii];
           return (
@@ -260,7 +216,6 @@ export const ExampleCompareSection: React.FC<{
                   whiteSpace: 'nowrap',
                   left: 0,
                   position: 'sticky',
-                  // left: leftRef.current?.offsetWidth ?? 'unset',
                   zIndex: 1,
                   backgroundColor: 'white',
                   textAlign: 'right',
@@ -274,7 +229,6 @@ export const ExampleCompareSection: React.FC<{
             </React.Fragment>
           );
         })}
-        {/* </GridCell> */}
         <GridCell
           cols={2}
           rows={1 + NUM_OUTPUT_KEYS + 1 + NUM_METRICS}
@@ -284,7 +238,6 @@ export const ExampleCompareSection: React.FC<{
             gridTemplateRows: 'subgrid',
             gridTemplateColumns: 'subgrid',
             position: 'sticky',
-            // bottom: 0,
             left: 0,
             zIndex: 3,
             backgroundColor: 'white',
@@ -303,20 +256,12 @@ export const ExampleCompareSection: React.FC<{
           {_.range(NUM_OUTPUT_KEYS).map(oi => {
             return (
               <React.Fragment key={outputColumnKeys[oi]}>
-                {/* <GridCell
-                style={{
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 1,
-                  backgroundColor: 'white',
-                }}></GridCell> */}
                 <GridCell
                   cols={2}
                   style={{
                     whiteSpace: 'nowrap',
                     position: 'sticky',
                     left: 0,
-                    // left: leftRef.current?.offsetWidth ?? 'unset',
                     zIndex: 1,
                     backgroundColor: 'white',
                     textAlign: 'right',
@@ -399,7 +344,6 @@ export const ExampleCompareSection: React.FC<{
             display: 'grid',
             gridTemplateRows: 'subgrid',
             gridTemplateColumns: `repeat(${NUM_EVALS}, min-content auto)`,
-            // overflowY: 'auto',
           }}
           rows={
             NUM_OUTPUT_KEYS +
@@ -500,7 +444,6 @@ export const ExampleCompareSection: React.FC<{
                   overflowX: 'auto',
                   position: 'sticky',
                   bottom: 0,
-                  //   left: leftRef.current?.offsetWidth ?? 'unset',
                   zIndex: 1,
                   backgroundColor: 'white',
                   border: 'none',
@@ -527,7 +470,6 @@ export const ExampleCompareSection: React.FC<{
                           selectedTrialNdx === ti ? 'primary' : 'secondary'
                         }
                         onClick={() => {
-                          //   console.log('selecting');
                           setSelectedTrials(curr => {
                             return {
                               ...curr,

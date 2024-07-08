@@ -1,18 +1,5 @@
 /**
  * This is the entrypoint for the Evaluation Comparison Page.
- *
- * Remaining TODO:
- * - [ ] Code Cleanup: There is a lot of dead / messy code (commnts, knip, etc...)
- *
- * Quick Followups:
- * - [ ] Shareability: Retain filter / row selection in URL. Probably want to let the feature bake a bit before committing to a data model in the URL.
- * - [ ] Performance Audit: Audit the queries to determine areas of improvement and parallelization
- * - [ ] UX: Hover tooltips on all plots
- * - [ ] UX: Use user-defined call names for evaluation calls
- * - [ ] UX: Binary scores should be "confusion matrix" style
- * - [ ] UX: Consider making all filter plots 1-1 aspect ratio
- * - [ ] UX: Scatter plots should have dimension units
- * - [ ] UX: Expand top-level refs (e.g. when a model prompt is a ref, see /wandb-designers/signal-maven)
  */
 
 import {Box} from '@material-ui/core';
@@ -60,8 +47,6 @@ export const CompareEvaluationsPage: React.FC<
   const [selectedInputDigest, setSelectedInputDigest] = React.useState<
     string | null
   >(null);
-
-  // Wow this cascading state is getting out of hand
 
   const setComparisonDimensionsAndClearInputDigest = useCallback(
     (
@@ -183,7 +168,6 @@ const CompareEvaluationsPageInner: React.FC = props => {
         {Object.keys(state.data.models).length === 2 && (
           <ExampleFilterSection state={state} />
         )}
-        {/* <ResultsSection state={state} /> */}
         <ResultExplorer state={state} />
       </VerticalBox>
     </Box>
@@ -207,7 +191,6 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
           width: '100%',
           alignItems: 'center',
           justifyContent: 'flex-start',
-          // marginBottom: '8px',
         }}>
         <Box
           sx={{
