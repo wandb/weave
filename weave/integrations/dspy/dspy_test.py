@@ -91,7 +91,7 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     weave_server_respose = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
-    assert len(weave_server_respose.calls) >= 5
+    assert len(weave_server_respose.calls) == 5
 
     call_1 = weave_server_respose.calls[0]
     assert call_1.exception is None and call_1.ended_at is not None
