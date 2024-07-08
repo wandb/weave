@@ -1,4 +1,5 @@
 import { sum } from 'lodash';
+import _ from 'lodash';
 import {useEffect, useMemo, useState} from 'react';
 
 import { WB_RUN_COLORS } from '../../../../../../common/css/color.styles';
@@ -443,10 +444,9 @@ const fetchEvaluationComparisonData = async (
           const maybeDigest = parts[1];
           if (maybeDigest != null && !maybeDigest.includes('/')) {
             const rowDigest = maybeDigest;
+            const possiblePredictNames = ['predict', 'infer', 'forward'];
             const isProbablyPredictCall =
-              // for infer_method_names in ("predict", "infer", "forward"):
-              // TODO: make this more robust
-              traceCall.op_name.includes('.predict:') &&
+              _.some(possiblePredictNames, name => traceCall.op_name.includes(`.${name}:`)) &&
               modelRefs.includes(traceCall.inputs.self);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);

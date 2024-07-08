@@ -7,7 +7,6 @@
  * - [ ] (probably) find all cases of the `_legacy_*` cases and remove them, this is an example of insufficient data model
  * - [ ] (probably) Change "Target Metric" to an ordered list of metrics. Default to first metric + latency
  * Bugs:
- * - [ ] (MUST)`isProbablyXCall` is incorrect - at least the predict one (eg. for infer_method_names in ("predict", "infer", "forward"):)
  * - [ ] (Probably) Selection Filter seems to reset periodically? on data refresh - also on page resize?
  * Smaller Features:
  * * Comparison Table:
