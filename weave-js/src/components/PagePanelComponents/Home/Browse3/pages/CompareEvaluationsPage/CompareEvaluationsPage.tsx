@@ -5,7 +5,6 @@
  * - [ ] (probably) find all cases of the `_raw*` cases and remove them, this is an example of insufficient data model
  * - [ ] (probably) find all cases of the `_legacy_*` cases and remove them, this is an example of insufficient data model
  * - [ ] Code Cleanup: There is a lot of dead / messy code (commnts, knip, etc...)
- * - [ ] Code Cleanup: Pill logic should be shared now between scorecard and viewer
  *
  * Quick Followups:
  * - [ ] Shareability: Retain filter / row selection in URL. Probably want to let the feature bake a bit before committing to a data model in the URL.

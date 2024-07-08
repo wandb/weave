@@ -32,6 +32,7 @@ import {
   dimensionUnit,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
+import {ComparisonPill} from '../ScorecardSection/ScorecardSection';
 import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 
 const MIN_OUTPUT_WIDTH = 500;
@@ -556,10 +557,8 @@ export const ExampleCompareSection: React.FC<{
                     <React.Fragment
                       key={isScorerMetric ? uniqueScorerRefs[si] : 'derived'}>
                       {_.range(NUM_METRICS_IN_SCORER).map(mi => {
-                        const isBaseline = ei === 0;
                         const dimension = dimensionsForThisScorer[mi];
 
-                        // TODO: Pill logic should be shared now
                         const unit = dimensionUnit(dimension, true);
                         const isBinary = dimension.scoreType === 'binary';
                         const scoreId = dimensionId(dimension);
@@ -572,29 +571,8 @@ export const ExampleCompareSection: React.FC<{
                           isBinary
                         );
 
-                        let color: TagColorName = 'moon';
-                        const diff = (summaryMetric ?? 0) - (baseline ?? 0);
                         const lowerIsBetter =
                           dimensionShouldMinimize(dimension);
-                        if (diff > 0) {
-                          if (!lowerIsBetter) {
-                            color = 'green';
-                          } else {
-                            color = 'red';
-                          }
-                        } else if (diff < 0) {
-                          if (!lowerIsBetter) {
-                            color = 'red';
-                          } else {
-                            color = 'green';
-                          }
-                        } else {
-                          color = 'moon';
-                        }
-
-                        const diffFixed = Number.isInteger(diff)
-                          ? diff.toLocaleString()
-                          : diff.toFixed(SIGNIFICANT_DIGITS);
                         return (
                           <React.Fragment key={scoreId}>
                             <GridCell
@@ -618,17 +596,12 @@ export const ExampleCompareSection: React.FC<{
                                 )}
                                 {unit}
                               </span>
-                              {!isBaseline &&
-                                diff !== 0 &&
-                                summaryMetric != null &&
-                                baseline != null && (
-                                  <Pill
-                                    label={
-                                      (diff > 0 ? '+' : '') + diffFixed + unit
-                                    }
-                                    color={color}
-                                  />
-                                )}
+                              <ComparisonPill
+                                value={summaryMetric}
+                                baseline={baseline}
+                                metricUnit={unit}
+                                metricLowerIsBetter={lowerIsBetter}
+                              />
                             </GridCell>
                             {_.range(NUM_TRIALS).map(ti => {
                               const metricValue =

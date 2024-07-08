@@ -519,35 +519,10 @@ export const ScorecardSection: React.FC<{
                     {evalCallIds.map((evalCallId, mNdx) => {
                       const modelRef =
                         props.state.data.evaluationCalls[evalCallId].modelRef;
-                      // const value = betterScores[key].metrics[metric.key]
                       const baseline =
                         def.metrics[metricKey].modelScores[baselineRef];
                       const value =
                         def.metrics[metricKey].modelScores[modelRef];
-                      // console.log({value});
-                      // console.log({baseline, value});
-                      let color: TagColorName = 'moon';
-                      const diff = (value ?? 0) - (baseline ?? 0);
-                      if (diff > 0) {
-                        if (!def.metrics[metricKey].lowerIsBetter) {
-                          color = 'green';
-                        } else {
-                          color = 'red';
-                        }
-                      } else if (diff < 0) {
-                        if (!def.metrics[metricKey].lowerIsBetter) {
-                          color = 'red';
-                        } else {
-                          color = 'green';
-                        }
-                      } else {
-                        color = 'moon';
-                      }
-
-                      const diffFixed = Number.isInteger(diff)
-                        ? diff.toLocaleString()
-                        : diff.toFixed(SIGNIFICANT_DIGITS);
-
                       return (
                         <GridCell
                           key={evalCallId}
@@ -556,7 +531,6 @@ export const ScorecardSection: React.FC<{
                               metricNdx === Object.keys(def.metrics).length - 1
                                 ? '1px solid #ccc'
                                 : '',
-                            // borderTop: metricNdx === 0 ? '1px solid #ccc' : '',
                           }}>
                           {value != null ? (
                             <HorizontalBox
@@ -574,19 +548,14 @@ export const ScorecardSection: React.FC<{
                                 />
                                 {def.metrics[metricKey].unit}
                               </span>
-                              {modelRef !== baselineRef &&
-                                diff !== 0 &&
-                                value != null &&
-                                baseline != null && (
-                                  <Pill
-                                    label={
-                                      (diff > 0 ? '+' : '') +
-                                      diffFixed +
-                                      def.metrics[metricKey].unit
-                                    }
-                                    color={color}
-                                  />
-                                )}
+                              <ComparisonPill
+                                value={value}
+                                baseline={baseline}
+                                metricUnit={def.metrics[metricKey].unit}
+                                metricLowerIsBetter={
+                                  def.metrics[metricKey].lowerIsBetter
+                                }
+                              />
                             </HorizontalBox>
                           ) : (
                             <NotApplicable />
@@ -616,5 +585,44 @@ export const ScorecardSection: React.FC<{
         })}
       </div>
     </Box>
+  );
+};
+
+export const ComparisonPill: React.FC<{
+  value: number | undefined;
+  baseline: number | undefined;
+  metricUnit: string;
+  metricLowerIsBetter?: boolean;
+}> = ({value, baseline, metricUnit, metricLowerIsBetter}) => {
+  const diff = (value ?? 0) - (baseline ?? 0);
+  const diffFixed = Number.isInteger(diff)
+    ? diff.toLocaleString()
+    : diff.toFixed(SIGNIFICANT_DIGITS);
+  const showPill = diff !== 0 && value != null && baseline != null;
+  let color: TagColorName = 'moon';
+
+  if (diff > 0) {
+    if (!metricLowerIsBetter) {
+      color = 'green';
+    } else {
+      color = 'red';
+    }
+  } else if (diff < 0) {
+    if (!metricLowerIsBetter) {
+      color = 'red';
+    } else {
+      color = 'green';
+    }
+  } else {
+    color = 'moon';
+  }
+  if (!showPill) {
+    return <></>;
+  }
+  return (
+    <Pill
+      label={(diff > 0 ? '+' : '') + diffFixed + metricUnit}
+      color={color}
+    />
   );
 };
