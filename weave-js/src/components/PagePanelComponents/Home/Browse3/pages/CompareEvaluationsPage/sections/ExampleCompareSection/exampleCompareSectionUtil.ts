@@ -66,7 +66,7 @@ const filterNones = (list: any[]) => {
   return list.filter(v => v != null);
 };
 
-export const rowIsSelected = (
+const rowIsSelected = (
   scores: {
     [dimensionId: string]: {
       [evaluationCallId: string]: number;

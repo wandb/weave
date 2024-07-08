@@ -193,7 +193,7 @@ export type PredictAndScoreCall = {
   _rawPredictTraceData?: TraceCallSchema;
 };
 
-export type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
+type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
 
 export type ComparisonDimensionsType = Array<{
   dimension: EvaluationMetricDimension;

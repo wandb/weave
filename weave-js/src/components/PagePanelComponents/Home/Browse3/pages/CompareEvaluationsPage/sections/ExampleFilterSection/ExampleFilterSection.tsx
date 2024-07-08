@@ -237,7 +237,7 @@ const SingleDimensionFilter: React.FC<{
     </VerticalBox>
   );
 };
-export const DimensionPicker: React.FC<{
+const DimensionPicker: React.FC<{
   state: EvaluationComparisonState;
   dimensionIndex: number;
 }> = props => {
