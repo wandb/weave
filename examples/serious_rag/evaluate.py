@@ -10,6 +10,7 @@ from weave_utils import (
     WeavePromptTemplate
 )
 
+# TODO: refactor the scorers for the performance, safety, governance overview more intuitive
 # TODO: find a way to structure cost and latency (maybe other infos) in eval overview through different scorers and different dicts for now (as discussed with Scott)
 # TODO: the prompt argument can actually be backed in statically to the respective class (prompts as public vars at doc top)
 # TODO: check out instructor and binary grade implementation from LC implementation
@@ -25,13 +26,27 @@ from weave_utils import (
 #######################
 # Performance Metrics #
 ####################### 
+## retrieval scorer ##
+@weave.op()
+def eval_retrieval(model_output: Optional[dict], main_source: str) -> dict:
+    """Evaluate the retrieval accuracy of the predictions: check whether top source document returned by the
+       RetrievalQA chain equals the original source document.
+       Args:
+           - model_output: the dict that will be provided by the model that is evaluated
+           - main_source: the target source - as defined in the dataset"""
+    
+    # post-process prediction results from RetrievalQA in the weave setup.RagNodel
+    nr1_retrieval = model_output["source_documents"][0]["url"]
+    return nr1_retrieval == main_source
+    #return {"first retrieval correct": nr1_retrieval == main_source}
+
 ## correctness scorer ##
 class CorrectnessLLMJudge(Scorer):
     prompt: WeavePromptTemplate
     model: WeaveChatModel
 
     @weave.op()
-    async def score(self, model_output: Optional[dict], query: str, answer: str) -> Any:
+    async def score(self, model_output: Optional[dict], query: str, answer: str, main_source:str, ) -> Any:
         """Score the correctness of the predictions by comparing the query, target answer and pred answer.
            Args:
             - model_output: the dict that will be provided by the model that is evaluated
@@ -50,8 +65,10 @@ class CorrectnessLLMJudge(Scorer):
 
         # chat model inference 
         grade = await self.model.predict(messages)
-        evaluation = "incorrect" not in grade["content"].strip().lower()
-        return {"answer correct": evaluation}
+        correct_bool = "incorrect" not in grade["content"].strip().lower()
+        retrieval_nr1_bool = eval_retrieval(model_output=model_output, main_source=main_source)
+        
+        return {"correct": correct_bool, "first_retrieval": retrieval_nr1_bool}
     
     @weave.op()
     def summarize(self, score_rows: WeaveList) -> Optional[dict]:
@@ -64,40 +81,39 @@ class CorrectnessLLMJudge(Scorer):
         # if nothing is provided the weave.flow.scorer.auto_summarize function is used
         # return auto_summarize(score_rows)
 
-        valid_data = [x.get("answer correct") for x in score_rows if x.get("answer correct") is not None]
-        count_true = list(valid_data).count(True)
-        int_data = [int(x) for x in valid_data]
-        
-        sample_mean = np.mean(int_data) if int_data else 0
-        sample_variance = np.var(int_data) if int_data else 0
-        sample_error = np.sqrt(sample_variance / len(int_data)) if int_data else 0
+        corr_valid_data = [x.get("correct") for x in score_rows if x.get("correct") is not None]
+        corr_count_true = list(corr_valid_data).count(True)
+        corr_int_data = [int(x) for x in corr_valid_data]
+        corr_sample_mean = np.mean(corr_int_data) if corr_int_data else 0
+        sample_variance = np.var(corr_int_data) if corr_int_data else 0
+        sample_error = np.sqrt(sample_variance / len(corr_int_data)) if corr_int_data else 0
+
+        retr_valid_data = [x.get("first_retrieval") for x in score_rows if x.get("first_retrieval") is not None]
+        retr_count_true = list(retr_valid_data).count(True)
+        retr_int_data = [int(x) for x in retr_valid_data]
+        retr_sample_mean = np.mean(retr_int_data) if retr_int_data else 0
+        retr_sample_variance = np.var(retr_int_data) if retr_int_data else 0
+        retr_sample_error = np.sqrt(retr_sample_variance / len(retr_int_data)) if retr_int_data else 0
 
         return {
-            "answer correct":{
-                "true_count": count_true,
-                "true_fraction": sample_mean,
-                "stderr": sample_error,
+            "Correctness":{
+                "#": corr_count_true,
+                "%": corr_sample_mean,
+                #"stderr": sample_error,
+            }, 
+            "Nr1_Retrieval":{
+                "#": retr_sample_mean,
+                "%": retr_count_true,
+                #"stderr": sample_error,
             }
         }
-
-## retrieval scorer ##
-@weave.op()
-def eval_retrieval(model_output: Optional[dict], main_source: str) -> dict:
-    """Evaluate the retrieval accuracy of the predictions: check whether top source document returned by the
-       RetrievalQA chain equals the original source document.
-       Args:
-           - model_output: the dict that will be provided by the model that is evaluated
-           - main_source: the target source - as defined in the dataset"""
-    
-    # post-process prediction results from RetrievalQA in the weave setup.RagNodel
-    nr1_retrieval = model_output["source_documents"][0]["url"]
-    return {"first retrieval correct": nr1_retrieval == main_source}
 
 
 ##################
 # Safety Metrics #
 ##################
 # TODO: check out different safety measure in Anish's RAG
+# TODO: for stuff aggregation - same code as for the RAGModel -> create stuff aggregation as class function to be called here
 
 ## hallucination scorer
 class HallucinationLLMJudge(Scorer):
@@ -112,7 +128,6 @@ class HallucinationLLMJudge(Scorer):
             - model_output: the dict that will be provided by the model that is evaluated
             - query: the question asked - as defined in the dataset"""
 
-        # TODO: this is the same code as for the RAGModel -> create stuff aggregation as class function to be called here
         # stuff aggregation
         context_documents = [x["page_content"] for x in model_output["source_documents"]]
         chat_context = "\n\n".join(
@@ -133,7 +148,30 @@ class HallucinationLLMJudge(Scorer):
         # evaluation of single example
         grade = await self.model.predict(messages)
         evaluation = "yes" in grade["content"].strip().lower()
-        return {"follows from source": evaluation}
+        return {"no_hallucination": evaluation}
+    
+    @weave.op()
+    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+        """Aggregate all the scores that are calculated for each row by the scoring function.
+           Args:
+            - score_rows: a WeaveList object, nested dict of metrics and scores
+           Returns:
+            - nested dict with the same structure as the input"""
+
+        hall_valid_data = [x.get("no_hallucination") for x in score_rows if x.get("no_hallucination") is not None]
+        hall_count_true = list(hall_valid_data).count(True)
+        hall_int_data = [int(x) for x in hall_valid_data]
+        hall_sample_mean = np.mean(hall_int_data) if hall_int_data else 0
+        sample_variance = np.var(hall_int_data) if hall_int_data else 0
+        sample_error = np.sqrt(sample_variance / len(hall_int_data)) if hall_int_data else 0
+
+        return {
+            "No Hallucination":{
+                "#": hall_count_true,
+                "%": hall_sample_mean,
+                #"stderr": sample_error,
+            }
+        }
 
 ######################
 # Governance Metrics #

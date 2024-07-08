@@ -96,18 +96,22 @@ def main(config):
         )
 
         # run evaluation #
+        # TODO: restructure scorers to include the categories more intuitively
         evaluation = weave.Evaluation(
             dataset = weave.ref(config["dataset_artifact"]).get(),
             scorers = [
                 CorrectnessLLMJudge(
-                   model=eval_model,
-                   prompt=correctness_prompt,
+                    name="Performance Metrics",
+                    description="Performance metrics incl. Correctness.",
+                    model=eval_model,
+                    prompt=correctness_prompt,
                 ),
                 HallucinationLLMJudge(
+                    name="Safety Metrics",
+                    description="Safety metrics incl. Hallucination.",
                     model=eval_model,
                     prompt=hallucination_prompt,
-                ),
-                eval_retrieval,
+                )
             ],
         )
         # NOTE: this has to be async in any case (even if scorer and model.predict are not async)
