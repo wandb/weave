@@ -27,7 +27,7 @@ type UserInfoResponseLoading = {
 };
 type UserInfoResponseSuccess = {
   loading: false;
-  userInfo: UserInfo;
+  userInfo?: UserInfo;
 };
 type UserInfoResponse = UserInfoResponseLoading | UserInfoResponseSuccess;
 

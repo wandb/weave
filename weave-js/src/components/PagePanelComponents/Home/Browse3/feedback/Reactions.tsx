@@ -135,7 +135,7 @@ export const Reactions = ({
       });
   };
 
-  if (loadingUserInfo || feedback === null) {
+  if (loadingUserInfo || feedback === null || userInfo == null) {
     // TODO: Loading indicator?
     return null;
   }
