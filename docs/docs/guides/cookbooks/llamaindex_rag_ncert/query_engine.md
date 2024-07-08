@@ -64,6 +64,7 @@ index = load_index_from_storage(
     storage_context, service_context=service_context
 )
 ```
+
 ## Building the Query Engine
 
 Now that the vector store index has been loaded, it can be referenced to query over user prompts and build our chatbot.
