@@ -78,12 +78,12 @@ def make_mutation(
         raise ValueError(f"Unknown operation: {operation}")
 
 
-class Tracable:
+class Traceable:
     mutated_value: Any = None
     ref: RefWithExtra
     list_mutations: Optional[list] = None
     mutations: Optional[list[Mutation]] = None
-    root: "Tracable"
+    root: "Traceable"
     server: TraceServerInterface
 
     def add_mutation(
@@ -162,13 +162,13 @@ def attribute_access_result(
     )
 
 
-class WeaveObject(Tracable):
+class WeaveObject(Traceable):
     def __init__(
         self,
         val: Any,
         ref: RefWithExtra,
         server: TraceServerInterface,
-        root: typing.Optional[Tracable],
+        root: typing.Optional[Traceable],
     ) -> None:
         self._val = val
         self.ref = ref
@@ -214,7 +214,7 @@ class WeaveObject(Tracable):
         return self._val == other
 
 
-class WeaveTable(Tracable):
+class WeaveTable(Traceable):
     filter: _TableRowFilter
 
     def __init__(
@@ -223,7 +223,7 @@ class WeaveTable(Tracable):
         ref: Optional[RefWithExtra],
         server: TraceServerInterface,
         filter: _TableRowFilter,
-        root: typing.Optional[Tracable],
+        root: typing.Optional[Traceable],
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
@@ -297,7 +297,7 @@ class WeaveTable(Tracable):
         self.root.add_mutation(self.ref.extra, "append", val)
 
 
-class WeaveList(Tracable, list):
+class WeaveList(Traceable, list):
     def __init__(
         self,
         *args: Any,
@@ -305,7 +305,7 @@ class WeaveList(Tracable, list):
     ):
         self.ref: RefWithExtra = kwargs.pop("ref")
         self.server: TraceServerInterface = kwargs.pop("server")
-        root: Optional[Tracable] = kwargs.pop("root", None)
+        root: Optional[Traceable] = kwargs.pop("root", None)
         if root is None:
             root = self
         self.root = root
@@ -327,7 +327,7 @@ class WeaveList(Tracable, list):
         return f"WeaveList({super().__repr__()})"
 
 
-class WeaveDict(Tracable, dict):
+class WeaveDict(Traceable, dict):
     def __init__(
         self,
         *args: Any,
@@ -335,7 +335,7 @@ class WeaveDict(Tracable, dict):
     ):
         self.ref: RefWithExtra = kwargs.pop("ref")
         self.server: TraceServerInterface = kwargs.pop("server")
-        root: Optional[Tracable] = kwargs.pop("root", None)
+        root: Optional[Traceable] = kwargs.pop("root", None)
         if root is None:
             root = self
         self.root = root
@@ -382,10 +382,10 @@ def make_trace_obj(
     val: Any,
     new_ref: RefWithExtra,
     server: TraceServerInterface,
-    root: Optional[Tracable],
+    root: Optional[Traceable],
     parent: Any = None,
 ) -> Any:
-    if isinstance(val, Tracable):
+    if isinstance(val, Traceable):
         # If val is a WeaveTable, we want to refer to it via the outer object
         # that it is within, rather than via the TableRef. For example we
         # want Dataset row refs to be Dataset.rows[id] rather than table[id]
@@ -393,8 +393,8 @@ def make_trace_obj(
             val.ref = new_ref
         return val
     if hasattr(val, "ref") and isinstance(val.ref, RefWithExtra):
-        # The Tracable check above does not currently work for Ops, where we
-        # directly attach a ref, or to our Boxed classes. We should use Tracable
+        # The Traceable check above does not currently work for Ops, where we
+        # directly attach a ref, or to our Boxed classes. We should use Traceable
         # for all of these, but for now we need to check for the ref attribute.
         return val
     # Derefence val and create the appropriate wrapper object
@@ -443,7 +443,7 @@ def make_trace_obj(
             if isinstance(val, TableRef):
                 val = WeaveTable(val, new_ref, server, _TableRowFilter(), root)
 
-    if not isinstance(val, Tracable):
+    if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
             return WeaveObject(val, new_ref, server, root)
         elif isinstance(val, list):
