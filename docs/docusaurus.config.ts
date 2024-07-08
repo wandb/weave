@@ -39,8 +39,7 @@ const config: Config = {
           breadcrumbs: false,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl:
-            "https://github.com/wandb/weave/blob/master/docs/",
+          editUrl: "https://github.com/wandb/weave/blob/master/docs/",
           routeBasePath: "/",
         },
         theme: {
@@ -50,9 +49,26 @@ const config: Config = {
     ],
   ],
 
+  plugins: [
+    ...(process.env.DOCS_SEGMENT_API_KEY
+      ? [
+          [
+            "@laxels/docusaurus-plugin-segment",
+            {
+              apiKey: process.env.DOCS_SEGMENT_API_KEY,
+              host: "wandb.ai",
+              ajsPath: "/sa-docs.min.js",
+              page: false,
+              excludeUserAgents: ["GoogleSecurityScanner"],
+            },
+          ],
+        ]
+      : []),
+  ],
+
   themeConfig: {
     // Replace with your project's social card
-    image: "img/logo.svg",
+    image: "img/logo-large-padded.png",
     navbar: {
       title: "Weave",
       logo: {
