@@ -10,15 +10,20 @@ import {
 } from '../../ecpConstants';
 import {getOrderedCallIds} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
+import {
+  dimensionLabel,
+  dimensionShouldMinimize,
+  dimensionUnit,
+  resolveDimensionValueForEvaluateCall,
+} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
-import {summaryMetrics} from './summaryMetrics';
 
 export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const plotlyRadarData = useNormalizedRadarPlotDataFromMetrics(props.state);
+  const plotlyRadarData = useNormalizedPlotDataFromMetrics(props.state);
 
   return (
     <VerticalBox
@@ -82,7 +87,7 @@ const normalizeValues = (values: Array<number | undefined>): number[] => {
   const maxPower = Math.ceil(Math.log2(maxVal));
   return values.map(val => (val ? val / 2 ** maxPower : 0));
 };
-const useNormalizedRadarPlotDataFromMetrics = (
+const useNormalizedPlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): RadarPlotData => {
   const metrics = useMemo(() => {
@@ -123,4 +128,36 @@ const useNormalizedRadarPlotDataFromMetrics = (
       })
     );
   }, [callIds, metrics, state.data.evaluationCalls]);
+};
+
+type SimplifiedSummaryMetric = {
+  path: string;
+  unit: string;
+  lowerIsBetter: boolean;
+  values: {[callId: string]: number | undefined};
+};
+
+const summaryMetrics = (
+  state: EvaluationComparisonState
+): SimplifiedSummaryMetric[] => {
+  const results: SimplifiedSummaryMetric[] = [];
+  const allEntries = [
+    ...Object.entries(state.data.scorerMetricDimensions),
+    ...Object.entries(state.data.derivedMetricDimensions),
+  ];
+  allEntries.forEach(([metricId, metric]) => {
+    results.push({
+      path: dimensionLabel(metric),
+      unit: dimensionUnit(metric),
+      lowerIsBetter: dimensionShouldMinimize(metric),
+      values: Object.fromEntries(
+        Object.entries(state.data.evaluationCalls).map(([callId, call]) => [
+          callId,
+          resolveDimensionValueForEvaluateCall(metric, call),
+        ])
+      ),
+    });
+  });
+
+  return results;
 };
