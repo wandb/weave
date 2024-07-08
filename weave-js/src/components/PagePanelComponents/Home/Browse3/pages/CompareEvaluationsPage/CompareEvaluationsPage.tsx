@@ -10,7 +10,6 @@
  * - [ ] (Probably) Selection Filter seems to reset periodically? on data refresh - also on page resize?
  * Smaller Features:
  * * Comparison Table:
- *    - [ ] (MUST) Add link to scorer in the compare table
  *    - [ ] (MUST) Evaluation pinning pushes summary off screen
  * - [ ] (MUST) Move toggle to the properties section similar to run comparer
  * - [ ] (MUST) Reflect local state in URL (dimension, range, & selection)

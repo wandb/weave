@@ -1,7 +1,8 @@
 import {Box} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
 import _ from 'lodash';
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
+import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {
@@ -15,9 +16,11 @@ import {Pill, TagColorName} from '../../../../../../../Tag';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
+import {useWeaveflowRouteContext} from '../../../../context';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
 import {isRef} from '../../../common/util';
+import {TraceCallSchema} from '../../../wfReactInterface/traceServerClient';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpTypes';
@@ -33,12 +36,27 @@ import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 
 const MIN_OUTPUT_WIDTH = 500;
 
-const GridCell = styled.div<{cols?: number; rows?: number; noPad?: boolean}>`
+const GridCell = styled.div<{
+  cols?: number;
+  rows?: number;
+  noPad?: boolean;
+  button?: boolean;
+}>`
   border: 1px solid ${MOON_300};
   grid-column-end: span ${props => props.cols || 1};
   grid-row-end: span ${props => props.rows || 1};
   padding: ${props => (props.noPad ? '0px' : '8px')};
-  /* min-width: 100px; */
+  // Hover should show click mouse icon
+  // and slowly highlight blue like a button
+  ${props =>
+    props.button &&
+    `
+    cursor: pointer;
+    transition: background-color 0.2s;
+    &:hover {
+      background-color: ${MOON_300};
+    }
+  `}
 `;
 
 const GridContainer = styled.div<{numColumns: number}>`
@@ -104,6 +122,19 @@ export const ExampleCompareSection: React.FC<{
   //   });
   //   return keysList;
   // }, [flattenedRows]);
+
+  const history = useHistory();
+  const {peekingRouter} = useWeaveflowRouteContext();
+
+  const onScorerClick = useCallback(
+    (scorerCall: TraceCallSchema) => {
+      const [entityName, projectName] = scorerCall.project_id.split('/');
+      const callId = scorerCall.id;
+      const to = peekingRouter.callUIUrl(entityName, projectName, '', callId);
+      history.push(to);
+    },
+    [history, peekingRouter]
+  );
 
   if (target == null) {
     return <div>Filter resulted in 0 rows</div>;
@@ -472,7 +503,16 @@ export const ExampleCompareSection: React.FC<{
                               }
 
                               return (
-                                <GridCell key={ti}>
+                                <GridCell
+                                  key={ti}
+                                  button
+                                  onClick={() =>
+                                    onScorerClick(
+                                      trialsForThisEval[ti].predictAndScore
+                                        .scorerMetrics[scoreId].sourceCall
+                                        ._rawScoreTraceData
+                                    )
+                                  }>
                                   <CellValue value={metricValue} />
                                 </GridCell>
                               );

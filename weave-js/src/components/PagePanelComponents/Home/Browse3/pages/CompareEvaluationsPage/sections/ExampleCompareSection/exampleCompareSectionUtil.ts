@@ -6,20 +6,24 @@ import { getOrderedCallIds } from '../../ecpState';
 import {EvaluationComparisonState, PredictAndScoreCall} from '../../ecpTypes';
 import { dimensionId, resolveDimensionValueForPASCall } from '../../ecpUtil';
 
-type FlattenedRow = {
+type RowBase = {
   id: string;
   evaluationCallId: string;
   inputDigest: string;
   inputRef: string;
   input: {[inputKey: string]: any};
+  path: string[];
+  predictAndScore: PredictAndScoreCall;
+}
+
+type FlattenedRow = RowBase & {
   output: {[outputKey: string]: any};
   scores: {[scoreId: string]: number | boolean | undefined};
   latency: number;
   totalTokens: number;
-  path: string[];
-  predictAndScore: PredictAndScoreCall;
 };
-type PivotedRow = FlattenedRow & {
+
+type PivotedRow = RowBase & {
   output: {[outputKey: string]: {[callId: string]: any}};
   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
   latency: {[callId: string]: number};
