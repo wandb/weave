@@ -83,7 +83,7 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: "category",
-          label: "Cookbook: Automating Students' Grading using RAG",
+          label: "Building an English Teaching Assistant using RAG",
           link: { type: "doc", id: "guides/cookbooks/llamaindex_rag_ncert/intro" },
           items: [
             "guides/cookbooks/llamaindex_rag_ncert/vector_index",

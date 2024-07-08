@@ -1,4 +1,4 @@
-# Cookbook: Automating Students' Grading using RAG
+# Building an English Teaching Assistant using RAG
 
 A lot of teachers in the education system have to spend a lot of time manually grading and evaluating their students’ answersheets which which takes up a significant chunk of their time and focus from teaching. In this cookbook, we attempt to showcase a recipe to build an assistant to a teacher that can help with the grading and doubt clearing of students using a Retrieval Augmented Generation (RAG) pipeline built using
 
