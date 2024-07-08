@@ -342,13 +342,7 @@ class WeaveClient:
         #
         # However, we always want to resolve the ref to the digest. So
         # here, we just directly assign the digest.
-        ref = ObjectRef(
-            entity=ref.entity,
-            project=ref.project,
-            name=ref.name,
-            digest=read_res.obj.digest,
-            extra=ref.extra,
-        )
+        ref = dataclasses.replace(ref, digest=read_res.obj.digest)
 
         data = read_res.obj.val
 
