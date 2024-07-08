@@ -1,69 +1,95 @@
 interactions:
 - request:
-    body: null
+    body: '{"messages": [{"role": "user", "content": "hello! this is a raw prompt
+      to GPT-3.5"}], "model": "gpt-3.5-turbo-1106", "frequency_penalty": 0, "max_tokens":
+      300, "n": 1, "presence_penalty": 0, "temperature": 0.0, "top_p": 1}'
     headers:
-      Accept:
-      - '*/*'
-      Accept-Encoding:
-      - gzip, deflate, zstd
-      Connection:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
       - keep-alive
-      User-Agent:
-      - python-requests/2.32.3
-    method: GET
-    uri: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
+      content-length:
+      - '222'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - _ModuleClient/Python 1.35.10
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 1.35.10
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.12
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
   response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SQS0/DMBCE7/kVi89NlVeB5MK1CAEHQEIgFDnJNnXreK14I1pV/e8ojzbisocZ
+        f7OzPnkAQlUiA1FuJZeN1X6qdFRI/Hzbvaey+jg8vbx+pYea3b57bsSiJ6jYYckXallSYzWyIjPa
+        ZYuSsU8N76IgWSXR/WowGqpQ91ht2Y+XK5+7tiA/DIPbidySKtGJDL49AIDTMPuOpsKDyCBYXJQG
+        nZM1iuz6CEC0pHtFSOeUY2lYLGazJMNohtpr1JpuYE2/UEoDjzACcKQOmCp5fBATd74u1FTbloq+
+        nOm0vuobZZTb5i1KR6YPd0x2xM8ewM9wWPevq7AtNZZzpj2aPjAKxzgxf+VsppPHxFLPchx4Uz3h
+        jo6xyTfK1NjaVo1HbmyeJGEcyaTCWHhn7w8AAP//AwCjIhAR7gEAAA==
     headers:
-      Accept-Ranges:
-      - bytes
-      Access-Control-Allow-Origin:
-      - '*'
-      Cache-Control:
-      - max-age=300
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8a01460f1a443e04-BOM
       Connection:
       - keep-alive
       Content-Encoding:
       - gzip
-      Content-Length:
-      - '8079'
-      Content-Security-Policy:
-      - default-src 'none'; style-src 'unsafe-inline'; sandbox
       Content-Type:
-      - text/plain; charset=utf-8
-      Cross-Origin-Resource-Policy:
-      - cross-origin
+      - application/json
       Date:
-      - Mon, 08 Jul 2024 14:04:14 GMT
-      ETag:
-      - W/"c445c3e715abfd4b7ad16fc0be422ee17b80966e5dbc456a98db9416c61ef98e"
-      Expires:
-      - Mon, 08 Jul 2024 14:09:14 GMT
-      Source-Age:
-      - '259'
-      Strict-Transport-Security:
-      - max-age=31536000
-      Vary:
-      - Authorization,Accept-Encoding,Origin
-      Via:
-      - 1.1 varnish
-      X-Cache:
-      - HIT
-      X-Cache-Hits:
-      - '6'
-      X-Content-Type-Options:
-      - nosniff
-      X-Fastly-Request-ID:
-      - fa097abb1e00f31e00c96295eef9b677591c7b9f
-      X-Frame-Options:
-      - deny
-      X-GitHub-Request-Id:
-      - 6356:1C2326:C4BFC:ECA37:6689836D
-      X-Served-By:
-      - cache-qpg1280-QPG
-      X-Timer:
-      - S1720447455.671964,VS0,VE0
-      X-XSS-Protection:
-      - 1; mode=block
+      - Mon, 08 Jul 2024 15:58:05 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=fv3nvUr8O6TJtGMCtcyk4U1NBgQKJX14sBPLQ_GzFLo-1720454285-1.0.1.1-1ZXxELRHbS6kr293cygHMMXvS9dCveC5DZBm1SX4GdoxC3UaV53mPQzQFIrW7wihWKjnQljPt8cPKXhCf.faNw;
+        path=/; expires=Mon, 08-Jul-24 16:28:05 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=aUmIa9YGHwFHgbGB3s6P..Z9JNP9LzUbpJVm32NFvBM-1720454285292-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '142'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '5000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '4999689'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 3ms
+      x-request-id:
+      - req_544bed2ba56145b04d0a1f537bf6f1a5
     status:
       code: 200
       message: OK

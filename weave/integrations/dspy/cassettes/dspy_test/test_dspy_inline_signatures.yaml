@@ -1,69 +1,98 @@
 interactions:
 - request:
-    body: null
+    body: '{"messages": [{"role": "user", "content": "Given the fields `sentence`,
+      produce the fields `sentiment`.\n\n---\n\nFollow the following format.\n\nSentence:
+      ${sentence}\nSentiment: ${sentiment}\n\n---\n\nSentence: it''s a charming and
+      often affecting journey.\nSentiment:"}], "model": "gpt-3.5-turbo", "frequency_penalty":
+      0, "max_tokens": 150, "n": 1, "presence_penalty": 0, "temperature": 0.0, "top_p":
+      1}'
     headers:
-      Accept:
-      - '*/*'
-      Accept-Encoding:
-      - gzip, deflate, zstd
-      Connection:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
       - keep-alive
-      User-Agent:
-      - python-requests/2.32.3
-    method: GET
-    uri: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
+      content-length:
+      - '405'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - _ModuleClient/Python 1.35.10
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 1.35.10
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.12
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
   response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SQsU7DMBRF93yF9eamatJE0GxdEAMSBSExIFQlzmvi4vhZ9gsCqv47shvasni4
+        1/fo2IdECFAtVAJkX7McrE5XShdy/TPuXjYP9093bZOvXqld58+3j/seZmFBzR4l/63mkgarkRWZ
+        Uy0d1oyBmt3ki6IsimwRi4Fa1GHWWU6X8zLl0TWULrK8nJY9KYkeKvGWCCHEIZ7B0bT4BZWInJgM
+        6H3dIVTnS0KAIx0SqL1XnmvDMLuUkgyjidob8orVJ8LUHs9YTZ111AQFM2p9znfKKN9vHdaeTEB4
+        JnuaHxMh3qP++M8IrKPB8pbpA00AlssTDi4fdimzqWPiWl9timTSA//tGYftTpkOnXUqPiVIJsfk
+        FwAA//8DAHRqJHTJAQAA
     headers:
-      Accept-Ranges:
-      - bytes
-      Access-Control-Allow-Origin:
-      - '*'
-      Cache-Control:
-      - max-age=300
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8a01492159ff3e04-BOM
       Connection:
       - keep-alive
       Content-Encoding:
       - gzip
-      Content-Length:
-      - '8079'
-      Content-Security-Policy:
-      - default-src 'none'; style-src 'unsafe-inline'; sandbox
       Content-Type:
-      - text/plain; charset=utf-8
-      Cross-Origin-Resource-Policy:
-      - cross-origin
+      - application/json
       Date:
-      - Mon, 08 Jul 2024 14:04:44 GMT
-      ETag:
-      - W/"c445c3e715abfd4b7ad16fc0be422ee17b80966e5dbc456a98db9416c61ef98e"
-      Expires:
-      - Mon, 08 Jul 2024 14:09:44 GMT
-      Source-Age:
-      - '289'
-      Strict-Transport-Security:
-      - max-age=31536000
-      Vary:
-      - Authorization,Accept-Encoding,Origin
-      Via:
-      - 1.1 varnish
-      X-Cache:
-      - HIT
-      X-Cache-Hits:
-      - '5'
-      X-Content-Type-Options:
-      - nosniff
-      X-Fastly-Request-ID:
-      - 9a8863ed966772ade5b6d38512a82953903f5181
-      X-Frame-Options:
-      - deny
-      X-GitHub-Request-Id:
-      - 6356:1C2326:C4BFC:ECA37:6689836D
-      X-Served-By:
-      - cache-qpg1272-QPG
-      X-Timer:
-      - S1720447484.483268,VS0,VE0
-      X-XSS-Protection:
-      - 1; mode=block
+      - Mon, 08 Jul 2024 16:00:11 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=AIetUcZfVYopu6EFfDej_MxmxY0Xz7If7axexutRC0g-1720454411-1.0.1.1-oU3vU8xS1zfbg22K4.PgnT7nGboL5cfsgYVrth0AcdEGep4EoSYrca4496dMMy.pk8Ea8TOqW3GqAVK7zYGVjg;
+        path=/; expires=Mon, 08-Jul-24 16:30:11 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=ww5fZ_DhUX22AnrQwSbzzc9afPvYAorq0_19UAMpGfM-1720454411043-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '169'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '5000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '4999795'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 2ms
+      x-request-id:
+      - req_c99357689b9913ffde4c0a1930665745
     status:
       code: 200
       message: OK
