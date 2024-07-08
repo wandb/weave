@@ -275,7 +275,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     
 
   }, [aggregatedRows, state.comparisonDimension, state.rangeSelection]);
-  console.log(filteredRows)
 
   const inputColumnKeys = useMemo(() => {
     const keys = new Set<string>();

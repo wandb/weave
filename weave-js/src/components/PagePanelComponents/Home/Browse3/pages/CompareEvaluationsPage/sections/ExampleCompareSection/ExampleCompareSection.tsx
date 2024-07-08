@@ -221,6 +221,18 @@ export const ExampleCompareSection: React.FC<{
           //   gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) repeat(${TOTAL_ROWS} 1fr) `,
         }}>
         <GridCell
+          cols={NUM_COLS}
+          style={{
+            position: 'sticky',
+            left: 0,
+            top: 0,
+            zIndex: 3,
+            // backgroundColor: 'white',
+            backgroundColor: MOON_100,
+          }}>
+          <SmallRef objRef={inputRef} allowShrink />
+        </GridCell>
+        {/* <GridCell
           rows={NUM_INPUT_PROPS}
           style={{
             position: 'sticky',
@@ -229,17 +241,18 @@ export const ExampleCompareSection: React.FC<{
             backgroundColor: 'white',
           }}>
           <SmallRef objRef={inputRef} allowShrink />
-        </GridCell>
+        </GridCell> */}
         {_.range(NUM_INPUT_PROPS).map(ii => {
           const inputColumnKey = inputColumnKeys[ii];
           return (
             <React.Fragment key={inputColumnKey}>
               <GridCell
+                cols={2}
                 style={{
                   whiteSpace: 'nowrap',
-
+                  left: 0,
                   position: 'sticky',
-                  left: leftRef.current?.offsetWidth ?? 'unset',
+                  // left: leftRef.current?.offsetWidth ?? 'unset',
                   zIndex: 1,
                   backgroundColor: 'white',
                 }}>

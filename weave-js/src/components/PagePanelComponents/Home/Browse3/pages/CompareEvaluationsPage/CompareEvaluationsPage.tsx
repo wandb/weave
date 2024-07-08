@@ -16,7 +16,6 @@
  * Performance:
  * - [ ] (probably) Audit the queries to determine areas of improvement and parallelization
  * Styling / UX:
- * - [ ] (MUST) Ref Link in object viewer is really lame
  * - [ ] (probably) Hover tooltip on charts to show values
  * - [ ] (maybe) Should pull in EvaluationCall display name if it exists
  * - Scatterplot Filter UX
@@ -27,7 +26,7 @@
  *    - [ ] (probably) Scatterplot Filter dimensions are not quite obvious
  *    - [ ] (probably) Scatterplot filter would benefit from a title / help text
  *    - [ ] (maybe) Scatterplot filter should have 1-1 aspect ratio
- *    - [ ] Double click does not clear the box boundary
+ *    - [ ] (maybe) Double click does not clear the box boundary
  * Implementation Tasks:
  * - [ ] (MUST) Code Cleanup: There is a lot of dead / messy code (commnts, knip, etc...)
  * - [ ] (MUST) Code Cleanup: Pill logic should be shared now between scorecard and viewer
