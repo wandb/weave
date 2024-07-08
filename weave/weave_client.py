@@ -2,7 +2,6 @@ import dataclasses
 import datetime
 import typing
 import uuid
-from collections import namedtuple
 from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 
 import pydantic
@@ -15,7 +14,6 @@ from weave.table import Table
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
-    pydantic_asdict_one_level,
     pydantic_object_record,
 )
 from weave.trace.op import Op
@@ -25,7 +23,6 @@ from weave.trace.refs import (
     OpRef,
     Ref,
     TableRef,
-    parse_uri,
 )
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -37,11 +34,8 @@ from weave.trace_server.trace_server_interface import (
     CallStartReq,
     CallUpdateReq,
     EndedCallSchemaForInsert,
-    Feedback,
-    FeedbackQueryReq,
     ObjCreateReq,
     ObjQueryReq,
-    ObjQueryRes,
     ObjReadReq,
     ObjSchema,
     ObjSchemaForInsert,
@@ -49,12 +43,10 @@ from weave.trace_server.trace_server_interface import (
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
     TableCreateReq,
-    TableQueryReq,
     TableSchemaForInsert,
     TraceServerInterface,
     _CallsFilter,
     _ObjectVersionFilter,
-    _TableRowFilter,
 )
 
 if typing.TYPE_CHECKING:

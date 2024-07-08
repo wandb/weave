@@ -4,7 +4,6 @@ from fastapi import FastAPI
 from modal import Image, Secret, Stub, asgi_app
 
 from weave.deploy.util import safe_name
-from weave.legacy.artifact_wandb import WandbArtifactRef
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.uris import WeaveURI
 
@@ -29,7 +28,6 @@ uri = WeaveURI.parse("$MODEL_REF")
 def fastapi_app() -> FastAPI:
     from weave import api
     from weave.serve_fastapi import object_method_app
-    from weave.uris import WeaveURI
 
     uri_ref = parse_uri(os.environ["MODEL_REF"])
     if not isinstance(uri_ref, ObjectRef):
