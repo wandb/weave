@@ -7,7 +7,8 @@ import {opNiceName} from './Links';
 
 export const EditableCallName: React.FC<{
   call: CallSchema;
-}> = ({call}) => {
+  editableFieldRef: React.RefObject<EditableField>;
+}> = ({call, editableFieldRef}) => {
   const defaultDisplayName = opNiceName(call.spanName);
   const displayNameIsEmpty =
     call.displayName == null || call.displayName === '';
@@ -47,6 +48,7 @@ export const EditableCallName: React.FC<{
 
   return (
     <EditableField
+      ref={editableFieldRef}
       value={currNameToDisplay}
       onFinish={saveName}
       placeholder={defaultDisplayName}

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, {SyntheticEvent} from 'react';
 import styled from 'styled-components';
 
+import EditableField from '../../../../../../common/components/EditableField';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Reactions} from '../../feedback/Reactions';
 import {EditableCallName} from '../common/EditableCallName';
@@ -44,19 +45,30 @@ export const CallOverview: React.FC<{
 }> = ({call}) => {
   const statusCode = call.rawSpan.status_code;
   const refCall = makeRefCall(call.entity, call.project, call.callId);
+  const editableCallDisplayNameRef = React.useRef<EditableField>(null);
 
   return (
     <>
       <Overview>
         <CallName>
-          <EditableCallName call={call} />
+          <EditableCallName
+            call={call}
+            editableFieldRef={editableCallDisplayNameRef}
+          />
         </CallName>
         <CopyableId id={call.callId} type="Call" />
         <StatusChip value={statusCode} iconOnly />
         <Spacer />
         <Reactions weaveRef={refCall} forceVisible={true} />
         <OverflowBin>
-          <OverflowMenu selectedCalls={[call]} />
+          <OverflowMenu
+            selectedCalls={[call]}
+            setIsRenaming={() => {
+              // TODO(gst): fix hack
+              const event = new Event('click') as unknown as SyntheticEvent;
+              editableCallDisplayNameRef.current?.startEditing(event);
+            }}
+          />
         </OverflowBin>
       </Overview>
       {call.rawSpan.exception && (
