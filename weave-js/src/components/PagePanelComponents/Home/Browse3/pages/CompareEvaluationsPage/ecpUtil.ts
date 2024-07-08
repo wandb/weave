@@ -1,4 +1,17 @@
-import { EvaluationCall, EvaluationMetricDimension, isBinarySummaryScore, isContinuousSummaryScore, isDerivedMetricDefinition, isScorerMetricDimension,MetricResult, PredictAndScoreCall, ScoreType, SummaryScore } from './ecpTypes';
+import { EvaluationCall, EvaluationMetricDimension, isBinaryScore, isBinarySummaryScore, isContinuousSummaryScore, isDerivedMetricDefinition, isScorerMetricDimension,MetricResult, PredictAndScoreCall, ScoreType, SummaryScore } from './ecpTypes';
+
+export const adjustValueForDisplay = (value: number | boolean | undefined, isBooleanAggregate?: boolean): number | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (isBinaryScore(value)) {
+    return value ? 100 : 0;
+  } else if (isBooleanAggregate) {
+    return value * 100;
+  } else {
+    return value;
+  }
+}
 
 export const dimensionLabel = (dim: EvaluationMetricDimension): string => {
   if (isScorerMetricDimension(dim)) {
@@ -11,8 +24,11 @@ export const dimensionLabel = (dim: EvaluationMetricDimension): string => {
   }
 };
 
-export const dimensionUnit = (dim: EvaluationMetricDimension): string => {
+export const dimensionUnit = (dim: EvaluationMetricDimension, isAggregate?: boolean): string => {
   if (isScorerMetricDimension(dim)) {
+    if (isAggregate && dim.scoreType === 'binary') {
+      return '%';
+    }
     return '';
   } else if (isDerivedMetricDefinition(dim)) {
     return dim.unit ?? '';

@@ -8,6 +8,8 @@ export const PlotlyScatterPlot: React.FC<{
   height: number;
   xColor: string;
   yColor: string;
+  xIsPercentage: boolean;
+  yIsPercentage: boolean;
   data: ScatterPlotData;
   onRangeChange: (
     xMin?: number,
@@ -45,7 +47,7 @@ export const PlotlyScatterPlot: React.FC<{
       // width: props.height,
       // showlegend: true,
       margin: {
-        l: 20, // legend
+        l: 50, // legend
         r: 0,
         b: 20, // legend
         t: 0,
@@ -55,6 +57,7 @@ export const PlotlyScatterPlot: React.FC<{
       xaxis: {
         // fixedrange: true,
         // title: props.xTitle,
+        tickformat: props.xIsPercentage ? '.0%' : '',
         gridcolor: MOON_300,
         linecolor: props.xColor,
         linewidth: 2,
@@ -62,6 +65,7 @@ export const PlotlyScatterPlot: React.FC<{
       yaxis: {
         // fixedrange: true,
         // title: props.yTitle,
+        tickformat: props.yIsPercentage ? '.0%' : '',
         gridcolor: MOON_300,
         linecolor: props.yColor,
         linewidth: 2,

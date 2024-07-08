@@ -19,6 +19,7 @@ import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpTypes';
 import {
+  adjustValueForDisplay,
   dimensionId,
   dimensionLabel,
   dimensionShouldMinimize,
@@ -349,13 +350,20 @@ export const ExampleCompareSection: React.FC<{
                         const dimension = dimensionsForThisScorer[mi];
 
                         // TODO: Pill logic should be shared now
+                        const unit = dimensionUnit(dimension, true);
+                        const isBinary = dimension.scoreType === 'binary';
                         const scoreId = dimensionId(dimension);
-                        const summaryMetric =
-                          target.scores[scoreId][currEvalCallId];
-                        const unit = dimensionUnit(dimension);
+                        const summaryMetric = adjustValueForDisplay(
+                          target.scores[scoreId][currEvalCallId],
+                          isBinary
+                        );
+                        const baseline = adjustValueForDisplay(
+                          target.scores[scoreId][leafDims[0]],
+                          isBinary
+                        );
+
                         let color: TagColorName = 'moon';
-                        const baseline = target.scores[scoreId][leafDims[0]];
-                        const diff = summaryMetric - baseline;
+                        const diff = (summaryMetric ?? 0) - (baseline ?? 0);
                         const lowerIsBetter =
                           dimensionShouldMinimize(dimension);
                         if (diff > 0) {

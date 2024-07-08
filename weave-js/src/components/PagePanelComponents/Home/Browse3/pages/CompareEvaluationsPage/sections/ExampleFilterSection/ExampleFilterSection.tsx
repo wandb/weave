@@ -25,6 +25,11 @@ export const ExampleFilterSection: React.FC<{
     callId => callId !== baselineCallId
   )!;
 
+  const xIsPercentage = targetDimension?.scoreType === 'binary';
+  const yIsPercentage = targetDimension?.scoreType === 'binary';
+
+  console.log(xIsPercentage, yIsPercentage);
+
   const data = useMemo(() => {
     const series: ScatterPlotData[number] = {
       x: [],
@@ -138,6 +143,8 @@ export const ExampleFilterSection: React.FC<{
           data={data}
           xColor={xColor}
           yColor={yColor}
+          xIsPercentage={xIsPercentage}
+          yIsPercentage={yIsPercentage}
         />
       </VerticalBox>
     </VerticalBox>

@@ -21,7 +21,9 @@ import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
 import {
+  adjustValueForDisplay,
   dimensionLabel,
+  dimensionUnit,
   resolveDimensionValueForEvaluateCall,
 } from '../../ecpUtil';
 import {HorizontalBox} from '../../Layout';
@@ -118,8 +120,7 @@ export const ScorecardSection: React.FC<{
                 scorerMetricsDimension.scorerDef.scorerOpOrObjRef;
               const scorerName =
                 scorerMetricsDimension.scorerDef.likelyTopLevelKeyName;
-              const unit =
-                scorerMetricsDimension.scoreType === 'continuous' ? '' : '%';
+              const unit = dimensionUnit(scorerMetricsDimension, true);
               const lowerIsBetter = false;
               if (res[scorerRef] == null) {
                 res[scorerRef] = {
@@ -139,14 +140,17 @@ export const ScorecardSection: React.FC<{
 
               res[scorerRef].metrics[metricDimensionId].modelScores[
                 evaluationCall.modelRef
-              ] = resolveDimensionValueForEvaluateCall(
-                scorerMetricsDimension,
-                evaluationCall
+              ] = adjustValueForDisplay(
+                resolveDimensionValueForEvaluateCall(
+                  scorerMetricsDimension,
+                  evaluationCall
+                ),
+                scorerMetricsDimension.scoreType === 'binary'
               );
             } else if (derivedMetricsDimension != null) {
               const scorerRef = '__DERIVED__';
               const scorerName = derivedMetricsDimension.derivedMetricName;
-              const unit = derivedMetricsDimension.unit ?? '';
+              const unit = dimensionUnit(derivedMetricsDimension, true);
               const lowerIsBetter =
                 derivedMetricsDimension.shouldMinimize ?? false;
               if (res[scorerRef] == null) {
@@ -167,9 +171,12 @@ export const ScorecardSection: React.FC<{
 
               res[scorerRef].metrics[metricDimensionId].modelScores[
                 evaluationCall.modelRef
-              ] = resolveDimensionValueForEvaluateCall(
-                derivedMetricsDimension,
-                evaluationCall
+              ] = adjustValueForDisplay(
+                resolveDimensionValueForEvaluateCall(
+                  derivedMetricsDimension,
+                  evaluationCall
+                ),
+                derivedMetricsDimension.scoreType === 'binary'
               );
             } else {
               throw new Error('Unknown metric dimension type');
