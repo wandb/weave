@@ -604,7 +604,7 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
   } else if (typeof value === 'object') {
     text = JSON.stringify(value || {}, null, 2);
   } else if (typeof value === 'string' && isRef(value)) {
-    return <SmallRef objRef={parseRef(value)} allowShrink />;
+    return <SmallRef objRef={parseRef(value)} />;
   } else {
     text = value.toString();
   }

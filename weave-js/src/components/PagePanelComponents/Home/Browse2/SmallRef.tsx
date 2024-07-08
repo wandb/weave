@@ -80,8 +80,7 @@ export const SmallRef: FC<{
   objRef: ObjectRef;
   wfTable?: WFDBTableType;
   iconOnly?: boolean;
-  allowShrink?: boolean;
-}> = ({objRef, wfTable, allowShrink = false, iconOnly = false}) => {
+}> = ({objRef, wfTable, iconOnly = false}) => {
   const {
     useObjectVersion,
     useOpVersion,
@@ -178,8 +177,7 @@ export const SmallRef: FC<{
             minWidth: 0,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: allowShrink ? '' : 'nowrap',
-            wordBreak: allowShrink ? 'break-all' : 'normal',
+            whiteSpace: 'nowrap',
           }}>
           {label}
         </Box>
