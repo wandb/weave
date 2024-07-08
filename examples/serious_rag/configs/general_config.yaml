@@ -1,0 +1,141 @@
+###################
+# general configs #
+###################
+entity: 'wandb-smle'
+project_name: 'weave-rag-experiments' #'weave-rag-lc-demo'
+device: 'cpu'
+
+# GENERAL NOTES
+# 1) Weave can't store objects for now so we save the path to local objects if needed
+# 2) embed model has to be a SentenceTransformer model in general for the RetrievalQA
+
+########
+# main #
+########
+setup: False
+benchmark: True
+
+#########
+# setup #
+#########
+# sources
+display_source_eval_data: True
+source_list_path: './configs/sources_urls.csv'
+raw_data_artifact: 'raw_data'
+dataset_artifact: 'gen_eval_dataset'
+chunk_size: 500
+chunk_overlap: 50
+
+# data generation (questions_per_chunk * max_chunks_considered)
+source_chunk_size: 1000
+source_chunk_overlap: 10
+questions_per_chunk: 3
+max_chunks_considered: 10 # if -1, consider all chunks, otherwise sample from all chunks
+
+# embedding model
+embedding_model: 'text-embedding-ada-002' #'sentence-transformers/all-MiniLM-L6-v2' #'sentence-transformers/all-MiniLM-L12-v2' 
+embedding_model_norm_embed: True
+vectorstore_path: './faiss_index'
+retrieval_chain_type: 'stuff'
+
+# chat model
+chat_model: 'gpt-3.5-turbo' #'gemini-1.5-pro' #'microsoft/phi-1_5' #'microsoft/Phi-3-mini-128k-instruct' #'gpt-3.5-turbo' #'meta-llama/Meta-Llama-3-8B' #'microsoft/phi-1_5' # 'meta-llama/Meta-Llama-3-8B' #'gpt-4-turbo' #'microsoft/phi-1_5' #'claude-3-haiku-20240307' #'microsoft/phi-1_5' #'bigscience/bloom-560m', 'meta-llama/Llama-2-7b-chat-hf'
+cm_quantize: False
+cm_temperature: 0.1
+cm_max_new_tokens: 128
+
+############
+# evaluate #
+############
+inference_batch_size: 16
+max_concurrency: 1
+
+eval_model: 'gpt-3.5-turbo' #'gemini-1.5-flash' #'claude-3-haiku-20240307' #'gpt-3.5-turbo' #'claude-3-haiku-20240307' #'claude-3-sonnet-20240229' # 'gpt-4', 'claude-instant-1.2', 'bigscience/bloom-560m'
+em_quantize: False
+em_temperature: 0.1
+em_max_new_tokens: 128
+
+gen_eval_model: 'gpt-4' #'claude-3-opus-20240229' #'gpt-3.5-turbo'
+gm_quantize: False
+gm_temperature: 0.5
+gm_max_new_tokens: 128
+
+############
+# prompts #
+############
+# for rag (Helpful Answer: needs to stay for output parsing in this toy example)
+rag_prompt_system: |
+  You're an expert answering questions about climate change.
+
+rag_prompt_user: |
+  Use the following information to answer the subsequent question. If the answer cannot be found, write "I don't know."
+  Context:
+  """
+  {context}
+  """
+  Question: {question}
+
+# general judge system message
+eval_system_prompt: |
+  You are a teacher grading a quiz.
+
+# for correctness judge
+eval_corr_prompt_user: |
+  Given a question, the student's answer, and the true answer score the student answer as either CORRECT or INCORRECT.
+
+  Example Format:
+  QUESTION: question here
+  STUDENT ANSWER: student's answer here
+  TRUE ANSWER: true answer here
+  GRADE: CORRECT or INCORRECT here
+
+  Grade the student answers based ONLY on their factual accuracy. 
+  Ignore differences in punctuation and phrasing between the student answer and true answer. 
+  It is OK if the student answer contains more information than the true answer, as long as it does not contain any conflicting statements. Begin! 
+
+  QUESTION: {query}
+  STUDENT ANSWER: {result}
+  TRUE ANSWER: {answer}
+  GRADE:
+
+# for relevance judge
+eval_hall_prompt_user: |
+  Given a question, an extract of relevant sources, and answer given by the student state whether the student's answer STRICTLY FOLLOWS from the given sources as either YES or NO.
+
+  Example Format:
+  CONTEXT: extract of relevant sources here
+  QUESTION: question here
+  STUDENT ANSWER: student's answer here
+  GRADE: YES or NO here
+
+  Grade the student answers based ONLY on whether their answer follows from the given extract of relevant sources.
+  Ignore differences in punctuation and phrasing between the student answer and the given sources. Also ignore whether the answer is factually accurate.
+  It is OK if the student answer contains more or less information than given in the sources, as long as it does not contain anything made up. Begin!
+
+  CONTEXT: {chat_context}
+  QUESTION: {query}
+  STUDENT ANSWER: {result}
+  GRADE:
+
+# for evalset generation
+gen_eval_prompt: |
+  You are a Teacher/Professor creating a quiz based on a given source.
+  Your task is to setup a list of question-answer pairs that test the students' understanding of the source.
+  The questions should be diverse in nature across the provided source. 
+  The answers should be detailed and true to the source. 
+  Restrict both the questions and answers ONLY TO THE SOURCE, don't use your prior knowledge.
+
+  Example Format for 2 question-answer pairs:
+  SOURCE: extract of relevant source here
+
+  QUESTION: a question about the source here
+  ANSWER: the correct answer to the question based on the source here
+
+  QUESTION: another question about the source here
+  ANSWER: the correct answer to the question based on the source here
+
+  ONLY use the information given in the extract of the source.
+  Also ignore whether the answer is factually accurate, simply make sure that it follows from the given source.
+
+  Now generate {questions_per_chunk} question-answer pairs for the following source. Begin!
+  SOURCE: {source_str}
