@@ -103,7 +103,7 @@ export const ScorecardSection: React.FC<{
       return values.some((value, i) => i > 0 && value !== values[0]);
     });
   }, [modelProps]);
-  const [showDifferences, setShowDifferences] = React.useState(false);
+  const [diffOnly, setDiffOnly] = React.useState(true);
 
   const betterScores: ScorecardSpecificLegacyScoresType = useMemo(() => {
     const res: ScorecardSpecificLegacyScoresType = {};
@@ -321,24 +321,6 @@ export const ScorecardSection: React.FC<{
           }}>
           Model Comparison
         </Box>
-        <div
-          style={{
-            // fontWeight: 'bold',
-            // paddingRight: '10px',
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            justifyContent: 'flex-end',
-            gap: '8px',
-            // border: '1px solid #ccc',
-            // borderRadius: '6px',
-          }}>
-          <span>Show all properties</span>
-          <Checkbox
-            checked={showDifferences}
-            onClick={() => setShowDifferences(v => !v)}
-          />
-        </div>
       </HorizontalBox>
       <div
         style={{
@@ -407,13 +389,26 @@ export const ScorecardSection: React.FC<{
             fontWeight: 'bold',
             borderTop: '1px solid #ccc',
             borderBottom: '1px solid #ccc',
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
           }}>
           Properties
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              gap: '8px',
+            }}>
+            <span>diff only</span>
+            <Checkbox checked={diffOnly} onClick={() => setDiffOnly(v => !v)} />
+          </div>
         </GridCell>
 
         {/* Model Rows */}
         {Object.entries(modelProps).map(([prop, modelData]) => {
-          if (!showDifferences && !propsWithDifferences.includes(prop)) {
+          if (diffOnly && !propsWithDifferences.includes(prop)) {
             return null;
           }
           return (

@@ -11,7 +11,6 @@
  * Smaller Features:
  * * Comparison Table:
  *    - [ ] (MUST) Evaluation pinning pushes summary off screen
- * - [ ] (MUST) Move toggle to the properties section similar to run comparer
  * - [ ] (MUST) Reflect local state in URL (dimension, range, & selection)
  * - [ ] (MUST) Sort example results to be absolute value of difference of primary metric
  * - [ ] (maybe) Refs in Model Property table should be expanded. Example:  https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22bf5188ba-48cd-4c6d-91ea-e25464570c13%22%2C%222f4544f3-9649-487e-b083-df6985e21b12%22%2C%228cbeccd6-6ff7-4eac-a305-6fb6450530f1%22%5D
@@ -31,7 +30,7 @@
  *    - [ ] (maybe) Scatterplot filter should have 1-1 aspect ratio
  *    - [ ] Double click does not clear the box boundary
  * Implementation Tasks:
- * - [ ] (MUST) Code Cleanup: There is a lot of dead / messy code
+ * - [ ] (MUST) Code Cleanup: There is a lot of dead / messy code (commnts, knip, etc...)
  * - [ ] (MUST) Code Cleanup: Pill logic should be shared now between scorecard and viewer
  */
 
