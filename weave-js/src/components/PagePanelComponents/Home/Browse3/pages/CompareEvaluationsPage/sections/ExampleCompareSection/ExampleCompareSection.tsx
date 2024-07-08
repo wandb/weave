@@ -188,8 +188,9 @@ export const ExampleCompareSection: React.FC<{
           <SmallRef objRef={inputRef} allowShrink />
         </GridCell>
         {_.range(NUM_INPUT_PROPS).map(ii => {
+          const inputColumnKey = inputColumnKeys[ii];
           return (
-            <React.Fragment>
+            <React.Fragment key={inputColumnKey}>
               <GridCell
                 style={{
                   whiteSpace: 'nowrap',
@@ -199,10 +200,10 @@ export const ExampleCompareSection: React.FC<{
                   zIndex: 1,
                   backgroundColor: 'white',
                 }}>
-                {removePrefix(inputColumnKeys[ii], 'input.')}
+                {removePrefix(inputColumnKey, 'input.')}
               </GridCell>
               <GridCell>
-                <ICValueView value={target.input[inputColumnKeys[ii]]} />
+                <ICValueView value={target.input[inputColumnKey]} />
               </GridCell>
             </React.Fragment>
           );
@@ -230,6 +231,7 @@ export const ExampleCompareSection: React.FC<{
             const currEvalCallId = leafDims[ei];
             return (
               <GridCell
+                key={currEvalCallId}
                 cols={2}
                 style={{
                   minWidth: MIN_OUTPUT_WIDTH,
@@ -255,7 +257,7 @@ export const ExampleCompareSection: React.FC<{
                 trialsForThisEval[selectedTrials[currEvalCallId] || 0];
 
               return (
-                <GridCell cols={2}>
+                <GridCell key={currEvalCallId} cols={2}>
                   <ICValueView
                     value={
                       (selectedTrial?.output?.[outputColumnKeys[oi]] ?? {})[
@@ -277,6 +279,7 @@ export const ExampleCompareSection: React.FC<{
 
             return (
               <GridCell
+                key={currEvalCallId}
                 cols={2}
                 rows={NUM_METRICS + 1}
                 noPad
@@ -304,6 +307,7 @@ export const ExampleCompareSection: React.FC<{
                 {_.range(NUM_TRIALS).map(ti => {
                   return (
                     <GridCell
+                      key={ti}
                       style={{
                         textAlign: 'center',
                       }}>
@@ -338,7 +342,8 @@ export const ExampleCompareSection: React.FC<{
                     : derivedScorers;
                   const NUM_METRICS_IN_SCORER = dimensionsForThisScorer.length;
                   return (
-                    <React.Fragment>
+                    <React.Fragment
+                      key={isScorerMetric ? uniqueScorerRefs[si] : 'derived'}>
                       {_.range(NUM_METRICS_IN_SCORER).map(mi => {
                         const isBaseline = ei === 0;
                         const dimension = dimensionsForThisScorer[mi];
@@ -373,7 +378,7 @@ export const ExampleCompareSection: React.FC<{
                           ? diff.toLocaleString()
                           : diff.toFixed(SIGNIFICANT_DIGITS);
                         return (
-                          <React.Fragment>
+                          <React.Fragment key={scoreId}>
                             <GridCell
                               style={{
                                 position: 'sticky',
@@ -414,14 +419,14 @@ export const ExampleCompareSection: React.FC<{
                                 ];
                               if (metricValue == null) {
                                 return (
-                                  <GridCell>
+                                  <GridCell key={ti}>
                                     <NotApplicable />
                                   </GridCell>
                                 );
                               }
 
                               return (
-                                <GridCell>
+                                <GridCell key={ti}>
                                   <CellValue value={metricValue} />
                                 </GridCell>
                               );
@@ -438,7 +443,7 @@ export const ExampleCompareSection: React.FC<{
         </GridCell>
         {_.range(NUM_OUTPUT_KEYS).map(oi => {
           return (
-            <React.Fragment>
+            <React.Fragment key={outputColumnKeys[oi]}>
               <GridCell
                 style={{
                   position: 'sticky',
@@ -486,7 +491,7 @@ export const ExampleCompareSection: React.FC<{
             const NUM_METRICS_IN_SCORER = dimensionsForThisScorer.length;
             const scorerRef = uniqueScorerRefs[si];
             return (
-              <React.Fragment>
+              <React.Fragment key={isScorerMetric ? scorerRef : 'derived'}>
                 <GridCell ref={leftRef} rows={NUM_METRICS_IN_SCORER}>
                   {isScorerMetric && (
                     <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} />
@@ -494,7 +499,7 @@ export const ExampleCompareSection: React.FC<{
                 </GridCell>
                 {_.range(NUM_METRICS_IN_SCORER).map(mi => {
                   return (
-                    <React.Fragment>
+                    <React.Fragment key={mi}>
                       <GridCell
                         style={{
                           whiteSpace: 'nowrap',
@@ -510,7 +515,7 @@ export const ExampleCompareSection: React.FC<{
           {_.range(NUM_DERIVED).map(di => {
             const derivedMetric = derivedScorers[di];
             return (
-              <React.Fragment>
+              <React.Fragment key={di}>
                 <GridCell></GridCell>
                 <GridCell>{derivedMetric.derivedMetricName}</GridCell>
               </React.Fragment>
