@@ -1,7 +1,7 @@
 import pytest
 
 import weave
-from weave.trace.vals import TraceObject
+from weave.trace.vals import WeaveObject
 
 
 def test_traceobject_properties():
@@ -10,7 +10,7 @@ def test_traceobject_properties():
         def x(self):
             return 1
 
-    to = TraceObject(A(), None, None, None)
+    to = WeaveObject(A(), None, None, None)
     assert to.x == 1
 
 

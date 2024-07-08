@@ -162,7 +162,7 @@ def attribute_access_result(
     )
 
 
-class TraceObject(Tracable):
+class WeaveObject(Tracable):
     def __init__(
         self,
         val: Any,
@@ -208,13 +208,13 @@ class TraceObject(Tracable):
         return dir(self._val)
 
     def __repr__(self) -> str:
-        return f"TraceObject({self._val})"
+        return f"WeaveObject({self._val})"
 
     def __eq__(self, other: Any) -> bool:
         return self._val == other
 
 
-class TraceTable(Tracable):
+class WeaveTable(Tracable):
     filter: _TableRowFilter
 
     def __init__(
@@ -297,7 +297,7 @@ class TraceTable(Tracable):
         self.root.add_mutation(self.ref.extra, "append", val)
 
 
-class TraceList(Tracable, list):
+class WeaveList(Tracable, list):
     def __init__(
         self,
         *args: Any,
@@ -324,10 +324,10 @@ class TraceList(Tracable, list):
             yield self[i]
 
     def __repr__(self) -> str:
-        return f"TraceList({super().__repr__()})"
+        return f"WeaveList({super().__repr__()})"
 
 
-class TraceDict(Tracable, dict):
+class WeaveDict(Tracable, dict):
     def __init__(
         self,
         *args: Any,
@@ -369,13 +369,13 @@ class TraceDict(Tracable, dict):
             yield k, self[k]
 
     def __iter__(self) -> Iterator[str]:
-        # Simply define this to so that d = TraceDict({'a': 1, 'b': 2})); d2 = dict(d)
+        # Simply define this to so that d = WeaveDict({'a': 1, 'b': 2})); d2 = dict(d)
         # works. The dict(d) constructor works differently if __iter__ is not defined
         # on d.
         return super().__iter__()
 
     def __repr__(self) -> str:
-        return f"TraceDict({super().__repr__()})"
+        return f"WeaveDict({super().__repr__()})"
 
 
 def make_trace_obj(
@@ -386,10 +386,10 @@ def make_trace_obj(
     parent: Any = None,
 ) -> Any:
     if isinstance(val, Tracable):
-        # If val is a TraceTable, we want to refer to it via the outer object
+        # If val is a WeaveTable, we want to refer to it via the outer object
         # that it is within, rather than via the TableRef. For example we
         # want Dataset row refs to be Dataset.rows[id] rather than table[id]
-        if isinstance(val, TraceTable):
+        if isinstance(val, WeaveTable):
             val.ref = new_ref
         return val
     if hasattr(val, "ref") and isinstance(val.ref, RefWithExtra):
@@ -420,9 +420,9 @@ def make_trace_obj(
                     "Expected Table.ref or Table.table_ref to be TableRef"
                 )
             val_ref = val_table_ref
-        val = TraceTable(val_ref, new_ref, server, _TableRowFilter(), root)
+        val = WeaveTable(val_ref, new_ref, server, _TableRowFilter(), root)
     if isinstance(val, TableRef):
-        val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
+        val = WeaveTable(val, new_ref, server, _TableRowFilter(), root)
 
     if extra:
         # This is where extra resolution happens?
@@ -441,15 +441,15 @@ def make_trace_obj(
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
-                val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
+                val = WeaveTable(val, new_ref, server, _TableRowFilter(), root)
 
     if not isinstance(val, Tracable):
         if isinstance(val, ObjectRecord):
-            return TraceObject(val, new_ref, server, root)
+            return WeaveObject(val, new_ref, server, root)
         elif isinstance(val, list):
-            return TraceList(val, ref=new_ref, server=server, root=root)
+            return WeaveList(val, ref=new_ref, server=server, root=root)
         elif isinstance(val, dict):
-            return TraceDict(val, ref=new_ref, server=server, root=root)
+            return WeaveDict(val, ref=new_ref, server=server, root=root)
     if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
         # This condition attempts to bind the current `self` to the attribute if
         # it happens to be both an `Op` and have a `self` argument. This is a
