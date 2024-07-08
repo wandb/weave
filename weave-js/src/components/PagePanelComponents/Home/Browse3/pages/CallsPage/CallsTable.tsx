@@ -6,7 +6,13 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {Autocomplete, Chip, FormControl, ListItem} from '@mui/material';
+import {
+  Autocomplete,
+  Checkbox,
+  Chip,
+  FormControl,
+  ListItem,
+} from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
   GridApiPro,
@@ -27,11 +33,15 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
-import {WeaveHeaderExtrasContext} from '../../context';
+import {
+  useWeaveflowCurrentRouteContext,
+  WeaveHeaderExtrasContext,
+} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
@@ -283,7 +293,9 @@ export const CallsTable: FC<{
 
   // DataGrid Model Management
   const [pinnedColumnsModel, setPinnedColumnsModel] =
-    useState<GridPinnedColumns>({left: ['op_name', 'feedback']});
+    useState<GridPinnedColumns>({
+      left: ['CustomCheckbox', 'op_name', 'feedback'],
+    });
 
   // END OF CPR FACTORED CODE
 
@@ -329,6 +341,75 @@ export const CallsTable: FC<{
     entity,
     project
   );
+
+  // Selection Management
+  const [compareSelection, setCompareSelection] = useState<string[]>([]);
+  const muiColumns = useMemo(() => {
+    if (!isEvaluateTable) {
+      return columns.cols;
+    }
+    return [
+      {
+        width: 40,
+        field: 'CustomCheckbox',
+        headerName: '',
+        renderCell: (params: any) => {
+          const rowId = params.id as string;
+          return (
+            <Checkbox
+              disabled={
+                params.row.exception != null || params.row.ended_at == null
+              }
+              checked={compareSelection.includes(rowId)}
+              onChange={() => {
+                if (compareSelection.includes(rowId)) {
+                  setCompareSelection(
+                    compareSelection.filter(id => id !== rowId)
+                  );
+                } else {
+                  setCompareSelection([...compareSelection, rowId]);
+                }
+              }}
+            />
+          );
+        },
+      },
+      ...columns.cols,
+    ];
+  }, [columns.cols, compareSelection, isEvaluateTable]);
+
+  const history = useHistory();
+  const router = useWeaveflowCurrentRouteContext();
+  useEffect(() => {
+    if (!isEvaluateTable) {
+      return;
+    }
+    addExtra('compareEvaluations', {
+      node: (
+        <CompareEvaluationsTableButton
+          onClick={() => {
+            history.push(
+              router.compareEvaluationsUri(entity, project, compareSelection)
+            );
+          }}
+          disabled={compareSelection.length === 0}
+        />
+      ),
+    });
+
+    return () => removeExtra('compareEvaluations');
+  }, [
+    apiRef,
+    addExtra,
+    removeExtra,
+    isEvaluateTable,
+    compareSelection.length,
+    compareSelection,
+    router,
+    entity,
+    project,
+    history,
+  ]);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -470,7 +551,7 @@ export const CallsTable: FC<{
         pageSizeOptions={[defaultPageSize]}
         // PAGINATION SECTION END
         rowHeight={38}
-        columns={columns.cols as any}
+        columns={muiColumns}
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
@@ -628,6 +709,30 @@ const ExportRunsTableButton = ({
       onClick={() => tableRef.current?.exportDataAsCsv()}
       icon="export-share-upload">
       Export to CSV
+    </Button>
+  </Box>
+);
+
+const CompareEvaluationsTableButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({onClick, disabled}) => (
+  <Box
+    sx={{
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+    }}>
+    <Button
+      className="mx-16"
+      style={{
+        marginLeft: '0px',
+      }}
+      size="medium"
+      disabled={disabled}
+      onClick={onClick}
+      icon="chart-scatterplot">
+      Compare Evaluations
     </Button>
   </Box>
 );
