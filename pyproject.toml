@@ -102,7 +102,6 @@ known-third-party = ["wandb"]
 [tool.ruff.lint.per-file-ignores]
 "weave/tests/*" = ["F401"]
 "weave/weave_server.py" = ["F401"]
-"weave/trace/custom_objs.py" = ["F401"]
 
 
 [tool.ruff]
