@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Union
+from typing import Any, Tuple, Union
 
 from ..trace_server import refs_internal
 
@@ -51,7 +51,7 @@ class ObjectRef(RefWithExtra):
     project: str
     name: str
     digest: str
-    extra: list[str] = dataclasses.field(default_factory=list)
+    extra: Tuple[str, ...] = ()
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
