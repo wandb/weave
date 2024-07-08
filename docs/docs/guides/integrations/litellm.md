@@ -13,12 +13,15 @@ It's important to store traces of LLM applications in a central database, both d
 
 > **Note:** When using LiteLLM, make sure to import the library using `import litellm` and call the completion function with `litellm.completion` instead of `from litellm import completion`. This ensures that all functions and attributes are correctly referenced.
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/examples/cookbooks/weave_litellm_integration_docs.ipynb)
+
 Weave will automatically capture traces for LiteLLM. You can use the library as usual, start by calling `weave.init()`:
 
 ```python
 import litellm
 import weave
 
+# highlight-next-line
 weave.init("weave_litellm_integration")
 
 openai_response = litellm.completion(
@@ -46,8 +49,10 @@ Weave ops make results reproducible by automatically versioning code as you expe
 import litellm
 import weave
 
+# highlight-next-line
 weave.init("weave_litellm_integration")
 
+# highlight-next-line
 @weave.op()
 def translate(text: str, target_language: str, model: str) -> str:
     response = litellm.completion(
@@ -73,12 +78,15 @@ In the example below, you can experiment with different models and temperatures:
 import litellm
 import weave
 
+# highlight-next-line
 weave.init('weave_litellm_integration')
 
+# highlight-next-line
 class TranslatorModel(weave.Model):
     model: str
     temperature: float
   
+    # highlight-next-line
     @weave.op()
     def predict(self, text: str, target_language: str):
         response = litellm.completion(
@@ -114,6 +122,7 @@ LiteLLM supports function calling for compatible models. Weave will automaticall
 import litellm
 import weave
 
+# highlight-next-line
 weave.init("weave_litellm_integration")
 
 response = litellm.completion(
