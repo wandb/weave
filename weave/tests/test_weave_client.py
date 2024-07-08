@@ -131,14 +131,14 @@ def test_dataset_refs(client):
         "test-project",
         "my-dataset",
         ref.ref.digest,
-        [
+        (
             OBJECT_ATTR_EDGE_NAME,
             "rows",
             TABLE_ROW_ID_EDGE_NAME,
             RegexStringMatcher(".*"),
             DICT_KEY_EDGE_NAME,
             "v",
-        ],
+        ),
     )
 
     row1 = ref2[1]
@@ -149,14 +149,14 @@ def test_dataset_refs(client):
         "test-project",
         "my-dataset",
         ref.ref.digest,
-        [
+        (
             OBJECT_ATTR_EDGE_NAME,
             "rows",
             TABLE_ROW_ID_EDGE_NAME,
             RegexStringMatcher(".*"),
             DICT_KEY_EDGE_NAME,
             "v",
-        ],
+        ),
     )
 
 
