@@ -48,7 +48,7 @@ export const SummaryPlots: React.FC<{
         }}>
         <Box
           sx={{
-            flex: '1 1 ' + PLOT_HEIGHT + 'px',
+            flex: '1 2 ' + PLOT_HEIGHT + 'px',
             height: PLOT_HEIGHT,
             // width: PLOT_HEIGHT * 2,
             borderRadius: BOX_RADIUS,
@@ -58,12 +58,10 @@ export const SummaryPlots: React.FC<{
             width: PLOT_HEIGHT,
           }}>
           <PlotlyRadarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
-          {/* <PlotlyRadarPlot /> */}
-          {/* // <PlotlyRadialPlot /> */}
         </Box>
         <Box
           sx={{
-            flex: '1 1 ' + PLOT_HEIGHT + 'px',
+            flex: '2 1 ' + PLOT_HEIGHT + 'px',
             height: PLOT_HEIGHT,
             overflow: 'hidden',
             borderRadius: BOX_RADIUS,

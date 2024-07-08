@@ -1,9 +1,11 @@
-import {Box, IconButton} from '@material-ui/core';
-import {Alert, AlertTitle, Button, Collapse} from '@mui/material';
+import {Box} from '@material-ui/core';
+import {FormControl} from '@material-ui/core';
+import {Alert, AlertTitle, Autocomplete, Button} from '@mui/material';
 import {mean} from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
 import {MOON_500} from '../../../../../../../../common/css/color.styles';
+import {StyledTextField} from '../../../../StyledTextField';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {PLOT_HEIGHT, STANDARD_PADDING} from '../../ecpConstants';
 import {
@@ -11,9 +13,13 @@ import {
   isBinaryScore,
   isContinuousScore,
 } from '../../ecpTypes';
-import {resolveDimensionMetricResultForPASCall} from '../../ecpUtil';
+import {
+  dimensionId,
+  dimensionLabel,
+  resolveDimensionMetricResultForPASCall,
+} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
-import {DimensionPicker} from '../ComparisonDefinitionSection/ComparisonDefinitionSection';
+import {useFilteredAggregateRows} from '../ExampleCompareSection/exampleCompareSectionUtil';
 import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
 
 const RESULT_FILTER_INSTRUCTIONS =
@@ -25,15 +31,93 @@ const RESULT_FILTER_INSTRUCTIONS =
 export const ExampleFilterSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const {setRangeSelection} = useCompareEvaluationsState();
-  const targetDimension = props.state.comparisonDimension;
+  const [isExpanded, setIsExpanded] = React.useState(true);
+
+  return (
+    <VerticalBox
+      sx={{
+        width: '100%',
+        paddingLeft: STANDARD_PADDING,
+        paddingRight: STANDARD_PADDING,
+      }}>
+      <HorizontalBox
+        sx={{
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          marginBottom: '8px',
+        }}>
+        <Box
+          sx={{
+            fontSize: '1.5em',
+            fontWeight: 'bold',
+          }}>
+          Result Filter
+        </Box>
+      </HorizontalBox>
+      <HorizontalBox
+        sx={{
+          flex: '1 1 auto',
+          width: '100%',
+          flexWrap: 'wrap',
+        }}>
+        <SingleDimensionFilter {...props} dimensionIndex={0} />
+        <SingleDimensionFilter {...props} dimensionIndex={1} />
+      </HorizontalBox>
+      <Alert
+        severity="info"
+        action={
+          // Expand icon - j
+          <Button
+            color="inherit"
+            size="small"
+            onClick={() => {
+              setIsExpanded(!isExpanded);
+            }}>
+            {isExpanded ? 'COLLAPSE' : 'EXPAND'}
+          </Button>
+        }
+        slotProps={{
+          closeIcon: {
+            name: '',
+          },
+        }}>
+        <AlertTitle
+          sx={{
+            marginBottom: isExpanded ? '5px' : '0px',
+          }}>
+          Plot Details
+        </AlertTitle>
+        {isExpanded ? RESULT_FILTER_INSTRUCTIONS : ''}
+      </Alert>
+    </VerticalBox>
+  );
+};
+
+const SingleDimensionFilter: React.FC<{
+  state: EvaluationComparisonState;
+  dimensionIndex: number;
+}> = props => {
+  const {setComparisonDimensions} = useCompareEvaluationsState();
   const baselineCallId = props.state.baselineEvaluationCallId;
   const compareCallId = Object.keys(props.state.data.evaluationCalls).find(
     callId => callId !== baselineCallId
   )!;
 
+  const targetComparisonDimension =
+    props.state.comparisonDimensions?.[props.dimensionIndex]!;
+  const targetDimension = targetComparisonDimension.dimension;
+
   const xIsPercentage = targetDimension?.scoreType === 'binary';
   const yIsPercentage = targetDimension?.scoreType === 'binary';
+
+  const xColor = props.state.data.evaluationCalls[baselineCallId].color;
+  const yColor = props.state.data.evaluationCalls[compareCallId].color;
+
+  const {filteredRows} = useFilteredAggregateRows(props.state);
+  const filteredDigest = useMemo(() => {
+    return new Set(filteredRows.map(row => row.inputDigest));
+  }, [filteredRows]);
 
   const data = useMemo(() => {
     const series: ScatterPlotData = [];
@@ -43,7 +127,7 @@ export const ExampleFilterSection: React.FC<{
     //   color: MOON_500,
     // };
     if (targetDimension != null) {
-      Object.values(props.state.data.resultRows).forEach(row => {
+      Object.entries(props.state.data.resultRows).forEach(([digest, row]) => {
         const xVals: number[] = [];
         const yVals: number[] = [];
         Object.values(row.evaluations[baselineCallId].predictAndScores).forEach(
@@ -84,6 +168,7 @@ export const ExampleFilterSection: React.FC<{
           y: mean(yVals),
           size: 15, // xVals.length,
           color: MOON_500,
+          selected: filteredDigest.has(digest),
         });
       });
     }
@@ -101,19 +186,21 @@ export const ExampleFilterSection: React.FC<{
   }, [
     baselineCallId,
     compareCallId,
+    filteredDigest,
     props.state.data.resultRows,
     targetDimension,
   ]);
   // console.log(data, props.state);
-  const xColor = props.state.data.evaluationCalls[baselineCallId].color;
-  const yColor = props.state.data.evaluationCalls[compareCallId].color;
 
   const onRangeChange = useCallback(
     (xMin?: number, xMax?: number, yMin?: number, yMax?: number) => {
+      const res = props.state.comparisonDimensions
+        ? [...props.state.comparisonDimensions]
+        : [];
       if (xMin == null || xMax == null || yMin == null || yMax == null) {
-        setRangeSelection({});
+        res[props.dimensionIndex].rangeSelection = undefined;
       } else {
-        setRangeSelection({
+        res[props.dimensionIndex].rangeSelection = {
           [baselineCallId]: {
             min: xMin,
             max: xMax,
@@ -122,90 +209,104 @@ export const ExampleFilterSection: React.FC<{
             min: yMin,
             max: yMax,
           },
-        });
+        };
       }
+      setComparisonDimensions(res);
     },
-    [baselineCallId, compareCallId, setRangeSelection]
+    [
+      baselineCallId,
+      compareCallId,
+      props.dimensionIndex,
+      props.state.comparisonDimensions,
+      setComparisonDimensions,
+    ]
   );
-
-  const [isExpanded, setIsExpanded] = React.useState(true);
 
   return (
     <VerticalBox
-      sx={{
-        width: '100%',
-        paddingLeft: STANDARD_PADDING,
-        paddingRight: STANDARD_PADDING,
+      style={{
+        flex: '1 1 ' + PLOT_HEIGHT + 'px',
+        width: PLOT_HEIGHT,
       }}>
-      <HorizontalBox
-        sx={{
-          width: '100%',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          marginBottom: '8px',
-        }}>
-        <Box
-          sx={{
-            fontSize: '1.5em',
-            fontWeight: 'bold',
-          }}>
-          Result Filter
-        </Box>
-        <DimensionPicker {...props} />
-      </HorizontalBox>
-      <VerticalBox
-        sx={{
-          flex: '1 1 auto',
-          width: '100%',
-        }}>
-        <PlotlyScatterPlot
-          onRangeChange={onRangeChange}
-          height={PLOT_HEIGHT}
-          data={data}
-          xColor={xColor}
-          yColor={yColor}
-          xIsPercentage={xIsPercentage}
-          yIsPercentage={yIsPercentage}
-          xTitle={
-            'Baseline: ' +
-            props.state.data.evaluationCalls[baselineCallId].name +
-            ' ' +
-            props.state.data.evaluationCalls[baselineCallId].callId.slice(-4)
-          }
-          yTitle={
-            'Challenger: ' +
-            props.state.data.evaluationCalls[compareCallId].name +
-            ' ' +
-            props.state.data.evaluationCalls[compareCallId].callId.slice(-4)
-          }
-        />
-      </VerticalBox>
-      <Alert
-        severity="info"
-        action={
-          // Expand icon - j
-          <Button
-            color="inherit"
-            size="small"
-            onClick={() => {
-              setIsExpanded(!isExpanded);
-            }}>
-            {isExpanded ? 'COLLAPSE' : 'EXPAND'}
-          </Button>
+      <DimensionPicker {...props} dimensionIndex={props.dimensionIndex} />
+      <PlotlyScatterPlot
+        onRangeChange={onRangeChange}
+        height={PLOT_HEIGHT}
+        data={data}
+        xColor={xColor}
+        yColor={yColor}
+        xIsPercentage={xIsPercentage}
+        yIsPercentage={yIsPercentage}
+        xTitle={
+          'Baseline: ' +
+          props.state.data.evaluationCalls[baselineCallId].name +
+          ' ' +
+          props.state.data.evaluationCalls[baselineCallId].callId.slice(-4)
         }
-        slotProps={{
-          closeIcon: {
-            name: '',
-          },
-        }}>
-        <AlertTitle
-          sx={{
-            marginBottom: isExpanded ? '5px' : '0px',
-          }}>
-          Plot Details
-        </AlertTitle>
-        {isExpanded ? RESULT_FILTER_INSTRUCTIONS : ''}
-      </Alert>
+        yTitle={
+          'Challenger: ' +
+          props.state.data.evaluationCalls[compareCallId].name +
+          ' ' +
+          props.state.data.evaluationCalls[compareCallId].callId.slice(-4)
+        }
+      />
     </VerticalBox>
+  );
+};
+export const DimensionPicker: React.FC<{
+  state: EvaluationComparisonState;
+  dimensionIndex: number;
+}> = props => {
+  const targetComparisonDimension =
+    props.state.comparisonDimensions?.[props.dimensionIndex]!;
+
+  const currDimension = targetComparisonDimension.dimension;
+  const dimensions = useMemo(() => {
+    return [
+      ...Object.values(props.state.data.derivedMetricDimensions),
+      ...Object.values(props.state.data.scorerMetricDimensions),
+    ];
+  }, [
+    props.state.data.derivedMetricDimensions,
+    props.state.data.scorerMetricDimensions,
+  ]);
+  const {setComparisonDimensions} = useCompareEvaluationsState();
+  // console.log(dimensions);
+  const dimensionMap = useMemo(() => {
+    return Object.fromEntries(dimensions.map(dim => [dimensionId(dim), dim]));
+  }, [dimensions]);
+
+  return (
+    <FormControl>
+      <Autocomplete
+        size="small"
+        disableClearable
+        limitTags={1}
+        value={currDimension ? dimensionId(currDimension) : undefined}
+        onChange={(event, newValue) => {
+          setComparisonDimensions(curr => {
+            if (curr == null) {
+              return null;
+            }
+            const res = [...curr];
+            res[props.dimensionIndex].dimension = dimensionMap[newValue];
+            res[props.dimensionIndex].rangeSelection = undefined;
+            return res;
+          });
+        }}
+        getOptionLabel={option => {
+          return dimensionLabel(dimensionMap[option]!);
+        }}
+        options={Object.keys(dimensionMap)}
+        renderInput={renderParams => (
+          <StyledTextField
+            {...renderParams}
+            value={currDimension ? dimensionLabel(currDimension) : ''}
+            label={'Dimension'}
+            sx={{width: '300px'}}
+          />
+        )}
+      />
+    </FormControl>
   );
 };

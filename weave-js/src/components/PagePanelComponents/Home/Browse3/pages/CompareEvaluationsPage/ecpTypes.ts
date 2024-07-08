@@ -3,11 +3,11 @@ import {
   TraceObjSchema,
 } from '../wfReactInterface/traceServerClient';
 
+
 export type EvaluationComparisonState = {
   data: EvaluationComparisonData;
   baselineEvaluationCallId: string;
-  comparisonDimension?: EvaluationMetricDimension;
-  rangeSelection: RangeSelection;
+  comparisonDimensions?: ComparisonDimensionsType;
   selectedInputDigest?: string;
 };
 type BinarySummaryScore = {
@@ -198,5 +198,12 @@ export type PredictAndScoreCall = {
     [metricDimensionId: string]: MetricResult;
   };
   _rawPredictAndScoreTraceData: TraceCallSchema;
-};export type RangeSelection = { [evalCallId: string]: { min: number; max: number; }; };
+};
+
+export type RangeSelection = { [evalCallId: string]: { min: number; max: number; }; };
+
+export type ComparisonDimensionsType = Array<{
+  dimension: EvaluationMetricDimension;
+  rangeSelection?: RangeSelection;
+}>;
 

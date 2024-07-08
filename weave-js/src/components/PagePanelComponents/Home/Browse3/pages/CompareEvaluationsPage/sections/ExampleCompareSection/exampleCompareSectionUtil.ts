@@ -29,10 +29,18 @@ type PivotedRow = RowBase & {
   latency: {[callId: string]: number};
   totalTokens: {[callId: string]: number};
 };
-const aggregateGroupedNestedRows = (
+
+// type AggregatedRow = RowBase & {
+//   output: {[outputKey: string]: {[callId: string]: any}};
+//   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
+//   latency: {[callId: string]: number};
+//   totalTokens: {[callId: string]: number};
+// };
+
+const aggregateGroupedNestedRows = <T,>(
   rows: PivotedRow[],
   field: keyof PivotedRow,
-  aggFunc: (vals: any[]) => any
+  aggFunc: (vals: any[]) => T
 ) => {
   return Object.fromEntries(
     Object.entries(
@@ -91,6 +99,35 @@ const aggregateGroupedRows = (
 const filterNones = (list: any[]) => {
   return list.filter(v => v != null);
 };
+
+export const rowIsSelected = (
+
+    scores: {
+      [dimensionId: string]: {
+          [evaluationCallId: string]: number;
+      };
+  }
+  ,
+  state: EvaluationComparisonState) => {
+    const compareDims = state.comparisonDimensions;
+    if (compareDims == null || compareDims.length === 0) {
+      return true;
+    }
+    return compareDims.every((compareDim) => {
+    if (compareDim.rangeSelection == null || Object.entries(compareDim.rangeSelection).length === 0) {
+      return true;
+    }
+    const values = scores[
+      dimensionId(compareDim.dimension)
+    ];
+  return Object.entries(compareDim.rangeSelection).every(([key, val]) => {
+    const rowVal = values[key] as number;
+    return val.min <= rowVal && rowVal <= val.max;
+  });
+  })
+  
+}
+
 export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
 
@@ -231,31 +268,28 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     );
   }, [pivotedRows]);
 
+
+
   const filteredRows = useMemo(() => {
     const aggregatedAsList = Object.values(aggregatedRows);
-    const compareDim = state.comparisonDimension;
+    const compareDims = state.comparisonDimensions;
     let res = aggregatedAsList;
-    if (state.rangeSelection && Object.keys(state.rangeSelection).length > 0 && compareDim != null) {
+    if (compareDims != null && compareDims.length > 0) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
-        const values =
-          aggregatedRows[digest].scores[
-            dimensionId(compareDim)
-          ];
-        return Object.entries(state.rangeSelection).every(([key, val]) => {
-          return val.min <= values[key] && values[key] <= val.max;
-        });
+        return rowIsSelected(aggregatedRows[digest].scores, state);
       });
       
        res = aggregatedAsList.filter(row =>
         allowedDigests.includes(row.inputDigest)
       )
     }
-    if ( compareDim != null) {
+    if ( compareDims != null && compareDims.length > 0) {
       // Sort by the difference between the max and min values
+      const compareDim = compareDims[0];
         res = _.sortBy(res,  row => {
           const values =
             aggregatedRows[row.inputDigest].scores[
-              dimensionId(compareDim)
+              dimensionId(compareDim.dimension)
             ];
             const valuesAsNumbers = Object.values(values).map(v => {
               if (typeof v === 'number') {
@@ -274,7 +308,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       return res;
     
 
-  }, [aggregatedRows, state.comparisonDimension, state.rangeSelection]);
+  }, [aggregatedRows, state]);
 
   const inputColumnKeys = useMemo(() => {
     const keys = new Set<string>();

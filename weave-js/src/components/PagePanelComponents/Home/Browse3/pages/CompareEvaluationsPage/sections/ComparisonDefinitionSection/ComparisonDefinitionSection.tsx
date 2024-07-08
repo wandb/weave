@@ -1,14 +1,10 @@
-import {FormControl} from '@material-ui/core';
-import {Autocomplete} from '@mui/material';
 import React, {useMemo} from 'react';
 
 import {Button} from '../../../../../../../Button';
-import {StyledTextField} from '../../../../StyledTextField';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {STANDARD_PADDING} from '../../ecpConstants';
 import {getOrderedCallIds} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
-import {dimensionId, dimensionLabel} from '../../ecpUtil';
 import {HorizontalBox} from '../../Layout';
 import {EvaluationDefinition} from './EvaluationDefinition';
 
@@ -41,51 +37,6 @@ export const ComparisonDefinitionSection: React.FC<{
   );
 };
 
-export const DimensionPicker: React.FC<{
-  state: EvaluationComparisonState;
-}> = props => {
-  const currDimension = props.state.comparisonDimension;
-  const dimensions = useMemo(() => {
-    return [
-      ...Object.values(props.state.data.derivedMetricDimensions),
-      ...Object.values(props.state.data.scorerMetricDimensions),
-    ];
-  }, [
-    props.state.data.derivedMetricDimensions,
-    props.state.data.scorerMetricDimensions,
-  ]);
-  const {setComparisonDimension} = useCompareEvaluationsState();
-  // console.log(dimensions);
-  const dimensionMap = useMemo(() => {
-    return Object.fromEntries(dimensions.map(dim => [dimensionId(dim), dim]));
-  }, [dimensions]);
-
-  return (
-    <FormControl>
-      <Autocomplete
-        size="small"
-        disableClearable
-        limitTags={1}
-        value={currDimension ? dimensionId(currDimension) : undefined}
-        onChange={(event, newValue) => {
-          setComparisonDimension(dimensionMap[newValue]!);
-        }}
-        getOptionLabel={option => {
-          return dimensionLabel(dimensionMap[option]!);
-        }}
-        options={Object.keys(dimensionMap)}
-        renderInput={renderParams => (
-          <StyledTextField
-            {...renderParams}
-            value={currDimension ? dimensionLabel(currDimension) : ''}
-            label={'Dimension'}
-            sx={{width: '300px'}}
-          />
-        )}
-      />
-    </FormControl>
-  );
-};
 const SwapPositionsButton: React.FC<{callId: string}> = props => {
   const {setBaselineEvaluationCallId} = useCompareEvaluationsState();
   return (

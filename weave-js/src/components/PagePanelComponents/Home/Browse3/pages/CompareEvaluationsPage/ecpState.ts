@@ -22,9 +22,8 @@ import {
   ScorerDefinition,
   ScorerMetricDimension,
 } from './ecpTypes';
-import {EvaluationMetricDimension} from './ecpTypes';
+import {ComparisonDimensionsType} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
-import { RangeSelection } from './ecpTypes';
 import { dimensionId } from './ecpUtil';
 
 export const useEvaluationComparisonState = (
@@ -32,8 +31,7 @@ export const useEvaluationComparisonState = (
   project: string,
   evaluationCallIds: string[],
   baselineEvaluationCallId?: string,
-  comparisonDimension?: EvaluationMetricDimension,
-  rangeSelection?: RangeSelection,
+  comparisonDimensions?: ComparisonDimensionsType,
   selectedInputDigest?: string
 ): Loadable<EvaluationComparisonState> => {
   const data = useEvaluationComparisonData(
@@ -49,7 +47,32 @@ export const useEvaluationComparisonState = (
 
     const scorerDimensions = Object.values(data.result.scorerMetricDimensions);
     const derivedDimensions = Object.values(data.result.derivedMetricDimensions);
-    const defaultComparisonDimension = scorerDimensions.length > 0 ? scorerDimensions[0] : derivedDimensions[0];
+
+    let newComparisonDimensions = comparisonDimensions;
+    if (newComparisonDimensions == null) {
+      newComparisonDimensions = [];
+      if (scorerDimensions.length > 0) {
+        newComparisonDimensions.push({
+          dimension: scorerDimensions[0]
+        }); 
+        if (derivedDimensions.length > 0) {
+          newComparisonDimensions.push({
+            dimension: derivedDimensions[0]
+          });
+        }
+      } else {
+        if (derivedDimensions.length > 0) {
+          newComparisonDimensions.push({
+            dimension: derivedDimensions[0]
+          });
+        }
+        if (derivedDimensions.length > 1) {
+          newComparisonDimensions.push({
+            dimension: derivedDimensions[1]
+          });
+        }
+      }
+    }
 
     return {
       loading: false,
@@ -57,19 +80,11 @@ export const useEvaluationComparisonState = (
         data: data.result,
         baselineEvaluationCallId:
           baselineEvaluationCallId ?? evaluationCallIds[0],
-        comparisonDimension: comparisonDimension ?? defaultComparisonDimension,
-        rangeSelection: rangeSelection ?? {},
+        comparisonDimensions: newComparisonDimensions,
         selectedInputDigest,
-      },
+      } 
     };
-  }, [
-    data,
-    baselineEvaluationCallId,
-    evaluationCallIds,
-    comparisonDimension,
-    rangeSelection,
-    selectedInputDigest,
-  ]);
+  }, [data.result, data.loading, baselineEvaluationCallId, evaluationCallIds, comparisonDimensions, selectedInputDigest]);
 
   return value;
 };

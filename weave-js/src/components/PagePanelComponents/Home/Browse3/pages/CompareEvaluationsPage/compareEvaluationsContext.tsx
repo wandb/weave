@@ -3,19 +3,17 @@ import React, {useMemo} from 'react';
 
 import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
 import {useEvaluationComparisonState} from './ecpState';
-import {RangeSelection} from './ecpTypes';
-import {EvaluationMetricDimension} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
+import {ComparisonDimensionsType} from './ecpTypes';
 
 const CompareEvaluationsContext = React.createContext<{
   state: EvaluationComparisonState;
   setBaselineEvaluationCallId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
-  setComparisonDimension: React.Dispatch<
-    React.SetStateAction<EvaluationMetricDimension | null>
+  setComparisonDimensions: React.Dispatch<
+    React.SetStateAction<ComparisonDimensionsType | null>
   >;
-  setRangeSelection: React.Dispatch<React.SetStateAction<RangeSelection>>;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
 } | null>(null);
 
@@ -34,26 +32,24 @@ export const CompareEvaluationsProvider: React.FC<{
   setBaselineEvaluationCallId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
-  setComparisonDimension: React.Dispatch<
-    React.SetStateAction<EvaluationMetricDimension | null>
+  setComparisonDimensions: React.Dispatch<
+    React.SetStateAction<ComparisonDimensionsType | null>
   >;
-  setRangeSelection: React.Dispatch<React.SetStateAction<RangeSelection>>;
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
-  rangeSelection?: RangeSelection;
   baselineEvaluationCallId?: string;
-  comparisonDimension?: EvaluationMetricDimension;
+  comparisonDimensions?: ComparisonDimensionsType;
   selectedInputDigest?: string;
 }> = ({
   entity,
   project,
   evaluationCallIds,
   setBaselineEvaluationCallId,
-  setComparisonDimension,
-  setRangeSelection,
+  setComparisonDimensions,
+
   setSelectedInputDigest,
-  rangeSelection,
+
   baselineEvaluationCallId,
-  comparisonDimension,
+  comparisonDimensions,
   selectedInputDigest,
   children,
 }) => {
@@ -62,8 +58,7 @@ export const CompareEvaluationsProvider: React.FC<{
     project,
     evaluationCallIds,
     baselineEvaluationCallId,
-    comparisonDimension,
-    rangeSelection,
+    comparisonDimensions,
     selectedInputDigest
   );
 
@@ -74,16 +69,14 @@ export const CompareEvaluationsProvider: React.FC<{
     return {
       state: initialState.result,
       setBaselineEvaluationCallId,
-      setComparisonDimension,
-      setRangeSelection,
+      setComparisonDimensions,
       setSelectedInputDigest,
     };
   }, [
     initialState.loading,
     initialState.result,
     setBaselineEvaluationCallId,
-    setComparisonDimension,
-    setRangeSelection,
+    setComparisonDimensions,
     setSelectedInputDigest,
   ]);
 

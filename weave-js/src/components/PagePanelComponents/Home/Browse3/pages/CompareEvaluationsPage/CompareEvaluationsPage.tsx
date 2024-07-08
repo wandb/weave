@@ -3,11 +3,9 @@
  *
  * Remaining TODO:
  * - [ ] Example comparison section needs a layout rework. Issues: header section scrolls off screen, etc...
- * - [ ] Add second comparison dimension and rework data model to support N dimensions. Default to first metric + latency
  * - [ ] (probably) find all cases of the `_raw*` cases and remove them, this is an example of insufficient data model
  * - [ ] (probably) find all cases of the `_legacy_*` cases and remove them, this is an example of insufficient data model
  * - [ ] UX: (BUG) Scatter filter does not resize when peek preview is closed
- * - [ ] UX: (BUG) Double click clears filter selection, but not the box
  * - [ ] Code Cleanup: There is a lot of dead / messy code (commnts, knip, etc...)
  * - [ ] Code Cleanup: Pill logic should be shared now between scorecard and viewer
  *
@@ -38,8 +36,7 @@ import {
   useCompareEvaluationsState,
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
-import {RangeSelection} from './ecpTypes';
-import {EvaluationMetricDimension} from './ecpTypes';
+import {ComparisonDimensionsType} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
@@ -62,50 +59,31 @@ export const CompareEvaluationsPage: React.FC<
       props.evaluationCallIds.length > 0 ? props.evaluationCallIds[0] : null
     );
 
-  const [comparisonDimension, setComparisonDimension] =
-    React.useState<EvaluationMetricDimension | null>(null);
+  const [comparisonDimensions, setComparisonDimensions] =
+    React.useState<ComparisonDimensionsType | null>(null);
 
   const [selectedInputDigest, setSelectedInputDigest] = React.useState<
     string | null
   >(null);
 
-  const [rangeSelection, setRangeSelection] = React.useState<RangeSelection>(
-    {}
-  );
-
   // Wow this cascading state is getting out of hand
 
-  const setRangeSelectionAndClearSelectedInputDigest = useCallback(
+  const setComparisonDimensionsAndClearInputDigest = useCallback(
     (
-      newRangeSelection:
-        | RangeSelection
-        | ((prev: RangeSelection) => RangeSelection)
-    ) => {
-      if (typeof newRangeSelection === 'function') {
-        newRangeSelection = newRangeSelection(rangeSelection);
-      }
-      setRangeSelection(newRangeSelection);
-      setSelectedInputDigest(null);
-    },
-    [rangeSelection]
-  );
-
-  const setComparisonDimensionAndClearRange = useCallback(
-    (
-      dim:
-        | EvaluationMetricDimension
+      dimensions:
+        | ComparisonDimensionsType
         | null
         | ((
-            prev: EvaluationMetricDimension | null
-          ) => EvaluationMetricDimension | null)
+            prev: ComparisonDimensionsType | null
+          ) => ComparisonDimensionsType | null)
     ) => {
-      if (typeof dim === 'function') {
-        dim = dim(comparisonDimension);
+      if (typeof dimensions === 'function') {
+        dimensions = dimensions(comparisonDimensions);
       }
-      setComparisonDimension(dim);
-      setRangeSelectionAndClearSelectedInputDigest({});
+      setComparisonDimensions(dimensions);
+      setSelectedInputDigest(null);
     },
-    [comparisonDimension, setRangeSelectionAndClearSelectedInputDigest]
+    [comparisonDimensions]
   );
 
   if (props.evaluationCallIds.length === 0) {
@@ -125,11 +103,11 @@ export const CompareEvaluationsPage: React.FC<
               project={props.project}
               evaluationCallIds={props.evaluationCallIds}
               baselineEvaluationCallId={baselineEvaluationCallId ?? undefined}
-              comparisonDimension={comparisonDimension ?? undefined}
-              rangeSelection={rangeSelection}
+              comparisonDimensions={comparisonDimensions ?? undefined}
               setBaselineEvaluationCallId={setBaselineEvaluationCallId}
-              setComparisonDimension={setComparisonDimensionAndClearRange}
-              setRangeSelection={setRangeSelectionAndClearSelectedInputDigest}
+              setComparisonDimensions={
+                setComparisonDimensionsAndClearInputDigest
+              }
               selectedInputDigest={selectedInputDigest ?? undefined}
               setSelectedInputDigest={setSelectedInputDigest}>
               <CompareEvaluationsPageInner />

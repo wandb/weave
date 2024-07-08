@@ -168,16 +168,7 @@ export const ExampleCompareSection: React.FC<{
           bgcolor: MOON_100,
           padding: '16px',
         }}>
-        {props.state.comparisonDimension &&
-        Object.keys(props.state.rangeSelection).length > 0
-          ? `Filtered example`
-          : 'Example'}
-        {` ${targetIndex + 1} of ${filteredRows.length}`}
-        {props.state.comparisonDimension
-          ? ` sorted by largest difference in ${dimensionLabel(
-              props.state.comparisonDimension
-            )}`
-          : ''}
+        {`Filtered example ${targetIndex + 1} of ${filteredRows.length}`}
         <Box>
           <Button
             className="mx-16"

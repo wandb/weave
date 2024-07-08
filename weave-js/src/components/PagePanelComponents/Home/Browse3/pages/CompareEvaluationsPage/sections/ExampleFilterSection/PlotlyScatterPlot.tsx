@@ -8,6 +8,7 @@ export type ScatterPlotData = Array<{
   y: number;
   size: number;
   color: string;
+  selected?: boolean;
 }>;
 export const PlotlyScatterPlot: React.FC<{
   height: number;
@@ -32,16 +33,33 @@ export const PlotlyScatterPlot: React.FC<{
       y: [s.y],
       mode: 'markers',
       type: 'scatter',
-      marker: {color: s.color, size: s.size},
+      hoverinfo: 'none',
+      marker: {
+        color: s.color,
+        size: s.size,
+        symbol: s.selected ? 'circle' : 'circle-open',
+      },
+      // selected: {
+      //   marker: {
+      //     color: MOON_300,
+      //     opacity: 1,
+      //   },
+      // },
+      // unselected: {
+      //   marker: {
+      //     color: MOON_100,
+      //     opacity: 1,
+      //   },
+      // },
     }));
   }, [props.data]);
 
   const ranges = useMemo(() => {
-    const x = props.data.map(s => s.x).flat();
-    const y = props.data.map(s => s.y).flat();
+    const vals = props.data.map(s => [s.x, s.y]).flat();
+    // const y = props.data.map(s => s.y).flat();
     return {
-      x: [Math.min(...x), Math.max(...x)],
-      y: [Math.min(...y), Math.max(...y)],
+      x: [Math.min(...vals), Math.max(...vals)],
+      y: [Math.min(...vals), Math.max(...vals)],
     };
   }, [props.data]);
 
@@ -135,7 +153,20 @@ export const PlotlyScatterPlot: React.FC<{
       // Set up event listener for relayout (zoom and range change)
       (current as any).on('plotly_selected', (eventData: any) => {
         if (eventData == null) {
-          props.onRangeChange();
+          // Clear bounding box:
+          Plotly.relayout(current, {
+            dragmode: undefined,
+          })
+            .then(() => {
+              return Plotly.relayout(current, {
+                dragmode: 'select',
+              });
+            })
+            .then(() => {
+              setTimeout(() => {
+                props.onRangeChange();
+              }, 250); // really weird hack to get the range to clear
+            });
         } else {
           const newXMin = eventData.range.x[0];
           const newXMax = eventData.range.x[1];
