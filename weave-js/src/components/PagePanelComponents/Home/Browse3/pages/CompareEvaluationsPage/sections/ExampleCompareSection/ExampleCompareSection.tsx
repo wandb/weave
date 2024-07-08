@@ -168,7 +168,24 @@ export const ExampleCompareSection: React.FC<{
           bgcolor: MOON_100,
           padding: '16px',
         }}>
-        {`Filtered example ${targetIndex + 1} of ${filteredRows.length}`}
+        <HorizontalBox
+          sx={{
+            alignItems: 'center',
+            flex: 1,
+          }}>
+          <Box
+            style={{
+              flex: 0,
+            }}>
+            <SmallRef objRef={inputRef} iconOnly />
+          </Box>
+          <Box
+            style={{
+              flex: 1,
+            }}>
+            {`Filtered example ${targetIndex + 1} of ${filteredRows.length}`}
+          </Box>
+        </HorizontalBox>
         <Box>
           <Button
             className="mx-16"
@@ -211,18 +228,6 @@ export const ExampleCompareSection: React.FC<{
           //   }, min-content`,
           //   gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) repeat(${TOTAL_ROWS} 1fr) `,
         }}>
-        <GridCell
-          cols={NUM_COLS}
-          style={{
-            position: 'sticky',
-            left: 0,
-            top: 0,
-            zIndex: 3,
-            // backgroundColor: 'white',
-            backgroundColor: MOON_100,
-          }}>
-          <SmallRef objRef={inputRef} allowShrink />
-        </GridCell>
         {/* <GridCell
           rows={NUM_INPUT_PROPS}
           style={{
@@ -233,6 +238,18 @@ export const ExampleCompareSection: React.FC<{
           }}>
           <SmallRef objRef={inputRef} allowShrink />
         </GridCell> */}
+        {/* <GridCell
+          cols={NUM_COLS}
+          rows={NUM_INPUT_PROPS}
+          noPad
+          style={{
+            border: 'none',
+            display: 'grid',
+            gridTemplateRows: 'subgrid',
+            gridTemplateColumns: `subgrid`,
+            maxHeight: '45vh',
+            // overflowY: 'auto',
+          }}> */}
         {_.range(NUM_INPUT_PROPS).map(ii => {
           const inputColumnKey = inputColumnKeys[ii];
           return (
@@ -246,6 +263,8 @@ export const ExampleCompareSection: React.FC<{
                   // left: leftRef.current?.offsetWidth ?? 'unset',
                   zIndex: 1,
                   backgroundColor: 'white',
+                  textAlign: 'right',
+                  fontWeight: 'bold',
                 }}>
                 {removePrefix(inputColumnKey, 'input.')}
               </GridCell>
@@ -255,15 +274,124 @@ export const ExampleCompareSection: React.FC<{
             </React.Fragment>
           );
         })}
+        {/* </GridCell> */}
         <GridCell
           cols={2}
+          rows={1 + NUM_OUTPUT_KEYS + 1 + NUM_METRICS}
+          noPad
           style={{
+            display: 'grid',
+            gridTemplateRows: 'subgrid',
+            gridTemplateColumns: 'subgrid',
             position: 'sticky',
+            // bottom: 0,
             left: 0,
-            top: 0,
-            zIndex: 2,
-            backgroundColor: MOON_100,
-          }}></GridCell>
+            zIndex: 3,
+            backgroundColor: 'white',
+            border: 'none',
+          }}>
+          <GridCell
+            cols={2}
+            style={{
+              position: 'sticky',
+              left: 0,
+              top: 0,
+              zIndex: 2,
+              backgroundColor: MOON_100,
+            }}></GridCell>
+
+          {_.range(NUM_OUTPUT_KEYS).map(oi => {
+            return (
+              <React.Fragment key={outputColumnKeys[oi]}>
+                {/* <GridCell
+                style={{
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 1,
+                  backgroundColor: 'white',
+                }}></GridCell> */}
+                <GridCell
+                  cols={2}
+                  style={{
+                    whiteSpace: 'nowrap',
+                    position: 'sticky',
+                    left: 0,
+                    // left: leftRef.current?.offsetWidth ?? 'unset',
+                    zIndex: 1,
+                    backgroundColor: 'white',
+                    textAlign: 'right',
+                    fontWeight: 'bold',
+                  }}>
+                  {removePrefix(outputColumnKeys[oi], 'output.')}
+                </GridCell>
+              </React.Fragment>
+            );
+          })}
+          <GridCell
+            cols={2}
+            rows={NUM_METRICS + 1}
+            noPad
+            style={{
+              display: 'grid',
+              gridTemplateRows: 'subgrid',
+              gridTemplateColumns: 'subgrid',
+              position: 'sticky',
+              bottom: 0,
+              left: 0,
+              zIndex: 3,
+              backgroundColor: 'white',
+              border: 'none',
+            }}>
+            <GridCell
+              cols={2}
+              style={{
+                backgroundColor: MOON_100,
+              }}>
+              Metrics
+            </GridCell>
+            {_.range(NUM_SCORERS + 1).map(si => {
+              const isScorerMetric = si < NUM_SCORERS;
+              const dimensionsForThisScorer = isScorerMetric
+                ? sortedScorers.filter(
+                    s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
+                  )
+                : derivedScorers;
+              const NUM_METRICS_IN_SCORER = dimensionsForThisScorer.length;
+              const scorerRef = uniqueScorerRefs[si];
+              return (
+                <React.Fragment key={isScorerMetric ? scorerRef : 'derived'}>
+                  <GridCell
+                    ref={leftRef}
+                    rows={NUM_METRICS_IN_SCORER}
+                    style={{
+                      alignContent: 'center',
+                    }}>
+                    {isScorerMetric && (
+                      <SmallRef
+                        objRef={parseRef(scorerRef) as WeaveObjectRef}
+                        iconOnly
+                      />
+                    )}
+                  </GridCell>
+                  {_.range(NUM_METRICS_IN_SCORER).map(mi => {
+                    return (
+                      <React.Fragment key={mi}>
+                        <GridCell
+                          style={{
+                            whiteSpace: 'nowrap',
+                            textAlign: 'right',
+                            fontWeight: 'bold',
+                          }}>
+                          {dimensionLabel(dimensionsForThisScorer[mi])}
+                        </GridCell>
+                      </React.Fragment>
+                    );
+                  })}
+                </React.Fragment>
+              );
+            })}
+          </GridCell>
+        </GridCell>
         <GridCell
           noPad
           style={{
@@ -385,7 +513,7 @@ export const ExampleCompareSection: React.FC<{
                     zIndex: 1,
                     backgroundColor: MOON_100,
                   }}>
-                  Aggregate Metrics
+                  Agg Metrics \ Trials
                 </GridCell>
                 {_.range(NUM_TRIALS).map(ti => {
                   return (
@@ -541,78 +669,6 @@ export const ExampleCompareSection: React.FC<{
                   );
                 })}
               </GridCell>
-            );
-          })}
-        </GridCell>
-        {_.range(NUM_OUTPUT_KEYS).map(oi => {
-          return (
-            <React.Fragment key={outputColumnKeys[oi]}>
-              <GridCell
-                style={{
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 1,
-                  backgroundColor: 'white',
-                }}></GridCell>
-              <GridCell
-                cols={1}
-                style={{
-                  whiteSpace: 'nowrap',
-                  position: 'sticky',
-                  left: leftRef.current?.offsetWidth ?? 'unset',
-                  zIndex: 1,
-                  backgroundColor: 'white',
-                }}>
-                {removePrefix(outputColumnKeys[oi], 'output.')}
-              </GridCell>
-            </React.Fragment>
-          );
-        })}
-        <GridCell
-          cols={2}
-          rows={NUM_METRICS + 1}
-          noPad
-          style={{
-            display: 'grid',
-            gridTemplateRows: 'subgrid',
-            gridTemplateColumns: 'subgrid',
-            position: 'sticky',
-            bottom: 0,
-            left: 0,
-            zIndex: 3,
-            backgroundColor: 'white',
-            border: 'none',
-          }}>
-          <GridCell cols={2}>Metrics</GridCell>
-          {_.range(NUM_SCORERS + 1).map(si => {
-            const isScorerMetric = si < NUM_SCORERS;
-            const dimensionsForThisScorer = isScorerMetric
-              ? sortedScorers.filter(
-                  s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
-                )
-              : derivedScorers;
-            const NUM_METRICS_IN_SCORER = dimensionsForThisScorer.length;
-            const scorerRef = uniqueScorerRefs[si];
-            return (
-              <React.Fragment key={isScorerMetric ? scorerRef : 'derived'}>
-                <GridCell ref={leftRef} rows={NUM_METRICS_IN_SCORER}>
-                  {isScorerMetric && (
-                    <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} />
-                  )}
-                </GridCell>
-                {_.range(NUM_METRICS_IN_SCORER).map(mi => {
-                  return (
-                    <React.Fragment key={mi}>
-                      <GridCell
-                        style={{
-                          whiteSpace: 'nowrap',
-                        }}>
-                        {dimensionLabel(dimensionsForThisScorer[mi])}
-                      </GridCell>
-                    </React.Fragment>
-                  );
-                })}
-              </React.Fragment>
             );
           })}
         </GridCell>
