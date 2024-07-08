@@ -264,7 +264,6 @@ export const CallLink: React.FC<{
   tracetree?: boolean;
   icon?: React.ReactNode;
   color?: string;
-  noName?: boolean;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -306,7 +305,7 @@ export const CallLink: React.FC<{
             gap: '4px',
           }}>
           {props.icon}
-          {props.noName ? '' : opName}
+          {opName}
           <Id id={props.callId} type="Call" />
         </Link>
       </LinkTruncater>
