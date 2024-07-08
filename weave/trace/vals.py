@@ -16,8 +16,8 @@ from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
 from weave.client_context.weave_client import get_weave_client
-from weave.legacy import box
 from weave.table import Table
+from weave.trace import box
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import Op, maybe_bind_method
