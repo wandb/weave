@@ -1,8 +1,8 @@
 import * as Plotly from 'plotly.js';
 import React, {useEffect, useMemo, useRef} from 'react';
 
-import {MOON_300} from '../../../../../../../../common/css/color.styles';
 import {usePeekLocation} from '../../../../context';
+import {PLOT_GRID_COLOR} from '../../ecpConstants';
 
 export type ScatterPlotData = Array<{
   x: number;
@@ -68,7 +68,7 @@ export const PlotlyScatterPlot: React.FC<{
       dragmode: 'select',
       xaxis: {
         tickformat: props.xIsPercentage ? '.0%' : '',
-        gridcolor: MOON_300,
+        gridcolor: PLOT_GRID_COLOR,
         linecolor: props.xColor,
         linewidth: 2,
         title: {
@@ -79,7 +79,7 @@ export const PlotlyScatterPlot: React.FC<{
       },
       yaxis: {
         tickformat: props.yIsPercentage ? '.0%' : '',
-        gridcolor: MOON_300,
+        gridcolor: PLOT_GRID_COLOR,
         linecolor: props.yColor,
         linewidth: 2,
         automargin: true,

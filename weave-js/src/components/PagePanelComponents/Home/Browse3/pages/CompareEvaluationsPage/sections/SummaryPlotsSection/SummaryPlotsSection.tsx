@@ -20,6 +20,9 @@ import {HorizontalBox, VerticalBox} from '../../Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 
+/**
+ * Summary plots produce plots to summarize evaluation comparisons.
+ */
 export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {

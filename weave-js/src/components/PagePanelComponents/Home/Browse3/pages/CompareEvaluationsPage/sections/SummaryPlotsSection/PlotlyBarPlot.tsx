@@ -1,7 +1,7 @@
 import * as Plotly from 'plotly.js';
 import React, {useEffect, useMemo, useRef} from 'react';
 
-import {MOON_300} from '../../../../../../../../common/css/color.styles';
+import {PLOT_GRID_COLOR} from '../../ecpConstants';
 import {RadarPlotData} from './PlotlyRadarPlot';
 
 export const PlotlyBarPlot: React.FC<{
@@ -36,13 +36,13 @@ export const PlotlyBarPlot: React.FC<{
       xaxis: {
         automargin: true,
         fixedrange: true,
-        gridcolor: MOON_300,
-        linecolor: MOON_300,
+        gridcolor: PLOT_GRID_COLOR,
+        linecolor: PLOT_GRID_COLOR,
       },
       yaxis: {
         fixedrange: true,
-        gridcolor: MOON_300,
-        linecolor: MOON_300,
+        gridcolor: PLOT_GRID_COLOR,
+        linecolor: PLOT_GRID_COLOR,
       },
     };
   }, [props.height]);

@@ -1,7 +1,7 @@
 import * as Plotly from 'plotly.js';
 import React, {useEffect, useMemo, useRef} from 'react';
 
-import {MOON_300} from '../../../../../../../../common/css/color.styles';
+import {PLOT_GRID_COLOR} from '../../ecpConstants';
 
 export type RadarPlotData = {
   [seriesId: string]: {
@@ -41,15 +41,15 @@ export const PlotlyRadarPlot: React.FC<{
         pad: 0,
       },
       polar: {
-        color: MOON_300,
+        color: PLOT_GRID_COLOR,
         radialaxis: {
-          linecolor: MOON_300,
+          linecolor: PLOT_GRID_COLOR,
           visible: false,
-          gridcolor: MOON_300,
+          gridcolor: PLOT_GRID_COLOR,
         },
         angularaxis: {
-          linecolor: MOON_300,
-          gridcolor: MOON_300,
+          linecolor: PLOT_GRID_COLOR,
+          gridcolor: PLOT_GRID_COLOR,
           ticklen: 3,
         },
       },
