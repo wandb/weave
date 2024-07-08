@@ -22,18 +22,19 @@ export const PlotlyBarPlot: React.FC<{
     });
   }, [props.data]);
 
-  const plotlyLayout = useMemo(() => {
+  const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
       height: props.height - 40,
       showlegend: false,
       margin: {
         l: 0,
         r: 0,
-        b: 80,
+        b: 20,
         t: 0,
         pad: 0,
       },
       xaxis: {
+        automargin: true,
         fixedrange: true,
         gridcolor: MOON_300,
         linecolor: MOON_300,

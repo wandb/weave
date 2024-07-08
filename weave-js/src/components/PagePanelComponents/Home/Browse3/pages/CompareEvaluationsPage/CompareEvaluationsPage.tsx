@@ -16,7 +16,7 @@
  * Performance:
  * - [ ] (probably) Audit the queries to determine areas of improvement and parallelization
  * Styling / UX:
- * - [ ] Ref Link in object viewer is really lame
+ * - [ ] (MUST) Ref Link in object viewer is really lame
  * - [ ] (probably) Hover tooltip on charts to show values
  * - [ ] (maybe) Should pull in EvaluationCall display name if it exists
  * - Scatterplot Filter UX

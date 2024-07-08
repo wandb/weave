@@ -30,7 +30,7 @@ export const PlotlyRadarPlot: React.FC<{
     });
   }, [props.data]);
   // console.log(plotlyData);
-  const plotlyLayout = useMemo(() => {
+  const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
     return {
       height: props.height,
       showlegend: false,
@@ -52,23 +52,10 @@ export const PlotlyRadarPlot: React.FC<{
         angularaxis: {
           linecolor: MOON_300,
           gridcolor: MOON_300,
+          ticklen: 3,
+          // tickangle: 90,
         },
       },
-      // legend: {
-      //   x: 1,
-      //   xanchor: 'left',
-      //   y: 1,
-      //   title: {
-      //     text: 'Legend',
-      //     font: {
-      //       size: 12,
-      //     },
-      //   },
-      //   font: {
-      //     size: 10,
-      //   },
-      //   orientation: 'v',
-      // },
     };
   }, [props.height]);
   const plotlyConfig = useMemo(() => {
