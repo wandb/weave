@@ -518,13 +518,17 @@ export const ExampleCompareSection: React.FC<{
                               return (
                                 <GridCell
                                   key={ti}
-                                  button
-                                  onClick={() =>
-                                    onScorerClick(
-                                      trialsForThisEval[ti].predictAndScore
-                                        .scorerMetrics[scoreId].sourceCall
-                                        ._rawScoreTraceData
-                                    )
+                                  button={isScorerMetric}
+                                  onClick={
+                                    isScorerMetric
+                                      ? () =>
+                                          onScorerClick(
+                                            trialsForThisEval[ti]
+                                              .predictAndScore.scorerMetrics[
+                                              scoreId
+                                            ].sourceCall._rawScoreTraceData
+                                          )
+                                      : undefined
                                   }>
                                   <CellValue value={metricValue} />
                                 </GridCell>

@@ -2,6 +2,7 @@ import * as Plotly from 'plotly.js';
 import React, {useEffect, useMemo, useRef} from 'react';
 
 import {MOON_300} from '../../../../../../../../common/css/color.styles';
+import {usePeekLocation} from '../../../../context';
 
 export type ScatterPlotData = Array<{
   x: number;
@@ -194,6 +195,19 @@ export const PlotlyScatterPlot: React.FC<{
       });
     }
   }, [props.data]);
+
+  // Hack that does not belong here to resize the plotly plot
+  // when the peeking state closes
+  const peekLoc = usePeekLocation();
+  useEffect(() => {
+    if (peekLoc == null) {
+      setTimeout(() => {
+        if (divRef.current != null) {
+          Plotly.Plots.resize(divRef.current);
+        }
+      }, 250); // timeout allows resize to complete
+    }
+  }, [peekLoc]);
 
   return <div ref={divRef}></div>;
 };

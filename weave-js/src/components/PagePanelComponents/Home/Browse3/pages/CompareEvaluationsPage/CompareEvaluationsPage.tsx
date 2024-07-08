@@ -5,7 +5,6 @@
  * - [ ] Example comparison section needs a layout rework. Issues: header section scrolls off screen, etc...
  * - [ ] (probably) find all cases of the `_raw*` cases and remove them, this is an example of insufficient data model
  * - [ ] (probably) find all cases of the `_legacy_*` cases and remove them, this is an example of insufficient data model
- * - [ ] UX: (BUG) Scatter filter does not resize when peek preview is closed
  * - [ ] Code Cleanup: There is a lot of dead / messy code (commnts, knip, etc...)
  * - [ ] Code Cleanup: Pill logic should be shared now between scorecard and viewer
  *
