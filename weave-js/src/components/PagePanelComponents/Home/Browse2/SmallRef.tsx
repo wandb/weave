@@ -176,8 +176,8 @@ export const SmallRef: FC<{
             flex: 1,
             minWidth: 0,
             overflow: 'hidden',
-            textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
           }}>
           {label}
         </Box>
