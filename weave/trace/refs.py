@@ -27,22 +27,25 @@ class TableRef(Ref):
 
 @dataclasses.dataclass(frozen=True)
 class RefWithExtra(Ref):
-    def with_extra(self, extra: list[str]) -> "RefWithExtra":
+    def with_extra(self, extra: Tuple[str, ...]) -> "RefWithExtra":
         params = dataclasses.asdict(self)
-        params["extra"] = self.extra + extra  # type: ignore
+
+        print(f"{self.extra=}")
+
+        params["extra"] = self.extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
     def with_key(self, key: str) -> "RefWithExtra":
-        return self.with_extra([DICT_KEY_EDGE_NAME, key])
+        return self.with_extra((DICT_KEY_EDGE_NAME, key))
 
     def with_attr(self, attr: str) -> "RefWithExtra":
-        return self.with_extra([OBJECT_ATTR_EDGE_NAME, attr])
+        return self.with_extra((OBJECT_ATTR_EDGE_NAME, attr))
 
     def with_index(self, index: int) -> "RefWithExtra":
-        return self.with_extra([LIST_INDEX_EDGE_NAME, str(index)])
+        return self.with_extra((LIST_INDEX_EDGE_NAME, str(index)))
 
     def with_item(self, item_digest: str) -> "RefWithExtra":
-        return self.with_extra([TABLE_ROW_ID_EDGE_NAME, f"{item_digest}"])
+        return self.with_extra((TABLE_ROW_ID_EDGE_NAME, f"{item_digest}"))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -115,7 +118,7 @@ class CallRef(RefWithExtra):
     entity: str
     project: str
     id: str
-    extra: list[str] = dataclasses.field(default_factory=list)
+    extra: Tuple[str, ...] = ()
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
@@ -135,7 +138,7 @@ def parse_uri(uri: str) -> AnyRef:
     if len(parts) < 3:
         raise ValueError(f"Invalid URI: {uri}")
     entity, project, kind = parts[:3]
-    remaining = parts[3:]
+    remaining = tuple(parts[3:])
     if kind == "table":
         return TableRef(entity=entity, project=project, digest=remaining[0])
     elif kind == "call":
