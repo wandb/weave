@@ -185,12 +185,10 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
-  compareCallsUIUrl: (
+  compareEvaluationsUri: (
     entityName: string,
     projectName: string,
-    callIds: string[],
-    primaryDim: string,
-    secondaryDim: string
+    evaluationCallIds: string[]
   ) => {
     throw new Error('Not implemented');
   },
@@ -407,21 +405,17 @@ export const browse3ContextGen = (
       }
       return `${base}/?exp=${encodeURIComponent(expression)}`;
     },
-    compareCallsUIUrl: (
+    compareEvaluationsUri: (
       entityName: string,
       projectName: string,
-      callIds: string[],
-      primaryDim: string,
-      secondaryDim: string
+      evaluationCallIds: string[]
     ) => {
       return `${projectRoot(
         entityName,
         projectName
-      )}/compare-calls?callIds=${encodeURIComponent(
-        JSON.stringify(callIds)
-      )}&primaryDim=${encodeURIComponent(
-        primaryDim
-      )}&secondaryDim=${encodeURIComponent(secondaryDim)}`;
+      )}/compare-evaluations?evaluationCallIds=${encodeURIComponent(
+        JSON.stringify(evaluationCallIds)
+      )}`;
     },
   };
   return browse3Context;
@@ -501,12 +495,10 @@ type RouteType = {
     // TODO: Add filter when supported
   ) => string;
   opPageUrl: (opUri: string) => string;
-  compareCallsUIUrl: (
+  compareEvaluationsUri: (
     entityName: string,
     projectName: string,
-    callIds: string[],
-    primaryDim: string,
-    secondaryDim: string
+    evaluationCallIds: string[]
   ) => string;
 };
 
@@ -613,10 +605,13 @@ const useMakePeekingRouter = (): RouteType => {
       //   baseContext.boardForExpressionUIUrl(...args)
       // );
     },
-    compareCallsUIUrl: (
-      ...args: Parameters<typeof baseContext.compareCallsUIUrl>
+    compareEvaluationsUri: (
+      ...args: Parameters<typeof baseContext.compareEvaluationsUri>
     ) => {
-      return setSearchParam(PEEK_PARAM, baseContext.compareCallsUIUrl(...args));
+      return setSearchParam(
+        PEEK_PARAM,
+        baseContext.compareEvaluationsUri(...args)
+      );
     },
   };
 };

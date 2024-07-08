@@ -13,12 +13,12 @@ def test_dict_refs(client):
     assert d["a"] == 1
     assert isinstance(d["a"].ref, ObjectRef)
     assert d["a"].ref.is_descended_from(d.ref)
-    assert d["a"].ref.extra == [DICT_KEY_EDGE_NAME, "a"]
+    assert d["a"].ref.extra == (DICT_KEY_EDGE_NAME, "a")
 
     assert d["b"] == 2
     assert isinstance(d["b"].ref, ObjectRef)
     assert d["b"].ref.is_descended_from(d.ref)
-    assert d["b"].ref.extra == [DICT_KEY_EDGE_NAME, "b"]
+    assert d["b"].ref.extra == (DICT_KEY_EDGE_NAME, "b")
 
 
 def test_dict_iter(client):
@@ -30,12 +30,12 @@ def test_dict_iter(client):
     assert d["a"] == 1
     assert isinstance(d["a"].ref, ObjectRef)
     assert d["a"].ref.is_descended_from(d_orig.ref)
-    assert d["a"].ref.extra == [DICT_KEY_EDGE_NAME, "a"]
+    assert d["a"].ref.extra == (DICT_KEY_EDGE_NAME, "a")
 
     assert d["b"] == 2
     assert isinstance(d["b"].ref, ObjectRef)
     assert d["b"].ref.is_descended_from(d_orig.ref)
-    assert d["b"].ref.extra == [DICT_KEY_EDGE_NAME, "b"]
+    assert d["b"].ref.extra == (DICT_KEY_EDGE_NAME, "b")
 
 
 def test_list_refs(client):
@@ -44,12 +44,12 @@ def test_list_refs(client):
     assert l[0] == 1
     assert isinstance(l[0].ref, ObjectRef)
     assert l[0].ref.is_descended_from(l.ref)
-    assert l[0].ref.extra == [LIST_INDEX_EDGE_NAME, "0"]
+    assert l[0].ref.extra == (LIST_INDEX_EDGE_NAME, "0")
 
     assert l[1] == 2
     assert isinstance(l[1].ref, ObjectRef)
     assert l[1].ref.is_descended_from(l.ref)
-    assert l[1].ref.extra == [LIST_INDEX_EDGE_NAME, "1"]
+    assert l[1].ref.extra == (LIST_INDEX_EDGE_NAME, "1")
 
 
 def test_list_iter(client):
