@@ -197,7 +197,7 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
             fontSize: '1.5em',
             fontWeight: 'bold',
           }}>
-          Browse Model Outputs on Examples
+          Output Comparison
         </Box>
       </HorizontalBox>
       <Box

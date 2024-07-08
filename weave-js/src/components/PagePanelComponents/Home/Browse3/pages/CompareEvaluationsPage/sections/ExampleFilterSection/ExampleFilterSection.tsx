@@ -52,7 +52,7 @@ export const ExampleFilterSection: React.FC<{
             fontSize: '1.5em',
             fontWeight: 'bold',
           }}>
-          Result Filter
+          Example Filter
         </Box>
       </HorizontalBox>
       <HorizontalBox

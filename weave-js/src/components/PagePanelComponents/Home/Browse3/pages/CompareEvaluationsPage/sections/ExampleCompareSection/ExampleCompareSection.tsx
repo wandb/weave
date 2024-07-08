@@ -166,7 +166,7 @@ export const ExampleCompareSection: React.FC<{
             style={{
               flex: 1,
             }}>
-            {`Filtered example ${targetIndex + 1} of ${filteredRows.length}`}
+            {`Example ${targetIndex + 1} of ${filteredRows.length}`}
           </Box>
         </HorizontalBox>
         <Box>

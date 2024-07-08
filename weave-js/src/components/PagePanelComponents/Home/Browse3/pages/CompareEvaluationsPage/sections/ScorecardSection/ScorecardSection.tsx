@@ -214,7 +214,7 @@ export const ScorecardSection: React.FC<{
             fontSize: '1.5em',
             fontWeight: 'bold',
           }}>
-          Model Comparison
+          Scorecard
         </Box>
       </HorizontalBox>
       <div
