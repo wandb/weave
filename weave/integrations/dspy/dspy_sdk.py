@@ -25,10 +25,19 @@ def dspy_get_patched_lm_functions(
     return [
         SymbolPatcher(
             get_base_symbol=lambda: importlib.import_module(base_symbol),
-            attribute_name=f"{lm_class_name}.{functional_attribute}",
-            make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.{functional_attribute}"),
-        )
-        for functional_attribute in patchable_functional_attributes
+            attribute_name=f"{lm_class_name}.basic_request",
+            make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.basic_request"),
+        ),
+        SymbolPatcher(
+            get_base_symbol=lambda: importlib.import_module(base_symbol),
+            attribute_name=f"{lm_class_name}.request",
+            make_new_value=dspy_wrapper(f"dspy.{lm_class_name}.request"),
+        ),
+        SymbolPatcher(
+            get_base_symbol=lambda: importlib.import_module(base_symbol),
+            attribute_name=f"{lm_class_name}.__call__",
+            make_new_value=dspy_wrapper(f"dspy.{lm_class_name}"),
+        ),
     ]
 
 
@@ -36,7 +45,7 @@ patched_functions = [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Predict.__call__",
-        make_new_value=dspy_wrapper("dspy.Predict.__call__"),
+        make_new_value=dspy_wrapper("dspy.Predict"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
@@ -46,7 +55,7 @@ patched_functions = [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="TypedPredictor.__call__",
-        make_new_value=dspy_wrapper("dspy.TypedPredictor.__call__"),
+        make_new_value=dspy_wrapper("dspy.TypedPredictor"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
@@ -56,17 +65,17 @@ patched_functions = [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Module.__call__",
-        make_new_value=dspy_wrapper("dspy.Module.__call__"),
+        make_new_value=dspy_wrapper("dspy.Module"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="TypedChainOfThought.__call__",
-        make_new_value=dspy_wrapper("dspy.TypedChainOfThought.__call__"),
+        make_new_value=dspy_wrapper("dspy.TypedChainOfThought"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Retrieve.__call__",
-        make_new_value=dspy_wrapper("dspy.Retrieve.__call__"),
+        make_new_value=dspy_wrapper("dspy.Retrieve"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
@@ -76,7 +85,7 @@ patched_functions = [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.evaluate.evaluate"),
         attribute_name="Evaluate.__call__",
-        make_new_value=dspy_wrapper("dspy.evaluate.Evaluate.__call__"),
+        make_new_value=dspy_wrapper("dspy.evaluate.Evaluate"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
@@ -190,17 +199,17 @@ patched_functions += [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Databricks.__call__",
-        make_new_value=dspy_wrapper("dspy.Databricks.__call__"),
+        make_new_value=dspy_wrapper("dspy.Databricks"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="ColBERTv2.__call__",
-        make_new_value=dspy_wrapper("dspy.ColBERTv2.__call__"),
+        make_new_value=dspy_wrapper("dspy.ColBERTv2"),
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Pyserini.__call__",
-        make_new_value=dspy_wrapper("dspy.Pyserini.__call__"),
+        make_new_value=dspy_wrapper("dspy.Pyserini"),
     ),
 ]
 
