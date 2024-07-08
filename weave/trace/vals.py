@@ -2,7 +2,15 @@ import dataclasses
 import inspect
 import operator
 import typing
-from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
+from typing import (
+    Any,
+    Generator,
+    Iterator,
+    Literal,
+    Optional,
+    SupportsIndex,
+    Union,
+)
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
@@ -33,21 +41,21 @@ from weave.trace_server.trace_server_interface import (
 
 @dataclasses.dataclass
 class MutationSetitem:
-    path: list[str]
+    path: tuple[str, ...]
     operation: Literal["setitem"]
     args: tuple[str, Any]
 
 
 @dataclasses.dataclass
 class MutationSetattr:
-    path: list[str]
+    path: tuple[str, ...]
     operation: Literal["setattr"]
     args: tuple[str, Any]
 
 
 @dataclasses.dataclass
 class MutationAppend:
-    path: list[str]
+    path: tuple[str, ...]
     operation: Literal["append"]
     args: tuple[Any]
 
@@ -57,7 +65,7 @@ MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["appen
 
 
 def make_mutation(
-    path: list[str], operation: MutationOperation, args: tuple[Any, ...]
+    path: tuple[str, ...], operation: MutationOperation, args: tuple[Any, ...]
 ) -> Mutation:
     if operation == "setitem":
         if len(args) != 2 or not isinstance(args[0], str):
@@ -87,7 +95,7 @@ class Tracable:
     server: TraceServerInterface
 
     def add_mutation(
-        self, path: list[str], operation: MutationOperation, *args: Any
+        self, path: tuple[str, ...], operation: MutationOperation, *args: Any
     ) -> None:
         if self.mutations is None:
             self.mutations = []
@@ -398,7 +406,7 @@ def make_trace_obj(
         # for all of these, but for now we need to check for the ref attribute.
         return val
     # Derefence val and create the appropriate wrapper object
-    extra: list[str] = []
+    extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
         new_ref = val
         extra = val.extra

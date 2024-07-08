@@ -582,7 +582,7 @@ def test_dataset_rows_ref(client):
     saved = client.save(dataset, "my-dataset")
     assert isinstance(saved.rows.ref, weave_client.ObjectRef)
     assert saved.rows.ref.name == "my-dataset"
-    assert saved.rows.ref.extra == [OBJECT_ATTR_EDGE_NAME, "rows"]
+    assert saved.rows.ref.extra == (OBJECT_ATTR_EDGE_NAME, "rows")
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")

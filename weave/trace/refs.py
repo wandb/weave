@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Tuple, Union
+from typing import Any, Union
 
 from ..trace_server import refs_internal
 
@@ -27,11 +27,8 @@ class TableRef(Ref):
 
 @dataclasses.dataclass(frozen=True)
 class RefWithExtra(Ref):
-    def with_extra(self, extra: Tuple[str, ...]) -> "RefWithExtra":
+    def with_extra(self, extra: tuple[str, ...]) -> "RefWithExtra":
         params = dataclasses.asdict(self)
-
-        print(f"{self.extra=}")
-
         params["extra"] = self.extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
@@ -54,7 +51,7 @@ class ObjectRef(RefWithExtra):
     project: str
     name: str
     digest: str
-    extra: Tuple[str, ...] = ()
+    extra: tuple[str, ...] = ()
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
@@ -118,7 +115,7 @@ class CallRef(RefWithExtra):
     entity: str
     project: str
     id: str
-    extra: Tuple[str, ...] = ()
+    extra: tuple[str, ...] = ()
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
