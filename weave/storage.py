@@ -14,11 +14,11 @@ from weave.legacy import (
     artifact_local,
     artifact_mem,
     artifact_wandb,
+    box,
     graph,
     mappers_python,
     timestamp,
 )
-from weave.trace import box
 
 from . import errors, ref_base
 from . import weave_types as types
