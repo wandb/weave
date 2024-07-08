@@ -486,9 +486,16 @@ class WeaveClient:
         summary = {}
         if call._children:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
-        elif isinstance(output, dict) and "usage" in output and "model" in output:
+        elif (
+            isinstance(original_output, dict)
+            and "usage" in original_output
+            and "model" in original_output
+        ):
             summary["usage"] = {}
-            summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
+            summary["usage"][original_output["model"]] = {
+                "requests": 1,
+                **original_output["usage"],
+            }
         elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
             # Handle the cases where we are emitting an object instead of a pre-serialized dict
             # In fact, this is going to become the more common case
