@@ -15,6 +15,8 @@ export const PlotlyScatterPlot: React.FC<{
   yColor: string;
   xIsPercentage: boolean;
   yIsPercentage: boolean;
+  xTitle: string;
+  yTitle: string;
   data: ScatterPlotData;
   onRangeChange: (
     xMin?: number,
@@ -52,7 +54,7 @@ export const PlotlyScatterPlot: React.FC<{
       // width: props.height,
       showlegend: false,
       margin: {
-        l: 40, // legend
+        l: 0, // legend
         r: 0,
         b: 20, // legend
         t: 0,
@@ -66,6 +68,14 @@ export const PlotlyScatterPlot: React.FC<{
         gridcolor: MOON_300,
         linecolor: props.xColor,
         linewidth: 2,
+        title: {
+          text: props.xTitle,
+          standoff: 10,
+          // font: {
+          //   color: props.xColor,
+          // },
+        },
+        automargin: true,
       },
       yaxis: {
         // fixedrange: true,
@@ -74,6 +84,15 @@ export const PlotlyScatterPlot: React.FC<{
         gridcolor: MOON_300,
         linecolor: props.yColor,
         linewidth: 2,
+        // title: 'Challenger',
+        automargin: true,
+        title: {
+          text: props.yTitle,
+          standoff: 10,
+          // font: {
+          //   color: props.yColor,
+          // },
+        },
       },
       shapes: [
         {
@@ -95,8 +114,10 @@ export const PlotlyScatterPlot: React.FC<{
     props.height,
     props.xColor,
     props.xIsPercentage,
+    props.xTitle,
     props.yColor,
     props.yIsPercentage,
+    props.yTitle,
     upperBound,
   ]);
   const plotlyConfig = useMemo(() => {

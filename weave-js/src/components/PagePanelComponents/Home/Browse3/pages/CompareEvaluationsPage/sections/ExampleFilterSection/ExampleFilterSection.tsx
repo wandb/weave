@@ -1,4 +1,5 @@
-import {Box} from '@material-ui/core';
+import {Box, IconButton} from '@material-ui/core';
+import {Alert, AlertTitle, Button, Collapse} from '@mui/material';
 import {mean} from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
@@ -14,6 +15,12 @@ import {resolveDimensionMetricResultForPASCall} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {DimensionPicker} from '../ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
+
+const RESULT_FILTER_INSTRUCTIONS =
+  'Select a region of point(s) in the plot to filter the examples below.' +
+  ' Points on the diagonal are points that have the same value for both evaluations.' +
+  ' The X and Y axes represent the values of the selected metric for the baseline and comparison evaluations, respectively.' +
+  ' Therefore, points towards the top left of the plot are examples where the comparison evaluation has a higher value than the baseline evaluation; points towards the bottom right are examples where the baseline evaluation has a higher value than the comparison evaluation.';
 
 export const ExampleFilterSection: React.FC<{
   state: EvaluationComparisonState;
@@ -75,20 +82,20 @@ export const ExampleFilterSection: React.FC<{
         series.push({
           x: mean(xVals),
           y: mean(yVals),
-          size: xVals.length,
+          size: 15, // xVals.length,
           color: MOON_500,
         });
       });
     }
 
-    const minSize = Math.min(...series.map(s => s.size));
-    const maxSize = Math.max(...series.map(s => s.size));
-    const targetRange = [12, 20];
-    series.forEach(s => {
-      const targetRangeSize = targetRange[1] - targetRange[0];
-      const sizePct = (1 + (s.size - minSize)) / (1 + (maxSize - minSize));
-      s.size = targetRange[0] + targetRangeSize * sizePct;
-    });
+    // const minSize = Math.min(...series.map(s => s.size));
+    // const maxSize = Math.max(...series.map(s => s.size));
+    // const targetRange = [12, 20];
+    // series.forEach(s => {
+    //   const targetRangeSize = targetRange[1] - targetRange[0];
+    //   const sizePct = (1 + (s.size - minSize)) / (1 + (maxSize - minSize));
+    //   s.size = targetRange[0] + targetRangeSize * sizePct;
+    // });
 
     return series;
   }, [
@@ -120,6 +127,8 @@ export const ExampleFilterSection: React.FC<{
     },
     [baselineCallId, compareCallId, setRangeSelection]
   );
+
+  const [isExpanded, setIsExpanded] = React.useState(true);
 
   return (
     <VerticalBox
@@ -157,8 +166,46 @@ export const ExampleFilterSection: React.FC<{
           yColor={yColor}
           xIsPercentage={xIsPercentage}
           yIsPercentage={yIsPercentage}
+          xTitle={
+            'Baseline: ' +
+            props.state.data.evaluationCalls[baselineCallId].name +
+            ' ' +
+            props.state.data.evaluationCalls[baselineCallId].callId.slice(-4)
+          }
+          yTitle={
+            'Challenger: ' +
+            props.state.data.evaluationCalls[compareCallId].name +
+            ' ' +
+            props.state.data.evaluationCalls[compareCallId].callId.slice(-4)
+          }
         />
       </VerticalBox>
+      <Alert
+        severity="info"
+        action={
+          // Expand icon - j
+          <Button
+            color="inherit"
+            size="small"
+            onClick={() => {
+              setIsExpanded(!isExpanded);
+            }}>
+            {isExpanded ? 'COLLAPSE' : 'EXPAND'}
+          </Button>
+        }
+        slotProps={{
+          closeIcon: {
+            name: '',
+          },
+        }}>
+        <AlertTitle
+          sx={{
+            marginBottom: isExpanded ? '5px' : '0px',
+          }}>
+          Plot Details
+        </AlertTitle>
+        {isExpanded ? RESULT_FILTER_INSTRUCTIONS : ''}
+      </Alert>
     </VerticalBox>
   );
 };
