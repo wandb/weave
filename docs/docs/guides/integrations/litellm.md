@@ -19,7 +19,7 @@ Weave will automatically capture traces for LiteLLM. You can use the library as 
 import litellm
 import weave
 
-weave.init("litellm_project")
+weave.init("weave_litellm_integration")
 
 openai_response = litellm.completion(
     model="gpt-3.5-turbo", 
@@ -46,7 +46,7 @@ Weave ops make results reproducible by automatically versioning code as you expe
 import litellm
 import weave
 
-weave.init("litellm_project")
+weave.init("weave_litellm_integration")
 
 @weave.op()
 def translate(text: str, target_language: str, model: str) -> str:
@@ -73,7 +73,7 @@ In the example below, you can experiment with different models and temperatures:
 import litellm
 import weave
 
-weave.init('litellm_project')
+weave.init('weave_litellm_integration')
 
 class TranslatorModel(weave.Model):
     model: str
@@ -114,7 +114,7 @@ LiteLLM supports function calling for compatible models. Weave will automaticall
 import litellm
 import weave
 
-weave.init("litellm_project")
+weave.init("weave_litellm_integration")
 
 response = litellm.completion(
     model="gpt-3.5-turbo",
