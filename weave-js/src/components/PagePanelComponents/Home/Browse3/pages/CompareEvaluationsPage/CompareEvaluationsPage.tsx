@@ -1,32 +1,25 @@
 /**
  * This is the entrypoint for the Evaluation Comparison Page.
  *
- * TODO:
- * Data Model:
+ * Remaining TODO:
+ * - [ ] Example comparison section needs a layout rework. Issues: header section scrolls off screen, etc...
+ * - [ ] Add second comparison dimension and rework data model to support N dimensions. Default to first metric + latency
  * - [ ] (probably) find all cases of the `_raw*` cases and remove them, this is an example of insufficient data model
  * - [ ] (probably) find all cases of the `_legacy_*` cases and remove them, this is an example of insufficient data model
- * - [ ] (probably) Change "Target Metric" to an ordered list of metrics. Default to first metric + latency
- * Bugs:
- * - [ ] (Probably) Selection Filter seems to reset periodically? on data refresh - also on page resize?
- * Smaller Features:
- * * Comparison Table:
- *    - [ ] (MUST) Evaluation pinning pushes summary off screen
- * - [ ] (MUST) Reflect local state in URL (dimension, range, & selection)
- * - [ ] (maybe) Refs in Model Property table should be expanded. Example:  https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22bf5188ba-48cd-4c6d-91ea-e25464570c13%22%2C%222f4544f3-9649-487e-b083-df6985e21b12%22%2C%228cbeccd6-6ff7-4eac-a305-6fb6450530f1%22%5D
- * Performance:
- * - [ ] (probably) Audit the queries to determine areas of improvement and parallelization
- * Styling / UX:
- * - [ ] (probably) Hover tooltip on charts to show values
- * - [ ] (maybe) Should pull in EvaluationCall display name if it exists
- * - Scatterplot Filter UX
- *    - [ ] (should) Half Width (and add latency as a second)
- *    - [ ] (probably) Axis dimension needs unit
- *    - [ ] (probably) Scatterplot Filter dimensions are not quite obvious
- *    - [ ] (maybe) Scatterplot filter should have 1-1 aspect ratio
- *    - [ ] (maybe) Double click does not clear the box boundary
- * Implementation Tasks:
- * - [ ] (MUST) Code Cleanup: There is a lot of dead / messy code (commnts, knip, etc...)
- * - [ ] (MUST) Code Cleanup: Pill logic should be shared now between scorecard and viewer
+ * - [ ] UX: (BUG) Scatter filter does not resize when peek preview is closed
+ * - [ ] UX: (BUG) Double click clears filter selection, but not the box
+ * - [ ] Code Cleanup: There is a lot of dead / messy code (commnts, knip, etc...)
+ * - [ ] Code Cleanup: Pill logic should be shared now between scorecard and viewer
+ *
+ * Quick Followups:
+ * - [ ] Shareability: Retain filter / row selection in URL. Probably want to let the feature bake a bit before committing to a data model in the URL.
+ * - [ ] Performance Audit: Audit the queries to determine areas of improvement and parallelization
+ * - [ ] UX: Hover tooltips on all plots
+ * - [ ] UX: Use user-defined call names for evaluation calls
+ * - [ ] UX: Binary scores should be "confusion matrix" style
+ * - [ ] UX: Consider making all filter plots 1-1 aspect ratio
+ * - [ ] UX: Scatter plots should have dimension units
+ * - [ ] UX: Expand top-level refs (e.g. when a model prompt is a ref, see /wandb-designers/signal-maven)
  */
 
 import {Box} from '@material-ui/core';
