@@ -259,7 +259,6 @@ const DimensionPicker: React.FC<{
   const dimensionMap = useMemo(() => {
     return Object.fromEntries(dimensions.map(dim => [dimensionId(dim), dim]));
   }, [dimensions]);
-
   return (
     <FormControl>
       <Autocomplete
@@ -268,15 +267,12 @@ const DimensionPicker: React.FC<{
         limitTags={1}
         value={currDimension ? dimensionId(currDimension) : undefined}
         onChange={(event, newValue) => {
-          setComparisonDimensions(curr => {
-            if (curr == null) {
-              return null;
-            }
-            const res = [...curr];
-            res[props.dimensionIndex].dimension = dimensionMap[newValue];
-            res[props.dimensionIndex].rangeSelection = undefined;
-            return res;
-          });
+          const res = props.state.comparisonDimensions
+            ? [...props.state.comparisonDimensions]
+            : [];
+          res[props.dimensionIndex].dimension = dimensionMap[newValue];
+          res[props.dimensionIndex].rangeSelection = undefined;
+          setComparisonDimensions(res);
         }}
         getOptionLabel={option => {
           return dimensionLabel(dimensionMap[option]!);
