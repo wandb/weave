@@ -335,7 +335,6 @@ class WeaveClient:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             raise
 
-        # Probably bad form to mutate the ref here
         # At this point, `ref.digest` is one of three things:
         # 1. "latest" - the user asked for the latest version of the object
         # 2. "v###" - the user asked for a specific version of the object
