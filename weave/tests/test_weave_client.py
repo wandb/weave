@@ -650,34 +650,34 @@ def test_evaluate(client):
 
     example0_obj = child0.inputs["example"]
     assert example0_obj.ref.name == "Dataset"
-    assert example0_obj.ref.extra == [
+    assert example0_obj.ref.extra == (
         OBJECT_ATTR_EDGE_NAME,
         "rows",
         TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
-    ]
+    )
     example0_obj_input = example0_obj["input"]
     assert example0_obj_input == "1 + 2"
     assert example0_obj_input.ref.name == "Dataset"
-    assert example0_obj_input.ref.extra == [
+    assert example0_obj_input.ref.extra == (
         OBJECT_ATTR_EDGE_NAME,
         "rows",
         TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
         DICT_KEY_EDGE_NAME,
         "input",
-    ]
+    )
     example0_obj_target = example0_obj["target"]
     assert example0_obj_target == 3
     assert example0_obj_target.ref.name == "Dataset"
-    assert example0_obj_target.ref.extra == [
+    assert example0_obj_target.ref.extra == (
         OBJECT_ATTR_EDGE_NAME,
         "rows",
         TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
         DICT_KEY_EDGE_NAME,
         "target",
-    ]
+    )
 
     # second child is another predict_and_score call
     child1 = eval_call_children[1]
@@ -690,12 +690,12 @@ def test_evaluate(client):
     assert child0.inputs["model"].name == child1.inputs["model"].name
     example1_obj = child1.inputs["example"]
     assert example1_obj.ref.name == "Dataset"
-    assert example1_obj.ref.extra == [
+    assert example1_obj.ref.extra == (
         OBJECT_ATTR_EDGE_NAME,
         "rows",
         TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
-    ]
+    )
     # Should be a different row ref
     assert example1_obj.ref.extra[3] != example0_obj.ref.extra[3]
 
