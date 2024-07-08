@@ -2,7 +2,7 @@ import importlib
 from typing import Callable
 
 import weave
-from weave.trace.patcher import SymbolPatcher, MultiPatcher
+from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
 def dspy_wrapper(name: str) -> Callable[[Callable], Callable]:

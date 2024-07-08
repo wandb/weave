@@ -1,10 +1,11 @@
 import os
-import pytest
 from typing import Any
 
+import pytest
+
 import weave
-from weave.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+from weave.weave_client import WeaveClient
 
 
 def _get_call_output(call: tsi.CallSchema) -> Any:
