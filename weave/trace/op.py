@@ -74,10 +74,11 @@ class Op:
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
 
-        call = self._create_call(*args, **kwargs)
+        weave_options = kwargs.pop("weave_options", {})
+        call = self._create_call(weave_options, *args, **kwargs)
         return self._execute_call(call, *args, **kwargs)
 
-    def _create_call(self, *args: Any, **kwargs: Any) -> Any:
+    def _create_call(self, weave_options, *args: Any, **kwargs: Any) -> Any:
         client = client_context.weave_client.require_weave_client()
 
         try:
@@ -101,6 +102,7 @@ class Op:
             inputs_with_defaults,
             parent_call,
             attributes=attributes,
+            display_name=weave_options.get("display_name", None),
         )
 
     def _execute_call(self, call: Any, *args: Any, **kwargs: Any) -> Any:
