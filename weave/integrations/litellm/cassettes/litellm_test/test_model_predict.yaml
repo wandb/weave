@@ -1,0 +1,135 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": [{"type": "text", "text": "There
+      is a bug in my code!"}]}], "temperature": 0.1, "max_tokens": 1024, "system":
+      "You are a translator. Translate the given text to Spanish.", "model": "claude-3-5-sonnet-20240620"}'
+    headers:
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '252'
+      User-Agent:
+      - python-requests/2.32.3
+      accept:
+      - application/json
+      anthropic-version:
+      - '2023-06-01'
+      content-type:
+      - application/json
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA0yOzUrEMBSFX6WedQqdOA6SrYsZcFazFSmhvdRgelNzb6Bj6VP5CL6YdFBwdeA7
+        P5wFoYfDKEPb7J6O57cw7+eDPttjd7mcRzv4TxjodaItRSJ+IBjkFDfgRYKoZ4XBmHqKcOiiLz3V
+        9/VDLYmZtLaN3TcH28CgS6zECvey/I0qzVv9Jg4nf60KV5RzyhVxNYaq+/7qw5DusL4aiKapzeQl
+        MRyI+1ZLZvwaQh+FuCM4LjEalNtdtyDwVLTV9E4scPbRIBX9j3bNuv4AAAD//wMADkGiDwwBAAA=
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8a02858dfb2eebb7-SEA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 08 Jul 2024 19:36:12 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      request-id:
+      - req_01H2FTM2q2q1snuSWfnip6yb
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - acca2b6cf24325f076dfcabdc34ab8f9
+    status:
+      code: 200
+      message: OK
+- request:
+    body: !!binary |
+      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
+      r2eI9tvZs54ebeNfpKW760+/TNar3BoAAA==
+    headers:
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      User-Agent:
+      - sentry.python/1.28.1
+      X-Sentry-Auth:
+      - Sentry sentry_key=99697cf8ca5158250d3dd6cb23cca9b0, sentry_version=7, sentry_client=sentry.python/1.28.1
+    method: POST
+    uri: https://o151352.ingest.us.sentry.io/api/4507019311251456/store/
+  response:
+    body:
+      string: '{"id":"ddbfeefeac684414a4acfc1d46ee563d"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '41'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 08 Jul 2024 19:36:12 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Via:
+      - 1.1 google
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - x-sentry-error,x-sentry-rate-limits,retry-after
+      cross-origin-resource-policy:
+      - cross-origin
+      vary:
+      - origin,access-control-request-method,access-control-request-headers
+    status:
+      code: 200
+      message: OK
+version: 1

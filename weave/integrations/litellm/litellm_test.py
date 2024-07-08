@@ -212,7 +212,8 @@ async def test_litellm_quickstart_stream_async(
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 def test_model_predict(
@@ -223,7 +224,7 @@ def test_model_predict(
         temperature: float
 
         @weave.op()
-        def predict(self, text: str, target_language: str):
+        def predict(self, text: str, target_language: str) -> str:
             response = litellm.completion(
                 api_key=os.environ.get("ANTHROPIC_API_KEY", "sk-ant-DUMMY_API_KEY"),
                 model=self.model,
