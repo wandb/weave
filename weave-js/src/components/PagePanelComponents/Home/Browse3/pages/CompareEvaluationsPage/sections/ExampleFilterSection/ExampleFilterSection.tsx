@@ -29,11 +29,12 @@ export const ExampleFilterSection: React.FC<{
   const yIsPercentage = targetDimension?.scoreType === 'binary';
 
   const data = useMemo(() => {
-    const series: ScatterPlotData[number] = {
-      x: [],
-      y: [],
-      color: MOON_500,
-    };
+    const series: ScatterPlotData = [];
+    // = {
+    //   x: [],
+    //   y: [],
+    //   color: MOON_500,
+    // };
     if (targetDimension != null) {
       Object.values(props.state.data.resultRows).forEach(row => {
         const xVals: number[] = [];
@@ -71,12 +72,25 @@ export const ExampleFilterSection: React.FC<{
         if (xVals.length === 0 || yVals.length === 0) {
           return;
         }
-        series.x.push(mean(xVals));
-        series.y.push(mean(yVals));
+        series.push({
+          x: mean(xVals),
+          y: mean(yVals),
+          size: xVals.length,
+          color: MOON_500,
+        });
       });
     }
 
-    return [series];
+    const minSize = Math.min(...series.map(s => s.size));
+    const maxSize = Math.max(...series.map(s => s.size));
+    const targetRange = [12, 20];
+    series.forEach(s => {
+      const targetRangeSize = targetRange[1] - targetRange[0];
+      const sizePct = (1 + (s.size - minSize)) / (1 + (maxSize - minSize));
+      s.size = targetRange[0] + targetRangeSize * sizePct;
+    });
+
+    return series;
   }, [
     baselineCallId,
     compareCallId,

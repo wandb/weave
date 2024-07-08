@@ -3,7 +3,12 @@ import React, {useEffect, useMemo, useRef} from 'react';
 
 import {MOON_300} from '../../../../../../../../common/css/color.styles';
 
-export type ScatterPlotData = Array<{x: number[]; y: number[]; color: string}>;
+export type ScatterPlotData = Array<{
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+}>;
 export const PlotlyScatterPlot: React.FC<{
   height: number;
   xColor: string;
@@ -21,11 +26,11 @@ export const PlotlyScatterPlot: React.FC<{
   const divRef = useRef<HTMLDivElement>(null);
   const plotlyData: Plotly.Data[] = useMemo(() => {
     return props.data.map(s => ({
-      x: s.x,
-      y: s.y,
+      x: [s.x],
+      y: [s.y],
       mode: 'markers',
       type: 'scatter',
-      marker: {color: s.color, size: 12},
+      marker: {color: s.color, size: s.size},
     }));
   }, [props.data]);
 
@@ -45,9 +50,9 @@ export const PlotlyScatterPlot: React.FC<{
     return {
       height: props.height,
       // width: props.height,
-      // showlegend: true,
+      showlegend: false,
       margin: {
-        l: 50, // legend
+        l: 40, // legend
         r: 0,
         b: 20, // legend
         t: 0,
@@ -84,8 +89,16 @@ export const PlotlyScatterPlot: React.FC<{
           },
         },
       ],
-    };
-  }, [lowerBound, props.height, props.xColor, props.yColor, upperBound]);
+    } as Partial<Plotly.Layout>;
+  }, [
+    lowerBound,
+    props.height,
+    props.xColor,
+    props.xIsPercentage,
+    props.yColor,
+    props.yIsPercentage,
+    upperBound,
+  ]);
   const plotlyConfig = useMemo(() => {
     return {
       displayModeBar: false,

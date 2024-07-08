@@ -19,10 +19,9 @@
  * - [ ] (probably) Hover tooltip on charts to show values
  * - [ ] (maybe) Should pull in EvaluationCall display name if it exists
  * - Scatterplot Filter UX
- *    - [ ] (MUST) Scatterplot Scale dot to number of points
- *    - [ ] (MUST) Axis dimension needs unit
  *    - [ ] (MUST) Axis Labels
  *    - [ ] (MUST) Half Width (and add latency as a second)
+ *    - [ ] (probably) Axis dimension needs unit
  *    - [ ] (probably) Scatterplot Filter dimensions are not quite obvious
  *    - [ ] (probably) Scatterplot filter would benefit from a title / help text
  *    - [ ] (maybe) Scatterplot filter should have 1-1 aspect ratio
