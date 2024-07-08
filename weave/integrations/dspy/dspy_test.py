@@ -26,6 +26,8 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
 def test_dspy_language_models(client: WeaveClient) -> None:
     import dspy
 
+    os.environ["DSP_CACHEBOOL"] = "False"
+
     gpt3_turbo = dspy.OpenAI(
         model="gpt-3.5-turbo-1106",
         max_tokens=300,
@@ -77,6 +79,8 @@ def test_dspy_language_models(client: WeaveClient) -> None:
 )
 def test_dspy_inline_signatures(client: WeaveClient) -> None:
     import dspy
+
+    os.environ["DSP_CACHEBOOL"] = "False"
 
     turbo = dspy.OpenAI(
         model="gpt-3.5-turbo", api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
