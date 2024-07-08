@@ -246,5 +246,12 @@ def test_model_predict(
     )
 
     res = claude_translator.predict("There is a bug in my code!", "Spanish")
-
     assert res != None
+
+    call = claude_translator.predict.calls()[0]  # type: ignore
+    assert dict(call.summary["usage"]["claude-3-5-sonnet-20240620"]) == {
+        "requests": 1,
+        "prompt_tokens": 28,
+        "completion_tokens": 10,
+        "total_tokens": 38,
+    }
