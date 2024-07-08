@@ -3,7 +3,6 @@
  *
  * Remaining TODO:
  * - [ ] (probably) find all cases of the `_raw*` cases and remove them, this is an example of insufficient data model
- * - [ ] (probably) find all cases of the `_legacy_*` cases and remove them, this is an example of insufficient data model
  * - [ ] Code Cleanup: There is a lot of dead / messy code (commnts, knip, etc...)
  *
  * Quick Followups:

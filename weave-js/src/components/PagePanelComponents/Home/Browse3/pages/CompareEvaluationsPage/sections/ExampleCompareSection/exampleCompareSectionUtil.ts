@@ -19,15 +19,11 @@ type RowBase = {
 type FlattenedRow = RowBase & {
   output: {[outputKey: string]: any};
   scores: {[scoreId: string]: number | boolean | undefined};
-  latency: number;
-  totalTokens: number;
 };
 
 type PivotedRow = RowBase & {
   output: {[outputKey: string]: {[callId: string]: any}};
   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
-  latency: {[callId: string]: number};
-  totalTokens: {[callId: string]: number};
 };
 
 // type AggregatedRow = RowBase & {
@@ -72,30 +68,30 @@ const aggregateGroupedNestedRows = <T,>(
     })
   );
 };
-const aggregateGroupedRows = (
-  rows: PivotedRow[],
-  field: keyof PivotedRow,
-  aggFunc: (vals: any[]) => any
-) => {
-  return Object.fromEntries(
-    Object.entries(
-      rows.reduce<{
-        [flatKey: string]: any[];
-      }>((acc, row) => {
-        Object.entries(row[field]).forEach(([key, val]) => {
-          if (acc[key] == null) {
-            acc[key] = [];
-          }
-          acc[key].push(val);
-        });
+// const aggregateGroupedRows = (
+//   rows: PivotedRow[],
+//   field: keyof PivotedRow,
+//   aggFunc: (vals: any[]) => any
+// ) => {
+//   return Object.fromEntries(
+//     Object.entries(
+//       rows.reduce<{
+//         [flatKey: string]: any[];
+//       }>((acc, row) => {
+//         Object.entries(row[field]).forEach(([key, val]) => {
+//           if (acc[key] == null) {
+//             acc[key] = [];
+//           }
+//           acc[key].push(val);
+//         });
 
-        return acc;
-      }, {})
-    ).map(([key, val]) => {
-      return [key, aggFunc(val)];
-    })
-  );
-};
+//         return acc;
+//       }, {})
+//     ).map(([key, val]) => {
+//       return [key, aggFunc(val)];
+//     })
+//   );
+// };
 const filterNones = (list: any[]) => {
   return list.filter(v => v != null);
 };
@@ -142,7 +138,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
               const datasetRow =
                 state.data.inputs[predictAndScoreRes.rowDigest];
               if (datasetRow != null) {
-                const output = predictAndScoreRes._legacy_predictCall?.output;
+                const output = predictAndScoreRes._rawPredictTraceData?.output;
                 rows.push({
                   id: predictAndScoreRes.callId,
                   evaluationCallId: predictAndScoreRes.evaluationCallId,
@@ -150,9 +146,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   inputRef: predictAndScoreRes.firstExampleRef,
                   input: flattenObject({input: datasetRow.val}),
                   output: flattenObject({output}),
-                  latency: predictAndScoreRes._legacy_predictCall?.latencyMs ?? 0,
-                  totalTokens:
-                    predictAndScoreRes._legacy_predictCall?.totalUsageTokens ?? 0,
                   scores: Object.fromEntries(
                     ([...Object.entries(state.data.scorerMetricDimensions), ...Object.entries(state.data.derivedMetricDimensions)]).map(([scoreKey, scoreVal]) => {
                       return [
@@ -219,8 +212,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
         // ),
         output: expandDict(row.output, row.evaluationCallId),
         scores: expandDict(row.scores, row.evaluationCallId),
-        latency: expandPrimitive(row.latency, row.evaluationCallId),
-        totalTokens: expandPrimitive(row.totalTokens, row.evaluationCallId),
       };
     }) as PivotedRow[];
   }, [flattenedRows, leafDims]);
@@ -254,12 +245,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   }
                 })
               )
-            ),
-            latency: aggregateGroupedRows(rows, 'latency', vals =>
-              _.mean(filterNones(vals))
-            ),
-            totalTokens: aggregateGroupedRows(rows, 'totalTokens', vals =>
-              _.mean(filterNones(vals))
             ),
             originalRows: rows,
           },

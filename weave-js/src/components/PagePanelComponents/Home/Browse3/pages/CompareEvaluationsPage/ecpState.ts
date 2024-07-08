@@ -519,37 +519,27 @@ const fetchEvaluationComparisonData = async (
                 rowDigest,
                 modelRef,
                 evaluationCallId,
-                _legacy_predictCall: undefined,
                 scorerMetrics: {},
                 derivedMetrics: {},
                 _rawPredictAndScoreTraceData: parentPredictAndScore,
+                _rawPredictTraceData: undefined,
               };
             }
 
             const predictAndScoreFinal = modelForDigestCollection.predictAndScores[parentPredictAndScore.id];
 
             if (isProbablyPredictCall) {
-              const totalTokens = sum(
-                Object.values(traceCall.summary?.usage ?? {}).map(
-                  (x: any) => x?.total_tokens ?? 0
-                )
-              );
-              predictAndScoreFinal._legacy_predictCall = {
-                callId: traceCall.id,
-                output: traceCall.output as any,
-                latencyMs: (convertISOToDate(
-                  traceCall.ended_at ?? traceCall.started_at
-                ).getTime() -
-                  convertISOToDate(traceCall.started_at).getTime()) /
-                  1000, // why is this different than the predictandscore model latency?
-                totalUsageTokens: totalTokens,
-                _rawPredictTraceData: traceCall,
-              };
+              
+              predictAndScoreFinal._rawPredictTraceData = traceCall;
 
               // Add model latency and tokens
               const modelLatencyMetricDimensionId = dimensionId(modelLatencyMetricDimension);
               predictAndScoreFinal.derivedMetrics[modelLatencyMetricDimensionId] = {
-                value: predictAndScoreFinal._legacy_predictCall.latencyMs,
+                value:  (convertISOToDate(
+                  traceCall.ended_at ?? traceCall.started_at
+                ).getTime() -
+                  convertISOToDate(traceCall.started_at).getTime()) /
+                  1000, // why is this different than the predictandscore model latency?
                 sourceCall: {
                   callId: traceCall.id,
                   _rawScoreTraceData: traceCall,
@@ -558,8 +548,13 @@ const fetchEvaluationComparisonData = async (
 
               // Add total tokens
               const totalTokensMetricDimensionId = dimensionId(totalTokensMetricDimension);
+              const totalTokens = sum(
+                Object.values(traceCall.summary?.usage ?? {}).map(
+                  (x: any) => x?.total_tokens ?? 0
+                )
+              );
               predictAndScoreFinal.derivedMetrics[totalTokensMetricDimensionId] = {
-                value: predictAndScoreFinal._legacy_predictCall.totalUsageTokens,
+                value: totalTokens,
                 sourceCall: {
                   callId: traceCall.id,
                   _rawScoreTraceData: traceCall,

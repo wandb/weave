@@ -184,13 +184,6 @@ export type PredictAndScoreCall = {
   rowDigest: string;
   modelRef: string;
   evaluationCallId: string;
-  _legacy_predictCall?: {
-    callId: string;
-    output: any;
-    latencyMs: number;
-    totalUsageTokens: number;
-    _rawPredictTraceData: TraceCallSchema;
-  };
   scorerMetrics: {
     [metricDimensionId: string]: MetricResult;
   };
@@ -198,6 +191,7 @@ export type PredictAndScoreCall = {
     [metricDimensionId: string]: MetricResult;
   };
   _rawPredictAndScoreTraceData: TraceCallSchema;
+  _rawPredictTraceData?: TraceCallSchema;
 };
 
 export type RangeSelection = { [evalCallId: string]: { min: number; max: number; }; };

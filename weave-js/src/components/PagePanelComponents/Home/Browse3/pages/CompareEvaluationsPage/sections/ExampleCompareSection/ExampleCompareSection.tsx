@@ -415,8 +415,7 @@ export const ExampleCompareSection: React.FC<{
             const selectedTrial =
               trialsForThisEval[selectedTrials[currEvalCallId] || 0];
             const trialPredict =
-              selectedTrial.predictAndScore._legacy_predictCall
-                ?._rawPredictTraceData;
+              selectedTrial.predictAndScore._rawPredictTraceData;
             const [trialEntity, trialProject] =
               trialPredict?.project_id.split('/') ?? [];
             const trialOpName = parseRefMaybe(
