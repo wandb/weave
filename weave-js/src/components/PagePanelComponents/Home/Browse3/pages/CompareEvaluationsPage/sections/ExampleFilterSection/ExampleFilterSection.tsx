@@ -1,13 +1,14 @@
 import {Box} from '@material-ui/core';
 import {FormControl} from '@material-ui/core';
 import {Alert, AlertTitle, Autocomplete, Button} from '@mui/material';
-import {mean} from 'lodash';
+import _, {mean, sum} from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
 import {MOON_500} from '../../../../../../../../common/css/color.styles';
 import {StyledTextField} from '../../../../StyledTextField';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {PLOT_HEIGHT, STANDARD_PADDING} from '../../ecpConstants';
+import {MAX_PLOT_DOT_SIZE, MIN_PLOT_DOT_SIZE} from '../../ecpConstants';
 import {
   EvaluationComparisonState,
   isBinaryScore,
@@ -20,7 +21,7 @@ import {
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {useFilteredAggregateRows} from '../ExampleCompareSection/exampleCompareSectionUtil';
-import {PlotlyScatterPlot, ScatterPlotData} from './PlotlyScatterPlot';
+import {PlotlyScatterPlot, ScatterPlotPoint} from './PlotlyScatterPlot';
 
 const RESULT_FILTER_INSTRUCTIONS =
   'Select a region of point(s) in the plot to filter the examples below.' +
@@ -119,7 +120,7 @@ const SingleDimensionFilter: React.FC<{
   }, [filteredRows]);
 
   const data = useMemo(() => {
-    const series: ScatterPlotData = [];
+    const series: Array<ScatterPlotPoint & {count: number}> = [];
     if (targetDimension != null) {
       Object.entries(props.state.data.resultRows).forEach(([digest, row]) => {
         const xVals: number[] = [];
@@ -160,11 +161,47 @@ const SingleDimensionFilter: React.FC<{
         series.push({
           x: mean(xVals),
           y: mean(yVals),
-          size: 15, // xVals.length,
+          count: xVals.length,
+          size: MIN_PLOT_DOT_SIZE,
           color: MOON_500,
           selected: filteredDigest.has(digest),
         });
       });
+
+      if (targetDimension.scoreType === 'binary') {
+        // Here we are going to further group the points by their x and y values
+        // since the points are going to be discrete, and stacked. Note, while it
+        // is true that each individual trial is either a 0 or 1, the mean of the
+        // trials can be a float.
+        const grouped = _.groupBy(series, point => `${point.x}-${point.y}`);
+        const counts = Object.values(grouped).map(points =>
+          sum(points.map(point => point.count))
+        );
+        const minCount = Math.min(...counts);
+        const maxCount = Math.max(...counts);
+        console.log(minCount, maxCount);
+        const sizeForCount = (count: number) => {
+          if (minCount === maxCount) {
+            return MIN_PLOT_DOT_SIZE;
+          }
+          return (
+            MIN_PLOT_DOT_SIZE +
+            ((count - minCount) / (maxCount - minCount)) *
+              (MAX_PLOT_DOT_SIZE - MIN_PLOT_DOT_SIZE)
+          );
+        };
+        return Object.values(grouped).map(points => {
+          const count = sum(points.map(point => point.count));
+          return {
+            x: points[0].x, // x is the same for all points in the group
+            y: points[0].y, // y is the same for all points in the group
+            size: sizeForCount(count),
+            count,
+            color: points[0].color,
+            selected: points.some(point => point.selected),
+          };
+        });
+      }
     }
 
     return series;

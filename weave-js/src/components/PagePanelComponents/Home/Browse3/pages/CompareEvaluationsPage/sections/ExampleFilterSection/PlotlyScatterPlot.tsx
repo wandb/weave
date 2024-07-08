@@ -4,13 +4,14 @@ import React, {useEffect, useMemo, useRef} from 'react';
 import {usePeekLocation} from '../../../../context';
 import {PLOT_GRID_COLOR} from '../../ecpConstants';
 
-export type ScatterPlotData = Array<{
+export type ScatterPlotPoint = {
   x: number;
   y: number;
   size: number;
   color: string;
   selected?: boolean;
-}>;
+};
+type ScatterPlotData = ScatterPlotPoint[];
 export const PlotlyScatterPlot: React.FC<{
   height: number;
   xColor: string;
