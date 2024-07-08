@@ -3,7 +3,7 @@ import {useMemo} from 'react';
 
 import {flattenObject} from '../../../../../Browse2/browse2Util';
 import { getOrderedCallIds } from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState, PredictAndScoreCall} from '../../ecpTypes';
 import { dimensionId, resolveDimensionValueForPASCall } from '../../ecpUtil';
 
 type FlattenedRow = {
@@ -17,19 +17,13 @@ type FlattenedRow = {
   latency: number;
   totalTokens: number;
   path: string[];
+  predictAndScore: PredictAndScoreCall;
 };
-type PivotedRow = {
-  id: string;
-  inputDigest: string;
-  inputRef: string;
-  input: {[inputKey: string]: any};
-  evaluationCallId: string;
-  // evaluationCallId: {[callId: string]: string};
+type PivotedRow = FlattenedRow & {
   output: {[outputKey: string]: {[callId: string]: any}};
   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
   latency: {[callId: string]: number};
   totalTokens: {[callId: string]: number};
-  path: string[];
 };
 const aggregateGroupedNestedRows = (
   rows: PivotedRow[],
@@ -133,7 +127,10 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                     predictAndScoreRes.evaluationCallId,
                     predictAndScoreRes.callId,
                   ],
+                predictAndScore: predictAndScoreRes
+
                 });
+                
               }
             }
           );

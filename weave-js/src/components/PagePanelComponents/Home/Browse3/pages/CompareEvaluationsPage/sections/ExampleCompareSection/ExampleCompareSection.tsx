@@ -1,4 +1,5 @@
 import {Box} from '@material-ui/core';
+import {Circle} from '@mui/icons-material';
 import _ from 'lodash';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
@@ -6,17 +7,19 @@ import styled from 'styled-components';
 import {
   MOON_100,
   MOON_300,
+  MOON_800,
 } from '../../../../../../../../common/css/color.styles';
 import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
 import {Pill, TagColorName} from '../../../../../../../Tag';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../../../Browse2/SmallRef';
+import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
+import {CallLink} from '../../../common/Links';
 import {isRef} from '../../../common/util';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
-import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
+import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpTypes';
 import {
   adjustValueForDisplay,
@@ -26,7 +29,6 @@ import {
   dimensionUnit,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
-import {EvaluationCallLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 
 const MIN_OUTPUT_WIDTH = 500;
@@ -227,9 +229,31 @@ export const ExampleCompareSection: React.FC<{
             gridTemplateColumns: `repeat(${NUM_EVALS}, min-content auto)`,
             // overflowY: 'auto',
           }}
-          rows={NUM_OUTPUT_KEYS + 2 + NUM_METRICS}>
+          rows={
+            NUM_OUTPUT_KEYS +
+            1 + // Eval Header
+            1 + // Aggregate Metrics Header
+            NUM_METRICS
+          }>
           {_.range(NUM_EVALS).map(ei => {
             const currEvalCallId = leafDims[ei];
+            const trialsForThisEval = target.originalRows.filter(
+              row => row.evaluationCallId === currEvalCallId
+            );
+            const selectedTrial =
+              trialsForThisEval[selectedTrials[currEvalCallId] || 0];
+            const trialPredict =
+              selectedTrial.predictAndScore._legacy_predictCall
+                ?._rawPredictTraceData;
+            const [trialEntity, trialProject] =
+              trialPredict?.project_id.split('/') ?? [];
+            const trialOpName = parseRefMaybe(
+              trialPredict?.op_name ?? ''
+            )?.artifactName;
+            const trialCallId = trialPredict?.id;
+            const evaluationCall =
+              props.state.data.evaluationCalls[currEvalCallId];
+
             return (
               <GridCell
                 key={currEvalCallId}
@@ -241,13 +265,27 @@ export const ExampleCompareSection: React.FC<{
                   zIndex: 1,
                   backgroundColor: MOON_100,
                 }}>
-                <EvaluationCallLink
-                  callId={currEvalCallId}
-                  state={props.state}
-                />
+                {trialEntity && trialProject && trialOpName && trialCallId && (
+                  <CallLink
+                    entityName={trialEntity}
+                    projectName={trialProject}
+                    opName={trialOpName}
+                    callId={trialCallId}
+                    icon={
+                      <Circle
+                        sx={{
+                          color: evaluationCall.color,
+                          height: CIRCLE_SIZE,
+                        }}
+                      />
+                    }
+                    color={MOON_800}
+                  />
+                )}
               </GridCell>
             );
           })}
+
           {_.range(NUM_OUTPUT_KEYS).map(oi => {
             return _.range(NUM_EVALS).map(ei => {
               const currEvalCallId = leafDims[ei];

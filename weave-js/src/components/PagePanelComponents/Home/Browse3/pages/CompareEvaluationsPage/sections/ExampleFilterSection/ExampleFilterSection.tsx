@@ -28,8 +28,6 @@ export const ExampleFilterSection: React.FC<{
   const xIsPercentage = targetDimension?.scoreType === 'binary';
   const yIsPercentage = targetDimension?.scoreType === 'binary';
 
-  console.log(xIsPercentage, yIsPercentage);
-
   const data = useMemo(() => {
     const series: ScatterPlotData[number] = {
       x: [],
