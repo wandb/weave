@@ -20,6 +20,7 @@ class Scorer(Object):
 
     @weave.op()
     def summarize(self, score_rows: list) -> dict | None:
+        print(f"333 {score_rows=}")
         return auto_summarize(score_rows)
 
 
@@ -61,6 +62,7 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     elif isinstance(val, dict):
         result = {}
         for k in val:
+            print(f"111 {data=}")
             if (summary := auto_summarize([x[k] for x in data])) is not None:
                 if k in summary:
                     result.update(summary)
@@ -70,6 +72,7 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
             return None
         return result
     elif isinstance(val, BaseModel):
+        print(f"444 {data=}")
         return auto_summarize([x.model_dump() for x in data])
     return None
 
