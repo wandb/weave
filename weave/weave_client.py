@@ -422,8 +422,10 @@ class WeaveClient:
         else:
             op_str = op
 
-        self._save_nested_objects(inputs)
-        inputs_with_refs = map_to_refs(inputs)
+        inputs_redacted = redact_sensitive_keys(inputs)
+
+        self._save_nested_objects(inputs_redacted)
+        inputs_with_refs = map_to_refs(inputs_redacted)
         call_id = generate_id()
 
         if parent is None and use_stack:
@@ -817,3 +819,26 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     op = Op(op_fn)
     op.name = name
     return op
+
+
+REDACT_KEYS = ("api_key",)
+REDACTED_VALUE = "REDACTED"
+
+
+def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
+    if isinstance(obj, dict):
+        dict_res = {}
+        for k, v in obj.items():
+            if k in REDACT_KEYS:
+                dict_res[k] = REDACTED_VALUE
+            else:
+                dict_res[k] = redact_sensitive_keys(v)
+        return dict_res
+
+    elif isinstance(obj, list):
+        list_res = []
+        for v in obj:
+            list_res.append(redact_sensitive_keys(v))
+        return list_res
+
+    return obj
