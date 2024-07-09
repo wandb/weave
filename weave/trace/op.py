@@ -1,6 +1,8 @@
 import functools
 import inspect
 import typing
+from functools import partial, wraps
+from types import MethodType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -9,18 +11,26 @@ from typing import (
     Dict,
     Mapping,
     Optional,
+    Protocol,
     TypeVar,
+    Union,
+    cast,
+    overload,
+    runtime_checkable,
 )
 
 from typing_extensions import ParamSpec
 
 from weave import call_context, client_context
 from weave.legacy import box, context_state
+from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 
 from .constants import TRACE_CALL_EMOJI
+
+T = TypeVar("T", bound=Callable[..., Any])
 
 if TYPE_CHECKING:
     from weave.weave_client import Call, CallsIter
@@ -257,3 +267,193 @@ def _apply_fn_defaults_to_inputs(
             elif param.kind == inspect.Parameter.VAR_KEYWORD:
                 inputs[param_name] = dict()
     return inputs
+
+
+@runtime_checkable
+class Op2(Protocol):
+    name: str
+    signature: inspect.Signature
+    ref: Union[ObjectRef, None]
+
+    call: Callable[..., Any]
+    calls: Callable[..., "CallsIter"]
+
+
+def _create_call(func, *args, **kwargs):
+    client = client_context.weave_client.get_weave_client()
+
+    try:
+        inputs = func.signature.bind(*args, **kwargs).arguments
+        print(f"{inputs=}")
+    except TypeError as e:
+        raise OpCallError(f"Error calling {func.name}: {e}")
+    inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
+
+    # This should probably be configurable, but for now we redact the api_key
+    if "api_key" in inputs_with_defaults:
+        inputs_with_defaults["api_key"] = "REDACTED"
+
+    # If/When we do memoization, this would be a good spot
+
+    parent_call = call_context.get_current_call()
+    client._save_nested_objects(inputs_with_defaults)
+    attributes = call_attributes.get()
+
+    return client.create_call(
+        func,
+        inputs_with_defaults,
+        parent_call,
+        attributes=attributes,
+    )
+
+
+def _execute_call(func, call: Any, *args: Any, **kwargs: Any) -> Any:
+    client = client_context.weave_client.require_weave_client()
+    has_finished = False
+
+    def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
+        nonlocal has_finished
+        if has_finished:
+            raise ValueError("Should not call finish more than once")
+        client.finish_call(call, output, exception)
+        if not call_context.get_current_call():
+            print_call_link(call)
+
+    def on_output(output: Any) -> Any:
+        if hasattr(func, "_on_output_handler") and func._on_output_handler:
+            return func._on_output_handler(output, finish, call.inputs)
+        finish(output)
+        return output
+
+    try:
+        res = func(*args, **kwargs)
+        # res = func.resolve_fn(*args, **kwargs)
+        # TODO: can we get rid of this?
+        res = box.box(res)
+    except BaseException as e:
+        finish(exception=e)
+        raise
+    # We cannot let BoxedNone or BoxedBool escape into the user's code
+    # since they cannot pass instance checks for None or bool.
+    if isinstance(res, box.BoxedNone):
+        res = None
+    if isinstance(res, box.BoxedBool):
+        res = res.val
+    if inspect.iscoroutine(res):
+
+        async def _call_async() -> Coroutine[Any, Any, Any]:
+            try:
+                awaited_res = res
+                call_context.push_call(call)
+                output = await awaited_res
+                return on_output(output)
+                # return output
+            except BaseException as e:
+                finish(exception=e)
+                raise
+
+        call_context.pop_call(call.id)
+        return _call_async()
+    else:
+        return on_output(res)
+    # finish(res)
+    # return res
+
+
+def call(self, *args, **kwargs):
+    c = _create_call(self, *args, **kwargs)
+    _execute_call(self, c, *args, **kwargs)
+    return c
+
+
+def calls(self) -> "CallsIter":
+    client = client_context.weave_client.get_weave_client()
+    return client._op_calls()
+
+
+@overload
+def op2() -> Callable[[T], Op2]: ...
+
+
+@overload
+def op2(func: T) -> Op2: ...
+
+
+def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
+    """The op decorator!"""
+
+    def op_deco(func: T) -> Op2:
+        # We go through this process instead of using a class to make the decorated
+        # funcs pass `inspect.isfunction` and `inspect.iscoroutine` checks.
+
+        # check function type
+        sig = inspect.signature(func)
+        params = list(sig.parameters.values())
+        is_method = params and params[0].name in {"self", "cls"}
+        is_async = inspect.iscoroutinefunction(func)
+
+        # Tack these helpers on to our "class function"
+        func._is_op = True  # type: ignore
+        func.name = func.__qualname__  # type: ignore
+        func.signature = sig  # type: ignore
+        func.ref = None  # type: ignore
+
+        # func.call = _call  # type: ignore
+        # func.calls = _calls  # type: ignore
+        func.call = partial(call, func)
+        func.calls = partial(calls, func)
+
+        # This is the equivalent of the old Op's __call__ method
+        # is_method is the equivalent of the BoundOp check
+        if is_method:
+            if is_async:
+
+                @wraps(func)
+                async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    self, *rest = args
+                    if client_context.weave_client.get_weave_client() is None:
+                        return await func(*args, **kwargs)
+                    call = _create_call(func, *args, **kwargs)
+                    # return call
+                    return await _execute_call(func, call, *args, **kwargs)
+            else:
+
+                @wraps(func)
+                def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    self, *rest = args
+                    if client_context.weave_client.get_weave_client() is None:
+                        return func(*args, **kwargs)
+                    call = _create_call(func, *args, **kwargs)
+                    # return call
+                    return _execute_call(func, call, *args, **kwargs)
+        else:
+            if is_async:
+
+                @wraps(func)
+                async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    if client_context.weave_client.get_weave_client() is None:
+                        return await func(*args, **kwargs)
+                    call = _create_call(func, *args, **kwargs)
+                    # return call
+                    return await _execute_call(func, call, *args, **kwargs)
+            else:
+
+                @wraps(func)
+                def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    if client_context.weave_client.get_weave_client() is None:
+                        return func(*args, **kwargs)
+                    call = _create_call(func, *args, **kwargs)
+                    # return call
+                    return _execute_call(func, call, *args, **kwargs)
+
+        return cast(Op, wrapper)
+
+    if func is None:
+        return op_deco
+    return op_deco(func)
+
+
+def bind(obj, func):
+    bound_method = MethodType(func, obj)
+    print("binding method", func.__name__, "to", obj)
+    setattr(obj, func.__name__, bound_method)

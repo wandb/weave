@@ -19,7 +19,7 @@ from weave.trace.refs import ObjectRef
 
 from .. import environment, errors, storage
 from . import serializer
-from .op import Op
+from .op import Op, Op2
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
@@ -570,4 +570,5 @@ def test():
 
 
 serializer.register_serializer(Op, save_instance, load_instance)
-serializer.register_serializer(type(test), save_instance, load_instance)
+# serializer.register_serializer(type(test), save_instance, load_instance)
+serializer.register_serializer(Op2, save_instance, load_instance)
