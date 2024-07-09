@@ -4,7 +4,7 @@ from pydantic import field_validator
 
 import weave
 from weave.flow.obj import Object
-from weave.trace.vals import TraceTable
+from weave.trace.vals import WeaveTable
 
 
 def short_str(obj: Any, limit: int = 25) -> str:
@@ -44,7 +44,7 @@ class Dataset(Object):
     def convert_to_table(cls, rows: Any) -> weave.Table:
         if not isinstance(rows, weave.Table):
             table_ref = getattr(rows, "table_ref", None)
-            if isinstance(rows, TraceTable):
+            if isinstance(rows, WeaveTable):
                 rows = list(rows)
             rows = weave.Table(rows)
             if table_ref:

@@ -1,6 +1,6 @@
 export type Model = keyof typeof LLM_TOKEN_COSTS;
 export const isValidLLMModel = (model: string): model is Model => {
-  return model in Object.keys(LLM_TOKEN_COSTS);
+  return Object.keys(LLM_TOKEN_COSTS).includes(model);
 };
 
 export const LLM_TOKEN_COSTS = {

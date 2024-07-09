@@ -58,6 +58,7 @@ import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
+import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
 import {
@@ -463,6 +464,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
+        <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
+          <CompareEvaluationsBinding />
+        </Route>
         {/* BOARDS */}
         <Route
           path={[
@@ -783,6 +787,21 @@ const OpPageBinding = () => {
       entity={params.entity}
       project={params.project}
       opName={params.itemName}
+    />
+  );
+};
+
+const CompareEvaluationsBinding = () => {
+  const {entity, project} = useParams<Browse3TabParams>();
+  const query = useURLSearchParamsDict();
+  const evaluationCallIds = useMemo(() => {
+    return JSON.parse(query.evaluationCallIds);
+  }, [query.evaluationCallIds]);
+  return (
+    <CompareEvaluationsPage
+      entity={entity}
+      project={project}
+      evaluationCallIds={evaluationCallIds}
     />
   );
 };

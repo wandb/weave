@@ -1,20 +1,20 @@
 import pytest
 
 import weave
-from weave.trace.vals import TraceObject
+from weave.trace.vals import WeaveObject
 
 
-def test_traceobject_properties():
+def test_weaveobject_properties():
     class A:
         @property
         def x(self):
             return 1
 
-    to = TraceObject(A(), None, None, None)
+    to = WeaveObject(A(), None, None, None)
     assert to.x == 1
 
 
-def test_traceobject_access_after_init_termination(client):
+def test_weaveobject_access_after_init_termination(client):
     my_obj = None
 
     class MyObj(weave.Object):

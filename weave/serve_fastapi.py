@@ -17,7 +17,7 @@ from weave.legacy.artifact_wandb import WandbArtifactRef
 from weave.legacy.wandb_api import WandbApiAsync, WandbApiContext, wandb_api_context
 from weave.trace import op
 from weave.trace.refs import ObjectRef, OpRef
-from weave.trace.vals import TraceObject
+from weave.trace.vals import WeaveObject
 
 from . import errors, pyfunc_type_util, weave_pydantic
 from . import weave_types as types
