@@ -46,7 +46,6 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     """
     if not data:
         return {}
-
     data = [x for x in data if x is not None]
     val = data[0]
 
