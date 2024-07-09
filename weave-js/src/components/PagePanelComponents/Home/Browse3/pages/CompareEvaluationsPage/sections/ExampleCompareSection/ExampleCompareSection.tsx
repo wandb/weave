@@ -199,12 +199,12 @@ export const ExampleCompareSection: React.FC<{
       <GridContainer
         numColumns={NUM_COLS}
         style={{
-          height: '100%',
-          flex: 1,
+          height: '33%',
+          flex: '1 1 33%',
           display: 'grid',
           overflow: 'auto',
           gridTemplateColumns: `repeat(2, min-content) auto`,
-          gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) min-content repeat(${NUM_OUTPUT_KEYS}, auto) min-content repeat(${NUM_METRICS}, min-content)`,
+          gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content)`,
         }}>
         {_.range(NUM_INPUT_PROPS).map(ii => {
           const inputColumnKey = inputColumnKeys[ii];
@@ -220,6 +220,7 @@ export const ExampleCompareSection: React.FC<{
                   backgroundColor: 'white',
                   textAlign: 'right',
                   fontWeight: 'bold',
+                  width: leftRef.current ? leftRef.current.offsetWidth : 'auto',
                 }}>
                 {removePrefix(inputColumnKey, 'input.')}
               </GridCell>
@@ -229,6 +230,17 @@ export const ExampleCompareSection: React.FC<{
             </React.Fragment>
           );
         })}
+      </GridContainer>
+      <GridContainer
+        numColumns={NUM_COLS}
+        style={{
+          height: '66%',
+          flex: '2 2 66%',
+          display: 'grid',
+          overflow: 'auto',
+          gridTemplateColumns: `repeat(2, min-content) auto`,
+          gridTemplateRows: `min-content repeat(${NUM_OUTPUT_KEYS}, auto) min-content repeat(${NUM_METRICS}, min-content)`,
+        }}>
         <GridCell
           cols={2}
           rows={1 + NUM_OUTPUT_KEYS + 1 + NUM_METRICS}
@@ -288,6 +300,7 @@ export const ExampleCompareSection: React.FC<{
               border: 'none',
             }}>
             <GridCell
+              ref={leftRef}
               cols={2}
               style={{
                 backgroundColor: MOON_100,
@@ -306,7 +319,6 @@ export const ExampleCompareSection: React.FC<{
               return (
                 <React.Fragment key={isScorerMetric ? scorerRef : 'derived'}>
                   <GridCell
-                    ref={leftRef}
                     rows={NUM_METRICS_IN_SCORER}
                     style={{
                       alignContent: 'center',
@@ -617,6 +629,8 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
         whiteSpace: 'pre-wrap',
         textAlign: 'left',
         wordBreak: 'break-all',
+        padding: '0px',
+        margin: '0px',
       }}>
       {text}
     </pre>
