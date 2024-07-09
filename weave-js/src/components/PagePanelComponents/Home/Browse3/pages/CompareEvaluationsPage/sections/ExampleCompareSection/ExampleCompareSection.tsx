@@ -39,13 +39,13 @@ const MIN_OUTPUT_WIDTH = 500;
 const GridCell = styled.div<{
   cols?: number;
   rows?: number;
-  noPad?: boolean;
   button?: boolean;
 }>`
   border: 1px solid ${MOON_300};
   grid-column-end: span ${props => props.cols || 1};
   grid-row-end: span ${props => props.rows || 1};
-  padding: ${props => (props.noPad ? '0px' : '8px')};
+  padding: 8px;
+  background-color: white;
   // Hover should show click mouse icon
   // and slowly highlight blue like a button
   ${props =>
@@ -57,6 +57,19 @@ const GridCell = styled.div<{
       background-color: ${MOON_300};
     }
   `}
+`;
+
+const GridCellSubgrid = styled.div<{
+  cols?: number;
+  rows?: number;
+}>`
+  grid-column-end: span ${props => props.cols || 1};
+  grid-row-end: span ${props => props.rows || 1};
+  padding: 0px;
+  background-color: white;
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-template-columns: subgrid;
 `;
 
 const GridContainer = styled.div<{numColumns: number}>`
@@ -229,19 +242,14 @@ export const ExampleCompareSection: React.FC<{
             </React.Fragment>
           );
         })}
-        <GridCell
+        <GridCellSubgrid
           cols={2}
           rows={1 + NUM_OUTPUT_KEYS + 1 + NUM_METRICS}
-          noPad
           style={{
-            display: 'grid',
-            gridTemplateRows: 'subgrid',
-            gridTemplateColumns: 'subgrid',
             position: 'sticky',
             left: 0,
             zIndex: 3,
             backgroundColor: 'white',
-            border: 'none',
           }}>
           <GridCell
             cols={2}
@@ -272,20 +280,14 @@ export const ExampleCompareSection: React.FC<{
               </React.Fragment>
             );
           })}
-          <GridCell
+          <GridCellSubgrid
             cols={2}
             rows={NUM_METRICS + 1}
-            noPad
             style={{
-              display: 'grid',
-              gridTemplateRows: 'subgrid',
-              gridTemplateColumns: 'subgrid',
               position: 'sticky',
               bottom: 0,
               left: 0,
               zIndex: 3,
-              backgroundColor: 'white',
-              border: 'none',
             }}>
             <GridCell
               cols={2}
@@ -335,14 +337,10 @@ export const ExampleCompareSection: React.FC<{
                 </React.Fragment>
               );
             })}
-          </GridCell>
-        </GridCell>
-        <GridCell
-          noPad
+          </GridCellSubgrid>
+        </GridCellSubgrid>
+        <GridCellSubgrid
           style={{
-            border: 'none',
-            display: 'grid',
-            gridTemplateRows: 'subgrid',
             gridTemplateColumns: `repeat(${NUM_EVALS}, min-content auto)`,
           }}
           rows={
@@ -432,21 +430,16 @@ export const ExampleCompareSection: React.FC<{
             const NUM_TRIALS = trialsForThisEval.length;
 
             return (
-              <GridCell
+              <GridCellSubgrid
                 key={currEvalCallId}
                 cols={2}
                 rows={NUM_METRICS + 1}
-                noPad
                 style={{
-                  display: 'grid',
-                  gridTemplateRows: 'subgrid',
                   gridTemplateColumns: `repeat(${NUM_TRIALS + 1}, auto)`,
                   overflowX: 'auto',
                   position: 'sticky',
                   bottom: 0,
                   zIndex: 1,
-                  backgroundColor: 'white',
-                  border: 'none',
                 }}>
                 <GridCell
                   style={{
@@ -582,10 +575,10 @@ export const ExampleCompareSection: React.FC<{
                     </React.Fragment>
                   );
                 })}
-              </GridCell>
+              </GridCellSubgrid>
             );
           })}
-        </GridCell>
+        </GridCellSubgrid>
       </GridContainer>
     </VerticalBox>
   );
@@ -618,6 +611,8 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
         whiteSpace: 'pre-wrap',
         textAlign: 'left',
         wordBreak: 'break-all',
+        padding: 0,
+        margin: 0,
       }}>
       {text}
     </pre>
