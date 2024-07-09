@@ -53,7 +53,7 @@ def test_anthropic(
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
-    assert output.stop_sequence == None
+    assert output.stop_sequence is None
     assert output.content[0].text == exp
     summary = call.summary
     assert summary is not None
@@ -100,7 +100,7 @@ def test_anthropic_stream(
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
-    assert output.stop_sequence == None
+    assert output.stop_sequence is None
     assert output.content[0].text == exp
     summary = call.summary
     assert summary is not None
@@ -141,7 +141,7 @@ async def test_async_anthropic(
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
-    assert output.stop_sequence == None
+    assert output.stop_sequence is None
     assert output.content[0].text == exp
     summary = call.summary
     assert summary is not None
@@ -190,7 +190,7 @@ async def test_async_anthropic_stream(
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "end_turn"
-    assert output.stop_sequence == None
+    assert output.stop_sequence is None
     assert output.content[0].text == exp
     summary = call.summary
     assert summary is not None
@@ -250,7 +250,7 @@ def test_tools_calling(
     assert output.id == message.id
     assert output.model == message.model
     assert output.stop_reason == "tool_use"
-    assert output.stop_sequence == None
+    assert output.stop_sequence is None
     assert output.content[0].input["location"] == exp
     summary = call.summary
     assert summary is not None

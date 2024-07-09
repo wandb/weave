@@ -1574,7 +1574,7 @@ def test_single_primitive_output(client):
     assert isinstance(b, bool)
     assert b == True
     assert isinstance(c, type(None))
-    assert c == None
+    assert c is None
     assert isinstance(d, dict)
     assert isinstance(d["a"], int)
     assert isinstance(d["b"], bool)
@@ -1590,7 +1590,7 @@ def test_single_primitive_output(client):
     assert len(inner_res.calls) == 4
     assert inner_res.calls[0].output == 1
     assert inner_res.calls[1].output == True
-    assert inner_res.calls[2].output == None
+    assert inner_res.calls[2].output is None
     assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
 
 
