@@ -291,7 +291,10 @@ export const ExampleCompareSection: React.FC<{
           rowSpan={1}
           colSpan={1}
           rowsTemp={`min-content repeat(${NEW_NUM_OUTPUT_KEYS}, auto)`}
-          colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}>
+          colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}
+          style={{
+            scrollbarWidth: 'none',
+          }}>
           {/* OUTPUT HEADER */}
           <React.Fragment>
             <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
@@ -346,7 +349,6 @@ export const ExampleCompareSection: React.FC<{
             return (
               <React.Fragment key={scorerIndex}>
                 <GridCell style={{...STICKY_SIDEBAR}}>
-                  {' '}
                   Scorer/Metric Key {scorerIndex}
                 </GridCell>
                 {_.range(NEW_NUM_EVALS).map(evalIndex => {
