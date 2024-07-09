@@ -303,6 +303,7 @@ export const CallLink: React.FC<{
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
+            justifyContent: 'space-between',
           }}>
           {props.icon}
           {opName}
