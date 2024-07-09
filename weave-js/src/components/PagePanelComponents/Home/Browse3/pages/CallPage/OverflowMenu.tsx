@@ -6,7 +6,7 @@ import {
 } from '@material-ui/core';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
-import {IconDelete} from '@wandb/weave/components/Icon';
+import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
@@ -16,10 +16,20 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const OverflowMenu: FC<{
   selectedCalls: CallSchema[];
-}> = ({selectedCalls}) => {
+  setIsRenaming: (isEditing: boolean) => void;
+}> = ({selectedCalls, setIsRenaming}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
+    [
+      {
+        key: 'rename',
+        text: 'Rename',
+        icon: <IconPencilEdit style={{marginRight: '4px'}} />,
+        onClick: () => setIsRenaming(true),
+        disabled: selectedCalls.length !== 1,
+      },
+    ],
     [
       {
         key: 'delete',
@@ -51,7 +61,7 @@ export const OverflowMenu: FC<{
             style={{marginLeft: '4px'}}
           />
         }
-        offset="-68px, -10px"
+        offset="-78px, -16px"
       />
     </>
   );
@@ -102,28 +112,36 @@ const ConfirmDeleteModal: FC<{
 
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  let error = null;
-  if (calls.length === 0) {
-    error = 'No calls selected';
-  } else if (new Set(calls.map(c => c.entity)).size > 1) {
-    error = 'Cannot delete calls from multiple entities';
-  } else if (new Set(calls.map(c => c.project)).size > 1) {
-    error = 'Cannot delete calls from multiple projects';
-  } else if (calls.length > 1) {
-    error = 'Cannot delete multiple calls';
-  }
+  const [error, setError] = useState<string | null>(null);
 
   const onDelete = () => {
+    if (calls.length === 0) {
+      setError('No call(s) selected');
+      return;
+    }
+    // error if all projects are not the same
+    if (calls.every(call => call.project !== calls[0].project)) {
+      setError('All calls must be in the same project to delete');
+      return;
+    }
     setDeleteLoading(true);
     callsDelete(
       calls[0].entity,
       calls[0].project,
-      calls.map(c => c.callId)
-    ).then(() => {
-      setDeleteLoading(false);
-      setConfirmDelete(false);
-      closePeek();
-    });
+      calls.map(call => call.callId)
+    )
+      .catch(() => {
+        setError(
+          `Failed to delete call(s) ${calls
+            .map(call => call.displayName ?? call.spanName)
+            .join(', ')}`
+        );
+      })
+      .then(() => {
+        setDeleteLoading(false);
+        setConfirmDelete(false);
+        closePeek();
+      });
   };
 
   return (
@@ -143,7 +161,9 @@ const ConfirmDeleteModal: FC<{
           </p>
         )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
-          <CallName key={call.callId}>{call.spanName}</CallName>
+          <CallName key={call.callId}>
+            {call.displayName ?? call.spanName}
+          </CallName>
         ))}
         {calls.length > MAX_DELETED_CALLS_TO_SHOW && (
           <p style={{marginTop: '8px'}}>
