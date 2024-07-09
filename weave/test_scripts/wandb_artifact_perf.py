@@ -16,7 +16,6 @@ import time
 from weave.legacy import (
     artifact_wandb,
     async_map,
-    io_service,
     wandb_api,
     wandb_file_manager,
 )

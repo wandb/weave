@@ -10,7 +10,6 @@ import traceback
 import typing
 
 import requests
-from flask import current_app
 from werkzeug.serving import make_server
 
 from weave.legacy import (
@@ -116,8 +115,6 @@ class SubprocessServer(multiprocessing.Process):
         self.resp_queue = resp_queue
 
     def run(self):
-        from weave.legacy import ops, panels, panels_py
-
         while True:
             req = self.req_queue.get()
             try:

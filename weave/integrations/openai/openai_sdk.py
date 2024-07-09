@@ -7,7 +7,7 @@ from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
-    from openai.types.chat import ChatCompletion, ChatCompletionChunk
+    from openai.types.chat import ChatCompletionChunk
 
 
 def openai_on_finish_post_processor(

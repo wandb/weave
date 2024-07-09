@@ -6,7 +6,6 @@ import traceback
 import typing
 from typing import Any, Callable, Optional, Union
 
-import numpy as np
 from rich import print
 from rich.console import Console
 

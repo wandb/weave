@@ -1,7 +1,6 @@
 import io
 import json
 import logging
-import sys
 import typing as t
 
 import requests
