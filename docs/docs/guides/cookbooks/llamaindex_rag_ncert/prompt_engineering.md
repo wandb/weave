@@ -47,7 +47,7 @@ retreival_engine = index.as_retriever(
 
 Now we can use this retriever to retrieve a list of [`NodeWithScore`](https://docs.llamaindex.ai/en/stable/api_reference/schema/?h=nodewithscore#llama_index.core.schema.NodeWithScore) objects which represent units of retrieved text segments. The nodes are arranged in descending order of similarity score, hence we can simply pick the first node in the list as our context.
 
-```
+```python
 query = """what was the mood in the classroom when M. Hamel gave his last French lesson?"""
 response = retreival_engine.retrieve(query)
 
