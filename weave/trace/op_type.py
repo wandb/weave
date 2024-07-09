@@ -205,7 +205,6 @@ def reconstruct_signature(fn: typing.Callable) -> str:
     module = sys.modules[fn.__module__]
 
     def make_annotation_str(annotation: Any) -> str:
-        print(f"{annotation=}")
         if isinstance(annotation, str):
             return annotation
         if annotation is inspect.Parameter.empty:
@@ -215,8 +214,6 @@ def reconstruct_signature(fn: typing.Callable) -> str:
             args = get_args(annotation)
             replaced_args = [make_annotation_str(arg) for arg in args]
             replaced_args_str = ", ".join(replaced_args)
-
-            print(replaced_args)
 
             if origin_name := getattr(origin, "__name__", None):
                 return f"{origin_name}[{replaced_args_str}]"
