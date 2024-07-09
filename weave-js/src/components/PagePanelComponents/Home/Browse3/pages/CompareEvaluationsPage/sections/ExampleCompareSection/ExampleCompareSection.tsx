@@ -1,7 +1,7 @@
 import {Box} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
 import _ from 'lodash';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
@@ -60,21 +60,49 @@ const GridCell = styled.div<{
 `;
 
 const GridCellSubgrid = styled.div<{
-  cols?: number;
-  rows?: number;
+  colSpan?: number;
+  rowSpan?: number;
+  colsTemp?: string;
+  rowsTemp?: string;
 }>`
-  grid-column-end: span ${props => props.cols || 1};
-  grid-row-end: span ${props => props.rows || 1};
+  grid-column-end: span ${props => props.colSpan || 1};
+  grid-row-end: span ${props => props.rowSpan || 1};
   padding: 0px;
   background-color: white;
   display: grid;
-  grid-template-rows: subgrid;
-  grid-template-columns: subgrid;
+  grid-template-rows: ${props => props.rowsTemp || 'subgrid'};
+  grid-template-columns: ${props => props.colsTemp || 'subgrid'};
+  overflow: auto;
 `;
 
-const GridContainer = styled.div`
+const GridContainer = styled.div<{colsTemp: string; rowsTemp: string}>`
   display: grid;
+  overflow: auto;
+  grid-template-columns: ${props => props.colsTemp};
+  grid-template-rows: ${props => props.rowsTemp};
 `;
+
+const STICKY_HEADER: React.CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 1,
+  backgroundColor: MOON_100,
+};
+
+const STICKY_SIDEBAR: React.CSSProperties = {
+  position: 'sticky',
+  left: 0,
+  zIndex: 1,
+  backgroundColor: MOON_100,
+};
+
+const STICKY_SIDEBAR_HEADER: React.CSSProperties = {
+  ...STICKY_HEADER,
+  ...STICKY_SIDEBAR,
+  zIndex: 2,
+};
+
+const LOREM_IPSUM = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non risus. Suspendisse lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, dolor. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.`;
 
 export const ExampleCompareSection: React.FC<{
   state: EvaluationComparisonState;
@@ -129,6 +157,8 @@ export const ExampleCompareSection: React.FC<{
     },
     [history, peekingRouter]
   );
+
+  const {ref1, ref2} = useLinkHorizontalScroll();
 
   if (target == null) {
     return <div>Filter resulted in 0 rows</div>;
@@ -203,6 +233,17 @@ export const ExampleCompareSection: React.FC<{
     </HorizontalBox>
   );
 
+  const NEW_NUM_INPUT_PROPS = 10;
+  const NEW_NUM_OUTPUT_KEYS = 2;
+  const NEW_NUM_SCORERS = 4;
+  const NEW_NUM_METRICS_PER_SCORER = [1, 2, 3, 4];
+  const NEW_NUM_EVALS = 4;
+  const NEW_NUM_TRIALS = [1, 2, 3, 4];
+
+  const NEW_FIXED_SIDEBAR_WIDTH_PX = 250;
+  const NEW_FIXED_SINGLE_ROW_HEIGHT_PX = 40;
+  const NEW_FIXED_MIN_EVAL_WIDTH_PX = 350;
+
   return (
     <VerticalBox
       sx={{
@@ -211,6 +252,117 @@ export const ExampleCompareSection: React.FC<{
       }}>
       {header}
       <GridContainer
+        colsTemp={'auto'}
+        rowsTemp={`fit-content(100%) auto fit-content(100%)`}
+        style={{
+          height: '100%',
+          flex: 1,
+        }}>
+        {/* INPUT SECTION */}
+        <GridCellSubgrid
+          rowSpan={1}
+          colSpan={1}
+          rowsTemp={`repeat(${NEW_NUM_INPUT_PROPS + 1})`}
+          colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px auto`}>
+          {/* INPUT HEADER */}
+          <React.Fragment>
+            <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
+              Input Key header
+            </GridCell>
+            <GridCell style={{...STICKY_HEADER}}>Input Val header</GridCell>
+          </React.Fragment>
+          {/* INPUT ROWS */}
+          {_.range(NEW_NUM_INPUT_PROPS).map(inputPropIndex => {
+            return (
+              <React.Fragment key={inputPropIndex}>
+                <GridCell style={{...STICKY_SIDEBAR}}>
+                  Input Key {inputPropIndex}
+                </GridCell>
+                <GridCell>
+                  Input Val {inputPropIndex}: {LOREM_IPSUM}
+                </GridCell>
+              </React.Fragment>
+            );
+          })}
+        </GridCellSubgrid>
+        {/* OUTPUT SECTION */}
+        <GridCellSubgrid
+          ref={ref1}
+          rowSpan={1}
+          colSpan={1}
+          rowsTemp={`min-content repeat(${NEW_NUM_OUTPUT_KEYS}, auto)`}
+          colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}>
+          {/* OUTPUT HEADER */}
+          <React.Fragment>
+            <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
+              Output Key header
+            </GridCell>
+            {_.range(NEW_NUM_EVALS).map(evalIndex => {
+              return (
+                <GridCell style={{...STICKY_HEADER}}>Eval {evalIndex}</GridCell>
+              );
+            })}
+          </React.Fragment>
+          {/* OUTPUT ROWS */}
+          {_.range(NEW_NUM_OUTPUT_KEYS).map(outputPropIndex => {
+            return (
+              <React.Fragment key={outputPropIndex}>
+                <GridCell style={{...STICKY_SIDEBAR}}>
+                  OUTPUT Key {outputPropIndex}
+                </GridCell>
+                {_.range(NEW_NUM_EVALS).map(evalIndex => {
+                  return (
+                    <GridCell>
+                      OUTPUT Key {outputPropIndex} Eval {evalIndex}
+                    </GridCell>
+                  );
+                })}
+              </React.Fragment>
+            );
+          })}
+        </GridCellSubgrid>
+        {/* METRIC SECTION */}
+        <GridCellSubgrid
+          ref={ref2}
+          rowSpan={1}
+          colSpan={1}
+          rowsTemp={`repeat(${NEW_NUM_SCORERS + 1})`}
+          colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}>
+          {/* METRIC HEADER */}
+          <React.Fragment>
+            <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
+              Scorer/Metric Key header
+            </GridCell>
+            {_.range(NEW_NUM_EVALS).map(evalIndex => {
+              return (
+                <GridCell style={{...STICKY_HEADER}}>
+                  Scorer/Metric Key header Eval {evalIndex}
+                </GridCell>
+              );
+            })}
+          </React.Fragment>
+          {/* METRIC ROWS */}
+          {_.range(NEW_NUM_SCORERS).map(scorerIndex => {
+            return (
+              <React.Fragment key={scorerIndex}>
+                <GridCell style={{...STICKY_SIDEBAR}}>
+                  {' '}
+                  Scorer/Metric Key {scorerIndex}
+                </GridCell>
+                {_.range(NEW_NUM_EVALS).map(evalIndex => {
+                  return (
+                    <GridCell>
+                      Scorer/Metric Key header Eval {evalIndex} Scorer/Metric
+                      Val {scorerIndex}:
+                    </GridCell>
+                  );
+                })}
+              </React.Fragment>
+            );
+          })}
+        </GridCellSubgrid>
+      </GridContainer>
+      {/* <GridContainer
         style={{
           height: '100%',
           flex: 1,
@@ -578,7 +730,7 @@ export const ExampleCompareSection: React.FC<{
             );
           })}
         </GridCellSubgrid>
-      </GridContainer>
+      </GridContainer> */}
     </VerticalBox>
   );
 };
@@ -620,4 +772,50 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
 const trimWhitespace = (str: string) => {
   // Trim leading and trailing whitespace
   return str.replace(/^\s+|\s+$/g, '');
+};
+
+/**
+ * Allows 2 divs to scroll horizontally in sync. The user
+ * should be able to scroll either div and the other should
+ * scroll as well.
+ */
+const useLinkHorizontalScroll = () => {
+  const ref1 = useRef<HTMLDivElement>(null);
+  const ref2 = useRef<HTMLDivElement>(null);
+
+  const scroll1Handler = useCallback(() => {
+    if (ref1.current && ref2.current) {
+      ref2.current.scrollLeft = ref1.current.scrollLeft;
+    }
+  }, []);
+
+  const scroll2Handler = useCallback(() => {
+    if (ref1.current && ref2.current) {
+      ref1.current.scrollLeft = ref2.current.scrollLeft;
+    }
+  }, []);
+
+  useEffect(() => {
+    const ref1Current = ref1.current;
+    const ref2Current = ref2.current;
+
+    if (ref1Current) {
+      ref1Current.addEventListener('scroll', scroll1Handler);
+    }
+
+    if (ref2Current) {
+      ref2Current.addEventListener('scroll', scroll2Handler);
+    }
+
+    return () => {
+      if (ref1Current) {
+        ref1Current.removeEventListener('scroll', scroll1Handler);
+      }
+      if (ref2Current) {
+        ref2Current.removeEventListener('scroll', scroll2Handler);
+      }
+    };
+  }, [scroll1Handler, scroll2Handler]);
+
+  return {ref1, ref2};
 };
