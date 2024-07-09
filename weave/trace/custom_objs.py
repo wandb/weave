@@ -145,7 +145,7 @@ def decode_custom_obj(
             raise ValueError(f"Expected ObjectRef, got {load_instance_op_uri}")
         wc = require_weave_client()
         load_instance_op = wc.get(ref)
-        if load_instance_op == None:  # == to check for None or BoxedNone
+        if load_instance_op is None:
             raise ValueError(
                 f"Failed to load op needed to decoded object of type {weave_type}. See logs above for more information."
             )

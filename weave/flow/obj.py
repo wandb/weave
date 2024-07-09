@@ -48,8 +48,6 @@ class Object(BaseModel):
                 if k.startswith("_"):
                     continue
                 val = getattr(v, k)
-                if isinstance(val, box.BoxedNone):
-                    val = None
                 fields[k] = val
 
             # pydantic validation will construct a new pydantic object

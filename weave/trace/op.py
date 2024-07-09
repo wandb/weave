@@ -197,10 +197,8 @@ def _execute_call(
         raise
     else:
         res = box.box(res)  # TODO: can we get rid of this?
-    # We cannot let BoxedNone or BoxedBool escape into the user's code
+    # We cannot let BoxedBool escape into the user's code
     # since they cannot pass instance checks for None or bool.
-    if isinstance(res, box.BoxedNone):
-        res = None
     if isinstance(res, box.BoxedBool):
         res = res.val
 
