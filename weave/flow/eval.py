@@ -271,7 +271,6 @@ class Evaluation(Object):
                     scored = summarize_fn(score_table)
                     summary[scorer_name] = scored
             else:
-                print(f"2222 {vals=}")
                 model_output_summary = auto_summarize(vals)
                 if model_output_summary:
                     summary[name] = model_output_summary
@@ -285,7 +284,6 @@ class Evaluation(Object):
         start_time = time.time()
 
         async def eval_example(example: dict) -> dict:
-            print(f"666 {example=}")
             try:
                 eval_row = await self.predict_and_score(model, example)
             except OpCallError as e:
@@ -321,7 +319,6 @@ class Evaluation(Object):
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
 
-        print(f"555 {eval_rows=}")
         summary = await self.summarize(eval_rows)
 
         print("Evaluation summary", summary)
