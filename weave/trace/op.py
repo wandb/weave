@@ -315,7 +315,9 @@ def _create_call(func, *args, **kwargs):
     )
 
 
-def _execute_call(func, call: Any, *args: Any, **kwargs: Any) -> Any:
+def _execute_call(
+    func, call: Any, *args: Any, return_type="call", **kwargs: Any
+) -> Any:
     client = client_context.weave_client.require_weave_client()
     has_finished = False
 
@@ -358,7 +360,11 @@ def _execute_call(func, call: Any, *args: Any, **kwargs: Any) -> Any:
                 call_context.push_call(call)
                 output = await awaited_res
                 # TODO: return call instead?
-                return on_output(output)
+                res2 = on_output(output)
+                if return_type == "call":  # is it always call?
+                    return call
+                else:
+                    return res2
                 # return output
             except BaseException as e:
                 finish(exception=e)
@@ -367,7 +373,11 @@ def _execute_call(func, call: Any, *args: Any, **kwargs: Any) -> Any:
         call_context.pop_call(call.id)
         return _call_async()
     else:
-        return on_output(res)
+        res2 = on_output(res)
+        if return_type == "call":
+            return call
+        else:
+            return res2
     # finish(res)
     # return res
 
@@ -376,12 +386,6 @@ def call(self, *args, **kwargs):
     c = _create_call(self, *args, **kwargs)
     res = _execute_call(self, c, *args, **kwargs)
     return res
-
-
-def acall(self, *args, **kwargs):
-    c = _create_call(self, *args, **kwargs)
-    _execute_call(self, c, *args, **kwargs)
-    return c
 
 
 def calls(self) -> "CallsIter":
@@ -439,15 +443,17 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
                 if client_context.weave_client.get_weave_client() is None:
                     return await func(*args, **kwargs)
                 call = _create_call(func, *args, **kwargs)
-                return await _execute_call(func, call, *args, **kwargs)
+                return await _execute_call(
+                    func, call, *args, return_type="normal", **kwargs
+                )
         else:
 
             @wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
                 if client_context.weave_client.get_weave_client() is None:
-                    return method(*args, **kwargs)
-                call = _create_call(method, *args, **kwargs)
-                return _execute_call(method, call, *args, **kwargs)
+                    return func(*args, **kwargs)
+                call = _create_call(func, *args, **kwargs)
+                return _execute_call(func, call, *args, return_type="normal", **kwargs)
         # else:
         #     if is_async:
 
