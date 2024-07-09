@@ -2,7 +2,7 @@ import inspect
 
 import pytest
 
-from weave.trace.op import op2
+from weave.trace.op import Op2, op2
 from weave.weave_client import Call
 
 
@@ -78,17 +78,26 @@ async def test_async_method_call(client):
 
 
 def test_sync_func_patching_passes_inspection():
+    assert isinstance(func, Op2)
     assert inspect.isfunction(func)
 
 
 def test_async_func_patching_passes_inspection():
+    assert isinstance(afunc, Op2)
     assert inspect.iscoroutinefunction(afunc)
 
 
 def test_sync_method_patching_passes_inspection():
+    assert isinstance(a.method, Op2)
     assert inspect.ismethod(a.method)
 
 
 def test_async_method_patching_passes_inspection():
+    assert isinstance(a.amethod, Op2)
     assert inspect.iscoroutinefunction(a.amethod)
     assert inspect.ismethod(a.amethod)
+
+
+def test_sync_method_calls(client):
+    calls = a.method.calls()
+    raise

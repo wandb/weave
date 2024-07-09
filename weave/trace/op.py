@@ -276,7 +276,7 @@ def _apply_fn_defaults_to_inputs(
 class Op2(Protocol):
     name: str
     signature: inspect.Signature
-    ref: Union[ObjectRef, None]
+    ref: Optional[ObjectRef]
 
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
@@ -418,11 +418,14 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
         func.call = partial(call, f)  # type: ignore
         func.calls = partial(calls, f)  # type: ignore
 
+        func.__call__ = func
+        func.__self__ = func
+
         # This is the equivalent of the old Op's __call__ method
         if is_async:
 
             @wraps(func)
-            async def awrapper(*args: Any, **kwargs: Any) -> Any:
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
                 if client_context.weave_client.get_weave_client() is None:
                     return await func(*args, **kwargs)
                 call = _create_call(func, *args, **kwargs)  # type: ignore
@@ -430,7 +433,6 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
                     func, call, *args, return_type="normal", **kwargs
                 )
 
-            return cast(Op2, awrapper)
         else:
 
             @wraps(func)
@@ -440,7 +442,16 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
                 call = _create_call(func, *args, **kwargs)  # type: ignore
                 return _execute_call(func, call, *args, return_type="normal", **kwargs)
 
-            return cast(Op2, wrapper)
+        # there should be a better way than this...
+        wrapper.name = func.name  # type: ignore
+        wrapper.signature = func.signature  # type: ignore
+        wrapper.ref = func.ref  # type: ignore
+        wrapper.call = func.call  # type: ignore
+        wrapper.calls = func.calls  # type: ignore
+        wrapper.__call__ = wrapper  # type: ignore
+        wrapper.__self__ = func  # type: ignore
+
+        return cast(Op2, wrapper)
 
     if func is None:
         return op_deco

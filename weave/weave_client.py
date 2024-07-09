@@ -362,7 +362,7 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
+    def calls(self, filter: Optional[_CallsFilter] = None) -> "CallsIter":
         if filter is None:
             filter = _CallsFilter()
 
@@ -384,7 +384,7 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
         self,
-        op: Union[str, Op],
+        op: Union[str, Op, Op2],
         inputs: dict,
         parent: Optional[Call] = None,
         attributes: Optional[dict] = None,
@@ -409,14 +409,15 @@ class WeaveClient:
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
+
+        print(
+            f"{type(op)=}, {inspect.isfunction(op)=}, {isinstance(op, Op2)=}, {isinstance(op, Op)=}"
+        )
+
         if isinstance(op, Op):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
-        # elif inspect.isfunction(op):
-        # op_def_ref = self._save_op(op)
-        # op_str = op_def_ref.uri()
-        # op_str = op.name
-        elif isinstance(op, Op2):
+        if isinstance(op, Op2):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
@@ -645,6 +646,7 @@ class WeaveClient:
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
         is_opdef = isinstance(val, Op)
+        is_opdef2 = isinstance(val, Op2)
         # print(f"XXinside save object basic {val=}")
         val = map_to_refs(val)
         # print(f"YYinside save object basic {val=}")
@@ -664,7 +666,7 @@ class WeaveClient:
         ref: Ref
         if is_opdef:
             ref = OpRef(self.entity, self.project, name, response.digest)
-        elif inspect.isfunction(val):
+        elif is_opdef2:
             ref = OpRef(self.entity, self.project, name, response.digest)
         else:
             ref = ObjectRef(self.entity, self.project, name, response.digest)
@@ -720,7 +722,7 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op) -> CallsIter:
+    def _op_calls(self, op: Op) -> "CallsIter":
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
