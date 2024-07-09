@@ -841,4 +841,10 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
             list_res.append(redact_sensitive_keys(v))
         return list_res
 
+    elif isinstance(obj, tuple):
+        tuple_res = []
+        for v in obj:
+            tuple_res.append(redact_sensitive_keys(v))
+        return tuple(tuple_res)
+
     return obj
