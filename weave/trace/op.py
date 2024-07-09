@@ -10,6 +10,7 @@ from typing import (
     Mapping,
     Optional,
     TypeVar,
+    TypedDict,
 )
 
 from typing_extensions import ParamSpec
@@ -29,6 +30,10 @@ try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
 except ImportError:
     OPENAI_NOT_GIVEN = None
+
+
+class WeaveOptions(TypedDict):
+    display_name: Optional[str]
 
 
 def print_call_link(call: "Call") -> None:
@@ -78,7 +83,9 @@ class Op:
         call = self._create_call(weave_options, *args, **kwargs)
         return self._execute_call(call, *args, **kwargs)
 
-    def _create_call(self, weave_options, *args: Any, **kwargs: Any) -> Any:
+    def _create_call(
+        self, weave_options: WeaveOptions, *args: Any, **kwargs: Any
+    ) -> Any:
         client = client_context.weave_client.require_weave_client()
 
         try:
