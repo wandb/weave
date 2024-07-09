@@ -294,8 +294,8 @@ class Evaluation(Object):
             # )
             if eval_row is None:
                 eval_row = {"model_output": None, "scores": {}}
-            if eval_row["scores"] is None:
-                eval_row["scores"] = {}
+            else:
+                eval_row["scores"] = eval_row.get("scores", {})
             for scorer in self.scorers or []:
                 scorer_name, _, _ = get_scorer_attributes(scorer)
                 if scorer_name not in eval_row["scores"]:
