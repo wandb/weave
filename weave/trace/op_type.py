@@ -460,7 +460,10 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 def save_instance(
     obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
 ) -> None:
-    result = get_code_deps(obj.resolve_fn, artifact)
+    if hasattr(obj, "resolve_fn"):
+        result = get_code_deps(obj.resolve_fn, artifact)
+    else:
+        result = get_code_deps(obj, artifact)
     import_code = result["import_code"]
     code = result["code"]
     warnings = result["warnings"]
@@ -498,6 +501,7 @@ def load_instance(
     artifact: artifact_fs.FilesystemArtifact,
     name: str,
 ) -> Optional["Op"]:
+    print("inside load instance")
     if environment.wandb_production():
         # Returning None here instead of erroring allows the Weaveflow app
         # to reference op defs without crashing.
@@ -561,4 +565,9 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
     return "file://" + op_module_file + "." + wrap_fn.__name__
 
 
+def test():
+    pass
+
+
 serializer.register_serializer(Op, save_instance, load_instance)
+serializer.register_serializer(type(test), save_instance, load_instance)

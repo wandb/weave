@@ -82,6 +82,7 @@ class Op:
 
         try:
             inputs = self.signature.bind(*args, **kwargs).arguments
+            print(f"{inputs=}")
         except TypeError as e:
             raise OpCallError(f"Error calling {self.name}: {e}")
         inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
