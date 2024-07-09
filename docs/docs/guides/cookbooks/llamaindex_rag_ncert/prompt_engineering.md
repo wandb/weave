@@ -1,4 +1,4 @@
-# Building Task-specific Assitants using Prompt Engineering
+# Building Task-specific Assistants using Prompt Engineering
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/docs/docs/guides/cookbooks/llamaindex_rag_ncert/notebooks/03_prompt_engineering.ipynb)
 
