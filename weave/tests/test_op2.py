@@ -99,5 +99,27 @@ def test_async_method_patching_passes_inspection():
 
 
 def test_sync_method_calls(client):
+    for x in range(3):
+        a.method(x)
+
+    for x in range(3):
+        a.method.call(x)
+
     calls = a.method.calls()
-    raise
+    calls = list(calls)
+
+    assert len(calls) == 6
+
+
+@pytest.mark.asyncio
+async def test_async_method_calls(client):
+    for x in range(3):
+        await a.amethod(x)
+
+    for x in range(3):
+        await a.amethod.call(x)
+
+    calls = a.amethod.calls()
+    calls = list(calls)
+
+    assert len(calls) == 6

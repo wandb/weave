@@ -385,7 +385,7 @@ def call(func: Op2, *args: Any, **kwargs: Any) -> Any:
 
 def calls(func: Op2) -> "CallsIter":
     client = client_context.weave_client.require_weave_client()
-    return client._op_calls()
+    return client._op_calls(func)
 
 
 @overload
