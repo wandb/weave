@@ -53,6 +53,8 @@ class Serializer:
             # "Op" in the database.
             if ser_id.endswith(".Op2"):
                 return "Op"
+            if ser_id.endswith(".Op"):
+                return "Op"
         return self.target_class.__name__
 
 

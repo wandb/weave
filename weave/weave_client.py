@@ -418,6 +418,7 @@ class WeaveClient:
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         elif isinstance(op, Op2):
+            print(f"calling save_op from create call {op=}")
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
@@ -706,6 +707,7 @@ class WeaveClient:
             self._save_op(obj)
         elif isinstance(obj, Op2):
             # print("going down function save")
+            print(f"calling save op from save nested objects {obj=}")
             self._save_op(obj)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -754,7 +756,10 @@ class WeaveClient:
         if name is None:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
+        print(f"{op_def_ref=}")
         op.ref = op_def_ref  # type: ignore
+        print(f"{op=}")
+        print(f"{op.ref=}")
         return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()

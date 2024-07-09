@@ -52,9 +52,15 @@ def test_simple_op(client):
     def my_op(a: int) -> int:
         return a + 1
 
+    print(f"{my_op=}")
+
     assert my_op(5) == 6
 
+    print(f"{my_op=}")
+    print(f"{my_op.ref=}")
+
     op_ref = weave_client.get_ref(my_op)
+    print(f"{op_ref=}")
     # assert client._ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
