@@ -139,11 +139,34 @@ if __name__ == "__main__":
         # annotate and publish when ready
         edited_df = st.data_editor(weave_dataset_df, num_rows="dynamic")
 
-        # TODO: saving doesn't work yet!
-        if st.button("Save Dataset"):
-            dataset = weave.Dataset(
-                name=new_dataset_name, 
-                rows=edited_df.to_dict(orient="records")
-            )
-            weave.publish(dataset)
-            st.success("Successfully saved data to Weave!", icon="✅")
+        st.subheader('Feeding data back to Weave')
+        st.markdown('You can either create a new `weave.Dataset` or append to an existing dataset.')
+        data_selector_2 = st.radio(
+            "Select Feedback Mode", 
+            ["New Weave Dataset", "Update Weave Dataset"]
+        )
+        if data_selector_2 == "New Weave Dataset":
+            new_dataset_name = st.text_input("Enter New Dataset Name", new_dataset_name)
+            if st.button("Save Dataset"):
+                dataset = weave.Dataset(
+                    name=new_dataset_name, 
+                    rows=edited_df.to_dict(orient="records")
+                )
+                weave.publish(dataset)
+                st.success("Successfully saved data to Weave!", icon="✅")
+        else:
+            dataset_name = st.text_input("Enter Existing Dataset NAME:VERSION", "gen_eval_dataset:latest")
+            dataset_name = dataset_name.split(":")[0]
+            rows = [dict(elem) for elem in weave.ref(dataset_name).get().rows]
+            # TODO: adapt once predict and predicted source can be retrieved above
+            for elem in edited_df.to_dict(orient="records"):
+                new_elem = {"query": elem["query"], "answer": elem["feedback_comment"], "main_source": "https://www.ipcc.ch/report/ar6/syr/downloads/report/IPCC_AR6_SYR_LongerReport.pdf"}
+                rows.append(new_elem)
+            if st.button("Update Dataset"):
+                dataset = weave.Dataset(
+                    name=dataset_name, 
+                    rows=rows,
+                )
+                weave.publish(dataset)
+                st.success("Successfully updated data to Weave!", icon="✅")
+        
