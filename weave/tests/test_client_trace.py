@@ -15,7 +15,7 @@ from pydantic import BaseModel, ValidationError
 import weave
 from weave import weave_client
 from weave.legacy import context_state
-from weave.trace.vals import MissingSelfInstanceError, TraceObject
+from weave.trace.vals import MissingSelfInstanceError, WeaveObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 from ..trace_server import trace_server_interface as tsi

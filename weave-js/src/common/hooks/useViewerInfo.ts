@@ -13,13 +13,23 @@ const VIEWER_QUERY = gql`
     viewer {
       id
       username
+      teams {
+        edges {
+          node {
+            id
+            name
+          }
+        }
+      }
     }
   }
 `;
 
+// TODO: Would be useful to add admin mode flags
 type UserInfo = {
   id: string;
   username: string;
+  teams: string[];
 };
 type UserInfoResponseLoading = {
   loading: true;
@@ -27,7 +37,7 @@ type UserInfoResponseLoading = {
 };
 type UserInfoResponseSuccess = {
   loading: false;
-  userInfo: UserInfo;
+  userInfo: UserInfo | null;
 };
 type UserInfoResponse = UserInfoResponseLoading | UserInfoResponseSuccess;
 
@@ -44,9 +54,24 @@ export const useViewerInfo = (): UserInfoResponse => {
         return;
       }
       const userInfo = result.data.viewer;
+      if (!userInfo) {
+        // User is not logged in
+        setResponse({
+          loading: false,
+          userInfo: null,
+        });
+        return;
+      }
+      const {id, username} = userInfo;
+      const teamEdges = userInfo?.teams?.edges ?? [];
+      const teams = teamEdges.map((edge: any) => edge.node.name).sort();
       setResponse({
         loading: false,
-        userInfo,
+        userInfo: {
+          id,
+          username,
+          teams,
+        },
       });
     });
     return () => {

@@ -8,7 +8,7 @@ import {Tailwind} from '../../../../Tailwind';
 import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 
 type EmojiDetailsProps = {
-  viewer: string; // Username
+  viewer: string | null; // Username
   reactions: Feedback[];
   maxNames?: number;
 };
