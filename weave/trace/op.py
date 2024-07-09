@@ -418,8 +418,8 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
         func.call = partial(call, f)  # type: ignore
         func.calls = partial(calls, f)  # type: ignore
 
-        func.__call__ = func
-        func.__self__ = func
+        func.__call__ = func  # type: ignore
+        func.__self__ = func  # type: ignore
 
         # This is the equivalent of the old Op's __call__ method
         if is_async:

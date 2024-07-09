@@ -417,7 +417,7 @@ class WeaveClient:
         if isinstance(op, Op):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
-        if isinstance(op, Op2):
+        elif isinstance(op, Op2):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
