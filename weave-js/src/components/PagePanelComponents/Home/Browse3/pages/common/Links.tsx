@@ -43,12 +43,19 @@ export const Link = styled(LinkComp)<LinkProps>`
 `;
 Link.displayName = 'S.Link';
 
-const LinkWrapper = styled.div<{fullWidth?: boolean}>`
+const LinkWrapper = styled.div<{fullWidth?: boolean; color?: string}>`
   ${p =>
     p.fullWidth &&
     css`
       width: 100%;
     `};
+  & a {
+    color: ${p => p.color ?? 'inherit'};
+  }
+  & > .callId {
+    background-color: ${MOON_200};
+    color: ${p => p.color ?? 'inherit'};
+  }
 
   display: flex;
   align-items: center;
@@ -137,6 +144,8 @@ export const ObjectVersionLink: React.FC<{
   filePath?: string;
   refExtra?: string;
   fullWidth?: boolean;
+  icon?: React.ReactNode;
+  color?: string;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -157,9 +166,21 @@ export const ObjectVersionLink: React.FC<{
   };
 
   return (
-    <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
-      <LinkTruncater>
-        <Link to={to}>{text}</Link>
+    <LinkWrapper
+      onClick={onClick}
+      fullWidth={props.fullWidth}
+      color={props.color}>
+      <LinkTruncater fullWidth={props.fullWidth}>
+        <Link
+          to={to}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}>
+          {props.icon}
+          {text}
+        </Link>
       </LinkTruncater>
     </LinkWrapper>
   );
@@ -241,6 +262,8 @@ export const CallLink: React.FC<{
   fullWidth?: boolean;
   preservePath?: boolean;
   tracetree?: boolean;
+  icon?: React.ReactNode;
+  color?: string;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -268,13 +291,24 @@ export const CallLink: React.FC<{
   };
 
   return (
-    <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
+    <LinkWrapper
+      onClick={onClick}
+      fullWidth={props.fullWidth}
+      color={props.color}>
       <LinkTruncater fullWidth={props.fullWidth}>
-        <Link $variant={props.variant} to={to}>
+        <Link
+          $variant={props.variant}
+          to={to}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}>
+          {props.icon}
           {opName}
+          <Id id={props.callId} type="Call" />
         </Link>
       </LinkTruncater>
-      <Id id={props.callId} type="Call" />
     </LinkWrapper>
   );
 };

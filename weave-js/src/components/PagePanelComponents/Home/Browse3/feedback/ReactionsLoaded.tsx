@@ -33,7 +33,7 @@ export const StyledTooltip = styled(
 }));
 
 type ReactionsLoadedProps = {
-  viewer: string;
+  viewer: string | null;
   reactions: Feedback[];
   onAddEmoji: (emoji: string) => void;
   onAddNote: (note: string) => void;
@@ -75,6 +75,9 @@ export const ReactionsLoaded = ({
     setAnchorElNotes(anchorElReactions ? null : refViewNotes.current);
   };
   const onViewNotesClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (readonly && notes.length === 0) {
+      return;
+    }
     openNotes();
   };
 
@@ -85,6 +88,9 @@ export const ReactionsLoaded = ({
 
   // TODO: Would need to revisit this if we want to support skin tones
   const onToggleEmoji = (emoji: string) => {
+    if (!viewer) {
+      return;
+    }
     const userReactions = groupedByUser[viewer];
     const existing = _.find(userReactions, r => r.payload.emoji === emoji);
     if (existing) {
@@ -109,10 +115,10 @@ export const ReactionsLoaded = ({
   const onCloseNotes = () => setAnchorElNotes(null);
 
   const notePreview = isOpenNotes ? undefined : notes.length > 0 ? (
-    <Notes notes={notes} onClick={openNotes} />
-  ) : (
+    <Notes readonly={readonly} notes={notes} onClick={openNotes} />
+  ) : !readonly ? (
     <div>Click to add notes</div>
-  );
+  ) : undefined;
 
   const onMouseEnter = () => setIsMouseOver(true);
   const onMouseLeave = () => setIsMouseOver(false);
@@ -214,16 +220,18 @@ export const ReactionsLoaded = ({
                 </Popover>
               </>
             )}
-            <StyledTooltip enterDelay={500} title={notePreview}>
-              <Button
-                ref={refViewNotes}
-                icon="forum-chat-bubble"
-                variant="ghost"
-                size="small"
-                onClick={onViewNotesClick}>
-                {noteLabel}
-              </Button>
-            </StyledTooltip>
+            {readonly && notes.length === 0 ? null : (
+              <StyledTooltip enterDelay={500} title={notePreview}>
+                <Button
+                  ref={refViewNotes}
+                  icon="forum-chat-bubble"
+                  variant="ghost"
+                  size="small"
+                  onClick={onViewNotesClick}>
+                  {noteLabel}
+                </Button>
+              </StyledTooltip>
+            )}
             <Popover
               id={idNotes}
               open={isOpenNotes}
@@ -235,6 +243,7 @@ export const ReactionsLoaded = ({
               }}>
               <Notes
                 viewer={viewer}
+                readonly={readonly}
                 notes={notes}
                 note={note}
                 setNote={setNote}

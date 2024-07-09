@@ -11,7 +11,7 @@ from pydantic import (
 # import pydantic
 from weave.legacy import box
 from weave.trace.op import ObjectRef, Op
-from weave.trace.vals import ObjectRecord, TraceObject, pydantic_getattribute
+from weave.trace.vals import ObjectRecord, WeaveObject, pydantic_getattribute
 from weave.weave_client import get_ref
 
 
@@ -38,7 +38,7 @@ class Object(BaseModel):
     ) -> Any:
         if isinstance(v, ObjectRef):
             return v.get()
-        if isinstance(v, TraceObject):
+        if isinstance(v, WeaveObject):
             # This is a relocated object, so destructure it into a dictionary
             # so pydantic can validate it.
             keys = v._val.__dict__.keys()
@@ -66,7 +66,7 @@ class Object(BaseModel):
             # TODO: fix this. I think dedupe may make it so the user data ends up
             #    working fine, but not setting a ref here will cause the client
             #    to do extra work.
-            if isinstance(v, TraceObject):
+            if isinstance(v, WeaveObject):
                 ref = get_ref(v)
                 new_obj.__dict__["ref"] = ref
             # return new_obj
