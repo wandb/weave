@@ -9,6 +9,7 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
+    Literal,
     Mapping,
     Optional,
     Protocol,
@@ -280,10 +281,11 @@ class Op2(Protocol):
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
 
+    __call__: Callable[..., Any]
 
-def _create_call(func, *args, **kwargs):
+
+def _create_call(func: Op2, *args, **kwargs):
     client = client_context.weave_client.get_weave_client()
-    import inspect
 
     is_method = inspect.ismethod(func)
     if is_method:
@@ -316,7 +318,11 @@ def _create_call(func, *args, **kwargs):
 
 
 def _execute_call(
-    func, call: Any, *args: Any, return_type="call", **kwargs: Any
+    func: Callable,
+    call: Any,
+    *args: Any,
+    return_type: Literal["call", "normal"] = "call",
+    **kwargs: Any,
 ) -> Any:
     client = client_context.weave_client.require_weave_client()
     has_finished = False
@@ -330,19 +336,18 @@ def _execute_call(
             print_call_link(call)
 
     def on_output(output: Any) -> Any:
-        if hasattr(func, "_on_output_handler") and func._on_output_handler:
-            return func._on_output_handler(output, finish, call.inputs)
+        if handler := getattr(func, "_on_output_handler", None):
+            return handler(output, finish, call.inputs)
         finish(output)
         return output
 
     try:
         res = func(*args, **kwargs)
-        # res = func.resolve_fn(*args, **kwargs)
-        # TODO: can we get rid of this?
-        res = box.box(res)
     except BaseException as e:
         finish(exception=e)
         raise
+    else:
+        res = box.box(res)  # TODO: can we get rid of this?
     # We cannot let BoxedNone or BoxedBool escape into the user's code
     # since they cannot pass instance checks for None or bool.
     if isinstance(res, box.BoxedNone):
@@ -350,55 +355,44 @@ def _execute_call(
     if isinstance(res, box.BoxedBool):
         res = res.val
 
-    # print(f"{inspect.iscoroutine(res)=}")
-
     if inspect.iscoroutine(res):
+        awaitable = res
 
         async def _call_async() -> Coroutine[Any, Any, Any]:
             try:
-                awaited_res = res
                 call_context.push_call(call)
-                output = await awaited_res
-                # TODO: return call instead?
+                output = await awaitable
                 res2 = on_output(output)
-                if return_type == "call":  # is it always call?
-                    return call
-                else:
-                    return res2
-                # return output
+                return call if return_type == "call" else res2
             except BaseException as e:
                 finish(exception=e)
                 raise
+            finally:
+                call_context.pop_call(call.id)
 
-        call_context.pop_call(call.id)
         return _call_async()
     else:
         res2 = on_output(res)
-        if return_type == "call":
-            return call
-        else:
-            return res2
-    # finish(res)
-    # return res
+        return call if return_type == "call" else res2
 
 
-def call(self, *args, **kwargs):
-    c = _create_call(self, *args, **kwargs)
-    res = _execute_call(self, c, *args, **kwargs)
+def call(func: Op2, *args, **kwargs):
+    c = _create_call(func, *args, **kwargs)
+    res = _execute_call(func, c, *args, **kwargs)
     return res
 
 
-def calls(self) -> "CallsIter":
+def calls(func: Op2) -> "CallsIter":
     client = client_context.weave_client.get_weave_client()
     return client._op_calls()
 
 
 @overload
-def op2() -> Callable[[T], Op2]: ...
+def op2() -> Callable[[Any], Op2]: ...
 
 
 @overload
-def op2(func: T) -> Op2: ...
+def op2(func: Any) -> Op2: ...
 
 
 def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
@@ -406,7 +400,7 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
 
     def op_deco(func: T) -> Op2:
         # We go through this process instead of using a class to make the decorated
-        # funcs pass `inspect.isfunction` and `inspect.iscoroutine` checks.
+        # funcs pass `inspect.isfunction` and `inspect.iscoroutinefunction` checks.
 
         # check function type
         sig = inspect.signature(func)
@@ -415,37 +409,27 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
         is_async = inspect.iscoroutinefunction(func)
 
         # Tack these helpers on to our "class function"
-        func._is_op = True  # type: ignore
         func.name = func.__qualname__  # type: ignore
         func.signature = sig  # type: ignore
         func.ref = None  # type: ignore
 
-        # func.call = _call  # type: ignore
-        # func.calls = _calls  # type: ignore
-        if is_method:
-            method = MethodType(func, func)
-            func.call = partial(call, method)  # type: ignore
-            func.calls = partial(calls, method)  # type: ignore
-        else:
-            func.call = partial(call, func)  # type: ignore
-            func.calls = partial(calls, func)  # type: ignore
-        # bound_method = MethodType(func, func)
-        # func.call = partial(call, bound_method)  # type: ignore
-        # func.calls = partial(calls, bound_method)  # type: ignore
+        f = MethodType(func, func) if is_method else func
+        func.call = partial(call, f)  # type: ignore
+        func.calls = partial(calls, f)  # type: ignore
 
         # This is the equivalent of the old Op's __call__ method
-        # is_method is the equivalent of the BoundOp check
-        # if is_method:
         if is_async:
 
             @wraps(func)
-            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            async def awrapper(*args: Any, **kwargs: Any) -> Any:
                 if client_context.weave_client.get_weave_client() is None:
                     return await func(*args, **kwargs)
                 call = _create_call(func, *args, **kwargs)
                 return await _execute_call(
                     func, call, *args, return_type="normal", **kwargs
                 )
+
+            return cast(Op2, awrapper)
         else:
 
             @wraps(func)
@@ -454,32 +438,9 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
                     return func(*args, **kwargs)
                 call = _create_call(func, *args, **kwargs)
                 return _execute_call(func, call, *args, return_type="normal", **kwargs)
-        # else:
-        #     if is_async:
 
-        #         @wraps(func)
-        #         async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        #             if client_context.weave_client.get_weave_client() is None:
-        #                 return await func(*args, **kwargs)
-        #             call = _create_call(func, *args, **kwargs)
-        #             return await _execute_call(func, call, *args, **kwargs)
-        #     else:
-
-        #         @wraps(func)
-        #         def wrapper(*args: Any, **kwargs: Any) -> Any:
-        #             if client_context.weave_client.get_weave_client() is None:
-        #                 return func(*args, **kwargs)
-        #             call = _create_call(func, *args, **kwargs)
-        #             return _execute_call(func, call, *args, **kwargs)
-
-        return cast(Op, wrapper)
+            return cast(Op2, wrapper)
 
     if func is None:
         return op_deco
     return op_deco(func)
-
-
-def bind(obj, func):
-    bound_method = MethodType(func, obj)
-    print("binding method", func.__name__, "to", obj)
-    setattr(obj, func.__name__, bound_method)
