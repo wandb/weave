@@ -72,10 +72,8 @@ const GridCellSubgrid = styled.div<{
   grid-template-columns: subgrid;
 `;
 
-const GridContainer = styled.div<{numColumns: number}>`
+const GridContainer = styled.div`
   display: grid;
-  /* grid-template-columns: ${props => '1fr '.repeat(props.numColumns)}; */
-  /* grid-gap: 10px; */
 `;
 
 export const ExampleCompareSection: React.FC<{
@@ -150,71 +148,72 @@ export const ExampleCompareSection: React.FC<{
   const NUM_OUTPUT_KEYS = outputColumnKeys.length;
   const NUM_EVALS = leafDims.length;
 
+  const header = (
+    <HorizontalBox
+      sx={{
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        bgcolor: MOON_100,
+        padding: '16px',
+      }}>
+      <HorizontalBox
+        sx={{
+          alignItems: 'center',
+          flex: 1,
+        }}>
+        <Box
+          style={{
+            flex: 0,
+          }}>
+          <SmallRef objRef={inputRef} iconOnly />
+        </Box>
+        <Box
+          style={{
+            flex: 1,
+          }}>
+          {`Example ${targetIndex + 1} of ${filteredRows.length}`}
+        </Box>
+      </HorizontalBox>
+      <Box>
+        <Button
+          className="mx-16"
+          style={{
+            marginLeft: '0px',
+          }}
+          size="small"
+          disabled={targetIndex === 0}
+          onClick={() => {
+            setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
+          }}
+          icon="chevron-back"
+        />
+
+        <Button
+          style={{
+            marginLeft: '0px',
+          }}
+          disabled={targetIndex === filteredRows.length - 1}
+          size="small"
+          onClick={() => {
+            setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
+          }}
+          icon="chevron-next"
+        />
+      </Box>
+    </HorizontalBox>
+  );
+
   return (
     <VerticalBox
       sx={{
         height: '100%',
-
         gridGap: '0px',
       }}>
-      <HorizontalBox
-        sx={{
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          bgcolor: MOON_100,
-          padding: '16px',
-        }}>
-        <HorizontalBox
-          sx={{
-            alignItems: 'center',
-            flex: 1,
-          }}>
-          <Box
-            style={{
-              flex: 0,
-            }}>
-            <SmallRef objRef={inputRef} iconOnly />
-          </Box>
-          <Box
-            style={{
-              flex: 1,
-            }}>
-            {`Example ${targetIndex + 1} of ${filteredRows.length}`}
-          </Box>
-        </HorizontalBox>
-        <Box>
-          <Button
-            className="mx-16"
-            style={{
-              marginLeft: '0px',
-            }}
-            size="small"
-            disabled={targetIndex === 0}
-            onClick={() => {
-              setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
-            }}
-            icon="chevron-back"
-          />
-
-          <Button
-            style={{
-              marginLeft: '0px',
-            }}
-            disabled={targetIndex === filteredRows.length - 1}
-            size="small"
-            onClick={() => {
-              setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
-            }}
-            icon="chevron-next"
-          />
-        </Box>
-      </HorizontalBox>
+      {header}
       <GridContainer
-        numColumns={NUM_COLS}
         style={{
           height: '100%',
           flex: 1,
-          display: 'grid',
           overflow: 'auto',
           gridTemplateColumns: `repeat(2, min-content) auto`,
           gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) min-content repeat(${NUM_OUTPUT_KEYS}, auto) min-content repeat(${NUM_METRICS}, min-content)`,
