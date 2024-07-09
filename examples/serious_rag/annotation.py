@@ -41,7 +41,7 @@ def assemble_production_data(op_name: str) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 @st.cache_resource
-def assemble_feedback_data(calls) -> pd.DataFrame:
+def assemble_feedback_data() -> pd.DataFrame:
     data = []
     # TODO: this doesn't work
     client = client_context.weave_client.get_weave_client()
@@ -71,8 +71,6 @@ def assemble_feedback_data(calls) -> pd.DataFrame:
 if __name__ == "__main__":
     # init page and get project and dataset names
     streamlit_setup()
-
-    # select weave project
     entity = st.text_input("Enter Weave Entity", "wandb-smle")
     project_name = st.text_input("Enter Weave Project Name", "weave-rag-experiments")
 
@@ -87,7 +85,7 @@ if __name__ == "__main__":
     feedback_name = st.text_input("Enter Feedback Reaction", "👎")
 
     # start annotation
-    edit_mode = st.checkbox("Go to edit mode - once either dataset or operation is selected (is cached)")
+    edit_mode = st.checkbox("Go to edit mode. For feedback - adapt the answer and used source based on the feedback and save it as ground truth to the new eval dataset.")
 
     if edit_mode:
         # download data from weave and display in streamlit
@@ -106,9 +104,9 @@ if __name__ == "__main__":
 
             data = []
             thumbs_down = client.feedback(reaction=feedback_name)
-            calls = thumbs_down.refs().calls()[-2:]
+            calls = thumbs_down.refs().calls()
+            print(calls)
             for call in calls:
-                # TODO: would be nice to have these as utility functions
                 last_reaction, last_comment = None, None
                 for f in call.feedback[::-1]:
                     if f.feedback_type == "wandb.reaction.1":
@@ -118,16 +116,16 @@ if __name__ == "__main__":
                     if last_reaction and last_comment:
                         break
 
-                result_url = call.output["model_output"]["result"]
-                first_source_url = call.output["model_output"]["source_documents"][0]
-
+                # NOTE: this can be easily customized based on the needed feedback structure
                 data.append({
+                    # prediction - used as question and target answer and url in dataset
                     "query": call.inputs['example']['query'],
-                    # TODO: this also doesn't work within the UI - check why?
-                    # "prediction": weave.ref(result_url).get(),
-                    # "used_main_source": weave.ref(first_source_url).get(),
+                    "prediction": call.output["model_output"]["result"]["content"],
+                    "used_main_source": call.output["model_output"]["source_documents"][0]["url"],
+                    # feedback - used to guide the annotation
                     "feedback_reaction": last_reaction,
                     "feedback_comment": last_comment,
+                    # judge output
                     "correct": call.output["scores"]["Performance Metrics"]["correct"].val,
                     "first_retrieval": call.output["scores"]["Performance Metrics"]["first_retrieval"].val,
                     "no_hallucination": call.output["scores"]["Safety Metrics"]["no_hallucination"].val,
@@ -139,6 +137,7 @@ if __name__ == "__main__":
         # annotate and publish when ready
         edited_df = st.data_editor(weave_dataset_df, num_rows="dynamic")
 
+        # saving back to Weave
         st.subheader('Feeding data back to Weave')
         st.markdown('You can either create a new `weave.Dataset` or append to an existing dataset.')
         data_selector_2 = st.radio(
@@ -158,10 +157,15 @@ if __name__ == "__main__":
             dataset_name = st.text_input("Enter Existing Dataset NAME:VERSION", "gen_eval_dataset:latest")
             dataset_name = dataset_name.split(":")[0]
             rows = [dict(elem) for elem in weave.ref(dataset_name).get().rows]
-            # TODO: adapt once predict and predicted source can be retrieved above
+
             for elem in edited_df.to_dict(orient="records"):
-                new_elem = {"query": elem["query"], "answer": elem["feedback_comment"], "main_source": "https://www.ipcc.ch/report/ar6/syr/downloads/report/IPCC_AR6_SYR_LongerReport.pdf"}
-                rows.append(new_elem)
+                rows.append(
+                    {
+                        "query": elem["query"], 
+                        "answer": elem["prediction"], 
+                        "main_source": elem["used_main_source"],
+                    }
+                )
             if st.button("Update Dataset"):
                 dataset = weave.Dataset(
                     name=dataset_name, 

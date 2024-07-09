@@ -33,13 +33,13 @@ questions_per_chunk: 3
 max_chunks_considered: 10 # if -1, consider all chunks, otherwise sample from all chunks
 
 # embedding model
-embedding_model: 'text-embedding-ada-002' #'sentence-transformers/all-MiniLM-L6-v2' #'sentence-transformers/all-MiniLM-L12-v2' 
+embedding_model: 'text-embedding-3-small' #'sentence-transformers/all-MiniLM-L6-v2' #'sentence-transformers/all-MiniLM-L12-v2' 
 embedding_model_norm_embed: True
 vectorstore_path: './faiss_index'
 retrieval_chain_type: 'stuff'
 
 # chat model
-chat_model: 'gpt-3.5-turbo' #'gemini-1.5-pro' #'microsoft/phi-1_5' #'microsoft/Phi-3-mini-128k-instruct' #'gpt-3.5-turbo' #'meta-llama/Meta-Llama-3-8B' #'microsoft/phi-1_5' # 'meta-llama/Meta-Llama-3-8B' #'gpt-4-turbo' #'microsoft/phi-1_5' #'claude-3-haiku-20240307' #'microsoft/phi-1_5' #'bigscience/bloom-560m', 'meta-llama/Llama-2-7b-chat-hf'
+chat_model: 'gpt-4-turbo' #'gemini-1.5-pro' #'microsoft/phi-1_5' #'microsoft/Phi-3-mini-128k-instruct' #'gpt-3.5-turbo' #'meta-llama/Meta-Llama-3-8B' #'microsoft/phi-1_5' # 'meta-llama/Meta-Llama-3-8B' #'gpt-4-turbo' #'microsoft/phi-1_5' #'claude-3-haiku-20240307' #'microsoft/phi-1_5' #'bigscience/bloom-560m', 'meta-llama/Llama-2-7b-chat-hf'
 cm_quantize: False
 cm_temperature: 0.1
 cm_max_new_tokens: 128

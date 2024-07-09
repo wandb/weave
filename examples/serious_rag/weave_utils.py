@@ -65,7 +65,9 @@ class WeaveChatModel(weave.Model):
         if "gpt" not in self.chat_model:
             completion_args["system"] = query.pop(0)["content"]
         response = await acompletion(**completion_args)
-        return response.choices[0].message
+        
+        # TODO: make sure that copied values are returned and not references
+        return dict(response.choices[0].message)
     
 # TODO: check whether this will be recognized as "predict" for weave.Model
 # TODO: make sure that return type will be list of list of floats
@@ -165,8 +167,8 @@ class WeaveVectorStore(weave.Object):
     limit: int = -1
     chunk_size: Optional[int] = None
     chunk_overlap: Optional[int] = None
-    chunked_docs: Optional[List[Dict]] = None
-    index: Optional[faiss.IndexFlat] = None
+    _chunked_docs: Optional[List[Dict]] = None
+    _index: Optional[faiss.IndexFlat] = None
         
     # TODO: check if better way to store chunked docs (now it would be hard to connect chunks with meta-data), also do parallel
     # TODO: check how the others allow the loading of existing stores
@@ -181,7 +183,7 @@ class WeaveVectorStore(weave.Object):
         serializer.register_serializer(faiss.Index, save_instance, load_instance)
 
         # embedd the docs
-        if not self.index:
+        if not self._index:
             asyncio.run(self._embed_all_docs())
         else:
             print("An index has already been created. Please call search to search the index.")
@@ -212,14 +214,14 @@ class WeaveVectorStore(weave.Object):
             raise ValueError("No documents found in the dataset.")
 
         # Chunk and embed documents concurrently    
-        self.chunked_docs = await self._chunk_docs(ref_col=self.key, non_chunked_docs=self.docs.rows[:self.limit])
-        embedding_tasks = [self.embedding_model.aembedd(docs=[doc[self.key]]) for doc in self.chunked_docs]
+        self._chunked_docs = await self._chunk_docs(ref_col=self.key, non_chunked_docs=self.docs.rows[:self.limit])
+        embedding_tasks = [self.embedding_model.aembedd(docs=[doc[self.key]]) for doc in self._chunked_docs]
         embeddings_list = await asyncio.gather(*embedding_tasks)
         
         ## Create FAISS index and add the embeddings
-        self.index = faiss.IndexFlatIP(len(embeddings_list[0]))
+        self._index = faiss.IndexFlatIP(len(embeddings_list[0]))
         embeddings_matrix = np.array(embeddings_list, dtype=np.float32)
-        self.index.add(embeddings_matrix)
+        self._index.add(embeddings_matrix)
 
     @weave.op()
     def search(self, query: str, k: int) -> List[Dict]:
@@ -227,7 +229,7 @@ class WeaveVectorStore(weave.Object):
         Search for the appropriate document chunks using faiss.IndexFlat.search returning max k vectors.
         Return a list of dicts with at least the keys "content" and "url" (used in eval).
         """
-        if not self.index:
+        if not self._index:
             raise ValueError("No index has been created. Please call create first.")
 
         embedded_query = self.embedding_model.embedd(docs=[query])
@@ -235,12 +237,14 @@ class WeaveVectorStore(weave.Object):
             embedded_query, 
             dtype=np.float32
         )
-        if query_vector.shape[1] != self.index.d:
-            raise ValueError(f"Query vector shape {query_vector.shape} does not match index shape {self.index.d}")
+        if query_vector.shape[1] != self._index.d:
+            raise ValueError(f"Query vector shape {query_vector.shape} does not match index shape {self._index.d}")
         
         # scores, indices = await asyncio.to_thread(self.index.search, query_vector, k)
-        scores, indices = self.index.search(query_vector, k)
-        return [self.chunked_docs[int(i)] for i in indices[0]]
+        scores, indices = self._index.search(query_vector, k)
+
+        # TODO: wrap in list to make sure that value is returned and not reference
+        return list([self._chunked_docs[int(i)] for i in indices[0]])
     
 ###########
 # GENERAL #
