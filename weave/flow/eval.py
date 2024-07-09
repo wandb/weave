@@ -112,7 +112,7 @@ class Evaluation(Object):
         if isinstance(self.dataset, list):
             self.dataset = Dataset(rows=self.dataset)
 
-        if self.name is None and self.dataset.name != None:
+        if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
     @weave.op()
