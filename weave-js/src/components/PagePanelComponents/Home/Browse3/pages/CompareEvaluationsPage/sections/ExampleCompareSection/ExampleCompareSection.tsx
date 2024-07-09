@@ -234,8 +234,7 @@ export const ExampleCompareSection: React.FC<{
       <GridContainer
         numColumns={NUM_COLS}
         style={{
-          height: '66%',
-          flex: '2 2 66%',
+          height: 'fit-content',
           display: 'grid',
           overflow: 'auto',
           gridTemplateColumns: `repeat(2, min-content) auto`,
