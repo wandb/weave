@@ -289,7 +289,6 @@ class Evaluation(Object):
             except OpCallError as e:
                 raise e
             except Exception as e:
-                print(f"ERROR {e=}")
                 print("Predict and score failed")
                 traceback.print_exc()
                 return {"model_output": None, "scores": {}}
