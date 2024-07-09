@@ -131,10 +131,6 @@ class Op:
         except BaseException as e:
             finish(exception=e)
             raise
-        # We cannot let BoxedBool escape into the user's code
-        # since they cannot pass instance checks for bool.
-        if isinstance(res, box.BoxedBool):
-            res = res.val
         if inspect.iscoroutine(res):
 
             async def _call_async() -> Coroutine[Any, Any, Any]:

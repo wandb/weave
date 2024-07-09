@@ -49,7 +49,7 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     data = [x for x in data if x is not None]
     val = data[0]
 
-    if isinstance(val, (bool, box.BoxedBool)):
+    if isinstance(val, bool):
         return {
             "true_count": (true_count := sum(1 for x in data if x)),
             "true_fraction": true_count / len(data),
