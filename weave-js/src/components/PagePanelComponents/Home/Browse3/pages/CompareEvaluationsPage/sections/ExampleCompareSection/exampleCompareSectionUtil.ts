@@ -203,8 +203,13 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
               vals => filterNones(vals)[0]
             ),
             scores: aggregateGroupedNestedRows(rows, 'scores', vals =>
-              _.mean(
-                filterNones(vals).map(v => {
+              {
+                const allVals = filterNones(vals);
+                if (allVals.length === 0) {
+                  return undefined;
+                }
+                return _.mean(
+                  allVals.map(v => {
                   if (typeof v === 'number') {
                     return v;
                   } else if (typeof v === 'boolean') {
@@ -213,7 +218,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                     return 0;
                   }
                 })
-              )
+              )}
             ),
             originalRows: rows,
           },
