@@ -17,7 +17,7 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
-from weave.trace.op import Op
+from weave.trace.op import Op, Op2
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -412,10 +412,13 @@ class WeaveClient:
         if isinstance(op, Op):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
-        elif inspect.isfunction(op):
+        # elif inspect.isfunction(op):
+        # op_def_ref = self._save_op(op)
+        # op_str = op_def_ref.uri()
+        # op_str = op.name
+        elif isinstance(op, Op2):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
-            # op_str = op.name
         else:
             op_str = op
 
