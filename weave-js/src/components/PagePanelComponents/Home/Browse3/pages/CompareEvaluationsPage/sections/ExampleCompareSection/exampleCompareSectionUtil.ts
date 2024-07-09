@@ -69,7 +69,7 @@ const filterNones = (list: any[]) => {
 const rowIsSelected = (
   scores: {
     [dimensionId: string]: {
-      [evaluationCallId: string]: number;
+      [evaluationCallId: string]: number | undefined;
     };
   },
   state: EvaluationComparisonState
@@ -87,6 +87,9 @@ const rowIsSelected = (
     }
     const values = scores[dimensionId(compareDim.dimension)];
     return Object.entries(compareDim.rangeSelection).every(([key, val]) => {
+      if (values[key] == null) {
+        return false;
+      }
       const rowVal = values[key] as number;
       return val.min <= rowVal && rowVal <= val.max;
     });
@@ -202,9 +205,13 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
               'output',
               vals => filterNones(vals)[0]
             ),
-            scores: aggregateGroupedNestedRows(rows, 'scores', vals =>
-              _.mean(
-                filterNones(vals).map(v => {
+            scores: aggregateGroupedNestedRows(rows, 'scores', vals => {
+              const allVals = filterNones(vals);
+              if (allVals.length === 0) {
+                return undefined;
+              }
+              return _.mean(
+                allVals.map(v => {
                   if (typeof v === 'number') {
                     return v;
                   } else if (typeof v === 'boolean') {
@@ -213,8 +220,8 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                     return 0;
                   }
                 })
-              )
-            ),
+              );
+            }),
             originalRows: rows,
           },
         ];

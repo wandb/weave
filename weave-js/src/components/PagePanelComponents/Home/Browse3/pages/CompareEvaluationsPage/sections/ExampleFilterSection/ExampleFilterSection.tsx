@@ -140,21 +140,21 @@ const SingleDimensionFilter: React.FC<{
             }
           }
         );
-        Object.values(row.evaluations[compareCallId].predictAndScores).forEach(
-          score => {
-            const val = resolveDimensionMetricResultForPASCall(
-              targetDimension,
-              score
-            );
-            if (val === undefined) {
-              return;
-            } else if (isBinaryScore(val.value)) {
-              yVals.push(val.value ? 1 : 0);
-            } else if (isContinuousScore(val.value)) {
-              yVals.push(val.value);
-            }
+        Object.values(
+          row.evaluations[compareCallId]?.predictAndScores ?? {}
+        ).forEach(score => {
+          const val = resolveDimensionMetricResultForPASCall(
+            targetDimension,
+            score
+          );
+          if (val === undefined) {
+            return;
+          } else if (isBinaryScore(val.value)) {
+            yVals.push(val.value ? 1 : 0);
+          } else if (isContinuousScore(val.value)) {
+            yVals.push(val.value);
           }
-        );
+        });
         if (xVals.length === 0 || yVals.length === 0) {
           return;
         }
