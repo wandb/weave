@@ -23,7 +23,7 @@ def test_laref_artifact_version_1():
     assert parsed_ref.artifact.name == art.name
     assert parsed_ref.artifact._version == art._version
     assert parsed_ref.path == "obj"
-    assert parsed_ref.extra == None
+    assert parsed_ref.extra is None
 
     assert ref.local_ref_str() == "obj"
     assert ref_util.parse_local_ref_str("obj") == ("obj", None)
@@ -38,7 +38,7 @@ def test_laref_artifact_version_path():
     assert parsed_ref.artifact.name == art.name
     assert parsed_ref.artifact._version == art._version
     assert parsed_ref.path == "x.txt"
-    assert parsed_ref.extra == None
+    assert parsed_ref.extra is None
 
     assert ref.local_ref_str() == "x.txt"
     assert ref_util.parse_local_ref_str("x.txt") == (

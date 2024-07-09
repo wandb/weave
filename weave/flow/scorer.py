@@ -75,7 +75,7 @@ def get_scorer_attributes(
 ) -> Tuple[str, Callable, Callable]:
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
-        if scorer_name == None:
+        if scorer_name is None:
             scorer_name = scorer.__class__.__name__
         try:
             score_fn = scorer.score

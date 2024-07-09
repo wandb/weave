@@ -250,7 +250,7 @@ class WeaveTable(Traceable):
         # load the entire set of rows the first time we need anything. However
         # the previous implementation loaded the entire set of rows for every action
         # so this is still better.
-        if self._loaded_rows == None:
+        if self._loaded_rows is None:
             self._loaded_rows = [row for row in self._remote_iter()]
 
         return typing.cast(typing.List[typing.Dict], self._loaded_rows)
