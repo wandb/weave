@@ -96,6 +96,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
 
 def encode_custom_obj(obj: Any) -> Optional[dict]:
     serializer = get_serializer_for_obj(obj)
+    print(f"inside encode custom obj, {obj=}, {serializer=}")
     if serializer is None:
         # We silently return None right now. We could warn here. This object
         # will not be recoverable with client.get

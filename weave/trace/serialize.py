@@ -13,6 +13,7 @@ from weave.trace_server.trace_server_interface import (
 
 
 def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
+    print(f"inside to_json, {obj=}")
     if isinstance(obj, TableRef):
         return obj.uri()
     elif isinstance(obj, ObjectRef):
@@ -49,6 +50,7 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     load_op_uri = encoded.get("load_op")
     if load_op_uri:
         result["load_op"] = load_op_uri
+    print(f"{result=}")
     return result
 
 

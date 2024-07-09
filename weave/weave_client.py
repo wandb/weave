@@ -100,34 +100,24 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
-    print(f"inside map to refs... {obj=}")
     ref = _get_direct_ref(obj)
     print(f"{ref=}, {obj=}, {type(obj)=}")
     if ref:
-        print(11)
         return ref
     if isinstance(obj, ObjectRecord):
-        print(22)
         return obj.map_values(map_to_refs)
     elif isinstance(obj, pydantic.BaseModel):
-        print(33)
         obj_record = pydantic_object_record(obj)
         return obj_record.map_values(map_to_refs)
     elif dataclasses.is_dataclass(obj):
-        print(44)
         obj_record = dataclass_object_record(obj)
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
-        print(55)
         return obj.ref
     elif isinstance(obj, list):
-        print(66)
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
-        print(77)
         return {k: map_to_refs(v) for k, v in obj.items()}
-
-    print(88)
     return obj
 
 
@@ -680,38 +670,30 @@ class WeaveClient:
         return ref
 
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
-        print(f"Saving nested objects for {obj=}, {name=}")
         if get_ref(obj) is not None:
-            print(1)
             return
         if isinstance(obj, pydantic.BaseModel):
-            print(2)
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
         elif dataclasses.is_dataclass(obj):
-            print(3)
             obj_rec = dataclass_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
         elif isinstance(obj, Table):
-            print(4)
             table_ref = self._save_table(obj)
             obj.ref = table_ref
         elif isinstance_namedtuple(obj):
-            print(5)
             for v in obj._asdict().values():
                 self._save_nested_objects(v)
         elif isinstance(obj, (list, tuple)):
-            print(6)
             for v in obj:
                 self._save_nested_objects(v)
         elif isinstance(obj, dict):
-            print(7)
             for v in obj.values():
                 self._save_nested_objects(v)
         elif isinstance(obj, Op):
