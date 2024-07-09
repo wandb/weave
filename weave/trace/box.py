@@ -3,24 +3,16 @@
 This copies many things from weave/legacy/box.py, but it notably
 does not box None and bool which simplify checks for trace users."""
 
+from __future__ import annotations
+
 import datetime
-import random
 import typing
 
 import numpy as np
 
 from weave import ref_util
 
-
-def make_id() -> int:
-    return random.randint(-(2**63), 2**63 - 1)
-
-
-class HasBoxedRepr:
-    val: typing.Any
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__} ({self.val})>"
+T = typing.TypeVar("T")
 
 
 class BoxedInt(int):
@@ -99,10 +91,6 @@ class BoxedTimedelta(datetime.timedelta):
         )
 
 
-def cannot_have_weakref(obj: typing.Any):
-    return isinstance(obj, (BoxedInt, BoxedFloat, BoxedStr, BoxedBool, BoxedNone))
-
-
 # See https://numpy.org/doc/stable/user/basics.subclassing.html
 class BoxedNDArray(np.ndarray):
     def __new__(cls, input_array):
@@ -114,22 +102,19 @@ class BoxedNDArray(np.ndarray):
             return
 
 
-T = typing.TypeVar("T")
-
-
 def box(
     obj: T,
-) -> typing.Union[
-    T,
-    BoxedInt,
-    BoxedFloat,
-    BoxedStr,
-    BoxedDict,
-    BoxedList,
-    BoxedNDArray,
-    BoxedDatetime,
-    BoxedTimedelta,
-]:
+) -> (
+    T
+    | BoxedInt
+    | BoxedFloat
+    | BoxedStr
+    | BoxedDict
+    | BoxedList
+    | BoxedNDArray
+    | BoxedDatetime
+    | BoxedTimedelta
+):
     if type(obj) == int:
         return BoxedInt(obj)
     elif type(obj) == float:
@@ -151,17 +136,17 @@ def box(
 
 def unbox(
     obj: T,
-) -> typing.Union[
-    T,
-    int,
-    float,
-    str,
-    dict,
-    list,
-    np.ndarray,
-    datetime.datetime,
-    datetime.timedelta,
-]:
+) -> (
+    T
+    | int
+    | float
+    | str
+    | dict
+    | list
+    | np.ndarray
+    | datetime.datetime
+    | datetime.timedelta
+):
     if type(obj) == BoxedInt:
         return int(obj)
     elif type(obj) == BoxedFloat:
@@ -179,7 +164,3 @@ def unbox(
     elif type(obj) == BoxedTimedelta:
         return datetime.timedelta(seconds=obj.total_seconds())
     return obj
-
-
-def is_boxed(obj: typing.Any) -> bool:
-    return id(obj) == id(box(obj))
