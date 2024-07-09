@@ -7,8 +7,6 @@ from openai import AsyncOpenAI, OpenAI
 import weave
 from weave.trace_server import trace_server_interface as tsi
 
-from .openai_sdk import openai_patcher
-
 model = "gpt-4o"
 
 

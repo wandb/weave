@@ -1,13 +1,12 @@
 # Sqlite Trace Server
 
-import contextlib
 import contextvars
 import datetime
 import hashlib
 import json
 import sqlite3
 import threading
-from typing import Any, Iterator, Optional, Union, cast
+from typing import Any, Iterator, Optional, cast
 from zoneinfo import ZoneInfo
 
 import emoji

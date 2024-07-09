@@ -1,13 +1,11 @@
 import os
-from typing import Any, Generator
+from typing import Any
 
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
 
 import weave
 from weave.trace_server import trace_server_interface as tsi
-
-from .anthropic_sdk import anthropic_patcher
 
 model = "claude-3-haiku-20240307"
 # model = "claude-3-opus-20240229"

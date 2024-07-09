@@ -6,14 +6,10 @@ from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
 
 from weave.client_context.weave_client import require_weave_client
 from weave.legacy import artifact_fs
-from weave.trace import op_type  # Must import this to register op save/load
+from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
 from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
-from weave.trace_server.trace_server_interface_util import (
-    decode_b64_to_bytes,
-    encode_bytes_as_b64,
-)
 
 
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
@@ -165,4 +161,6 @@ def decode_custom_obj(
         metadata={},
     )
     with artifact_fs.loading_artifact(art):
-        return load_instance_op(art, "obj")
+        res = load_instance_op(art, "obj")
+        res.art = art
+        return res

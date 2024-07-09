@@ -12,7 +12,7 @@ import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 import {EmojiDetails} from './EmojiDetails';
 
 type EmojiButtonProps = {
-  viewer: string;
+  viewer: string | null;
   reactions: Feedback[];
   onToggleEmoji: (emoji: string) => void;
   readonly: boolean;
@@ -54,8 +54,8 @@ export const EmojiButton = ({
       <Button
         size="small"
         variant="secondary"
+        className={readonly ? 'cursor-default' : undefined}
         active={includesUser}
-        disabled={readonly}
         onClick={onClick}>{`${emoji} ${count}`}</Button>
     </StyledTooltip>
   );

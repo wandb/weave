@@ -7,7 +7,7 @@ from rich.table import Table
 from weave import client_context
 from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import AnyRef, CallRef, parse_uri
-from weave.trace.vals import TraceObject
+from weave.trace.vals import WeaveObject
 
 
 class Refs(AbstractRichContainer[str]):
@@ -29,7 +29,7 @@ class Refs(AbstractRichContainer[str]):
         return Refs(ref for ref in self.items if isinstance(parse_uri(ref), CallRef))
 
     # TODO: Perhaps there should be a Calls that extends AbstractRichContainer
-    def calls(self) -> list[TraceObject]:
+    def calls(self) -> list[WeaveObject]:
         client = client_context.weave_client.require_weave_client()
         objs = []
         for ref in self.call_refs():

@@ -1,5 +1,3 @@
-import enum
-
 from pydantic import BaseModel, create_model
 
 from . import infer_types

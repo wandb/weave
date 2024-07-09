@@ -2,7 +2,7 @@
 
 import json
 import traceback
-from typing import Any, Optional, TypedDict
+from typing import Optional, TypedDict
 
 
 class StackFrameDict(TypedDict):
