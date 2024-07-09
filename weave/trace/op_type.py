@@ -565,10 +565,5 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
     return "file://" + op_module_file + "." + wrap_fn.__name__
 
 
-def test():
-    pass
-
-
 serializer.register_serializer(Op, save_instance, load_instance)
-# serializer.register_serializer(type(test), save_instance, load_instance)
 serializer.register_serializer(Op2, save_instance, load_instance)

@@ -282,10 +282,11 @@ class Op2(Protocol):
     calls: Callable[..., "CallsIter"]
 
     __call__: Callable[..., Any]
+    __self__: Any
 
 
-def _create_call(func: Op2, *args, **kwargs):
-    client = client_context.weave_client.get_weave_client()
+def _create_call(func: Op2, *args: Any, **kwargs: Any) -> "Call":
+    client = client_context.weave_client.require_weave_client()
 
     is_method = inspect.ismethod(func)
     if is_method:
@@ -376,14 +377,14 @@ def _execute_call(
         return call if return_type == "call" else res2
 
 
-def call(func: Op2, *args, **kwargs):
+def call(func: Op2, *args: Any, **kwargs: Any) -> Any:
     c = _create_call(func, *args, **kwargs)
     res = _execute_call(func, c, *args, **kwargs)
     return res
 
 
 def calls(func: Op2) -> "CallsIter":
-    client = client_context.weave_client.get_weave_client()
+    client = client_context.weave_client.require_weave_client()
     return client._op_calls()
 
 
@@ -424,7 +425,7 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
             async def awrapper(*args: Any, **kwargs: Any) -> Any:
                 if client_context.weave_client.get_weave_client() is None:
                     return await func(*args, **kwargs)
-                call = _create_call(func, *args, **kwargs)
+                call = _create_call(func, *args, **kwargs)  # type: ignore
                 return await _execute_call(
                     func, call, *args, return_type="normal", **kwargs
                 )
@@ -436,7 +437,7 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
             def wrapper(*args: Any, **kwargs: Any) -> Any:
                 if client_context.weave_client.get_weave_client() is None:
                     return func(*args, **kwargs)
-                call = _create_call(func, *args, **kwargs)
+                call = _create_call(func, *args, **kwargs)  # type: ignore
                 return _execute_call(func, call, *args, return_type="normal", **kwargs)
 
             return cast(Op2, wrapper)

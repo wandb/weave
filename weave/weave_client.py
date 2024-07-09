@@ -702,7 +702,7 @@ class WeaveClient:
         elif isinstance(obj, Op):
             # print("going down op save")
             self._save_op(obj)
-        elif inspect.isfunction(obj):
+        elif isinstance(obj, Op2):
             # print("going down function save")
             self._save_op(obj)
 
@@ -745,7 +745,7 @@ class WeaveClient:
         )
         return response.objs
 
-    def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
+    def _save_op(self, op: Union[Op, Op2], name: Optional[str] = None) -> Ref:
         # print(f"inside save op, {op=}")
         if op.ref is not None:
             return op.ref
