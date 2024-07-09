@@ -41,7 +41,7 @@ type ScorecardSpecificLegacyScoresType = {
         displayName: string;
         unit: string;
         lowerIsBetter: boolean;
-        modelScores: {[modelRef: string]: number | undefined};
+        evalScores: {[evalCallId: string]: number | undefined};
       };
     };
   };
@@ -55,10 +55,6 @@ const GridCell = styled.div`
 export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const baselineRef =
-    props.state.data.evaluationCalls[props.state.baselineEvaluationCallId]
-      .modelRef;
-
   const modelRefs = useMemo(
     () => getOrderedModelRefs(props.state),
     [props.state]
@@ -128,12 +124,12 @@ export const ScorecardSection: React.FC<{
                   displayName: dimensionLabel(scorerMetricsDimension),
                   unit,
                   lowerIsBetter,
-                  modelScores: {},
+                  evalScores: {},
                 };
               }
 
-              res[scorerRef].metrics[metricDimensionId].modelScores[
-                evaluationCall.modelRef
+              res[scorerRef].metrics[metricDimensionId].evalScores[
+                evaluationCall.callId
               ] = adjustValueForDisplay(
                 resolveDimensionValueForEvaluateCall(
                   scorerMetricsDimension,
@@ -159,12 +155,12 @@ export const ScorecardSection: React.FC<{
                   displayName: dimensionLabel(derivedMetricsDimension),
                   unit,
                   lowerIsBetter,
-                  modelScores: {},
+                  evalScores: {},
                 };
               }
 
-              res[scorerRef].metrics[metricDimensionId].modelScores[
-                evaluationCall.modelRef
+              res[scorerRef].metrics[metricDimensionId].evalScores[
+                evaluationCall.callId
               ] = adjustValueForDisplay(
                 resolveDimensionValueForEvaluateCall(
                   derivedMetricsDimension,
@@ -391,12 +387,12 @@ export const ScorecardSection: React.FC<{
                       {def.metrics[metricKey].displayName}
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
-                      const modelRef =
-                        props.state.data.evaluationCalls[evalCallId].modelRef;
                       const baseline =
-                        def.metrics[metricKey].modelScores[baselineRef];
+                        def.metrics[metricKey].evalScores[
+                          props.state.baselineEvaluationCallId
+                        ];
                       const value =
-                        def.metrics[metricKey].modelScores[modelRef];
+                        def.metrics[metricKey].evalScores[evalCallId];
                       return (
                         <GridCell
                           key={evalCallId}
