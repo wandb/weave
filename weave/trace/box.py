@@ -32,17 +32,19 @@ def box(
     | BoxedInt
     | BoxedFloat
     | BoxedStr
-    | BoxedBool
     | BoxedDict
     | BoxedList
     | BoxedNDArray
     | BoxedDatetime
     | BoxedTimedelta
     | None
+    | bool
 ):
     res = box_legacy(obj)
     if isinstance(res, BoxedNone):
         return None
+    if isinstance(res, BoxedBool):
+        return res.val
     return res
 
 
