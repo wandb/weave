@@ -18,9 +18,6 @@ export const isBinaryScore = (score: any): score is BinaryScore => {
   return typeof score === 'boolean';
 };
 
-type ContinuousSummaryScore = {
-  mean: number;
-};
 export const isBinarySummaryScore = (
   score: any
 ): score is BinarySummaryScore => {
@@ -32,10 +29,20 @@ export const isBinarySummaryScore = (
   );
 };
 
+type ContinuousSummaryScore = {
+  mean: number;
+};
 export const isContinuousSummaryScore = (
   score: any
 ): score is ContinuousSummaryScore => {
   return typeof score === 'object' && score != null && 'mean' in score;
+};
+
+type CustomSummaryScore = number; // When the user defines their own summarizer
+export const isCustomSummaryScore = (
+  score: any
+): score is CustomSummaryScore => {
+  return typeof score === 'number';
 };
 
 type ContinuousScore = number;
@@ -53,7 +60,7 @@ export type ScorerMetricDimension = {
   dimensionType: 'scorerMetric';
   scorerDef: ScorerDefinition;
   metricSubPath: string[];
-  scoreType: 'binary' | 'continuous';
+  scoreType: 'binary' | 'continuous' | 'custom';
 };
 
 export type DerivedMetricDefinition = {
@@ -104,7 +111,11 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
   };
 };
 
-export type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
+export type SummaryScore =
+  | BinarySummaryScore
+  | ContinuousSummaryScore
+  | CustomSummaryScore;
+
 export type EvaluationCall = {
   callId: string;
   name: string;

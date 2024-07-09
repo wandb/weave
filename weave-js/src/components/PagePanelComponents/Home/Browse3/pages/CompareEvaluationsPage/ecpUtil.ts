@@ -4,6 +4,7 @@ import {
   isBinaryScore,
   isBinarySummaryScore,
   isContinuousSummaryScore,
+  isCustomSummaryScore,
   isDerivedMetricDefinition,
   isScorerMetricDimension,
   MetricResult,
@@ -116,6 +117,8 @@ export const resolveDimensionValueForEvaluateCall = (
     return score.true_fraction;
   } else if (isContinuousSummaryScore(score)) {
     return score.mean;
+  } else if (isCustomSummaryScore(score)) {
+    return score;
   }
   return undefined;
 };

@@ -28,6 +28,7 @@ import {
   isBinarySummaryScore,
   isContinuousScore,
   isContinuousSummaryScore,
+  isCustomSummaryScore,
   ScorerDefinition,
   ScorerMetricDimension,
 } from '../CompareEvaluationsPage/ecpTypes';
@@ -191,6 +192,16 @@ const fetchEvaluationComparisonData = async (
             scorerDef: {...scorerDef},
             metricSubPath: currPath,
             scoreType: 'continuous',
+          };
+          const metricDimensionId = dimensionId(metricDimension);
+          result.scorerMetricDimensions[metricDimensionId] = metricDimension;
+          evalCall.summaryMetrics[metricDimensionId] = scoreVal;
+        } else if (isCustomSummaryScore(scoreVal)) {
+          const metricDimension: ScorerMetricDimension = {
+            dimensionType: 'scorerMetric',
+            scorerDef: {...scorerDef},
+            metricSubPath: currPath,
+            scoreType: 'custom',
           };
           const metricDimensionId = dimensionId(metricDimension);
           result.scorerMetricDimensions[metricDimensionId] = metricDimension;
@@ -447,7 +458,28 @@ const fetchEvaluationComparisonData = async (
               };
 
               const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
-                if (isBinaryScore(scoreVal)) {
+                const customMetricDim: ScorerMetricDimension = {
+                  dimensionType: 'scorerMetric',
+                  scorerDef: {...scorerDef},
+                  metricSubPath: currPath,
+                  scoreType: 'continuous',
+                };
+                const customMetricDimId = dimensionId(customMetricDim);
+                if (
+                  (result.scorerMetricDimensions[customMetricDimId] &&
+                    isBinaryScore(scoreVal)) ||
+                  isContinuousScore(scoreVal)
+                ) {
+                  result.scorerMetricDimensions[customMetricDimId] =
+                    customMetricDim;
+                  predictAndScoreFinal.scorerMetrics[customMetricDimId] = {
+                    sourceCall: {
+                      callId: traceCall.id,
+                      _rawScoreTraceData: traceCall,
+                    },
+                    value: scoreVal,
+                  };
+                } else if (isBinaryScore(scoreVal)) {
                   const metricDimension: ScorerMetricDimension = {
                     dimensionType: 'scorerMetric',
                     scorerDef: {...scorerDef},
@@ -468,7 +500,7 @@ const fetchEvaluationComparisonData = async (
                       value: scoreVal,
                     };
                   } else {
-                    console.error('Skipping metric', metricDimensionId);
+                    console.error('Skipping metric', metricDimensionId, customMetricDimId, Object.keys(result.scorerMetricDimensions));
                   }
                 } else if (isContinuousScore(scoreVal)) {
                   const metricDimension: ScorerMetricDimension = {
@@ -491,7 +523,7 @@ const fetchEvaluationComparisonData = async (
                       value: scoreVal,
                     };
                   } else {
-                    console.error('Skipping metric', metricDimensionId);
+                    console.error('Skipping metric', metricDimensionId, customMetricDimId, Object.keys(result.scorerMetricDimensions));
                   }
                 } else if (
                   scoreVal != null &&
