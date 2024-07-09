@@ -101,7 +101,7 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 def map_to_refs(obj: Any) -> Any:
     ref = _get_direct_ref(obj)
-    print(f"{ref=}, {obj=}, {type(obj)=}")
+    # print(f"{ref=}, {obj=}, {type(obj)=}")
     if ref:
         return ref
     if isinstance(obj, ObjectRecord):
@@ -637,7 +637,7 @@ class WeaveClient:
     # is nicer for clients I think?
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        print(f"inside save object {val=}")
+        # print(f"inside save object {val=}")
         self._save_nested_objects(val, name=name)
         return self._save_object_basic(val, name, branch)
 
@@ -645,9 +645,9 @@ class WeaveClient:
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
         is_opdef = isinstance(val, Op)
-        print(f"XXinside save object basic {val=}")
+        # print(f"XXinside save object basic {val=}")
         val = map_to_refs(val)
-        print(f"YYinside save object basic {val=}")
+        # print(f"YYinside save object basic {val=}")
         if isinstance(val, ObjectRef):
             return val
         json_val = to_json(val, self._project_id(), self.server)
@@ -700,10 +700,10 @@ class WeaveClient:
             for v in obj.values():
                 self._save_nested_objects(v)
         elif isinstance(obj, Op):
-            print("going down op save")
+            # print("going down op save")
             self._save_op(obj)
         elif inspect.isfunction(obj):
-            print("going down function save")
+            # print("going down function save")
             self._save_op(obj)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -746,7 +746,7 @@ class WeaveClient:
         return response.objs
 
     def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
-        print(f"inside save op, {op=}")
+        # print(f"inside save op, {op=}")
         if op.ref is not None:
             return op.ref
         if name is None:

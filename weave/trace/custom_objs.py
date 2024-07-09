@@ -96,7 +96,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
 
 def encode_custom_obj(obj: Any) -> Optional[dict]:
     serializer = get_serializer_for_obj(obj)
-    print(f"inside encode custom obj, {obj=}, {serializer=}")
+    # print(f"inside encode custom obj, {obj=}, {serializer=}")
     if serializer is None:
         # We silently return None right now. We could warn here. This object
         # will not be recoverable with client.get
@@ -109,7 +109,7 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     # we're saving is actually an op, since that would be self-referential
     # (the op loading code is always present, we don't need to save/load it).
     load_op_uri = None
-    print(f"inside encode custom obj, {serializer.id()=}")
+    # print(f"inside encode custom obj, {serializer.id()=}")
     if serializer.id() != "Op":
         # Ensure load_instance is an op
         if not isinstance(serializer.load, Op):

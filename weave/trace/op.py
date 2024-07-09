@@ -94,7 +94,7 @@ class Op:
 
         try:
             inputs = self.signature.bind(*args, **kwargs).arguments
-            print(f"{inputs=}")
+            # print(f"{inputs=}")
         except TypeError as e:
             raise OpCallError(f"Error calling {self.name}: {e}")
         inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
@@ -289,14 +289,10 @@ def _create_call(func, *args, **kwargs):
     if is_method:
         self = func.__self__
         args = (self,) + args
-    print(f"{is_method=}")
-    print(f"Inside _create_call, {func=}, {args=}, {kwargs=}")
-
-    print(f"{func.signature=}")
 
     try:
         inputs = func.signature.bind(*args, **kwargs).arguments
-        print(f"{inputs=}")
+        # print(f"{inputs=}")
     except TypeError as e:
         raise OpCallError(f"Error calling {func.name}: {e}")
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
@@ -352,7 +348,7 @@ def _execute_call(func, call: Any, *args: Any, **kwargs: Any) -> Any:
     if isinstance(res, box.BoxedBool):
         res = res.val
 
-    print(f"{inspect.iscoroutine(res)=}")
+    # print(f"{inspect.iscoroutine(res)=}")
 
     if inspect.iscoroutine(res):
 
@@ -419,8 +415,6 @@ def op2(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
         func.name = func.__qualname__  # type: ignore
         func.signature = sig  # type: ignore
         func.ref = None  # type: ignore
-
-        print(f"{sig=}")
 
         # func.call = _call  # type: ignore
         # func.calls = _calls  # type: ignore
