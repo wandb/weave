@@ -16,7 +16,8 @@ describe('parseRef', () => {
         weaveKind: 'object',
       });
     });
-    // Capital letters in team names seen in the wild.
+    // Entities are not supposed to have uppercase letters, spaces, etc.
+    // But in the wild they do, so the ref parser shouldn't throw an error.
     it('parses a ref with capital letters in entity', () => {
       const parsed = parseRef(
         'weave:///Entity/project/object/artifact-name:artifactversion'
@@ -26,6 +27,20 @@ describe('parseRef', () => {
         artifactRefExtra: '',
         artifactVersion: 'artifactversion',
         entityName: 'Entity',
+        projectName: 'project',
+        scheme: 'weave',
+        weaveKind: 'object',
+      });
+    });
+    it('parses a ref with spaces in entity', () => {
+      const parsed = parseRef(
+        'weave:///Entity%20Name/project/object/artifact-name:artifactversion'
+      );
+      expect(parsed).toEqual({
+        artifactName: 'artifact-name',
+        artifactRefExtra: '',
+        artifactVersion: 'artifactversion',
+        entityName: 'Entity Name',
         projectName: 'project',
         scheme: 'weave',
         weaveKind: 'object',
