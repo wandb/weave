@@ -2,26 +2,26 @@ import inspect
 
 import pytest
 
-from weave.trace.op import Op2, op2
+from weave.trace.op import Op2, op
 from weave.weave_client import Call
 
 
-@op2
+@op
 def func(a: int) -> int:
     return a + 1
 
 
-@op2
+@op
 async def afunc(a: int) -> int:
     return a + 1
 
 
 class A:
-    @op2
+    @op
     def method(self, a: int) -> int:
         return a + 1
 
-    @op2
+    @op
     async def amethod(self, a: int) -> int:
         return a + 1
 
