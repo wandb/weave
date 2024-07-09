@@ -82,7 +82,7 @@ def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
 
 def get_obj_name(val: Any) -> str:
     name = getattr(val, "name", None)
-    if name == None:
+    if name is None:
         if isinstance(val, ObjectRecord):
             name = val._class_name
         else:
