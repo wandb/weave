@@ -1,8 +1,5 @@
 /**
  * TODO:
- * * Scorecard:
- *    * When 1 scorer, show the ref
- *    * When >1 scorer, show warning, and show ref in each column
  * * Summary metrics: Currently just shows the baseline
  *    * Use this new format from `ScorecardSpecificLegacyScoresType`. Perhaps this is a good chance to align on the format
  * * Example Filters: Currently shows all scorers
@@ -12,7 +9,8 @@
  *    * When >1 scorer, sho warning icon with hover info (probably use the same component as scorecard)
  */
 
-import {Box} from '@material-ui/core';
+import {Box, Tooltip} from '@material-ui/core';
+import {Alert} from '@mui/material';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
@@ -20,7 +18,7 @@ import {
   MOON_100,
   MOON_600,
 } from '../../../../../../../../common/css/color.styles';
-import {WeaveObjectRef} from '../../../../../../../../react';
+import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
@@ -46,9 +44,12 @@ import {
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
 
+const VARIATION_WARNING =
+  'The scoring function logic varies between evaluations. Take precaution when comparing results.';
+
 type ScorecardSpecificLegacyScoresType = {
   [scorerGroupName: string]: {
-    scorerRefs: string[]; // multiple means we might not have apples to apples comparison
+    evalCallIdToScorerRef: {[evalCallId: string]: string}; // multiple means we might not have apples to apples comparison
     scorerName?: string;
     metrics: {
       [metricName: string]: {
@@ -129,14 +130,13 @@ export const ScorecardSection: React.FC<{
               const lowerIsBetter = false;
               if (res[scorerName] == null) {
                 res[scorerName] = {
-                  scorerRefs: [scorerRef],
+                  evalCallIdToScorerRef: {},
                   scorerName,
                   metrics: {},
                 };
               }
-              if (res[scorerName].scorerRefs.indexOf(scorerRef) === -1) {
-                res[scorerName].scorerRefs.push(scorerRef);
-              }
+              res[scorerName].evalCallIdToScorerRef[evalCallId] = scorerRef;
+
               const displayName = dimensionLabel(scorerMetricsDimension);
               if (res[scorerName].metrics[displayName] == null) {
                 res[scorerName].metrics[displayName] = {
@@ -174,14 +174,13 @@ export const ScorecardSection: React.FC<{
                 derivedMetricsDimension.shouldMinimize ?? false;
               if (res[scorerName] == null) {
                 res[scorerName] = {
-                  scorerRefs: [scorerRef],
+                  evalCallIdToScorerRef: {},
                   scorerName,
                   metrics: {},
                 };
               }
-              if (res[scorerName].scorerRefs.indexOf(scorerRef) === -1) {
-                res[scorerName].scorerRefs.push(scorerRef);
-              }
+              res[scorerName].evalCallIdToScorerRef[evalCallId] = scorerRef;
+
               const displayName = dimensionLabel(derivedMetricsDimension);
               if (res[scorerName].metrics[displayName] == null) {
                 res[scorerName].metrics[displayName] = {
@@ -386,34 +385,62 @@ export const ScorecardSection: React.FC<{
         </GridCell>
         {/* Score Rows */}
         {Object.entries(betterScores).map(([key, def]) => {
-          const scorerRefParsed = null;
-          // parseRefMaybe(
-          //   def.scorerRef ?? ''
-          // ) as WeaveObjectRef | null;
+          const uniqueScorerRefs = Array.from(
+            new Set(Object.values(def.evalCallIdToScorerRef))
+          );
+          const scorersAreComparable = uniqueScorerRefs.length === 1;
+          const scorerRefParsed = parseRefMaybe(
+            uniqueScorerRefs[0]
+          ) as WeaveObjectRef | null;
           return (
             <React.Fragment key={key}>
-              {def.scorerName && (
-                <>
+              <GridCell
+                style={{
+                  gridColumnEnd: 'span 2',
+                  borderTop: '1px solid #ccc',
+                  fontWeight: 'bold',
+                  textAlign: 'left',
+                }}>
+                {scorersAreComparable ? (
+                  scorerRefParsed ? (
+                    <SmallRef objRef={scorerRefParsed} />
+                  ) : (
+                    def.scorerName ?? ''
+                  )
+                ) : (
+                  <Alert severity="warning">
+                    <Tooltip title={VARIATION_WARNING}>
+                      <div
+                        style={{
+                          whiteSpace: 'nowrap',
+                        }}>
+                        Variation Detected
+                      </div>
+                    </Tooltip>
+                  </Alert>
+                )}
+              </GridCell>
+              {evalCallIds.map((evalCallId, mNdx) => {
+                const scorerRefParsed = parseRefMaybe(
+                  def.evalCallIdToScorerRef[evalCallId]
+                ) as WeaveObjectRef | null;
+                return (
                   <GridCell
                     style={{
-                      gridColumnEnd: 'span 2',
                       borderTop: '1px solid #ccc',
-                      fontWeight: 'bold',
-                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
                     }}>
-                    {scorerRefParsed ? (
-                      <SmallRef objRef={scorerRefParsed} />
-                    ) : (
-                      def.scorerName ?? ''
-                    )}
+                    {!scorersAreComparable &&
+                      (scorerRefParsed != null ? (
+                        <SmallRef objRef={scorerRefParsed} />
+                      ) : (
+                        <NotApplicable />
+                      ))}
                   </GridCell>
-                  <GridCell
-                    style={{
-                      borderTop: '1px solid #ccc',
-                      gridColumnEnd: 'span ' + evalCallIds.length,
-                    }}></GridCell>
-                </>
-              )}
+                );
+              })}
+
               {Object.keys(def.metrics).map((metricKey, metricNdx) => {
                 return (
                   <React.Fragment key={metricKey}>
