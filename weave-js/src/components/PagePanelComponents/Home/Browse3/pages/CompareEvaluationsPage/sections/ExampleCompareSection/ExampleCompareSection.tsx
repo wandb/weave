@@ -172,7 +172,7 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
  *    not get the metric headers to be sticky. I tried many things, but could
  *    not get it to work, while maintaining the desired layout. Challenge for
  *    future devs.
- *    * Example:
+ *    * Example. Go here and make the screen quite small - notice the 3rd eval's trials don't have sticky headers
  *      https://wandb.ai/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%2C%2232f3e6bc-5488-4dd4-b9c4-801929f2c541%22%2C%2234c0a20f-657f-407e-bb33-277abbb9997f%22%5D
  */
 
@@ -270,9 +270,89 @@ export const ExampleCompareSection: React.FC<{
   //      `trial`: A single trial (index is within an evaluation)
   //      `scorer`: A single scorer
   //      `metric`: A single metric (index is within a scorer)
+  //   * `lookup*` helper functions to get the data for a specific dimension
   //   * `[DIMENSION]MapKey` is used to get the key for a component when mapping.
   //   * `[DIMENSION][PROP]Comp` specific component for a dimension's property
-  //   * `lookup*` helper functions to get the data for a specific dimension
+  const BASELINE_EVAL_INDEX = 0;
+
+  const lookupIsDerivedMetric = (scorerIndex: number) => {
+    return scorerIndex === numScorers;
+  };
+
+  const lookupTrialsForEval = (evalIndex: number) => {
+    const currEvalCallId = orderedCallIds[evalIndex];
+    return target.originalRows.filter(
+      row => row.evaluationCallId === currEvalCallId
+    );
+  };
+
+  const lookupSelectedTrialIndexForEval = (evalIndex: number) => {
+    const currEvalCallId = orderedCallIds[evalIndex];
+    return selectedTrials[currEvalCallId] || 0;
+  };
+
+  const lookupSelectedTrialForEval = (evalIndex: number) => {
+    const trialsForThisEval = lookupTrialsForEval(evalIndex);
+    return trialsForThisEval[lookupSelectedTrialIndexForEval(evalIndex)];
+  };
+
+  const lookupDimensionsForScorer = (scorerIndex: number) => {
+    const isDerivedMetric = lookupIsDerivedMetric(scorerIndex);
+    return isDerivedMetric
+      ? derivedMetrics
+      : sortedScorers.filter(
+          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
+        );
+  };
+
+  const lookupDimension = (scorerIndex: number, metricIndex: number) => {
+    const dimensionsForThisScorer = lookupDimensionsForScorer(scorerIndex);
+    return dimensionsForThisScorer[metricIndex];
+  };
+
+  const lookupDimensionId = (scorerIndex: number, metricIndex: number) => {
+    return dimensionId(lookupDimension(scorerIndex, metricIndex));
+  };
+
+  const lookupTargetTrial = (evalIndex: number, trialIndex: number) => {
+    const trialsForThisEval = lookupTrialsForEval(evalIndex);
+    return trialsForThisEval[trialIndex];
+  };
+
+  const lookupMetricValue = (
+    evalIndex: number,
+    trialIndex: number,
+    scorerIndex: number,
+    metricIndex: number
+  ) => {
+    const scoreId = lookupDimensionId(scorerIndex, metricIndex);
+    const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
+    const currEvalCallId = orderedCallIds[evalIndex];
+
+    return targetTrial.scores[scoreId][currEvalCallId];
+  };
+
+  const lookupAggScorerMetricValue = (
+    evalIndex: number,
+    scorerIndex: number,
+    metricIndex: number
+  ) => {
+    const dimension = lookupDimension(scorerIndex, metricIndex);
+    const scoreId = dimensionId(dimension);
+    const currEvalCallId = orderedCallIds[evalIndex];
+    return target.scores[scoreId][currEvalCallId];
+  };
+
+  const lookupOutputValue = (evalIndex: number, outputPropIndex: number) => {
+    const currEvalCallId = orderedCallIds[evalIndex];
+    const selectedTrial = lookupSelectedTrialForEval(evalIndex);
+
+    return (selectedTrial?.output?.[outputColumnKeys[outputPropIndex]] ?? {})[
+      currEvalCallId
+    ];
+  };
+
+  // End helpers, start layout
 
   const inputPropMapKey = (inputPropIndex: number) => {
     return inputColumnKeys[inputPropIndex];
@@ -316,19 +396,6 @@ export const ExampleCompareSection: React.FC<{
     return orderedCallIds[evalIndex];
   };
 
-  const lookupTrialsForEval = (evalIndex: number) => {
-    const currEvalCallId = orderedCallIds[evalIndex];
-    return target.originalRows.filter(
-      row => row.evaluationCallId === currEvalCallId
-    );
-  };
-
-  const lookupSelectedTrialForEval = (evalIndex: number) => {
-    const currEvalCallId = orderedCallIds[evalIndex];
-    const trialsForThisEval = lookupTrialsForEval(evalIndex);
-    return trialsForThisEval[selectedTrials[currEvalCallId] || 0];
-  };
-
   const evalSelectedTrialPredictCallComp = (evalIndex: number) => {
     const currEvalCallId = orderedCallIds[evalIndex];
     const selectedTrial = lookupSelectedTrialForEval(evalIndex);
@@ -367,32 +434,14 @@ export const ExampleCompareSection: React.FC<{
     return null;
   };
 
-  const evalOutputValueComp = (
-    evaluationIndex: number,
-    outputPropIndex: number
-  ) => {
-    const currEvalCallId = orderedCallIds[evaluationIndex];
-    const trialsForThisEval = target.originalRows.filter(
-      row => row.evaluationCallId === currEvalCallId
-    );
-
-    const selectedTrial =
-      trialsForThisEval[selectedTrials[currEvalCallId] || 0];
-
-    return (
-      <ICValueView
-        value={
-          (selectedTrial?.output?.[outputColumnKeys[outputPropIndex]] ?? {})[
-            currEvalCallId
-          ]
-        }
-      />
-    );
+  const evalOutputValueComp = (evalIndex: number, outputPropIndex: number) => {
+    const value = lookupOutputValue(evalIndex, outputPropIndex);
+    return <ICValueView value={value} />;
   };
 
   const evalTrialSelectComp = (evalIndex: number, trialIndex: number) => {
     const currEvalCallId = orderedCallIds[evalIndex];
-    const selectedTrialNdx = selectedTrials[currEvalCallId] || 0;
+    const selectedTrialNdx = lookupSelectedTrialIndexForEval(evalIndex);
     return (
       <Button
         size="small"
@@ -416,24 +465,15 @@ export const ExampleCompareSection: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ) => {
-    const isDerivedMetric = scorerIndex === numScorers;
-    const currEvalCallId = orderedCallIds[evalIndex];
-    const dimensionsForThisScorer = isDerivedMetric
-      ? derivedMetrics
-      : sortedScorers.filter(
-          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
-        );
-    const dimension = dimensionsForThisScorer[metricIndex];
-
+    const dimension = lookupDimension(scorerIndex, metricIndex);
     const unit = dimensionUnit(dimension, true);
     const isBinary = dimension.scoreType === 'binary';
-    const scoreId = dimensionId(dimension);
     const summaryMetric = adjustValueForDisplay(
-      target.scores[scoreId][currEvalCallId],
+      lookupAggScorerMetricValue(evalIndex, scorerIndex, metricIndex),
       isBinary
     );
     const baseline = adjustValueForDisplay(
-      target.scores[scoreId][orderedCallIds[0]],
+      lookupAggScorerMetricValue(BASELINE_EVAL_INDEX, scorerIndex, metricIndex),
       isBinary
     );
 
@@ -476,20 +516,12 @@ export const ExampleCompareSection: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ) => {
-    const isDerivedMetric = scorerIndex === numScorers;
-    const currEvalCallId = orderedCallIds[evalIndex];
-    const dimensionsForThisScorer = isDerivedMetric
-      ? derivedMetrics
-      : sortedScorers.filter(
-          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
-        );
-    const dimension = dimensionsForThisScorer[metricIndex];
-    const scoreId = dimensionId(dimension);
-    const trialsForThisEval = target.originalRows.filter(
-      row => row.evaluationCallId === currEvalCallId
+    const metricValue = lookupMetricValue(
+      evalIndex,
+      trialIndex,
+      scorerIndex,
+      metricIndex
     );
-    const metricValue =
-      trialsForThisEval[trialIndex].scores[scoreId][currEvalCallId];
     if (metricValue == null) {
       return <NotApplicable />;
     }
@@ -503,32 +535,22 @@ export const ExampleCompareSection: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ) => {
-    const isDerivedMetric = scorerIndex === numScorers;
-    const currEvalCallId = orderedCallIds[evalIndex];
-    const dimensionsForThisScorer = isDerivedMetric
-      ? derivedMetrics
-      : sortedScorers.filter(
-          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
-        );
-    const dimension = dimensionsForThisScorer[metricIndex];
-    const scoreId = dimensionId(dimension);
-    const trialsForThisEval = target.originalRows.filter(
-      row => row.evaluationCallId === currEvalCallId
-    );
+    const scoreId = lookupDimensionId(scorerIndex, metricIndex);
+    const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
 
-    if (isDerivedMetric) {
+    if (lookupIsDerivedMetric(scorerIndex)) {
       return undefined;
     }
     return () =>
       onScorerClick(
-        trialsForThisEval[trialIndex].predictAndScore.scorerMetrics[scoreId]
-          .sourceCall._rawScoreTraceData
+        targetTrial.predictAndScore.scorerMetrics[scoreId].sourceCall
+          ._rawScoreTraceData
       );
   };
 
   const scorerComp = (scorerIndex: number) => {
-    if (scorerIndex === numScorers) {
-      return null; // derived
+    if (lookupIsDerivedMetric(scorerIndex)) {
+      return null;
     }
     const scorerRef = uniqueScorerRefs[scorerIndex];
     return (
@@ -546,12 +568,7 @@ export const ExampleCompareSection: React.FC<{
   };
 
   const scorerMetricKeyComp = (scorerIndex: number, metricIndex: number) => {
-    const isDerivedMetric = scorerIndex === numScorers;
-    const dimensionsForThisScorer = isDerivedMetric
-      ? derivedMetrics
-      : sortedScorers.filter(
-          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
-        );
+    const dimensionsForThisScorer = lookupDimensionsForScorer(scorerIndex);
     return (
       <PropKey>{dimensionLabel(dimensionsForThisScorer[metricIndex])}</PropKey>
     );
