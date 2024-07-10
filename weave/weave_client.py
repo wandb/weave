@@ -297,7 +297,7 @@ class WeaveClient:
         self.entity = entity
         self.project = project
         self.server = server
-        self._anonymous_ops: dict[str, Op] = {}
+        self._anonymous_ops: dict[str, Op2] = {}
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -384,7 +384,7 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
         self,
-        op: Union[str, Op, Op2],
+        op: Union[str, Op2],
         inputs: dict,
         parent: Optional[Call] = None,
         attributes: Optional[dict] = None,
@@ -654,7 +654,7 @@ class WeaveClient:
         ref: Ref
         if is_opdef:
             ref = OpRef(self.entity, self.project, name, response.digest)
-        elif is_opdef2:
+        if is_opdef2:
             ref = OpRef(self.entity, self.project, name, response.digest)
         else:
             ref = ObjectRef(self.entity, self.project, name, response.digest)
@@ -708,7 +708,7 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op) -> CallsIter:
+    def _op_calls(self, op: Op2) -> CallsIter:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
@@ -772,7 +772,7 @@ class WeaveClient:
     def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
         raise NotImplementedError()
 
-    def _op_runs(self, op_def: Op) -> Sequence[Call]:
+    def _op_runs(self, op_def: Op2) -> Sequence[Call]:
         raise NotImplementedError()
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
