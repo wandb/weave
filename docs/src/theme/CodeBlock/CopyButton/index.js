@@ -11,7 +11,7 @@ export default function CopyButton({code, className}) {
   const handleCopyCode = useCallback(() => {
 
     // Track the copy event
-    // Only line added to the sqizzled component
+    // Only line added to the swizzled component
     window.analytics?.track('copy_code', {code: typeof code == 'string' ? code.slice(0, 100) : 'code is not string'});
 
     copy(code);
