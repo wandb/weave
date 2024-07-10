@@ -18,7 +18,7 @@ import {
   MOON_100,
   MOON_600,
 } from '../../../../../../../../common/css/color.styles';
-import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
+import {WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
@@ -44,7 +44,8 @@ import {
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
 
-const VARIATION_WARNING =
+const VARIATION_WARNING_TITLE = 'Variation detected';
+const VARIATION_WARNING_EXPLAINATION =
   'The scoring function logic varies between evaluations. Take precaution when comparing results.';
 
 type ScorecardSpecificLegacyScoresType = {
@@ -409,19 +410,19 @@ export const ScorecardSection: React.FC<{
                   )
                 ) : (
                   <Alert severity="warning">
-                    <Tooltip title={VARIATION_WARNING}>
+                    <Tooltip title={VARIATION_WARNING_EXPLAINATION}>
                       <div
                         style={{
                           whiteSpace: 'nowrap',
                         }}>
-                        Variation Detected
+                        {VARIATION_WARNING_TITLE}
                       </div>
                     </Tooltip>
                   </Alert>
                 )}
               </GridCell>
               {evalCallIds.map((evalCallId, mNdx) => {
-                const scorerRefParsed = parseRefMaybe(
+                const innerScorerRefParsed = parseRefMaybe(
                   def.evalCallIdToScorerRef[evalCallId]
                 ) as WeaveObjectRef | null;
                 return (
@@ -432,8 +433,8 @@ export const ScorecardSection: React.FC<{
                       alignItems: 'center',
                     }}>
                     {!scorersAreComparable &&
-                      (scorerRefParsed != null ? (
-                        <SmallRef objRef={scorerRefParsed} />
+                      (innerScorerRefParsed != null ? (
+                        <SmallRef objRef={innerScorerRefParsed} />
                       ) : (
                         <NotApplicable />
                       ))}
