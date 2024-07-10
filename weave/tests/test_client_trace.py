@@ -1302,26 +1302,25 @@ def test_op_retrieval(client):
     assert my_op2(1) == 2
 
 
-class CustomType2(weave.Object):
-    a: int
-
-    @weave.op()
-    def op_with_custom_type(self, v):
-        return self.a + v
-
-
 # TODO: Do we need this if we don't have bound op anymore?
-# def test_bound_op_retrieval(client):
-#     obj = CustomType2(a=1)
-#     obj_ref = weave.publish(obj)
-#     obj2 = obj_ref.get()
+def test_bound_op_retrieval(client):
+    class CustomType(weave.Object):
+        a: int
 
-#     x = obj2.op_with_custom_type(1)
-#     assert x == 2
+        @weave.op()
+        def op_with_custom_type(self, v):
+            return self.a + v
 
-#     my_op_ref = weave_client.get_ref(CustomType2.op_with_custom_type)
-#     with pytest.raises(MissingSelfInstanceError):
-#         my_op2 = my_op_ref.get()
+    obj = CustomType(a=1)
+    obj_ref = weave.publish(obj)
+    obj2 = obj_ref.get()
+
+    x = obj2.op_with_custom_type(1)
+    assert x == 2
+
+    my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref.get()
 
 
 @pytest.mark.skip("Not implemented: general bound op designation")
