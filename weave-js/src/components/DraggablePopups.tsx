@@ -5,7 +5,8 @@
 import Grow from '@mui/material/Grow';
 import Tooltip, {tooltipClasses, TooltipProps} from '@mui/material/Tooltip';
 import * as Colors from '@wandb/weave/common/css/color.styles';
-import React from 'react';
+import classNames from 'classnames';
+import React, {useCallback, useState} from 'react';
 import Draggable from 'react-draggable';
 import styled from 'styled-components';
 
@@ -65,3 +66,25 @@ export const DraggableGrow = React.forwardRef(
     );
   }
 );
+
+type DraggableHandleProps = {
+  children: React.ReactNode;
+};
+
+export const DraggableHandle = ({children}: DraggableHandleProps) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const onMouseDown = useCallback(() => setIsDragging(true), [setIsDragging]);
+  const onMouseUp = useCallback(() => setIsDragging(false), [setIsDragging]);
+
+  return (
+    <div
+      className={classNames(
+        'handle',
+        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+      )}
+      onMouseDown={onMouseDown}
+      onMouseUp={onMouseUp}>
+      {children}
+    </div>
+  );
+};

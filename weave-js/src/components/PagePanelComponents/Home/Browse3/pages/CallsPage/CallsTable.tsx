@@ -12,10 +12,12 @@ import {
   Chip,
   FormControl,
   ListItem,
+  Tooltip,
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
   GridApiPro,
+  GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
   GridPinnedColumns,
@@ -60,6 +62,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {useCallsTableColumns} from './callsTableColumns';
 import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
@@ -70,8 +73,10 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
+import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
+const MAX_EVAL_COMPARISONS = 5;
 
 export const CallsTable: FC<{
   entity: string;
@@ -82,6 +87,9 @@ export const CallsTable: FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
   hideControls?: boolean;
+
+  columnVisibilityModel?: GridColumnVisibilityModel;
+  setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
 }> = ({
   entity,
   project,
@@ -89,6 +97,8 @@ export const CallsTable: FC<{
   onFilterUpdate,
   frozenFilter,
   hideControls,
+  columnVisibilityModel,
+  setColumnVisibilityModel,
 }) => {
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
@@ -355,22 +365,39 @@ export const CallsTable: FC<{
         headerName: '',
         renderCell: (params: any) => {
           const rowId = params.id as string;
+          const isSelected = compareSelection.includes(rowId);
+          const disabledDueToMax =
+            compareSelection.length >= MAX_EVAL_COMPARISONS && !isSelected;
+          const disabledDueToNonSuccess =
+            params.row.exception != null || params.row.ended_at == null;
+          let tooltipText = '';
+          if (disabledDueToNonSuccess) {
+            tooltipText = 'Cannot compare non-successful evaluations';
+          } else if (disabledDueToMax) {
+            tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
+          }
+
           return (
-            <Checkbox
-              disabled={
-                params.row.exception != null || params.row.ended_at == null
-              }
-              checked={compareSelection.includes(rowId)}
-              onChange={() => {
-                if (compareSelection.includes(rowId)) {
-                  setCompareSelection(
-                    compareSelection.filter(id => id !== rowId)
-                  );
-                } else {
-                  setCompareSelection([...compareSelection, rowId]);
-                }
-              }}
-            />
+            <Tooltip title={tooltipText} placement="right" arrow>
+              {/* https://mui.com/material-ui/react-tooltip/ */}
+              {/* By default disabled elements like <button> do not trigger user interactions */}
+              {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
+              <span>
+                <Checkbox
+                  disabled={disabledDueToNonSuccess || disabledDueToMax}
+                  checked={isSelected}
+                  onChange={() => {
+                    if (isSelected) {
+                      setCompareSelection(
+                        compareSelection.filter(id => id !== rowId)
+                      );
+                    } else {
+                      setCompareSelection([...compareSelection, rowId]);
+                    }
+                  }}
+                />
+              </span>
+            </Tooltip>
           );
         },
       },
@@ -410,6 +437,13 @@ export const CallsTable: FC<{
     project,
     history,
   ]);
+
+  // Called in reaction to Hide column menu
+  const onColumnVisibilityModelChange = setColumnVisibilityModel
+    ? (newModel: GridColumnVisibilityModel) => {
+        setColumnVisibilityModel(newModel);
+      }
+    : undefined;
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -500,6 +534,16 @@ export const CallsTable: FC<{
               }}
             />
           )}
+          <div style={{flex: '1 1 auto'}} />
+          {columnVisibilityModel && setColumnVisibilityModel && (
+            <div>
+              <ManageColumnsButton
+                columnInfo={columns}
+                columnVisibilityModel={columnVisibilityModel}
+                setColumnVisibilityModel={setColumnVisibilityModel}
+              />
+            </div>
+          )}
         </>
       }>
       <StyledDataGrid
@@ -528,10 +572,8 @@ export const CallsTable: FC<{
         loading={callsLoading}
         rows={tableData}
         // initialState={initialState}
-        // onColumnVisibilityModelChange={newModel =>
-        //   setColumnVisibilityModel(newModel)
-        // }
-        // columnVisibilityModel={columnVisibilityModel}
+        onColumnVisibilityModelChange={onColumnVisibilityModelChange}
+        columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
         sortModel={sortModel}
@@ -622,6 +664,7 @@ export const CallsTable: FC<{
               </Box>
             );
           },
+          columnMenu: CallsCustomColumnMenu,
         }}
       />
     </FilterLayoutTemplate>
