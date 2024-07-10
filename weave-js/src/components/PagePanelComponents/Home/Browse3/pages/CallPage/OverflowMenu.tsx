@@ -15,9 +15,11 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const OverflowMenu: FC<{
+  entity: string;
+  project: string;
   selectedCalls: CallSchema[];
   setIsRenaming: (isEditing: boolean) => void;
-}> = ({selectedCalls, setIsRenaming}) => {
+}> = ({selectedCalls, setIsRenaming, entity, project}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
@@ -45,7 +47,12 @@ export const OverflowMenu: FC<{
     <>
       {confirmDelete && (
         <ConfirmDeleteModal
-          calls={selectedCalls}
+          entity={entity}
+          project={project}
+          calls={selectedCalls.map(call => ({
+            callId: call.callId,
+            name: call.displayName ?? call.spanName,
+          }))}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
         />
@@ -101,11 +108,13 @@ DialogActions.displayName = 'S.DialogActions';
 
 const MAX_DELETED_CALLS_TO_SHOW = 10;
 
-const ConfirmDeleteModal: FC<{
-  calls: CallSchema[];
+export const ConfirmDeleteModal: FC<{
+  entity: string;
+  project: string;
+  calls: Array<{callId: string; name: string}>;
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
-}> = ({calls, confirmDelete, setConfirmDelete}) => {
+}> = ({entity, project, calls, confirmDelete, setConfirmDelete}) => {
   const {useCallsDeleteFunc} = useWFHooks();
   const callsDelete = useCallsDeleteFunc();
   const closePeek = useClosePeek();
@@ -119,22 +128,15 @@ const ConfirmDeleteModal: FC<{
       setError('No call(s) selected');
       return;
     }
-    // error if all projects are not the same
-    if (calls.every(call => call.project !== calls[0].project)) {
-      setError('All calls must be in the same project to delete');
-      return;
-    }
     setDeleteLoading(true);
     callsDelete(
-      calls[0].entity,
-      calls[0].project,
+      entity,
+      project,
       calls.map(call => call.callId)
     )
       .catch(() => {
         setError(
-          `Failed to delete call(s) ${calls
-            .map(call => call.displayName ?? call.spanName)
-            .join(', ')}`
+          `Failed to delete call(s) ${calls.map(call => call.name).join(', ')}`
         );
       })
       .then(() => {
@@ -151,7 +153,7 @@ const ConfirmDeleteModal: FC<{
       maxWidth="xs"
       fullWidth>
       <DialogTitle>Delete {calls.length > 1 ? 'calls' : 'call'}</DialogTitle>
-      <DialogContent>
+      <DialogContent style={{overflow: 'hidden'}}>
         {error != null ? (
           <p style={{color: 'red'}}>{error}</p>
         ) : (
@@ -161,9 +163,7 @@ const ConfirmDeleteModal: FC<{
           </p>
         )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
-          <CallName key={call.callId}>
-            {call.displayName ?? call.spanName}
-          </CallName>
+          <CallName key={call.callId}>{call.name}</CallName>
         ))}
         {calls.length > MAX_DELETED_CALLS_TO_SHOW && (
           <p style={{marginTop: '8px'}}>

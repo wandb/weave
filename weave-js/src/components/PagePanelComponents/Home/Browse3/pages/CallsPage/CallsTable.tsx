@@ -8,7 +8,6 @@
 
 import {
   Autocomplete,
-  Checkbox,
   Chip,
   FormControl,
   ListItem,
@@ -16,7 +15,6 @@ import {
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
-  GridApiPro,
   GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
@@ -26,6 +24,7 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
+import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import React, {
   FC,
   useCallback,
@@ -47,6 +46,7 @@ import {
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
+import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -60,7 +60,10 @@ import {
 } from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
-import {objectVersionNiceString} from '../wfReactInterface/utilities';
+import {
+  objectVersionNiceString,
+  opVersionRefOpName,
+} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
@@ -104,15 +107,6 @@ export const CallsTable: FC<{
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
-
-  // Register Export Button
-  useEffect(() => {
-    addExtra('exportRunsTableButton', {
-      node: <ExportRunsTableButton tableRef={apiRef} />,
-    });
-
-    return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, addExtra, removeExtra]);
 
   // Table State consists of:
   // 1. Filter (Structured Filter)
@@ -352,22 +346,45 @@ export const CallsTable: FC<{
     project
   );
 
+  // const rowDisabled = (row: TraceCallSchema) => {
+  //   return row.exception != null || row.ended_at == null;
+  // };
+
   // Selection Management
-  const [compareSelection, setCompareSelection] = useState<string[]>([]);
+  const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const muiColumns = useMemo(() => {
-    if (!isEvaluateTable) {
-      return columns.cols;
-    }
     return [
       {
-        width: 40,
+        minWidth: 30,
+        width: 38,
         field: 'CustomCheckbox',
-        headerName: '',
+        sortable: false,
+        disableColumnMenu: true,
+        renderHeader: (params: any) => {
+          return (
+            <Checkbox
+              checked={
+                selectedCalls.length === 0
+                  ? false
+                  : selectedCalls.length === tableData.length
+                  ? true
+                  : 'indeterminate'
+              }
+              onCheckedChange={() => {
+                if (selectedCalls.length === tableData.length) {
+                  setSelectedCalls([]);
+                } else {
+                  setSelectedCalls(tableData.map(row => row.id));
+                }
+              }}
+            />
+          );
+        },
         renderCell: (params: any) => {
           const rowId = params.id as string;
-          const isSelected = compareSelection.includes(rowId);
+          const isSelected = selectedCalls.includes(rowId);
           const disabledDueToMax =
-            compareSelection.length >= MAX_EVAL_COMPARISONS && !isSelected;
+            selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected;
           const disabledDueToNonSuccess =
             params.row.exception != null || params.row.ended_at == null;
           let tooltipText = '';
@@ -386,13 +403,13 @@ export const CallsTable: FC<{
                 <Checkbox
                   disabled={disabledDueToNonSuccess || disabledDueToMax}
                   checked={isSelected}
-                  onChange={() => {
+                  onCheckedChange={() => {
                     if (isSelected) {
-                      setCompareSelection(
-                        compareSelection.filter(id => id !== rowId)
+                      setSelectedCalls(
+                        selectedCalls.filter(id => id !== rowId)
                       );
                     } else {
-                      setCompareSelection([...compareSelection, rowId]);
+                      setSelectedCalls([...selectedCalls, rowId]);
                     }
                   }}
                 />
@@ -403,25 +420,76 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-  }, [columns.cols, compareSelection, isEvaluateTable]);
+  }, [columns.cols, selectedCalls, tableData]);
 
+  // *** REGISTER HEADER EXTRAS ***
+  // Register Export Button
+  useEffect(() => {
+    addExtra('exportRunsTableButton', {
+      node: (
+        <ExportRunsTableButton
+          onClick={() =>
+            apiRef.current?.exportDataAsCsv({
+              getRowsToExport:
+                selectedCalls.length > 0 ? () => selectedCalls : undefined,
+            })
+          }
+          disabled={tableData.length === 0}
+          exportAll={selectedCalls.length === 0}
+        />
+      ),
+      order: 1,
+    });
+
+    return () => removeExtra('exportRunsTableButton');
+  }, [apiRef, selectedCalls, tableData.length, addExtra, removeExtra]);
+
+  // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
   useEffect(() => {
     if (!isEvaluateTable) {
       return;
     }
+    const selectedCallData = selectedCalls.map(call =>
+      tableData.find(row => row.id === call)
+    );
+    const disabledDueToMax = selectedCalls.length >= MAX_EVAL_COMPARISONS;
+    const disabledDueToOngoing = selectedCallData.some(
+      call => call?.ended_at == null
+    );
+    const disabledDueToException = selectedCallData.some(
+      call => call?.exception != null
+    );
+    let tooltipText = '';
+
+    if (disabledDueToException) {
+      tooltipText = 'Cannot compare evaluations with exceptions';
+    } else if (disabledDueToOngoing) {
+      tooltipText = 'Cannot compare ongoing evaluations';
+    } else if (disabledDueToMax) {
+      tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
+    } else if (selectedCalls.length === 0) {
+      tooltipText = 'Select at least one evaluation to compare';
+    }
     addExtra('compareEvaluations', {
       node: (
         <CompareEvaluationsTableButton
           onClick={() => {
             history.push(
-              router.compareEvaluationsUri(entity, project, compareSelection)
+              router.compareEvaluationsUri(entity, project, selectedCalls)
             );
           }}
-          disabled={compareSelection.length === 0}
+          disabled={
+            selectedCalls.length === 0 ||
+            disabledDueToMax ||
+            disabledDueToOngoing ||
+            disabledDueToException
+          }
+          tooltipText={tooltipText}
         />
       ),
+      order: 3,
     });
 
     return () => removeExtra('compareEvaluations');
@@ -430,12 +498,62 @@ export const CallsTable: FC<{
     addExtra,
     removeExtra,
     isEvaluateTable,
-    compareSelection.length,
-    compareSelection,
+    selectedCalls.length,
+    selectedCalls,
+    tableData,
     router,
     entity,
     project,
     history,
+  ]);
+
+  // Register Delete Button
+  const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
+  useEffect(() => {
+    addExtra('deleteSelectedCalls', {
+      node: (
+        <DeleteSelectedCallsButton
+          onClick={() => setDeleteConfirmModalOpen(true)}
+          disabled={selectedCalls.length === 0}
+          isRightmostButton={!isEvaluateTable}
+        />
+      ),
+      order: 2,
+    });
+
+    return () => removeExtra('deleteSelectedCalls');
+  }, [addExtra, removeExtra, selectedCalls, isEvaluateTable]);
+
+  useEffect(() => {
+    const callsToDelete = tableData
+      .filter(call => selectedCalls.includes(call.id))
+      .map(call => {
+        return {
+          callId: call.id,
+          name: call.display_name ?? opVersionRefOpName(call.op_name),
+        };
+      });
+    addExtra('deleteSelectedCallsModal', {
+      node: (
+        <ConfirmDeleteModal
+          entity={entity}
+          project={project}
+          calls={callsToDelete}
+          confirmDelete={deleteConfirmModalOpen}
+          setConfirmDelete={setDeleteConfirmModalOpen}
+        />
+      ),
+      order: -1,
+    });
+    return () => removeExtra('deleteSelectedCallsModal');
+  }, [
+    addExtra,
+    removeExtra,
+    selectedCalls,
+    deleteConfirmModalOpen,
+    entity,
+    project,
+    tableData,
   ]);
 
   // Called in reaction to Hide column menu
@@ -735,9 +853,13 @@ const getPeekId = (peekPath: string | null): string | null => {
 };
 
 const ExportRunsTableButton = ({
-  tableRef,
+  onClick,
+  disabled,
+  exportAll,
 }: {
-  tableRef: React.MutableRefObject<GridApiPro>;
+  onClick: () => void;
+  disabled?: boolean;
+  exportAll?: boolean;
 }) => (
   <Box
     sx={{
@@ -746,20 +868,24 @@ const ExportRunsTableButton = ({
       alignItems: 'center',
     }}>
     <Button
-      className="mx-16"
+      className="mx-4"
       size="medium"
-      variant="secondary"
-      onClick={() => tableRef.current?.exportDataAsCsv()}
-      icon="export-share-upload">
-      Export to CSV
-    </Button>
+      variant="ghost"
+      onClick={onClick}
+      disabled={disabled}
+      tooltip={
+        exportAll ? 'Export table to CSV' : 'Export selected rows to CSV'
+      }
+      icon="export-share-upload"
+    />
   </Box>
 );
 
 const CompareEvaluationsTableButton: FC<{
   onClick: () => void;
   disabled?: boolean;
-}> = ({onClick, disabled}) => (
+  tooltipText?: string;
+}> = ({onClick, disabled, tooltipText}) => (
   <Box
     sx={{
       height: '100%',
@@ -767,15 +893,39 @@ const CompareEvaluationsTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mx-16"
-      style={{
-        marginLeft: '0px',
-      }}
+      className="mr-4"
       size="medium"
+      variant="ghost"
       disabled={disabled}
       onClick={onClick}
-      icon="chart-scatterplot">
+      icon="chart-scatterplot"
+      tooltip={tooltipText}>
       Compare Evaluations
     </Button>
   </Box>
 );
+
+const DeleteSelectedCallsButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+  isRightmostButton?: boolean;
+}> = ({onClick, disabled, isRightmostButton}) => {
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        className={isRightmostButton ? 'ml-4 mr-16' : 'mx-4'}
+        variant="ghost"
+        size="medium"
+        disabled={disabled}
+        onClick={onClick}
+        tooltip="Select rows with the checkbox to delete"
+        icon="delete"
+      />
+    </Box>
+  );
+};
