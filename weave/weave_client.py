@@ -686,8 +686,6 @@ class WeaveClient:
         elif isinstance(obj, dict):
             for v in obj.values():
                 self._save_nested_objects(v)
-        elif isinstance(obj, Op):
-            self._save_op(obj)
         elif isinstance(obj, Op2):
             self._save_op(obj)
 
