@@ -732,7 +732,7 @@ class WeaveClient:
         )
         return response.objs
 
-    def _save_op(self, op: Union[Op, Op2], name: Optional[str] = None) -> Ref:
+    def _save_op(self, op: Op2, name: Optional[str] = None) -> Ref:
         if op.ref is not None:
             return op.ref
         if name is None:

@@ -31,7 +31,7 @@ def async_call(
     func: typing.Union[Callable, Op, Op2], *args: Any, **kwargs: Any
 ) -> typing.Coroutine:
     is_async = False
-    if isinstance(func, (Op, Op2)):
+    if isinstance(func, Op2):
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
     else:
         is_async = inspect.iscoroutinefunction(func)
@@ -99,9 +99,9 @@ class Evaluation(Object):
                 raise ValueError(
                     f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
                 )
-            elif callable(scorer) and not isinstance(scorer, (Op, Op2)):
+            elif callable(scorer) and not isinstance(scorer, Op2):
                 scorer = weave.op()(scorer)
-            elif isinstance(scorer, (Op, Op2)):
+            elif isinstance(scorer, Op2):
                 pass
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
