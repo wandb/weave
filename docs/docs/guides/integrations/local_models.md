@@ -5,7 +5,7 @@ hide_table_of_contents: true
 
 # Local Models
 
-Many developers download and run open source models like LLama-3, Mixtral, Gemma, Phi and more locally. There are quite a few ways of running these models locally and Weave supports a few of them out of the box, as long as they support OpenAI SDK compatibility.
+Many developers download and run open source models like LLama-3, Mixtral, Gemma, Phi and more locally. There are quite a few ways of running these models locally and Weave automatically supports them out of the box, as long as they support OpenAI SDK compatibility.
 
 ## Wrap local model functions with `@weave.op()`
 
@@ -13,12 +13,13 @@ You can easily integrate Weave with any LLM yourself simply by initializing Weav
 
 ## Updating your OpenAI SDK code to use local models
 
-All of the frameworks of services that support OpenAI SDK compatibility require a few minor changes. 
+All of the local model serving frameworks mentioned below support the OpenAI SDK in the same way, and require minimal code changes. 
 
-First and most important, is the `base_url` change during the `openai.OpenAI()` initialization. 
+First and most important, is the `base_url` change during the `OpenAI()` client initialization. 
 
 ```python
-client = openai.OpenAI(
+from openai import OpenAI
+client = OpenAI(
     api_key='fake',
     base_url="http://localhost:1234",
 )
