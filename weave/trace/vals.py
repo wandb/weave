@@ -21,7 +21,7 @@ from weave.legacy import box
 from weave.table import Table
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op import Op
+from weave.trace.op import Op2
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -465,7 +465,9 @@ def make_trace_obj(
             return WeaveList(val, ref=new_ref, server=server, root=root)
         elif isinstance(val, dict):
             return WeaveDict(val, ref=new_ref, server=server, root=root)
-    if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
+    if isinstance(val, Op2) and inspect.signature(val.resolve_fn).parameters.get(
+        "self"
+    ):
         # This condition attempts to bind the current `self` to the attribute if
         # it happens to be both an `Op` and have a `self` argument. This is a
         # bit of a hack since we are not always sure that the current object is
@@ -484,7 +486,8 @@ def make_trace_obj(
             raise MissingSelfInstanceError(
                 f"{val.name} Op requires a bound self instance. Must be called from an instance method."
             )
-        val = val.__get__(parent, type(parent))
+        # val = val.__get__(parent, type(parent))
+        val = val.__self__
     box_val = box.box(val)
     if isinstance(box_val, pydantic_v1.BaseModel):
         box_val.__dict__["ref"] = new_ref
