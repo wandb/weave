@@ -13,7 +13,7 @@ import {
 
 export const DERIVED_SCORER_REF = '__DERIVED__';
 
-type CompositeSummaryMetric = {
+export type CompositeSummaryMetric = {
   scorerRefToDimensionId: {[scorerRef: string]: string};
   metricLabel: string;
   unit: string;

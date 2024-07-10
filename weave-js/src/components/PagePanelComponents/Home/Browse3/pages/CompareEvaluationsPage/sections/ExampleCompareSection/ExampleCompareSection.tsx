@@ -33,7 +33,11 @@ import {
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {ComparisonPill} from '../ScorecardSection/ScorecardSection';
-import {buildCompositeComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
+import {
+  buildCompositeComparisonSummaryMetrics,
+  CompositeSummaryMetric,
+  DERIVED_SCORER_REF,
+} from '../ScorecardSection/summaryMetricUtil';
 import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 
 const SIDEBAR_WIDTH_PX = 250;
@@ -221,7 +225,7 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
-  const {resolvePeerDimension} = useMemo(
+  const {compositeMetrics, resolvePeerDimension} = useMemo(
     () => buildCompositeComparisonSummaryMetrics(props.state),
     [props.state]
   );
@@ -231,27 +235,31 @@ export const ExampleCompareSection: React.FC<{
   }
 
   // This section contains the primary helper variable for laying out the grid
-  const sortedScorers = _.sortBy(
-    Object.values(props.state.data.scorerMetricDimensions),
-    k => k.scorerDef.scorerOpOrObjRef
+  // const sortedScorers = _.sortBy(
+  //   Object.values(props.state.data.scorerMetricDimensions),
+  //   k => k.scorerDef.scorerOpOrObjRef
+  // );
+  // const uniqueScorerRefs = _.uniq(
+  //   sortedScorers.map(v => v.scorerDef.scorerOpOrObjRef)
+  // );
+
+  const scorerGroupNames = Object.keys(compositeMetrics).filter(
+    k => k !== DERIVED_SCORER_REF
   );
-  const uniqueScorerRefs = _.uniq(
-    sortedScorers.map(v => v.scorerDef.scorerOpOrObjRef)
-  );
+
   const derivedMetrics = Object.values(
     props.state.data.derivedMetricDimensions
   );
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
-  const numScorers = uniqueScorerRefs.length;
+  const numScorers = scorerGroupNames.length;
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
   const numOutputKeys = outputColumnKeys.length;
   const numDerivedMetrics = derivedMetrics.length;
   const numMetricsPerScorer = [
-    ...uniqueScorerRefs.map(scorer => {
-      return sortedScorers.filter(s => s.scorerDef.scorerOpOrObjRef === scorer)
-        .length;
+    ...scorerGroupNames.map(groupName => {
+      return Object.keys(compositeMetrics[groupName].metrics).length;
     }),
     numDerivedMetrics,
   ];
@@ -301,13 +309,34 @@ export const ExampleCompareSection: React.FC<{
     return trialsForThisEval[lookupSelectedTrialIndexForEval(evalIndex)];
   };
 
+  const lookupScoreGroupForScorerIndex = (scorerIndex: number) => {
+    return compositeMetrics[scorerGroupNames[scorerIndex]];
+  };
+
+  const lookupScoreGroupMetricsForScorerIndex = (scorerIndex: number) => {
+    return lookupScoreGroupForScorerIndex(scorerIndex).metrics;
+  };
+
+  const lookupAnyScorerRefForScorerIndex = (scorerIndex: number) => {
+    return Object.values(
+      lookupScoreGroupForScorerIndex(scorerIndex).evalCallIdToScorerRef
+    )[0];
+  };
+
   const lookupDimensionsForScorer = (scorerIndex: number) => {
     const isDerivedMetric = lookupIsDerivedMetric(scorerIndex);
-    return isDerivedMetric
-      ? derivedMetrics
-      : sortedScorers.filter(
-          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
-        );
+    const lookupAnyDimensionForMetric = (sm: CompositeSummaryMetric) => {
+      return props.state.data.scorerMetricDimensions[
+        Object.values(sm.scorerRefToDimensionId)[0]
+      ];
+    };
+
+    if (isDerivedMetric) {
+      return derivedMetrics;
+    }
+    return Object.values(
+      lookupScoreGroupMetricsForScorerIndex(scorerIndex)
+    ).map(lookupAnyDimensionForMetric);
   };
 
   const lookupDimension = (scorerIndex: number, metricIndex: number) => {
@@ -571,7 +600,8 @@ export const ExampleCompareSection: React.FC<{
     if (lookupIsDerivedMetric(scorerIndex)) {
       return null;
     }
-    const scorerRef = uniqueScorerRefs[scorerIndex];
+    const scorerRef = lookupAnyScorerRefForScorerIndex(scorerIndex);
+
     return (
       <VerticalBox
         style={{
