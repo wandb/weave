@@ -1,7 +1,8 @@
 /**
  * TODO:
- * * Example Filters: Currently shows all scorers
+ * * (Bonus) Example Filters: Currently shows all scorers
  *    * Limit filters to just the baseline dims
+ *    * EmptyCase: https://app.wandb.test/lavanyashukla/nims_rag_2/weave/compare-evaluations?evaluationCallIds=%5B%22d6358605-5c1d-4561-819d-179bb433a7a7%22%2C%227ca7836f-e055-42eb-94c5-1625b73af789%22%2C%221024b6c8-6707-4e61-9474-463ad424a067%22%2C%22fad0e96b-e9e3-4a84-8ce0-ad61dce5987e%22%5D
  * * Output Comparison: Currently shows all scorers
  *    * When 1 scorer, show the ref
  *    * When >1 scorer, sho warning icon with hover info (probably use the same component as scorecard)

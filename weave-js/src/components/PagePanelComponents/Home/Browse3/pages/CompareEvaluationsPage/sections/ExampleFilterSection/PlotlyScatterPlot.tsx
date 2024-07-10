@@ -56,6 +56,21 @@ export const PlotlyScatterPlot: React.FC<{
   const upperBound = Math.min(ranges.x[1], ranges.y[1]);
 
   const plotlyLayout: Partial<Plotly.Layout> = useMemo(() => {
+    const shapes: Partial<Plotly.Layout['shapes']> = [];
+    if (plotlyData.length > 0) {
+      shapes.push({
+        type: 'line',
+        x0: lowerBound,
+        y0: lowerBound,
+        x1: upperBound,
+        y1: upperBound,
+        line: {
+          color: 'rgba(50, 171, 96, 1)',
+          width: 2,
+          dash: 'dot',
+        },
+      });
+    }
     return {
       height: props.height,
       showlegend: false,
@@ -89,23 +104,11 @@ export const PlotlyScatterPlot: React.FC<{
           standoff: 10,
         },
       },
-      shapes: [
-        {
-          type: 'line',
-          x0: lowerBound,
-          y0: lowerBound,
-          x1: upperBound,
-          y1: upperBound,
-          line: {
-            color: 'rgba(50, 171, 96, 1)',
-            width: 2,
-            dash: 'dot',
-          },
-        },
-      ],
+      shapes: shapes,
     } as Partial<Plotly.Layout>;
   }, [
     lowerBound,
+    plotlyData.length,
     props.height,
     props.xColor,
     props.xIsPercentage,

@@ -138,13 +138,13 @@ const SingleDimensionFilter: React.FC<{
           const xVals: number[] = [];
           const yVals: number[] = [];
           Object.values(
-            row.evaluations[baselineCallId].predictAndScores
+            row.evaluations[baselineCallId]?.predictAndScores ?? {}
           ).forEach(score => {
             const val = resolveDimensionMetricResultForPASCall(
               baselineTargetDimension,
               score
             );
-            if (val === undefined) {
+            if (val == null) {
               return;
             } else if (isBinaryScore(val.value)) {
               xVals.push(val.value ? 1 : 0);
@@ -159,7 +159,7 @@ const SingleDimensionFilter: React.FC<{
               compareTargetDimension,
               score
             );
-            if (val === undefined) {
+            if (val == null) {
               return;
             } else if (isBinaryScore(val.value)) {
               yVals.push(val.value ? 1 : 0);
