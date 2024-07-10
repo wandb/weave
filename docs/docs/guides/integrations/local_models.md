@@ -14,7 +14,8 @@ All of the frameworks of services that support OpenAI SDK compatibility require 
 First and most important, is the `base_url` change during the `openai.OpenAI()` initialization. 
 
 ```python
-client = openai.OpenAI(
+from openai import OpenAI
+client = OpenAI(
     api_key='fake',
     base_url="http://localhost:1234",
 )
