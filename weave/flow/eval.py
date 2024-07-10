@@ -22,19 +22,17 @@ from weave.flow.scorer import (
 )
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
-from weave.trace.op import BoundOp, Op, Op2
+from weave.trace.op import BoundOp, Op2
 
 console = Console()
 
 
 def async_call(
-    func: typing.Union[Callable, Op, Op2], *args: Any, **kwargs: Any
+    func: typing.Union[Callable, Op2], *args: Any, **kwargs: Any
 ) -> typing.Coroutine:
     is_async = False
     if isinstance(func, Op2):
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
-    else:
-        is_async = inspect.iscoroutinefunction(func)
     if is_async:
         return func(*args, **kwargs)  # type: ignore
     return asyncio.to_thread(func, *args, **kwargs)
@@ -86,12 +84,12 @@ class Evaluation(Object):
     """
 
     dataset: Union[Dataset, list]
-    scorers: Optional[list[Union[Callable, Op, Op2, Scorer]]] = None
+    scorers: Optional[list[Union[Callable, Op2, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
 
     def model_post_init(self, __context: Any) -> None:
-        scorers: list[Union[Callable, Scorer, Op, Op2, Scorer]] = []
+        scorers: list[Union[Callable, Scorer, Op2, Scorer]] = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
@@ -130,11 +128,11 @@ class Evaluation(Object):
 
         model_predict_fn_name = (
             model_predict.name
-            if isinstance(model_predict, Op)
+            if isinstance(model_predict, Op2)
             else model_predict.__name__
         )
 
-        if isinstance(model_predict, Op):
+        if isinstance(model_predict, Op2):
             predict_signature = model_predict.signature
         else:
             predict_signature = inspect.signature(model_predict)
@@ -190,10 +188,10 @@ class Evaluation(Object):
         model_latency = time.time() - model_start_time
 
         scores = {}
-        scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
+        scorers = typing.cast(list[Union[Op2, Scorer]], self.scorers or [])
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
-            if isinstance(score_fn, Op):
+            if isinstance(score_fn, Op2):
                 score_signature = score_fn.signature
             else:
                 score_signature = inspect.signature(score_fn)
