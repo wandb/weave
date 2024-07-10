@@ -1,3 +1,12 @@
+/**
+ * TODO:
+ * * Audit unused code
+ * * Audit symbol names
+ * * formatting of pill (side by side)
+ * * left-align trial metrics
+ * * Metric name overflow :(
+ */
+
 import {Box} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
 import _ from 'lodash';
@@ -87,6 +96,7 @@ const STICKY_HEADER: React.CSSProperties = {
   top: 0,
   zIndex: 1,
   backgroundColor: MOON_100,
+  fontWeight: 'bold',
 };
 
 const STICKY_SIDEBAR: React.CSSProperties = {
@@ -94,6 +104,7 @@ const STICKY_SIDEBAR: React.CSSProperties = {
   left: 0,
   zIndex: 1,
   backgroundColor: MOON_100,
+  fontWeight: 'bold',
 };
 
 const STICKY_SIDEBAR_HEADER: React.CSSProperties = {
@@ -166,17 +177,14 @@ export const ExampleCompareSection: React.FC<{
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
   const NUM_SCORERS = uniqueScorerRefs.length;
-  const NUM_DERIVED = derivedScorers.length;
-  const NUM_METRICS =
-    NUM_DERIVED + Object.values(props.state.data.scorerMetricDimensions).length;
-  const NUM_COLS =
-    1 + // Input / Eval Title
-    2; // Input Prop Key / Val
+  // const NUM_METRICS = NUM_DERIVED + Object.values(props.state.data.scorerMetricDimensions).length;
+  // const NUM_COLS =
+  //   1 + // Input / Eval Title
+  //   2; // Input Prop Key / Val
 
-  const inputColumnKeys = Object.keys(target.input);
-  const NUM_INPUT_PROPS = inputColumnKeys.length;
-  const NUM_OUTPUT_KEYS = outputColumnKeys.length;
-  const NUM_EVALS = leafDims.length;
+  // const NUM_INPUT_PROPS = inputColumnKeys.length;
+  // const NUM_OUTPUT_KEYS = outputColumnKeys.length;
+  // const NUM_EVALS = leafDims.length;
 
   const header = (
     <HorizontalBox
@@ -233,16 +241,264 @@ export const ExampleCompareSection: React.FC<{
     </HorizontalBox>
   );
 
-  const SHOW_INPUT_HEADER = true;
-  const NEW_NUM_INPUT_PROPS = 10;
-  const NEW_NUM_OUTPUT_KEYS = 2;
-  const NEW_NUM_METRICS_PER_SCORER = [1, 2, 3, 4];
+  const inputColumnKeys = Object.keys(target.input);
+  const SHOW_INPUT_HEADER = false;
+  const NEW_NUM_INPUT_PROPS = inputColumnKeys.length;
+  const NEW_NUM_OUTPUT_KEYS = outputColumnKeys.length;
+  const NUM_DERIVED = derivedScorers.length;
+  const NEW_NUM_METRICS_PER_SCORER = [
+    ...uniqueScorerRefs.map(scorer => {
+      return sortedScorers.filter(s => s.scorerDef.scorerOpOrObjRef === scorer)
+        .length;
+    }),
+    NUM_DERIVED,
+  ];
   const NEW_TOTAL_METRICS = _.sum(NEW_NUM_METRICS_PER_SCORER);
-  const NEW_NUM_SCORERS = NEW_NUM_METRICS_PER_SCORER.length;
-  const NEW_NUM_TRIALS = [1, 2, 3, 4];
+  // const NEW_NUM_SCORERS = NEW_NUM_METRICS_PER_SCORER.length;
+  const NEW_NUM_TRIALS = leafDims.map(leafId => {
+    return target.originalRows.filter(row => row.evaluationCallId === leafId)
+      .length;
+  });
   const NEW_NUM_EVALS = NEW_NUM_TRIALS.length;
   const NEW_FIXED_SIDEBAR_WIDTH_PX = 250;
   const NEW_FIXED_MIN_EVAL_WIDTH_PX = 350;
+
+  const compKeyForInputPropIndex = (inputPropIndex: number) => {
+    return inputColumnKeys[inputPropIndex];
+  };
+
+  const inputPropKeyCompForInputPropIndex = (inputPropIndex: number) => {
+    return removePrefix(compKeyForInputPropIndex(inputPropIndex), 'input.');
+  };
+
+  const inputPropValCompForInputPropIndex = (inputPropIndex: number) => {
+    return (
+      <ICValueView
+        value={target.input[compKeyForInputPropIndex(inputPropIndex)]}
+      />
+    );
+  };
+
+  const predictCallCompForEvaluationIndex = (evalIndex: number) => {
+    const currEvalCallId = leafDims[evalIndex];
+    const trialsForThisEval = target.originalRows.filter(
+      row => row.evaluationCallId === currEvalCallId
+    );
+    const selectedTrial =
+      trialsForThisEval[selectedTrials[currEvalCallId] || 0];
+    const trialPredict = selectedTrial.predictAndScore._rawPredictTraceData;
+    const [trialEntity, trialProject] =
+      trialPredict?.project_id.split('/') ?? [];
+    const trialOpName = parseRefMaybe(
+      trialPredict?.op_name ?? ''
+    )?.artifactName;
+    const trialCallId = trialPredict?.id;
+    const evaluationCall = props.state.data.evaluationCalls[currEvalCallId];
+    if (trialEntity && trialProject && trialOpName && trialCallId) {
+      return (
+        <CallLink
+          entityName={trialEntity}
+          projectName={trialProject}
+          opName={trialOpName}
+          callId={trialCallId}
+          icon={
+            <Circle
+              sx={{
+                color: evaluationCall.color,
+                height: CIRCLE_SIZE,
+              }}
+            />
+          }
+          color={MOON_800}
+        />
+      );
+    }
+    return null;
+  };
+
+  const compKeyCompForOutputPropIndex = (outputPropIndex: number) => {
+    return outputColumnKeys[outputPropIndex];
+  };
+
+  const outputKeyCompForOutputPropIndex = (outputPropIndex: number) => {
+    return removePrefix(
+      compKeyCompForOutputPropIndex(outputPropIndex),
+      'output.'
+    );
+  };
+
+  const outputValueCompForOutputPropIndex = (
+    evaluationIndex: number,
+    outputPropIndex: number
+  ) => {
+    const currEvalCallId = leafDims[evaluationIndex];
+    const trialsForThisEval = target.originalRows.filter(
+      row => row.evaluationCallId === currEvalCallId
+    );
+    const selectedTrial =
+      trialsForThisEval[selectedTrials[currEvalCallId] || 0];
+
+    return (
+      <ICValueView
+        value={
+          (selectedTrial?.output?.[outputColumnKeys[outputPropIndex]] ?? {})[
+            currEvalCallId
+          ]
+        }
+      />
+    );
+  };
+
+  const trialCompForEvaluationIndex = (
+    evalIndex: number,
+    trialIndex: number
+  ) => {
+    const selectedTrialNdx = selectedTrials[evalIndex] || 0;
+    return (
+      <Button
+        size="small"
+        variant={selectedTrialNdx === trialIndex ? 'primary' : 'secondary'}
+        onClick={() => {
+          setSelectedTrials(curr => {
+            return {
+              ...curr,
+              [evalIndex]: trialIndex,
+            };
+          });
+        }}
+        icon="show-visible">
+        {trialIndex.toString()}
+      </Button>
+    );
+  };
+
+  const scorerCompForScorerIndex = (scorerIndex: number) => {
+    if (scorerIndex === NUM_SCORERS) {
+      return null; // derived
+    }
+    const scorerRef = uniqueScorerRefs[scorerIndex];
+    return <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} iconOnly />;
+  };
+
+  const metricCompForScorerIndex = (
+    scorerIndex: number,
+    metricIndex: number
+  ) => {
+    const isDerivedMetric = scorerIndex === NUM_SCORERS;
+    const dimensionsForThisScorer = isDerivedMetric
+      ? derivedScorers
+      : sortedScorers.filter(
+          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
+        );
+    return dimensionLabel(dimensionsForThisScorer[metricIndex]);
+  };
+
+  const aggregateMetricCompForScorerIndex = (
+    scorerIndex: number,
+    metricIndex: number,
+    evalIndex: number
+  ) => {
+    const isDerivedMetric = scorerIndex === NUM_SCORERS;
+    const currEvalCallId = leafDims[evalIndex];
+    const dimensionsForThisScorer = isDerivedMetric
+      ? derivedScorers
+      : sortedScorers.filter(
+          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
+        );
+    const dimension = dimensionsForThisScorer[metricIndex];
+
+    const unit = dimensionUnit(dimension, true);
+    const isBinary = dimension.scoreType === 'binary';
+    const scoreId = dimensionId(dimension);
+    const summaryMetric = adjustValueForDisplay(
+      target.scores[scoreId][currEvalCallId],
+      isBinary
+    );
+    const baseline = adjustValueForDisplay(
+      target.scores[scoreId][leafDims[0]],
+      isBinary
+    );
+
+    const lowerIsBetter = dimensionShouldMinimize(dimension);
+
+    return (
+      <React.Fragment>
+        <span>
+          {summaryMetric != null ? (
+            <ValueViewNumber
+              value={summaryMetric}
+              fractionDigits={SIGNIFICANT_DIGITS}
+            />
+          ) : (
+            <NotApplicable />
+          )}
+          {unit}
+        </span>
+        <ComparisonPill
+          value={summaryMetric}
+          baseline={baseline}
+          metricUnit={unit}
+          metricLowerIsBetter={lowerIsBetter}
+        />
+      </React.Fragment>
+    );
+  };
+
+  const trialMetricCompForScorerIndex = (
+    scorerIndex: number,
+    metricIndex: number,
+    evalIndex: number,
+    trialIndex: number
+  ) => {
+    const isDerivedMetric = scorerIndex === NUM_SCORERS;
+    const currEvalCallId = leafDims[evalIndex];
+    const dimensionsForThisScorer = isDerivedMetric
+      ? derivedScorers
+      : sortedScorers.filter(
+          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
+        );
+    const dimension = dimensionsForThisScorer[metricIndex];
+    const scoreId = dimensionId(dimension);
+    const trialsForThisEval = target.originalRows.filter(
+      row => row.evaluationCallId === currEvalCallId
+    );
+    const metricValue =
+      trialsForThisEval[trialIndex].scores[scoreId][currEvalCallId];
+    if (metricValue == null) {
+      return <NotApplicable />;
+    }
+
+    return <CellValue value={metricValue} />;
+  };
+
+  const trialMetricOnClickForScorerIndex = (
+    scorerIndex: number,
+    metricIndex: number,
+    evalIndex: number,
+    trialIndex: number
+  ) => {
+    const isDerivedMetric = scorerIndex === NUM_SCORERS;
+    const currEvalCallId = leafDims[evalIndex];
+    const dimensionsForThisScorer = isDerivedMetric
+      ? derivedScorers
+      : sortedScorers.filter(
+          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
+        );
+    const dimension = dimensionsForThisScorer[metricIndex];
+    const scoreId = dimensionId(dimension);
+    const trialsForThisEval = target.originalRows.filter(
+      row => row.evaluationCallId === currEvalCallId
+    );
+
+    if (isDerivedMetric) {
+      return undefined;
+    }
+    return () =>
+      onScorerClick(
+        trialsForThisEval[trialIndex].predictAndScore.scorerMetrics[scoreId]
+          .sourceCall._rawScoreTraceData
+      );
+  };
 
   return (
     <VerticalBox
@@ -276,12 +532,12 @@ export const ExampleCompareSection: React.FC<{
           {/* INPUT ROWS */}
           {_.range(NEW_NUM_INPUT_PROPS).map(inputPropIndex => {
             return (
-              <React.Fragment key={inputPropIndex}>
+              <React.Fragment key={compKeyForInputPropIndex(inputPropIndex)}>
                 <GridCell style={{...STICKY_SIDEBAR}}>
-                  IK_{inputPropIndex}
+                  {inputPropKeyCompForInputPropIndex(inputPropIndex)}
                 </GridCell>
                 <GridCell>
-                  IV_{inputPropIndex}: {LOREM_IPSUM}
+                  {inputPropValCompForInputPropIndex(inputPropIndex)}
                 </GridCell>
               </React.Fragment>
             );
@@ -302,7 +558,9 @@ export const ExampleCompareSection: React.FC<{
             <GridCell style={{...STICKY_SIDEBAR_HEADER}}>Outputs</GridCell>
             {_.range(NEW_NUM_EVALS).map(evalIndex => {
               return (
-                <GridCell style={{...STICKY_HEADER}}>Eval {evalIndex}</GridCell>
+                <GridCell style={{...STICKY_HEADER}}>
+                  {predictCallCompForEvaluationIndex(evalIndex)}
+                </GridCell>
               );
             })}
           </React.Fragment>
@@ -311,13 +569,15 @@ export const ExampleCompareSection: React.FC<{
             return (
               <React.Fragment key={outputPropIndex}>
                 <GridCell style={{...STICKY_SIDEBAR}}>
-                  OK_{outputPropIndex}
+                  {outputKeyCompForOutputPropIndex(outputPropIndex)}
                 </GridCell>
                 {_.range(NEW_NUM_EVALS).map(evalIndex => {
                   return (
                     <GridCell>
-                      E_{evalIndex}_OK_{outputPropIndex}: {LOREM_IPSUM}{' '}
-                      {LOREM_IPSUM}
+                      {outputValueCompForOutputPropIndex(
+                        evalIndex,
+                        outputPropIndex
+                      )}
                     </GridCell>
                   );
                 })}
@@ -353,31 +613,49 @@ export const ExampleCompareSection: React.FC<{
                   rowSpan={NEW_TOTAL_METRICS + 1}
                   colSpan={1}
                   colsTemp={`min-content repeat(${TRIALS_FOR_EVAL} , auto)`}>
-                  <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
-                    E_{evalIndex}_AGG
-                  </GridCell>
+                  <GridCell style={{...STICKY_SIDEBAR_HEADER}}>Trials</GridCell>
                   {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
                     return (
                       <GridCell style={{...STICKY_HEADER}}>
-                        T_{trialIndex}
+                        {trialCompForEvaluationIndex(evalIndex, trialIndex)}
                       </GridCell>
                     );
                   })}
-                  {_.range(NEW_TOTAL_METRICS).map(scorerIndex => {
-                    return (
-                      <React.Fragment key={scorerIndex}>
-                        <GridCell style={{...STICKY_SIDEBAR}}>
-                          SM_{scorerIndex}_E_{evalIndex}
-                        </GridCell>
-                        {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
-                          return (
-                            <GridCell>
-                              SM_{scorerIndex}_E_{evalIndex}_T_{trialIndex}
-                            </GridCell>
-                          );
-                        })}
-                      </React.Fragment>
-                    );
+                  {NEW_NUM_METRICS_PER_SCORER.map((numMetrics, scorerIndex) => {
+                    return _.range(numMetrics).map(metricIndex => {
+                      return (
+                        <React.Fragment key={scorerIndex}>
+                          <GridCell style={{...STICKY_SIDEBAR}}>
+                            {aggregateMetricCompForScorerIndex(
+                              scorerIndex,
+                              metricIndex,
+                              evalIndex
+                            )}
+                          </GridCell>
+                          {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
+                            const onClick = trialMetricOnClickForScorerIndex(
+                              scorerIndex,
+                              metricIndex,
+                              evalIndex,
+                              trialIndex
+                            );
+
+                            return (
+                              <GridCell
+                                button={onClick != null}
+                                onClick={onClick}>
+                                {trialMetricCompForScorerIndex(
+                                  scorerIndex,
+                                  metricIndex,
+                                  evalIndex,
+                                  trialIndex
+                                )}
+                              </GridCell>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    });
                   })}
                 </GridCellSubgrid>
               );
@@ -395,12 +673,12 @@ export const ExampleCompareSection: React.FC<{
                     <GridCell
                       style={{...STICKY_SIDEBAR}}
                       rowSpan={NUM_METRICS_FOR_SCORER}>
-                      S_{scorerIndex}
+                      {scorerCompForScorerIndex(scorerIndex)}
                     </GridCell>
                     {_.range(NUM_METRICS_FOR_SCORER).map(metricIndex => {
                       return (
                         <GridCell style={{...STICKY_SIDEBAR}}>
-                          S_{scorerIndex}_MK_{metricIndex}
+                          {metricCompForScorerIndex(scorerIndex, metricIndex)}
                         </GridCell>
                       );
                     })}
