@@ -21,6 +21,7 @@ import {
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {useFilteredAggregateRows} from '../ExampleCompareSection/exampleCompareSectionUtil';
+import {deriveComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
 import {PlotlyScatterPlot, ScatterPlotPoint} from './PlotlyScatterPlot';
 
 const RESULT_FILTER_INSTRUCTIONS =
@@ -278,24 +279,41 @@ const DimensionPicker: React.FC<{
   state: EvaluationComparisonState;
   dimensionIndex: number;
 }> = props => {
+  const derivedMetrics = useMemo(
+    () => deriveComparisonSummaryMetrics(props.state),
+    [props.state]
+  );
   const targetComparisonDimension =
     props.state.comparisonDimensions?.[props.dimensionIndex]!;
 
   const currDimension = targetComparisonDimension.dimension;
-  const dimensions = useMemo(() => {
-    return [
-      ...Object.values(props.state.data.derivedMetricDimensions),
-      ...Object.values(props.state.data.scorerMetricDimensions),
-    ];
-  }, [
-    props.state.data.derivedMetricDimensions,
-    props.state.data.scorerMetricDimensions,
-  ]);
   const {setComparisonDimensions} = useCompareEvaluationsState();
 
   const dimensionMap = useMemo(() => {
-    return Object.fromEntries(dimensions.map(dim => [dimensionId(dim), dim]));
-  }, [dimensions]);
+    return Object.fromEntries(
+      Object.entries(derivedMetrics)
+        .map(([groupName, group]) => {
+          return Object.entries(group.metrics)
+            .map(([metricName, metric]) => {
+              const dimId = Object.values(metric.scorerRefToMetricKey)[0];
+              const dim =
+                props.state.data.derivedMetricDimensions[dimId] ??
+                props.state.data.scorerMetricDimensions[dimId];
+              if (dim) {
+                return [[dimId, dim]];
+              }
+              return [];
+            })
+            .flat();
+        })
+        .flat()
+    );
+  }, [
+    derivedMetrics,
+    props.state.data.derivedMetricDimensions,
+    props.state.data.scorerMetricDimensions,
+  ]);
+
   return (
     <FormControl>
       <Autocomplete

@@ -1,10 +1,11 @@
 /**
  * TODO:
  * * Example Filters: Currently shows all scorers
- *    * Use this new format from `ScorecardSpecificLegacyScoresType`. Perhaps this is a good chance to align on the format
+ *    * Data is missing...
  * * Output Comparison: Currently shows all scorers
  *    * When 1 scorer, show the ref
  *    * When >1 scorer, sho warning icon with hover info (probably use the same component as scorecard)
+ * * Add dataset variation row in scorecard
  */
 
 import {Box, Tooltip} from '@material-ui/core';
@@ -298,6 +299,7 @@ export const ScorecardSection: React.FC<{
                 ) as WeaveObjectRef | null;
                 return (
                   <GridCell
+                    key={evalCallId}
                     style={{
                       borderTop: '1px solid #ccc',
                       display: 'flex',

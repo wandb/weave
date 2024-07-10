@@ -13,6 +13,7 @@ type DerivedSummaryMetric = {
   lowerIsBetter: boolean;
   evalScores: {[evalCallId: string]: number | undefined};
 };
+
 type DerivedSummaryScoreGroup = {
   evalCallIdToScorerRef: {[evalCallId: string]: string}; // multiple means we might not have apples to apples comparison
   scorerName?: string;
@@ -20,12 +21,14 @@ type DerivedSummaryScoreGroup = {
     [metricName: string]: DerivedSummaryMetric;
   };
 };
+
 export type DerivedComparisonSummaryMetrics = {
   [scorerGroupName: string]: DerivedSummaryScoreGroup;
 };
+
 export const deriveComparisonSummaryMetrics = (
   state: EvaluationComparisonState
-) => {
+): DerivedComparisonSummaryMetrics => {
   const res: DerivedComparisonSummaryMetrics = {};
   Object.entries(state.data.evaluationCalls).forEach(
     ([evalCallId, evaluationCall]) => {
