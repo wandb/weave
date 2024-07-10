@@ -347,7 +347,7 @@ def get_code_deps(
             if var_value.__name__ != var_name:
                 import_line += f" as {var_name}"
             import_code.append(import_line)
-        elif isinstance(var_value, (py_types.FunctionType, Op, type)):
+        elif isinstance(var_value, (py_types.FunctionType, Op, Op2, type)):
             if var_value.__module__ == fn.__module__:
                 result = get_code_deps(var_value, artifact, depth + 1)
                 fn_warnings = result["warnings"]
