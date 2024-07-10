@@ -100,24 +100,15 @@ def object_method_app(
             )
         method_name = next(iter(op_attrs))
 
-    print(f"{method_name=}")
+    method = getattr(obj, method_name)
+    unbound_method = method.__func__
 
-    bound_method_op = typing.cast(op.Op, getattr(obj, method_name))
-    if not isinstance(bound_method_op, op.Op):
-        raise ValueError(f"Expected an op, got {bound_method_op}")
+    if not isinstance(unbound_method, op.Op2):
+        raise ValueError(f"Expected an op, got {unbound_method}")
 
-    try:
-        bound_method_op_args = pyfunc_type_util.determine_input_type(
-            bound_method_op.resolve_fn
-        )
-    except errors.WeaveDefinitionError as e:
-        raise ValueError(
-            f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
-        )
-    if not isinstance(bound_method_op_args, op_args.OpNamedArgs):
-        raise ValueError("predict op must have named args")
-
-    arg_types = bound_method_op_args.weave_type().property_types
+    # TODO: don tneed to unbind
+    args = pyfunc_type_util.determine_input_type(unbound_method)
+    arg_types = args.weave_type().property_types
     del arg_types["self"]
 
     Item = weave_pydantic.weave_type_to_pydantic(arg_types, name="Item")
@@ -130,10 +121,10 @@ def object_method_app(
 
     @app.post(f"/{method_name}", summary=method_name)
     async def method_route(item: Item) -> dict:  # type: ignore
-        if inspect.iscoroutinefunction(bound_method_op.resolve_fn):
-            result = await bound_method_op(**item.dict())  # type: ignore
+        if inspect.iscoroutinefunction(method):
+            result = await method(**item.dict())  # type: ignore
         else:
-            result = bound_method_op(**item.dict())  # type: ignore
+            result = method(**item.dict())  # type: ignore
         return {"result": result}
 
     return app
