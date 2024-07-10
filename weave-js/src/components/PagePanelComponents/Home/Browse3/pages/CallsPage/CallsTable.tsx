@@ -378,7 +378,6 @@ export const CallsTable: FC<{
           const rowId = params.id as string;
           return (
             <Checkbox
-              // disabled={rowDisabled(params.row)}
               checked={selectedCalls.includes(rowId)}
               onCheckedChange={() => {
                 if (selectedCalls.includes(rowId)) {
@@ -866,7 +865,7 @@ const CompareEvaluationsTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mr-4"
+      className="ml-4 mr-16"
       size="medium"
       variant="ghost"
       disabled={disabled}
