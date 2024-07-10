@@ -25,6 +25,4 @@ Vertex API supports OpenAI SDK compatibility ([docs](https://cloud.google.com/ve
 Weave native client integration with the `google-generativeai` python package is currently in development
 :::
 
-While we build the native integration with the Gemini API native python package, you can easily integrate Weave with the Gemini API yourself simply by initializing Weave with `weave.init('name of your project')` and then wrapping the calls that call your LLMs with `weave.op()` 
-
-See [Quickstart](/quickstart) for more details.
+While we build the native integration with the Gemini API native python package, you can easily integrate Weave with the Gemini API yourself simply by initializing Weave with `weave.init('<your-project-name>')` and then wrapping the calls that call your LLMs with `weave.op()`. See our guide on [tracing](/guides/tracking/tracing) for more details.
