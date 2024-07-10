@@ -12,6 +12,7 @@ try:
 except ImportError:
     from typing_extensions import Annotated  # type: ignore
 
+from weave import pyfunc_type_util
 from weave.legacy import cache
 from weave.legacy.wandb_api import WandbApiAsync
 from weave.trace import op
@@ -101,20 +102,20 @@ def object_method_app(
 
     print(f"{method_name=}")
 
-    # bound_method_op = typing.cast(op.Op, getattr(obj, method_name))
-    # if not isinstance(bound_method_op, op.Op):
-    #     raise ValueError(f"Expected an op, got {bound_method_op}")
+    bound_method_op = typing.cast(op.Op, getattr(obj, method_name))
+    if not isinstance(bound_method_op, op.Op):
+        raise ValueError(f"Expected an op, got {bound_method_op}")
 
-    # try:
-    #     bound_method_op_args = pyfunc_type_util.determine_input_type(
-    #         bound_method_op.resolve_fn
-    #     )
-    # except errors.WeaveDefinitionError as e:
-    #     raise ValueError(
-    #         f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
-    #     )
-    # if not isinstance(bound_method_op_args, op_args.OpNamedArgs):
-    #     raise ValueError("predict op must have named args")
+    try:
+        bound_method_op_args = pyfunc_type_util.determine_input_type(
+            bound_method_op.resolve_fn
+        )
+    except errors.WeaveDefinitionError as e:
+        raise ValueError(
+            f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
+        )
+    if not isinstance(bound_method_op_args, op_args.OpNamedArgs):
+        raise ValueError("predict op must have named args")
 
     arg_types = bound_method_op_args.weave_type().property_types
     del arg_types["self"]
