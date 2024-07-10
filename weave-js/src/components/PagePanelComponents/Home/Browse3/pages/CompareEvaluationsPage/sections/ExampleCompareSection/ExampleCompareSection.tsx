@@ -1,6 +1,5 @@
 /**
  * TODO:
- * * Audit unused code
  * * Audit symbol names
  * The Super challenge header
  * Fixed-Width Sidebar
@@ -46,10 +45,11 @@ import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 const NEW_FIXED_SIDEBAR_WIDTH_PX = 250;
 const NEW_FIXED_MIN_EVAL_WIDTH_PX = 350;
 const HEADER_HEIGHT_PX = 38;
+const TOP_CELL_PADDING_PX = 4;
 
 const PropKey = styled.div`
   position: sticky;
-  top: 8px;
+  top: ${TOP_CELL_PADDING_PX}px;
   overflow: auto;
   text-align: right;
   scrollbar-width: none;
@@ -63,7 +63,7 @@ const GridCell = styled.div<{
   border: 1px solid ${MOON_200};
   grid-column-end: span ${props => props.colSpan || 1};
   grid-row-end: span ${props => props.rowSpan || 1};
-  padding: 4px 8px;
+  padding: ${TOP_CELL_PADDING_PX}px 8px;
   background-color: white;
   // Hover should show click mouse icon
   // and slowly highlight blue like a button
@@ -101,7 +101,15 @@ const GridContainer = styled.div<{colsTemp: string; rowsTemp: string}>`
   grid-template-rows: ${props => props.rowsTemp};
 `;
 
+const CENTERED_TEXT: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  textAlign: 'center',
+};
+
 const STICKY_HEADER: React.CSSProperties = {
+  ...CENTERED_TEXT,
   position: 'sticky',
   top: 0,
   zIndex: 1,
@@ -249,7 +257,7 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const inputColumnKeys = Object.keys(target.input);
-  const SHOW_INPUT_HEADER = false;
+  const SHOW_INPUT_HEADER = true;
   const NEW_NUM_INPUT_PROPS = inputColumnKeys.length;
   const NEW_NUM_OUTPUT_KEYS = outputColumnKeys.length;
   const NUM_DERIVED = derivedScorers.length;
@@ -277,8 +285,14 @@ export const ExampleCompareSection: React.FC<{
   };
 
   const inputPropKeyCompForInputPropIndex = (inputPropIndex: number) => {
+    // (SHOW_INPUT_HEADER ? 1 : 0)
     return (
-      <PropKey>
+      <PropKey
+        style={{
+          top:
+            TOP_CELL_PADDING_PX +
+            (SHOW_INPUT_HEADER ? 1 + HEADER_HEIGHT_PX : 0),
+        }}>
         {removePrefix(compKeyForInputPropIndex(inputPropIndex), 'input.')}
       </PropKey>
     );
@@ -342,7 +356,7 @@ export const ExampleCompareSection: React.FC<{
     return (
       <PropKey
         style={{
-          top: 9 + HEADER_HEIGHT_PX,
+          top: TOP_CELL_PADDING_PX + 1 + HEADER_HEIGHT_PX,
         }}>
         {removePrefix(
           compKeyCompForOutputPropIndex(outputPropIndex),
@@ -382,26 +396,20 @@ export const ExampleCompareSection: React.FC<{
     const currEvalCallId = leafDims[evalIndex];
     const selectedTrialNdx = selectedTrials[currEvalCallId] || 0;
     return (
-      <HorizontalBox
-        style={{
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        <Button
-          size="small"
-          variant={selectedTrialNdx === trialIndex ? 'primary' : 'secondary'}
-          onClick={() => {
-            setSelectedTrials(curr => {
-              return {
-                ...curr,
-                [currEvalCallId]: trialIndex,
-              };
-            });
-          }}
-          icon="show-visible">
-          {trialIndex.toString()}
-        </Button>
-      </HorizontalBox>
+      <Button
+        size="small"
+        variant={selectedTrialNdx === trialIndex ? 'primary' : 'secondary'}
+        onClick={() => {
+          setSelectedTrials(curr => {
+            return {
+              ...curr,
+              [currEvalCallId]: trialIndex,
+            };
+          });
+        }}
+        icon="show-visible">
+        {trialIndex.toString()}
+      </Button>
     );
   };
 
@@ -609,7 +617,7 @@ export const ExampleCompareSection: React.FC<{
           }}>
           {/* OUTPUT HEADER */}
           <React.Fragment>
-            <GridCell style={{...STICKY_SIDEBAR_HEADER, textAlign: 'center'}}>
+            <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
               Model Outputs
             </GridCell>
             {_.range(NEW_NUM_EVALS).map(evalIndex => {
@@ -661,8 +669,8 @@ export const ExampleCompareSection: React.FC<{
                 // to move on. The result is that the metrics headers (and trial selection
                 // buttons) will scroll off the screen. Not horrible, but a defeat.
                 ...STICKY_SIDEBAR,
+                ...CENTERED_TEXT,
                 zIndex: 3,
-                textAlign: 'center',
               }}>
               Metrics
             </GridCell>
@@ -674,10 +682,7 @@ export const ExampleCompareSection: React.FC<{
                   rowSpan={NEW_TOTAL_METRICS + 1}
                   colSpan={1}
                   colsTemp={`min-content repeat(${TRIALS_FOR_EVAL} , auto)`}>
-                  <GridCell
-                    style={{...STICKY_SIDEBAR_HEADER, textAlign: 'center'}}>
-                    Trials
-                  </GridCell>
+                  <GridCell style={{...STICKY_SIDEBAR_HEADER}}>Trials</GridCell>
                   {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
                     return (
                       <GridCell key={trialIndex} style={{...STICKY_HEADER}}>
