@@ -49,7 +49,6 @@ from . import errors
 from weave.legacy.decorators import weave_class, mutation, type
 from weave.trace.op import Op2, op
 
-from weave.trace.op import Op
 from . import usage_analytics
 from weave.legacy.context import (
     use_fixed_server_port,
