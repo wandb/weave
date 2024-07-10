@@ -336,7 +336,12 @@ export const ExampleCompareSection: React.FC<{
           <React.Fragment>
             <GridCell
               style={{
-                ...STICKY_SIDEBAR, // in a perfect world, this would be STICKY_SIDEBAR_HEADER, but it's not working
+                // in a perfect world, this would be STICKY_SIDEBAR_HEADER,
+                // but I can't get the eval metric headers to be sticky. I
+                // have spent many hours trying to pull this one off and need
+                // to move on. The result is that the metrics headers (and trial selection
+                // buttons) will scroll off the screen. Not horrible, but a defeat.
+                ...STICKY_SIDEBAR,
                 zIndex: 3,
               }}>
               Metrics
