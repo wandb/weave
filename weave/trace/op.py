@@ -300,10 +300,6 @@ def _create_call(func: Op2, *args: Any, **kwargs: Any) -> "Call":
     client._save_nested_objects(inputs_with_defaults)
     attributes = call_attributes.get()
 
-    print(
-        f"about to call client.create_call with {func=}, {inputs_with_defaults=}, {parent_call=}, {attributes=}"
-    )
-
     return client.create_call(
         func,
         inputs_with_defaults,
@@ -320,12 +316,10 @@ def _execute_call(
     **kwargs: Any,
 ) -> Any:
     func = wrapper.resolve_fn
-    print(f"Before call {func=}")
     client = client_context.weave_client.require_weave_client()
     has_finished = False
 
     def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
-        print("start finish")
         nonlocal has_finished
         if has_finished:
             raise ValueError("Should not call finish more than once")
@@ -334,9 +328,7 @@ def _execute_call(
             print_call_link(call)
 
     def on_output(output: Any) -> Any:
-        print("start on_output")
         if handler := getattr(wrapper, "_on_output_handler", None):
-            print(f"Calling the handler {handler=}")
             return handler(output, finish, call.inputs)
         finish(output)
         return output
