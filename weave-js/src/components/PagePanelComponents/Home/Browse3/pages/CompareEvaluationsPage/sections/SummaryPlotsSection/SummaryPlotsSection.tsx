@@ -11,7 +11,7 @@ import {
 import {getOrderedCallIds} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
 import {HorizontalBox, VerticalBox} from '../../Layout';
-import {deriveComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
+import {buildCompositeComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 
@@ -88,15 +88,15 @@ const normalizeValues = (values: Array<number | undefined>): number[] => {
 const useNormalizedPlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): RadarPlotData => {
-  const {derivedMetrics} = useMemo(() => {
-    return deriveComparisonSummaryMetrics(state);
+  const {compositeMetrics} = useMemo(() => {
+    return buildCompositeComparisonSummaryMetrics(state);
   }, [state]);
   const callIds = useMemo(() => {
     return getOrderedCallIds(state);
   }, [state]);
 
   return useMemo(() => {
-    const normalizedMetrics = Object.values(derivedMetrics)
+    const normalizedMetrics = Object.values(compositeMetrics)
       .map(scoreGroup => Object.values(scoreGroup.metrics))
       .flat()
       .map(metric => {
@@ -131,5 +131,5 @@ const useNormalizedPlotDataFromMetrics = (
         ];
       })
     );
-  }, [callIds, derivedMetrics, state.data.evaluationCalls]);
+  }, [callIds, compositeMetrics, state.data.evaluationCalls]);
 };

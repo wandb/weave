@@ -21,7 +21,7 @@ import {
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {useFilteredAggregateRows} from '../ExampleCompareSection/exampleCompareSectionUtil';
-import {deriveComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
+import {buildCompositeComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
 import {PlotlyScatterPlot, ScatterPlotPoint} from './PlotlyScatterPlot';
 
 const RESULT_FILTER_INSTRUCTIONS =
@@ -121,7 +121,9 @@ const SingleDimensionFilter: React.FC<{
   }, [filteredRows]);
 
   const data = useMemo(() => {
-    const {resolvePeerDimension} = deriveComparisonSummaryMetrics(props.state);
+    const {resolvePeerDimension} = buildCompositeComparisonSummaryMetrics(
+      props.state
+    );
     const series: Array<ScatterPlotPoint & {count: number}> = [];
     if (targetDimension != null) {
       const baselineTargetDimension = resolvePeerDimension(
@@ -291,8 +293,8 @@ const DimensionPicker: React.FC<{
   state: EvaluationComparisonState;
   dimensionIndex: number;
 }> = props => {
-  const {derivedMetrics} = useMemo(
-    () => deriveComparisonSummaryMetrics(props.state),
+  const {compositeMetrics: derivedMetrics} = useMemo(
+    () => buildCompositeComparisonSummaryMetrics(props.state),
     [props.state]
   );
   const targetComparisonDimension =

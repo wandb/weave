@@ -35,7 +35,7 @@ import {
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
-  deriveComparisonSummaryMetrics,
+  buildCompositeComparisonSummaryMetrics,
   DERIVED_SCORER_REF,
 } from './summaryMetricUtil';
 
@@ -99,8 +99,8 @@ export const ScorecardSection: React.FC<{
   }, [modelProps]);
   const [diffOnly, setDiffOnly] = React.useState(true);
 
-  const {derivedMetrics} = useMemo(() => {
-    return deriveComparisonSummaryMetrics(props.state);
+  const {compositeMetrics} = useMemo(() => {
+    return buildCompositeComparisonSummaryMetrics(props.state);
   }, [props.state]);
 
   const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
@@ -307,7 +307,7 @@ export const ScorecardSection: React.FC<{
           Metrics
         </GridCell>
         {/* Score Rows */}
-        {Object.entries(derivedMetrics).map(([key, def]) => {
+        {Object.entries(compositeMetrics).map(([key, def]) => {
           const uniqueScorerRefs = Array.from(
             new Set(Object.values(def.evalCallIdToScorerRef))
           );
