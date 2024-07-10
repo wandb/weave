@@ -2,9 +2,7 @@
  * TODO:
  * * Audit unused code
  * * Audit symbol names
- * * formatting of pill (side by side)
- * * left-align trial metrics
- * * Metric name overflow :(
+ * a bunch of missing loop keys
  */
 
 import {Box} from '@material-ui/core';
@@ -43,7 +41,17 @@ import {HorizontalBox, VerticalBox} from '../../Layout';
 import {ComparisonPill} from '../ScorecardSection/ScorecardSection';
 import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 
-const MIN_OUTPUT_WIDTH = 500;
+const NEW_FIXED_SIDEBAR_WIDTH_PX = 250;
+const NEW_FIXED_MIN_EVAL_WIDTH_PX = 350;
+const OUTPUTS_HEADER_HEIGHT_PX = 46;
+
+const PropKey = styled.div`
+  position: sticky;
+  top: 8px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: right;
+`;
 
 const GridCell = styled.div<{
   colSpan?: number;
@@ -112,8 +120,6 @@ const STICKY_SIDEBAR_HEADER: React.CSSProperties = {
   ...STICKY_SIDEBAR,
   zIndex: 2,
 };
-
-const LOREM_IPSUM = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non risus. Suspendisse lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, dolor. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.`;
 
 export const ExampleCompareSection: React.FC<{
   state: EvaluationComparisonState;
@@ -193,6 +199,7 @@ export const ExampleCompareSection: React.FC<{
         alignItems: 'center',
         bgcolor: MOON_100,
         padding: '16px',
+        borderBottom: '1px solid #ccc',
       }}>
       <HorizontalBox
         sx={{
@@ -260,15 +267,17 @@ export const ExampleCompareSection: React.FC<{
       .length;
   });
   const NEW_NUM_EVALS = NEW_NUM_TRIALS.length;
-  const NEW_FIXED_SIDEBAR_WIDTH_PX = 250;
-  const NEW_FIXED_MIN_EVAL_WIDTH_PX = 350;
 
   const compKeyForInputPropIndex = (inputPropIndex: number) => {
     return inputColumnKeys[inputPropIndex];
   };
 
   const inputPropKeyCompForInputPropIndex = (inputPropIndex: number) => {
-    return removePrefix(compKeyForInputPropIndex(inputPropIndex), 'input.');
+    return (
+      <PropKey>
+        {removePrefix(compKeyForInputPropIndex(inputPropIndex), 'input.')}
+      </PropKey>
+    );
   };
 
   const inputPropValCompForInputPropIndex = (inputPropIndex: number) => {
@@ -296,21 +305,26 @@ export const ExampleCompareSection: React.FC<{
     const evaluationCall = props.state.data.evaluationCalls[currEvalCallId];
     if (trialEntity && trialProject && trialOpName && trialCallId) {
       return (
-        <CallLink
-          entityName={trialEntity}
-          projectName={trialProject}
-          opName={trialOpName}
-          callId={trialCallId}
-          icon={
-            <Circle
-              sx={{
-                color: evaluationCall.color,
-                height: CIRCLE_SIZE,
-              }}
-            />
-          }
-          color={MOON_800}
-        />
+        <Box
+          style={{
+            overflow: 'hidden',
+          }}>
+          <CallLink
+            entityName={trialEntity}
+            projectName={trialProject}
+            opName={trialOpName}
+            callId={trialCallId}
+            icon={
+              <Circle
+                sx={{
+                  color: evaluationCall.color,
+                  height: CIRCLE_SIZE,
+                }}
+              />
+            }
+            color={MOON_800}
+          />
+        </Box>
       );
     }
     return null;
@@ -321,9 +335,16 @@ export const ExampleCompareSection: React.FC<{
   };
 
   const outputKeyCompForOutputPropIndex = (outputPropIndex: number) => {
-    return removePrefix(
-      compKeyCompForOutputPropIndex(outputPropIndex),
-      'output.'
+    return (
+      <PropKey
+        style={{
+          top: 9 + OUTPUTS_HEADER_HEIGHT_PX,
+        }}>
+        {removePrefix(
+          compKeyCompForOutputPropIndex(outputPropIndex),
+          'output.'
+        )}
+      </PropKey>
     );
   };
 
@@ -335,6 +356,7 @@ export const ExampleCompareSection: React.FC<{
     const trialsForThisEval = target.originalRows.filter(
       row => row.evaluationCallId === currEvalCallId
     );
+
     const selectedTrial =
       trialsForThisEval[selectedTrials[currEvalCallId] || 0];
 
@@ -353,22 +375,29 @@ export const ExampleCompareSection: React.FC<{
     evalIndex: number,
     trialIndex: number
   ) => {
-    const selectedTrialNdx = selectedTrials[evalIndex] || 0;
+    const currEvalCallId = leafDims[evalIndex];
+    const selectedTrialNdx = selectedTrials[currEvalCallId] || 0;
     return (
-      <Button
-        size="small"
-        variant={selectedTrialNdx === trialIndex ? 'primary' : 'secondary'}
-        onClick={() => {
-          setSelectedTrials(curr => {
-            return {
-              ...curr,
-              [evalIndex]: trialIndex,
-            };
-          });
-        }}
-        icon="show-visible">
-        {trialIndex.toString()}
-      </Button>
+      <HorizontalBox
+        style={{
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Button
+          size="small"
+          variant={selectedTrialNdx === trialIndex ? 'primary' : 'secondary'}
+          onClick={() => {
+            setSelectedTrials(curr => {
+              return {
+                ...curr,
+                [currEvalCallId]: trialIndex,
+              };
+            });
+          }}
+          icon="show-visible">
+          {trialIndex.toString()}
+        </Button>
+      </HorizontalBox>
     );
   };
 
@@ -390,7 +419,9 @@ export const ExampleCompareSection: React.FC<{
       : sortedScorers.filter(
           s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
         );
-    return dimensionLabel(dimensionsForThisScorer[metricIndex]);
+    return (
+      <PropKey>{dimensionLabel(dimensionsForThisScorer[metricIndex])}</PropKey>
+    );
   };
 
   const aggregateMetricCompForScorerIndex = (
@@ -421,26 +452,34 @@ export const ExampleCompareSection: React.FC<{
 
     const lowerIsBetter = dimensionShouldMinimize(dimension);
 
+    if (summaryMetric == null) {
+      return <NotApplicable />;
+    }
+
     return (
-      <React.Fragment>
-        <span>
-          {summaryMetric != null ? (
-            <ValueViewNumber
-              value={summaryMetric}
-              fractionDigits={SIGNIFICANT_DIGITS}
-            />
-          ) : (
-            <NotApplicable />
-          )}
+      <HorizontalBox
+        style={{
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+        <HorizontalBox
+          style={{
+            alignItems: 'center',
+            gap: '1px',
+          }}>
+          <ValueViewNumber
+            fractionDigits={SIGNIFICANT_DIGITS}
+            value={summaryMetric}
+          />
           {unit}
-        </span>
+        </HorizontalBox>
         <ComparisonPill
           value={summaryMetric}
           baseline={baseline}
           metricUnit={unit}
           metricLowerIsBetter={lowerIsBetter}
         />
-      </React.Fragment>
+      </HorizontalBox>
     );
   };
 
@@ -548,14 +587,16 @@ export const ExampleCompareSection: React.FC<{
           ref={ref1}
           rowSpan={1}
           colSpan={1}
-          rowsTemp={`min-content repeat(${NEW_NUM_OUTPUT_KEYS}, auto)`}
+          rowsTemp={`${OUTPUTS_HEADER_HEIGHT_PX}px repeat(${NEW_NUM_OUTPUT_KEYS}, auto)`}
           colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}
           style={{
             scrollbarWidth: 'none',
           }}>
           {/* OUTPUT HEADER */}
           <React.Fragment>
-            <GridCell style={{...STICKY_SIDEBAR_HEADER}}>Outputs</GridCell>
+            <GridCell style={{...STICKY_SIDEBAR_HEADER, textAlign: 'center'}}>
+              Model Outputs
+            </GridCell>
             {_.range(NEW_NUM_EVALS).map(evalIndex => {
               return (
                 <GridCell style={{...STICKY_HEADER}}>
@@ -603,6 +644,7 @@ export const ExampleCompareSection: React.FC<{
                 // buttons) will scroll off the screen. Not horrible, but a defeat.
                 ...STICKY_SIDEBAR,
                 zIndex: 3,
+                textAlign: 'center',
               }}>
               Metrics
             </GridCell>
@@ -613,7 +655,10 @@ export const ExampleCompareSection: React.FC<{
                   rowSpan={NEW_TOTAL_METRICS + 1}
                   colSpan={1}
                   colsTemp={`min-content repeat(${TRIALS_FOR_EVAL} , auto)`}>
-                  <GridCell style={{...STICKY_SIDEBAR_HEADER}}>Trials</GridCell>
+                  <GridCell
+                    style={{...STICKY_SIDEBAR_HEADER, textAlign: 'center'}}>
+                    Trials
+                  </GridCell>
                   {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
                     return (
                       <GridCell style={{...STICKY_HEADER}}>
@@ -624,7 +669,12 @@ export const ExampleCompareSection: React.FC<{
                   {NEW_NUM_METRICS_PER_SCORER.map((numMetrics, scorerIndex) => {
                     return _.range(numMetrics).map(metricIndex => {
                       return (
-                        <React.Fragment key={scorerIndex}>
+                        <React.Fragment
+                          key={
+                            scorerIndex.toString() +
+                            '.' +
+                            metricIndex.toString()
+                          }>
                           <GridCell style={{...STICKY_SIDEBAR}}>
                             {aggregateMetricCompForScorerIndex(
                               scorerIndex,
@@ -665,7 +715,8 @@ export const ExampleCompareSection: React.FC<{
           <GridCellSubgrid
             rowSpan={NEW_TOTAL_METRICS}
             colSpan={1}
-            colsTemp={`min-content auto`}>
+            colsTemp={`min-content auto`}
+            style={{...STICKY_SIDEBAR}}>
             {NEW_NUM_METRICS_PER_SCORER.map(
               (NUM_METRICS_FOR_SCORER, scorerIndex) => {
                 return (
@@ -677,7 +728,12 @@ export const ExampleCompareSection: React.FC<{
                     </GridCell>
                     {_.range(NUM_METRICS_FOR_SCORER).map(metricIndex => {
                       return (
-                        <GridCell style={{...STICKY_SIDEBAR}}>
+                        <GridCell
+                          style={{
+                            backgroundColor: MOON_100,
+                          }}
+                          // style={{...STICKY_SIDEBAR}}
+                        >
                           {metricCompForScorerIndex(scorerIndex, metricIndex)}
                         </GridCell>
                       );
@@ -689,375 +745,6 @@ export const ExampleCompareSection: React.FC<{
           </GridCellSubgrid>
         </GridCellSubgrid>
       </GridContainer>
-      {/* <GridContainer
-        style={{
-          height: '100%',
-          flex: 1,
-          overflow: 'auto',
-          gridTemplateColumns: `repeat(2, min-content) auto`,
-          gridTemplateRows: `repeat(${NUM_INPUT_PROPS}, min-content) min-content repeat(${NUM_OUTPUT_KEYS}, auto) min-content repeat(${NUM_METRICS}, min-content)`,
-        }}>
-        {_.range(NUM_INPUT_PROPS).map(ii => {
-          const inputColumnKey = inputColumnKeys[ii];
-          return (
-            <React.Fragment key={inputColumnKey}>
-              <GridCell
-                cols={2}
-                style={{
-                  whiteSpace: 'nowrap',
-                  left: 0,
-                  position: 'sticky',
-                  zIndex: 1,
-                  backgroundColor: 'white',
-                  textAlign: 'right',
-                  fontWeight: 'bold',
-                }}>
-                {removePrefix(inputColumnKey, 'input.')}
-              </GridCell>
-              <GridCell>
-                <ICValueView value={target.input[inputColumnKey]} />
-              </GridCell>
-            </React.Fragment>
-          );
-        })}
-        <GridCellSubgrid
-          cols={2}
-          rows={1 + NUM_OUTPUT_KEYS + 1 + NUM_METRICS}
-          style={{
-            position: 'sticky',
-            left: 0,
-            zIndex: 3,
-            backgroundColor: 'white',
-          }}>
-          <GridCell
-            cols={2}
-            style={{
-              position: 'sticky',
-              left: 0,
-              top: 0,
-              zIndex: 2,
-              backgroundColor: MOON_100,
-            }}></GridCell>
-
-          {_.range(NUM_OUTPUT_KEYS).map(oi => {
-            return (
-              <React.Fragment key={outputColumnKeys[oi]}>
-                <GridCell
-                  cols={2}
-                  style={{
-                    whiteSpace: 'nowrap',
-                    position: 'sticky',
-                    left: 0,
-                    zIndex: 1,
-                    backgroundColor: 'white',
-                    textAlign: 'right',
-                    fontWeight: 'bold',
-                  }}>
-                  {removePrefix(outputColumnKeys[oi], 'output.')}
-                </GridCell>
-              </React.Fragment>
-            );
-          })}
-          <GridCellSubgrid
-            cols={2}
-            rows={NUM_METRICS + 1}
-            style={{
-              position: 'sticky',
-              bottom: 0,
-              left: 0,
-              zIndex: 3,
-            }}>
-            <GridCell
-              cols={2}
-              style={{
-                backgroundColor: MOON_100,
-              }}>
-              Metrics
-            </GridCell>
-            {_.range(NUM_SCORERS + 1).map(si => {
-              const isScorerMetric = si < NUM_SCORERS;
-              const dimensionsForThisScorer = isScorerMetric
-                ? sortedScorers.filter(
-                    s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
-                  )
-                : derivedScorers;
-              const NUM_METRICS_IN_SCORER = dimensionsForThisScorer.length;
-              const scorerRef = uniqueScorerRefs[si];
-              return (
-                <React.Fragment key={isScorerMetric ? scorerRef : 'derived'}>
-                  <GridCell
-                    ref={leftRef}
-                    rows={NUM_METRICS_IN_SCORER}
-                    style={{
-                      alignContent: 'center',
-                    }}>
-                    {isScorerMetric && (
-                      <SmallRef
-                        objRef={parseRef(scorerRef) as WeaveObjectRef}
-                        iconOnly
-                      />
-                    )}
-                  </GridCell>
-                  {_.range(NUM_METRICS_IN_SCORER).map(mi => {
-                    return (
-                      <React.Fragment key={mi}>
-                        <GridCell
-                          style={{
-                            whiteSpace: 'nowrap',
-                            textAlign: 'right',
-                            fontWeight: 'bold',
-                          }}>
-                          {dimensionLabel(dimensionsForThisScorer[mi])}
-                        </GridCell>
-                      </React.Fragment>
-                    );
-                  })}
-                </React.Fragment>
-              );
-            })}
-          </GridCellSubgrid>
-        </GridCellSubgrid>
-        <GridCellSubgrid
-          style={{
-            gridTemplateColumns: `repeat(${NUM_EVALS}, min-content auto)`,
-          }}
-          rows={
-            NUM_OUTPUT_KEYS +
-            1 + // Eval Header
-            1 + // Aggregate Metrics Header
-            NUM_METRICS
-          }>
-          {_.range(NUM_EVALS).map(ei => {
-            const currEvalCallId = leafDims[ei];
-            const trialsForThisEval = target.originalRows.filter(
-              row => row.evaluationCallId === currEvalCallId
-            );
-            const selectedTrial =
-              trialsForThisEval[selectedTrials[currEvalCallId] || 0];
-            const trialPredict =
-              selectedTrial.predictAndScore._rawPredictTraceData;
-            const [trialEntity, trialProject] =
-              trialPredict?.project_id.split('/') ?? [];
-            const trialOpName = parseRefMaybe(
-              trialPredict?.op_name ?? ''
-            )?.artifactName;
-            const trialCallId = trialPredict?.id;
-            const evaluationCall =
-              props.state.data.evaluationCalls[currEvalCallId];
-
-            return (
-              <GridCell
-                key={currEvalCallId}
-                cols={2}
-                style={{
-                  minWidth: MIN_OUTPUT_WIDTH,
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1,
-                  backgroundColor: MOON_100,
-                }}>
-                {trialEntity && trialProject && trialOpName && trialCallId && (
-                  <CallLink
-                    entityName={trialEntity}
-                    projectName={trialProject}
-                    opName={trialOpName}
-                    callId={trialCallId}
-                    icon={
-                      <Circle
-                        sx={{
-                          color: evaluationCall.color,
-                          height: CIRCLE_SIZE,
-                        }}
-                      />
-                    }
-                    color={MOON_800}
-                  />
-                )}
-              </GridCell>
-            );
-          })}
-
-          {_.range(NUM_OUTPUT_KEYS).map(oi => {
-            return _.range(NUM_EVALS).map(ei => {
-              const currEvalCallId = leafDims[ei];
-              const trialsForThisEval = target.originalRows.filter(
-                row => row.evaluationCallId === currEvalCallId
-              );
-              const selectedTrial =
-                trialsForThisEval[selectedTrials[currEvalCallId] || 0];
-
-              return (
-                <GridCell key={currEvalCallId} cols={2}>
-                  <ICValueView
-                    value={
-                      (selectedTrial?.output?.[outputColumnKeys[oi]] ?? {})[
-                        currEvalCallId
-                      ]
-                    }
-                  />
-                </GridCell>
-              );
-            });
-          })}
-          {_.range(NUM_EVALS).map(ei => {
-            const currEvalCallId = leafDims[ei];
-            const trialsForThisEval = target.originalRows.filter(
-              row => row.evaluationCallId === currEvalCallId
-            );
-            const selectedTrialNdx = selectedTrials[currEvalCallId] || 0;
-            const NUM_TRIALS = trialsForThisEval.length;
-
-            return (
-              <GridCellSubgrid
-                key={currEvalCallId}
-                cols={2}
-                rows={NUM_METRICS + 1}
-                style={{
-                  gridTemplateColumns: `repeat(${NUM_TRIALS + 1}, auto)`,
-                  overflowX: 'auto',
-                  position: 'sticky',
-                  bottom: 0,
-                  zIndex: 1,
-                }}>
-                <GridCell
-                  style={{
-                    position: 'sticky',
-                    left: 0,
-                    zIndex: 1,
-                    backgroundColor: MOON_100,
-                  }}>
-                  Agg Metrics \ Trials
-                </GridCell>
-                {_.range(NUM_TRIALS).map(ti => {
-                  return (
-                    <GridCell
-                      key={ti}
-                      style={{
-                        textAlign: 'center',
-                      }}>
-                      <Button
-                        size="small"
-                        variant={
-                          selectedTrialNdx === ti ? 'primary' : 'secondary'
-                        }
-                        onClick={() => {
-                          setSelectedTrials(curr => {
-                            return {
-                              ...curr,
-                              [currEvalCallId]: ti,
-                            };
-                          });
-                        }}
-                        icon="show-visible">
-                        {ti.toString()}
-                      </Button>
-                    </GridCell>
-                  );
-                })}
-                {_.range(NUM_SCORERS + 1).map(si => {
-                  const isScorerMetric = si < NUM_SCORERS;
-
-                  const dimensionsForThisScorer = isScorerMetric
-                    ? sortedScorers.filter(
-                        s =>
-                          s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[si]
-                      )
-                    : derivedScorers;
-                  const NUM_METRICS_IN_SCORER = dimensionsForThisScorer.length;
-                  return (
-                    <React.Fragment
-                      key={isScorerMetric ? uniqueScorerRefs[si] : 'derived'}>
-                      {_.range(NUM_METRICS_IN_SCORER).map(mi => {
-                        const dimension = dimensionsForThisScorer[mi];
-
-                        const unit = dimensionUnit(dimension, true);
-                        const isBinary = dimension.scoreType === 'binary';
-                        const scoreId = dimensionId(dimension);
-                        const summaryMetric = adjustValueForDisplay(
-                          target.scores[scoreId][currEvalCallId],
-                          isBinary
-                        );
-                        const baseline = adjustValueForDisplay(
-                          target.scores[scoreId][leafDims[0]],
-                          isBinary
-                        );
-
-                        const lowerIsBetter =
-                          dimensionShouldMinimize(dimension);
-
-                        return (
-                          <React.Fragment key={scoreId}>
-                            <GridCell
-                              style={{
-                                position: 'sticky',
-                                left: 0,
-                                zIndex: 1,
-                                backgroundColor: MOON_100,
-                                display: 'flex',
-                                flexDirection: 'row',
-                                justifyContent: 'space-between  ',
-                              }}>
-                              <span>
-                                {summaryMetric != null ? (
-                                  <ValueViewNumber
-                                    value={summaryMetric}
-                                    fractionDigits={SIGNIFICANT_DIGITS}
-                                  />
-                                ) : (
-                                  <NotApplicable />
-                                )}
-                                {unit}
-                              </span>
-                              <ComparisonPill
-                                value={summaryMetric}
-                                baseline={baseline}
-                                metricUnit={unit}
-                                metricLowerIsBetter={lowerIsBetter}
-                              />
-                            </GridCell>
-                            {_.range(NUM_TRIALS).map(ti => {
-                              const metricValue =
-                                trialsForThisEval[ti].scores[scoreId][
-                                  currEvalCallId
-                                ];
-                              if (metricValue == null) {
-                                return (
-                                  <GridCell key={ti}>
-                                    <NotApplicable />
-                                  </GridCell>
-                                );
-                              }
-
-                              return (
-                                <GridCell
-                                  key={ti}
-                                  button={isScorerMetric}
-                                  onClick={
-                                    isScorerMetric
-                                      ? () =>
-                                          onScorerClick(
-                                            trialsForThisEval[ti]
-                                              .predictAndScore.scorerMetrics[
-                                              scoreId
-                                            ].sourceCall._rawScoreTraceData
-                                          )
-                                      : undefined
-                                  }>
-                                  <CellValue value={metricValue} />
-                                </GridCell>
-                              );
-                            })}
-                          </React.Fragment>
-                        );
-                      })}
-                    </React.Fragment>
-                  );
-                })}
-              </GridCellSubgrid>
-            );
-          })}
-        </GridCellSubgrid>
-      </GridContainer> */}
     </VerticalBox>
   );
 };
