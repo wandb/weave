@@ -9,7 +9,7 @@ import weave
 from weave.flow.obj import Object
 from weave.legacy import box
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op
+from weave.trace.op import Op2
 
 
 class Scorer(Object):
@@ -71,7 +71,7 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
 
 
 def get_scorer_attributes(
-    scorer: Union[Callable, Op, Scorer],
+    scorer: Union[Callable, Op2, Scorer],
 ) -> Tuple[str, Callable, Callable]:
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
@@ -85,7 +85,7 @@ def get_scorer_attributes(
                 f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
             )
     elif callable(scorer):
-        if isinstance(scorer, Op):
+        if isinstance(scorer, Op2):
             scorer_name = scorer.name
         else:
             scorer_name = scorer.__name__

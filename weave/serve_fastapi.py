@@ -1,7 +1,7 @@
 import datetime
 import inspect
 import typing
-from typing import Optional, Union
+from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -80,10 +80,8 @@ def object_method_app(
 ) -> FastAPI:
     obj = obj_ref.get()
 
-    attrs: dict[str, Union[op.Op, op.Op2]] = {
-        attr: getattr(obj, attr) for attr in dir(obj)
-    }
-    op_attrs = {k: v for k, v in attrs.items() if isinstance(v, (op.Op, op.Op2))}
+    attrs: dict[str, op.Op2] = {attr: getattr(obj, attr) for attr in dir(obj)}
+    op_attrs = {k: v for k, v in attrs.items() if isinstance(v, op.Op2)}
 
     if not op_attrs:
         raise ValueError("No ops found on object")
