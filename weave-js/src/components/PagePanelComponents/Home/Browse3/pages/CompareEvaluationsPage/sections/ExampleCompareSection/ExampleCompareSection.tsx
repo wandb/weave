@@ -1,5 +1,5 @@
-import {Box} from '@material-ui/core';
-import {Circle} from '@mui/icons-material';
+import {Box, Tooltip} from '@material-ui/core';
+import {Circle, WarningAmberOutlined} from '@mui/icons-material';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -32,7 +32,11 @@ import {
   flattenedDimensionPath,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
-import {ComparisonPill} from '../ScorecardSection/ScorecardSection';
+import {
+  ComparisonPill,
+  SCORER_VARIATION_WARNING_EXPLANATION,
+  SCORER_VARIATION_WARNING_TITLE,
+} from '../ScorecardSection/ScorecardSection';
 import {
   buildCompositeComparisonSummaryMetrics,
   CompositeSummaryMetric,
@@ -317,10 +321,10 @@ export const ExampleCompareSection: React.FC<{
     return lookupScoreGroupForScorerIndex(scorerIndex).metrics;
   };
 
-  const lookupAnyScorerRefForScorerIndex = (scorerIndex: number) => {
+  const lookupAnyScorerRefsForScorerIndex = (scorerIndex: number) => {
     return Object.values(
       lookupScoreGroupForScorerIndex(scorerIndex).evalCallIdToScorerRef
-    )[0];
+    );
   };
 
   const lookupDimensionsForScorer = (scorerIndex: number) => {
@@ -600,7 +604,26 @@ export const ExampleCompareSection: React.FC<{
     if (lookupIsDerivedMetric(scorerIndex)) {
       return null;
     }
-    const scorerRef = lookupAnyScorerRefForScorerIndex(scorerIndex);
+    const scorerRefs = lookupAnyScorerRefsForScorerIndex(scorerIndex);
+
+    let inner: JSX.Element | null = null;
+    if (scorerRefs.length === 0) {
+      inner = null;
+    } else if (scorerRefs.length === 1) {
+      const parsedRef = parseRef(scorerRefs[0]);
+      inner = <SmallRef objRef={parsedRef as WeaveObjectRef} iconOnly />;
+    } else {
+      inner = (
+        <Tooltip
+          title={
+            SCORER_VARIATION_WARNING_TITLE +
+            ': ' +
+            SCORER_VARIATION_WARNING_EXPLANATION
+          }>
+          <WarningAmberOutlined color="warning" />
+        </Tooltip>
+      );
+    }
 
     return (
       <VerticalBox
@@ -611,7 +634,7 @@ export const ExampleCompareSection: React.FC<{
           height: '100%',
           paddingLeft: '2px',
         }}>
-        <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} iconOnly />
+        {inner}
       </VerticalBox>
     );
   };

@@ -39,8 +39,8 @@ import {
   DERIVED_SCORER_REF,
 } from './summaryMetricUtil';
 
-const SCORER_VARIATION_WARNING_TITLE = 'Scoring inconsistency detected';
-const SCORER_VARIATION_WARNING_EXPLANATION =
+export const SCORER_VARIATION_WARNING_TITLE = 'Scoring inconsistency detected';
+export const SCORER_VARIATION_WARNING_EXPLANATION =
   'The scoring logic varies between evaluations. Take precaution when comparing results.';
 
 const DATASET_VARIATION_WARNING_TITLE = 'Dataset inconsistency detected';
