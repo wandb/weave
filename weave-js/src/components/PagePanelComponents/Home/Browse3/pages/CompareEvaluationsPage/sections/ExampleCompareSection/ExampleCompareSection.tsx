@@ -264,7 +264,7 @@ export const ExampleCompareSection: React.FC<{
           colSpan={1}
           rowsTemp={`repeat(${
             NEW_NUM_INPUT_PROPS + (SHOW_INPUT_HEADER ? 1 : 0)
-          })`}
+          }, auto)`}
           colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px auto`}>
           {/* INPUT HEADER */}
           {SHOW_INPUT_HEADER && (
@@ -330,7 +330,7 @@ export const ExampleCompareSection: React.FC<{
           ref={ref2}
           rowSpan={1}
           colSpan={1}
-          rowsTemp={`repeat(${NEW_TOTAL_METRICS + 1})`}
+          rowsTemp={`repeat(${NEW_TOTAL_METRICS + 1}, auto)`}
           colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}>
           {/* METRIC HEADER */}
           <React.Fragment>
@@ -341,7 +341,6 @@ export const ExampleCompareSection: React.FC<{
               const TRIALS_FOR_EVAL = NEW_NUM_TRIALS[evalIndex];
               return (
                 <GridCellSubgrid
-                  style={{}}
                   rowSpan={NEW_TOTAL_METRICS + 1}
                   colSpan={1}
                   colsTemp={`min-content repeat(${TRIALS_FOR_EVAL} , auto)`}>
@@ -359,7 +358,7 @@ export const ExampleCompareSection: React.FC<{
                     return (
                       <React.Fragment key={scorerIndex}>
                         <GridCell style={{...STICKY_SIDEBAR}}>
-                          SM_{scorerIndex}
+                          SM_{scorerIndex}_E_{evalIndex}
                         </GridCell>
                         {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
                           return (
