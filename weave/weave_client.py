@@ -105,7 +105,9 @@ def map_to_refs(obj: Any) -> Any:
     if ref:
         return ref
     if isinstance(obj, ObjectRecord):
-        return obj.map_values(map_to_refs)
+        res = obj.map_values(map_to_refs)
+        print(f">>> {res=}")
+        return res
     elif isinstance(obj, pydantic.BaseModel):
         obj_record = pydantic_object_record(obj)
         return obj_record.map_values(map_to_refs)
@@ -338,6 +340,9 @@ class WeaveClient:
         ref = dataclasses.replace(ref, digest=read_res.obj.digest)
 
         data = read_res.obj.val
+
+        print(f"{read_res=}")
+        print(f"{ref=}, {data=}")
 
         # If there is a ref-extra, we should resolve it. Rather than walking
         # the object, it is more efficient to directly query for the data and

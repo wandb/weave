@@ -543,13 +543,13 @@ def test_save_model(client):
     assert model2.predict("x") == "input is: x"
 
 
-@pytest.mark.flaky(reruns=5, reruns_delay=2)
+@pytest.mark.flaky(reruns=3, reruns_delay=2)
 def test_saved_nested_modellike(client):
     class A(weave.Object):
         x: int
 
         @weave.op()
-        async def call(self, input):
+        async def mycall(self, input):
             return self.x + input
 
     class B(weave.Object):
@@ -557,12 +557,17 @@ def test_saved_nested_modellike(client):
         y: int
 
         @weave.op()
-        async def call(self, input):
-            return await self.a.call(input - self.y)
+        async def mycall(self, input):
+            return await self.a.mycall(input - self.y)
 
     model = B(a=A(x=3), y=2)
     ref = client._save_object(model, "my-model")
     model2 = client.get(ref)
+
+    print(f"{model2=}")
+    print(f"{model2.a=}")
+    print(f"{model2.y=}")
+    print(f"{model2.mycall=}")
 
     class C(weave.Object):
         b: B
@@ -570,7 +575,7 @@ def test_saved_nested_modellike(client):
 
         @weave.op()
         async def call(self, input):
-            return await self.b.call(input - 2 * self.z)
+            return await self.b.mycall(input - 2 * self.z)
 
     @weave.op()
     async def call_model(c, input):
