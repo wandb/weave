@@ -15,6 +15,7 @@ import styled from 'styled-components';
 
 import {
   MOON_100,
+  MOON_200,
   MOON_300,
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
@@ -59,7 +60,7 @@ const GridCell = styled.div<{
   rowSpan?: number;
   button?: boolean;
 }>`
-  border: 1px solid ${MOON_300};
+  border: 1px solid ${MOON_200};
   grid-column-end: span ${props => props.colSpan || 1};
   grid-row-end: span ${props => props.rowSpan || 1};
   padding: 4px 8px;
@@ -156,8 +157,6 @@ export const ExampleCompareSection: React.FC<{
   const derivedScorers = Object.values(
     props.state.data.derivedMetricDimensions
   );
-
-  const leftRef = React.useRef<HTMLDivElement>(null);
 
   const [selectedTrials, setSelectedTrials] = React.useState<{
     [evalCallId: string]: number;
