@@ -36,10 +36,7 @@ import {
   EvaluationCallLink,
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
-import {
-  deriveComparisonSummaryMetrics,
-  DerivedComparisonSummaryMetrics,
-} from './summaryMetricUtil';
+import {deriveComparisonSummaryMetrics} from './summaryMetricUtil';
 
 const VARIATION_WARNING_TITLE = 'Variation detected';
 const VARIATION_WARNING_EXPLANATION =

@@ -1,4 +1,9 @@
-import {EvaluationComparisonState, EvaluationMetricDimension, isDerivedMetricDefinition, isScorerMetricDimension} from '../../ecpTypes';
+import {
+  EvaluationComparisonState,
+  EvaluationMetricDimension,
+  isDerivedMetricDefinition,
+  isScorerMetricDimension,
+} from '../../ecpTypes';
 import {
   adjustValueForDisplay,
   dimensionUnit,
@@ -6,7 +11,7 @@ import {
   resolveDimensionValueForEvaluateCall,
 } from '../../ecpUtil';
 
-const DERIVED_SCORER_REF = '__DERIVED__'
+const DERIVED_SCORER_REF = '__DERIVED__';
 
 type DerivedSummaryMetric = {
   scorerRefToDimensionId: {[scorerRef: string]: string};
@@ -24,17 +29,21 @@ type DerivedSummaryScoreGroup = {
   };
 };
 
-
 export type DerivedComparisonSummaryMetrics = {
   [scorerGroupName: string]: DerivedSummaryScoreGroup;
 };
 
-export const dimensionKeys = (dimension: EvaluationMetricDimension): {
+export const dimensionKeys = (
+  dimension: EvaluationMetricDimension
+): {
   scorerGroupName: string;
   dimensionPath: string;
 } => {
   if (isDerivedMetricDefinition(dimension)) {
-    return {scorerGroupName: DERIVED_SCORER_REF, dimensionPath: dimension.derivedMetricName};
+    return {
+      scorerGroupName: DERIVED_SCORER_REF,
+      dimensionPath: dimension.derivedMetricName,
+    };
   } else if (isScorerMetricDimension(dimension)) {
     return {
       scorerGroupName: dimension.scorerDef.likelyTopLevelKeyName,
@@ -43,14 +52,18 @@ export const dimensionKeys = (dimension: EvaluationMetricDimension): {
   } else {
     throw new Error('Unknown dimension type');
   }
-}
+};
 
-export type ResolvePeerDimensionFn = (evalCallId: string, peerDimension: EvaluationMetricDimension) => EvaluationMetricDimension | undefined
+export type ResolvePeerDimensionFn = (
+  evalCallId: string,
+  peerDimension: EvaluationMetricDimension
+) => EvaluationMetricDimension | undefined;
 
 export const deriveComparisonSummaryMetrics = (
   state: EvaluationComparisonState
-): {derivedMetrics: DerivedComparisonSummaryMetrics, resolvePeerDimension: ResolvePeerDimensionFn
-
+): {
+  derivedMetrics: DerivedComparisonSummaryMetrics;
+  resolvePeerDimension: ResolvePeerDimensionFn;
 } => {
   const derivedMetrics: DerivedComparisonSummaryMetrics = {};
   Object.entries(state.data.evaluationCalls).forEach(
@@ -73,9 +86,17 @@ export const deriveComparisonSummaryMetrics = (
                 metrics: {},
               };
             }
-            derivedMetrics[dimKeys.scorerGroupName].evalCallIdToScorerRef[evalCallId] = scorerRef;
-            if (derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath] == null) {
-              derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath] = {
+            derivedMetrics[dimKeys.scorerGroupName].evalCallIdToScorerRef[
+              evalCallId
+            ] = scorerRef;
+            if (
+              derivedMetrics[dimKeys.scorerGroupName].metrics[
+                dimKeys.dimensionPath
+              ] == null
+            ) {
+              derivedMetrics[dimKeys.scorerGroupName].metrics[
+                dimKeys.dimensionPath
+              ] = {
                 metricLabel: dimKeys.dimensionPath,
                 scorerRefToDimensionId: {[scorerRef]: metricDimensionId},
                 unit,
@@ -84,18 +105,18 @@ export const deriveComparisonSummaryMetrics = (
               };
             }
             if (
-              derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath].scorerRefToDimensionId[
-                scorerRef
-              ] == null
+              derivedMetrics[dimKeys.scorerGroupName].metrics[
+                dimKeys.dimensionPath
+              ].scorerRefToDimensionId[scorerRef] == null
             ) {
-              derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath].scorerRefToDimensionId[
-                scorerRef
-              ] = metricDimensionId;
+              derivedMetrics[dimKeys.scorerGroupName].metrics[
+                dimKeys.dimensionPath
+              ].scorerRefToDimensionId[scorerRef] = metricDimensionId;
             }
 
-            derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath].evalScores[
-              evaluationCall.callId
-            ] = adjustValueForDisplay(
+            derivedMetrics[dimKeys.scorerGroupName].metrics[
+              dimKeys.dimensionPath
+            ].evalScores[evaluationCall.callId] = adjustValueForDisplay(
               resolveDimensionValueForEvaluateCall(
                 scorerMetricsDimension,
                 evaluationCall
@@ -115,10 +136,18 @@ export const deriveComparisonSummaryMetrics = (
                 metrics: {},
               };
             }
-            derivedMetrics[dimKeys.scorerGroupName].evalCallIdToScorerRef[evalCallId] = scorerRef;
+            derivedMetrics[dimKeys.scorerGroupName].evalCallIdToScorerRef[
+              evalCallId
+            ] = scorerRef;
 
-            if (derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath] == null) {
-              derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath] = {
+            if (
+              derivedMetrics[dimKeys.scorerGroupName].metrics[
+                dimKeys.dimensionPath
+              ] == null
+            ) {
+              derivedMetrics[dimKeys.scorerGroupName].metrics[
+                dimKeys.dimensionPath
+              ] = {
                 metricLabel: dimKeys.dimensionPath,
                 scorerRefToDimensionId: {[scorerRef]: metricDimensionId},
                 unit,
@@ -127,18 +156,18 @@ export const deriveComparisonSummaryMetrics = (
               };
             }
             if (
-              derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath].scorerRefToDimensionId[
-                scorerRef
-              ] == null
+              derivedMetrics[dimKeys.scorerGroupName].metrics[
+                dimKeys.dimensionPath
+              ].scorerRefToDimensionId[scorerRef] == null
             ) {
-              derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath].scorerRefToDimensionId[
-                scorerRef
-              ] = metricDimensionId;
+              derivedMetrics[dimKeys.scorerGroupName].metrics[
+                dimKeys.dimensionPath
+              ].scorerRefToDimensionId[scorerRef] = metricDimensionId;
             }
 
-            derivedMetrics[dimKeys.scorerGroupName].metrics[dimKeys.dimensionPath].evalScores[
-              evaluationCall.callId
-            ] = adjustValueForDisplay(
+            derivedMetrics[dimKeys.scorerGroupName].metrics[
+              dimKeys.dimensionPath
+            ].evalScores[evaluationCall.callId] = adjustValueForDisplay(
               resolveDimensionValueForEvaluateCall(
                 derivedMetricsDimension,
                 evaluationCall
@@ -155,7 +184,7 @@ export const deriveComparisonSummaryMetrics = (
 
   const resolvePeerDimension = (
     evalCallId: string,
-    peerDimension: EvaluationMetricDimension,
+    peerDimension: EvaluationMetricDimension
   ): EvaluationMetricDimension | undefined => {
     // Given the Target Dimension, get the scorer group & metricName -> basically gets the common identifier
     // Given the scorer group & the eval id, get the scorerRef       -> resolve part 1

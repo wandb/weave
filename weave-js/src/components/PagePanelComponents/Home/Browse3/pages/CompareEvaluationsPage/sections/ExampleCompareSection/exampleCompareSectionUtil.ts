@@ -5,7 +5,10 @@ import {flattenObject} from '../../../../../Browse2/browse2Util';
 import {getOrderedCallIds} from '../../ecpState';
 import {EvaluationComparisonState, PredictAndScoreCall} from '../../ecpTypes';
 import {dimensionId, resolveDimensionValueForPASCall} from '../../ecpUtil';
-import { deriveComparisonSummaryMetrics,ResolvePeerDimensionFn } from '../ScorecardSection/summaryMetricUtil';
+import {
+  deriveComparisonSummaryMetrics,
+  ResolvePeerDimensionFn,
+} from '../ScorecardSection/summaryMetricUtil';
 
 type RowBase = {
   id: string;
@@ -87,18 +90,23 @@ const rowIsSelected = (
     ) {
       return true;
     }
-    return Object.entries(compareDim.rangeSelection).every(([evalCallId, range]) => {
-      const resolvedPeerDim = resolvePeerDimension(evalCallId, compareDim.dimension);
-      if (resolvedPeerDim == null) {
-        return false;
+    return Object.entries(compareDim.rangeSelection).every(
+      ([evalCallId, range]) => {
+        const resolvedPeerDim = resolvePeerDimension(
+          evalCallId,
+          compareDim.dimension
+        );
+        if (resolvedPeerDim == null) {
+          return false;
+        }
+        const values = scores[dimensionId(resolvedPeerDim)];
+        if (values[evalCallId] == null) {
+          return false;
+        }
+        const rowVal = values[evalCallId] as number;
+        return range.min <= rowVal && rowVal <= range.max;
       }
-      const values = scores[dimensionId(resolvedPeerDim)];
-      if (values[evalCallId] == null) {
-        return false;
-      }
-      const rowVal = values[evalCallId] as number;
-      return range.min <= rowVal && rowVal <= range.max;
-    });
+    );
   });
 };
 
@@ -242,7 +250,11 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     let res = aggregatedAsList;
     if (compareDims != null && compareDims.length > 0) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
-        return rowIsSelected(aggregatedRows[digest].scores, state, resolvePeerDimension);
+        return rowIsSelected(
+          aggregatedRows[digest].scores,
+          state,
+          resolvePeerDimension
+        );
       });
 
       res = aggregatedAsList.filter(row =>
