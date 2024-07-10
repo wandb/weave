@@ -1,8 +1,9 @@
 import dataclasses
 import datetime
+import inspect
 import typing
 import uuid
-from typing import Any, Dict, Optional, Sequence, TypedDict, Union
+from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
 
 import pydantic
 from requests import HTTPError
@@ -746,6 +747,9 @@ class WeaveClient:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
         print(f"{op_def_ref=}")
+        # it's both a method AND an Op2
+        if inspect.ismethod(op):
+            op = cast(op, Op2)
         op.ref = op_def_ref  # type: ignore
         print(f"{op=}")
         print(f"{op.ref=}")
