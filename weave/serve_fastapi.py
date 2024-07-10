@@ -12,13 +12,11 @@ try:
 except ImportError:
     from typing_extensions import Annotated  # type: ignore
 
-from weave import pyfunc_type_util
-from weave.legacy import cache
+from weave import errors, pyfunc_type_util, weave_pydantic
+from weave.legacy import cache, op_args
 from weave.legacy.wandb_api import WandbApiAsync
 from weave.trace import op
 from weave.trace.refs import ObjectRef
-
-from . import weave_pydantic
 
 key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
     cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
@@ -98,15 +96,26 @@ def object_method_app(
             )
         method_name = next(iter(op_attrs))
 
-    method = getattr(obj, method_name)
+    method = getattr(obj, method_name, None)
+    if method is None:
+        raise ValueError(f"Method {method_name} not found")
+
     unbound_method = method.__func__
 
     if not isinstance(unbound_method, op.Op2):
         raise ValueError(f"Expected an op, got {unbound_method}")
 
-    # TODO: don tneed to unbind
-    args = pyfunc_type_util.determine_input_type(unbound_method)
-    arg_types = args.weave_type().property_types  # type: ignore
+    try:
+        args = pyfunc_type_util.determine_input_type(unbound_method)
+    except errors.WeaveDefinitionError as e:
+        raise ValueError(
+            f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
+        )
+
+    if not isinstance(args, op_args.OpNamedArgs):
+        raise ValueError("predict op must have named args")
+
+    arg_types = args.weave_type().property_types
     del arg_types["self"]
 
     Item = weave_pydantic.weave_type_to_pydantic(arg_types, name="Item")

@@ -25,7 +25,6 @@ class Object(BaseModel):
         arbitrary_types_allowed=True,
         protected_namespaces=(),
         extra="forbid",
-        # extra="allow",
     )
 
     __str__ = BaseModel.__repr__
