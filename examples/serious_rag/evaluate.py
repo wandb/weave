@@ -102,8 +102,8 @@ class CorrectnessLLMJudge(Scorer):
                 #"stderr": sample_error,
             }, 
             "Nr1_Retrieval":{
-                "#": retr_sample_mean,
-                "%": retr_count_true,
+                "#": retr_count_true,
+                "%": retr_sample_mean,
                 #"stderr": sample_error,
             }
         }
