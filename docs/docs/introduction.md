@@ -15,7 +15,7 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 
 ![Weave Hero](../static/img/weave-hero.png)
 
-Seriously, try the 🍪 **[quickstart](/quickstart)** 🍪 or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Seriously, try the 🍪 **[quickstart](/quickstart)** 🍪 or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab" onClick={()=>{window.analytics?.track("Weave colab clicked")}}><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 You can use Weave to:
 - Log and debug language model inputs, outputs, and traces
