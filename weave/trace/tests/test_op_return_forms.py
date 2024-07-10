@@ -90,9 +90,11 @@ async def test_op_return_async_obj(client):
 
 
 def simple_list_accumulator(acc, value):
+    print("Hello from simple_list_accumulator")
     if acc is None:
         acc = []
     acc.append(value)
+    print(f"{acc=}")
     return acc
 
 
@@ -227,17 +229,18 @@ async def test_op_return_async_iterator(client):
     assert res.calls[0].output == list(range(9, -1, -1))
 
 
+@weave.op()
+def fn1():
+    size = 10
+    while size > 0:
+        size -= 1
+        yield size
+
+
 def test_op_return_sync_generator_never_iter(client):
-    @weave.op()
-    def fn():
-        size = 10
-        while size > 0:
-            size -= 1
-            yield size
+    add_accumulator(fn1, lambda inputs: simple_list_accumulator)
 
-    add_accumulator(fn, lambda inputs: simple_list_accumulator)
-
-    fn()
+    fn1()
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -245,7 +248,7 @@ def test_op_return_sync_generator_never_iter(client):
         )
     )
 
-    obj_ref = get_ref(fn)
+    obj_ref = get_ref(fn1)
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}

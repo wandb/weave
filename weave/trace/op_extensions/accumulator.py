@@ -52,6 +52,9 @@ def add_accumulator(
     add_accumulator(fn, simple_list_accumulator) # returns the op with `list(range(9, -1, -1))` as output
     ```
     """
+    print(
+        f"Adding an accumulator, {op=}, {make_accumulator=}, {should_accumulate=}, {on_finish_post_processor=}"
+    )
 
     def on_output(
         value: Iterator[V], on_finish: FinishCallbackType, inputs: Dict

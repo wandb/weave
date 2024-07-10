@@ -480,24 +480,27 @@ def test_saveload_op(client):
     assert obj2["b"].name == "op-add3"
 
 
+class MyCustomObj:
+    a: int
+    b: str
+
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+
+
+def custom_obj_save(obj, artifact, name) -> None:
+    with artifact.new_file(f"{name}.json") as f:
+        json.dump({"a": obj.a, "b": obj.b}, f)
+
+
+def custom_obj_load(artifact, name):
+    with artifact.open(f"{name}.json") as f:
+        json_obj = json.load(f)
+        return MyCustomObj(json_obj["a"], json_obj["b"])
+
+
 def test_saveload_customtype(client, strict_op_saving):
-    class MyCustomObj:
-        a: int
-        b: str
-
-        def __init__(self, a, b):
-            self.a = a
-            self.b = b
-
-    def custom_obj_save(obj, artifact, name) -> None:
-        with artifact.new_file(f"{name}.json") as f:
-            json.dump({"a": obj.a, "b": obj.b}, f)
-
-    def custom_obj_load(artifact, name):
-        with artifact.open(f"{name}.json") as f:
-            json_obj = json.load(f)
-            return MyCustomObj(json_obj["a"], json_obj["b"])
-
     register_serializer(MyCustomObj, custom_obj_save, custom_obj_load)
 
     obj = MyCustomObj(5, "x")
@@ -768,21 +771,24 @@ def test_refs_read_batch_dataset_rows(client):
     assert res.vals[1] == 6
 
 
+class CoolCustomThing:
+    a: str
+
+    def __init__(self, a):
+        self.a = a
+
+
+def save_instance(obj, artifact, name):
+    with artifact.new_file(name) as f:
+        f.write(obj.a * 10000005)
+
+
+def load_instance(artifact, name, extra=None):
+    with artifact.open(name) as f:
+        return CoolCustomThing(f.read())
+
+
 def test_large_files(client):
-    class CoolCustomThing:
-        a: str
-
-        def __init__(self, a):
-            self.a = a
-
-    def save_instance(obj, artifact, name):
-        with artifact.new_file(name) as f:
-            f.write(obj.a * 10000005)
-
-    def load_instance(artifact, name, extra=None):
-        with artifact.open(name) as f:
-            return CoolCustomThing(f.read())
-
     register_serializer(CoolCustomThing, save_instance, load_instance)
 
     ref = client._save_object(CoolCustomThing("x"), "my-obj")

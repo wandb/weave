@@ -414,22 +414,24 @@ class SomeDict(typing.TypedDict):
     val: int
 
 @weave.op()
-def some_d(v: int) -> SomeDict:
+def some_e(v: int) -> SomeDict:
     return SomeDict(val=v)
 """
 
 
+class SomeDict(typing.TypedDict):
+    val: int
+
+
+@weave.op()
+def some_e(v: int) -> SomeDict:
+    return SomeDict(val=v)
+
+
 def test_op_return_typeddict_annotation(client, strict_op_saving):
-    class SomeDict(typing.TypedDict):
-        val: int
+    assert some_e(1) == {"val": 1}
 
-    @weave.op()
-    def some_d(v: int) -> SomeDict:
-        return SomeDict(val=v)
-
-    assert some_d(1) == {"val": 1}
-
-    ref = weave.obj_ref(some_d)
+    ref = weave.obj_ref(some_e)
     assert ref is not None
 
     saved_code = get_saved_code(client, ref)
@@ -451,25 +453,27 @@ class MyCoolClass:
         self.val = val
 
 @weave.op()
-def some_d(v: int):
+def some_f(v: int):
     return MyCoolClass(v)
 """
 
 
+class MyCoolClass:
+    val: int
+
+    def __init__(self, val):
+        self.val = val
+
+
+@weave.op()
+def some_f(v: int):
+    return MyCoolClass(v)
+
+
 def test_op_return_return_custom_class(client, strict_op_saving):
-    class MyCoolClass:
-        val: int
+    assert some_f(1).val == 1
 
-        def __init__(self, val):
-            self.val = val
-
-    @weave.op()
-    def some_d(v: int):
-        return MyCoolClass(v)
-
-    assert some_d(1).val == 1
-
-    ref = weave.obj_ref(some_d)
+    ref = weave.obj_ref(some_f)
     assert ref is not None
 
     saved_code = get_saved_code(client, ref)
@@ -482,7 +486,7 @@ def test_op_return_return_custom_class(client, strict_op_saving):
 EXPECTED_NESTED_FUNCTION_CODE = """import weave
 
 @weave.op()
-def some_d(v: int):
+def some_g(v: int):
     def internal_fn(x):
         return x + 3
 
@@ -490,17 +494,19 @@ def some_d(v: int):
 """
 
 
+@weave.op()
+def some_g(v: int):
+    def internal_fn(x):
+        return x + 3
+
+    return internal_fn(v)
+
+
+assert some_g(1) == 4
+
+
 def test_op_nested_function(client, strict_op_saving):
-    @weave.op()
-    def some_d(v: int):
-        def internal_fn(x):
-            return x + 3
-
-        return internal_fn(v)
-
-    assert some_d(1) == 4
-
-    ref = weave.obj_ref(some_d)
+    ref = weave.obj_ref(some_g)
     assert ref is not None
 
     saved_code = get_saved_code(client, ref)

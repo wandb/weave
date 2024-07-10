@@ -1,8 +1,6 @@
-import functools
 import inspect
 import typing
 from functools import partial, wraps
-from types import MethodType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -278,6 +276,7 @@ class Op2(Protocol):
     name: str
     signature: inspect.Signature
     ref: Optional[ObjectRef]
+    resolve_fn: Callable
 
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
@@ -350,17 +349,19 @@ def _create_call(func: Op2, *args: Any, **kwargs: Any) -> "Call":
 
 
 def _execute_call(
-    func: Callable,
+    wrapper: Op2,
     call: Any,
     *args: Any,
     return_type: Literal["call", "value"] = "call",
     **kwargs: Any,
 ) -> Any:
+    func = wrapper.resolve_fn
     print(f"Before call {func=}")
     client = client_context.weave_client.require_weave_client()
     has_finished = False
 
     def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
+        print("start finish")
         nonlocal has_finished
         if has_finished:
             raise ValueError("Should not call finish more than once")
@@ -369,7 +370,9 @@ def _execute_call(
             print_call_link(call)
 
     def on_output(output: Any) -> Any:
-        if handler := getattr(func, "_on_output_handler", None):
+        print("start on_output")
+        if handler := getattr(wrapper, "_on_output_handler", None):
+            print(f"Calling the handler {handler=}")
             return handler(output, finish, call.inputs)
         finish(output)
         return output
@@ -451,7 +454,7 @@ def op(*args, **kwargs) -> Union[Callable[[Any], Op2], Op2]:
                         return await func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)
                     return await _execute_call(
-                        func, call, *args, return_type="normal", **kwargs
+                        wrapper, call, *args, return_type="normal", **kwargs
                     )
             else:
 
@@ -459,13 +462,17 @@ def op(*args, **kwargs) -> Union[Callable[[Any], Op2], Op2]:
                 def wrapper(*args, **kwargs):
                     if client_context.weave_client.get_weave_client() is None:
                         return func(*args, **kwargs)
+
+                    print(f"{wrapper._on_output_handler=}")
+
                     call = _create_call(wrapper, *args, **kwargs)
                     return _execute_call(
-                        func, call, *args, return_type="normal", **kwargs
+                        wrapper, call, *args, return_type="normal", **kwargs
                     )
 
             # Tack these helpers on to our wrapper
             # should this be qualname?
+            wrapper.resolve_fn = func  # type: ignore
             wrapper.name = func.__name__  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore

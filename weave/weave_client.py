@@ -86,7 +86,9 @@ def get_obj_name(val: Any) -> str:
 
 
 def get_ref(obj: Any) -> Optional[ObjectRef]:
-    return getattr(obj, "ref", None)
+    res = getattr(obj, "ref", None)
+    print(f"{res=}")
+    return res
 
 
 def _get_direct_ref(obj: Any) -> Optional[Ref]:
@@ -481,7 +483,6 @@ class WeaveClient:
     def finish_call(
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
-        print("finishing call")
         self._save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
@@ -866,3 +867,31 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
         return tuple(tuple_res)
 
     return obj
+
+
+def materialize(iterable):
+    """
+    Materialize any iterable (generator function or object implementing __iter__) into a list.
+
+    Args:
+    iterable: A generator function, generator expression, or any object that implements __iter__
+
+    Returns:
+    A list containing all the elements from the iterable
+    """
+    # Check if the input is callable (potentially a generator function)
+    if callable(iterable):
+        # If it's callable, execute it to get an iterator
+        iterator = iterable()
+    else:
+        # If it's not callable, assume it's already an iterable
+        iterator = iterable
+
+    # Try to get an iterator from the object
+    try:
+        iterator = iter(iterator)
+    except TypeError:
+        raise TypeError(f"The input {iterable} is not iterable")
+
+    # Materialize the iterator into a list
+    return list(iterator)
