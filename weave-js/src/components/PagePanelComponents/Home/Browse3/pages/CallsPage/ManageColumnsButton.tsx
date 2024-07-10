@@ -9,7 +9,7 @@ import classNames from 'classnames';
 import React, {useCallback, useRef, useState} from 'react';
 
 import {Button} from '../../../../../Button';
-import {DraggableGrow} from '../../../../../DraggablePopups';
+import {DraggableGrow, DraggableHandle} from '../../../../../DraggablePopups';
 import {TextField} from '../../../../../Form/TextField';
 import {Tailwind} from '../../../../../Tailwind';
 import {ColumnInfo} from '../../types';
@@ -101,21 +101,23 @@ export const ManageColumnsButton = ({
         TransitionComponent={DraggableGrow}>
         <Tailwind>
           <div className="min-w-[300px] p-12">
-            <div className="handle flex items-center pb-8">
-              <div className="flex-auto font-semibold">Manage columns</div>
-              <div>
-                <Button
-                  size="small"
-                  variant="ghost"
-                  icon="close"
-                  tooltip="Close column management"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setAnchorEl(null);
-                  }}
-                />
+            <DraggableHandle>
+              <div className="flex items-center pb-8">
+                <div className="flex-auto font-semibold">Manage columns</div>
+                <div>
+                  <Button
+                    size="small"
+                    variant="ghost"
+                    icon="close"
+                    tooltip="Close column management"
+                    onClick={e => {
+                      e.stopPropagation();
+                      setAnchorEl(null);
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            </DraggableHandle>
             <div className="mb-8">
               <TextField
                 placeholder="Filter columns"
@@ -157,7 +159,7 @@ export const ManageColumnsButton = ({
                       <label
                         htmlFor={idSwitch}
                         className={classNames(
-                          'ml-4',
+                          'ml-6',
                           disabled ? '' : 'cursor-pointer'
                         )}>
                         {label}
