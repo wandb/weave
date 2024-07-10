@@ -501,9 +501,9 @@ export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
   return ref.scheme === 'weave';
 };
 
-// Entity name: lowercase, digits, dash, underscore
-// Note: Also adding uppercase because team names allow it. Not sure if that was intentional.
-const PATTERN_ENTITY = '([A-Za-z0-9-_]+)';
+// Entity name should be lowercase, digits, dash, underscore
+// Unfortunately many teams have been created that violate this.
+const PATTERN_ENTITY = '([^/]+)';
 const PATTERN_PROJECT = '([^\\#?%:]{1,128})'; // Project name
 const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
   [

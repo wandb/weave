@@ -37,7 +37,7 @@ from weave import client_context
 from weave.call_context import get_current_call as get_current_call
 from weave.trace import context as trace_context
 from .trace.constants import TRACE_OBJECT_EMOJI
-from weave.trace.refs import ObjectRef
+from weave.trace.refs import ObjectRef, parse_uri
 
 # exposed as part of api
 from . import weave_types as types
@@ -250,7 +250,7 @@ def ref(location: str) -> _weave_client.ObjectRef:
             name, version = location.split(":")
         location = str(client._ref_uri(name, version, "obj"))
 
-    uri = _weave_client.parse_uri(location)
+    uri = parse_uri(location)
     if not isinstance(uri, _weave_client.ObjectRef):
         raise ValueError("Expected an object ref")
     return uri

@@ -1,12 +1,9 @@
-import typing
-from typing import Any, Generator, List, Optional
+from typing import Any, Generator, Optional
 
 import pytest
 
 import weave
 from weave.trace_server import trace_server_interface as tsi
-
-from .llamaindex import llamaindex_patcher
 
 
 def filter_body(r: Any) -> Any:
@@ -97,6 +94,7 @@ def test_llamaindex_quickstart(
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_calls_correct_for_quickstart(res.calls)
+    assert res.calls[-2].inputs["serialized"]["api_key"] == "REDACTED"
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -119,3 +117,4 @@ async def test_llamaindex_quickstart_async(
     response = await query_engine.aquery("What did the author do growing up?")
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_calls_correct_for_quickstart(res.calls)
+    assert res.calls[-2].inputs["serialized"]["api_key"] == "REDACTED"

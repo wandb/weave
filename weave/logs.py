@@ -2,7 +2,6 @@ import contextlib
 import contextvars
 import dataclasses
 import enum
-import json
 import logging
 import logging.config
 import os

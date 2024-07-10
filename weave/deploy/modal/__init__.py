@@ -5,11 +5,11 @@ import time
 import typing
 from pathlib import Path
 
-from weave import artifact_wandb, environment
+from weave import artifact_wandb as artifact_wandb
+from weave import environment
 from weave.trace.refs import ObjectRef, parse_uri
 
 try:
-    import dotenv
     from modal.cli.import_refs import import_stub
     from modal.config import config
     from modal.runner import deploy_stub

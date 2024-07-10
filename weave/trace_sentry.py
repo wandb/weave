@@ -13,7 +13,6 @@ __all__ = ("Sentry",)
 import atexit
 import functools
 import os
-import pathlib
 import site
 import sys
 from types import TracebackType

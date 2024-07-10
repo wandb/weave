@@ -1,5 +1,3 @@
-import re
-
 import sqlparse
 
 from weave.trace_server import trace_server_interface as tsi

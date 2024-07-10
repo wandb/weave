@@ -1,6 +1,5 @@
 import numpy as np
 
-from . import errors
 from . import weave_types as types
 
 

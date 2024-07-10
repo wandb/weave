@@ -513,6 +513,7 @@ export const ExampleCompareSection: React.FC<{
 
                         const lowerIsBetter =
                           dimensionShouldMinimize(dimension);
+
                         return (
                           <React.Fragment key={scoreId}>
                             <GridCell

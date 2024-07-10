@@ -9,6 +9,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
+import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {Loading} from '@wandb/weave/components/Loading';
@@ -29,6 +30,7 @@ import {
   Route,
   Switch,
   useHistory,
+  useLocation,
   useParams,
 } from 'react-router-dom';
 
@@ -666,12 +668,29 @@ const CallsPageBinding = () => {
     },
     [history, entity, project, routerContext]
   );
+
+  const location = useLocation();
+  const columnVisibilityModel = useMemo(() => {
+    try {
+      return JSON.parse(query.cols);
+    } catch (e) {
+      return {};
+    }
+  }, [query.cols]);
+  const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    newQuery.set('cols', JSON.stringify(newModel));
+    history.push({search: newQuery.toString()});
+  };
+
   return (
     <CallsPage
       entity={entity}
       project={project}
       initialFilter={filters}
       onFilterUpdate={onFilterUpdate}
+      columnVisibilityModel={columnVisibilityModel}
+      setColumnVisibilityModel={setColumnVisibilityModel}
     />
   );
 };

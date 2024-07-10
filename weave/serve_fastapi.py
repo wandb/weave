@@ -13,15 +13,11 @@ except ImportError:
     from typing_extensions import Annotated  # type: ignore
 
 from weave.legacy import cache, op_args
-from weave.legacy.artifact_wandb import WandbArtifactRef
-from weave.legacy.wandb_api import WandbApiAsync, WandbApiContext, wandb_api_context
+from weave.legacy.wandb_api import WandbApiAsync
 from weave.trace import op
-from weave.trace.refs import ObjectRef, OpRef
-from weave.trace.vals import WeaveObject
+from weave.trace.refs import ObjectRef
 
 from . import errors, pyfunc_type_util, weave_pydantic
-from . import weave_types as types
-from .legacy.monitoring import monitor
 
 key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
     cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
