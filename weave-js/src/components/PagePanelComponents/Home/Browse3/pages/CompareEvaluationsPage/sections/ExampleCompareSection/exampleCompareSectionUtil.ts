@@ -246,7 +246,8 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const filteredRows = useMemo(() => {
     const aggregatedAsList = Object.values(aggregatedRows);
     const compareDims = state.comparisonDimensions;
-    const {resolvePeerDimension} = buildCompositeComparisonSummaryMetrics(state);
+    const {resolvePeerDimension} =
+      buildCompositeComparisonSummaryMetrics(state);
     let res = aggregatedAsList;
     if (compareDims != null && compareDims.length > 0) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
