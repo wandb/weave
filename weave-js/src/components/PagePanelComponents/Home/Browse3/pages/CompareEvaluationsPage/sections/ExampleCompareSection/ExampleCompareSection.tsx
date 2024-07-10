@@ -33,6 +33,7 @@ import {
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {ComparisonPill} from '../ScorecardSection/ScorecardSection';
+import {buildCompositeComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
 import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 
 const SIDEBAR_WIDTH_PX = 250;
@@ -220,6 +221,10 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
+  const {resolvePeerDimension} = useMemo(
+    () => buildCompositeComparisonSummaryMetrics(props.state),
+    [props.state]
+  );
 
   if (target == null) {
     return <div>Filter resulted in 0 rows</div>;
@@ -325,11 +330,18 @@ export const ExampleCompareSection: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ) => {
-    const scoreId = lookupDimensionId(scorerIndex, metricIndex);
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
     const currEvalCallId = orderedCallIds[evalIndex];
+    const resolvedScoreId = resolvePeerDimension(
+      currEvalCallId,
+      lookupDimension(scorerIndex, metricIndex)
+    );
 
-    return targetTrial.scores[scoreId][currEvalCallId];
+    if (resolvedScoreId == null) {
+      return undefined;
+    }
+
+    return targetTrial.scores[dimensionId(resolvedScoreId)][currEvalCallId];
   };
 
   const lookupAggScorerMetricValue = (
@@ -337,10 +349,17 @@ export const ExampleCompareSection: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ) => {
-    const dimension = lookupDimension(scorerIndex, metricIndex);
-    const scoreId = dimensionId(dimension);
     const currEvalCallId = orderedCallIds[evalIndex];
-    return target.scores[scoreId][currEvalCallId];
+    const resolvedScoreId = resolvePeerDimension(
+      currEvalCallId,
+      lookupDimension(scorerIndex, metricIndex)
+    );
+
+    if (resolvedScoreId == null) {
+      return undefined;
+    }
+
+    return target.scores[dimensionId(resolvedScoreId)][currEvalCallId];
   };
 
   const lookupOutputValue = (evalIndex: number, outputPropIndex: number) => {
