@@ -6,7 +6,7 @@ import {
   resolveDimensionValueForEvaluateCall,
 } from '../../ecpUtil';
 
-export type DerivedSummaryMetric = {
+type DerivedSummaryMetric = {
   scorerRefToMetricKey: {[scorerRef: string]: string};
   metricLabel: string;
   unit: string;
