@@ -1,7 +1,5 @@
 /**
  * TODO:
- * * Summary metrics: Currently just shows the baseline
- *    * Use this new format from `ScorecardSpecificLegacyScoresType`. Perhaps this is a good chance to align on the format
  * * Example Filters: Currently shows all scorers
  *    * Use this new format from `ScorecardSpecificLegacyScoresType`. Perhaps this is a good chance to align on the format
  * * Output Comparison: Currently shows all scorers
@@ -32,37 +30,19 @@ import {
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
-import {
-  adjustValueForDisplay,
-  dimensionLabel,
-  dimensionUnit,
-  resolveDimensionValueForEvaluateCall,
-} from '../../ecpUtil';
 import {HorizontalBox} from '../../Layout';
 import {
   EvaluationCallLink,
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
+import {
+  deriveComparisonSummaryMetrics,
+  DerivedComparisonSummaryMetrics,
+} from './summaryMetricUtil';
 
 const VARIATION_WARNING_TITLE = 'Variation detected';
-const VARIATION_WARNING_EXPLAINATION =
+const VARIATION_WARNING_EXPLANATION =
   'The scoring function logic varies between evaluations. Take precaution when comparing results.';
-
-type ScorecardSpecificLegacyScoresType = {
-  [scorerGroupName: string]: {
-    evalCallIdToScorerRef: {[evalCallId: string]: string}; // multiple means we might not have apples to apples comparison
-    scorerName?: string;
-    metrics: {
-      [metricName: string]: {
-        scorerRefToMetricKey: {[scorerRef: string]: string};
-        displayName: string;
-        unit: string;
-        lowerIsBetter: boolean;
-        evalScores: {[evalCallId: string]: number | undefined};
-      };
-    };
-  };
-};
 
 const GridCell = styled.div`
   padding: 6px 16px;
@@ -112,118 +92,9 @@ export const ScorecardSection: React.FC<{
   }, [modelProps]);
   const [diffOnly, setDiffOnly] = React.useState(true);
 
-  const betterScores: ScorecardSpecificLegacyScoresType = useMemo(() => {
-    const res: ScorecardSpecificLegacyScoresType = {};
-    Object.entries(props.state.data.evaluationCalls).forEach(
-      ([evalCallId, evaluationCall]) => {
-        Object.entries(evaluationCall.summaryMetrics).forEach(
-          ([metricDimensionId, metricDimension]) => {
-            const scorerMetricsDimension =
-              props.state.data.scorerMetricDimensions[metricDimensionId];
-            const derivedMetricsDimension =
-              props.state.data.derivedMetricDimensions[metricDimensionId];
-            if (scorerMetricsDimension != null) {
-              const scorerRef =
-                scorerMetricsDimension.scorerDef.scorerOpOrObjRef;
-              const scorerName =
-                scorerMetricsDimension.scorerDef.likelyTopLevelKeyName;
-              const unit = dimensionUnit(scorerMetricsDimension, true);
-              const lowerIsBetter = false;
-              if (res[scorerName] == null) {
-                res[scorerName] = {
-                  evalCallIdToScorerRef: {},
-                  scorerName,
-                  metrics: {},
-                };
-              }
-              res[scorerName].evalCallIdToScorerRef[evalCallId] = scorerRef;
-
-              const displayName = dimensionLabel(scorerMetricsDimension);
-              if (res[scorerName].metrics[displayName] == null) {
-                res[scorerName].metrics[displayName] = {
-                  displayName,
-                  scorerRefToMetricKey: {[scorerRef]: metricDimensionId},
-                  unit,
-                  lowerIsBetter,
-                  evalScores: {},
-                };
-              }
-              if (
-                res[scorerName].metrics[displayName].scorerRefToMetricKey[
-                  scorerRef
-                ] == null
-              ) {
-                res[scorerName].metrics[displayName].scorerRefToMetricKey[
-                  scorerRef
-                ] = metricDimensionId;
-              }
-
-              res[scorerName].metrics[displayName].evalScores[
-                evaluationCall.callId
-              ] = adjustValueForDisplay(
-                resolveDimensionValueForEvaluateCall(
-                  scorerMetricsDimension,
-                  evaluationCall
-                ),
-                scorerMetricsDimension.scoreType === 'binary'
-              );
-            } else if (derivedMetricsDimension != null) {
-              const scorerRef = '__DERIVED__';
-              const scorerName = '';
-              const unit = dimensionUnit(derivedMetricsDimension, true);
-              const lowerIsBetter =
-                derivedMetricsDimension.shouldMinimize ?? false;
-              if (res[scorerName] == null) {
-                res[scorerName] = {
-                  evalCallIdToScorerRef: {},
-                  scorerName,
-                  metrics: {},
-                };
-              }
-              res[scorerName].evalCallIdToScorerRef[evalCallId] = scorerRef;
-
-              const displayName = dimensionLabel(derivedMetricsDimension);
-              if (res[scorerName].metrics[displayName] == null) {
-                res[scorerName].metrics[displayName] = {
-                  displayName,
-                  scorerRefToMetricKey: {[scorerRef]: metricDimensionId},
-                  unit,
-                  lowerIsBetter,
-                  evalScores: {},
-                };
-              }
-              if (
-                res[scorerName].metrics[displayName].scorerRefToMetricKey[
-                  scorerRef
-                ] == null
-              ) {
-                res[scorerName].metrics[displayName].scorerRefToMetricKey[
-                  scorerRef
-                ] = metricDimensionId;
-              }
-
-              res[scorerName].metrics[displayName].evalScores[
-                evaluationCall.callId
-              ] = adjustValueForDisplay(
-                resolveDimensionValueForEvaluateCall(
-                  derivedMetricsDimension,
-                  evaluationCall
-                ),
-                derivedMetricsDimension.scoreType === 'binary'
-              );
-            } else {
-              throw new Error('Unknown metric dimension type');
-            }
-          }
-        );
-      }
-    );
-    return res;
-  }, [
-    props.state.data.derivedMetricDimensions,
-    props.state.data.evaluationCalls,
-    props.state.data.scorerMetricDimensions,
-  ]);
+  const derivedMetrics: DerivedComparisonSummaryMetrics = useMemo(() => {
+    return deriveComparisonSummaryMetrics(props.state);
+  }, [props.state]);
 
   let gridTemplateColumns = '';
   gridTemplateColumns += 'min-content '; // Scorer Name
@@ -385,7 +256,7 @@ export const ScorecardSection: React.FC<{
           Metrics
         </GridCell>
         {/* Score Rows */}
-        {Object.entries(betterScores).map(([key, def]) => {
+        {Object.entries(derivedMetrics).map(([key, def]) => {
           const uniqueScorerRefs = Array.from(
             new Set(Object.values(def.evalCallIdToScorerRef))
           );
@@ -410,7 +281,7 @@ export const ScorecardSection: React.FC<{
                   )
                 ) : (
                   <Alert severity="warning">
-                    <Tooltip title={VARIATION_WARNING_EXPLAINATION}>
+                    <Tooltip title={VARIATION_WARNING_EXPLANATION}>
                       <div
                         style={{
                           whiteSpace: 'nowrap',
@@ -456,7 +327,7 @@ export const ScorecardSection: React.FC<{
                         textAlign: 'right',
                         textOverflow: 'ellipsis',
                       }}>
-                      {def.metrics[metricKey].displayName}
+                      {def.metrics[metricKey].metricLabel}
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
                       const baseline =
