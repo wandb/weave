@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 import pydantic
 
-from weave.trace.op import Op
+from weave.trace.op import Op, Op2
 
 
 class ObjectRecord:
@@ -48,7 +48,7 @@ def class_all_bases_names(cls: type) -> list[str]:
 
 def pydantic_object_record(obj: pydantic.BaseModel) -> ObjectRecord:
     attrs = pydantic_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: isinstance(x, Op), lambda e: None):
+    for k, v in getmembers(obj, lambda x: isinstance(x, (Op, Op2)), lambda e: None):
         attrs[k] = v
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
