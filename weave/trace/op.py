@@ -282,8 +282,18 @@ class Op2(Protocol):
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
 
+    # this should not be here but kept for simplicity for now
+    _set_on_output_handler: Callable[[OnOutputHandlerType], None]
+    _on_output_handler: Optional[OnOutputHandlerType]
+
     __call__: Callable[..., Any]
     __self__: Any
+
+
+def _set_on_output_handler(func: Op2, on_output: OnOutputHandlerType) -> None:
+    if func._on_output_handler is not None:
+        raise ValueError("Cannot set on_output_handler multiple times")
+    func._on_output_handler = on_output
 
 
 def _create_call(func: Op2, *args: Any, **kwargs: Any) -> "Call":
@@ -451,6 +461,9 @@ def op(*args, **kwargs) -> Union[Callable[[Any], Op2], Op2]:
 
             wrapper.__call__ = wrapper  # type: ignore
             wrapper.__self__ = wrapper  # type: ignore
+
+            wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
+            wrapper._on_output_handler = None  # type: ignore
 
             return cast(Op2, wrapper)
 
