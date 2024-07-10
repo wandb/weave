@@ -22,16 +22,16 @@ from weave.flow.scorer import (
 )
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
-from weave.trace.op import BoundOp, Op
+from weave.trace.op import BoundOp, Op, Op2
 
 console = Console()
 
 
 def async_call(
-    func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
+    func: typing.Union[Callable, Op, Op2], *args: Any, **kwargs: Any
 ) -> typing.Coroutine:
     is_async = False
-    if isinstance(func, Op):
+    if isinstance(func, (Op, Op2)):
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
     else:
         is_async = inspect.iscoroutinefunction(func)
@@ -86,12 +86,12 @@ class Evaluation(Object):
     """
 
     dataset: Union[Dataset, list]
-    scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
+    scorers: Optional[list[Union[Callable, Op, Op2, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
     trials: int = 1
 
     def model_post_init(self, __context: Any) -> None:
-        scorers = []
+        scorers: list[Union[Callable, Scorer, Op, Op2, Scorer]] = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
@@ -99,9 +99,9 @@ class Evaluation(Object):
                 raise ValueError(
                     f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
                 )
-            elif callable(scorer) and not isinstance(scorer, Op):
+            elif callable(scorer) and not isinstance(scorer, (Op, Op2)):
                 scorer = weave.op()(scorer)
-            elif isinstance(scorer, Op):
+            elif isinstance(scorer, (Op, Op2)):
                 pass
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")

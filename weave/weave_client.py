@@ -855,31 +855,3 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
         return tuple(tuple_res)
 
     return obj
-
-
-def materialize(iterable):
-    """
-    Materialize any iterable (generator function or object implementing __iter__) into a list.
-
-    Args:
-    iterable: A generator function, generator expression, or any object that implements __iter__
-
-    Returns:
-    A list containing all the elements from the iterable
-    """
-    # Check if the input is callable (potentially a generator function)
-    if callable(iterable):
-        # If it's callable, execute it to get an iterator
-        iterator = iterable()
-    else:
-        # If it's not callable, assume it's already an iterable
-        iterator = iterable
-
-    # Try to get an iterator from the object
-    try:
-        iterator = iter(iterator)
-    except TypeError:
-        raise TypeError(f"The input {iterable} is not iterable")
-
-    # Materialize the iterator into a list
-    return list(iterator)

@@ -3,7 +3,7 @@
 
 import time
 import typing
-from typing import Optional
+from typing import Optional, Union
 import os
 import contextlib
 import dataclasses
@@ -270,7 +270,7 @@ def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:
     return client._ref_output_of(ref)
 
 
-def as_op(fn: typing.Callable) -> Op:
+def as_op(fn: typing.Callable) -> Union[Op, Op2]:
     """Given a @weave.op() decorated function, return its Op.
 
     @weave.op() decorated functions are instances of Op already, so this

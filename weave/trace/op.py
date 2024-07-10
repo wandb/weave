@@ -427,51 +427,71 @@ def calls(func: Op2) -> "CallsIter":
     return client._op_calls(func)
 
 
+# Legacy decos
+@overload
+def op(name: Any) -> Any: ...
+@overload
+def op(input_type: Any, output_type: Any) -> Any: ...
+@overload
+def op(name: Any, input_type: Any, output_type: Any) -> Any: ...
+@overload
+def op(name: Any, output_type: Any) -> Any: ...
+@overload
+def op(name: Any, input_type: Any, output_type: Any, render_info: Any) -> Any: ...
+@overload
+def op(name: Any, input_type: Any, output_type: Any, pure: Any) -> Any: ...
+@overload
+def op(name: Any, input_type: Any, output_type: Any, hidden: Any) -> Any: ...
+
+
+# Modern decos
 @overload
 def op() -> Callable[[Any], Op2]: ...
-
-
 @overload
 def op(func: Any) -> Op2: ...
 
 
-# def op(func: Optional[T] = None) -> Union[Callable[[T], Op2], Op2]:
-def op(*args, **kwargs) -> Union[Callable[[Any], Op2], Op2]:
+def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op2], Op2, Op]:
     """The op decorator!"""
     if context_state.get_loading_built_ins():
         from weave.legacy.decorator_op import op as legacy_op
 
         return legacy_op(*args, **kwargs)  # type: ignore
 
-    def op_deco(func: T) -> Op2:
+    def op_deco(func: Callable) -> Op2:
         # Check function type
         sig = inspect.signature(func)
         is_method = _is_method_alt(func)
         is_async = inspect.iscoroutinefunction(func)
 
-        def create_wrapper(func):
+        def create_wrapper(func: Callable) -> Op2:
             if is_async:
 
                 @wraps(func)
-                async def wrapper(*args, **kwargs):
+                async def wrapper(*args: Any, **kwargs: Any) -> Any:
                     if client_context.weave_client.get_weave_client() is None:
                         return await func(*args, **kwargs)
-                    call = _create_call(wrapper, *args, **kwargs)
+                    call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     return await _execute_call(
-                        wrapper, call, *args, return_type="normal", **kwargs
+                        wrapper,  # type: ignore
+                        call,
+                        *args,
+                        return_type="value",
+                        **kwargs,
                     )
             else:
 
                 @wraps(func)
-                def wrapper(*args, **kwargs):
+                def wrapper(*args: Any, **kwargs: Any) -> Any:
                     if client_context.weave_client.get_weave_client() is None:
                         return func(*args, **kwargs)
-
-                    print(f"{wrapper._on_output_handler=}")
-
-                    call = _create_call(wrapper, *args, **kwargs)
+                    call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     return _execute_call(
-                        wrapper, call, *args, return_type="normal", **kwargs
+                        wrapper,  # type: ignore
+                        call,
+                        *args,
+                        return_type="value",
+                        **kwargs,
                     )
 
             # Tack these helpers on to our wrapper
