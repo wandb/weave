@@ -104,7 +104,7 @@ export const PlotlyScatterPlot: React.FC<{
           standoff: 10,
         },
       },
-      shapes: shapes,
+      shapes,
     } as Partial<Plotly.Layout>;
   }, [
     lowerBound,
