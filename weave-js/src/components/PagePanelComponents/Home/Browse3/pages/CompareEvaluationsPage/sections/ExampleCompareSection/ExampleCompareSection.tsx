@@ -2,7 +2,8 @@
  * TODO:
  * * Audit unused code
  * * Audit symbol names
- * a bunch of missing loop keys
+ * The Super challenge header
+ * Fixed-Width Sidebar
  */
 
 import {Box} from '@material-ui/core';
@@ -270,6 +271,10 @@ export const ExampleCompareSection: React.FC<{
 
   const compKeyForInputPropIndex = (inputPropIndex: number) => {
     return inputColumnKeys[inputPropIndex];
+  };
+
+  const keyForEvalIndex = (evalIndex: number) => {
+    return leafDims[evalIndex];
   };
 
   const inputPropKeyCompForInputPropIndex = (inputPropIndex: number) => {
@@ -610,7 +615,9 @@ export const ExampleCompareSection: React.FC<{
             </GridCell>
             {_.range(NEW_NUM_EVALS).map(evalIndex => {
               return (
-                <GridCell style={{...STICKY_HEADER}}>
+                <GridCell
+                  key={keyForEvalIndex(evalIndex)}
+                  style={{...STICKY_HEADER}}>
                   {predictCallCompForEvaluationIndex(evalIndex)}
                 </GridCell>
               );
@@ -619,13 +626,14 @@ export const ExampleCompareSection: React.FC<{
           {/* OUTPUT ROWS */}
           {_.range(NEW_NUM_OUTPUT_KEYS).map(outputPropIndex => {
             return (
-              <React.Fragment key={outputPropIndex}>
+              <React.Fragment
+                key={compKeyCompForOutputPropIndex(outputPropIndex)}>
                 <GridCell style={{...STICKY_SIDEBAR}}>
                   {outputKeyCompForOutputPropIndex(outputPropIndex)}
                 </GridCell>
                 {_.range(NEW_NUM_EVALS).map(evalIndex => {
                   return (
-                    <GridCell>
+                    <GridCell key={keyForEvalIndex(evalIndex)}>
                       {outputValueCompForOutputPropIndex(
                         evalIndex,
                         outputPropIndex
@@ -663,6 +671,7 @@ export const ExampleCompareSection: React.FC<{
               const TRIALS_FOR_EVAL = NEW_NUM_TRIALS[evalIndex];
               return (
                 <GridCellSubgrid
+                  key={keyForEvalIndex(evalIndex)}
                   rowSpan={NEW_TOTAL_METRICS + 1}
                   colSpan={1}
                   colsTemp={`min-content repeat(${TRIALS_FOR_EVAL} , auto)`}>
@@ -672,7 +681,7 @@ export const ExampleCompareSection: React.FC<{
                   </GridCell>
                   {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
                     return (
-                      <GridCell style={{...STICKY_HEADER}}>
+                      <GridCell key={trialIndex} style={{...STICKY_HEADER}}>
                         {trialCompForEvaluationIndex(evalIndex, trialIndex)}
                       </GridCell>
                     );
@@ -703,6 +712,7 @@ export const ExampleCompareSection: React.FC<{
 
                             return (
                               <GridCell
+                                key={trialIndex}
                                 button={onClick != null}
                                 onClick={onClick}>
                                 {trialMetricCompForScorerIndex(
@@ -740,6 +750,7 @@ export const ExampleCompareSection: React.FC<{
                     {_.range(NUM_METRICS_FOR_SCORER).map(metricIndex => {
                       return (
                         <GridCell
+                          key={metricIndex}
                           style={{
                             backgroundColor: MOON_100,
                           }}>
