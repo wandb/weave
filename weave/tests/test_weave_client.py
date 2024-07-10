@@ -946,14 +946,15 @@ def test_summary_descendents(client):
     ]
 
 
+class MyModel(weave.Model):
+    prompt: str
+
+    @weave.op()
+    def predict(self, input: str) -> str:
+        return self.prompt.format(input=input)
+
+
 def test_weave_server(client):
-    class MyModel(weave.Model):
-        prompt: str
-
-        @weave.op()
-        def predict(self, input: str) -> str:
-            return self.prompt.format(input=input)
-
     model = MyModel(prompt="input is: {input}")
     ref = client._save_object(model, "my-model")
 

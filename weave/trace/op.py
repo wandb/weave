@@ -477,7 +477,7 @@ def op(*args, **kwargs) -> Union[Callable[[Any], Op2], Op2]:
             # Tack these helpers on to our wrapper
             # should this be qualname?
             wrapper.resolve_fn = func  # type: ignore
-            wrapper.name = func.__name__  # type: ignore
+            wrapper.name = func.__qualname__ if is_method else func.__name__  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
