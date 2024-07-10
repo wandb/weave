@@ -109,7 +109,6 @@ def object_method_app(
         raise ValueError(
             f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
         )
-
     if not isinstance(args, op_args.OpNamedArgs):
         raise ValueError("predict op must have named args")
 

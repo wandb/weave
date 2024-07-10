@@ -460,10 +460,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 def save_instance(
     obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
 ) -> None:
-    if hasattr(obj, "resolve_fn"):
-        result = get_code_deps(obj.resolve_fn, artifact)
-    else:
-        result = get_code_deps(obj, artifact)
+    result = get_code_deps(obj.resolve_fn, artifact)
     import_code = result["import_code"]
     code = result["code"]
     warnings = result["warnings"]
@@ -563,5 +560,4 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
     return "file://" + op_module_file + "." + wrap_fn.__name__
 
 
-# serializer.register_serializer(Op, save_instance, load_instance)
 serializer.register_serializer(Op, save_instance, load_instance)

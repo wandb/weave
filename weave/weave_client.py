@@ -118,6 +118,7 @@ def map_to_refs(obj: Any) -> Any:
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
+
     return obj
 
 
@@ -734,8 +735,9 @@ class WeaveClient:
         if name is None:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
-        # it's both a method AND an Op
+
         if inspect.ismethod(op):
+            # this "func" is both a method AND an Op, but we need to cast to get dot access to its attributes
             op = cast(op, Op)  # type: ignore
         op.ref = op_def_ref  # type: ignore
         return op_def_ref

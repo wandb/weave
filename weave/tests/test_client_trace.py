@@ -1313,9 +1313,7 @@ def test_bound_op_retrieval(client):
     obj = CustomType(a=1)
     obj_ref = weave.publish(obj)
     obj2 = obj_ref.get()
-
-    x = obj2.op_with_custom_type(1)
-    assert x == 2
+    assert obj2.op_with_custom_type(1) == 2
 
     my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
     assert my_op_ref is None, "Must call get on the instance!"

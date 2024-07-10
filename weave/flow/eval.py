@@ -33,6 +33,8 @@ def async_call(
     is_async = False
     if isinstance(func, Op):
         is_async = inspect.iscoroutinefunction(func.resolve_fn)
+    else:
+        is_async = inspect.iscoroutinefunction(func)
     if is_async:
         return func(*args, **kwargs)  # type: ignore
     return asyncio.to_thread(func, *args, **kwargs)
@@ -89,7 +91,7 @@ class Evaluation(Object):
     trials: int = 1
 
     def model_post_init(self, __context: Any) -> None:
-        scorers: list[Union[Callable, Scorer, Op, Scorer]] = []
+        scorers: list[Union[Callable, Scorer, Op]] = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
