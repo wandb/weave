@@ -99,7 +99,7 @@ def test_groq_quickstart(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_function_calling_example(client: weave.weave_client.WeaveClient) -> None:
-    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY", "DUMMY_API_KEY"))
     MODEL = "llama3-70b-8192"
     SEED = 42
 
@@ -285,7 +285,7 @@ def test_groq_function_calling_example(client: weave.weave_client.WeaveClient) -
 def test_groq_async_chat_completion(
     client: weave.weave_client.WeaveClient,
 ) -> None:
-    groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY"))
+    groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"))
 
     async def complete_chat():
         chat_completion = await groq_client.chat.completions.create(
