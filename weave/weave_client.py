@@ -18,6 +18,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.op import Op, Op2
+from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -802,7 +803,7 @@ def check_wandb_run_matches(
             )
 
 
-def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
+def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op2:
     if config is None:
 
         def op_fn(*args, **kwargs):  # type: ignore
@@ -816,7 +817,7 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
             op_config = config
 
     op_fn.__name__ = name
-    op = Op(op_fn)
+    op = op_deco(op_fn)
     op.name = name
     return op
 
