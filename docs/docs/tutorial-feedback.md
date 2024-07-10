@@ -9,6 +9,15 @@ Gathering feedback from end users of your application is a useful way to get sig
 
 In this tutorial, we'll show how to collect feedback from users of your application using Weave. Because collecting feedback is slow and expensive, we'll use the feedback we've collected to build an evaluation dataset which we can use for automated evaluation.
 
+## Use Case - Collecting Feedback to Improve Evaluation Pipeline
+In order to successfully deploy LLM apps that correspond to the users' expectation it's important to have an evaluation pipeline that produces representative metrics for both the user group and the specific set of use-cases. In order to build such a pipeline, we need to collect feedback from users. For a Q&A Chatbot this could be done in the following way:
+
+1. We generate a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions
+2. We do some first baseline evaluations before deploying the Chatbot to some first users
+3. We let the user ask some questions and give some direct feedback (reaction + note)
+4. We pull all question-answer-pairs with a :-1: reaction and let experts annotate the given answer with help of the given feedback from the user
+5. We save back the new annotated samples as a new version of the existing evaluation dataset and run evaluations again
+
 ## Getting Started
 
 To start collecting feedback within your application, the first step is to track your function with the @weave.op decorator. Here’s how:
