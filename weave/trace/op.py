@@ -296,13 +296,29 @@ def _set_on_output_handler(func: Op2, on_output: OnOutputHandlerType) -> None:
     func._on_output_handler = on_output
 
 
+def _is_method_alt(func: Callable) -> bool:
+    sig = inspect.signature(func)
+    params = list(sig.parameters.values())
+    is_method = params and params[0].name in {"self", "cls"}
+
+    return bool(is_method)
+
+
 def _create_call(func: Op2, *args: Any, **kwargs: Any) -> "Call":
     client = client_context.weave_client.require_weave_client()
 
+    is_method2 = _is_method_alt(func)
     is_method = inspect.ismethod(func)
+    print(f"{is_method=}")
     if is_method:
         self = func.__self__
         args = (self,) + args
+
+    # if not is_method and is_method2:
+    #     self = func.__self__
+    #     args = (self,) + args
+
+    print(f"{args=}")
 
     try:
         inputs = func.signature.bind(*args, **kwargs).arguments
@@ -337,7 +353,7 @@ def _execute_call(
     func: Callable,
     call: Any,
     *args: Any,
-    return_type: Literal["call", "normal"] = "call",
+    return_type: Literal["call", "value"] = "call",
     **kwargs: Any,
 ) -> Any:
     print(f"Before call {func=}")
@@ -423,8 +439,7 @@ def op(*args, **kwargs) -> Union[Callable[[Any], Op2], Op2]:
     def op_deco(func: T) -> Op2:
         # Check function type
         sig = inspect.signature(func)
-        params = list(sig.parameters.values())
-        is_method = params and params[0].name in {"self", "cls"}
+        is_method = _is_method_alt(func)
         is_async = inspect.iscoroutinefunction(func)
 
         def create_wrapper(func):
@@ -455,7 +470,7 @@ def op(*args, **kwargs) -> Union[Callable[[Any], Op2], Op2]:
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
-            f = MethodType(wrapper, wrapper) if is_method else wrapper
+            # f = MethodType(wrapper, wrapper) if is_method else wrapper
             wrapper.call = partial(call, wrapper)  # type: ignore
             wrapper.calls = partial(calls, wrapper)  # type: ignore
 
