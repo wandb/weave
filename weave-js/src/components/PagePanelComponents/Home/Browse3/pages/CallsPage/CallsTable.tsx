@@ -16,6 +16,7 @@ import {
 import {Box, Typography} from '@mui/material';
 import {
   GridApiPro,
+  GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
   GridPinnedColumns,
@@ -60,6 +61,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {useCallsTableColumns} from './callsTableColumns';
 import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
@@ -70,6 +72,7 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
+import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 
@@ -82,6 +85,9 @@ export const CallsTable: FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
   hideControls?: boolean;
+
+  columnVisibilityModel?: GridColumnVisibilityModel;
+  setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
 }> = ({
   entity,
   project,
@@ -89,6 +95,8 @@ export const CallsTable: FC<{
   onFilterUpdate,
   frozenFilter,
   hideControls,
+  columnVisibilityModel,
+  setColumnVisibilityModel,
 }) => {
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
@@ -411,6 +419,13 @@ export const CallsTable: FC<{
     history,
   ]);
 
+  // Called in reaction to Hide column menu
+  const onColumnVisibilityModelChange = setColumnVisibilityModel
+    ? (newModel: GridColumnVisibilityModel) => {
+        setColumnVisibilityModel(newModel);
+      }
+    : undefined;
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -500,6 +515,16 @@ export const CallsTable: FC<{
               }}
             />
           )}
+          <div style={{flex: '1 1 auto'}} />
+          {columnVisibilityModel && setColumnVisibilityModel && (
+            <div>
+              <ManageColumnsButton
+                columnInfo={columns}
+                columnVisibilityModel={columnVisibilityModel}
+                setColumnVisibilityModel={setColumnVisibilityModel}
+              />
+            </div>
+          )}
         </>
       }>
       <StyledDataGrid
@@ -528,10 +553,8 @@ export const CallsTable: FC<{
         loading={callsLoading}
         rows={tableData}
         // initialState={initialState}
-        // onColumnVisibilityModelChange={newModel =>
-        //   setColumnVisibilityModel(newModel)
-        // }
-        // columnVisibilityModel={columnVisibilityModel}
+        onColumnVisibilityModelChange={onColumnVisibilityModelChange}
+        columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
         sortModel={sortModel}
@@ -622,6 +645,7 @@ export const CallsTable: FC<{
               </Box>
             );
           },
+          columnMenu: CallsCustomColumnMenu,
         }}
       />
     </FilterLayoutTemplate>
