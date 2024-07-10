@@ -101,15 +101,12 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 def map_to_refs(obj: Any) -> Any:
     ref = _get_direct_ref(obj)
-    # print(f"{ref=}, {obj=}, {type(obj)=}")
     if ref:
         return ref
     if isinstance(obj, ObjectRecord):
         res = obj.map_values(map_to_refs)
-        print(f">>> {res=}")
         return res
     elif isinstance(obj, pydantic.BaseModel):
-        print(f"{obj=}")
         obj_record = pydantic_object_record(obj)
         return obj_record.map_values(map_to_refs)
     elif dataclasses.is_dataclass(obj):
@@ -342,9 +339,6 @@ class WeaveClient:
 
         data = read_res.obj.val
 
-        print(f"{read_res=}")
-        print(f"{ref=}, {data=}")
-
         # If there is a ref-extra, we should resolve it. Rather than walking
         # the object, it is more efficient to directly query for the data and
         # let the server resolve it.
@@ -420,9 +414,6 @@ class WeaveClient:
             op_str = op_def_ref.uri()
         else:
             op_str = op
-
-        print(f"{type(op)=}")
-        print(f"{op_str=}")
 
         inputs_redacted = redact_sensitive_keys(inputs)
 
@@ -755,14 +746,11 @@ class WeaveClient:
         if name is None:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
-        # print(f"{op_def_ref=}")
         # it's both a method AND an Op2
         if inspect.ismethod(op):
             op = cast(op, Op2)  # type: ignore
         op.ref = op_def_ref  # type: ignore
         print(f"tacking the ref... {op=}, {op.ref=}")
-        # print(f"{op=}")
-        # print(f"{op.ref=}")
         return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()

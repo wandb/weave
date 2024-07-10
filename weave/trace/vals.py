@@ -146,13 +146,10 @@ def attribute_access_result(
 ) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
-        print("callable", val_attr_val)
         sig = inspect.signature(val_attr_val)
-        print(f"{sig=}")
-        print(f"{sig.parameters=}")
 
         # bind it
-        if sig.parameters.get("self"):
+        if sig and sig.parameters.get("self"):
             val_attr_val = MethodType(val_attr_val, self)
             return val_attr_val
         return val_attr_val

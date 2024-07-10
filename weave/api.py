@@ -212,7 +212,6 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
         save_name = obj.__class__.__name__
 
     ref = client._save_object(obj, save_name, "latest")
-    print(f"{ref=}")
 
     if isinstance(ref, _weave_client.ObjectRef):
         url = urls.object_version_path(

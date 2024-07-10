@@ -85,9 +85,7 @@ def object_method_app(
     attrs: dict[str, Union[op.Op, op.Op2]] = {
         attr: getattr(obj, attr) for attr in dir(obj)
     }
-    print(f"{attrs=}")
     op_attrs = {k: v for k, v in attrs.items() if isinstance(v, (op.Op, op.Op2))}
-    print(f"{op_attrs=}")
 
     if not op_attrs:
         raise ValueError("No ops found on object")

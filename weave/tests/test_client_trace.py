@@ -52,15 +52,9 @@ def test_simple_op(client):
     def my_op(a: int) -> int:
         return a + 1
 
-    print(f"{my_op=}")
-
     assert my_op(5) == 6
 
-    print(f"{my_op=}")
-    print(f"{my_op.ref=}")
-
     op_ref = weave_client.get_ref(my_op)
-    print(f"{op_ref=}")
     # assert client._ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
@@ -1322,13 +1316,10 @@ class CustomType2(weave.Object):
 #     obj_ref = weave.publish(obj)
 #     obj2 = obj_ref.get()
 
-#     print(f"{obj2.op_with_custom_type=}")
-
 #     x = obj2.op_with_custom_type(1)
 #     assert x == 2
 
 #     my_op_ref = weave_client.get_ref(CustomType2.op_with_custom_type)
-#     print(f"{my_op_ref=}")
 #     with pytest.raises(MissingSelfInstanceError):
 #         my_op2 = my_op_ref.get()
 

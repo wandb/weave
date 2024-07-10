@@ -522,16 +522,6 @@ def load_instance(
         version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
     )
 
-    # print(f"{import_name=}, {module_dir=}")
-    # import importlib
-
-    # module = importlib.import_module(f"{import_name}.{module_dir}")
-    # source_code = inspect.getsource(module)
-    # print(f"{source_code=}")
-
-    # print(f"{module_dir=}")
-    # print(f"{import_name=}")
-
     sys.path.insert(0, os.path.abspath(module_dir))
     with context_state.no_op_register():
         try:
@@ -562,9 +552,6 @@ def load_instance(
         return None
 
     od: "Op" = getattr(mod, last_op_function.name)
-    print(f"{last_op_function=}")
-    print(f"{od=}")
-
     return od
 
 

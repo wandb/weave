@@ -564,11 +564,6 @@ def test_saved_nested_modellike(client):
     ref = client._save_object(model, "my-model")
     model2 = client.get(ref)
 
-    print(f"{model2=}")
-    print(f"{model2.a=}")
-    print(f"{model2.y=}")
-    print(f"{model2.mycall=}")
-
     class C(weave.Object):
         b: B
         z: int

@@ -93,7 +93,6 @@ class Op:
 
         try:
             inputs = self.signature.bind(*args, **kwargs).arguments
-            # print(f"{inputs=}")
         except TypeError as e:
             raise OpCallError(f"Error calling {self.name}: {e}")
         inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
@@ -306,22 +305,8 @@ def _is_method_alt(func: Callable) -> bool:
 def _create_call(func: Op2, *args: Any, **kwargs: Any) -> "Call":
     client = client_context.weave_client.require_weave_client()
 
-    # is_method2 = _is_method_alt(func)
-    # is_method = inspect.ismethod(func)
-    # print(f"{is_method=}")
-    # if is_method:
-    #     self = func.__self__
-    #     args = (self,) + args
-
-    # if not is_method and is_method2:
-    #     self = func.__self__
-    #     args = (self,) + args
-
-    print(f"{func=}, {args=}, {kwargs=}")
-
     try:
         inputs = func.signature.bind(*args, **kwargs).arguments
-        # print(f"{inputs=}")
     except TypeError as e:
         raise OpCallError(f"Error calling {func.name}: {e}")
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)

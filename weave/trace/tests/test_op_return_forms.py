@@ -90,11 +90,9 @@ async def test_op_return_async_obj(client):
 
 
 def simple_list_accumulator(acc, value):
-    print("Hello from simple_list_accumulator")
     if acc is None:
         acc = []
     acc.append(value)
-    print(f"{acc=}")
     return acc
 
 

@@ -506,7 +506,6 @@ def test_op_nested_function(client, strict_op_saving):
     assert some_g(1) == 4
 
     ref = weave.obj_ref(some_g)
-    print(f"{ref=}")
     assert ref is not None
 
     saved_code = get_saved_code(client, ref)

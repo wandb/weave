@@ -163,6 +163,5 @@ def decode_custom_obj(
     )
     with artifact_fs.loading_artifact(art):
         res = load_instance_op(art, "obj")
-        print(f"{res=}")
         res.art = art
         return res
