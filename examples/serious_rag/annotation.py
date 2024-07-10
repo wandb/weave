@@ -41,35 +41,39 @@ def assemble_production_data(op_name: str) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 @st.cache_resource
-def assemble_feedback_data() -> pd.DataFrame:
+def assemble_feedback_data(entity:str, project_name: str) -> pd.DataFrame:
     data = []
-    # TODO: this doesn't work
-    client = client_context.weave_client.get_weave_client()
-    thumbs_down = client.feedback(reaction="👎")
+    client = start_weave(entity, project_name)
+    thumbs_down = client.feedback(reaction=feedback_name)
     calls = thumbs_down.refs().calls()
+    print(calls)
     for call in calls:
-        # TODO: would be nice to have these as utility functions
         last_reaction, last_comment = None, None
-        for i in range(len(call.feedback), 0, -1):
-            if call.feedback[i].feedback_type == "wandb.reaction.1":
-                last_reaction = call.feedback[i].payload.emoji
-            elif call.feedback[i].feedback_type == "wandb.note.1":
-                last_comment = call.feedback[i].payload.note
+        for f in call.feedback[::-1]:
+            if f.feedback_type == "wandb.reaction.1":
+                last_reaction = f.payload["emoji"]
+            elif f.feedback_type == "wandb.note.1":
+                last_comment = f.payload["note"]
             if last_reaction and last_comment:
                 break
 
+        # NOTE: this can be easily customized based on the needed feedback structure
         data.append({
-            "query": call.inputs['model_output']['query'],
-            "prediction": call.inputs['model_output']['result'],
-            "used_main_source": call.inputs['model_output']['source_documents'][0]['url'],
+            # prediction - used as question and target answer and url in dataset
+            "query": call.inputs['example']['query'],
+            "prediction": call.output["model_output"]["result"]["content"],
+            "used_main_source": call.output["model_output"]["source_documents"][0]["url"],
+            # feedback - used to guide the annotation
             "feedback_reaction": last_reaction,
             "feedback_comment": last_comment,
-            "first_retrieval_correct": call.output['correct'].val,
+            # judge output - used to guide the annotation
+            "correct": call.output["scores"]["Performance Metrics"]["correct"].val,
+            "first_retrieval": call.output["scores"]["Performance Metrics"]["first_retrieval"].val,
+            "no_hallucination": call.output["scores"]["Safety Metrics"]["no_hallucination"].val,
         })
     return pd.DataFrame(data)
 
 if __name__ == "__main__":
-    # init page and get project and dataset names
     streamlit_setup()
     entity = st.text_input("Enter Weave Entity", "wandb-smle")
     project_name = st.text_input("Enter Weave Project Name", "weave-rag-experiments")
@@ -86,55 +90,22 @@ if __name__ == "__main__":
 
     # start annotation
     edit_mode = st.checkbox("Go to edit mode. For feedback - adapt the answer and used source based on the feedback and save it as ground truth to the new eval dataset.")
-
     if edit_mode:
-        # download data from weave and display in streamlit
-        client = start_weave(entity, project_name)
-
         if data_selector == "Weave Dataset (existing)":
+            client = start_weave(entity, project_name)
             new_dataset_name = dataset_name.split(":")[0]
             weave_dataset_df = get_weave_dataset(dataset_name)
         elif data_selector == "Weave Operation (production data)":
+            client = start_weave(entity, project_name)
             new_dataset_name = "annotated_prod_data"
             weave_dataset_df = assemble_production_data(op_name)
         elif data_selector == "Weave Feedback (production data)":
             new_dataset_name = "annotated_feedback_data"
-            # TODO: retrieve client and then offload in other function
-            #weave_dataset_df = assemble_feedback_data()
-
-            data = []
-            thumbs_down = client.feedback(reaction=feedback_name)
-            calls = thumbs_down.refs().calls()
-            print(calls)
-            for call in calls:
-                last_reaction, last_comment = None, None
-                for f in call.feedback[::-1]:
-                    if f.feedback_type == "wandb.reaction.1":
-                        last_reaction = f.payload["emoji"]
-                    elif f.feedback_type == "wandb.note.1":
-                        last_comment = f.payload["note"]
-                    if last_reaction and last_comment:
-                        break
-
-                # NOTE: this can be easily customized based on the needed feedback structure
-                data.append({
-                    # prediction - used as question and target answer and url in dataset
-                    "query": call.inputs['example']['query'],
-                    "prediction": call.output["model_output"]["result"]["content"],
-                    "used_main_source": call.output["model_output"]["source_documents"][0]["url"],
-                    # feedback - used to guide the annotation
-                    "feedback_reaction": last_reaction,
-                    "feedback_comment": last_comment,
-                    # judge output
-                    "correct": call.output["scores"]["Performance Metrics"]["correct"].val,
-                    "first_retrieval": call.output["scores"]["Performance Metrics"]["first_retrieval"].val,
-                    "no_hallucination": call.output["scores"]["Safety Metrics"]["no_hallucination"].val,
-                })
-            weave_dataset_df = pd.DataFrame(data)
+            weave_dataset_df = assemble_feedback_data(entity, project_name)
         else:
             st.error("Please select a valid data source!")
 
-        # annotate and publish when ready
+        # main annotation window
         edited_df = st.data_editor(weave_dataset_df, num_rows="dynamic")
 
         # saving back to Weave
