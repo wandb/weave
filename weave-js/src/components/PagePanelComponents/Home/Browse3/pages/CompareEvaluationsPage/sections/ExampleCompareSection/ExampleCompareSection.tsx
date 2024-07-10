@@ -1,10 +1,3 @@
-/**
- * TODO:
- * * Audit symbol names
- * The Super challenge header
- * Fixed-Width Sidebar
- */
-
 import {Box} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
 import _ from 'lodash';
@@ -130,6 +123,57 @@ const STICKY_SIDEBAR_HEADER: React.CSSProperties = {
   ...STICKY_SIDEBAR,
   zIndex: 2,
 };
+
+/**
+ * This component will occupy the entire space provided by the parent container.
+ * It is intended to be used in teh CompareEvaluations page, as it depends on
+ * the EvaluationComparisonState. However, in principle, it is a general purpose
+ * model-output comparison tool. It allows the user to view inputs, then compare
+ * model outputs and evaluation metrics across multiple trials.
+ *
+ * The UX design is quite complex and particular. It uses a series of nested
+ * grids to achieve the desired layout, which contains many rules for stickiness
+ * and scrolling. Getting this to work correctly was a significant challenge.
+ * The basic idea is:
+ *    * There are 3 main sections, stacked vertically: Input, Model Outputs, and
+ *      Metrics
+ *        * Each of these sections has a sticky header
+ *    * The left sticky sidebar contains the property keys for each section.
+ *        * A special case are the metrics, which are grouped by the scoring
+ *          function
+ *    * The input section only has one "value" column. It should scroll
+ *      vertically, but not horizontally
+ *    * The model outputs section has a column for each evaluation/model. These
+ *      will scroll vertically and horizontally
+ *    * The metrics section has a column for each evaluation (aligned with the
+ *      model outputs) and then further subdivides into a column for each trial
+ *
+ *       * THe nested inner trial grid needs to also scroll horizontally and
+ *         vertically with it's own inner nested sticky header and sidebar
+ *    * The Input and Metrics section are designed to be as small as possible,
+ *      with extra space given to the Model Outputs section
+ *       * When there is not enough vertical space, all sections should flex
+ *         down equally, sharing the space - resulting in all panels always in
+ *         view.
+ *
+ * Since grid system layouts often are not as easy to iterate, I pulled out all
+ * the data lookup logic into their own functions so future devs can just focus
+ * on the layout, without mixing in the data logic.
+ *
+ * As of this writing, there are 2 remaining style/UX challenges for this
+ * component: There are 2 remaining style/UX challenges for this component:
+ *
+ * 1. "Fixed-Width Sidebar" - Due the how the grid system works, we cannot have
+ *    a sidebar width that responds to the content. It must be fixed.
+ *    * Options: allow the users to drag the sidebar width; use a ref to get the
+ *      largest width of the sidebar and set all to that width
+ * 2. "Sticky Metric Trial Headers": Due to how the grid system works, I could
+ *    not get the metric headers to be sticky. I tried many things, but could
+ *    not get it to work, while maintaining the desired layout. Challenge for
+ *    future devs.
+ *    * Example:
+ *      https://wandb.ai/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%2C%2232f3e6bc-5488-4dd4-b9c4-801929f2c541%22%2C%2234c0a20f-657f-407e-bb33-277abbb9997f%22%5D
+ */
 
 export const ExampleCompareSection: React.FC<{
   state: EvaluationComparisonState;
@@ -555,6 +599,7 @@ export const ExampleCompareSection: React.FC<{
     <VerticalBox
       sx={{
         height: '100%',
+        width: '100%',
         gridGap: '0px',
       }}>
       {header}
