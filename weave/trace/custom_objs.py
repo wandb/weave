@@ -108,7 +108,6 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     # we're saving is actually an op, since that would be self-referential
     # (the op loading code is always present, we don't need to save/load it).
     load_op_uri = None
-    # print(f"inside encode custom obj, {serializer.id()=}")
     if serializer.id() != "Op":
         # Ensure load_instance is an op
         if not isinstance(serializer.load, (Op, Op2)):

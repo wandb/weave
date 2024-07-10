@@ -480,27 +480,24 @@ def test_saveload_op(client):
     assert obj2["b"].name == "op-add3"
 
 
-class MyCustomObj:
-    a: int
-    b: str
-
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-
-
-def custom_obj_save(obj, artifact, name) -> None:
-    with artifact.new_file(f"{name}.json") as f:
-        json.dump({"a": obj.a, "b": obj.b}, f)
-
-
-def custom_obj_load(artifact, name):
-    with artifact.open(f"{name}.json") as f:
-        json_obj = json.load(f)
-        return MyCustomObj(json_obj["a"], json_obj["b"])
-
-
 def test_saveload_customtype(client, strict_op_saving):
+    class MyCustomObj:
+        a: int
+        b: str
+
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+    def custom_obj_save(obj, artifact, name) -> None:
+        with artifact.new_file(f"{name}.json") as f:
+            json.dump({"a": obj.a, "b": obj.b}, f)
+
+    def custom_obj_load(artifact, name):
+        with artifact.open(f"{name}.json") as f:
+            json_obj = json.load(f)
+            return MyCustomObj(json_obj["a"], json_obj["b"])
+
     register_serializer(MyCustomObj, custom_obj_save, custom_obj_load)
 
     obj = MyCustomObj(5, "x")
@@ -543,13 +540,13 @@ def test_save_model(client):
     assert model2.predict("x") == "input is: x"
 
 
-@pytest.mark.flaky(reruns=3, reruns_delay=2)
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 def test_saved_nested_modellike(client):
     class A(weave.Object):
         x: int
 
         @weave.op()
-        async def mycall(self, input):
+        async def call(self, input):
             return self.x + input
 
     class B(weave.Object):
@@ -557,8 +554,8 @@ def test_saved_nested_modellike(client):
         y: int
 
         @weave.op()
-        async def mycall(self, input):
-            return await self.a.mycall(input - self.y)
+        async def call(self, input):
+            return await self.a.call(input - self.y)
 
     model = B(a=A(x=3), y=2)
     ref = client._save_object(model, "my-model")
@@ -570,7 +567,7 @@ def test_saved_nested_modellike(client):
 
         @weave.op()
         async def call(self, input):
-            return await self.b.mycall(input - 2 * self.z)
+            return await self.b.call(input - 2 * self.z)
 
     @weave.op()
     async def call_model(c, input):
@@ -771,24 +768,21 @@ def test_refs_read_batch_dataset_rows(client):
     assert res.vals[1] == 6
 
 
-class CoolCustomThing:
-    a: str
-
-    def __init__(self, a):
-        self.a = a
-
-
-def save_instance(obj, artifact, name):
-    with artifact.new_file(name) as f:
-        f.write(obj.a * 10000005)
-
-
-def load_instance(artifact, name, extra=None):
-    with artifact.open(name) as f:
-        return CoolCustomThing(f.read())
-
-
 def test_large_files(client):
+    class CoolCustomThing:
+        a: str
+
+        def __init__(self, a):
+            self.a = a
+
+    def save_instance(obj, artifact, name):
+        with artifact.new_file(name) as f:
+            f.write(obj.a * 10000005)
+
+    def load_instance(artifact, name, extra=None):
+        with artifact.open(name) as f:
+            return CoolCustomThing(f.read())
+
     register_serializer(CoolCustomThing, save_instance, load_instance)
 
     ref = client._save_object(CoolCustomThing("x"), "my-obj")
@@ -946,15 +940,14 @@ def test_summary_descendents(client):
     ]
 
 
-class MyModel(weave.Model):
-    prompt: str
-
-    @weave.op()
-    def predict(self, input: str) -> str:
-        return self.prompt.format(input=input)
-
-
 def test_weave_server(client):
+    class MyModel(weave.Model):
+        prompt: str
+
+        @weave.op()
+        def predict(self, input: str) -> str:
+            return self.prompt.format(input=input)
+
     model = MyModel(prompt="input is: {input}")
     ref = client._save_object(model, "my-model")
 

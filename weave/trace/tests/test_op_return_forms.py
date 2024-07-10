@@ -227,18 +227,17 @@ async def test_op_return_async_iterator(client):
     assert res.calls[0].output == list(range(9, -1, -1))
 
 
-@weave.op()
-def fn1():
-    size = 10
-    while size > 0:
-        size -= 1
-        yield size
-
-
 def test_op_return_sync_generator_never_iter(client):
-    add_accumulator(fn1, lambda inputs: simple_list_accumulator)
+    @weave.op()
+    def fn():
+        size = 10
+        while size > 0:
+            size -= 1
+            yield size
 
-    fn1()
+    add_accumulator(fn, lambda inputs: simple_list_accumulator)
+
+    fn()
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -246,7 +245,7 @@ def test_op_return_sync_generator_never_iter(client):
         )
     )
 
-    obj_ref = get_ref(fn1)
+    obj_ref = get_ref(fn)
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}

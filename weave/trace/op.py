@@ -89,8 +89,6 @@ class Op:
     def _create_call(self, *args: Any, **kwargs: Any) -> Any:
         client = client_context.weave_client.require_weave_client()
 
-        print(f"Inside _create_call, {self=}, {args=}, {kwargs=}")
-
         try:
             inputs = self.signature.bind(*args, **kwargs).arguments
         except TypeError as e:
@@ -227,25 +225,6 @@ class BoundOp(Op):
 
 P = ParamSpec("P")
 R = TypeVar("R")
-
-
-# The decorator!
-# def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
-#     if context_state.get_loading_built_ins():
-#         from weave.legacy.decorator_op import op
-
-#         return op(*args, **kwargs)
-
-#     # def wrap(f: Callable[P, R]) -> Callable[P, R]:
-#     #     op = Op(f)
-#     #     functools.update_wrapper(op, f)
-#     #     return op  # type: ignore
-
-#     if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
-#         # return wrap(args[0])
-#         return op2(args[0])
-
-#     return op2
 
 
 def value_is_sentinel(param: Any) -> bool:

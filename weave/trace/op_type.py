@@ -501,7 +501,6 @@ def load_instance(
     artifact: artifact_fs.FilesystemArtifact,
     name: str,
 ) -> Optional["Op"]:
-    print("inside load instance")
     if environment.wandb_production():
         # Returning None here instead of erroring allows the Weaveflow app
         # to reference op defs without crashing.
