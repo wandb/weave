@@ -155,7 +155,7 @@ rich.print(assistant.predict(question=query, context=context))
 
 ## Building a Simple Assistant for Generating Student Response
 
-Let's use another simple prompt template to build a student response generating assistant that generates an ideal answer to a question dependening on the total marks that can be awarded for the question.
+Let's use a simple prompt template to build an assistant to help clarify students' doubts about any point in the textbook.
 
 ```python
 class EnglishStudentResponseAssistant(weave.Model):
