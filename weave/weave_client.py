@@ -635,7 +635,7 @@ class WeaveClient:
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
-        is_opdef = isinstance(val, (Op, Op2))
+        is_opdef = isinstance(val, Op2)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
