@@ -11,7 +11,7 @@ import {
   resolveDimensionValueForEvaluateCall,
 } from '../../ecpUtil';
 
-const DERIVED_SCORER_REF = '__DERIVED__';
+export const DERIVED_SCORER_REF = '__DERIVED__';
 
 type DerivedSummaryMetric = {
   scorerRefToDimensionId: {[scorerRef: string]: string};
@@ -23,7 +23,7 @@ type DerivedSummaryMetric = {
 
 type DerivedSummaryScoreGroup = {
   evalCallIdToScorerRef: {[evalCallId: string]: string}; // multiple means we might not have apples to apples comparison
-  scorerName?: string;
+  scorerName: string;
   metrics: {
     [dimensionPath: string]: DerivedSummaryMetric;
   };
