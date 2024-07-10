@@ -43,14 +43,14 @@ import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 
 const NEW_FIXED_SIDEBAR_WIDTH_PX = 250;
 const NEW_FIXED_MIN_EVAL_WIDTH_PX = 350;
-const OUTPUTS_HEADER_HEIGHT_PX = 46;
+const HEADER_HEIGHT_PX = 38;
 
 const PropKey = styled.div`
   position: sticky;
   top: 8px;
-  overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow: auto;
   text-align: right;
+  scrollbar-width: none;
 `;
 
 const GridCell = styled.div<{
@@ -61,7 +61,7 @@ const GridCell = styled.div<{
   border: 1px solid ${MOON_300};
   grid-column-end: span ${props => props.colSpan || 1};
   grid-row-end: span ${props => props.rowSpan || 1};
-  padding: 8px;
+  padding: 4px 8px;
   background-color: white;
   // Hover should show click mouse icon
   // and slowly highlight blue like a button
@@ -338,7 +338,7 @@ export const ExampleCompareSection: React.FC<{
     return (
       <PropKey
         style={{
-          top: 9 + OUTPUTS_HEADER_HEIGHT_PX,
+          top: 9 + HEADER_HEIGHT_PX,
         }}>
         {removePrefix(
           compKeyCompForOutputPropIndex(outputPropIndex),
@@ -406,7 +406,18 @@ export const ExampleCompareSection: React.FC<{
       return null; // derived
     }
     const scorerRef = uniqueScorerRefs[scorerIndex];
-    return <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} iconOnly />;
+    return (
+      <VerticalBox
+        style={{
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
+          paddingLeft: '2px',
+        }}>
+        <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} iconOnly />
+      </VerticalBox>
+    );
   };
 
   const metricCompForScorerIndex = (
@@ -587,7 +598,7 @@ export const ExampleCompareSection: React.FC<{
           ref={ref1}
           rowSpan={1}
           colSpan={1}
-          rowsTemp={`${OUTPUTS_HEADER_HEIGHT_PX}px repeat(${NEW_NUM_OUTPUT_KEYS}, auto)`}
+          rowsTemp={`${HEADER_HEIGHT_PX}px repeat(${NEW_NUM_OUTPUT_KEYS}, auto)`}
           colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}
           style={{
             scrollbarWidth: 'none',
@@ -631,7 +642,7 @@ export const ExampleCompareSection: React.FC<{
           ref={ref2}
           rowSpan={1}
           colSpan={1}
-          rowsTemp={`min-content repeat(${NEW_TOTAL_METRICS}, auto)`}
+          rowsTemp={`${HEADER_HEIGHT_PX}px repeat(${NEW_TOTAL_METRICS}, auto)`}
           colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}>
           {/* METRIC HEADER */}
           <React.Fragment>
@@ -715,7 +726,7 @@ export const ExampleCompareSection: React.FC<{
           <GridCellSubgrid
             rowSpan={NEW_TOTAL_METRICS}
             colSpan={1}
-            colsTemp={`min-content auto`}
+            colsTemp={`45px ${NEW_FIXED_SIDEBAR_WIDTH_PX - 45}px`}
             style={{...STICKY_SIDEBAR}}>
             {NEW_NUM_METRICS_PER_SCORER.map(
               (NUM_METRICS_FOR_SCORER, scorerIndex) => {
@@ -731,9 +742,7 @@ export const ExampleCompareSection: React.FC<{
                         <GridCell
                           style={{
                             backgroundColor: MOON_100,
-                          }}
-                          // style={{...STICKY_SIDEBAR}}
-                        >
+                          }}>
                           {metricCompForScorerIndex(scorerIndex, metricIndex)}
                         </GridCell>
                       );
