@@ -191,15 +191,6 @@ export const ExampleCompareSection: React.FC<{
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
   const NUM_SCORERS = uniqueScorerRefs.length;
-  // const NUM_METRICS = NUM_DERIVED + Object.values(props.state.data.scorerMetricDimensions).length;
-  // const NUM_COLS =
-  //   1 + // Input / Eval Title
-  //   2; // Input Prop Key / Val
-
-  // const NUM_INPUT_PROPS = inputColumnKeys.length;
-  // const NUM_OUTPUT_KEYS = outputColumnKeys.length;
-  // const NUM_EVALS = leafDims.length;
-
   const header = (
     <HorizontalBox
       sx={{
@@ -269,7 +260,6 @@ export const ExampleCompareSection: React.FC<{
     NUM_DERIVED,
   ];
   const NEW_TOTAL_METRICS = _.sum(NEW_NUM_METRICS_PER_SCORER);
-  // const NEW_NUM_SCORERS = NEW_NUM_METRICS_PER_SCORER.length;
   const NEW_NUM_TRIALS = leafDims.map(leafId => {
     return target.originalRows.filter(row => row.evaluationCallId === leafId)
       .length;
@@ -285,7 +275,6 @@ export const ExampleCompareSection: React.FC<{
   };
 
   const inputPropKeyCompForInputPropIndex = (inputPropIndex: number) => {
-    // (SHOW_INPUT_HEADER ? 1 : 0)
     return (
       <PropKey
         style={{
