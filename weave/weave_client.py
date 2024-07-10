@@ -17,7 +17,7 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
-from weave.trace.op import Op, Op2
+from weave.trace.op import Op2
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -409,7 +409,7 @@ class WeaveClient:
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
-        if isinstance(op, (Op, Op2)):
+        if isinstance(op, Op2):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
