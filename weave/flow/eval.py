@@ -22,7 +22,7 @@ from weave.flow.scorer import (
 )
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
-from weave.trace.op import BoundOp, Op2
+from weave.trace.op import Op2
 
 console = Console()
 
@@ -137,11 +137,6 @@ class Evaluation(Object):
         else:
             predict_signature = inspect.signature(model_predict)
         model_predict_arg_names = list(predict_signature.parameters.keys())
-        # If the op is a `BoundOp`, then the first arg is automatically added at
-        # call time and we should exclude it from the args required from the
-        # user.
-        if isinstance(model_predict, BoundOp):
-            model_predict_arg_names = model_predict_arg_names[1:]
 
         if isinstance(model_input, dict):
             model_predict_args = {
@@ -167,8 +162,6 @@ class Evaluation(Object):
                 for param in predict_signature.parameters.values()
                 if param.default == inspect.Parameter.empty
             ]
-            if isinstance(model_predict, BoundOp):
-                required_arg_names = required_arg_names[1:]
 
             message = textwrap.dedent(
                 f"""
@@ -196,12 +189,6 @@ class Evaluation(Object):
             else:
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
-
-            # If the op is a `BoundOp`, then the first arg is automatically added at
-            # call time and we should exclude it from the args required from the
-            # user.
-            if isinstance(score_arg_names, BoundOp):
-                score_arg_names = score_arg_names[1:]
 
             if "model_output" not in score_arg_names:
                 raise OpCallError(
@@ -231,8 +218,6 @@ class Evaluation(Object):
                     for param in score_signature.parameters.values()
                     if param.default == inspect.Parameter.empty
                 ]
-                if isinstance(score_fn, BoundOp):
-                    required_arg_names = required_arg_names[1:]
                 required_arg_names.remove("model_output")
 
                 message = textwrap.dedent(
