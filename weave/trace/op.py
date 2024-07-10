@@ -459,13 +459,11 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op2], Op2, Op]:
                     )
 
             # Tack these helpers on to our wrapper
-            # should this be qualname?
             wrapper.resolve_fn = func  # type: ignore
             wrapper.name = func.__qualname__ if is_method else func.__name__  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
-            # f = MethodType(wrapper, wrapper) if is_method else wrapper
             wrapper.call = partial(call, wrapper)  # type: ignore
             wrapper.calls = partial(calls, wrapper)  # type: ignore
 
@@ -478,102 +476,6 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op2], Op2, Op]:
             return cast(Op2, wrapper)
 
         return create_wrapper(func)
-
-    # def op_deco(func: T) -> Op2:
-    #     # We go through this process instead of using a class to make the decorated
-    #     # funcs pass `inspect.isfunction` and `inspect.iscoroutinefunction` checks.
-
-    #     # check function type
-    #     sig = inspect.signature(func)
-    #     params = list(sig.parameters.values())
-    #     is_method = params and params[0].name in {"self", "cls"}
-    #     is_async = inspect.iscoroutinefunction(func)
-
-    #     def op_making_wrapper(func) -> Op2:
-    #         @wraps(func)
-    #         def wrapper(*args, **kwargs):
-    #             return func(*args, **kwargs)
-
-    #         # Tack these helpers on to our "class function"
-    #         wrapper.name = func.__qualname__  # type: ignore
-    #         wrapper.signature = sig  # type: ignore
-    #         wrapper.ref = None  # type: ignore
-
-    #         f = MethodType(wrapper, wrapper) if is_method else wrapper
-    #         wrapper.call = partial(call, wrapper)  # type: ignore
-    #         wrapper.calls = partial(calls, wrapper)  # type: ignore
-
-    #         wrapper.__call__ = wrapper  # type: ignore
-    #         wrapper.__self__ = wrapper  # type: ignore
-
-    #         return cast(Op2, wrapper)
-
-    #     made_op = op_making_wrapper(func)
-
-    #     if is_async:
-
-    #         @wraps(made_op)
-    #         async def async_wrapper(*args, **kwargs):
-    #             if client_context.weave_client.get_weave_client() is None:
-    #                 return made_op(*args, **kwargs)
-    #             call = _create_call(made_op, *args, **kwargs)
-    #             return await _execute_call(
-    #                 made_op, call, *args, return_type="normal", **kwargs
-    #             )
-
-    #         return async_wrapper
-    #     else:
-
-    #         @wraps(made_op)
-    #         def sync_wrapper(*args, **kwargs):
-    #             if client_context.weave_client.get_weave_client() is None:
-    #                 return made_op(*args, **kwargs)
-    #             call = _create_call(made_op, *args, **kwargs)
-    #             return _execute_call(
-    #                 made_op, call, *args, return_type="normal", **kwargs
-    #             )
-
-    #         return sync_wrapper
-
-    #     return made_op
-
-    #     # This is the equivalent of the old Op's __call__ method
-    #     if is_async:
-
-    #         @wraps(made_op)
-    #         async def wrapper(*args: Any, **kwargs: Any) -> Any:
-    #             if client_context.weave_client.get_weave_client() is None:
-    #                 return await made_op(*args, **kwargs)
-    #             call = _create_call(made_op, *args, **kwargs)  # type: ignore
-    #             return await _execute_call(
-    #                 made_op, call, *args, return_type="normal", **kwargs
-    #             )
-
-    #     else:
-
-    #         @wraps(made_op)
-    #         def wrapper(*args: Any, **kwargs: Any) -> Any:
-    #             if client_context.weave_client.get_weave_client() is None:
-    #                 return made_op(*args, **kwargs)
-    #             call = _create_call(made_op, *args, **kwargs)  # type: ignore
-    #             return _execute_call(
-    #                 made_op, call, *args, return_type="normal", **kwargs
-    #             )
-
-    #     # there should be a better way than this...
-    #     wrapper.name = func.name  # type: ignore
-    #     wrapper.signature = func.signature  # type: ignore
-    #     wrapper.ref = func.ref  # type: ignore
-    #     wrapper.call = func.call  # type: ignore
-    #     wrapper.calls = func.calls  # type: ignore
-    #     wrapper.__call__ = wrapper  # type: ignore
-    #     wrapper.__self__ = func  # type: ignore
-
-    #     return cast(Op2, wrapper)
-
-    # # if func is None:
-    # #     return op_deco
-    # # return op_deco(func)
 
     if len(args) == 1 and len(kwargs) == 0 and callable(func := args[0]):
         # return wrap(args[0])
