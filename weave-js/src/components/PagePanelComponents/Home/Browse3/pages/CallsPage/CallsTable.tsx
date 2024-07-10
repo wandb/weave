@@ -893,7 +893,7 @@ const CompareEvaluationsTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mr-4"
+      className="ml-4 mr-16"
       size="medium"
       variant="ghost"
       disabled={disabled}
