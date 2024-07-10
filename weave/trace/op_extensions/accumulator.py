@@ -13,19 +13,19 @@ from typing import (
     Union,
 )
 
-from weave.trace.op import FinishCallbackType, Op2
+from weave.trace.op import FinishCallbackType, Op
 
 S = TypeVar("S")
 V = TypeVar("V")
 
 
 def add_accumulator(
-    op: Op2,
+    op: Op,
     make_accumulator: Callable[[Dict], Callable[[S, V], S]],
     *,
     should_accumulate: Optional[Callable[[Dict], bool]] = None,
     on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
-) -> Op2:
+) -> Op:
     """This is to be used internally only - specifically designed for integrations with streaming libraries.
 
     Add an accumulator to an op. The accumulator will be called with the output of the op

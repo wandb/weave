@@ -69,7 +69,7 @@ def _apply_fn_defaults_to_inputs(
 
 
 @runtime_checkable
-class Op2(Protocol):
+class Op(Protocol):
     name: str
     signature: inspect.Signature
     ref: Optional[ObjectRef]
@@ -86,7 +86,7 @@ class Op2(Protocol):
     __self__: Any
 
 
-def _set_on_output_handler(func: Op2, on_output: OnOutputHandlerType) -> None:
+def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
     if func._on_output_handler is not None:
         raise ValueError("Cannot set on_output_handler multiple times")
     func._on_output_handler = on_output
@@ -100,7 +100,7 @@ def _is_method_alt(func: Callable) -> bool:
     return bool(is_method)
 
 
-def _create_call(func: Op2, *args: Any, **kwargs: Any) -> "Call":
+def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     client = client_context.weave_client.require_weave_client()
 
     try:
@@ -128,7 +128,7 @@ def _create_call(func: Op2, *args: Any, **kwargs: Any) -> "Call":
 
 
 def _execute_call(
-    wrapper: Op2,
+    wrapper: Op,
     call: Any,
     *args: Any,
     return_type: Literal["call", "value"] = "call",
@@ -187,7 +187,7 @@ def _execute_call(
         return call if return_type == "call" else res2
 
 
-def call(func: Op2, *args: Any, **kwargs: Any) -> Any:
+def call(func: Op, *args: Any, **kwargs: Any) -> Any:
     # There is probably a better place for this
     if _is_method_alt(func):
         self = func.__self__
@@ -197,7 +197,7 @@ def call(func: Op2, *args: Any, **kwargs: Any) -> Any:
     return res
 
 
-def calls(func: Op2) -> "CallsIter":
+def calls(func: Op) -> "CallsIter":
     client = client_context.weave_client.require_weave_client()
     return client._op_calls(func)
 
@@ -221,25 +221,25 @@ def op(name: Any, input_type: Any, output_type: Any, hidden: Any) -> Any: ...
 
 # Modern decos
 @overload
-def op() -> Callable[[Any], Op2]: ...
+def op() -> Callable[[Any], Op]: ...
 @overload
-def op(func: Any) -> Op2: ...
+def op(func: Any) -> Op: ...
 
 
-def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op2], Op2]:
+def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     """The op decorator!"""
     if context_state.get_loading_built_ins():
         from weave.legacy.decorator_op import op as legacy_op
 
         return legacy_op(*args, **kwargs)  # type: ignore
 
-    def op_deco(func: Callable) -> Op2:
+    def op_deco(func: Callable) -> Op:
         # Check function type
         sig = inspect.signature(func)
         is_method = _is_method_alt(func)
         is_async = inspect.iscoroutinefunction(func)
 
-        def create_wrapper(func: Callable) -> Op2:
+        def create_wrapper(func: Callable) -> Op:
             if is_async:
 
                 @wraps(func)
@@ -284,7 +284,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op2], Op2]:
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
 
-            return cast(Op2, wrapper)
+            return cast(Op, wrapper)
 
         return create_wrapper(func)
 

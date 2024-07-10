@@ -15,7 +15,7 @@ except ImportError:
 from weave import errors, pyfunc_type_util, weave_pydantic
 from weave.legacy import cache, op_args
 from weave.legacy.wandb_api import WandbApiAsync
-from weave.trace import op
+from weave.trace.op import Op
 from weave.trace.refs import ObjectRef
 
 key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
@@ -80,8 +80,8 @@ def object_method_app(
 ) -> FastAPI:
     obj = obj_ref.get()
 
-    attrs: dict[str, op.Op2] = {attr: getattr(obj, attr) for attr in dir(obj)}
-    op_attrs = {k: v for k, v in attrs.items() if isinstance(v, op.Op2)}
+    attrs: dict[str, Op] = {attr: getattr(obj, attr) for attr in dir(obj)}
+    op_attrs = {k: v for k, v in attrs.items() if isinstance(v, Op)}
 
     if not op_attrs:
         raise ValueError("No ops found on object")
@@ -100,7 +100,7 @@ def object_method_app(
 
     unbound_method = method.__func__
 
-    if not isinstance(unbound_method, op.Op2):
+    if not isinstance(unbound_method, Op):
         raise ValueError(f"Expected an op, got {unbound_method}")
 
     try:

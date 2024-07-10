@@ -10,7 +10,7 @@ from pydantic import (
 
 # import pydantic
 from weave.legacy import box
-from weave.trace.op import ObjectRef, Op2
+from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.weave_client import get_ref
 
@@ -21,7 +21,7 @@ class Object(BaseModel):
 
     # Allow Op attributes
     model_config = ConfigDict(
-        ignored_types=(Op2,),
+        ignored_types=(Op,),
         arbitrary_types_allowed=True,
         protected_namespaces=(),
         extra="forbid",

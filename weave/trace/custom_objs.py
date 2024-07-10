@@ -7,7 +7,7 @@ from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
 from weave.client_context.weave_client import require_weave_client
 from weave.legacy import artifact_fs
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
-from weave.trace.op import Op2, op
+from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
 
@@ -110,7 +110,7 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     load_op_uri = None
     if serializer.id() != "Op":
         # Ensure load_instance is an op
-        if not isinstance(serializer.load, Op2):
+        if not isinstance(serializer.load, Op):
             serializer.load = op(serializer.load)
         # Save the load_intance_op
         wc = require_weave_client()

@@ -50,8 +50,6 @@ class Serializer:
             # Special case for weave.Op (which is current weave.trace.op.Op).
             # The id is just Op, since we've already already stored this as
             # "Op" in the database.
-            if ser_id.endswith(".Op2"):
-                return "Op"
             if ser_id.endswith(".Op"):
                 return "Op"
         return self.target_class.__name__

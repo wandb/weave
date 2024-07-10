@@ -15,7 +15,7 @@ from weave import call_context
 from weave.legacy.monitoring.monitor import _get_global_monitor
 from weave.legacy.monitoring.openai.models import *
 from weave.legacy.monitoring.openai.util import *
-from weave.trace.op import Op2
+from weave.trace.op import Op
 from weave.trace.op import op as op_deco
 from weave import client_context
 
@@ -23,7 +23,7 @@ old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
 
 create_op_name = "openai.chat.completions.create"
-create_op: typing.Union[str, Op2] = create_op_name
+create_op: typing.Union[str, Op] = create_op_name
 try:
     create_op = op_deco(old_create)
     create_op.name = create_op_name
@@ -254,7 +254,7 @@ def unpatch() -> None:
 # TODO: centralize
 @contextmanager
 def log_call(
-    call_name: typing.Union[str, Op2], inputs: dict[str, Any]
+    call_name: typing.Union[str, Op], inputs: dict[str, Any]
 ) -> Iterator[Callable]:
     client = client_context.weave_client.require_weave_client()
     parent_call = call_context.get_current_call()

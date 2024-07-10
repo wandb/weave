@@ -17,7 +17,7 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
-from weave.trace.op import Op2
+from weave.trace.op import Op
 from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
@@ -297,7 +297,7 @@ class WeaveClient:
         self.entity = entity
         self.project = project
         self.server = server
-        self._anonymous_ops: dict[str, Op2] = {}
+        self._anonymous_ops: dict[str, Op] = {}
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -384,7 +384,7 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
         self,
-        op: Union[str, Op2],
+        op: Union[str, Op],
         inputs: dict,
         parent: Optional[Call] = None,
         attributes: Optional[dict] = None,
@@ -409,7 +409,7 @@ class WeaveClient:
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
-        if isinstance(op, Op2):
+        if isinstance(op, Op):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
@@ -635,7 +635,7 @@ class WeaveClient:
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
-        is_opdef = isinstance(val, Op2)
+        is_opdef = isinstance(val, Op)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
@@ -686,7 +686,7 @@ class WeaveClient:
         elif isinstance(obj, dict):
             for v in obj.values():
                 self._save_nested_objects(v)
-        elif isinstance(obj, Op2):
+        elif isinstance(obj, Op):
             self._save_op(obj)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -703,7 +703,7 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op2) -> CallsIter:
+    def _op_calls(self, op: Op) -> CallsIter:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
@@ -728,15 +728,15 @@ class WeaveClient:
         )
         return response.objs
 
-    def _save_op(self, op: Op2, name: Optional[str] = None) -> Ref:
+    def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
         if op.ref is not None:
             return op.ref
         if name is None:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
-        # it's both a method AND an Op2
+        # it's both a method AND an Op
         if inspect.ismethod(op):
-            op = cast(op, Op2)  # type: ignore
+            op = cast(op, Op)  # type: ignore
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
 
@@ -767,7 +767,7 @@ class WeaveClient:
     def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
         raise NotImplementedError()
 
-    def _op_runs(self, op_def: Op2) -> Sequence[Call]:
+    def _op_runs(self, op_def: Op) -> Sequence[Call]:
         raise NotImplementedError()
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
@@ -798,7 +798,7 @@ def check_wandb_run_matches(
             )
 
 
-def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op2:
+def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     if config is None:
 
         def op_fn(*args, **kwargs):  # type: ignore

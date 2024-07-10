@@ -19,7 +19,7 @@ from weave.trace.refs import ObjectRef
 
 from .. import environment, errors, storage
 from . import serializer
-from .op import Op2
+from .op import Op
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
@@ -254,7 +254,7 @@ def reconstruct_signature(fn: typing.Callable) -> str:
 
 
 def get_source_or_fallback(fn: typing.Callable) -> str:
-    if isinstance(fn, Op2):
+    if isinstance(fn, Op):
         fn = fn.resolve_fn
 
     func_name = fn.__name__
@@ -347,7 +347,7 @@ def get_code_deps(
             if var_value.__name__ != var_name:
                 import_line += f" as {var_name}"
             import_code.append(import_line)
-        elif isinstance(var_value, (py_types.FunctionType, Op2, type)):
+        elif isinstance(var_value, (py_types.FunctionType, Op, type)):
             if var_value.__module__ == fn.__module__:
                 result = get_code_deps(var_value, artifact, depth + 1)
                 fn_warnings = result["warnings"]
@@ -368,7 +368,7 @@ def get_code_deps(
                 if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
                     pass
 
-                if isinstance(var_value, Op2):
+                if isinstance(var_value, Op):
                     warnings.append(
                         f"Cross-module op dependencies are not yet serializable {var_value}"
                     )
@@ -458,7 +458,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 
 def save_instance(
-    obj: "Op2", artifact: artifact_fs.FilesystemArtifact, name: str
+    obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
 ) -> None:
     if hasattr(obj, "resolve_fn"):
         result = get_code_deps(obj.resolve_fn, artifact)
@@ -500,7 +500,7 @@ def save_instance(
 def load_instance(
     artifact: artifact_fs.FilesystemArtifact,
     name: str,
-) -> Optional["Op2"]:
+) -> Optional["Op"]:
     if environment.wandb_production():
         # Returning None here instead of erroring allows the Weaveflow app
         # to reference op defs without crashing.
@@ -550,7 +550,7 @@ def load_instance(
         )
         return None
 
-    od: "Op2" = getattr(mod, last_op_function.name)
+    od: "Op" = getattr(mod, last_op_function.name)
     return od
 
 
@@ -564,4 +564,4 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
 
 
 # serializer.register_serializer(Op, save_instance, load_instance)
-serializer.register_serializer(Op2, save_instance, load_instance)
+serializer.register_serializer(Op, save_instance, load_instance)
