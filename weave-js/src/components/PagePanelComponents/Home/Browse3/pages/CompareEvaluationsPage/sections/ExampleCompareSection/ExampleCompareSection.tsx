@@ -631,13 +631,19 @@ export const ExampleCompareSection: React.FC<{
   );
 
   return (
+    // The outermost container
     <VerticalBox
       sx={{
         height: '100%',
         width: '100%',
         gridGap: '0px',
       }}>
+      {/* Insert the header */}
       {header}
+      {/* Setup the outermost grid. Notice the rowsTemp - this is key to having
+      the input and metric sections flex down when there is not enough space, and
+      the model outputs get the extra space.
+       */}
       <GridContainer
         colsTemp={'auto'}
         rowsTemp={`fit-content(100%) auto fit-content(100%)`}
@@ -737,14 +743,18 @@ export const ExampleCompareSection: React.FC<{
               }}>
               Metrics
             </GridCell>
+            {/* METRIC VALUES */}
             {_.range(numEvals).map(evalIndex => {
               const TRIALS_FOR_EVAL = numTrials[evalIndex];
+
+              // EVAL METRIC SUBGRID
               return (
                 <GridCellSubgrid
                   key={evalMapKey(evalIndex)}
                   rowSpan={totalMetrics + 1}
                   colSpan={1}
                   colsTemp={`min-content repeat(${TRIALS_FOR_EVAL} , auto)`}>
+                  {/* TRIALS HEADER */}
                   <GridCell style={{...stickySidebarHeaderMixin}}>
                     Trials
                   </GridCell>
@@ -757,6 +767,8 @@ export const ExampleCompareSection: React.FC<{
                       </GridCell>
                     );
                   })}
+
+                  {/* TRIALS VALUES */}
                   {numMetricsPerScorer.map((numMetrics, scorerIndex) => {
                     return _.range(numMetrics).map(metricIndex => {
                       return (
@@ -803,7 +815,8 @@ export const ExampleCompareSection: React.FC<{
               );
             })}
           </React.Fragment>
-          {/* METRIC ROWS */}
+
+          {/* SCORER / METRIC KEYS */}
           <GridCellSubgrid
             rowSpan={totalMetrics}
             colSpan={1}
