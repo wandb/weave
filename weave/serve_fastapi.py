@@ -12,11 +12,12 @@ try:
 except ImportError:
     from typing_extensions import Annotated  # type: ignore
 
-from weave import errors, pyfunc_type_util, weave_pydantic
 from weave.legacy import cache, op_args
 from weave.legacy.wandb_api import WandbApiAsync
 from weave.trace.op import Op
 from weave.trace.refs import ObjectRef
+
+from . import errors, pyfunc_type_util, weave_pydantic
 
 key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
     cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
@@ -94,13 +95,10 @@ def object_method_app(
             )
         method_name = next(iter(op_attrs))
 
-    method = getattr(obj, method_name, None)
-    if method is None:
+    if (method := getattr(obj, method_name, None)) is None:
         raise ValueError(f"Method {method_name} not found")
 
-    unbound_method = method.__func__
-
-    if not isinstance(unbound_method, Op):
+    if not isinstance((unbound_method := method.__func__), Op):
         raise ValueError(f"Expected an op, got {unbound_method}")
 
     try:

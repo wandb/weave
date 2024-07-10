@@ -11,7 +11,6 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
-    TypeVar,
     Union,
     cast,
     overload,
@@ -20,14 +19,11 @@ from typing import (
 
 from weave import call_context, client_context
 from weave.legacy import box, context_state
-from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 
 from .constants import TRACE_CALL_EMOJI
-
-T = TypeVar("T", bound=Callable[..., Any])
 
 if TYPE_CHECKING:
     from weave.weave_client import Call, CallsIter
@@ -78,7 +74,7 @@ class Op(Protocol):
     call: Callable[..., Any]
     calls: Callable[..., "CallsIter"]
 
-    # this should not be here but kept for simplicity for now
+    # not sure if this is the best place for this, but kept for compat
     _set_on_output_handler: Callable[[OnOutputHandlerType], None]
     _on_output_handler: Optional[OnOutputHandlerType]
 
