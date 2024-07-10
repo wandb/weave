@@ -1,3 +1,4 @@
+import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {FC, useMemo} from 'react';
 
@@ -28,6 +29,9 @@ export const CallsPage: FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
+
+  columnVisibilityModel: GridColumnVisibilityModel;
+  setColumnVisibilityModel: (newModel: GridColumnVisibilityModel) => void;
 }> = props => {
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
@@ -72,6 +76,8 @@ export const CallsPage: FC<{
                 hideControls={filter.frozen}
                 initialFilter={filter}
                 onFilterUpdate={setFilter}
+                columnVisibilityModel={props.columnVisibilityModel}
+                setColumnVisibilityModel={props.setColumnVisibilityModel}
               />
             ),
           },

@@ -57,6 +57,11 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/anthropic",
             "guides/integrations/mistral",
             "guides/integrations/llamaindex",
+            "guides/integrations/dspy",
+            "guides/integrations/google-gemini",
+            "guides/integrations/together_ai",
+            "guides/integrations/openrouter",
+            "guides/integrations/local_models",
           ],
         },
         {

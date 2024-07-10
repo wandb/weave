@@ -2,7 +2,6 @@ import contextlib
 import contextvars
 import datetime
 import functools
-import json
 import os
 import pathlib
 import re

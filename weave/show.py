@@ -1,7 +1,5 @@
 import json
 import os
-import random
-import string
 import typing
 import urllib
 

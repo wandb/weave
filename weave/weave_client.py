@@ -2,7 +2,6 @@ import dataclasses
 import datetime
 import typing
 import uuid
-from collections import namedtuple
 from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 
 import pydantic
@@ -15,7 +14,6 @@ from weave.table import Table
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
-    pydantic_asdict_one_level,
     pydantic_object_record,
 )
 from weave.trace.op import Op
@@ -25,7 +23,6 @@ from weave.trace.refs import (
     OpRef,
     Ref,
     TableRef,
-    parse_uri,
 )
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -37,11 +34,8 @@ from weave.trace_server.trace_server_interface import (
     CallStartReq,
     CallUpdateReq,
     EndedCallSchemaForInsert,
-    Feedback,
-    FeedbackQueryReq,
     ObjCreateReq,
     ObjQueryReq,
-    ObjQueryRes,
     ObjReadReq,
     ObjSchema,
     ObjSchemaForInsert,
@@ -49,12 +43,10 @@ from weave.trace_server.trace_server_interface import (
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
     TableCreateReq,
-    TableQueryReq,
     TableSchemaForInsert,
     TraceServerInterface,
     _CallsFilter,
     _ObjectVersionFilter,
-    _TableRowFilter,
 )
 
 if typing.TYPE_CHECKING:
@@ -422,8 +414,10 @@ class WeaveClient:
         else:
             op_str = op
 
-        self._save_nested_objects(inputs)
-        inputs_with_refs = map_to_refs(inputs)
+        inputs_redacted = redact_sensitive_keys(inputs)
+
+        self._save_nested_objects(inputs_redacted)
+        inputs_with_refs = map_to_refs(inputs_redacted)
         call_id = generate_id()
 
         if parent is None and use_stack:
@@ -817,3 +811,32 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     op = Op(op_fn)
     op.name = name
     return op
+
+
+REDACT_KEYS = ("api_key",)
+REDACTED_VALUE = "REDACTED"
+
+
+def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
+    if isinstance(obj, dict):
+        dict_res = {}
+        for k, v in obj.items():
+            if k in REDACT_KEYS:
+                dict_res[k] = REDACTED_VALUE
+            else:
+                dict_res[k] = redact_sensitive_keys(v)
+        return dict_res
+
+    elif isinstance(obj, list):
+        list_res = []
+        for v in obj:
+            list_res.append(redact_sensitive_keys(v))
+        return list_res
+
+    elif isinstance(obj, tuple):
+        tuple_res = []
+        for v in obj:
+            tuple_res.append(redact_sensitive_keys(v))
+        return tuple(tuple_res)
+
+    return obj

@@ -101,7 +101,6 @@ TYPE ID    TYPE NAME
 """
 
 import dataclasses
-import json
 import typing
 
 import tabulate

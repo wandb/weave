@@ -3,7 +3,7 @@
 import datetime
 import os
 import random
-from datetime import time, timedelta
+from datetime import timedelta
 
 import numpy as np
 import pandas as pd

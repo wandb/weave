@@ -878,7 +878,6 @@ class List(Type):
         mapped_result = mapper.apply(result)
 
         # TODO: scan through for ID
-        from weave.legacy.ops_primitives.list_ import object_lookup
 
         if extra is not None:
             # return object_lookup.resolve_fn(mapped_result, extra[0])
