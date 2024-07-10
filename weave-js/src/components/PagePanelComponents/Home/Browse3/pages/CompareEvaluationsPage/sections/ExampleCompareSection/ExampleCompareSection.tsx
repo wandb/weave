@@ -330,11 +330,15 @@ export const ExampleCompareSection: React.FC<{
           ref={ref2}
           rowSpan={1}
           colSpan={1}
-          rowsTemp={`repeat(${NEW_TOTAL_METRICS + 1}, auto)`}
+          rowsTemp={`min-content repeat(${NEW_TOTAL_METRICS}, auto)`}
           colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}>
           {/* METRIC HEADER */}
           <React.Fragment>
-            <GridCell style={{...STICKY_SIDEBAR_HEADER, zIndex: 3}}>
+            <GridCell
+              style={{
+                ...STICKY_SIDEBAR, // in a perfect world, this would be STICKY_SIDEBAR_HEADER, but it's not working
+                zIndex: 3,
+              }}>
               Metrics
             </GridCell>
             {_.range(NEW_NUM_EVALS).map(evalIndex => {
