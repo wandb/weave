@@ -9,11 +9,14 @@ export type EvaluationComparisonState = {
   comparisonDimensions?: ComparisonDimensionsType;
   selectedInputDigest?: string;
 };
+
 type BinarySummaryScore = {
   true_count: number;
   true_fraction: number;
 };
+
 type BinaryScore = boolean;
+
 export const isBinaryScore = (score: any): score is BinaryScore => {
   return typeof score === 'boolean';
 };
@@ -21,6 +24,7 @@ export const isBinaryScore = (score: any): score is BinaryScore => {
 type ContinuousSummaryScore = {
   mean: number;
 };
+
 export const isBinarySummaryScore = (
   score: any
 ): score is BinarySummaryScore => {
@@ -105,25 +109,7 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
 };
 
 export type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
-export type EvaluationCall = {
-  callId: string;
-  name: string;
-  color: string;
-  evaluationRef: string;
-  modelRef: string;
-  summaryMetrics: {
-    [metricDimensionId: string]: SummaryScore;
-  };
-  _rawEvaluationTraceData: EvaluationEvaluateCallSchema;
-};
-type EvaluationObj = {
-  ref: string;
-  datasetRef: string;
-  scorerRefs: string[];
-  project: string;
-  entity: string;
-  _rawEvaluationObject: TraceObjSchema;
-};
+
 type DatasetRow = {
   digest: string;
   val: any;
@@ -177,6 +163,7 @@ export type EvaluationComparisonData = {
   };
   scorerMetricDimensions: {[metricDimensionId: string]: ScorerMetricDimension};
 };
+
 export type PredictAndScoreCall = {
   callId: string;
   firstExampleRef: string;
@@ -199,3 +186,24 @@ export type ComparisonDimensionsType = Array<{
   dimension: EvaluationMetricDimension;
   rangeSelection?: RangeSelection;
 }>;
+
+export type EvaluationCall = {
+  callId: string;
+  name: string;
+  color: string;
+  evaluationRef: string;
+  modelRef: string;
+  summaryMetrics: {
+    [metricDimensionId: string]: SummaryScore;
+  };
+  _rawEvaluationTraceData: EvaluationEvaluateCallSchema;
+};
+
+type EvaluationObj = {
+  ref: string;
+  datasetRef: string;
+  scorerRefs: string[];
+  project: string;
+  entity: string;
+  _rawEvaluationObject: TraceObjSchema;
+};

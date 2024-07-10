@@ -1,3 +1,17 @@
+/**
+ * TODO:
+ * * Scorecard:
+ *    * When 1 scorer, show the ref
+ *    * When >1 scorer, show warning, and show ref in each column
+ * * Summary metrics: Currently just shows the baseline
+ *    * Use this new format from `ScorecardSpecificLegacyScoresType`. Perhaps this is a good chance to align on the format
+ * * Example Filters: Currently shows all scorers
+ *    * Use this new format from `ScorecardSpecificLegacyScoresType`. Perhaps this is a good chance to align on the format
+ * * Output Comparison: Currently shows all scorers
+ *    * When 1 scorer, show the ref
+ *    * When >1 scorer, sho warning icon with hover info (probably use the same component as scorecard)
+ */
+
 import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
@@ -33,11 +47,12 @@ import {
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
 
 type ScorecardSpecificLegacyScoresType = {
-  [scorerId: string]: {
-    scorerRef?: string;
+  [scorerGroupName: string]: {
+    scorerRefs: string[]; // multiple means we might not have apples to apples comparison
     scorerName?: string;
     metrics: {
-      [metricKey: string]: {
+      [metricName: string]: {
+        scorerRefToMetricKey: {[scorerRef: string]: string};
         displayName: string;
         unit: string;
         lowerIsBetter: boolean;
@@ -112,23 +127,37 @@ export const ScorecardSection: React.FC<{
                 scorerMetricsDimension.scorerDef.likelyTopLevelKeyName;
               const unit = dimensionUnit(scorerMetricsDimension, true);
               const lowerIsBetter = false;
-              if (res[scorerRef] == null) {
-                res[scorerRef] = {
-                  scorerRef,
+              if (res[scorerName] == null) {
+                res[scorerName] = {
+                  scorerRefs: [scorerRef],
                   scorerName,
                   metrics: {},
                 };
               }
-              if (res[scorerRef].metrics[metricDimensionId] == null) {
-                res[scorerRef].metrics[metricDimensionId] = {
-                  displayName: dimensionLabel(scorerMetricsDimension),
+              if (res[scorerName].scorerRefs.indexOf(scorerRef) === -1) {
+                res[scorerName].scorerRefs.push(scorerRef);
+              }
+              const displayName = dimensionLabel(scorerMetricsDimension);
+              if (res[scorerName].metrics[displayName] == null) {
+                res[scorerName].metrics[displayName] = {
+                  displayName,
+                  scorerRefToMetricKey: {[scorerRef]: metricDimensionId},
                   unit,
                   lowerIsBetter,
                   evalScores: {},
                 };
               }
+              if (
+                res[scorerName].metrics[displayName].scorerRefToMetricKey[
+                  scorerRef
+                ] == null
+              ) {
+                res[scorerName].metrics[displayName].scorerRefToMetricKey[
+                  scorerRef
+                ] = metricDimensionId;
+              }
 
-              res[scorerRef].metrics[metricDimensionId].evalScores[
+              res[scorerName].metrics[displayName].evalScores[
                 evaluationCall.callId
               ] = adjustValueForDisplay(
                 resolveDimensionValueForEvaluateCall(
@@ -143,23 +172,37 @@ export const ScorecardSection: React.FC<{
               const unit = dimensionUnit(derivedMetricsDimension, true);
               const lowerIsBetter =
                 derivedMetricsDimension.shouldMinimize ?? false;
-              if (res[scorerRef] == null) {
-                res[scorerRef] = {
-                  scorerRef,
+              if (res[scorerName] == null) {
+                res[scorerName] = {
+                  scorerRefs: [scorerRef],
                   scorerName,
                   metrics: {},
                 };
               }
-              if (res[scorerRef].metrics[metricDimensionId] == null) {
-                res[scorerRef].metrics[metricDimensionId] = {
-                  displayName: dimensionLabel(derivedMetricsDimension),
+              if (res[scorerName].scorerRefs.indexOf(scorerRef) === -1) {
+                res[scorerName].scorerRefs.push(scorerRef);
+              }
+              const displayName = dimensionLabel(derivedMetricsDimension);
+              if (res[scorerName].metrics[displayName] == null) {
+                res[scorerName].metrics[displayName] = {
+                  displayName,
+                  scorerRefToMetricKey: {[scorerRef]: metricDimensionId},
                   unit,
                   lowerIsBetter,
                   evalScores: {},
                 };
               }
+              if (
+                res[scorerName].metrics[displayName].scorerRefToMetricKey[
+                  scorerRef
+                ] == null
+              ) {
+                res[scorerName].metrics[displayName].scorerRefToMetricKey[
+                  scorerRef
+                ] = metricDimensionId;
+              }
 
-              res[scorerRef].metrics[metricDimensionId].evalScores[
+              res[scorerName].metrics[displayName].evalScores[
                 evaluationCall.callId
               ] = adjustValueForDisplay(
                 resolveDimensionValueForEvaluateCall(
@@ -343,9 +386,10 @@ export const ScorecardSection: React.FC<{
         </GridCell>
         {/* Score Rows */}
         {Object.entries(betterScores).map(([key, def]) => {
-          const scorerRefParsed = parseRefMaybe(
-            def.scorerRef ?? ''
-          ) as WeaveObjectRef | null;
+          const scorerRefParsed = null;
+          // parseRefMaybe(
+          //   def.scorerRef ?? ''
+          // ) as WeaveObjectRef | null;
           return (
             <React.Fragment key={key}>
               {def.scorerName && (
