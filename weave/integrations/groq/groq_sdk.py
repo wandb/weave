@@ -6,8 +6,7 @@ from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if TYPE_CHECKING:
-    from groq.resources.chat.completions import Completions
-    from groq.resources.chat.completions import AsyncCompletions
+    from groq.resources.chat.completions import AsyncCompletions, Completions
 
 
 def groq_accumulator(

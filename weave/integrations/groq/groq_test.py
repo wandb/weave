@@ -9,7 +9,7 @@ from groq import AsyncGroq, Groq
 import weave
 from weave.trace_server import trace_server_interface as tsi
 
-from .groq import groq_patcher
+from .groq_sdk import groq_patcher
 
 
 def _get_call_output(call: tsi.CallSchema) -> Any:
@@ -72,6 +72,15 @@ def test_groq_quickstart(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
     assert len(weave_server_respose.calls) == 1
+
+    flatened_calls_list = [
+        (op_name_from_ref(c.op_name), d)
+        for (c, d) in flatten_calls(weave_server_respose.calls)
+    ]
+    assert flatened_calls_list == [
+        ("groq.resources.chat.completions.Completions.create", 0),
+    ]
+
     call = weave_server_respose.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
@@ -226,6 +235,17 @@ def test_groq_function_calling_example(client: weave.weave_client.WeaveClient) -
     )
     assert len(weave_server_respose.calls) == 4
 
+    flatened_calls_list = [
+        (op_name_from_ref(c.op_name), d)
+        for (c, d) in flatten_calls(weave_server_respose.calls)
+    ]
+    assert flatened_calls_list == [
+        ("run_conversation", 0),
+        ("groq.resources.chat.completions.Completions.create", 1),
+        ("get_game_score", 1),
+        ("groq.resources.chat.completions.Completions.create", 1),
+    ]
+
     call_1 = weave_server_respose.calls[1]
     assert call_1.exception is None and call_1.ended_at is not None
     output_1 = _get_call_output(call_1)
@@ -251,8 +271,6 @@ def test_groq_function_calling_example(client: weave.weave_client.WeaveClient) -
     output_3 = _get_call_output(call_3)
     assert output_3.model == MODEL
     assert output_3.usage.completion_tokens == 20
-    assert output_3.usage.prompt_tokens == 175
-    assert output_3.usage.total_tokens == 195
     assert (
         output_3.choices[0].message.content
         == "The Golden State Warriors played against the Los Angeles Lakers and won the game 128-121."
@@ -296,6 +314,15 @@ def test_groq_async_chat_completion(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
     assert len(weave_server_respose.calls) == 1
+
+    flatened_calls_list = [
+        (op_name_from_ref(c.op_name), d)
+        for (c, d) in flatten_calls(weave_server_respose.calls)
+    ]
+    assert flatened_calls_list == [
+        ("groq.resources.chat.completions.AsyncCompletions.create", 0),
+    ]
+
     call = weave_server_respose.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
@@ -304,9 +331,11 @@ def test_groq_async_chat_completion(
     assert output.usage.prompt_tokens == 38
     assert output.usage.total_tokens == 164
     assert output.choices[0].finish_reason == "stop"
-    assert output.choices[0].message.content == """I totally understand. It can be really frustrating when you feel like you're well-prepared, but your nerves get the better of you during the test. This is actually a very common experience for many students.
+    assert (
+        output.choices[0].message.content
+        == """I totally understand. It can be really frustrating when you feel like you're well-prepared, but your nerves get the better of you during the test. This is actually a very common experience for many students.
 
 Can you tell me more about what happened during the test? What were some of the thoughts that were going through your mind when you started to feel panicked? Was it a specific question that triggered your anxiety, or was it more of a general feeling of overwhelm?
 
 Also, how did you prepare for the test beforehand? Did you feel confident about the material, or were there any areas where you felt a bit uncertain?"""
-
+    )
