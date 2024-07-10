@@ -104,8 +104,7 @@ def map_to_refs(obj: Any) -> Any:
     if ref:
         return ref
     if isinstance(obj, ObjectRecord):
-        res = obj.map_values(map_to_refs)
-        return res
+        return obj.map_values(map_to_refs)
     elif isinstance(obj, pydantic.BaseModel):
         obj_record = pydantic_object_record(obj)
         return obj_record.map_values(map_to_refs)
@@ -362,7 +361,7 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> "CallsIter":
+    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
 
@@ -629,7 +628,6 @@ class WeaveClient:
     # is nicer for clients I think?
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        # print(f"inside save object {val=}")
         self._save_nested_objects(val, name=name)
         return self._save_object_basic(val, name, branch)
 
@@ -638,9 +636,7 @@ class WeaveClient:
     ) -> ObjectRef:
         is_opdef = isinstance(val, Op)
         is_opdef2 = isinstance(val, Op2)
-        # print(f"XXinside save object basic {val=}")
         val = map_to_refs(val)
-        # print(f"YYinside save object basic {val=}")
         if isinstance(val, ObjectRef):
             return val
         json_val = to_json(val, self._project_id(), self.server)
@@ -693,11 +689,8 @@ class WeaveClient:
             for v in obj.values():
                 self._save_nested_objects(v)
         elif isinstance(obj, Op):
-            # print("going down op save")
             self._save_op(obj)
         elif isinstance(obj, Op2):
-            # print("going down function save")
-            print(f"calling save op from save nested objects {obj=}")
             self._save_op(obj)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -714,7 +707,7 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op) -> "CallsIter":
+    def _op_calls(self, op: Op) -> CallsIter:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
@@ -740,7 +733,6 @@ class WeaveClient:
         return response.objs
 
     def _save_op(self, op: Union[Op, Op2], name: Optional[str] = None) -> Ref:
-        print(f"inside save op, {op=}, {isinstance(op, Op2)=}")
         if op.ref is not None:
             return op.ref
         if name is None:
@@ -750,7 +742,6 @@ class WeaveClient:
         if inspect.ismethod(op):
             op = cast(op, Op2)  # type: ignore
         op.ref = op_def_ref  # type: ignore
-        print(f"tacking the ref... {op=}, {op.ref=}")
         return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()
