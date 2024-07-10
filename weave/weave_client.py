@@ -758,7 +758,7 @@ class WeaveClient:
         # print(f"{op_def_ref=}")
         # it's both a method AND an Op2
         if inspect.ismethod(op):
-            op = cast(op, Op2)
+            op = cast(op, Op2)  # type: ignore
         op.ref = op_def_ref  # type: ignore
         print(f"tacking the ref... {op=}, {op.ref=}")
         # print(f"{op=}")

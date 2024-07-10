@@ -108,7 +108,7 @@ def object_method_app(
 
     # TODO: don tneed to unbind
     args = pyfunc_type_util.determine_input_type(unbound_method)
-    arg_types = args.weave_type().property_types
+    arg_types = args.weave_type().property_types  # type: ignore
     del arg_types["self"]
 
     Item = weave_pydantic.weave_type_to_pydantic(arg_types, name="Item")
