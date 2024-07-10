@@ -37,13 +37,13 @@ import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
 const MIN_OUTPUT_WIDTH = 500;
 
 const GridCell = styled.div<{
-  cols?: number;
-  rows?: number;
+  colSpan?: number;
+  rowSpan?: number;
   button?: boolean;
 }>`
   border: 1px solid ${MOON_300};
-  grid-column-end: span ${props => props.cols || 1};
-  grid-row-end: span ${props => props.rows || 1};
+  grid-column-end: span ${props => props.colSpan || 1};
+  grid-row-end: span ${props => props.rowSpan || 1};
   padding: 8px;
   background-color: white;
   // Hover should show click mouse icon
@@ -233,15 +233,15 @@ export const ExampleCompareSection: React.FC<{
     </HorizontalBox>
   );
 
+  const SHOW_INPUT_HEADER = true;
   const NEW_NUM_INPUT_PROPS = 10;
   const NEW_NUM_OUTPUT_KEYS = 2;
-  const NEW_NUM_SCORERS = 4;
   const NEW_NUM_METRICS_PER_SCORER = [1, 2, 3, 4];
-  const NEW_NUM_EVALS = 4;
+  const NEW_TOTAL_METRICS = _.sum(NEW_NUM_METRICS_PER_SCORER);
+  const NEW_NUM_SCORERS = NEW_NUM_METRICS_PER_SCORER.length;
   const NEW_NUM_TRIALS = [1, 2, 3, 4];
-
+  const NEW_NUM_EVALS = NEW_NUM_TRIALS.length;
   const NEW_FIXED_SIDEBAR_WIDTH_PX = 250;
-  const NEW_FIXED_SINGLE_ROW_HEIGHT_PX = 40;
   const NEW_FIXED_MIN_EVAL_WIDTH_PX = 350;
 
   return (
@@ -262,24 +262,26 @@ export const ExampleCompareSection: React.FC<{
         <GridCellSubgrid
           rowSpan={1}
           colSpan={1}
-          rowsTemp={`repeat(${NEW_NUM_INPUT_PROPS + 1})`}
+          rowsTemp={`repeat(${
+            NEW_NUM_INPUT_PROPS + (SHOW_INPUT_HEADER ? 1 : 0)
+          })`}
           colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px auto`}>
           {/* INPUT HEADER */}
-          <React.Fragment>
-            <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
-              Input Key header
-            </GridCell>
-            <GridCell style={{...STICKY_HEADER}}>Input Val header</GridCell>
-          </React.Fragment>
+          {SHOW_INPUT_HEADER && (
+            <React.Fragment>
+              <GridCell style={{...STICKY_SIDEBAR_HEADER}}>Input</GridCell>
+              <GridCell style={{...STICKY_HEADER}}>Value</GridCell>
+            </React.Fragment>
+          )}
           {/* INPUT ROWS */}
           {_.range(NEW_NUM_INPUT_PROPS).map(inputPropIndex => {
             return (
               <React.Fragment key={inputPropIndex}>
                 <GridCell style={{...STICKY_SIDEBAR}}>
-                  Input Key {inputPropIndex}
+                  IK_{inputPropIndex}
                 </GridCell>
                 <GridCell>
-                  Input Val {inputPropIndex}: {LOREM_IPSUM}
+                  IV_{inputPropIndex}: {LOREM_IPSUM}
                 </GridCell>
               </React.Fragment>
             );
@@ -297,9 +299,7 @@ export const ExampleCompareSection: React.FC<{
           }}>
           {/* OUTPUT HEADER */}
           <React.Fragment>
-            <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
-              Output Key header
-            </GridCell>
+            <GridCell style={{...STICKY_SIDEBAR_HEADER}}>Outputs</GridCell>
             {_.range(NEW_NUM_EVALS).map(evalIndex => {
               return (
                 <GridCell style={{...STICKY_HEADER}}>Eval {evalIndex}</GridCell>
@@ -311,12 +311,13 @@ export const ExampleCompareSection: React.FC<{
             return (
               <React.Fragment key={outputPropIndex}>
                 <GridCell style={{...STICKY_SIDEBAR}}>
-                  OUTPUT Key {outputPropIndex}
+                  OK_{outputPropIndex}
                 </GridCell>
                 {_.range(NEW_NUM_EVALS).map(evalIndex => {
                   return (
                     <GridCell>
-                      OUTPUT Key {outputPropIndex} Eval {evalIndex}
+                      E_{evalIndex}_OK_{outputPropIndex}: {LOREM_IPSUM}{' '}
+                      {LOREM_IPSUM}
                     </GridCell>
                   );
                 })}
@@ -329,39 +330,77 @@ export const ExampleCompareSection: React.FC<{
           ref={ref2}
           rowSpan={1}
           colSpan={1}
-          rowsTemp={`repeat(${NEW_NUM_SCORERS + 1})`}
+          rowsTemp={`repeat(${NEW_TOTAL_METRICS + 1})`}
           colsTemp={`${NEW_FIXED_SIDEBAR_WIDTH_PX}px repeat(${NEW_NUM_EVALS}, minmax(${NEW_FIXED_MIN_EVAL_WIDTH_PX}px, 1fr))`}>
           {/* METRIC HEADER */}
           <React.Fragment>
-            <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
-              Scorer/Metric Key header
+            <GridCell style={{...STICKY_SIDEBAR_HEADER, zIndex: 3}}>
+              Metrics
             </GridCell>
             {_.range(NEW_NUM_EVALS).map(evalIndex => {
+              const TRIALS_FOR_EVAL = NEW_NUM_TRIALS[evalIndex];
               return (
-                <GridCell style={{...STICKY_HEADER}}>
-                  Scorer/Metric Key header Eval {evalIndex}
-                </GridCell>
+                <GridCellSubgrid
+                  style={{}}
+                  rowSpan={NEW_TOTAL_METRICS + 1}
+                  colSpan={1}
+                  colsTemp={`min-content repeat(${TRIALS_FOR_EVAL} , auto)`}>
+                  <GridCell style={{...STICKY_SIDEBAR_HEADER}}>
+                    E_{evalIndex}_AGG
+                  </GridCell>
+                  {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
+                    return (
+                      <GridCell style={{...STICKY_HEADER}}>
+                        T_{trialIndex}
+                      </GridCell>
+                    );
+                  })}
+                  {_.range(NEW_TOTAL_METRICS).map(scorerIndex => {
+                    return (
+                      <React.Fragment key={scorerIndex}>
+                        <GridCell style={{...STICKY_SIDEBAR}}>
+                          SM_{scorerIndex}
+                        </GridCell>
+                        {_.range(TRIALS_FOR_EVAL).map(trialIndex => {
+                          return (
+                            <GridCell>
+                              SM_{scorerIndex}_E_{evalIndex}_T_{trialIndex}
+                            </GridCell>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                </GridCellSubgrid>
               );
             })}
           </React.Fragment>
           {/* METRIC ROWS */}
-          {_.range(NEW_NUM_SCORERS).map(scorerIndex => {
-            return (
-              <React.Fragment key={scorerIndex}>
-                <GridCell style={{...STICKY_SIDEBAR}}>
-                  Scorer/Metric Key {scorerIndex}
-                </GridCell>
-                {_.range(NEW_NUM_EVALS).map(evalIndex => {
-                  return (
-                    <GridCell>
-                      Scorer/Metric Key header Eval {evalIndex} Scorer/Metric
-                      Val {scorerIndex}:
+          <GridCellSubgrid
+            rowSpan={NEW_TOTAL_METRICS}
+            colSpan={1}
+            colsTemp={`min-content auto`}>
+            {NEW_NUM_METRICS_PER_SCORER.map(
+              (NUM_METRICS_FOR_SCORER, scorerIndex) => {
+                return (
+                  <React.Fragment key={scorerIndex}>
+                    <GridCell
+                      style={{...STICKY_SIDEBAR}}
+                      rowSpan={NUM_METRICS_FOR_SCORER}>
+                      S_{scorerIndex}
                     </GridCell>
-                  );
-                })}
-              </React.Fragment>
-            );
-          })}
+                    {_.range(NUM_METRICS_FOR_SCORER).map(metricIndex => {
+                      return (
+                        <GridCell style={{...STICKY_SIDEBAR}}>
+                          S_{scorerIndex}_MK_{metricIndex}
+                        </GridCell>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              }
+            )}
+          </GridCellSubgrid>
         </GridCellSubgrid>
       </GridContainer>
       {/* <GridContainer
