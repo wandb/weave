@@ -109,6 +109,7 @@ def map_to_refs(obj: Any) -> Any:
         print(f">>> {res=}")
         return res
     elif isinstance(obj, pydantic.BaseModel):
+        print(f"{obj=}")
         obj_record = pydantic_object_record(obj)
         return obj_record.map_values(map_to_refs)
     elif dataclasses.is_dataclass(obj):
@@ -748,7 +749,7 @@ class WeaveClient:
         return response.objs
 
     def _save_op(self, op: Union[Op, Op2], name: Optional[str] = None) -> Ref:
-        # print(f"inside save op, {op=}")
+        print(f"inside save op, {op=}, {isinstance(op, Op2)=}")
         if op.ref is not None:
             return op.ref
         if name is None:
@@ -759,6 +760,7 @@ class WeaveClient:
         if inspect.ismethod(op):
             op = cast(op, Op2)
         op.ref = op_def_ref  # type: ignore
+        print(f"tacking the ref... {op=}, {op.ref=}")
         # print(f"{op=}")
         # print(f"{op.ref=}")
         return op_def_ref

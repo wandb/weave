@@ -1,7 +1,7 @@
 import datetime
 import inspect
 import typing
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -12,12 +12,12 @@ try:
 except ImportError:
     from typing_extensions import Annotated  # type: ignore
 
-from weave.legacy import cache, op_args
+from weave.legacy import cache
 from weave.legacy.wandb_api import WandbApiAsync
 from weave.trace import op
 from weave.trace.refs import ObjectRef
 
-from . import errors, pyfunc_type_util, weave_pydantic
+from . import weave_pydantic
 
 key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
     cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
@@ -81,8 +81,13 @@ def object_method_app(
 ) -> FastAPI:
     obj = obj_ref.get()
 
-    attrs: dict[str, op.Op] = {attr: getattr(obj, attr) for attr in dir(obj)}
-    op_attrs = {k: v for k, v in attrs.items() if isinstance(v, op.Op)}
+    attrs: dict[str, Union[op.Op, op.Op2]] = {
+        attr: getattr(obj, attr) for attr in dir(obj)
+    }
+    print(f"{attrs=}")
+    op_attrs = {k: v for k, v in attrs.items() if isinstance(v, (op.Op, op.Op2))}
+    print(f"{op_attrs=}")
+
     if not op_attrs:
         raise ValueError("No ops found on object")
 
@@ -94,20 +99,22 @@ def object_method_app(
             )
         method_name = next(iter(op_attrs))
 
-    bound_method_op = typing.cast(op.Op, getattr(obj, method_name))
-    if not isinstance(bound_method_op, op.Op):
-        raise ValueError(f"Expected an op, got {bound_method_op}")
+    print(f"{method_name=}")
 
-    try:
-        bound_method_op_args = pyfunc_type_util.determine_input_type(
-            bound_method_op.resolve_fn
-        )
-    except errors.WeaveDefinitionError as e:
-        raise ValueError(
-            f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
-        )
-    if not isinstance(bound_method_op_args, op_args.OpNamedArgs):
-        raise ValueError("predict op must have named args")
+    # bound_method_op = typing.cast(op.Op, getattr(obj, method_name))
+    # if not isinstance(bound_method_op, op.Op):
+    #     raise ValueError(f"Expected an op, got {bound_method_op}")
+
+    # try:
+    #     bound_method_op_args = pyfunc_type_util.determine_input_type(
+    #         bound_method_op.resolve_fn
+    #     )
+    # except errors.WeaveDefinitionError as e:
+    #     raise ValueError(
+    #         f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
+    #     )
+    # if not isinstance(bound_method_op_args, op_args.OpNamedArgs):
+    #     raise ValueError("predict op must have named args")
 
     arg_types = bound_method_op_args.weave_type().property_types
     del arg_types["self"]
