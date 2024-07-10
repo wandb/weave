@@ -306,18 +306,18 @@ def _is_method_alt(func: Callable) -> bool:
 def _create_call(func: Op2, *args: Any, **kwargs: Any) -> "Call":
     client = client_context.weave_client.require_weave_client()
 
-    is_method2 = _is_method_alt(func)
-    is_method = inspect.ismethod(func)
-    print(f"{is_method=}")
-    if is_method:
-        self = func.__self__
-        args = (self,) + args
+    # is_method2 = _is_method_alt(func)
+    # is_method = inspect.ismethod(func)
+    # print(f"{is_method=}")
+    # if is_method:
+    #     self = func.__self__
+    #     args = (self,) + args
 
     # if not is_method and is_method2:
     #     self = func.__self__
     #     args = (self,) + args
 
-    print(f"{args=}")
+    print(f"{func=}, {args=}, {kwargs=}")
 
     try:
         inputs = func.signature.bind(*args, **kwargs).arguments
@@ -413,6 +413,10 @@ def _execute_call(
 
 
 def call(func: Op2, *args: Any, **kwargs: Any) -> Any:
+    # There is probably a better place for this
+    if _is_method_alt(func):
+        self = func.__self__
+        args = (self,) + args
     c = _create_call(func, *args, **kwargs)
     res = _execute_call(func, c, *args, **kwargs)
     return res

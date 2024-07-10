@@ -1308,14 +1308,15 @@ def test_op_retrieval(client):
     assert my_op2(1) == 2
 
 
+class CustomType(weave.Object):
+    a: int
+
+    @weave.op()
+    def op_with_custom_type(self, v):
+        return self.a + v
+
+
 def test_bound_op_retrieval(client):
-    class CustomType(weave.Object):
-        a: int
-
-        @weave.op()
-        def op_with_custom_type(self, v):
-            return self.a + v
-
     obj = CustomType(a=1)
     obj_ref = weave.publish(obj)
     obj2 = obj_ref.get()

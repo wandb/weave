@@ -47,7 +47,7 @@ from . import types_numpy as _types_numpy
 
 from . import errors
 from weave.legacy.decorators import weave_class, mutation, type
-from weave.trace.op import op
+from weave.trace.op import Op2, op
 
 from weave.trace.op import Op
 from . import usage_analytics
@@ -283,7 +283,7 @@ def as_op(fn: typing.Callable) -> Op:
     Returns:
         The Op of the function.
     """
-    if not isinstance(fn, Op):
+    if not isinstance(fn, (Op, Op2)):
         raise ValueError("fn must be a weave.op() decorated function")
     return fn
 

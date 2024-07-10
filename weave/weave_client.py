@@ -1,6 +1,5 @@
 import dataclasses
 import datetime
-import inspect
 import typing
 import uuid
 from typing import Any, Dict, Optional, Sequence, TypedDict, Union
@@ -86,9 +85,7 @@ def get_obj_name(val: Any) -> str:
 
 
 def get_ref(obj: Any) -> Optional[ObjectRef]:
-    res = getattr(obj, "ref", None)
-    print(f"{res=}")
-    return res
+    return getattr(obj, "ref", None)
 
 
 def _get_direct_ref(obj: Any) -> Optional[Ref]:
@@ -411,16 +408,7 @@ class WeaveClient:
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
-
-        print(
-            f"{type(op)=}, {inspect.isfunction(op)=}, {isinstance(op, Op2)=}, {isinstance(op, Op)=}"
-        )
-
-        if isinstance(op, Op):
-            op_def_ref = self._save_op(op)
-            op_str = op_def_ref.uri()
-        elif isinstance(op, Op2):
-            print(f"calling save_op from create call {op=}")
+        if isinstance(op, (Op, Op2)):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
