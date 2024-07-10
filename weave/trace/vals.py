@@ -2,6 +2,7 @@ import dataclasses
 import inspect
 import operator
 import typing
+from types import MethodType
 from typing import (
     Any,
     Generator,
@@ -145,6 +146,15 @@ def attribute_access_result(
 ) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
+        print("callable", val_attr_val)
+        sig = inspect.signature(val_attr_val)
+        print(f"{sig=}")
+        print(f"{sig.parameters=}")
+
+        # bind it
+        if sig.parameters.get("self"):
+            val_attr_val = MethodType(val_attr_val, self)
+            return val_attr_val
         return val_attr_val
 
     ref = None
@@ -190,7 +200,6 @@ class WeaveObject(Traceable):
             return object.__getattribute__(self, __name)
         except AttributeError:
             pass
-        print(f"{self._val=}")
         val_attr_val = object.__getattribute__(self._val, __name)
         result = attribute_access_result(self, val_attr_val, __name, server=self.server)
         # Store the result on _val so we don't deref next time.

@@ -75,6 +75,5 @@ def get_serializer_by_id(id: str) -> Optional[Serializer]:
 def get_serializer_for_obj(obj: Any) -> Optional[Serializer]:
     for serializer in SERIALIZERS:
         if isinstance(obj, serializer.target_class):
-            # print(f"Returning {serializer=}")
             return serializer
     return None

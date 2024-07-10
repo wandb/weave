@@ -415,6 +415,9 @@ class WeaveClient:
         else:
             op_str = op
 
+        print(f"{type(op)=}")
+        print(f"{op_str=}")
+
         inputs_redacted = redact_sensitive_keys(inputs)
 
         self._save_nested_objects(inputs_redacted)
@@ -746,13 +749,13 @@ class WeaveClient:
         if name is None:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
-        print(f"{op_def_ref=}")
+        # print(f"{op_def_ref=}")
         # it's both a method AND an Op2
         if inspect.ismethod(op):
             op = cast(op, Op2)
         op.ref = op_def_ref  # type: ignore
-        print(f"{op=}")
-        print(f"{op.ref=}")
+        # print(f"{op=}")
+        # print(f"{op.ref=}")
         return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()

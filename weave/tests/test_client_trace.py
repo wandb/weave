@@ -1308,7 +1308,7 @@ def test_op_retrieval(client):
     assert my_op2(1) == 2
 
 
-class CustomType(weave.Object):
+class CustomType2(weave.Object):
     a: int
 
     @weave.op()
@@ -1317,12 +1317,16 @@ class CustomType(weave.Object):
 
 
 def test_bound_op_retrieval(client):
-    obj = CustomType(a=1)
+    obj = CustomType2(a=1)
     obj_ref = weave.publish(obj)
     obj2 = obj_ref.get()
-    assert obj2.op_with_custom_type(1) == 2
 
-    my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
+    print(f"{obj2.op_with_custom_type=}")
+
+    x = obj2.op_with_custom_type(1)
+    assert x == 2
+
+    my_op_ref = weave_client.get_ref(CustomType2.op_with_custom_type)
     with pytest.raises(MissingSelfInstanceError):
         my_op2 = my_op_ref.get()
 

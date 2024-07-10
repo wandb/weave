@@ -552,6 +552,8 @@ def load_instance(
         return None
 
     od: "Op" = getattr(mod, last_op_function.name)
+    print(f"{last_op_function=}")
+    print(f"{od=}")
 
     return od
 
@@ -565,5 +567,5 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
     return "file://" + op_module_file + "." + wrap_fn.__name__
 
 
-serializer.register_serializer(Op, save_instance, load_instance)
+# serializer.register_serializer(Op, save_instance, load_instance)
 serializer.register_serializer(Op2, save_instance, load_instance)

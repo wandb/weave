@@ -7,7 +7,7 @@ from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
 from weave.client_context.weave_client import require_weave_client
 from weave.legacy import artifact_fs
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
-from weave.trace.op import Op, op
+from weave.trace.op import Op, Op2, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
 
@@ -96,7 +96,6 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
 
 def encode_custom_obj(obj: Any) -> Optional[dict]:
     serializer = get_serializer_for_obj(obj)
-    # print(f"inside encode custom obj, {obj=}, {serializer=}")
     if serializer is None:
         # We silently return None right now. We could warn here. This object
         # will not be recoverable with client.get
@@ -112,7 +111,7 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     # print(f"inside encode custom obj, {serializer.id()=}")
     if serializer.id() != "Op":
         # Ensure load_instance is an op
-        if not isinstance(serializer.load, Op):
+        if not isinstance(serializer.load, (Op, Op2)):
             serializer.load = op(serializer.load)
         # Save the load_intance_op
         wc = require_weave_client()
@@ -164,5 +163,6 @@ def decode_custom_obj(
     )
     with artifact_fs.loading_artifact(art):
         res = load_instance_op(art, "obj")
+        print(f"{res=}")
         res.art = art
         return res

@@ -201,7 +201,7 @@ def test_call_create(client):
     client.finish_call(call, "hello")
     result = client.call(call.id)
     expected = weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
+        op_name="weave:///shawn/test-project/op/x:lVZPsqT2dN9FBzDTQ4zvxtXcGzyps0OxCichT2jmhig",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -223,7 +223,7 @@ def test_calls_query(client):
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
+        op_name="weave:///shawn/test-project/op/x:lVZPsqT2dN9FBzDTQ4zvxtXcGzyps0OxCichT2jmhig",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -232,7 +232,7 @@ def test_calls_query(client):
         attributes={},
     )
     assert result[1] == weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
+        op_name="weave:///shawn/test-project/op/x:lVZPsqT2dN9FBzDTQ4zvxtXcGzyps0OxCichT2jmhig",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=call0.id,
