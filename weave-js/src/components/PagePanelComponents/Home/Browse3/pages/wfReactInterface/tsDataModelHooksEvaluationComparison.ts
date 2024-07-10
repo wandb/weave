@@ -21,7 +21,6 @@ import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
   DerivedMetricDefinition,
-  EvaluationCall,
   EvaluationComparisonData,
   EvaluationEvaluateCallSchema,
   isBinaryScore,
@@ -116,7 +115,7 @@ const fetchEvaluationComparisonData = async (
         modelRef: call.inputs.model,
         summaryMetrics: {}, // These cannot be filled out yet since we don't know the IDs yet
         _rawEvaluationTraceData: call as EvaluationEvaluateCallSchema,
-      } as EvaluationCall,
+      },
     ])
   );
 
