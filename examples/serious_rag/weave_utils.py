@@ -23,8 +23,6 @@ from litellm import (
 
 from langchain_community.document_loaders import WebBaseLoader, OnlinePDFLoader, DataFrameLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
 
 # Weave Serializers are used to define how non-primitive data types are stored on Weave
 # Weave Objects allow custom objects to be displayed other than just their __str__ on Weave
@@ -65,7 +63,7 @@ class WeaveChatModel(weave.Model):
         if "gpt" not in self.chat_model:
             completion_args["system"] = query.pop(0)["content"]
         response = await acompletion(**completion_args)
-        
+
         # TODO: make sure that copied values are returned and not references
         return dict(response.choices[0].message)
     
@@ -289,6 +287,7 @@ class WeaveRagModel(weave.Model):
         answer = await self.chat_model.predict(messages)
         return {"result": answer, "source_documents": context_documents}
     
+# TODO: replace langchain download and extraction with own functions
 @weave.op()
 def download_source_docs(
         source_list_path: str,
@@ -297,44 +296,54 @@ def download_source_docs(
     ) -> None:
     """Download sources and save them as table artifact to Weave"""
 
-    # 1. fetch using LC document loader
+    # Read the sources list
     sources_list_df = pd.read_csv(Path(__file__).parent/source_list_path)
-    sources_df = pd.DataFrame(columns=sources_list_df.columns.tolist()+["page_content", "metadata"])
-    for row_id in tqdm(range(sources_list_df.shape[0]), desc="Downloading sources"):
-        # download and extract
-        loader_cls = OnlinePDFLoader if sources_list_df.iloc[row_id]["type"] == "pdf" else WebBaseLoader
-        extracted_raw = loader_cls(sources_list_df.iloc[row_id]["url"]).load()
-        # structure into dataframe, note that metadata is a JSON object
-        new_rows = pd.DataFrame(extracted_raw, columns=["page_content", "metadata", "type1"]).map(lambda x: x[1])
-        new_rows[sources_list_df.columns] = sources_list_df.iloc[row_id].tolist()
-        sources_df = pd.concat([sources_df, new_rows], ignoreindex=True)
+    sources_list = sources_list_df.to_dict(orient="records")
 
-    # 2. weave: create dataset - str conversion for dict in metadata (dict can't be saved)
+    # Initialize a list to store all downloaded sources
+    downloaded_sources = []
+
+    # Define loader mapping for different types of sources
+    loader_mapping = {
+        "pdf": OnlinePDFLoader,
+        "web": WebBaseLoader
+    }
+    for source in tqdm(sources_list, desc="Downloading sources"):
+        # Select the appropriate loader and download the source
+        loader_cls = loader_mapping.get(source["type"], WebBaseLoader)
+        extracted_raw = loader_cls(source["url"]).load()
+
+        for extracted in extracted_raw:
+            extracted_dict = extracted.dict()
+            extracted_dict["metadata"] = str(extracted_dict["metadata"])  # Convert metadata to string for Weave compatibility
+            extracted_dict.update(source)  # Add the original source info to extracted data
+            downloaded_sources.append(extracted_dict)
+
+    # Convert the list of dictionaries to a DataFrame
+    sources_df = pd.DataFrame(downloaded_sources, columns=sources_list_df.columns.tolist() + ["page_content", "metadata"])
+
+    # Create and publish the dataset to Weave
     dataset = weave.Dataset(
         name=raw_data_artifact,
-        rows=sources_df.astype(str).to_dict(orient="records")
+        rows=sources_df.to_dict(orient="records")
     ) 
     weave.publish(dataset)
 
+# TODO: replace langchain chunking with own functions
 @weave.op()
-def gen_data(
+async def gen_data(
+        gen_model: WeaveChatModel,
+        prompt_template: WeavePromptTemplate,
         raw_data_artifact: str,
         dataset_artifact: str,
-        gen_eval_prompt: str,
-        gen_eval_model: str,
-        gm_max_new_tokens: int,
-        gm_temperature: float,
-        gm_quantize: bool,
-        inference_batch_size: int,
-        device: str,
+        questions_per_chunk: int,
+        max_chunks_considered: int,
         source_chunk_size: int,
         source_chunk_overlap: int,
-        max_chunks_considered: int,
-        questions_per_chunk: int,
         **kwargs,
     ) -> None:
     """Generate question-answer-source pairs for the provided sources and upload to Weave.
-       Inspired by llamaindex.evaluation.DatasetGenerator that generates questions per document.
+       Inspired by llama_index.evaluation.DatasetGenerator that generates questions per document.
        We will assume a document to be the entirety of a given source. In contrary to LlamaIndex
        we will not first generate questions and the responses in a separate step but we will generate
        both questions and answers at the same time and use custom parsing to extract the pairs."""
@@ -343,43 +352,44 @@ def gen_data(
     source_df = pd.DataFrame(weave.ref(raw_data_artifact).get().rows)
     source_docs = DataFrameLoader(source_df, page_content_column="page_content").load()
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size = source_chunk_size,
-        chunk_overlap = source_chunk_overlap
+        chunk_size=source_chunk_size,
+        chunk_overlap=source_chunk_overlap
     )
     all_splits = text_splitter.split_documents(source_docs)
 
-    # sample uniformly (w/o replacement) - necessary to limit context input to model
-    sampled_docs = random.sample(all_splits, max_chunks_considered)
+    # Sample uniformly from all splits
+    sampled_docs = random.sample(all_splits, min(max_chunks_considered, len(all_splits)))
 
-    # for every sampled chunk generate questions-answer-source pairs
-    prompt = PromptTemplate.from_template(gen_eval_prompt)
-
+    # Generate questions and answers concurrently per sampled_doc
     queries, answers, sources = [], [], []
-    gen_eval_chain = LLMChain(
-        llm=get_lc_model(
-            model_name=gen_eval_model,
-            max_new_tokens=gm_max_new_tokens,
-            temperature=gm_temperature,
-            quantize_model=gm_quantize,
-            inference_batch_size=inference_batch_size,
-            device=device,
-        ),
-        prompt=prompt,
-    )
-    for doc in tqdm(sampled_docs, desc="Generating question-answer-source pairs"):
-        output = gen_eval_chain.invoke({
-            "questions_per_chunk": questions_per_chunk,
-            "source_str":doc.page_content,
-        })
-        queries.extend(re.findall(r"QUESTION: (.*)\nANSWER:", output['text']))
-        answers.extend(re.findall(r"ANSWER: (.*)", output['text']))
-        sources.extend([doc.metadata['url']]*questions_per_chunk)
 
-    # weave: create dataset (this is where I used tables and artifacts in wandb)
-    dataset = weave.Dataset(
+    async def generate_qa_pairs(doc):
+        """Generate questions and answers for a given document."""
+        messages = prompt_template.format_prompt(
+            human_prompt_args={
+                "questions_per_chunk": questions_per_chunk,
+                "source_str": doc.page_content,
+            }
+        )
+        output = await gen_model.predict(messages)
+
+        doc_queries = re.findall(r"QUESTION: (.*)\nANSWER:", output['content'])
+        doc_answers = re.findall(r"ANSWER: (.*)", output['content'])
+        doc_sources = [doc.metadata['url']] * questions_per_chunk
+
+        return doc_queries, doc_answers, doc_sources
+
+    results = await asyncio.gather(*[generate_qa_pairs(doc) for doc in sampled_docs])
+
+    # Aggregate results
+    for doc_queries, doc_answers, doc_sources in results:
+        queries.extend(doc_queries)
+        answers.extend(doc_answers)
+        sources.extend(doc_sources)
+
+    # Create and publish the dataset
+    weave.publish(weave.Dataset(
         name=dataset_artifact,
-        rows=[
-            {"query": query, "answer": answer, "main_source": source}
-            for query, answer, source in zip(queries, answers, sources)
-        ])
-    weave.publish(dataset)
+        rows=[{"query": query, "answer": answer, "main_source": source}
+              for query, answer, source in zip(queries, answers, sources)]
+    ))

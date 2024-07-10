@@ -1,7 +1,4 @@
 import os
-os.environ['PYTHONASYNCIODEBUG'] = '1'
-os.environ['LITELLM_LOG']= 'DEBUG'
-
 import weave
 import asyncio
 
@@ -33,7 +30,31 @@ def main(config):
         download_source_docs(**config)
         
         # dataset generation, object: generated dataset
-        gen_data(**config)
+        gen_model_instance = WeaveChatModel(
+            name="GenModel",
+            chat_model=config["gen_eval_model"],
+            cm_max_new_tokens=config["gm_max_new_tokens"],
+            cm_quantize=config["gm_quantize"],
+            cm_temperature=config["gm_temperature"],
+            inference_batch_size=config["inference_batch_size"],
+            device=config["device"],
+        )
+        
+        prompt_template_instance = WeavePromptTemplate(
+            system_prompt=config["eval_system_prompt"],
+            human_prompt=config["gen_eval_prompt"],
+        )
+        
+        asyncio.run(gen_data(
+            gen_model=gen_model_instance,
+            prompt_template=prompt_template_instance,
+            raw_data_artifact=config["raw_data_artifact"],
+            dataset_artifact=config["dataset_artifact"],
+            questions_per_chunk=config["questions_per_chunk"],
+            max_chunks_considered=config["max_chunks_considered"],
+            source_chunk_size=config["source_chunk_size"],
+            source_chunk_overlap=config["source_chunk_overlap"],
+        ))
 
     if config["benchmark"]:
         # create RAG Model #
@@ -115,7 +136,7 @@ def main(config):
             ],
         )
         # NOTE: this has to be async in any case (even if scorer and model.predict are not async)
-        asyncio.run(evaluation.evaluate(wf_rag_model), debug=True)
+        asyncio.run(evaluation.evaluate(wf_rag_model))
 
 if __name__ == "__main__":
     config = {}
