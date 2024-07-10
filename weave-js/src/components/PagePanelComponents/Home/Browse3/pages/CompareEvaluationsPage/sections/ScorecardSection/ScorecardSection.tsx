@@ -1,8 +1,5 @@
 /**
  * TODO:
- * * (Bonus) Example Filters: Currently shows all scorers
- *    * Limit filters to just the baseline dims
- *    * EmptyCase: https://app.wandb.test/lavanyashukla/nims_rag_2/weave/compare-evaluations?evaluationCallIds=%5B%22d6358605-5c1d-4561-819d-179bb433a7a7%22%2C%227ca7836f-e055-42eb-94c5-1625b73af789%22%2C%221024b6c8-6707-4e61-9474-463ad424a067%22%2C%22fad0e96b-e9e3-4a84-8ce0-ad61dce5987e%22%5D
  * * Output Comparison: Currently shows all scorers
  *    * When 1 scorer, show the ref
  *    * When >1 scorer, sho warning icon with hover info (probably use the same component as scorecard)
@@ -35,6 +32,7 @@ import {EvaluationComparisonState} from '../../ecpTypes';
 import {HorizontalBox} from '../../Layout';
 import {
   EvaluationCallLink,
+  EvaluationDatasetLink,
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
@@ -42,9 +40,13 @@ import {
   DERIVED_SCORER_REF,
 } from './summaryMetricUtil';
 
-const VARIATION_WARNING_TITLE = 'Variation detected';
-const VARIATION_WARNING_EXPLANATION =
-  'The scoring function logic varies between evaluations. Take precaution when comparing results.';
+const SCORER_VARIATION_WARNING_TITLE = 'Scoring inconsistency';
+const SCORER_VARIATION_WARNING_EXPLANATION =
+  'The scoring logic varies between evaluations. Take precaution when comparing results.';
+
+const DATASET_VARIATION_WARNING_TITLE = 'Dataset inconsistency';
+const DATASET_VARIATION_WARNING_EXPLANATION =
+  'The dataset varies between evaluations therefore aggregate metrics may not be directly comparable. Examples are limited to the intersection of the datasets.';
 
 const GridCell = styled.div`
   padding: 6px 16px;
@@ -56,6 +58,10 @@ export const ScorecardSection: React.FC<{
 }> = props => {
   const modelRefs = useMemo(
     () => getOrderedModelRefs(props.state),
+    [props.state]
+  );
+  const datasetRefs = useMemo(
+    () => Object.values(props.state.data.evaluations).map(e => e.datasetRef),
     [props.state]
   );
   const evalCallIds = useMemo(
@@ -97,6 +103,8 @@ export const ScorecardSection: React.FC<{
   const {derivedMetrics} = useMemo(() => {
     return deriveComparisonSummaryMetrics(props.state);
   }, [props.state]);
+
+  const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
 
   let gridTemplateColumns = '';
   gridTemplateColumns += 'min-content '; // Scorer Name
@@ -176,6 +184,48 @@ export const ScorecardSection: React.FC<{
             </GridCell>
           );
         })}
+        {datasetVariation && (
+          <>
+            <GridCell
+              style={{
+                fontWeight: 'bold',
+                textAlign: 'right',
+                gridColumnEnd: 'span 2',
+              }}>
+              <Alert
+                severity="warning"
+                style={{
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                }}>
+                <Tooltip title={DATASET_VARIATION_WARNING_EXPLANATION}>
+                  <div
+                    style={{
+                      whiteSpace: 'nowrap',
+                    }}>
+                    {DATASET_VARIATION_WARNING_TITLE}
+                  </div>
+                </Tooltip>
+              </Alert>
+            </GridCell>
+            {evalCallIds.map(evalCallId => {
+              return (
+                <GridCell
+                  key={evalCallId}
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
+                  <EvaluationDatasetLink
+                    callId={evalCallId}
+                    state={props.state}
+                  />
+                </GridCell>
+              );
+            })}
+          </>
+        )}
         <GridCell
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
@@ -284,13 +334,18 @@ export const ScorecardSection: React.FC<{
                         def.scorerName ?? ''
                       )
                     ) : (
-                      <Alert severity="warning">
-                        <Tooltip title={VARIATION_WARNING_EXPLANATION}>
+                      <Alert
+                        severity="warning"
+                        style={{
+                          paddingTop: 0,
+                          paddingBottom: 0,
+                        }}>
+                        <Tooltip title={SCORER_VARIATION_WARNING_EXPLANATION}>
                           <div
                             style={{
                               whiteSpace: 'nowrap',
                             }}>
-                            {VARIATION_WARNING_TITLE}
+                            {SCORER_VARIATION_WARNING_TITLE}
                           </div>
                         </Tooltip>
                       </Alert>
