@@ -35,7 +35,7 @@ vcrpy==6.0.1
 mistralai>=0.1.8
 litellm>=1.36.1
 llama-index>=0.10.35
-anthropic>=0.28.0
+anthropic>=0.18.0
 langchain-core>=0.2.1
 langchain-openai>=0.1.7
 langchain-community>=0.2.1

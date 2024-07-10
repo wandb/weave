@@ -57,6 +57,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/anthropic",
             "guides/integrations/mistral",
             "guides/integrations/llamaindex",
+            "guides/integrations/dspy",
           ],
         },
         {

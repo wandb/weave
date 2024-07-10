@@ -188,7 +188,15 @@ interactions:
         0.0000000381469,\n        \"output_cost_per_pixel\": 0.0,\n        \"litellm_provider\":
         \"openai\"\n    },\n    \"whisper-1\": {\n        \"mode\": \"audio_transcription\",\n
         \       \"input_cost_per_second\": 0,\n        \"output_cost_per_second\":
-        0.0001, \n        \"litellm_provider\": \"openai\"\n    }, \n    \"azure/whisper-1\":
+        0.0001, \n        \"litellm_provider\": \"openai\"\n    }, \n    \"tts-1\":
+        {\n        \"mode\": \"audio_speech\", \n        \"input_cost_per_character\":
+        0.000015,\n        \"litellm_provider\": \"openai\"\n    },\n    \"tts-1-hd\":
+        {\n        \"mode\": \"audio_speech\", \n        \"input_cost_per_character\":
+        0.000030,\n        \"litellm_provider\": \"openai\"\n    },\n    \"azure/tts-1\":
+        {\n        \"mode\": \"audio_speech\", \n        \"input_cost_per_character\":
+        0.000015,\n        \"litellm_provider\": \"azure\"\n    },\n    \"azure/tts-1-hd\":
+        {\n        \"mode\": \"audio_speech\", \n        \"input_cost_per_character\":
+        0.000030,\n        \"litellm_provider\": \"azure\"\n    },\n    \"azure/whisper-1\":
         {\n        \"mode\": \"audio_transcription\",\n        \"input_cost_per_second\":
         0, \n        \"output_cost_per_second\": 0.0001, \n        \"litellm_provider\":
         \"azure\"\n    },\n    \"azure/gpt-4o\": {\n        \"max_tokens\": 4096,\n
@@ -406,7 +414,7 @@ interactions:
         0.000000,\n        \"litellm_provider\": \"text-completion-codestral\",\n
         \       \"mode\": \"completion\",\n        \"source\": \"https://docs.mistral.ai/capabilities/code_generation/\"\n
         \   },\n    \"deepseek-coder\": {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\":
-        32000,\n        \"max_output_tokens\": 4096,\n        \"input_cost_per_token\":
+        128000,\n        \"max_output_tokens\": 4096,\n        \"input_cost_per_token\":
         0.00000014,\n        \"output_cost_per_token\": 0.00000028,\n        \"litellm_provider\":
         \"deepseek\",\n        \"mode\": \"chat\"\n    },\n    \"groq/llama2-70b-4096\":
         {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\": 4096,\n        \"max_output_tokens\":
@@ -940,22 +948,22 @@ interactions:
         \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini/gemini-1.5-pro\": {\n        \"max_tokens\": 8192,\n
         \       \"max_input_tokens\": 2097152,\n        \"max_output_tokens\": 8192,\n
-        \       \"input_cost_per_token\": 0.00000035, \n        \"input_cost_per_token_above_128k_tokens\":
-        0.0000007, \n        \"output_cost_per_token\": 0.00000105, \n        \"output_cost_per_token_above_128k_tokens\":
-        0.0000021, \n        \"litellm_provider\": \"gemini\",\n        \"mode\":
-        \"chat\",\n        \"supports_system_messages\": true,\n        \"supports_function_calling\":
+        \       \"input_cost_per_token\": 0.0000035, \n        \"input_cost_per_token_above_128k_tokens\":
+        0.000007, \n        \"output_cost_per_token\": 0.0000105, \n        \"output_cost_per_token_above_128k_tokens\":
+        0.000021, \n        \"litellm_provider\": \"gemini\",\n        \"mode\": \"chat\",\n
+        \       \"supports_system_messages\": true,\n        \"supports_function_calling\":
         true,\n        \"supports_vision\": true,\n        \"supports_tool_choice\":
         true, \n        \"supports_response_schema\": true, \n        \"source\":
-        \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
-        \   },\n    \"gemini/gemini-1.5-pro-latest\": {\n        \"max_tokens\": 8192,\n
-        \       \"max_input_tokens\": 1048576,\n        \"max_output_tokens\": 8192,\n
-        \       \"input_cost_per_token\": 0.00000035, \n        \"input_cost_per_token_above_128k_tokens\":
-        0.0000007, \n        \"output_cost_per_token\": 0.00000105, \n        \"output_cost_per_token_above_128k_tokens\":
-        0.0000021, \n        \"litellm_provider\": \"gemini\",\n        \"mode\":
-        \"chat\",\n        \"supports_system_messages\": true,\n        \"supports_function_calling\":
+        \"https://ai.google.dev/pricing\"\n    },\n    \"gemini/gemini-1.5-pro-latest\":
+        {\n        \"max_tokens\": 8192,\n        \"max_input_tokens\": 1048576,\n
+        \       \"max_output_tokens\": 8192,\n        \"input_cost_per_token\": 0.0000035,
+        \n        \"input_cost_per_token_above_128k_tokens\": 0.000007, \n        \"output_cost_per_token\":
+        0.00000105, \n        \"output_cost_per_token_above_128k_tokens\": 0.000021,
+        \n        \"litellm_provider\": \"gemini\",\n        \"mode\": \"chat\",\n
+        \       \"supports_system_messages\": true,\n        \"supports_function_calling\":
         true,\n        \"supports_vision\": true,\n        \"supports_tool_choice\":
         true, \n        \"supports_response_schema\": true, \n        \"source\":
-        \"https://ai.google.dev/models/gemini\"\n    },\n    \"gemini/gemini-pro-vision\":
+        \"https://ai.google.dev/pricing\"\n    },\n    \"gemini/gemini-pro-vision\":
         {\n        \"max_tokens\": 2048,\n        \"max_input_tokens\": 30720,\n        \"max_output_tokens\":
         2048,\n        \"input_cost_per_token\": 0.00000035, \n        \"input_cost_per_token_above_128k_tokens\":
         0.0000007, \n        \"output_cost_per_token\": 0.00000105, \n        \"output_cost_per_token_above_128k_tokens\":
@@ -1974,7 +1982,7 @@ interactions:
       Content-Encoding:
       - gzip
       Content-Length:
-      - '8033'
+      - '8079'
       Content-Security-Policy:
       - default-src 'none'; style-src 'unsafe-inline'; sandbox
       Content-Type:
@@ -1982,13 +1990,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 04 Jul 2024 06:41:21 GMT
+      - Tue, 09 Jul 2024 07:07:14 GMT
       ETag:
-      - W/"acdd36963641f3925f59f19bd1cd84563b6134afb3cf9916d3716d467aac36a2"
+      - W/"c445c3e715abfd4b7ad16fc0be422ee17b80966e5dbc456a98db9416c61ef98e"
       Expires:
-      - Thu, 04 Jul 2024 06:46:21 GMT
+      - Tue, 09 Jul 2024 07:12:14 GMT
       Source-Age:
-      - '245'
+      - '92'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -1998,19 +2006,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '31'
+      - '2'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - ae9d7923a0e038a7bbe418d2c46bc0f87c68e4a1
+      - 7dfca1592c6ef76dcf94d454d4c73c577eeaaceb
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - E320:1B7147:5BE22:89C2D:6680CEF4
+      - E1DF:E3E86:147EC1:1933E4:6689841C
       X-Served-By:
-      - cache-hyd1100025-HYD
+      - cache-bom4723-BOM
       X-Timer:
-      - S1720075282.646005,VS0,VE0
+      - S1720508835.713436,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -2052,17 +2060,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA1SQXWvCMBSG7/srwrm2Uq3i1rvBxsaUCe5mMIak8bTNTHNCcoQ58b+P1Pqxm1y8
-        b583T3pIhAC9gUKAaiSr1pn0vnlYVcuXVTnf/lbPk9ePffU0Xz6+54vF/RsMIkHlNyo+U0NFrTPI
-        muypVh4lY1wdzcZZNpuO7/KuaGmDJmK14zQfTlPe+ZLSbDSe9mRDWmGAQnwmQghx6M7oaDf4A4XI
-        BuekxRBkjVBcPhICPJmYgAxBB5aWYXAtFVlG22nn0MfHy56h2nkq4912Z8wlr7TVoVl7lIFsZAOT
-        O+HHRIivznv3TwWcp9bxmmmLNg6O8tMcXP/UTdl3TCzNTTxJej0I+8DYritta/TO6+4NUTI5Jn8A
-        AAD//wMAQ0oCEsIBAAA=
+        H4sIAAAAAAAAA1SQPU/DMBRF9/wK681NlTaktBmLuiAWhFhAqHKc19Tg+Fn2CyJU/e/IafrB4uHe
+        nOvjHBIhQNdQClB7yap1Jl3p383Lw6LrV2vNb/3z0/y7snKT7fT68RUmkaDqExWfqami1hlkTfZU
+        K4+SMa7O7udZkS2X+WIoWqrRRKxxnObTIuXOV5Rms3kxknvSCgOU4j0RQojDcEZHW+MPlCKbnJMW
+        Q5ANQnn5SAjwZGICMgQdWFqGybVUZBntoJ3DGB8ve4Ya56mKd9vOmEu+01aH/dajDGQjG5jcCT8m
+        QnwM3t0/FXCeWsdbpi+0cXCWn+bg+qduyrFjYmlu4rtk1IPQB8Z2u9O2Qe+8Ht4QJZNj8gcAAP//
+        AwCX0C4MwgEAAA==
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 89dd2117d8bd17b2-MAA
+      - 8a0679e26a317f71-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -2070,14 +2078,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 04 Jul 2024 06:41:23 GMT
+      - Tue, 09 Jul 2024 07:07:16 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=Xoip1TgBi26g7gx5QzRZGZNmlCmWbIqXj8kPggTGLe4-1720075283-1.0.1.1-cgAsRknfTgnSTyAdCXgugEQ4PCBUwkE4hSKsuuvnM5KWzHzV9Xr1i4GW.7bYYNzMTxiDOu9xxY74BQQHL3mTlw;
-        path=/; expires=Thu, 04-Jul-24 07:11:23 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=X_6YDKmSN.rmrLpEZZenp4wSaU2W8R6kbHLRuY0LjyI-1720508836-1.0.1.1-GEfgKLwgzqDxW.TGI8gg.Q81uL4zjSYOmB4XL._mR.SD7JOSLfEUjrP9bNYkwkb.A7tyWEye5EoNVKyNgeUdag;
+        path=/; expires=Tue, 09-Jul-24 07:37:16 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=.kO2dg4viKnXk3H7JMgCa2I4.0EZXQKSnXM.OEgQQjs-1720075283627-0.0.1.1-604800000;
+      - _cfuvid=W4DBXcETobhO7nbiCOpiPU.KOmVwI2N_.TeYIUasOgY-1720508836695-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -2086,7 +2094,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '111'
+      - '133'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -2094,17 +2102,17 @@ interactions:
       x-ratelimit-limit-requests:
       - '10000'
       x-ratelimit-limit-tokens:
-      - '5000000'
+      - '15000000'
       x-ratelimit-remaining-requests:
       - '9999'
       x-ratelimit-remaining-tokens:
-      - '4999980'
+      - '14999981'
       x-ratelimit-reset-requests:
       - 6ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_c00d62393c10d83a19be84b678356167
+      - req_d04b8c6339f4eed5d5f8394cfdb11567
     status:
       code: 200
       message: OK
@@ -2144,17 +2152,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA1SQPU/DMBRF9/wK681NlSatCtlgQDAgVAYWhCrXeU1cbD/LfqlAVf87cpp+sHi4
-        N+f6OIdMCNAN1AJUJ1lZb/L77uF9+2Ga5s11+3IV94/9S2ufylX1+ryDSSJos0PFZ2qqyHqDrMmd
-        ahVQMqbV2bIsiuWivKuGwlKDJmGt57yaLnLuw4byYlYuRrIjrTBCLT4zIYQ4DGdydA3+QC2KyTmx
-        GKNsEerLR0JAIJMSkDHqyNIxTK6lIsfoBu05jPHxsmeo9YE26W7XG3PJt9rp2K0DykgusZHJn/Bj
-        JsTX4N3/UwEfyHpeM32jS4Oz6jQH1z91U44dE0tzE8+zUQ/ib2S06612LQYf9PCGJJkdsz8AAAD/
-        /wMAfg9TRMIBAAA=
+        H4sIAAAAAAAAA1SQy27CMBBF9/kKa9YEJYRXs29VKe0KqQuqCjlmCKaOx9hD1Rbx75VDeHTjxb05
+        18c5JkKAXkMpQG0lq9aZ9EH/Pi5mm7eFf/2q6t3SLp9xmlfVk3nZ72EQCap3qPhCDRW1ziBrsuda
+        eZSMcTWfjbJJNp8X065oaY0mYo3jtBhOUj74mtIsH016cktaYYBSvCdCCHHszuho1/gNpcgGl6TF
+        EGSDUF4/EgI8mZiADEEHlpZhcCsVWUbbaY+hj0/XPUON81THu+3BmGu+0VaH7cqjDGQjG5jcGT8l
+        Qnx03od/KuA8tY5XTJ9o42BenOfg9qfuyr5jYmnu4nHS60H4CYztaqNtg9553b0hSian5A8AAP//
+        AwAaQcQHwgEAAA==
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 89dd2117bd9e179e-MAA
+      - 8a0679e25d447f9f-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -2162,14 +2170,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 04 Jul 2024 06:41:23 GMT
+      - Tue, 09 Jul 2024 07:07:16 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=3bnapFyMFb3KdSoybXJvkAxgNvVkVKt9F2iaTrriqlU-1720075283-1.0.1.1-y1ZN7FeP1GaYb9Dp4oKt.27ROqieFfbZmKgfpi4ndRlOKBCqSphLetflqRIXUDfRkrL44SIgidJoOMaYJW_taA;
-        path=/; expires=Thu, 04-Jul-24 07:11:23 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=IdG9Gjw96.E_BR9EP49xoBfv.SYV0BaU4Ek4pyJ38Rg-1720508836-1.0.1.1-sbGKCIBDV5KFiWrWG1QSaDvKAXf6Ay8tsPLDdOdXgygOeZaLuX3fEQd2k.mpZvBcyfOsrcIwYKsbOHoAwWP94Q;
+        path=/; expires=Tue, 09-Jul-24 07:37:16 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=5wwNj0HnhAIY4BcUYmjg52qdKWCyoQUton0Ue8v3_8k-1720075283726-0.0.1.1-604800000;
+      - _cfuvid=OfIOmqRlmUnbBKxox0gE8ryCK5bqou2meiSIueKWswg-1720508836722-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -2178,7 +2186,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '149'
+      - '120'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -2186,17 +2194,17 @@ interactions:
       x-ratelimit-limit-requests:
       - '10000'
       x-ratelimit-limit-tokens:
-      - '5000000'
+      - '15000000'
       x-ratelimit-remaining-requests:
       - '9999'
       x-ratelimit-remaining-tokens:
-      - '4999980'
+      - '14999981'
       x-ratelimit-reset-requests:
       - 6ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_31e93f4c24a74571d48c7c4a443f9814
+      - req_4445b61c27b581a33283d6a384f00693
     status:
       code: 200
       message: OK

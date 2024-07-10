@@ -1,4 +1,4 @@
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Sequence
 
 
 class Patcher:
@@ -10,7 +10,7 @@ class Patcher:
 
 
 class MultiPatcher(Patcher):
-    def __init__(self, patchers: list[Patcher]) -> None:
+    def __init__(self, patchers: Sequence[Patcher]) -> None:
         self.patchers = patchers
 
     def attempt_patch(self) -> bool:
@@ -89,4 +89,5 @@ class SymbolPatcher(Patcher):
             return False
 
         setattr(target.base_symbol, target.attr, self._original_value)
+        self._original_value = None
         return True

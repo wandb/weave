@@ -66,19 +66,20 @@ filterwarnings = ["error"]
 [tool.ruff.lint]
 preview = true
 select = [
-  "D200", # https://docs.astral.sh/ruff/rules/fits-on-one-line/
-  "D201", # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
-  "D202", # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
-  "D204", # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
-  "D210", # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
-  "D211", # https://docs.astral.sh/ruff/rules/blank-line-before-class/
-  "D214", # https://docs.astral.sh/ruff/rules/section-not-over-indented/
+  "D200",   # https://docs.astral.sh/ruff/rules/fits-on-one-line/
+  "D201",   # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
+  "D202",   # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
+  "D204",   # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
+  "D210",   # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
+  "D211",   # https://docs.astral.sh/ruff/rules/blank-line-before-class/
+  "D214",   # https://docs.astral.sh/ruff/rules/section-not-over-indented/
   "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",
   "F541",
-  "I", # https://docs.astral.sh/ruff/rules/#isort-i
-  "W291", # https://docs.astral.sh/ruff/rules/trailing-whitespace/
-  "W391", # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
+  "I",      # https://docs.astral.sh/ruff/rules/#isort-i
+  "W291",   # https://docs.astral.sh/ruff/rules/trailing-whitespace/
+  "W391",   # https://docs.astral.sh/ruff/rules/too-many-newlines-at-end-of-file/
+  "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
 ]
 ignore = [
   "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/ - we use Google style
@@ -97,6 +98,11 @@ exclude = [
 
 [tool.ruff.lint.isort]
 known-third-party = ["wandb"]
+
+[tool.ruff.lint.per-file-ignores]
+"weave/tests/*" = ["F401"]
+"weave/weave_server.py" = ["F401"]
+
 
 [tool.ruff]
 line-length = 88

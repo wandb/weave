@@ -7,3 +7,4 @@ The Weave ecosystem contains automatic logging integrations for popular AI libra
 - [MistralAI](/guides/integrations/mistral): the `mistralai` library.
 - [LlamaIndex](/guides/integrations/llamaindex): the `llama-index` framework.
 - [langchain](/guides/integrations/langchain): the `langchain` framework.
+- [LiteLLM](/guides/integrations/litellm): the `litellm` library.
