@@ -1,8 +1,10 @@
 import inspect
+from copy import deepcopy
 
 import pytest
 
 from weave.trace.op import Op, op
+from weave.trace.refs import ObjectRef
 from weave.weave_client import Call
 
 
@@ -60,8 +62,12 @@ def test_sync_method(client):
 def test_sync_method_call(client):
     call = a.method.call(1)
     assert isinstance(call, Call)
-    # assert call.inputs == {"self": a, "a": 1}  # self is an opref?  Is that expected?
     assert call.output == 2
+
+    inputs = deepcopy(call.inputs)
+    self_ref = inputs.pop("self")
+    assert isinstance(self_ref, ObjectRef)
+    assert inputs == {"a": 1}
 
 
 @pytest.mark.asyncio
@@ -73,8 +79,12 @@ async def test_async_method(client):
 async def test_async_method_call(client):
     call = await a.amethod.call(1)
     assert isinstance(call, Call)
-    # assert call.inputs == {"self": a, "a": 1}  # self is an opref?  Is that expected?
     assert call.output == 2
+
+    inputs = deepcopy(call.inputs)
+    self_ref = inputs.pop("self")
+    assert isinstance(self_ref, ObjectRef)
+    assert inputs == {"a": 1}
 
 
 def test_sync_func_patching_passes_inspection():
