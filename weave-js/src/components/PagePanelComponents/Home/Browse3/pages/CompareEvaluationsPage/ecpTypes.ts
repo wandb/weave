@@ -166,7 +166,7 @@ export type EvaluationComparisonData = {
 
 export type PredictAndScoreCall = {
   callId: string;
-  firstExampleRef: string;
+  exampleRef: string;
   rowDigest: string;
   modelRef: string;
   evaluationCallId: string;

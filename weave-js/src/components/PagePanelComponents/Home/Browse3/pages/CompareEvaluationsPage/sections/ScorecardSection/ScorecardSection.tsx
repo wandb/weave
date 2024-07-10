@@ -1,7 +1,7 @@
 /**
  * TODO:
  * * Example Filters: Currently shows all scorers
- *    * Data is missing...
+ *    * Limit filters to just the baseline dims
  * * Output Comparison: Currently shows all scorers
  *    * When 1 scorer, show the ref
  *    * When >1 scorer, sho warning icon with hover info (probably use the same component as scorecard)
@@ -93,7 +93,7 @@ export const ScorecardSection: React.FC<{
   }, [modelProps]);
   const [diffOnly, setDiffOnly] = React.useState(true);
 
-  const derivedMetrics: DerivedComparisonSummaryMetrics = useMemo(() => {
+  const {derivedMetrics} = useMemo(() => {
     return deriveComparisonSummaryMetrics(props.state);
   }, [props.state]);
 

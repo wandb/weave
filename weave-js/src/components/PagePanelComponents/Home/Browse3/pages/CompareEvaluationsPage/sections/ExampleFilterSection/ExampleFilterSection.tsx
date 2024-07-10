@@ -16,7 +16,7 @@ import {
 } from '../../ecpTypes';
 import {
   dimensionId,
-  dimensionLabel,
+  flattenedDimensionPath,
   resolveDimensionMetricResultForPASCall,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
@@ -121,15 +121,27 @@ const SingleDimensionFilter: React.FC<{
   }, [filteredRows]);
 
   const data = useMemo(() => {
+    const {resolvePeerDimension} = deriveComparisonSummaryMetrics(props.state);
     const series: Array<ScatterPlotPoint & {count: number}> = [];
     if (targetDimension != null) {
-      Object.entries(props.state.data.resultRows).forEach(([digest, row]) => {
-        const xVals: number[] = [];
-        const yVals: number[] = [];
-        Object.values(row.evaluations[baselineCallId].predictAndScores).forEach(
-          score => {
+      const baselineTargetDimension = resolvePeerDimension(
+        baselineCallId,
+        targetDimension
+      );
+      const compareTargetDimension = resolvePeerDimension(
+        compareCallId,
+        targetDimension
+      );
+
+      if (baselineTargetDimension != null && compareTargetDimension != null) {
+        Object.entries(props.state.data.resultRows).forEach(([digest, row]) => {
+          const xVals: number[] = [];
+          const yVals: number[] = [];
+          Object.values(
+            row.evaluations[baselineCallId].predictAndScores
+          ).forEach(score => {
             const val = resolveDimensionMetricResultForPASCall(
-              targetDimension,
+              baselineTargetDimension,
               score
             );
             if (val === undefined) {
@@ -139,69 +151,69 @@ const SingleDimensionFilter: React.FC<{
             } else if (isContinuousScore(val.value)) {
               xVals.push(val.value);
             }
-          }
-        );
-        Object.values(
-          row.evaluations[compareCallId]?.predictAndScores ?? {}
-        ).forEach(score => {
-          const val = resolveDimensionMetricResultForPASCall(
-            targetDimension,
-            score
-          );
-          if (val === undefined) {
+          });
+          Object.values(
+            row.evaluations[compareCallId]?.predictAndScores ?? {}
+          ).forEach(score => {
+            const val = resolveDimensionMetricResultForPASCall(
+              compareTargetDimension,
+              score
+            );
+            if (val === undefined) {
+              return;
+            } else if (isBinaryScore(val.value)) {
+              yVals.push(val.value ? 1 : 0);
+            } else if (isContinuousScore(val.value)) {
+              yVals.push(val.value);
+            }
+          });
+          if (xVals.length === 0 || yVals.length === 0) {
             return;
-          } else if (isBinaryScore(val.value)) {
-            yVals.push(val.value ? 1 : 0);
-          } else if (isContinuousScore(val.value)) {
-            yVals.push(val.value);
           }
+          series.push({
+            x: mean(xVals),
+            y: mean(yVals),
+            count: xVals.length,
+            size: MIN_PLOT_DOT_SIZE,
+            color: MOON_500,
+            selected: filteredDigest.has(digest),
+          });
         });
-        if (xVals.length === 0 || yVals.length === 0) {
-          return;
-        }
-        series.push({
-          x: mean(xVals),
-          y: mean(yVals),
-          count: xVals.length,
-          size: MIN_PLOT_DOT_SIZE,
-          color: MOON_500,
-          selected: filteredDigest.has(digest),
-        });
-      });
 
-      if (targetDimension.scoreType === 'binary') {
-        // Here we are going to further group the points by their x and y values
-        // since the points are going to be discrete, and stacked. Note, while it
-        // is true that each individual trial is either a 0 or 1, the mean of the
-        // trials can be a float.
-        const grouped = _.groupBy(series, point => `${point.x}-${point.y}`);
-        const counts = Object.values(grouped).map(points =>
-          sum(points.map(point => point.count))
-        );
-        const minCount = Math.min(...counts);
-        const maxCount = Math.max(...counts);
-        console.log(minCount, maxCount);
-        const sizeForCount = (count: number) => {
-          if (minCount === maxCount) {
-            return MIN_PLOT_DOT_SIZE;
-          }
-          return (
-            MIN_PLOT_DOT_SIZE +
-            ((count - minCount) / (maxCount - minCount)) *
-              (MAX_PLOT_DOT_SIZE - MIN_PLOT_DOT_SIZE)
+        if (targetDimension.scoreType === 'binary') {
+          // Here we are going to further group the points by their x and y values
+          // since the points are going to be discrete, and stacked. Note, while it
+          // is true that each individual trial is either a 0 or 1, the mean of the
+          // trials can be a float.
+          const grouped = _.groupBy(series, point => `${point.x}-${point.y}`);
+          const counts = Object.values(grouped).map(points =>
+            sum(points.map(point => point.count))
           );
-        };
-        return Object.values(grouped).map(points => {
-          const count = sum(points.map(point => point.count));
-          return {
-            x: points[0].x, // x is the same for all points in the group
-            y: points[0].y, // y is the same for all points in the group
-            size: sizeForCount(count),
-            count,
-            color: points[0].color,
-            selected: points.some(point => point.selected),
+          const minCount = Math.min(...counts);
+          const maxCount = Math.max(...counts);
+
+          const sizeForCount = (count: number) => {
+            if (minCount === maxCount) {
+              return MIN_PLOT_DOT_SIZE;
+            }
+            return (
+              MIN_PLOT_DOT_SIZE +
+              ((count - minCount) / (maxCount - minCount)) *
+                (MAX_PLOT_DOT_SIZE - MIN_PLOT_DOT_SIZE)
+            );
           };
-        });
+          return Object.values(grouped).map(points => {
+            const count = sum(points.map(point => point.count));
+            return {
+              x: points[0].x, // x is the same for all points in the group
+              y: points[0].y, // y is the same for all points in the group
+              size: sizeForCount(count),
+              count,
+              color: points[0].color,
+              selected: points.some(point => point.selected),
+            };
+          });
+        }
       }
     }
 
@@ -210,7 +222,7 @@ const SingleDimensionFilter: React.FC<{
     baselineCallId,
     compareCallId,
     filteredDigest,
-    props.state.data.resultRows,
+    props.state,
     targetDimension,
   ]);
 
@@ -279,7 +291,7 @@ const DimensionPicker: React.FC<{
   state: EvaluationComparisonState;
   dimensionIndex: number;
 }> = props => {
-  const derivedMetrics = useMemo(
+  const {derivedMetrics} = useMemo(
     () => deriveComparisonSummaryMetrics(props.state),
     [props.state]
   );
@@ -295,7 +307,7 @@ const DimensionPicker: React.FC<{
         .map(([groupName, group]) => {
           return Object.entries(group.metrics)
             .map(([metricName, metric]) => {
-              const dimId = Object.values(metric.scorerRefToMetricKey)[0];
+              const dimId = Object.values(metric.scorerRefToDimensionId)[0];
               const dim =
                 props.state.data.derivedMetricDimensions[dimId] ??
                 props.state.data.scorerMetricDimensions[dimId];
@@ -330,13 +342,13 @@ const DimensionPicker: React.FC<{
           setComparisonDimensions(res);
         }}
         getOptionLabel={option => {
-          return dimensionLabel(dimensionMap[option]!);
+          return flattenedDimensionPath(dimensionMap[option]!);
         }}
         options={Object.keys(dimensionMap)}
         renderInput={renderParams => (
           <StyledTextField
             {...renderParams}
-            value={currDimension ? dimensionLabel(currDimension) : ''}
+            value={currDimension ? flattenedDimensionPath(currDimension) : ''}
             label={'Dimension'}
             sx={{width: '300px'}}
           />

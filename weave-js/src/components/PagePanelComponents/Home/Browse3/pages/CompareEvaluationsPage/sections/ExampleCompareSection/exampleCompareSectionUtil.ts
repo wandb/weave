@@ -5,6 +5,7 @@ import {flattenObject} from '../../../../../Browse2/browse2Util';
 import {getOrderedCallIds} from '../../ecpState';
 import {EvaluationComparisonState, PredictAndScoreCall} from '../../ecpTypes';
 import {dimensionId, resolveDimensionValueForPASCall} from '../../ecpUtil';
+import { deriveComparisonSummaryMetrics,ResolvePeerDimensionFn } from '../ScorecardSection/summaryMetricUtil';
 
 type RowBase = {
   id: string;
@@ -72,7 +73,8 @@ const rowIsSelected = (
       [evaluationCallId: string]: number | undefined;
     };
   },
-  state: EvaluationComparisonState
+  state: EvaluationComparisonState,
+  resolvePeerDimension: ResolvePeerDimensionFn
 ) => {
   const compareDims = state.comparisonDimensions;
   if (compareDims == null || compareDims.length === 0) {
@@ -85,13 +87,17 @@ const rowIsSelected = (
     ) {
       return true;
     }
-    const values = scores[dimensionId(compareDim.dimension)];
-    return Object.entries(compareDim.rangeSelection).every(([key, val]) => {
-      if (values[key] == null) {
+    return Object.entries(compareDim.rangeSelection).every(([evalCallId, range]) => {
+      const resolvedPeerDim = resolvePeerDimension(evalCallId, compareDim.dimension);
+      if (resolvedPeerDim == null) {
         return false;
       }
-      const rowVal = values[key] as number;
-      return val.min <= rowVal && rowVal <= val.max;
+      const values = scores[dimensionId(resolvedPeerDim)];
+      if (values[evalCallId] == null) {
+        return false;
+      }
+      const rowVal = values[evalCallId] as number;
+      return range.min <= rowVal && rowVal <= range.max;
     });
   });
 };
@@ -114,7 +120,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   id: predictAndScoreRes.callId,
                   evaluationCallId: predictAndScoreRes.evaluationCallId,
                   inputDigest: datasetRow.digest,
-                  inputRef: predictAndScoreRes.firstExampleRef,
+                  inputRef: predictAndScoreRes.exampleRef,
                   input: flattenObject({input: datasetRow.val}),
                   output: flattenObject({output}),
                   scores: Object.fromEntries(
@@ -232,10 +238,11 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const filteredRows = useMemo(() => {
     const aggregatedAsList = Object.values(aggregatedRows);
     const compareDims = state.comparisonDimensions;
+    const {resolvePeerDimension} = deriveComparisonSummaryMetrics(state);
     let res = aggregatedAsList;
     if (compareDims != null && compareDims.length > 0) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
-        return rowIsSelected(aggregatedRows[digest].scores, state);
+        return rowIsSelected(aggregatedRows[digest].scores, state, resolvePeerDimension);
       });
 
       res = aggregatedAsList.filter(row =>

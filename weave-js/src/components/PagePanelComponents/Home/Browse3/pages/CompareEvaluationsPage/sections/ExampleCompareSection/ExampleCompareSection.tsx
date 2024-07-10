@@ -26,9 +26,9 @@ import {EvaluationComparisonState} from '../../ecpTypes';
 import {
   adjustValueForDisplay,
   dimensionId,
-  dimensionLabel,
   dimensionShouldMinimize,
   dimensionUnit,
+  flattenedDimensionPath,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {ComparisonPill} from '../ScorecardSection/ScorecardSection';
@@ -327,7 +327,7 @@ export const ExampleCompareSection: React.FC<{
                             textAlign: 'right',
                             fontWeight: 'bold',
                           }}>
-                          {dimensionLabel(dimensionsForThisScorer[mi])}
+                          {flattenedDimensionPath(dimensionsForThisScorer[mi])}
                         </GridCell>
                       </React.Fragment>
                     );

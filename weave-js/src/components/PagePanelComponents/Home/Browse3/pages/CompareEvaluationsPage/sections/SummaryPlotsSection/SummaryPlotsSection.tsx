@@ -88,7 +88,7 @@ const normalizeValues = (values: Array<number | undefined>): number[] => {
 const useNormalizedPlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): RadarPlotData => {
-  const derivedMetrics = useMemo(() => {
+  const {derivedMetrics} = useMemo(() => {
     return deriveComparisonSummaryMetrics(state);
   }, [state]);
   const callIds = useMemo(() => {

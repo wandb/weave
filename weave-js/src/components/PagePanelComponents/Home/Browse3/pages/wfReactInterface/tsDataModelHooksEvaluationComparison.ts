@@ -376,7 +376,7 @@ const fetchEvaluationComparisonData = async (
                 parentPredictAndScore.id
               ] = {
                 callId: parentPredictAndScore.id,
-                firstExampleRef: exampleRef,
+                exampleRef,
                 rowDigest,
                 modelRef,
                 evaluationCallId,

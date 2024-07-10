@@ -28,7 +28,7 @@ export const adjustValueForDisplay = (
   }
 };
 
-export const dimensionLabel = (dim: EvaluationMetricDimension): string => {
+export const flattenedDimensionPath = (dim: EvaluationMetricDimension): string => {
   if (isScorerMetricDimension(dim)) {
     const parts = [dim.scorerDef.likelyTopLevelKeyName, ...dim.metricSubPath];
     return parts.join('.');
