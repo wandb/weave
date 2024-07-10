@@ -93,9 +93,9 @@ recommend_places_to_visit("Kolkata")
 
 ## Create a `Model` for easier experimentation
 
-Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](./guides/core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
+Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](../core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
 
-In addition to versioning code and capturing inputs/outputs, [`Model`](./guides/core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](./guides/core-types/evaluations)s.
+In addition to versioning code and capturing inputs/outputs, [`Model`](../core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](../core-types/evaluations.md)s.
 
 In the example below, you can experiment with `WeaveModel`. Every time you change one of these, you'll get a new _version_ of `WeaveModel`.
 
@@ -136,7 +136,7 @@ print(city_recommender.predict("Los Angeles"))
 
 | ![](./imgs/groq/groq_weave_model.png) |
 |---|
-| Tracing and versioning your calls using a [`Model`](./guides/core-types/models) |
+| Tracing and versioning your calls using a [`Model`](../core-types/models) |
 
 ### Serving a Weave Model
 
