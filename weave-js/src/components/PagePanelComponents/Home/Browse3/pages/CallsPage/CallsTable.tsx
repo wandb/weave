@@ -80,6 +80,7 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
+const MAX_BULK_DELETE = 10;
 
 export const CallsTable: FC<{
   entity: string;
@@ -346,9 +347,7 @@ export const CallsTable: FC<{
     project
   );
 
-  // const rowDisabled = (row: TraceCallSchema) => {
-  //   return row.exception != null || row.ended_at == null;
-  // };
+  const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
@@ -358,28 +357,9 @@ export const CallsTable: FC<{
         minWidth: 30,
         width: 38,
         field: 'CustomCheckbox',
+        headerName: '',
         sortable: false,
         disableColumnMenu: true,
-        renderHeader: (params: any) => {
-          return (
-            <Checkbox
-              checked={
-                selectedCalls.length === 0
-                  ? false
-                  : selectedCalls.length === tableData.length
-                  ? true
-                  : 'indeterminate'
-              }
-              onCheckedChange={() => {
-                if (selectedCalls.length === tableData.length) {
-                  setSelectedCalls([]);
-                } else {
-                  setSelectedCalls(tableData.map(row => row.id));
-                }
-              }}
-            />
-          );
-        },
         renderCell: (params: any) => {
           const rowId = params.id as string;
           const isSelected = selectedCalls.includes(rowId);
@@ -388,11 +368,18 @@ export const CallsTable: FC<{
           const disabledDueToNonSuccess =
             params.row.exception != null || params.row.ended_at == null;
           let tooltipText = '';
-          if (disabledDueToNonSuccess) {
+          if (bulkDeleteMode) {
+            // No restrictions on bulk deletion
+            tooltipText = '';
+          } else if (disabledDueToNonSuccess) {
             tooltipText = 'Cannot compare non-successful evaluations';
           } else if (disabledDueToMax) {
             tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
           }
+
+          const disabled = bulkDeleteMode
+            ? selectedCalls.length >= MAX_BULK_DELETE
+            : disabledDueToNonSuccess || disabledDueToMax;
 
           return (
             <Tooltip title={tooltipText} placement="right" arrow>
@@ -401,7 +388,7 @@ export const CallsTable: FC<{
               {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
               <span>
                 <Checkbox
-                  disabled={disabledDueToNonSuccess || disabledDueToMax}
+                  disabled={disabled}
                   checked={isSelected}
                   onCheckedChange={() => {
                     if (isSelected) {
@@ -420,7 +407,7 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-  }, [columns.cols, selectedCalls, tableData]);
+  }, [columns.cols, selectedCalls, bulkDeleteMode]);
 
   // *** REGISTER HEADER EXTRAS ***
   // Register Export Button
@@ -451,27 +438,6 @@ export const CallsTable: FC<{
     if (!isEvaluateTable) {
       return;
     }
-    const selectedCallData = selectedCalls.map(call =>
-      tableData.find(row => row.id === call)
-    );
-    const disabledDueToMax = selectedCalls.length >= MAX_EVAL_COMPARISONS;
-    const disabledDueToOngoing = selectedCallData.some(
-      call => call?.ended_at == null
-    );
-    const disabledDueToException = selectedCallData.some(
-      call => call?.exception != null
-    );
-    let tooltipText = '';
-
-    if (disabledDueToException) {
-      tooltipText = 'Cannot compare evaluations with exceptions';
-    } else if (disabledDueToOngoing) {
-      tooltipText = 'Cannot compare ongoing evaluations';
-    } else if (disabledDueToMax) {
-      tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
-    } else if (selectedCalls.length === 0) {
-      tooltipText = 'Select at least one evaluation to compare';
-    }
     addExtra('compareEvaluations', {
       node: (
         <CompareEvaluationsTableButton
@@ -480,13 +446,10 @@ export const CallsTable: FC<{
               router.compareEvaluationsUri(entity, project, selectedCalls)
             );
           }}
-          disabled={
-            selectedCalls.length === 0 ||
-            disabledDueToMax ||
-            disabledDueToOngoing ||
-            disabledDueToException
+          disabled={selectedCalls.length === 0 || bulkDeleteMode}
+          tooltipText={
+            bulkDeleteMode ? 'Cannot compare while bulk deleting' : undefined
           }
-          tooltipText={tooltipText}
         />
       ),
       order: 3,
@@ -505,6 +468,7 @@ export const CallsTable: FC<{
     entity,
     project,
     history,
+    bulkDeleteMode,
   ]);
 
   // Register Delete Button
@@ -513,16 +477,22 @@ export const CallsTable: FC<{
     addExtra('deleteSelectedCalls', {
       node: (
         <BulkDeleteButton
-          onClick={() => setDeleteConfirmModalOpen(true)}
+          onConfirm={() => setDeleteConfirmModalOpen(true)}
           disabled={selectedCalls.length === 0}
           isRightmostButton={!isEvaluateTable}
+          bulkDeleteModeToggle={mode => {
+            setBulkDeleteMode(mode);
+            if (!mode) {
+              setSelectedCalls([]);
+            }
+          }}
         />
       ),
       order: 2,
     });
 
     return () => removeExtra('deleteSelectedCalls');
-  }, [addExtra, removeExtra, selectedCalls, isEvaluateTable]);
+  }, [addExtra, removeExtra, selectedCalls, isEvaluateTable, bulkDeleteMode]);
 
   useEffect(() => {
     const callsToDelete = tableData
@@ -906,13 +876,12 @@ const CompareEvaluationsTableButton: FC<{
 );
 
 const BulkDeleteButton: FC<{
-  onClick: () => void;
   disabled?: boolean;
   isRightmostButton?: boolean;
-}> = ({onClick, disabled, isRightmostButton}) => {
-  
+  onConfirm: () => void;
+  bulkDeleteModeToggle: (mode: boolean) => void;
+}> = ({disabled, isRightmostButton, onConfirm, bulkDeleteModeToggle}) => {
   const [deleteClicked, setDeleteClicked] = useState(false);
-
   return (
     <Box
       sx={{
@@ -920,15 +889,14 @@ const BulkDeleteButton: FC<{
         display: 'flex',
         alignItems: 'center',
       }}>
-      {
-        deleteClicked ? (
-          <>
+      {deleteClicked ? (
+        <>
           <Button
-            className='mx-4'
+            className="mx-4"
             variant="ghost"
             size="medium"
             disabled={disabled}
-            onClick={onClick}
+            onClick={onConfirm}
             tooltip="Select rows with the checkbox to delete"
             icon="delete">
             Confirm
@@ -937,22 +905,26 @@ const BulkDeleteButton: FC<{
             className={isRightmostButton ? 'ml-4 mr-16' : 'mx-4'}
             variant="ghost"
             size="medium"
-            onClick={() => setDeleteClicked(false)}
-          >
+            onClick={() => {
+              setDeleteClicked(false);
+              bulkDeleteModeToggle(false);
+            }}>
             Cancel
           </Button>
-          </>
-        ) : (
-          <Button
-            className={isRightmostButton ? 'ml-4 mr-16' : 'mx-4'}
-            variant="ghost"
-            size="medium"
-            onClick={() => setDeleteClicked(true)}
-            tooltip="Select rows with the checkbox to delete"
-            icon="delete"
-          />
-        )
-      }
+        </>
+      ) : (
+        <Button
+          className={isRightmostButton ? 'ml-4 mr-16' : 'mx-4'}
+          variant="ghost"
+          size="medium"
+          onClick={() => {
+            setDeleteClicked(true);
+            bulkDeleteModeToggle(true);
+          }}
+          tooltip="Select rows with the checkbox to delete"
+          icon="delete"
+        />
+      )}
     </Box>
   );
 };
