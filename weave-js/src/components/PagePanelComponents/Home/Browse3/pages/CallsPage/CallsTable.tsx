@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
+  GridApiPro,
   GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
@@ -108,6 +109,15 @@ export const CallsTable: FC<{
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
+
+  // Register Export Button
+  useEffect(() => {
+    addExtra('exportRunsTableButton', {
+      node: <ExportRunsTableButton tableRef={apiRef} />,
+    });
+
+    return () => removeExtra('exportRunsTableButton');
+  }, [apiRef, addExtra, removeExtra]);
 
   // Table State consists of:
   // 1. Filter (Structured Filter)
@@ -408,28 +418,6 @@ export const CallsTable: FC<{
       ...columns.cols,
     ];
   }, [columns.cols, selectedCalls, bulkDeleteMode]);
-
-  // *** REGISTER HEADER EXTRAS ***
-  // Register Export Button
-  useEffect(() => {
-    addExtra('exportRunsTableButton', {
-      node: (
-        <ExportRunsTableButton
-          onClick={() =>
-            apiRef.current?.exportDataAsCsv({
-              getRowsToExport:
-                selectedCalls.length > 0 ? () => selectedCalls : undefined,
-            })
-          }
-          disabled={tableData.length === 0}
-          exportAll={selectedCalls.length === 0}
-        />
-      ),
-      order: 1,
-    });
-
-    return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, selectedCalls, tableData.length, addExtra, removeExtra]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -823,13 +811,9 @@ const getPeekId = (peekPath: string | null): string | null => {
 };
 
 const ExportRunsTableButton = ({
-  onClick,
-  disabled,
-  exportAll,
+  tableRef,
 }: {
-  onClick: () => void;
-  disabled?: boolean;
-  exportAll?: boolean;
+  tableRef: React.MutableRefObject<GridApiPro>;
 }) => (
   <Box
     sx={{
@@ -838,16 +822,13 @@ const ExportRunsTableButton = ({
       alignItems: 'center',
     }}>
     <Button
-      className="mx-4"
+      className="mx-16"
       size="medium"
-      variant="ghost"
-      onClick={onClick}
-      disabled={disabled}
-      tooltip={
-        exportAll ? 'Export table to CSV' : 'Export selected rows to CSV'
-      }
-      icon="export-share-upload"
-    />
+      variant="secondary"
+      onClick={() => tableRef.current?.exportDataAsCsv()}
+      icon="export-share-upload">
+      Export to CSV
+    </Button>
   </Box>
 );
 
