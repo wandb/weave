@@ -47,6 +47,8 @@ Weave automatically captures traces for your LangChain applications. It will tra
 
 In addition to automatic tracing, you can manually trace calls using the `WeaveTracer` callback or the `weave_tracing_enabled` context manager. These methods are akin to using request callbacks in individual parts of a LangChain application.
 
+**Note:** Weave tracing is enabled by default and is enabled when you call `weave.init()`. You can disable this behaviour by setting the environment variable `WEAVE_TRACE_LANGCHAIN` to `"false"` before calling `weave.init()`.
+
 ### Using `WeaveTracer`
 
 You can pass the `WeaveTracer` callback to individual LangChain components to trace specific requests.
