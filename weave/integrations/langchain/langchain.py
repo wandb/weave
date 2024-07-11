@@ -38,9 +38,9 @@ RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 if not import_failed:
 
     def make_valid_run_name(name: str) -> str:
-        name = name.replace("<", " ").replace(">", " ")
+        name = name.replace("<", "-").replace(">", "")
 
-        valid_run_name = re.sub(r"[^a-zA-Z0-9 .-_]", " ", name)
+        valid_run_name = re.sub(r"[^a-zA-Z0-9 .-_]", "-", name)
         return valid_run_name
 
     def _run_to_dict(run: Run, as_input: bool = False) -> dict:
