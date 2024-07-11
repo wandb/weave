@@ -333,7 +333,7 @@ const fetchEvaluationComparisonData = async (
       const evaluationCallId = parentPredictAndScore.parent_id!;
 
       const split = '/attr/rows/id/';
-      if (exampleRef.includes(split)) {
+      if (typeof exampleRef === 'string' && exampleRef.includes(split)) {
         const parts = exampleRef.split(split);
         if (parts.length === 2) {
           const maybeDigest = parts[1];
