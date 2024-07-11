@@ -66,6 +66,19 @@ def _apply_fn_defaults_to_inputs(
 
 @runtime_checkable
 class Op(Protocol):
+    """
+    The interface for Op-ified functions and methods.
+
+    Op was previously a class, and has been converted to a Protocol to allow
+    functions to pass for Op.  This is needed because many popular packages are
+    using the `inspect` module for control flow, and Op instances don't always
+    pass those checks.  In particular, `inspect.iscoroutinefunction` always
+    fails for classes, even ones that implement async methods or protocols.
+
+    Some of the attributes are carry-overs from when Op was a class.  We should
+    consider removing the unnecessary ones where possible.
+    """
+
     name: str
     signature: inspect.Signature
     ref: Optional[ObjectRef]
@@ -124,13 +137,13 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
 
 
 def _execute_call(
-    wrapper: Op,
+    __op: Op,
     call: Any,
     *args: Any,
-    return_type: Literal["call", "value"] = "call",
+    __return_type: Literal["call", "value"] = "call",
     **kwargs: Any,
 ) -> Any:
-    func = wrapper.resolve_fn
+    func = __op.resolve_fn
     client = client_context.weave_client.require_weave_client()
     has_finished = False
 
@@ -143,7 +156,7 @@ def _execute_call(
             print_call_link(call)
 
     def on_output(output: Any) -> Any:
-        if handler := getattr(wrapper, "_on_output_handler", None):
+        if handler := getattr(__op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
         finish(output)
         return output
@@ -170,7 +183,7 @@ def _execute_call(
                 call_context.push_call(call)
                 output = await awaitable
                 res2 = on_output(output)
-                return call if return_type == "call" else res2
+                return call if __return_type == "call" else res2
             except BaseException as e:
                 finish(exception=e)
                 raise
@@ -180,7 +193,7 @@ def _execute_call(
         return _call_async()
     else:
         res2 = on_output(res)
-        return call if return_type == "call" else res2
+        return call if __return_type == "call" else res2
 
 
 def call(op: Op, *args: Any, **kwargs: Any) -> Any:
@@ -218,7 +231,33 @@ def op(func: Any) -> Op: ...
 
 
 def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
-    """The op decorator!"""
+    """
+    A decorator to weave op-ify a function or method.  Works for both sync and async.
+
+    Decorated functions and methods can be called as normal, but will also
+    automatically track calls in the Weave UI.
+
+    If you don't call `weave.init` then the function will behave as if it were
+    not decorated.
+
+
+    Example usage:
+    ```
+    import weave
+    weave.init("my-project")
+
+    @weave.op
+    async def extract():
+        return await client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=[
+                {"role": "user", "content": "Create a user as JSON"},
+            ],
+        )
+
+    await extract()  # calls the function and tracks the call in the Weave UI
+    ```
+    """
     if context_state.get_loading_built_ins():
         from weave.legacy.decorator_op import op as legacy_op
 
@@ -242,7 +281,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         wrapper,  # type: ignore
                         call,
                         *args,
-                        return_type="value",
+                        __return_type="value",
                         **kwargs,
                     )
             else:
@@ -256,7 +295,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         wrapper,  # type: ignore
                         call,
                         *args,
-                        return_type="value",
+                        __return_type="value",
                         **kwargs,
                     )
 
