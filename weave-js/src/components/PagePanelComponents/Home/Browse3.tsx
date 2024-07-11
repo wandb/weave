@@ -702,10 +702,14 @@ const ObjectVersionsPageBinding = () => {
   const filters: WFHighLevelObjectVersionFilter = useMemo(() => {
     let queryFilter: WFHighLevelObjectVersionFilter = {};
     // Parse the filter from the query string
-    try {
-      queryFilter = JSON.parse(query.filter) as WFHighLevelObjectVersionFilter;
-    } catch (e) {
-      console.log(e);
+    if (query.filter) {
+      try {
+        queryFilter = JSON.parse(
+          query.filter
+        ) as WFHighLevelObjectVersionFilter;
+      } catch (e) {
+        console.log(e);
+      }
     }
 
     // If the tab is models or datasets, set the baseObjectClass filter

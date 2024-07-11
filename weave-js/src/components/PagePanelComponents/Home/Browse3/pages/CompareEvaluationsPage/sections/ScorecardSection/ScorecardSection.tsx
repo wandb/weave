@@ -1,4 +1,5 @@
-import {Box} from '@material-ui/core';
+import {Box, Tooltip} from '@material-ui/core';
+import {Alert} from '@mui/material';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
@@ -20,32 +21,24 @@ import {
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
-import {
-  adjustValueForDisplay,
-  dimensionLabel,
-  dimensionUnit,
-  resolveDimensionValueForEvaluateCall,
-} from '../../ecpUtil';
 import {HorizontalBox} from '../../Layout';
 import {
   EvaluationCallLink,
+  EvaluationDatasetLink,
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
+import {
+  buildCompositeComparisonSummaryMetrics,
+  DERIVED_SCORER_REF,
+} from './summaryMetricUtil';
 
-type ScorecardSpecificLegacyScoresType = {
-  [scorerId: string]: {
-    scorerRef?: string;
-    scorerName?: string;
-    metrics: {
-      [metricKey: string]: {
-        displayName: string;
-        unit: string;
-        lowerIsBetter: boolean;
-        evalScores: {[evalCallId: string]: number | undefined};
-      };
-    };
-  };
-};
+export const SCORER_VARIATION_WARNING_TITLE = 'Scoring inconsistency detected';
+export const SCORER_VARIATION_WARNING_EXPLANATION =
+  'The scoring logic varies between evaluations. Take precaution when comparing results.';
+
+const DATASET_VARIATION_WARNING_TITLE = 'Dataset inconsistency detected';
+const DATASET_VARIATION_WARNING_EXPLANATION =
+  'The dataset varies between evaluations therefore aggregate metrics may not be directly comparable. Examples are limited to the intersection of the datasets.';
 
 const GridCell = styled.div`
   padding: 6px 16px;
@@ -57,6 +50,10 @@ export const ScorecardSection: React.FC<{
 }> = props => {
   const modelRefs = useMemo(
     () => getOrderedModelRefs(props.state),
+    [props.state]
+  );
+  const datasetRefs = useMemo(
+    () => Object.values(props.state.data.evaluations).map(e => e.datasetRef),
     [props.state]
   );
   const evalCallIds = useMemo(
@@ -95,92 +92,11 @@ export const ScorecardSection: React.FC<{
   }, [modelProps]);
   const [diffOnly, setDiffOnly] = React.useState(true);
 
-  const betterScores: ScorecardSpecificLegacyScoresType = useMemo(() => {
-    const res: ScorecardSpecificLegacyScoresType = {};
-    Object.entries(props.state.data.evaluationCalls).forEach(
-      ([evalCallId, evaluationCall]) => {
-        Object.entries(evaluationCall.summaryMetrics).forEach(
-          ([metricDimensionId, metricDimension]) => {
-            const scorerMetricsDimension =
-              props.state.data.scorerMetricDimensions[metricDimensionId];
-            const derivedMetricsDimension =
-              props.state.data.derivedMetricDimensions[metricDimensionId];
-            if (scorerMetricsDimension != null) {
-              const scorerRef =
-                scorerMetricsDimension.scorerDef.scorerOpOrObjRef;
-              const scorerName =
-                scorerMetricsDimension.scorerDef.likelyTopLevelKeyName;
-              const unit = dimensionUnit(scorerMetricsDimension, true);
-              const lowerIsBetter = false;
-              if (res[scorerRef] == null) {
-                res[scorerRef] = {
-                  scorerRef,
-                  scorerName,
-                  metrics: {},
-                };
-              }
-              if (res[scorerRef].metrics[metricDimensionId] == null) {
-                res[scorerRef].metrics[metricDimensionId] = {
-                  displayName: dimensionLabel(scorerMetricsDimension),
-                  unit,
-                  lowerIsBetter,
-                  evalScores: {},
-                };
-              }
+  const {compositeMetrics} = useMemo(() => {
+    return buildCompositeComparisonSummaryMetrics(props.state);
+  }, [props.state]);
 
-              res[scorerRef].metrics[metricDimensionId].evalScores[
-                evaluationCall.callId
-              ] = adjustValueForDisplay(
-                resolveDimensionValueForEvaluateCall(
-                  scorerMetricsDimension,
-                  evaluationCall
-                ),
-                scorerMetricsDimension.scoreType === 'binary'
-              );
-            } else if (derivedMetricsDimension != null) {
-              const scorerRef = '__DERIVED__';
-              const scorerName = '';
-              const unit = dimensionUnit(derivedMetricsDimension, true);
-              const lowerIsBetter =
-                derivedMetricsDimension.shouldMinimize ?? false;
-              if (res[scorerRef] == null) {
-                res[scorerRef] = {
-                  scorerRef,
-                  scorerName,
-                  metrics: {},
-                };
-              }
-              if (res[scorerRef].metrics[metricDimensionId] == null) {
-                res[scorerRef].metrics[metricDimensionId] = {
-                  displayName: dimensionLabel(derivedMetricsDimension),
-                  unit,
-                  lowerIsBetter,
-                  evalScores: {},
-                };
-              }
-
-              res[scorerRef].metrics[metricDimensionId].evalScores[
-                evaluationCall.callId
-              ] = adjustValueForDisplay(
-                resolveDimensionValueForEvaluateCall(
-                  derivedMetricsDimension,
-                  evaluationCall
-                ),
-                derivedMetricsDimension.scoreType === 'binary'
-              );
-            } else {
-              throw new Error('Unknown metric dimension type');
-            }
-          }
-        );
-      }
-    );
-    return res;
-  }, [
-    props.state.data.derivedMetricDimensions,
-    props.state.data.evaluationCalls,
-    props.state.data.scorerMetricDimensions,
-  ]);
+  const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
 
   let gridTemplateColumns = '';
   gridTemplateColumns += 'min-content '; // Scorer Name
@@ -260,6 +176,48 @@ export const ScorecardSection: React.FC<{
             </GridCell>
           );
         })}
+        {datasetVariation && (
+          <>
+            <GridCell
+              style={{
+                fontWeight: 'bold',
+                textAlign: 'right',
+                gridColumnEnd: 'span 2',
+              }}>
+              <Alert
+                severity="warning"
+                style={{
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                }}>
+                <Tooltip title={DATASET_VARIATION_WARNING_EXPLANATION}>
+                  <div
+                    style={{
+                      whiteSpace: 'nowrap',
+                    }}>
+                    {DATASET_VARIATION_WARNING_TITLE}
+                  </div>
+                </Tooltip>
+              </Alert>
+            </GridCell>
+            {evalCallIds.map(evalCallId => {
+              return (
+                <GridCell
+                  key={evalCallId}
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
+                  <EvaluationDatasetLink
+                    callId={evalCallId}
+                    state={props.state}
+                  />
+                </GridCell>
+              );
+            })}
+          </>
+        )}
         <GridCell
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
@@ -342,13 +300,17 @@ export const ScorecardSection: React.FC<{
           Metrics
         </GridCell>
         {/* Score Rows */}
-        {Object.entries(betterScores).map(([key, def]) => {
+        {Object.entries(compositeMetrics).map(([key, def]) => {
+          const uniqueScorerRefs = Array.from(
+            new Set(Object.values(def.evalCallIdToScorerRef))
+          );
+          const scorersAreComparable = uniqueScorerRefs.length === 1;
           const scorerRefParsed = parseRefMaybe(
-            def.scorerRef ?? ''
+            uniqueScorerRefs[0]
           ) as WeaveObjectRef | null;
           return (
             <React.Fragment key={key}>
-              {def.scorerName && (
+              {key !== DERIVED_SCORER_REF && (
                 <>
                   <GridCell
                     style={{
@@ -357,17 +319,51 @@ export const ScorecardSection: React.FC<{
                       fontWeight: 'bold',
                       textAlign: 'left',
                     }}>
-                    {scorerRefParsed ? (
-                      <SmallRef objRef={scorerRefParsed} />
+                    {scorersAreComparable ? (
+                      scorerRefParsed ? (
+                        <SmallRef objRef={scorerRefParsed} />
+                      ) : (
+                        def.scorerName ?? ''
+                      )
                     ) : (
-                      def.scorerName ?? ''
+                      <Alert
+                        severity="warning"
+                        style={{
+                          paddingTop: 0,
+                          paddingBottom: 0,
+                        }}>
+                        <Tooltip title={SCORER_VARIATION_WARNING_EXPLANATION}>
+                          <div
+                            style={{
+                              whiteSpace: 'nowrap',
+                            }}>
+                            {SCORER_VARIATION_WARNING_TITLE}
+                          </div>
+                        </Tooltip>
+                      </Alert>
                     )}
                   </GridCell>
-                  <GridCell
-                    style={{
-                      borderTop: '1px solid #ccc',
-                      gridColumnEnd: 'span ' + evalCallIds.length,
-                    }}></GridCell>
+                  {evalCallIds.map((evalCallId, mNdx) => {
+                    const innerScorerRefParsed = parseRefMaybe(
+                      def.evalCallIdToScorerRef[evalCallId]
+                    ) as WeaveObjectRef | null;
+                    return (
+                      <GridCell
+                        key={evalCallId}
+                        style={{
+                          borderTop: '1px solid #ccc',
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}>
+                        {!scorersAreComparable &&
+                          (innerScorerRefParsed != null ? (
+                            <SmallRef objRef={innerScorerRefParsed} />
+                          ) : (
+                            <NotApplicable />
+                          ))}
+                      </GridCell>
+                    );
+                  })}
                 </>
               )}
               {Object.keys(def.metrics).map((metricKey, metricNdx) => {
@@ -384,7 +380,7 @@ export const ScorecardSection: React.FC<{
                         textAlign: 'right',
                         textOverflow: 'ellipsis',
                       }}>
-                      {def.metrics[metricKey].displayName}
+                      {def.metrics[metricKey].metricLabel}
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
                       const baseline =

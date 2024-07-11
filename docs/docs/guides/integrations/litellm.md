@@ -154,3 +154,5 @@ print(response)
 ```
 
 We automatically capture the functions you used in the prompt and keep them versioned.
+
+[![litellm_gif.png](imgs/litellm_gif.gif)](https://wandb.ai/a-sh0ts/weave_litellm_integration/weave/calls)
