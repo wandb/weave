@@ -3,6 +3,8 @@ import datetime
 import inspect
 import typing
 import uuid
+from functools import partial
+from types import MethodType
 from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
 
 import pydantic
@@ -411,7 +413,16 @@ class WeaveClient:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
         if isinstance(op, Op):
-            op_def_ref = self._save_op(op)
+            if isinstance(op, partial):
+                f = op.func
+            elif isinstance(op, MethodType):
+                f = op.__func__
+            else:
+                f = op
+
+            f = cast(Op, f)
+
+            op_def_ref = self._save_op(f)
             op_str = op_def_ref.uri()
         else:
             op_str = op

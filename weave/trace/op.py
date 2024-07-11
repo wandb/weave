@@ -183,19 +183,14 @@ def _execute_call(
         return call if return_type == "call" else res2
 
 
-def call(func: Op, *args: Any, **kwargs: Any) -> Any:
-    # There is probably a better place for this
-    if _is_method_alt(func):
-        self = func.__self__
-        args = (self,) + args
-    c = _create_call(func, *args, **kwargs)
-    res = _execute_call(func, c, *args, **kwargs)
-    return res
+def call(op: Op, *args: Any, **kwargs: Any) -> Any:
+    c = _create_call(op, *args, **kwargs)
+    return _execute_call(op, c, *args, **kwargs)
 
 
-def calls(func: Op) -> "CallsIter":
+def calls(op: Op) -> "CallsIter":
     client = client_context.weave_client.require_weave_client()
-    return client._op_calls(func)
+    return client._op_calls(op)
 
 
 # Legacy decos
