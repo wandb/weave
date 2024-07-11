@@ -513,6 +513,14 @@ const fetchEvaluationComparisonData = async (
     }
   });
 
+  // Filter out non-intersecting rows
+  result.resultRows = Object.fromEntries(
+    Object.entries(result.resultRows).filter(([digest, row]) => {
+      return Object.values(row.evaluations).length ===
+        Object.values(result.evaluationCalls).length;
+    })
+  );
+
   return result;
 };
 const getScoreKeyNameFromScorerRef = (scorerRef: string) => {

@@ -40,9 +40,13 @@ import {
 import {
   buildCompositeComparisonSummaryMetrics,
   CompositeSummaryMetric,
+  CompositeSummaryScoreGroup,
   DERIVED_SCORER_REF,
 } from '../ScorecardSection/summaryMetricUtil';
-import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
+import {
+  PivotedRow,
+  useFilteredAggregateRows,
+} from './exampleCompareSectionUtil';
 
 const SIDEBAR_WIDTH_PX = 250;
 const MIN_EVAL_WIDTH_PX = 350;
@@ -292,28 +296,32 @@ export const ExampleCompareSection: React.FC<{
   //   * `[DIMENSION][PROP]Comp` specific component for a dimension's property
   const BASELINE_EVAL_INDEX = 0;
 
-  const lookupIsDerivedMetric = (scorerIndex: number) => {
+  const lookupIsDerivedMetric = (scorerIndex: number): boolean => {
     return scorerIndex === numScorers;
   };
 
-  const lookupTrialsForEval = (evalIndex: number) => {
+  const lookupTrialsForEval = (evalIndex: number): PivotedRow[] => {
     const currEvalCallId = orderedCallIds[evalIndex];
     return target.originalRows.filter(
       row => row.evaluationCallId === currEvalCallId
     );
   };
 
-  const lookupSelectedTrialIndexForEval = (evalIndex: number) => {
+  const lookupSelectedTrialIndexForEval = (evalIndex: number): number => {
     const currEvalCallId = orderedCallIds[evalIndex];
     return selectedTrials[currEvalCallId] || 0;
   };
 
-  const lookupSelectedTrialForEval = (evalIndex: number) => {
+  const lookupSelectedTrialForEval = (
+    evalIndex: number
+  ): PivotedRow | undefined => {
     const trialsForThisEval = lookupTrialsForEval(evalIndex);
     return trialsForThisEval[lookupSelectedTrialIndexForEval(evalIndex)];
   };
 
-  const lookupScoreGroupForScorerIndex = (scorerIndex: number) => {
+  const lookupScoreGroupForScorerIndex = (
+    scorerIndex: number
+  ): CompositeSummaryScoreGroup => {
     return compositeMetrics[scorerGroupNames[scorerIndex]];
   };
 
@@ -321,9 +329,13 @@ export const ExampleCompareSection: React.FC<{
     return lookupScoreGroupForScorerIndex(scorerIndex).metrics;
   };
 
-  const lookupAnyScorerRefsForScorerIndex = (scorerIndex: number) => {
-    return Object.values(
-      lookupScoreGroupForScorerIndex(scorerIndex).evalCallIdToScorerRef
+  const lookupUniqueScorerRefsForScorerIndex = (scorerIndex: number) => {
+    return Array.from(
+      new Set(
+        Object.values(
+          lookupScoreGroupForScorerIndex(scorerIndex).evalCallIdToScorerRef
+        )
+      )
     );
   };
 
@@ -451,6 +463,9 @@ export const ExampleCompareSection: React.FC<{
   const evalSelectedTrialPredictCallComp = (evalIndex: number) => {
     const currEvalCallId = orderedCallIds[evalIndex];
     const selectedTrial = lookupSelectedTrialForEval(evalIndex);
+    if (selectedTrial == null) {
+      return null;
+    }
     const trialPredict = selectedTrial.predictAndScore._rawPredictTraceData;
     const [trialEntity, trialProject] =
       trialPredict?.project_id.split('/') ?? [];
@@ -604,7 +619,7 @@ export const ExampleCompareSection: React.FC<{
     if (lookupIsDerivedMetric(scorerIndex)) {
       return null;
     }
-    const scorerRefs = lookupAnyScorerRefsForScorerIndex(scorerIndex);
+    const scorerRefs = lookupUniqueScorerRefsForScorerIndex(scorerIndex);
 
     let inner: JSX.Element | null = null;
     if (scorerRefs.length === 0) {

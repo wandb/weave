@@ -21,7 +21,7 @@ export type CompositeSummaryMetric = {
   evalScores: {[evalCallId: string]: number | undefined};
 };
 
-type CompositeSummaryScoreGroup = {
+export type CompositeSummaryScoreGroup = {
   evalCallIdToScorerRef: {[evalCallId: string]: string}; // multiple means we might not have apples to apples comparison
   scorerName: string;
   metrics: {

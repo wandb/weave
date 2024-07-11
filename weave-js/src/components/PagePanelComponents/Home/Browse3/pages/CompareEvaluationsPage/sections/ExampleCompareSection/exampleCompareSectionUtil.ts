@@ -25,7 +25,7 @@ type FlattenedRow = RowBase & {
   scores: {[scoreId: string]: number | boolean | undefined};
 };
 
-type PivotedRow = RowBase & {
+export type PivotedRow = RowBase & {
   output: {[outputKey: string]: {[callId: string]: any}};
   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
 };
