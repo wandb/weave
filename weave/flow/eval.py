@@ -328,8 +328,9 @@ def evaluate(
     model: Union[Callable, Model],
     scores: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[Callable] = None,
+    max_concurrent_tasks: Optional[int] = None,
 ) -> dict:
     eval = Evaluation(
         dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
     )
-    return asyncio.run(eval.evaluate(model))
+    return asyncio.run(eval.evaluate(model, max_concurrent_tasks))
