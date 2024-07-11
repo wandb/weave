@@ -154,7 +154,7 @@ class Op:
         else:
             return on_output(res)
 
-    def call(self, *args: Any, **kwargs: Any) -> "Call":
+    async def call(self, *args: Any, **kwargs: Any) -> "Call":
         _call = self._create_call(*args, **kwargs)
         await self._execute_call(_call, *args, **kwargs)
         return _call
