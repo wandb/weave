@@ -434,18 +434,3 @@ async def get_wandb_api() -> WandbApiAsync:
 
 def get_wandb_api_sync() -> WandbApi:
     return WandbApi()
-
-
-DEFAULT_WANDB_BASE_URL = "https://api.wandb.ai/"
-
-
-# Currently weave only supports WANDB_BASE_URL="https://api.wandb.ai/"
-# Remove once we expand to support other base urls
-def check_base_url() -> None:
-    base_url = os.environ.get("WANDB_BASE_URL", DEFAULT_WANDB_BASE_URL)
-    is_testing = os.environ.get("CI") or base_url == "http://localhost:8080"
-    # Check that base url is either localhost for testing, or the default WANDB_BASE_URL
-    if base_url not in DEFAULT_WANDB_BASE_URL and not is_testing:
-        raise errors.WeaveConfigurationError(
-            f"The target WANDB_BASE_URL {base_url} points to a server that does not currently support Weave. Try setting WANDB_BASE_URL to https://api.wandb.ai/."
-        )

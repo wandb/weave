@@ -82,7 +82,6 @@ def init_weave(
     # case we're on a new thread.
     wandb_api.init()
     wandb_context = wandb_api.get_wandb_api_context()
-    wandb_api.check_base_url()
     if wandb_context is None:
         import wandb
 
