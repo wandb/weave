@@ -52,6 +52,10 @@ In addition to automatic tracing, you can manually trace calls using the `WeaveT
 You can pass the `WeaveTracer` callback to individual LangChain components to trace specific requests.
 
 ```python
+import os
+
+os.environ["WEAVE_TRACE_LANGCHAIN"] = "false" # <- explicitly disable global tracing.
+
 from weave.integrations.langchain import WeaveTracer
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
@@ -59,7 +63,7 @@ import weave
 
 # Initialize Weave with your project name
 # highlight-next-line
-weave.init("langchain_demo")
+weave.init("langchain_demo")  # <-- we don't enable tracing here because the env var is explicitly set to `false`
 
 # highlight-next-line
 weave_tracer = WeaveTracer()
@@ -73,9 +77,9 @@ prompt = PromptTemplate.from_template("1 + {number} = ")
 llm_chain = prompt | llm
 
 # highlight-next-line
-output = llm_chain.invoke({"number": 2}, config=config)
+output = llm_chain.invoke({"number": 2}, config=config) # <-- this enables tracing only for this chain invoke.
 
-print(output)
+llm_chain.invoke({"number": 4})  # <-- this will not have tracing enabled for langchain calls but openai calls will still be traced
 ```
 
 ### Using `weave_tracing_enabled` Context Manager
@@ -83,6 +87,10 @@ print(output)
 Alternatively, you can use the `weave_tracing_enabled` context manager to enable tracing for specific blocks of code.
 
 ```python
+import os
+
+os.environ["WEAVE_TRACE_LANGCHAIN"] = "false" # <- explicitly disable global tracing.
+
 from weave.integrations.langchain import weave_tracing_enabled
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
@@ -90,7 +98,7 @@ import weave
 
 # Initialize Weave with your project name
 # highlight-next-line
-weave.init("langchain_demo")
+weave.init("langchain_demo")  # <-- we don't enable tracing here because the env var is explicitly set to `false`
 
 llm = ChatOpenAI()
 prompt = PromptTemplate.from_template("1 + {number} = ")
@@ -98,10 +106,11 @@ prompt = PromptTemplate.from_template("1 + {number} = ")
 llm_chain = prompt | llm
 
 # highlight-next-line
-with weave_tracing_enabled():
+with weave_tracing_enabled():  # <-- this enables tracing only for this chain invoke.
     output = llm_chain.invoke({"number": 2})
 
-print(output)
+
+llm_chain.invoke({"number": 4})  # <-- this will not have tracing enabled for langchain calls but openai calls will still be traced
 ```
 
 ## Configuration
