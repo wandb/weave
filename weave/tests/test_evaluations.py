@@ -74,10 +74,12 @@ async def test_basic_evaluation(client):
         )
     )
 
+    # Flatten calls is a technique we use in the integration tests to assert the correct
+    # ordering of calls. This is used to assert that the calls are in the correct order
+    # as well as nested in the correct way. The returned list is the ordered list if calls
+    # with the depth of each call.
     flattened_calls = flatten_calls(calls.calls)
-
     assert len(flattened_calls) == 14
-
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened_calls]
     exp = [
         ("Evaluation.evaluate", 0),
@@ -97,8 +99,24 @@ async def test_basic_evaluation(client):
     ]
     assert got == exp
 
-    assert flattened_calls[1][0].inputs == {
-        "self": "weave:///shawn/test-project/object/Evaluation:kaQkkylnWlltlYaXYpT0IRpmlmbevcBBQUvIdaT8lF4",
-        "model": "weave:///shawn/test-project/object/MyModel:YCUen3Cmgo72cPqJiXH9HzXlCT2H1sVfwOEidsmvHK4",
-        "example": "weave:///shawn/test-project/object/Dataset:JYbPm92vzb3zl6YjQpXPotL13Xwh0L6bDLcXYrwJEYk/attr/rows/id/F2inb5rPfF4JnyHlEAfdzRATQgGWTDpNYF25WuidjP4",
-    }
+    def isObjectRefWithName(val: str, name: str):
+        return val.startswith(f"weave:///shawn/test-project/object/{name}:")
+
+    ## Assertion Category 1: Here we make some application-specific assertions about the
+    # structure of the calls, specifically for evaluation-specific UI elements
+
+    # The `Evaluation.evaluate` call is expected to have the correct inputs as refs
+    assert op_name_from_ref(flattened_calls[0][0].op_name) == "Evaluation.evaluate"
+    assert isObjectRefWithName(flattened_calls[0][0].inputs["self"], "Evaluation")
+    assert isObjectRefWithName(flattened_calls[0][0].inputs["model"], "MyModel")
+
+    # The UI depends on "example", "model" and "self" being refs, so we make that
+    # specific assertion here
+    for i in [1, 5, 9]:  # The indexes of the predict_and_score calls
+        assert (
+            op_name_from_ref(flattened_calls[i][0].op_name)
+            == "Evaluation.predict_and_score"
+        )
+        assert isObjectRefWithName(flattened_calls[i][0].inputs["self"], "Evaluation")
+        assert isObjectRefWithName(flattened_calls[i][0].inputs["model"], "MyModel")
+        assert isObjectRefWithName(flattened_calls[i][0].inputs["example"], "Dataset")
