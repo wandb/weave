@@ -156,7 +156,7 @@ class Op:
 
     def call(self, *args: Any, **kwargs: Any) -> "Call":
         _call = self._create_call(*args, **kwargs)
-        self._execute_call(_call, *args, **kwargs)
+        await self._execute_call(_call, *args, **kwargs)
         return _call
 
     def __repr__(self) -> str:
