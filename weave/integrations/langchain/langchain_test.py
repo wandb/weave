@@ -1,7 +1,8 @@
 import os
-from typing import Any, List, Optional, Tuple
+from typing import Any, Generator, List, Optional, Tuple
 
 import pytest
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
@@ -314,15 +315,33 @@ def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
     assert got == exp
 
 
+@pytest.fixture
+def fix_chroma_ci() -> Generator[None, None, None]:
+    # According to https://docs.trychroma.com/troubleshooting#sqlite
+    # which references https://gist.github.com/defulmere/8b9695e415a44271061cc8e272f3c300,
+    # on Linux machines (CI runners), we need to patch sqlite3 to pysqlite3 and ensure
+    # pysqlite3 is installed.
+    if not os.environ.get("CI"):
+        yield None
+
+    __import__("pysqlite3")
+    import sys
+
+    old = sys.modules["sqlite3"]
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+    try:
+        yield None
+    finally:
+        sys.modules["sqlite3"] = old
+
+
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_rag_chain(
-    client: WeaveClient,
-) -> None:
+def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
     from typing import List
 
     from langchain.text_splitter import RecursiveCharacterTextSplitter
