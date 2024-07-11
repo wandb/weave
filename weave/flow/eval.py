@@ -283,8 +283,6 @@ class Evaluation(Object):
     ) -> dict:
         eval_rows = []
 
-        start_time = time.time()
-
         async def eval_example(example: dict) -> dict:
             try:
                 eval_row = await self.predict_and_score(model, example)
