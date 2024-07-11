@@ -2,7 +2,6 @@ import os
 from typing import Any, List, Optional, Tuple
 
 import pytest
-
 import weave
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
@@ -79,6 +78,7 @@ def test_simple_chain_invoke(
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
+@pytest.mark.skip  # TODO: remove this once the langchain issue is fixed
 async def test_simple_chain_ainvoke(
     client: WeaveClient,
 ) -> None:
@@ -207,6 +207,7 @@ def test_simple_chain_batch(
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
+@pytest.mark.skip  # TODO: remove this once the langchain issue is fixed
 async def test_simple_chain_abatch(
     client: WeaveClient,
 ) -> None:

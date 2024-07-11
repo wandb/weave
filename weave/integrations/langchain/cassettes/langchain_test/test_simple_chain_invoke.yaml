@@ -188,7 +188,15 @@ interactions:
         0.0000000381469,\n        \"output_cost_per_pixel\": 0.0,\n        \"litellm_provider\":
         \"openai\"\n    },\n    \"whisper-1\": {\n        \"mode\": \"audio_transcription\",\n
         \       \"input_cost_per_second\": 0,\n        \"output_cost_per_second\":
-        0.0001, \n        \"litellm_provider\": \"openai\"\n    }, \n    \"azure/whisper-1\":
+        0.0001, \n        \"litellm_provider\": \"openai\"\n    }, \n    \"tts-1\":
+        {\n        \"mode\": \"audio_speech\", \n        \"input_cost_per_character\":
+        0.000015,\n        \"litellm_provider\": \"openai\"\n    },\n    \"tts-1-hd\":
+        {\n        \"mode\": \"audio_speech\", \n        \"input_cost_per_character\":
+        0.000030,\n        \"litellm_provider\": \"openai\"\n    },\n    \"azure/tts-1\":
+        {\n        \"mode\": \"audio_speech\", \n        \"input_cost_per_character\":
+        0.000015,\n        \"litellm_provider\": \"azure\"\n    },\n    \"azure/tts-1-hd\":
+        {\n        \"mode\": \"audio_speech\", \n        \"input_cost_per_character\":
+        0.000030,\n        \"litellm_provider\": \"azure\"\n    },\n    \"azure/whisper-1\":
         {\n        \"mode\": \"audio_transcription\",\n        \"input_cost_per_second\":
         0, \n        \"output_cost_per_second\": 0.0001, \n        \"litellm_provider\":
         \"azure\"\n    },\n    \"azure/gpt-4o\": {\n        \"max_tokens\": 4096,\n
@@ -406,7 +414,7 @@ interactions:
         0.000000,\n        \"litellm_provider\": \"text-completion-codestral\",\n
         \       \"mode\": \"completion\",\n        \"source\": \"https://docs.mistral.ai/capabilities/code_generation/\"\n
         \   },\n    \"deepseek-coder\": {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\":
-        32000,\n        \"max_output_tokens\": 4096,\n        \"input_cost_per_token\":
+        128000,\n        \"max_output_tokens\": 4096,\n        \"input_cost_per_token\":
         0.00000014,\n        \"output_cost_per_token\": 0.00000028,\n        \"litellm_provider\":
         \"deepseek\",\n        \"mode\": \"chat\"\n    },\n    \"groq/llama2-70b-4096\":
         {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\": 4096,\n        \"max_output_tokens\":
@@ -940,22 +948,22 @@ interactions:
         \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini/gemini-1.5-pro\": {\n        \"max_tokens\": 8192,\n
         \       \"max_input_tokens\": 2097152,\n        \"max_output_tokens\": 8192,\n
-        \       \"input_cost_per_token\": 0.00000035, \n        \"input_cost_per_token_above_128k_tokens\":
-        0.0000007, \n        \"output_cost_per_token\": 0.00000105, \n        \"output_cost_per_token_above_128k_tokens\":
-        0.0000021, \n        \"litellm_provider\": \"gemini\",\n        \"mode\":
-        \"chat\",\n        \"supports_system_messages\": true,\n        \"supports_function_calling\":
+        \       \"input_cost_per_token\": 0.0000035, \n        \"input_cost_per_token_above_128k_tokens\":
+        0.000007, \n        \"output_cost_per_token\": 0.0000105, \n        \"output_cost_per_token_above_128k_tokens\":
+        0.000021, \n        \"litellm_provider\": \"gemini\",\n        \"mode\": \"chat\",\n
+        \       \"supports_system_messages\": true,\n        \"supports_function_calling\":
         true,\n        \"supports_vision\": true,\n        \"supports_tool_choice\":
         true, \n        \"supports_response_schema\": true, \n        \"source\":
-        \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
-        \   },\n    \"gemini/gemini-1.5-pro-latest\": {\n        \"max_tokens\": 8192,\n
-        \       \"max_input_tokens\": 1048576,\n        \"max_output_tokens\": 8192,\n
-        \       \"input_cost_per_token\": 0.00000035, \n        \"input_cost_per_token_above_128k_tokens\":
-        0.0000007, \n        \"output_cost_per_token\": 0.00000105, \n        \"output_cost_per_token_above_128k_tokens\":
-        0.0000021, \n        \"litellm_provider\": \"gemini\",\n        \"mode\":
-        \"chat\",\n        \"supports_system_messages\": true,\n        \"supports_function_calling\":
+        \"https://ai.google.dev/pricing\"\n    },\n    \"gemini/gemini-1.5-pro-latest\":
+        {\n        \"max_tokens\": 8192,\n        \"max_input_tokens\": 1048576,\n
+        \       \"max_output_tokens\": 8192,\n        \"input_cost_per_token\": 0.0000035,
+        \n        \"input_cost_per_token_above_128k_tokens\": 0.000007, \n        \"output_cost_per_token\":
+        0.00000105, \n        \"output_cost_per_token_above_128k_tokens\": 0.000021,
+        \n        \"litellm_provider\": \"gemini\",\n        \"mode\": \"chat\",\n
+        \       \"supports_system_messages\": true,\n        \"supports_function_calling\":
         true,\n        \"supports_vision\": true,\n        \"supports_tool_choice\":
         true, \n        \"supports_response_schema\": true, \n        \"source\":
-        \"https://ai.google.dev/models/gemini\"\n    },\n    \"gemini/gemini-pro-vision\":
+        \"https://ai.google.dev/pricing\"\n    },\n    \"gemini/gemini-pro-vision\":
         {\n        \"max_tokens\": 2048,\n        \"max_input_tokens\": 30720,\n        \"max_output_tokens\":
         2048,\n        \"input_cost_per_token\": 0.00000035, \n        \"input_cost_per_token_above_128k_tokens\":
         0.0000007, \n        \"output_cost_per_token\": 0.00000105, \n        \"output_cost_per_token_above_128k_tokens\":
@@ -1974,7 +1982,7 @@ interactions:
       Content-Encoding:
       - gzip
       Content-Length:
-      - '8033'
+      - '8079'
       Content-Security-Policy:
       - default-src 'none'; style-src 'unsafe-inline'; sandbox
       Content-Type:
@@ -1982,13 +1990,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 04 Jul 2024 06:30:34 GMT
+      - Thu, 11 Jul 2024 03:41:14 GMT
       ETag:
-      - W/"acdd36963641f3925f59f19bd1cd84563b6134afb3cf9916d3716d467aac36a2"
+      - W/"c445c3e715abfd4b7ad16fc0be422ee17b80966e5dbc456a98db9416c61ef98e"
       Expires:
-      - Thu, 04 Jul 2024 06:35:34 GMT
+      - Thu, 11 Jul 2024 03:46:14 GMT
       Source-Age:
-      - '198'
+      - '172'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -1998,19 +2006,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '18'
+      - '2'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 7eab5f9decb2487baccd73e4857ebdac93f6a871
+      - d23cdf1590b9f5b4139e8c459150ae0e91116839
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - E320:1B7147:5BE22:89C2D:6680CEF4
+      - BC7D:D808E:DAB1B:133D4F:6689C6D9
       X-Served-By:
-      - cache-hyd1100032-HYD
+      - cache-hyd1100021-HYD
       X-Timer:
-      - S1720074634.003857,VS0,VE0
+      - S1720669274.278141,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -2052,17 +2060,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA1SQy27CMBBF9/kKa9YEJQSKmh1q1aIu2g+oKmScITHYHsueqK0Q/145hEc3Xtyb
-        c32cYyYE6AZqAaqTrKw3+WO3Wj9bluvv13J/aOwTqh736w//8nZ4h0kiaLtHxRdqqsh6g6zJnWsV
-        UDKm1XI5K4rl/KFaDIWlBk3CWs95NV3k3Ict5UU5W4xkR1phhFp8ZkIIcRzO5Oga/IFaFJNLYjFG
-        2SLU14+EgEAmJSBj1JGlY5jcSkWO0Q3aFYzx6bpnqPWBtulu1xtzzXfa6dhtAspILrGRyZ/xUybE
-        1+Dd/1MBH8h63jAd0KXBsjrPwe1P3ZVjx8TS3MXzbNSD+BsZ7WanXYvBBz28IUlmp+wPAAD//wMA
-        arkkHcIBAAA=
+        H4sIAAAAAAAAAwAAAP//VJA9b8IwFEX3/ArrzQRBwlcyInWrVDF1qCrkmEcwtf0s+0UqQvz3yiEE
+        uni4N+f6ONdMCNAHqAWok2RlvcmrM1623cK9fezwvKXP3cZuYuHeqxUWDUwSQc0ZFT+oqSLrDbIm
+        d69VQMmYVufrYrZaVcV62ReWDmgS1nrOy+ky5y40lM/mxXIgT6QVRqjFVyaEENf+TI7ugL9Qi9nk
+        kViMUbYI9fiREBDIpARkjDqydAyTZ6nIMbpeu4Qhvo17hlofqEl3u86YMT9qp+NpH1BGcomNTP6O
+        3zIhvnvv7p8K+EDW857pB10anJf3OXj+qZdy6JhYmpd4kQ16EC+R0e6P2rUYfND9G5Jkdsv+AAAA
+        //8DAOpTylLCAQAA
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 89dd11464ae17f63-MAA
+      - 8a15c6dc4f313c00-BLR
       Connection:
       - keep-alive
       Content-Encoding:
@@ -2070,14 +2078,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 04 Jul 2024 06:30:35 GMT
+      - Thu, 11 Jul 2024 03:41:16 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=eywkf0mc18qPU5nl2AHXaQBOzkIZCKxT9kfzibqP3wo-1720074635-1.0.1.1-mJpSvYXTsQo7NYsKYmndwX70lMnsiby52cgYezVOArKItVf2_SOQw5CGAw4NJpRUaPfWuOBYm_tPcgBOIkAAKg;
-        path=/; expires=Thu, 04-Jul-24 07:00:35 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=54gOYSvDfHs_RIi1NFu75402PqaVeRUq6iVl6pWQ3wI-1720669276-1.0.1.1-GlkYBuAUGLSevsf8GwCLFwCw3FRM1nuQcrdtnnZMcq2hFwh5QQs4Nj7na5bG72DAZNiH1W3ThfTkOyAmyEjRqA;
+        path=/; expires=Thu, 11-Jul-24 04:11:16 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=tX23Nu4YxvGBzBK7t906trZaDOT10xvuzFWPX0Oc3_4-1720074635696-0.0.1.1-604800000;
+      - _cfuvid=qb_xbtLRyKdq9uOrly4kbPfF.sNhEx0eN6QkY.Ox3kI-1720669276145-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -2086,7 +2094,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '124'
+      - '104'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -2094,17 +2102,17 @@ interactions:
       x-ratelimit-limit-requests:
       - '10000'
       x-ratelimit-limit-tokens:
-      - '5000000'
+      - '15000000'
       x-ratelimit-remaining-requests:
       - '9999'
       x-ratelimit-remaining-tokens:
-      - '4999980'
+      - '14999981'
       x-ratelimit-reset-requests:
       - 6ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_e858427f32290658ce282e8c2300c5bd
+      - req_42d70710a7b04728429baa1ac6e0ea85
     status:
       code: 200
       message: OK
