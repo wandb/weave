@@ -74,7 +74,7 @@ async def test_basic_evaluation(client):
 
     # Flatten calls is a technique we use in the integration tests to assert the correct
     # ordering of calls. This is used to assert that the calls are in the correct order
-    # as well as nested in the correct way. The returned list is the ordered list if calls
+    # as well as nested in the correct way. The returned list is the ordered list of calls
     # with the depth of each call.
     flattened_calls = flatten_calls(calls.calls)
     assert len(flattened_calls) == 14
