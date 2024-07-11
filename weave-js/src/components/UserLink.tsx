@@ -9,6 +9,7 @@ import styled from 'styled-components';
 import {Button} from './Button';
 import {
   DraggableGrow,
+  DraggableHandle,
   Popped,
   StyledTooltip,
   TooltipHint,
@@ -115,18 +116,20 @@ const UserContent = ({user, mode, onClose}: UserContentProps) => {
   const onCloseClick = onClose ? () => onClose() : undefined;
   return (
     <>
-      <UserContentHeader className="handle">
-        <UserName>{user.name}</UserName>
-        {isPopover && (
-          <Button
-            size="small"
-            variant="ghost"
-            icon="close"
-            tooltip="Close"
-            onClick={onCloseClick}
-          />
-        )}
-      </UserContentHeader>
+      <DraggableHandle>
+        <UserContentHeader>
+          <UserName>{user.name}</UserName>
+          {isPopover && (
+            <Button
+              size="small"
+              variant="ghost"
+              icon="close"
+              tooltip="Close"
+              onClick={onCloseClick}
+            />
+          )}
+        </UserContentHeader>
+      </DraggableHandle>
       <UserContentBody style={bodyStyle}>
         <Avatar src={user.photoUrl} sx={{width: imgSize, height: imgSize}} />
         <Grid>
