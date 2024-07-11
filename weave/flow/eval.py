@@ -277,7 +277,9 @@ class Evaluation(Object):
         return summary
 
     @weave.op()
-    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+    async def evaluate(
+        self, model: Union[Callable, Model], parallelism: Optional[int] = None
+    ) -> dict:
         eval_rows = []
 
         start_time = time.time()
@@ -298,8 +300,9 @@ class Evaluation(Object):
         dataset = typing.cast(Dataset, self.dataset)
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
+        parallelism = parallelism or get_weave_parallelism()
         async for example, eval_row in util.async_foreach(
-            trial_rows, eval_example, get_weave_parallelism()
+            trial_rows, eval_example, parallelism
         ):
             n_complete += 1
             duration = time.time() - start_time
@@ -329,8 +332,9 @@ def evaluate(
     model: Union[Callable, Model],
     scores: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[Callable] = None,
+    parallelism: Optional[int] = None,
 ) -> dict:
     eval = Evaluation(
         dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
     )
-    return asyncio.run(eval.evaluate(model))
+    return asyncio.run(eval.evaluate(model=model, parallelism=parallelism))
