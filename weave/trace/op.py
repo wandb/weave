@@ -221,11 +221,24 @@ def op(name: Any, input_type: Any, output_type: Any, render_info: Any) -> Any: .
 def op(name: Any, input_type: Any, output_type: Any, pure: Any) -> Any: ...
 @overload
 def op(name: Any, input_type: Any, output_type: Any, hidden: Any) -> Any: ...
+@overload
+def op(
+    input_type: Any = None,
+    output_type: Any = None,
+    refine_output_type: Any = None,
+    name: Any = None,
+    setter: Any = None,
+    render_info: Any = None,
+    hidden: Any = None,
+    pure: Any = None,
+    _op_def_class: Any = None,
+    plugins: Any = None,
+    mutation: Any = None,
+    weavify: Any = None,
+) -> Any: ...
 
 
 # Modern decos
-@overload
-def op() -> Callable[[Any], Op]: ...
 @overload
 def op(func: Any) -> Op: ...
 
