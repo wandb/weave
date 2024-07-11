@@ -37,6 +37,7 @@ import React, {
 } from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
@@ -105,6 +106,7 @@ export const CallsTable: FC<{
   columnVisibilityModel,
   setColumnVisibilityModel,
 }) => {
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
   // Setup Ref to underlying table
@@ -114,6 +116,7 @@ export const CallsTable: FC<{
   useEffect(() => {
     addExtra('exportRunsTableButton', {
       node: <ExportRunsTableButton tableRef={apiRef} />,
+      order: 2,
     });
 
     return () => removeExtra('exportRunsTableButton');
@@ -440,7 +443,7 @@ export const CallsTable: FC<{
           }
         />
       ),
-      order: 3,
+      order: 1,
     });
 
     return () => removeExtra('compareEvaluations');
@@ -460,29 +463,44 @@ export const CallsTable: FC<{
   ]);
 
   // Register Delete Button
+  const isReadonly =
+    loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   useEffect(() => {
+    if (isReadonly) {
+      return;
+    }
     addExtra('deleteSelectedCalls', {
       node: (
         <BulkDeleteButton
           onConfirm={() => setDeleteConfirmModalOpen(true)}
           disabled={selectedCalls.length === 0}
-          isRightmostButton={!isEvaluateTable}
           bulkDeleteModeToggle={mode => {
             setBulkDeleteMode(mode);
             if (!mode) {
               setSelectedCalls([]);
             }
           }}
+          selectedCalls={selectedCalls}
         />
       ),
-      order: 2,
+      order: 3,
     });
 
     return () => removeExtra('deleteSelectedCalls');
-  }, [addExtra, removeExtra, selectedCalls, isEvaluateTable, bulkDeleteMode]);
+  }, [
+    addExtra,
+    removeExtra,
+    selectedCalls,
+    isEvaluateTable,
+    bulkDeleteMode,
+    isReadonly,
+  ]);
 
   useEffect(() => {
+    if (isReadonly) {
+      return;
+    }
     const callsToDelete = tableData
       .filter(call => selectedCalls.includes(call.id))
       .map(call => {
@@ -509,6 +527,7 @@ export const CallsTable: FC<{
     removeExtra,
     selectedCalls,
     deleteConfirmModalOpen,
+    isReadonly,
     entity,
     project,
     tableData,
@@ -824,11 +843,11 @@ const ExportRunsTableButton = ({
     <Button
       className="mr-4"
       size="medium"
-      variant="secondary"
+      variant="ghost"
       onClick={() => tableRef.current?.exportDataAsCsv()}
-      icon="export-share-upload">
-      Export to CSV
-    </Button>
+      icon="export-share-upload"
+      tooltip="Export to CSV"
+    />
   </Box>
 );
 
@@ -844,7 +863,7 @@ const CompareEvaluationsTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="ml-4 mr-16"
+      className="mx-4"
       size="medium"
       variant="ghost"
       disabled={disabled}
@@ -858,10 +877,10 @@ const CompareEvaluationsTableButton: FC<{
 
 const BulkDeleteButton: FC<{
   disabled?: boolean;
-  isRightmostButton?: boolean;
+  selectedCalls: string[];
   onConfirm: () => void;
   bulkDeleteModeToggle: (mode: boolean) => void;
-}> = ({disabled, isRightmostButton, onConfirm, bulkDeleteModeToggle}) => {
+}> = ({disabled, selectedCalls, onConfirm, bulkDeleteModeToggle}) => {
   const [deleteClicked, setDeleteClicked] = useState(false);
   return (
     <Box
@@ -883,7 +902,7 @@ const BulkDeleteButton: FC<{
             Confirm
           </Button>
           <Button
-            className={isRightmostButton ? 'ml-4 mr-16' : 'mx-4'}
+            className="ml-4 mr-16"
             variant="ghost"
             size="medium"
             onClick={() => {
@@ -893,9 +912,18 @@ const BulkDeleteButton: FC<{
             Cancel
           </Button>
         </>
+      ) : selectedCalls.length > 0 ? (
+        <Button
+          className="ml-4 mr-16"
+          variant="destructive"
+          size="medium"
+          onClick={onConfirm}
+          tooltip="Select rows with the checkbox to delete"
+          icon="delete"
+        />
       ) : (
         <Button
-          className={isRightmostButton ? 'ml-4 mr-16' : 'mx-4'}
+          className="ml-4 mr-16"
           variant="ghost"
           size="medium"
           onClick={() => {
