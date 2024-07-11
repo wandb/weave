@@ -822,7 +822,7 @@ const ExportRunsTableButton = ({
       alignItems: 'center',
     }}>
     <Button
-      className="mx-16"
+      className="mr-4"
       size="medium"
       variant="secondary"
       onClick={() => tableRef.current?.exportDataAsCsv()}
