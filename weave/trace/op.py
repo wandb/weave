@@ -232,8 +232,26 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
 
     def wrap(f: Callable[P, R]) -> Callable[P, R]:
         op = Op(f)
-        functools.update_wrapper(op, f)
-        return op  # type: ignore
+        if inspect.iscoroutinefunction(f):
+
+            def async_wrapper(op: Op) -> Callable[P, R]:
+                @functools.wraps(f)
+                async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                    return await op(*args, **kwargs)
+
+                return wrapper
+
+            return async_wrapper(op)
+        else:
+
+            def sync_wrapper(op: Op) -> Callable[P, R]:
+                @functools.wraps(f)
+                def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                    return op(*args, **kwargs)
+
+                return wrapper
+
+            return sync_wrapper(op)
 
     if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
         return wrap(args[0])
