@@ -818,6 +818,19 @@ REDACTED_VALUE = "REDACTED"
 
 
 def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
+    # We should NEVER mutate reffed objects.
+    #
+    # 1. This code builds new objects that no longer have refs
+    # 2. Even if we did an in-place edit, that would invalidate the ref (since
+    # the ref is to the object's digest)
+
+    try:
+        ref = get_ref(obj)
+        if ref:
+            return obj
+    except Exception:
+        pass
+
     if isinstance(obj, dict):
         dict_res = {}
         for k, v in obj.items():
