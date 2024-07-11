@@ -232,3 +232,8 @@ This code generates an evaluation trace that can be visualized in the Weave UI:
 [![langchain_evaluation.png](imgs/langchain_eval.png)](https://wandb.ai/parambharat/langchain_demo/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fparambharat%2Flangchain_demo%2Fcalls%2F44c3f26c-d9d3-423e-b434-651ea5174be3)
 
 By integrating Weave with Langchain, you can ensure comprehensive logging and monitoring of your LLM applications, facilitating easier debugging and performance optimization.
+
+
+## Known Issues
+
+- **Tracing Async Calls** - A bug in the implementation of the `AsyncCallbackManager` in Langchain results in async calls not being traced in the correct order. We have filed a [PR](https://github.com/langchain-ai/langchain/pull/23909) to fix this. Therefore, the order of calls in the trace may not be accurate when using `ainvoke` and `abatch` methods in Langchain.
