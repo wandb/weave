@@ -21,16 +21,19 @@ const sidebars: SidebarsConfig = {
     {
       type: "category",
       label: "Getting Started",
+      collapsed: false,
       items: ["introduction", "quickstart", "tutorial-eval", "tutorial-rag"],
     },
     {
       type: "category",
       label: "Using Weave",
+      collapsed: false,
       items: [
         {
           type: "category",
           label: "Core Types",
           link: { type: "doc", id: "guides/core-types/index" },
+          collapsed: false,
           items: [
             "guides/core-types/models",
             "guides/core-types/datasets",
@@ -41,6 +44,7 @@ const sidebars: SidebarsConfig = {
           type: "category",
           label: "Tracking",
           link: { type: "doc", id: "guides/tracking/index" },
+          collapsed: false,
           items: [
             "guides/tracking/objects",
             "guides/tracking/ops",
@@ -52,6 +56,7 @@ const sidebars: SidebarsConfig = {
           type: "category",
           label: "Integrations",
           link: { type: "doc", id: "guides/integrations/index" },
+          collapsed: false,
           items: [
             "guides/integrations/openai",
             "guides/integrations/anthropic",
@@ -68,6 +73,7 @@ const sidebars: SidebarsConfig = {
           type: "category",
           label: "Tools",
           link: { type: "doc", id: "guides/tools/index" },
+          collapsed: false,
           items: ["guides/tools/serve", "guides/tools/deploy"],
         },
         {
@@ -85,6 +91,7 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Weave Cookbooks",
       link: { type: "doc", id: "guides/cookbooks/index" },
+      collapsed: false,
       items: [
         {
           type: "category",
