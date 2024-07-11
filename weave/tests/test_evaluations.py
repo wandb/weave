@@ -12,6 +12,13 @@ from ..trace_server import trace_server_interface as tsi
 def flatten_calls(
     calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
 ) -> list:
+    """
+    Flatten calls is a technique we use in the integration tests to assert the correct
+    ordering of calls. This is used to assert that the calls are in the correct order
+    as well as nested in the correct way. The returned list is the ordered list of calls
+    with the depth of each call.
+    """
+
     def children_of_parent_id(id: Optional[str]) -> list[tsi.CallSchema]:
         return [call for call in calls if call.parent_id == id]
 
@@ -72,10 +79,6 @@ async def test_basic_evaluation(client):
         )
     )
 
-    # Flatten calls is a technique we use in the integration tests to assert the correct
-    # ordering of calls. This is used to assert that the calls are in the correct order
-    # as well as nested in the correct way. The returned list is the ordered list of calls
-    # with the depth of each call.
     flattened_calls = flatten_calls(calls.calls)
     assert len(flattened_calls) == 14
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened_calls]
@@ -97,7 +100,7 @@ async def test_basic_evaluation(client):
     ]
     assert got == exp
 
-    def isObjectRefWithName(val: str, name: str):
+    def is_object_ref_with_name(val: str, name: str):
         return val.startswith(f"weave:///shawn/test-project/object/{name}:")
 
     ## Assertion Category 1: Here we make some application-specific assertions about the
@@ -105,8 +108,8 @@ async def test_basic_evaluation(client):
 
     # The `Evaluation.evaluate` call is expected to have the correct inputs as refs
     assert op_name_from_ref(flattened_calls[0][0].op_name) == "Evaluation.evaluate"
-    assert isObjectRefWithName(flattened_calls[0][0].inputs["self"], "Evaluation")
-    assert isObjectRefWithName(flattened_calls[0][0].inputs["model"], "MyModel")
+    assert is_object_ref_with_name(flattened_calls[0][0].inputs["self"], "Evaluation")
+    assert is_object_ref_with_name(flattened_calls[0][0].inputs["model"], "MyModel")
 
     # The UI depends on "example", "model" and "self" being refs, so we make that
     # specific assertion here
@@ -115,6 +118,10 @@ async def test_basic_evaluation(client):
             op_name_from_ref(flattened_calls[i][0].op_name)
             == "Evaluation.predict_and_score"
         )
-        assert isObjectRefWithName(flattened_calls[i][0].inputs["self"], "Evaluation")
-        assert isObjectRefWithName(flattened_calls[i][0].inputs["model"], "MyModel")
-        assert isObjectRefWithName(flattened_calls[i][0].inputs["example"], "Dataset")
+        assert is_object_ref_with_name(
+            flattened_calls[i][0].inputs["self"], "Evaluation"
+        )
+        assert is_object_ref_with_name(flattened_calls[i][0].inputs["model"], "MyModel")
+        assert is_object_ref_with_name(
+            flattened_calls[i][0].inputs["example"], "Dataset"
+        )

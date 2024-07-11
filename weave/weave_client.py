@@ -823,8 +823,7 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
     # 1. This code builds new objects that no longer have refs
     # 2. Even if we did an in-place edit, that would invalidate the ref (since
     # the ref is to the object's digest)
-    ref = get_ref(obj)
-    if ref:
+    if get_ref(obj):
         return obj
 
     if isinstance(obj, dict):
