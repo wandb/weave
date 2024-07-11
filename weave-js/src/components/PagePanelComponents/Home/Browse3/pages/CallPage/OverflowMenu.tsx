@@ -114,7 +114,15 @@ export const ConfirmDeleteModal: FC<{
   calls: Array<{callId: string; name: string}>;
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
-}> = ({entity, project, calls, confirmDelete, setConfirmDelete}) => {
+  onDeleteCallback?: () => void;
+}> = ({
+  entity,
+  project,
+  calls,
+  confirmDelete,
+  setConfirmDelete,
+  onDeleteCallback,
+}) => {
   const {useCallsDeleteFunc} = useWFHooks();
   const callsDelete = useCallsDeleteFunc();
   const closePeek = useClosePeek();
@@ -142,6 +150,7 @@ export const ConfirmDeleteModal: FC<{
       .then(() => {
         setDeleteLoading(false);
         setConfirmDelete(false);
+        onDeleteCallback?.();
         closePeek();
       });
   };

@@ -517,6 +517,9 @@ export const CallsTable: FC<{
           calls={callsToDelete}
           confirmDelete={deleteConfirmModalOpen}
           setConfirmDelete={setDeleteConfirmModalOpen}
+          onDeleteCallback={() => {
+            setSelectedCalls([]);
+          }}
         />
       ),
       order: -1,
