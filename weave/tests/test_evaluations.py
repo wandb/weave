@@ -29,9 +29,7 @@ def op_name_from_ref(ref: str) -> str:
 
 
 async def do_quickstart():
-    """
-    This is the basic example from the README/quickstart/docs
-    """
+    """This is the basic example from the README/quickstart/docs"""
     examples = [
         {"question": "What is the capital of France?", "expected": "Paris"},
         {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
