@@ -6,5 +6,5 @@ The Weave ecosystem contains automatic logging integrations for popular AI libra
 - [Anthropic](/guides/integrations/anthropic): the `anthropic-sdk-python` library.
 - [MistralAI](/guides/integrations/mistral): the `mistralai` library.
 - [LlamaIndex](/guides/integrations/llamaindex): the `llama-index` framework.
-- [langchain](/guides/integrations/langchain): the `langchain` framework.
+- [LangChain](/guides/integrations/langchain): the `langchain` framework.
 - [LiteLLM](/guides/integrations/litellm): the `litellm` library.
