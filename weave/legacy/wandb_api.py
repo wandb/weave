@@ -438,6 +438,7 @@ def get_wandb_api_sync() -> WandbApi:
 
 DEFAULT_WANDB_BASE_URL = "https://api.wandb.ai/"
 
+
 # Currently weave only supports WANDB_BASE_URL="https://api.wandb.ai/"
 # Remove once we expand to support other base urls
 def check_base_url() -> None:
@@ -447,13 +448,4 @@ def check_base_url() -> None:
     if base_url not in DEFAULT_WANDB_BASE_URL and not is_testing:
         raise errors.WeaveConfigurationError(
             f"The target WANDB_BASE_URL {base_url} points to a server that does not currently support Weave. Try setting WANDB_BASE_URL to https://api.wandb.ai/."
-        )
-
-
-# Currently weave only supports normal apikeys not local apikeys
-# Remove once we expand to support other base urls
-def check_api_key(api_key: str) -> None:
-    if "local" in api_key:
-        raise errors.WeaveConfigurationError(
-            f'The current logged in users api key {api_key} points to a server that does not currently support Weave. Try logging in with "wandb login --host https://api.wandb.ai".'
         )
