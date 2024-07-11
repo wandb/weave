@@ -2,7 +2,6 @@ import os
 from typing import Any, List, Optional, Tuple
 
 import pytest
-
 import weave
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
@@ -32,10 +31,18 @@ def op_name_from_ref(ref: str) -> str:
     return ref.split("/")[-1].split(":")[0]
 
 
+def assert_ends_and_errors(calls: List[tsi.CallSchema]) -> None:
+    for call, depth in calls:
+        assert call.ended_at is not None
+        assert call.exception is None
+
+
 def assert_correct_calls_for_chain_invoke(calls: list[tsi.CallSchema]) -> None:
     assert len(calls) == 4
 
     flattened = flatten_calls(calls)
+    assert_ends_and_errors(flattened)
+
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
     exp = [
         ("langchain.Chain.RunnableSequence", 0),
@@ -159,6 +166,7 @@ async def test_simple_chain_astream(
 def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
     assert len(calls) == 8
     flattened = flatten_calls(calls)
+    assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
     ids = [c.id for (c, _) in flattened]
@@ -233,6 +241,7 @@ async def test_simple_chain_abatch(
 def assert_correct_calls_for_chain_batch_from_op(calls: list[tsi.CallSchema]) -> None:
     assert len(calls) == 9
     flattened = flatten_calls(calls)
+    assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
     ids = [c.id for (c, _) in flattened]
@@ -286,6 +295,7 @@ def test_simple_chain_batch_inside_op(
 def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
     assert len(calls) == 10
     flattened = flatten_calls(calls)
+    assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 
@@ -372,6 +382,7 @@ def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> Non
     assert len(calls) == 10
 
     flattened = flatten_calls(calls)
+    assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 
@@ -491,6 +502,7 @@ def assert_correct_calls_for_agent_with_function_call(
     assert len(calls) == 11
 
     flattened = flatten_calls(calls)
+    assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 

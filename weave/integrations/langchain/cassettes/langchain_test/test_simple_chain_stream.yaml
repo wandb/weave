@@ -34,16 +34,16 @@ interactions:
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
-      string: 'data: {"id":"chatcmpl-9jh6EvS4C2RJRQQWVgmiNzkM315KX","object":"chat.completion.chunk","created":1720677462,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}],"usage":null}
+      string: 'data: {"id":"chatcmpl-9ji0gUa5EhrG0e9wj4habpOVWyqok","object":"chat.completion.chunk","created":1720680962,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-9jh6EvS4C2RJRQQWVgmiNzkM315KX","object":"chat.completion.chunk","created":1720677462,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"3"},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"id":"chatcmpl-9ji0gUa5EhrG0e9wj4habpOVWyqok","object":"chat.completion.chunk","created":1720680962,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"3"},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"id":"chatcmpl-9jh6EvS4C2RJRQQWVgmiNzkM315KX","object":"chat.completion.chunk","created":1720677462,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}],"usage":null}
+        data: {"id":"chatcmpl-9ji0gUa5EhrG0e9wj4habpOVWyqok","object":"chat.completion.chunk","created":1720680962,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}],"usage":null}
 
 
-        data: {"id":"chatcmpl-9jh6EvS4C2RJRQQWVgmiNzkM315KX","object":"chat.completion.chunk","created":1720677462,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[],"usage":{"prompt_tokens":13,"completion_tokens":1,"total_tokens":14}}
+        data: {"id":"chatcmpl-9ji0gUa5EhrG0e9wj4habpOVWyqok","object":"chat.completion.chunk","created":1720680962,"model":"gpt-3.5-turbo-0125","system_fingerprint":null,"choices":[],"usage":{"prompt_tokens":13,"completion_tokens":1,"total_tokens":14}}
 
 
         data: [DONE]
@@ -54,20 +54,20 @@ interactions:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 8a168ebd09cab2a0-MAA
+      - 8a16e42eed6f9146-MAA
       Connection:
       - keep-alive
       Content-Type:
       - text/event-stream; charset=utf-8
       Date:
-      - Thu, 11 Jul 2024 05:57:43 GMT
+      - Thu, 11 Jul 2024 06:56:02 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=MNl9HYhjU3v.ddLZmS3JtHJhamBnk728gFYx9ce6TvI-1720677463-1.0.1.1-LkXzHVsghMPnQpzPTJj13H3Ed3FF5h7nfzUbiIabMPW0AnYhyYM2_nyWwwUK7VKuUh8MkcXZoP8pNL2FQ1dwGw;
-        path=/; expires=Thu, 11-Jul-24 06:27:43 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=IRhWjhrSMbIBh8wSW975359wgZ0Yj4OgI0Zuj1Y9Aws-1720680962-1.0.1.1-.MKzzFLyeo_cWs_G9cvAW50umEU5jOv6fzCS8LYVQDsGXzGQswfljLxMwjCs1nXBsrb7DbKtwPGnR4Zwd7m_Ew;
+        path=/; expires=Thu, 11-Jul-24 07:26:02 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=_khAzTCzvn6dGYguvD59KttJ3XK2xsMz6RAG18drmAg-1720677463017-0.0.1.1-604800000;
+      - _cfuvid=kTdzuMXoWYkEsjIc04RiI4YxA0_BW9n_nZTHIrQAqhU-1720680962791-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -76,7 +76,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '77'
+      - '83'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -94,7 +94,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_428c39e257da11484577c24644ebb203
+      - req_d63eb4e754e63699bb7d1933bc58b798
     status:
       code: 200
       message: OK
