@@ -278,9 +278,7 @@ class Evaluation(Object):
         return summary
 
     @weave.op()
-    async def evaluate(
-        self, model: Union[Callable, Model], max_concurrent_tasks: Optional[int] = None
-    ) -> dict:
+    async def evaluate(self, model: Union[Callable, Model]) -> dict:
         eval_rows = []
 
         async def eval_example(example: dict) -> dict:
@@ -298,11 +296,10 @@ class Evaluation(Object):
         dataset = typing.cast(Dataset, self.dataset)
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
-        max_concurrent_tasks = max_concurrent_tasks or get_weave_parallelism()
         with Progress() as progress:
             task = progress.add_task("Evaluating", total=len(trial_rows))
             async for example, eval_row in util.async_foreach(
-                trial_rows, eval_example, max_concurrent_tasks
+                trial_rows, eval_example, get_weave_parallelism()
             ):
                 n_complete += 1
                 progress.update(task, advance=1)
@@ -328,9 +325,8 @@ def evaluate(
     model: Union[Callable, Model],
     scores: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[Callable] = None,
-    max_concurrent_tasks: Optional[int] = None,
 ) -> dict:
     eval = Evaluation(
         dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
     )
-    return asyncio.run(eval.evaluate(model, max_concurrent_tasks))
+    return asyncio.run(eval.evaluate(model))
