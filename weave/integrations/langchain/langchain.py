@@ -1,3 +1,14 @@
+"""
+Technical Note:
+This LangChain integration patching differs from other integrations in how tracing is enabled.
+Unlike other integrations where tracing is typically enabled through the `SymbolPatcher`,
+LangChain tracing is enabled by setting an environment variable.
+This is done because in LangChain, the tracing is configured during runtime, rather than at import time.
+This means that we need to enable tracing by setting an environment variable, rather than by replacing a symbol.
+
+The `LangchainPatcher` class in this file handles setting up the tracing hook based on this environment variable.
+"""
+
 import datetime
 import json
 import re
