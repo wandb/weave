@@ -301,7 +301,7 @@ def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
 
     exp = [
         ("langchain.Chain.RunnableSequence", 0),
-        ("langchain.Chain.RunnableParallel-context-question", 1),
+        ("langchain.Chain.RunnableParallel_context_question", 1),
         ("langchain.Chain.RunnableSequence", 2),
         ("langchain.Retriever.Retriever", 3),
         ("langchain.Chain.format_docs", 3),
@@ -389,7 +389,7 @@ def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> Non
     exp = [
         ("langchain.Chain.AgentExecutor", 0),
         ("langchain.Chain.RunnableSequence", 1),
-        ("langchain.Chain.RunnableParallel-input-chat_history-agent_scratchpad", 2),
+        ("langchain.Chain.RunnableParallel_input_chat_history_agent_scratchpad", 2),
         ("langchain.Chain.RunnableLambda", 3),
         ("langchain.Chain.RunnableLambda", 3),
         ("langchain.Chain.RunnableLambda", 3),
@@ -509,7 +509,7 @@ def assert_correct_calls_for_agent_with_function_call(
     exp = [
         ("langchain.Chain.AgentExecutor", 0),
         ("langchain.Chain.RunnableSequence", 1),
-        ("langchain.Chain.RunnableParallel-input-chat_history-agent_scratchpad", 2),
+        ("langchain.Chain.RunnableParallel_input_chat_history_agent_scratchpad", 2),
         ("langchain.Chain.RunnableLambda", 3),
         ("langchain.Chain.RunnableLambda", 3),
         ("langchain.Chain.RunnableLambda", 3),
