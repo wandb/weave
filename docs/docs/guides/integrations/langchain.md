@@ -236,4 +236,4 @@ By integrating Weave with Langchain, you can ensure comprehensive logging and mo
 
 ## Known Issues
 
-- **Tracing Async Calls** - A bug in the implementation of the `AsyncCallbackManager` in Langchain results in async calls not being traced in the correct order. We have filed a [PR](https://github.com/langchain-ai/langchain/pull/23909) to fix this. Therefore, the order of calls in the trace may not be accurate when using `ainvoke` and `abatch` methods in Langchain.
+- **Tracing Async Calls** - A bug in the implementation of the `AsyncCallbackManager` in Langchain results in async calls not being traced in the correct order. We have filed a [PR](https://github.com/langchain-ai/langchain/pull/23909) to fix this. Therefore, the order of calls in the trace may not be accurate when using `ainvoke`, `astream` and `abatch` methods in Langchain Runnables.

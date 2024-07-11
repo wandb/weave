@@ -1990,13 +1990,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 11 Jul 2024 03:41:14 GMT
+      - Thu, 11 Jul 2024 04:05:46 GMT
       ETag:
       - W/"c445c3e715abfd4b7ad16fc0be422ee17b80966e5dbc456a98db9416c61ef98e"
       Expires:
-      - Thu, 11 Jul 2024 03:46:14 GMT
+      - Thu, 11 Jul 2024 04:10:46 GMT
       Source-Age:
-      - '172'
+      - '52'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -2006,19 +2006,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '2'
+      - '1'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - d23cdf1590b9f5b4139e8c459150ae0e91116839
+      - d9ec1e3a3004ee8948b1fd7c03926d165e67d119
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
       - BC7D:D808E:DAB1B:133D4F:6689C6D9
       X-Served-By:
-      - cache-hyd1100021-HYD
+      - cache-hyd1100022-HYD
       X-Timer:
-      - S1720669274.278141,VS0,VE0
+      - S1720670747.800228,VS0,VE1
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -2040,7 +2040,7 @@ interactions:
       host:
       - api.openai.com
       user-agent:
-      - OpenAI/Python 1.35.7
+      - OpenAI/Python 1.35.13
       x-stainless-arch:
       - x64
       x-stainless-async:
@@ -2050,7 +2050,7 @@ interactions:
       x-stainless-os:
       - Linux
       x-stainless-package-version:
-      - 1.35.7
+      - 1.35.13
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
@@ -2060,17 +2060,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//VJA9b8IwFEX3/ArrzQRBwlcyInWrVDF1qCrkmEcwtf0s+0UqQvz3yiEE
-        uni4N+f6ONdMCNAHqAWok2RlvcmrM1623cK9fezwvKXP3cZuYuHeqxUWDUwSQc0ZFT+oqSLrDbIm
-        d69VQMmYVufrYrZaVcV62ReWDmgS1nrOy+ky5y40lM/mxXIgT6QVRqjFVyaEENf+TI7ugL9Qi9nk
-        kViMUbYI9fiREBDIpARkjDqydAyTZ6nIMbpeu4Qhvo17hlofqEl3u86YMT9qp+NpH1BGcomNTP6O
-        3zIhvnvv7p8K+EDW857pB10anJf3OXj+qZdy6JhYmpd4kQ16EC+R0e6P2rUYfND9G5Jkdsv+AAAA
-        //8DAOpTylLCAQAA
+        H4sIAAAAAAAAA1SQy27CMBBF9/kKa9YEhYRHmyVdtULqikVVVcg4k2BwPK496UOIf68cwqMbL+7N
+        uT7OMRECdAWlALWTrFpn0sd9vfp+qZCf10+Hbjl9tW9zzNdfbFbLTxhFgrZ7VHyhxopaZ5A12XOt
+        PErGuDpZ5Nl8kS2mD33RUoUmYo3jtBjPUu78ltJsks8GckdaYYBSvCdCCHHsz+hoK/yBUmSjS9Ji
+        CLJBKK8fCQGeTExAhqADS8swupWKLKPttQsY4tN1z1DjPG3j3bYz5prX2uqw23iUgWxkA5M746dE
+        iI/eu/unAs5T63jDdEAbByfFeQ5uf+quHDomluYuniaDHoTfwNhuam0b9M7r/g1RMjklfwAAAP//
+        AwDLvB/PwgEAAA==
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 8a15c6dc4f313c00-BLR
+      - 8a15eace5ea53c0c-BLR
       Connection:
       - keep-alive
       Content-Encoding:
@@ -2078,14 +2078,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 11 Jul 2024 03:41:16 GMT
+      - Thu, 11 Jul 2024 04:05:48 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=54gOYSvDfHs_RIi1NFu75402PqaVeRUq6iVl6pWQ3wI-1720669276-1.0.1.1-GlkYBuAUGLSevsf8GwCLFwCw3FRM1nuQcrdtnnZMcq2hFwh5QQs4Nj7na5bG72DAZNiH1W3ThfTkOyAmyEjRqA;
-        path=/; expires=Thu, 11-Jul-24 04:11:16 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=02sI4lhxj_6kUMYAMbhz.sFk23v4XBrmeIZpcTq9NeI-1720670748-1.0.1.1-3REiYVCYUlUH6f.SgltUmPihYBMKpc3NTh9xC2xeh8qUiw9VfhRz5Ek4K2ZOZG54dbMDJzGHKMDc4qSjObPtLw;
+        path=/; expires=Thu, 11-Jul-24 04:35:48 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=qb_xbtLRyKdq9uOrly4kbPfF.sNhEx0eN6QkY.Ox3kI-1720669276145-0.0.1.1-604800000;
+      - _cfuvid=k2ZKVbo5dgTEGC8Nayr8LT6I4NBWZunYmsFXbSg0A0w-1720670748372-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -2094,7 +2094,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '104'
+      - '156'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -2112,7 +2112,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_42d70710a7b04728429baa1ac6e0ea85
+      - req_d053f19cb11c97764235ab6186609136
     status:
       code: 200
       message: OK

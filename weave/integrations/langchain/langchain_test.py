@@ -133,6 +133,7 @@ def test_simple_chain_stream(
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
+@pytest.mark.skip
 async def test_simple_chain_astream(
     client: WeaveClient,
 ) -> None:
