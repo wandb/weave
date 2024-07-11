@@ -9,11 +9,15 @@ export default function CopyButton({code, className}) {
   const [isCopied, setIsCopied] = useState(false);
   const copyTimeout = useRef(undefined);
   const handleCopyCode = useCallback(() => {
-
     // Track the copy event
     // Only line added to the swizzled component
-    window.analytics?.track('copy_code', {code: typeof code == 'string' ? code.slice(0, 100) : 'code is not string'});
-
+    window.analytics?.track(
+      'Copied weave docs code', 
+      {code: typeof code == 'string' ? 
+        code.slice(0, 100) : 
+        'code is not string'}
+    );
+    
     copy(code);
     setIsCopied(true);
     copyTimeout.current = window.setTimeout(() => {
