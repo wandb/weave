@@ -1,6 +1,7 @@
 import inspect
 import typing
 from functools import partial, wraps
+from types import MethodType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -77,6 +78,10 @@ class Op(Protocol):
 
     Some of the attributes are carry-overs from when Op was a class.  We should
     consider removing the unnecessary ones where possible.
+    - resolve_fn (I think you can just use the func itself?)
+    - signature (just inspect the func)
+    - _set_on_output_handler (does this have to be on the op?)
+    - _on_output_handler (does this have to be on the op?)
     """
 
     name: str
@@ -336,3 +341,9 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
         return op_deco(func)
 
     return op_deco
+
+
+def maybe_bind_method(func: Callable) -> Union[Callable, MethodType]:
+    if (sig := inspect.signature(func)) and sig.parameters.get("self"):
+        return func.__get__(object())
+    return func
