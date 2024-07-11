@@ -1,3 +1,8 @@
+---
+sidebar_position: 0
+hide_table_of_contents: true
+---
+
 # Building an English Teaching Assistant using RAG
 
 A lot of teachers in the education system have to spend a lot of time manually grading and evaluating their students’ answersheets which which takes up a significant chunk of their time and focus from teaching. In this cookbook, we attempt to showcase a recipe to build an assistant to a teacher that can help with the grading of students' assignments and help clarify students' confusions and other questions regarding the syllabus and study material using a Retrieval Augmented Generation (RAG) pipeline built using

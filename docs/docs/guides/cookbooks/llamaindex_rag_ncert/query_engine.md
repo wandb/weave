@@ -1,3 +1,8 @@
+---
+sidebar_position: 0
+hide_table_of_contents: true
+---
+
 # Building the Query Engine
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/docs/docs/guides/cookbooks/llamaindex_rag_ncert/notebooks/01_rag_engine.ipynb)
