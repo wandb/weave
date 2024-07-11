@@ -1,5 +1,4 @@
 import inspect
-from copy import deepcopy
 
 import pytest
 
@@ -10,76 +9,97 @@ from weave.trace.refs import ObjectRef
 from weave.weave_client import Call
 
 
-@op
-def func(a: int) -> int:
-    return a + 1
-
-
-@op
-async def afunc(a: int) -> int:
-    return a + 1
-
-
-class A(weave.Object):
+@pytest.fixture
+def func():
     @op
-    def method(self, a: int) -> int:
+    def _func(a: int) -> int:
         return a + 1
 
+    yield _func
+
+
+@pytest.fixture
+def afunc():
     @op
-    async def amethod(self, a: int) -> int:
+    async def _afunc(a: int) -> int:
         return a + 1
 
-
-class B:
-    """
-    special funcs (b.method.call, b.method.calls, etc.)
-    wont work as expected because it's not a weave.Object
-    """
-
-    @op
-    def method(self, a: int) -> int:
-        return a + 1
-
-    @op
-    async def amethod(self, a: int) -> int:
-        return a + 1
+    yield _afunc
 
 
-a = A()
-b = B()
+@pytest.fixture
+def weave_obj():
+    class A(weave.Object):
+        @op
+        def method(self, a: int) -> int:
+            return a + 1
+
+        @op
+        async def amethod(self, a: int) -> int:
+            return a + 1
+
+    yield A()
 
 
-def test_sync_func(client):
+@pytest.fixture
+def py_obj():
+    class B:
+        """
+        special funcs (b.method.call, b.method.calls, etc.)
+        wont work as expected because it's not a weave.Object
+        """
+
+        @op
+        def method(self, a: int) -> int:
+            return a + 1
+
+        @op
+        async def amethod(self, a: int) -> int:
+            return a + 1
+
+    yield B()
+
+
+def test_sync_func(client, func):
     assert func(1) == 2
 
+    ref = weave.publish(func)
+    func2 = ref.get()
 
-def test_sync_func_call(client):
+    assert func2(1) == 2
+
+
+def test_sync_func_call(client, func):
     call = func.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {"a": 1}
     assert call.output == 2
 
 
-@pytest.mark.asyncio
-async def test_async_func(client):
+async def test_async_func(client, afunc):
     assert await afunc(1) == 2
 
+    ref = weave.publish(afunc)
+    afunc2 = ref.get()
+
+    assert await afunc2(1) == 2
+
 
 @pytest.mark.asyncio
-async def test_async_func_call(client):
+async def test_async_func_call(client, afunc):
     call = await afunc.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {"a": 1}
     assert call.output == 2
 
 
-def test_sync_method(client):
-    assert a.method(1) == 2
-    assert b.method(1) == 2
+def test_sync_method(client, weave_obj, py_obj):
+    assert weave_obj.method(1) == 2
+    assert py_obj.method(1) == 2
 
 
-def test_sync_method_call(client):
-    call = a.method.call(1)
+def test_sync_method_call(client, weave_obj, py_obj):
+    call = weave_obj.method.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {
         "self": ObjectRef(
@@ -94,18 +114,18 @@ def test_sync_method_call(client):
     assert call.output == 2
 
     with pytest.raises(errors.OpCallError):
-        call2 = b.amethod.call(1)
+        call2 = py_obj.amethod.call(1)
 
 
 @pytest.mark.asyncio
-async def test_async_method(client):
-    assert await a.amethod(1) == 2
-    assert await b.amethod(1) == 2
+async def test_async_method(client, weave_obj, py_obj):
+    assert await weave_obj.amethod(1) == 2
+    assert await py_obj.amethod(1) == 2
 
 
 @pytest.mark.asyncio
-async def test_async_method_call(client):
-    call = await a.amethod.call(1)
+async def test_async_method_call(client, weave_obj, py_obj):
+    call = await weave_obj.amethod.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {
         "self": ObjectRef(
@@ -120,59 +140,59 @@ async def test_async_method_call(client):
     assert call.output == 2
 
     with pytest.raises(errors.OpCallError):
-        call2 = await b.amethod.call(1)
+        call2 = await py_obj.amethod.call(1)
 
 
-def test_sync_func_patching_passes_inspection():
+def test_sync_func_patching_passes_inspection(func):
     assert isinstance(func, Op)
     assert inspect.isfunction(func)
 
 
-def test_async_func_patching_passes_inspection():
+def test_async_func_patching_passes_inspection(afunc):
     assert isinstance(afunc, Op)
     assert inspect.iscoroutinefunction(afunc)
 
 
-def test_sync_method_patching_passes_inspection():
-    assert isinstance(a.method, Op)
-    assert inspect.ismethod(a.method)
+def test_sync_method_patching_passes_inspection(weave_obj, py_obj):
+    assert isinstance(weave_obj.method, Op)
+    assert inspect.ismethod(weave_obj.method)
 
-    assert isinstance(b.method, Op)
-    assert inspect.ismethod(b.method)
-
-
-def test_async_method_patching_passes_inspection():
-    assert isinstance(a.amethod, Op)
-    assert inspect.iscoroutinefunction(a.amethod)
-    assert inspect.ismethod(a.amethod)
-
-    assert isinstance(b.amethod, Op)
-    assert inspect.iscoroutinefunction(b.amethod)
-    assert inspect.ismethod(b.amethod)
+    assert isinstance(py_obj.method, Op)
+    assert inspect.ismethod(py_obj.method)
 
 
-def test_sync_method_calls(client):
+def test_async_method_patching_passes_inspection(weave_obj, py_obj):
+    assert isinstance(weave_obj.amethod, Op)
+    assert inspect.iscoroutinefunction(weave_obj.amethod)
+    assert inspect.ismethod(weave_obj.amethod)
+
+    assert isinstance(py_obj.amethod, Op)
+    assert inspect.iscoroutinefunction(py_obj.amethod)
+    assert inspect.ismethod(py_obj.amethod)
+
+
+def test_sync_method_calls(client, weave_obj):
     for x in range(3):
-        a.method(x)
+        weave_obj.method(x)
 
     for x in range(3):
-        a.method.call(x)
+        weave_obj.method.call(x)
 
-    calls = a.method.calls()
+    calls = weave_obj.method.calls()
     calls = list(calls)
 
     assert len(calls) == 6
 
 
 @pytest.mark.asyncio
-async def test_async_method_calls(client):
+async def test_async_method_calls(client, weave_obj):
     for x in range(3):
-        await a.amethod(x)
+        await weave_obj.amethod(x)
 
     for x in range(3):
-        await a.amethod.call(x)
+        await weave_obj.amethod.call(x)
 
-    calls = a.amethod.calls()
+    calls = weave_obj.amethod.calls()
     calls = list(calls)
 
     assert len(calls) == 6
