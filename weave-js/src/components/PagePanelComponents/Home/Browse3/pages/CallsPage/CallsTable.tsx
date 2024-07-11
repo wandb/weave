@@ -512,7 +512,7 @@ export const CallsTable: FC<{
   useEffect(() => {
     addExtra('deleteSelectedCalls', {
       node: (
-        <DeleteSelectedCallsButton
+        <BulkDeleteButton
           onClick={() => setDeleteConfirmModalOpen(true)}
           disabled={selectedCalls.length === 0}
           isRightmostButton={!isEvaluateTable}
@@ -905,11 +905,14 @@ const CompareEvaluationsTableButton: FC<{
   </Box>
 );
 
-const DeleteSelectedCallsButton: FC<{
+const BulkDeleteButton: FC<{
   onClick: () => void;
   disabled?: boolean;
   isRightmostButton?: boolean;
 }> = ({onClick, disabled, isRightmostButton}) => {
+  
+  const [deleteClicked, setDeleteClicked] = useState(false);
+
   return (
     <Box
       sx={{
@@ -917,15 +920,39 @@ const DeleteSelectedCallsButton: FC<{
         display: 'flex',
         alignItems: 'center',
       }}>
-      <Button
-        className={isRightmostButton ? 'ml-4 mr-16' : 'mx-4'}
-        variant="ghost"
-        size="medium"
-        disabled={disabled}
-        onClick={onClick}
-        tooltip="Select rows with the checkbox to delete"
-        icon="delete"
-      />
+      {
+        deleteClicked ? (
+          <>
+          <Button
+            className='mx-4'
+            variant="ghost"
+            size="medium"
+            disabled={disabled}
+            onClick={onClick}
+            tooltip="Select rows with the checkbox to delete"
+            icon="delete">
+            Confirm
+          </Button>
+          <Button
+            className={isRightmostButton ? 'ml-4 mr-16' : 'mx-4'}
+            variant="ghost"
+            size="medium"
+            onClick={() => setDeleteClicked(false)}
+          >
+            Cancel
+          </Button>
+          </>
+        ) : (
+          <Button
+            className={isRightmostButton ? 'ml-4 mr-16' : 'mx-4'}
+            variant="ghost"
+            size="medium"
+            onClick={() => setDeleteClicked(true)}
+            tooltip="Select rows with the checkbox to delete"
+            icon="delete"
+          />
+        )
+      }
     </Box>
   );
 };
