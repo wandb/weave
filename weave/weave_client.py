@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 
 import pydantic
 from requests import HTTPError
+
 from weave import call_context, client_context, trace_sentry, urls
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
