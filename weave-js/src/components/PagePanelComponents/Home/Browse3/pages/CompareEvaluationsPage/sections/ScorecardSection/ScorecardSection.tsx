@@ -1,10 +1,3 @@
-/**
- * TODO:
- * * Output Comparison: Currently shows all scorers
- *    * When 1 scorer, show the ref
- *    * When >1 scorer, sho warning icon with hover info (probably use the same component as scorecard)
- */
-
 import {Box, Tooltip} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import React, {useMemo} from 'react';

@@ -243,14 +243,6 @@ export const ExampleCompareSection: React.FC<{
   }
 
   // This section contains the primary helper variable for laying out the grid
-  // const sortedScorers = _.sortBy(
-  //   Object.values(props.state.data.scorerMetricDimensions),
-  //   k => k.scorerDef.scorerOpOrObjRef
-  // );
-  // const uniqueScorerRefs = _.uniq(
-  //   sortedScorers.map(v => v.scorerDef.scorerOpOrObjRef)
-  // );
-
   const scorerGroupNames = Object.keys(compositeMetrics).filter(
     k => k !== DERIVED_SCORER_REF
   );
