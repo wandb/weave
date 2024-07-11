@@ -165,7 +165,7 @@ const CompareEvaluationsPageInner: React.FC = props => {
         <ComparisonDefinitionSection state={state} />
         <SummaryPlots state={state} />
         <ScorecardSection state={state} />
-        {Object.keys(state.data.models).length === 2 && (
+        {Object.keys(state.data.evaluationCalls).length === 2 && (
           <ExampleFilterSection state={state} />
         )}
         <ResultExplorer state={state} />

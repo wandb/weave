@@ -100,7 +100,7 @@ const fetchEvaluationComparisonData = async (
   //            2.3.1.1: Fetch the prediction
   //            2.3.1.1: Fetch the scores
   // 1: populate the evaluationCalls
-  const evalRes = await traceServerClient.callsQuery({
+  const evalRes = await traceServerClient.callsStreamQuery({
     project_id: projectId,
     filter: {call_ids: evaluationCallIds},
   });
@@ -297,7 +297,7 @@ const fetchEvaluationComparisonData = async (
 
   // 4. Populate the predictions and scores
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
-  const evalTraceRes = await traceServerClient.callsQuery({
+  const evalTraceRes = await traceServerClient.callsStreamQuery({
     project_id: projectId,
     filter: {trace_ids: evalTraceIds},
   });
@@ -333,7 +333,7 @@ const fetchEvaluationComparisonData = async (
       const evaluationCallId = parentPredictAndScore.parent_id!;
 
       const split = '/attr/rows/id/';
-      if (exampleRef.includes(split)) {
+      if (typeof exampleRef === 'string' && exampleRef.includes(split)) {
         const parts = exampleRef.split(split);
         if (parts.length === 2) {
           const maybeDigest = parts[1];
