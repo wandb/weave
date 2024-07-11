@@ -1,12 +1,32 @@
 """
 Technical Note:
-This LangChain integration patching differs from other integrations in how tracing is enabled.
-Unlike other integrations where tracing is typically enabled through the `SymbolPatcher`,
-LangChain tracing is enabled by setting an environment variable.
-This is done because in LangChain, the tracing is configured during runtime, rather than at import time.
-This means that we need to enable tracing by setting an environment variable, rather than by replacing a symbol.
+This LangChain integration patching differs from other integrations in how tracing is enabled:
 
-The `LangchainPatcher` class in this file handles setting up the tracing hook based on this environment variable.
+1. Environment Variable:
+   Unlike other integrations where tracing is typically enabled through the `SymbolPatcher`,
+   LangChain tracing is enabled by setting an environment variable (WEAVE_TRACE_LANGCHAIN).
+   This is because LangChain configures tracing during runtime, not at import time.
+
+2. Runtime Configuration:
+   The `LangchainPatcher` class handles setting up the tracing hook based on this environment variable.
+   It uses `register_configure_hook` to set up the tracing callback at runtime:
+
+   register_configure_hook(
+       weave_tracing_callback_var, True, WeaveTracer, "WEAVE_TRACE_LANGCHAIN"
+   )
+
+3. Respecting User Settings:
+   The patcher respects any existing WEAVE_TRACE_LANGCHAIN environment variable set by the user:
+   - If not set, it's set to "true" and global patchin is enabled.
+   - If already set, its value is preserved
+
+4. Context Manager:
+   Tracing can be enabled in code using the `weave_tracing_enabled()` context manager:
+
+   with weave_tracing_enabled():
+       # LangChain code here
+
+This approach allows for more flexible runtime configuration while still respecting global user-defined preferences.
 """
 
 import datetime
