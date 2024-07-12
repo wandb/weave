@@ -106,6 +106,22 @@ def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
     func._on_output_handler = on_output
 
 
+def _is_unbound_method(func: Callable) -> bool:
+    """Check if a function is a function defined on a class (an "unbound" method)
+
+    In python3, the "unbound" method is just a function, but that distinction is
+    not enough for our decorator because it needs to operate on both regular funcs
+    and unbound methods at the same time.
+
+    This check clarifies that distinction between function vs. unbound method.
+    """
+    sig = inspect.signature(func)
+    params = list(sig.parameters.values())
+    is_method = params and params[0].name in {"self", "cls"}
+
+    return bool(is_method)
+
+
 def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     client = client_context.weave_client.require_weave_client()
 
@@ -276,7 +292,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     def op_deco(func: Callable) -> Op:
         # Check function type
         sig = inspect.signature(func)
-        is_method = inspect.ismethod(func)
+        is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
 
         def create_wrapper(func: Callable) -> Op:
