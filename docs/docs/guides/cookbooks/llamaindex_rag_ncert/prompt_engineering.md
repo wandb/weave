@@ -104,9 +104,7 @@ class EnglishDoubtClearningAssistant(weave.Model):
     def __init__(self, model: Optional[str] = None):
         super().__init__()
         self.model = model if model is not None else self.model
-        self._groq_client = Groq(
-            api_key=os.environ.get("GROQ_API_KEY")
-        )
+        self._groq_client = Groq(api_key=GROQ_API_KEY)
     
     @weave.op()
     def get_prompts(self, question: str, context: str):
@@ -170,10 +168,8 @@ class EnglishStudentResponseAssistant(weave.Model):
     def __init__(self, model: Optional[str] = None):
         super().__init__()
         self.model = model if model is not None else self.model
-        self._groq_client = Groq(
-            api_key=os.environ.get("GROQ_API_KEY")
-        )
-    
+        self._groq_client = Groq(api_key=GROQ_API_KEY)
+
     @weave.op()
     def get_prompt(
         self, question: str, context: str, word_limit_min: int, word_limit_max: int
@@ -264,7 +260,7 @@ class EnglishGradingAssistant(EnglishStudentResponseAssistant):
         super().__init__(model=model)
         self.model = model if model is not None else self.model
         self._instructor_groq_client = instructor.from_groq(
-            Groq(api_key=os.environ.get("GROQ_API_KEY"))
+            Groq(api_key=GROQ_API_KEY)
         )
     
     @weave.op()

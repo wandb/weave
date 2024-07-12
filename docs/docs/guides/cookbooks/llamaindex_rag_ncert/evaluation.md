@@ -86,7 +86,7 @@ class OpenaAIJudgeModel(weave.Scorer):
         super().__init__()
         self.model = model if model is not None else self.model
         self._openai_client = instructor.from_openai(
-            OpenAI(api_key=userdata.get("OPENAI_API_KEY")),
+            OpenAI(api_key=OPENAI_API_KEY),
             mode=instructor.Mode.TOOLS,
         )
 
