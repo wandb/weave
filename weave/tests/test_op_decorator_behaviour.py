@@ -6,6 +6,7 @@ import weave
 from weave.trace import errors
 from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef
+from weave.trace.vals import MissingSelfInstanceError
 from weave.weave_client import Call
 
 
@@ -114,6 +115,10 @@ def test_sync_method(client, weave_obj, py_obj):
     assert weave_obj.method(1) == 2
     assert py_obj.method(1) == 2
 
+    weave_obj_method_ref = weave.publish(weave_obj.method)
+    with pytest.raises(MissingSelfInstanceError):
+        weave_obj_method2 = weave_obj_method_ref.get()
+
 
 def test_sync_method_call(client, weave_obj, py_obj):
     call = weave_obj.method.call(1)
@@ -130,6 +135,10 @@ def test_sync_method_call(client, weave_obj, py_obj):
     }
     assert call.output == 2
 
+    weave_obj_method_ref = weave.publish(weave_obj.method)
+    with pytest.raises(MissingSelfInstanceError):
+        weave_obj_method2 = weave_obj_method_ref.get()
+
     with pytest.raises(errors.OpCallError):
         call2 = py_obj.amethod.call(1)
 
@@ -138,6 +147,10 @@ def test_sync_method_call(client, weave_obj, py_obj):
 async def test_async_method(client, weave_obj, py_obj):
     assert await weave_obj.amethod(1) == 2
     assert await py_obj.amethod(1) == 2
+
+    weave_obj_amethod_ref = weave.publish(weave_obj.amethod)
+    with pytest.raises(MissingSelfInstanceError):
+        weave_obj_amethod2 = weave_obj_amethod_ref.get()
 
 
 @pytest.mark.asyncio
@@ -155,6 +168,10 @@ async def test_async_method_call(client, weave_obj, py_obj):
         "a": 1,
     }
     assert call.output == 2
+
+    weave_obj_amethod_ref = weave.publish(weave_obj.amethod)
+    with pytest.raises(MissingSelfInstanceError):
+        weave_obj_amethod2 = weave_obj_amethod_ref.get()
 
     with pytest.raises(errors.OpCallError):
         call2 = await py_obj.amethod.call(1)
