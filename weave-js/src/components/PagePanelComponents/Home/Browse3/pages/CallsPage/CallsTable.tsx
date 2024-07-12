@@ -749,7 +749,9 @@ const ExportRunsTableButton = ({
       className="mx-16"
       size="medium"
       variant="secondary"
-      onClick={() => tableRef.current?.exportDataAsCsv()}
+      onClick={() =>
+        tableRef.current?.exportDataAsCsv({includeColumnGroupsHeaders: false})
+      }
       icon="export-share-upload">
       Export to CSV
     </Button>
