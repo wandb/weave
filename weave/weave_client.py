@@ -223,6 +223,8 @@ class CallsIter:
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
     def _fetch_page(self, index: int) -> list[CallSchema]:
+        # caching in here means that any other CallsIter objects would also
+        # benefit from the cache
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self.project_id,
@@ -251,20 +253,18 @@ class CallsIter:
     def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
         if (start := key.start or 0) < 0:
             raise ValueError("Negative start not supported")
-        if (stop := key.stop) < 0:
+        if (stop := key.stop) is not None and stop < 0:
             raise ValueError("Negative stop not supported")
         if (step := key.step or 1) < 0:
             raise ValueError("Negative step not supported")
 
-        # result = []
-        for i in range(start, stop, step):
+        i = start
+        while stop is None or i < stop:
             try:
                 yield self._get_one(i)
-                # result.append(self._get_one(i))
             except IndexError:
                 break
-
-        # return result
+            i += step
 
     def __getitem__(
         self, key: Union[slice, int]
