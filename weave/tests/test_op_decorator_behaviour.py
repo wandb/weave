@@ -230,3 +230,12 @@ async def test_async_method_calls(client, weave_obj):
     calls = list(calls)
 
     assert len(calls) == 6
+
+
+@pytest.mark.asyncio
+async def test_gotten_object_method_is_callable(client, weave_obj):
+    ref = weave.publish(weave_obj)
+
+    weave_obj2 = ref.get()
+    assert weave_obj.method(1) == weave_obj2.method(1) == 2
+    assert await weave_obj.amethod(1) == await weave_obj2.amethod(1) == 2
