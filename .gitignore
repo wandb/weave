@@ -27,5 +27,3 @@ weave/tests/zlib.txt
 weave/tests/execute.json
 weave-js/src/generated
 .integration-deps
-cape_dev/
-

@@ -1,14 +1,10 @@
-import asyncio
-import json
 import os
-from typing import Any, Generator
+from typing import Any
 
 import cohere
 import pytest
 
 import weave
-from weave.autopatch import autopatch, reset_autopatch
-from weave.integrations.cohere.cohere_sdk import cohere_patcher
 from weave.trace_server import trace_server_interface as tsi
 
 cohere_model = "command"  # You can change this to a specific model if needed
@@ -19,6 +15,10 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     if isinstance(call_output, str) and call_output.startswith("weave://"):
         return weave.ref(call_output).get()
     return call_output
+
+
+def op_name_from_ref(ref: str) -> str:
+    return ref.split("/")[-1].split(":")[0]
 
 
 @pytest.mark.skip_clickhouse_client
@@ -45,6 +45,8 @@ def test_cohere(
     assert len(res.calls) == 1
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "cohere.Client.chat"
     output = _get_call_output(call)
     assert output.text == exp
     assert output.generation_id == response.generation_id
@@ -97,6 +99,8 @@ def test_cohere_stream(
     assert len(res.calls) == 1
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "cohere.Client.chat_stream"
     output = _get_call_output(call)
     assert output.text == response.text
     assert output.generation_id == response.generation_id
@@ -151,6 +155,8 @@ async def test_cohere_async(
     assert len(res.calls) == 1
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "cohere.AsyncClient.chat"
     output = _get_call_output(call)
     assert output.text == exp
     assert output.generation_id == response.generation_id
@@ -203,6 +209,8 @@ async def test_cohere_async_stream(
     assert len(res.calls) == 1
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "cohere.AsyncClient.chat_stream"
     output = _get_call_output(call)
     assert output.text == response.text
     assert output.generation_id == response.generation_id

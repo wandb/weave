@@ -13,8 +13,6 @@ def cohere_accumulator(
     acc: typing.Optional[dict],
     value: typing.Any,
 ) -> "NonStreamedChatResponse":
-    from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
-
     # don't need to accumulate, is build-in by cohere!
     # https://docs.cohere.com/docs/streaming
     # A stream-end event is the final event of the stream, and is returned only when streaming is finished.
