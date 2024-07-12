@@ -54,21 +54,12 @@ service_context = ServiceContext.from_defaults(
 )
 ```
 
-Next, we fetch the W&B vector index artifact and load back the index.
+Next, we load back the vector index from storage.
 
 ```python
-import wandb
-
-# We use `wandb.Api` to fetch the artifacts, this ensures that we don't
-# create a new W&B run for every query. The queries will be tracked by Weave.
-artifact = wandb.Api().artifact(
-    "geekyrakshit/groq-rag/ncert-flamingoes-prose-embeddings:latest"
-)
-artifact_dir = artifact.download()
-
 # Load the vector index from storage
 storage_context = StorageContext.from_defaults(
-    persist_dir=artifact_dir
+    persist_dir="./vector_embedding_storage"
 )
 index = load_index_from_storage(
     storage_context, service_context=service_context

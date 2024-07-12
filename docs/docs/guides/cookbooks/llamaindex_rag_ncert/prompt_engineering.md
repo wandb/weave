@@ -18,25 +18,19 @@ Now that we have a functional RAG pipeline, let's use some basic prompt engineer
 Retrievers are responsible for fetching the most relevant context given a user query or chat message. We are going to use the [`as_retriever`](https://docs.llamaindex.ai/en/stable/api_reference/indices/document_summary/?h=as_retriever#llama_index.core.indices.DocumentSummaryIndex.as_retriever) instead of the `as_query_engine` in the previous recipe to build our retriever.
 
 ```python
-import wandb
-
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core import (
     ServiceContext, StorageContext, load_index_from_storage
 )
-
-# fetch vector embeddings artifact
-artifact = wandb.Api().artifact(
-    "geekyrakshit/groq-rag/ncert-flamingoes-prose-embeddings:latest"
-)
-artifact_dir = artifact.download()
 
 # define service and storage contexts
 embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 service_context = ServiceContext.from_defaults(
     embed_model=embed_model, llm=None
 )
-storage_context = StorageContext.from_defaults(persist_dir=artifact_dir)
+storage_context = StorageContext.from_defaults(
+    persist_dir="./vector_embedding_storage"
+)
 
 # load index from storage
 index = load_index_from_storage(

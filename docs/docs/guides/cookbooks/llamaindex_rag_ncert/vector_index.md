@@ -26,22 +26,17 @@ The first step in building our RAG pipeline would be to load data. In our case t
 ```python
 import wandb
 
-# initialize a W&B run
-wandb.init(project="groq-rag", job_type="build-vector-index")
-
-# Fetch the W&B artifact containing the chapter-wise PDF docs
-artifact = wandb.use_artifact(
-    "geekyrakshit/groq-rag/ncert-flamingoes:latest", type="dataset"
-)
-artifact_dir = artifact.download()
+pdf_chapters_path = wandb.Api().artifact(
+    "geekyrakshit/groq-rag/ncert-flamingoes:latest"
+).download()
 ```
 
 Next we're going to use the [`SimpleDirectoryReader`](https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/?source=post_page-----b1709f770f55--------------------------------) data loader from LlamaIndex to load our PDF files.
 
 ```python
 # Load the documents from the artifact by simply passing the
-# `artifact_dir` to `SimpleDirectoryReader`.
-docs_path = os.path.join(artifact_dir, "prose", "chapters")
+# `pdf_chapters_path` to `SimpleDirectoryReader`.
+docs_path = os.path.join(pdf_chapters_path, "prose", "chapters")
 reader = SimpleDirectoryReader(input_dir=docs_path)
 
 # Call `reader.load_data` to load the data
@@ -103,19 +98,6 @@ vector_index.storage_context.persist(
 ```
 
 The `vector_index.storage_context.persist` creates a bunch of JSON files with vector embedding chunks. We're going to store this as a W&B artifact of type `vector_index` which can be easily reused during the querying.
-
-```python
-artifact = wandb.Artifact(
-    name="ncert-flamingoes-prose-embeddings", type="vector_index"
-)
-artifact.add_dir(local_path="./vector_embedding_storage")
-wandb.log_artifact(artifact)
-wandb.finish()
-```
-
-| ![](./images/lineage.png) |
-|---|
-| Using W&B Artifacts to manage our datasets and vector store index is that it lets us version our data and track their dependencies. |
 
 ## What's next?
 
