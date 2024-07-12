@@ -105,15 +105,6 @@ export const CallsTable: FC<{
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
 
-  // Register Export Button
-  useEffect(() => {
-    addExtra('exportRunsTableButton', {
-      node: <ExportRunsTableButton tableRef={apiRef} />,
-    });
-
-    return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, addExtra, removeExtra]);
-
   // Table State consists of:
   // 1. Filter (Structured Filter)
   // 2. Filter (Unstructured Filter)
@@ -353,11 +344,8 @@ export const CallsTable: FC<{
   );
 
   // Selection Management
-  const [compareSelection, setCompareSelection] = useState<string[]>([]);
+  const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const muiColumns = useMemo(() => {
-    if (!isEvaluateTable) {
-      return columns.cols;
-    }
     return [
       {
         width: 40,
@@ -365,9 +353,9 @@ export const CallsTable: FC<{
         headerName: '',
         renderCell: (params: any) => {
           const rowId = params.id as string;
-          const isSelected = compareSelection.includes(rowId);
+          const isSelected = selectedCalls.includes(rowId);
           const disabledDueToMax =
-            compareSelection.length >= MAX_EVAL_COMPARISONS && !isSelected;
+            selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected;
           const disabledDueToNonSuccess =
             params.row.exception != null || params.row.ended_at == null;
           let tooltipText = '';
@@ -388,11 +376,11 @@ export const CallsTable: FC<{
                   checked={isSelected}
                   onChange={() => {
                     if (isSelected) {
-                      setCompareSelection(
-                        compareSelection.filter(id => id !== rowId)
+                      setSelectedCalls(
+                        selectedCalls.filter(id => id !== rowId)
                       );
                     } else {
-                      setCompareSelection([...compareSelection, rowId]);
+                      setSelectedCalls([...selectedCalls, rowId]);
                     }
                   }}
                 />
@@ -403,7 +391,7 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-  }, [columns.cols, compareSelection, isEvaluateTable]);
+  }, [columns.cols, selectedCalls]);
 
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
@@ -416,10 +404,10 @@ export const CallsTable: FC<{
         <CompareEvaluationsTableButton
           onClick={() => {
             history.push(
-              router.compareEvaluationsUri(entity, project, compareSelection)
+              router.compareEvaluationsUri(entity, project, selectedCalls)
             );
           }}
-          disabled={compareSelection.length === 0}
+          disabled={selectedCalls.length === 0}
         />
       ),
     });
@@ -430,13 +418,27 @@ export const CallsTable: FC<{
     addExtra,
     removeExtra,
     isEvaluateTable,
-    compareSelection.length,
-    compareSelection,
+    selectedCalls.length,
+    selectedCalls,
     router,
     entity,
     project,
     history,
   ]);
+
+  // Register Export Button
+  useEffect(() => {
+    addExtra('exportRunsTableButton', {
+      node: (
+        <ExportRunsTableButton
+          tableRef={apiRef}
+          selectedCalls={selectedCalls}
+        />
+      ),
+    });
+
+    return () => removeExtra('exportRunsTableButton');
+  }, [apiRef, selectedCalls, addExtra, removeExtra]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -736,8 +738,10 @@ const getPeekId = (peekPath: string | null): string | null => {
 
 const ExportRunsTableButton = ({
   tableRef,
+  selectedCalls,
 }: {
   tableRef: React.MutableRefObject<GridApiPro>;
+  selectedCalls: string[];
 }) => (
   <Box
     sx={{
@@ -750,10 +754,14 @@ const ExportRunsTableButton = ({
       size="medium"
       variant="secondary"
       onClick={() =>
-        tableRef.current?.exportDataAsCsv({includeColumnGroupsHeaders: false})
+        tableRef.current?.exportDataAsCsv({
+          includeColumnGroupsHeaders: false,
+          getRowsToExport:
+            selectedCalls.length > 0 ? () => selectedCalls : undefined,
+        })
       }
       icon="export-share-upload">
-      Export to CSV
+      {selectedCalls.length > 0 ? `${selectedCalls.length}` : ''}
     </Button>
   </Box>
 );
