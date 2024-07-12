@@ -11,7 +11,7 @@ To iterate on any AI application, we need a way to systematically evaluate its p
 
 ## Building an Evaluation Dataset
 
-We built an evaluation dataset by scraping a question bank of solved question-answer pairs of the Flamigo textbook from [LearnCBSE](https://www.learncbse.in/chapter-wise-important-questions-class-12-english/). The dataset consists of 358 question-answer pairs corresponding to the 8 chapters from our knowledge base in the following format:
+We build an evaluation dataset by scraping a question bank of solved question-answer pairs of the Flamigo textbook from [LearnCBSE](https://www.learncbse.in/chapter-wise-important-questions-class-12-english/). The dataset consists of 358 question-answer pairs corresponding to the 8 chapters from our knowledge base in the following format:
 
 ```python
 {
