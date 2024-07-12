@@ -15,6 +15,12 @@ A lot of teachers in the education system have to spend a lot of time manually g
 
 We demonstrate the RAG pipeline to act as an assistant to an English teacher teaching the proses from the English textbook [Flamingo](https://ncert.nic.in/textbook.php?lefl1=0-13), which is part of the syllabus of [CBSE](https://www.cbse.gov.in/) board's English syllabus for Class XII.
 
+:::note
+
+You will need a Groq API Key to follow along this cookbook. You can create your Groq account at [https://groq.com/](https://groq.com/) and create your own API key as [https://console.groq.com/keys](https://console.groq.com/keys).
+
+:::
+
 ## Table of Content
 
 | Recipe | Notebook |

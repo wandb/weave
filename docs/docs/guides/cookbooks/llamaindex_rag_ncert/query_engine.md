@@ -21,16 +21,21 @@ weave.init(project_name="groq-rag")
 
 [GroqCloud](https://groq.com/) is an LLM cloud service provider that lets us use open-source LLMs like Llama3, Mixtral, Gemma, etc. The GroqCloud models run on their propreitary **Language Processing Unit** or **LPU** which has a deterministic, single core streaming architecture that sets the standard for genAI inference speed with predictable and repeatable performance for any given workload.
 
+You will need a Groq API Key to follow along this cookbook. You can create your Groq account at [https://groq.com/](https://groq.com/) and create your own API key as [https://console.groq.com/keys](https://console.groq.com/keys).
+
+```python
+from getpass import getpass
+
+GROQ_API_KEY = getpass("Enter your GROQ API key: ")
+```
+
 We can use GroqCloud models with LlamaIndex:
 
 ```python
 import os
 from llama_index.llms.groq import Groq
 
-llm = Groq(
-    model="llama3-8b-8192",
-    api_key=os.environ.get("GROQ_API_KEY")
-)
+llm = Groq(model="llama3-8b-8192", api_key=GROQ_API_KEY)
 ```
 
 ## Fetching and Loading the Vector Store Index
