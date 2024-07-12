@@ -35,6 +35,11 @@ except ImportError:
     OPENAI_NOT_GIVEN = None
 
 try:
+    from cohere.base_client import COHERE_NOT_GIVEN
+except ImportError:
+    COHERE_NOT_GIVEN = None
+
+try:
     from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
 except ImportError:
     ANTHROPIC_NOT_GIVEN = None
@@ -52,6 +57,7 @@ def value_is_sentinel(param: Any) -> bool:
     return (
         param.default is None
         or param.default is OPENAI_NOT_GIVEN
+        or param.default is COHERE_NOT_GIVEN
         or param.default is ANTHROPIC_NOT_GIVEN
     )
 
