@@ -9,6 +9,7 @@ import {
   MOON_50,
   MOON_500,
   OBLIVION,
+  RED_300,
   TEAL_300,
   WHITE,
 } from '../../../../common/css/globals.styles';
@@ -21,6 +22,7 @@ const backgroundColorHoveredSelected = Color.fromHex(WHITE)
   .blend(Color.fromHex(TEAL_300, 0.32))
   .blend(Color.fromHex(OBLIVION, 0.04))
   .toString();
+const backgroundColorSelectedForDeletion = hexToRGB(RED_300, 0.32);
 
 // Use our custom loading component that matches our palette.
 const LoadingOverlay = () => <Loading centered />;
@@ -75,6 +77,12 @@ export const StyledDataGrid = styled(
       backgroundColor: backgroundColorSelected,
       '&.Mui-hovered': {
         backgroundColor: backgroundColorHoveredSelected,
+      },
+    },
+    '&.bg-red-100': {
+      backgroundColor: backgroundColorSelectedForDeletion,
+      '&.Mui-hovered': {
+        backgroundColor: backgroundColorSelectedForDeletion,
       },
     },
   },

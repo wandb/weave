@@ -370,9 +370,41 @@ export const CallsTable: FC<{
         minWidth: 30,
         width: 38,
         field: 'CustomCheckbox',
-        headerName: '',
         sortable: false,
         disableColumnMenu: true,
+        renderHeader: (params: any) => {
+          return (
+            <Checkbox
+              checked={
+                selectedCalls.length === 0
+                  ? false
+                  : selectedCalls.length === tableData.length
+                  ? true
+                  : 'indeterminate'
+              }
+              onCheckedChange={() => {
+                // if bulk delete move, select all calls
+                if (bulkDeleteMode) {
+                  if (selectedCalls.length === tableData.length) {
+                    setSelectedCalls([]);
+                  } else {
+                    setSelectedCalls(tableData.map(row => row.id));
+                  }
+                } else {
+                  // exclude non-successful calls from selection
+                  const filtered = tableData.filter(
+                    row => row.exception == null && row.ended_at != null
+                  );
+                  if (selectedCalls.length === filtered.length) {
+                    setSelectedCalls([]);
+                  } else {
+                    setSelectedCalls(filtered.map(row => row.id));
+                  }
+                }
+              }}
+            />
+          );
+        },
         renderCell: (params: any) => {
           const rowId = params.id as string;
           const isSelected = selectedCalls.includes(rowId);
@@ -420,7 +452,7 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-  }, [columns.cols, selectedCalls, bulkDeleteMode]);
+  }, [columns.cols, selectedCalls, tableData, bulkDeleteMode]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -698,6 +730,12 @@ export const CallsTable: FC<{
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
+        getRowClassName={params => {
+          if (bulkDeleteMode && selectedCalls.includes(params.row.id)) {
+            return 'bg-red-100';
+          }
+          return '';
+        }}
         onColumnWidthChange={newCol => {
           setUserDefinedColumnWidths(curr => {
             return {
@@ -912,13 +950,13 @@ const BulkDeleteButton: FC<{
               setDeleteClicked(false);
               bulkDeleteModeToggle(false);
             }}>
-            Cancel
+            Exit delete mode
           </Button>
         </>
       ) : selectedCalls.length > 0 ? (
         <Button
           className="ml-4 mr-16"
-          variant="destructive"
+          variant="ghost"
           size="medium"
           onClick={onConfirm}
           tooltip="Select rows with the checkbox to delete"
