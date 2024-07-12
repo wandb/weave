@@ -40,6 +40,13 @@ response = client.chat.completions.create(
 
 [![openai.png](imgs/openai.png)](https://wandb.ai/_scott/emoji-bot/weave/calls)
 
+:::info
+
+Many LLM providers have build OpenAI SDK compatiblity, requiring a simple `base_url` change, such as [OpenRouter](/guides/integrations/openrouter), [Google Gemini](/guides/integrations/google-gemini), [Together.ai](/guides/integrations/together_ai) and even [Local Models](/guides/integrations/local_models).   
+Automatic Weave support for these services works the same way as outlined below with minimal code changes.
+
+:::
+
 ## Track your own ops
 
 Wrapping a function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
