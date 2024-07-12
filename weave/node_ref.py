@@ -4,7 +4,6 @@ import typing
 from weave.legacy import graph
 
 from . import ref_base
-from . import weave_types as types
 
 # Notes for the future:
 # - I added list.lookup to lookup rows in a list by ID. I think we probably should

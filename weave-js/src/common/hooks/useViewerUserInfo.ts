@@ -34,7 +34,7 @@ export const useViewerUserInfo = (): UserInfoResponse => {
 };
 
 const VIEWER_QUERY = gql`
-  query Viewer {
+  query Viewer2 {
     viewer {
       id
       username

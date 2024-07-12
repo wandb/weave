@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 from flask.testing import FlaskClient
 
-import weave
 from weave import weave_init
 from weave.legacy import client as client_legacy
 from weave.legacy import context_state, io_service, serialize
@@ -40,7 +39,6 @@ context_state._eager_mode.set(False)
 
 # A lot of tests rely on weave.legacy.ops.* being in scope. Importing this here
 # makes that work...
-from weave.legacy import ops
 
 ### Disable datadog engine tracing
 
@@ -56,9 +54,6 @@ def make_fake_tracer():
 
 ### End disable datadog engine tracing
 ### disable internet access
-import socket
-
-from . import engine_trace
 
 
 def guard(*args, **kwargs):

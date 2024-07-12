@@ -111,11 +111,10 @@ def find_names(obj):
 
 
 def is_colab():
-    try:
-        import google.colab
-    except ImportError:
-        return False
-    return True
+    import importlib
+
+    spec = importlib.util.find_spec("google.colab")
+    return bool(spec)
 
 
 def is_notebook() -> bool:

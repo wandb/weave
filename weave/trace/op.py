@@ -23,7 +23,7 @@ from weave.trace.refs import ObjectRef
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
-    from weave.weave_client import Call, CallsIter, WeaveClient
+    from weave.weave_client import Call, CallsIter
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
@@ -31,9 +31,14 @@ except ImportError:
     OPENAI_NOT_GIVEN = None
 
 try:
-    from cohere.base_client import OMIT
+    from cohere.base_client import COHERE_NOT_GIVEN
 except ImportError:
-    OMIT = None
+    COHERE_NOT_GIVEN = None
+
+try:
+    from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
+except ImportError:
+    ANTHROPIC_NOT_GIVEN = None
 
 
 def print_call_link(call: "Call") -> None:
@@ -90,10 +95,6 @@ class Op:
         except TypeError as e:
             raise OpCallError(f"Error calling {self.name}: {e}")
         inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
-
-        # This should probably be configurable, but for now we redact the api_key
-        if "api_key" in inputs_with_defaults:
-            inputs_with_defaults["api_key"] = "REDACTED"
 
         # If/When we do memoization, this would be a good spot
 
@@ -249,7 +250,8 @@ def value_is_sentinel(param: Any) -> bool:
     return (
         param.default is None
         or param.default is OPENAI_NOT_GIVEN
-        or param.default is OMIT
+        or param.default is COHERE_NOT_GIVEN
+        or param.default is ANTHROPIC_NOT_GIVEN
     )
 
 

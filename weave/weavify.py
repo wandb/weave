@@ -1,4 +1,3 @@
-import dataclasses
 import typing
 
 from weave.legacy import graph, op_args, val_const

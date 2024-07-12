@@ -11,7 +11,8 @@ import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 
 type NotesProps = {
   notes: Feedback[];
-  viewer?: string;
+  viewer?: string | null;
+  readonly: boolean;
   note?: string;
   setNote?: (value: string) => void;
   onNoteAdded?: () => void;
@@ -22,6 +23,7 @@ type NotesProps = {
 export const Notes = ({
   notes,
   viewer,
+  readonly,
   note,
   setNote,
   onNoteAdded,
@@ -99,7 +101,7 @@ export const Notes = ({
             <div ref={endOfNotesRef} />
           </div>
         )}
-        {onNoteAdded ? (
+        {readonly ? null : onNoteAdded ? (
           <div className="mt-8 flex">
             <div className="ml-12 w-full">
               <TextField

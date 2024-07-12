@@ -3,7 +3,7 @@ from typing import Any, TypeVar
 from typing_extensions import TypeGuard
 
 from weave.trace.object_record import ObjectRecord
-from weave.trace.vals import TraceObject
+from weave.trace.vals import WeaveObject
 
 C = TypeVar("C")
 
@@ -15,7 +15,7 @@ def weave_isinstance(obj: Any, cls: type[C]) -> TypeGuard[C]:
         return obj._class_name == cls.__name__ or any(
             b == cls.__name__ for b in obj._bases
         )
-    if isinstance(obj, TraceObject):
+    if isinstance(obj, WeaveObject):
         return obj._class_name == cls.__name__ or any(
             b == cls.__name__ for b in obj._bases
         )

@@ -6,10 +6,18 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {Autocomplete, Chip, FormControl, ListItem} from '@mui/material';
+import {
+  Autocomplete,
+  Checkbox,
+  Chip,
+  FormControl,
+  ListItem,
+  Tooltip,
+} from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
   GridApiPro,
+  GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
   GridPinnedColumns,
@@ -27,11 +35,15 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
-import {WeaveHeaderExtrasContext} from '../../context';
+import {
+  useWeaveflowCurrentRouteContext,
+  WeaveHeaderExtrasContext,
+} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
@@ -50,6 +62,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {useCallsTableColumns} from './callsTableColumns';
 import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
@@ -60,8 +73,10 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
+import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
+const MAX_EVAL_COMPARISONS = 5;
 
 export const CallsTable: FC<{
   entity: string;
@@ -72,6 +87,9 @@ export const CallsTable: FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
   hideControls?: boolean;
+
+  columnVisibilityModel?: GridColumnVisibilityModel;
+  setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
 }> = ({
   entity,
   project,
@@ -79,6 +97,8 @@ export const CallsTable: FC<{
   onFilterUpdate,
   frozenFilter,
   hideControls,
+  columnVisibilityModel,
+  setColumnVisibilityModel,
 }) => {
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
@@ -283,7 +303,9 @@ export const CallsTable: FC<{
 
   // DataGrid Model Management
   const [pinnedColumnsModel, setPinnedColumnsModel] =
-    useState<GridPinnedColumns>({left: ['op_name', 'feedback']});
+    useState<GridPinnedColumns>({
+      left: ['CustomCheckbox', 'op_name', 'feedback'],
+    });
 
   // END OF CPR FACTORED CODE
 
@@ -329,6 +351,99 @@ export const CallsTable: FC<{
     entity,
     project
   );
+
+  // Selection Management
+  const [compareSelection, setCompareSelection] = useState<string[]>([]);
+  const muiColumns = useMemo(() => {
+    if (!isEvaluateTable) {
+      return columns.cols;
+    }
+    return [
+      {
+        width: 40,
+        field: 'CustomCheckbox',
+        headerName: '',
+        renderCell: (params: any) => {
+          const rowId = params.id as string;
+          const isSelected = compareSelection.includes(rowId);
+          const disabledDueToMax =
+            compareSelection.length >= MAX_EVAL_COMPARISONS && !isSelected;
+          const disabledDueToNonSuccess =
+            params.row.exception != null || params.row.ended_at == null;
+          let tooltipText = '';
+          if (disabledDueToNonSuccess) {
+            tooltipText = 'Cannot compare non-successful evaluations';
+          } else if (disabledDueToMax) {
+            tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
+          }
+
+          return (
+            <Tooltip title={tooltipText} placement="right" arrow>
+              {/* https://mui.com/material-ui/react-tooltip/ */}
+              {/* By default disabled elements like <button> do not trigger user interactions */}
+              {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
+              <span>
+                <Checkbox
+                  disabled={disabledDueToNonSuccess || disabledDueToMax}
+                  checked={isSelected}
+                  onChange={() => {
+                    if (isSelected) {
+                      setCompareSelection(
+                        compareSelection.filter(id => id !== rowId)
+                      );
+                    } else {
+                      setCompareSelection([...compareSelection, rowId]);
+                    }
+                  }}
+                />
+              </span>
+            </Tooltip>
+          );
+        },
+      },
+      ...columns.cols,
+    ];
+  }, [columns.cols, compareSelection, isEvaluateTable]);
+
+  const history = useHistory();
+  const router = useWeaveflowCurrentRouteContext();
+  useEffect(() => {
+    if (!isEvaluateTable) {
+      return;
+    }
+    addExtra('compareEvaluations', {
+      node: (
+        <CompareEvaluationsTableButton
+          onClick={() => {
+            history.push(
+              router.compareEvaluationsUri(entity, project, compareSelection)
+            );
+          }}
+          disabled={compareSelection.length === 0}
+        />
+      ),
+    });
+
+    return () => removeExtra('compareEvaluations');
+  }, [
+    apiRef,
+    addExtra,
+    removeExtra,
+    isEvaluateTable,
+    compareSelection.length,
+    compareSelection,
+    router,
+    entity,
+    project,
+    history,
+  ]);
+
+  // Called in reaction to Hide column menu
+  const onColumnVisibilityModelChange = setColumnVisibilityModel
+    ? (newModel: GridColumnVisibilityModel) => {
+        setColumnVisibilityModel(newModel);
+      }
+    : undefined;
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -419,6 +534,16 @@ export const CallsTable: FC<{
               }}
             />
           )}
+          <div style={{flex: '1 1 auto'}} />
+          {columnVisibilityModel && setColumnVisibilityModel && (
+            <div>
+              <ManageColumnsButton
+                columnInfo={columns}
+                columnVisibilityModel={columnVisibilityModel}
+                setColumnVisibilityModel={setColumnVisibilityModel}
+              />
+            </div>
+          )}
         </>
       }>
       <StyledDataGrid
@@ -447,10 +572,8 @@ export const CallsTable: FC<{
         loading={callsLoading}
         rows={tableData}
         // initialState={initialState}
-        // onColumnVisibilityModelChange={newModel =>
-        //   setColumnVisibilityModel(newModel)
-        // }
-        // columnVisibilityModel={columnVisibilityModel}
+        onColumnVisibilityModelChange={onColumnVisibilityModelChange}
+        columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
         sortModel={sortModel}
@@ -470,7 +593,7 @@ export const CallsTable: FC<{
         pageSizeOptions={[defaultPageSize]}
         // PAGINATION SECTION END
         rowHeight={38}
-        columns={columns.cols as any}
+        columns={muiColumns}
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
@@ -541,6 +664,7 @@ export const CallsTable: FC<{
               </Box>
             );
           },
+          columnMenu: CallsCustomColumnMenu,
         }}
       />
     </FilterLayoutTemplate>
@@ -625,9 +749,35 @@ const ExportRunsTableButton = ({
       className="mx-16"
       size="medium"
       variant="secondary"
-      onClick={() => tableRef.current?.exportDataAsCsv()}
+      onClick={() =>
+        tableRef.current?.exportDataAsCsv({includeColumnGroupsHeaders: false})
+      }
       icon="export-share-upload">
       Export to CSV
+    </Button>
+  </Box>
+);
+
+const CompareEvaluationsTableButton: FC<{
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({onClick, disabled}) => (
+  <Box
+    sx={{
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+    }}>
+    <Button
+      className="mx-16"
+      style={{
+        marginLeft: '0px',
+      }}
+      size="medium"
+      disabled={disabled}
+      onClick={onClick}
+      icon="chart-scatterplot">
+      Compare Evaluations
     </Button>
   </Box>
 );

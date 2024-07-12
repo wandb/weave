@@ -3,7 +3,7 @@ import hashlib
 import json
 import typing
 import weakref
-from typing import Iterable, Optional, Sequence
+from typing import Sequence
 
 from weave import client_context
 from weave.legacy import box, context_state, object_context
@@ -17,8 +17,6 @@ from .legacy import uris
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
-    from weave.legacy import run
-
     from . import weave_client
     from . import weave_types as types
 

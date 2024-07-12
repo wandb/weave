@@ -58,6 +58,12 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/cohere",
             "guides/integrations/mistral",
             "guides/integrations/llamaindex",
+            "guides/integrations/dspy",
+            "guides/integrations/google-gemini",
+            "guides/integrations/together_ai",
+            "guides/integrations/openrouter",
+            "guides/integrations/local_models",
+            "guides/integrations/litellm",
           ],
         },
         {

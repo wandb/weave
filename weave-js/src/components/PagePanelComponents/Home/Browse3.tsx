@@ -9,6 +9,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
+import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {Loading} from '@wandb/weave/components/Loading';
@@ -29,6 +30,7 @@ import {
   Route,
   Switch,
   useHistory,
+  useLocation,
   useParams,
 } from 'react-router-dom';
 
@@ -58,6 +60,7 @@ import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
+import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
 import {
@@ -463,6 +466,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
+        <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
+          <CompareEvaluationsBinding />
+        </Route>
         {/* BOARDS */}
         <Route
           path={[
@@ -662,12 +668,29 @@ const CallsPageBinding = () => {
     },
     [history, entity, project, routerContext]
   );
+
+  const location = useLocation();
+  const columnVisibilityModel = useMemo(() => {
+    try {
+      return JSON.parse(query.cols);
+    } catch (e) {
+      return {};
+    }
+  }, [query.cols]);
+  const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    newQuery.set('cols', JSON.stringify(newModel));
+    history.push({search: newQuery.toString()});
+  };
+
   return (
     <CallsPage
       entity={entity}
       project={project}
       initialFilter={filters}
       onFilterUpdate={onFilterUpdate}
+      columnVisibilityModel={columnVisibilityModel}
+      setColumnVisibilityModel={setColumnVisibilityModel}
     />
   );
 };
@@ -679,10 +702,14 @@ const ObjectVersionsPageBinding = () => {
   const filters: WFHighLevelObjectVersionFilter = useMemo(() => {
     let queryFilter: WFHighLevelObjectVersionFilter = {};
     // Parse the filter from the query string
-    try {
-      queryFilter = JSON.parse(query.filter) as WFHighLevelObjectVersionFilter;
-    } catch (e) {
-      console.log(e);
+    if (query.filter) {
+      try {
+        queryFilter = JSON.parse(
+          query.filter
+        ) as WFHighLevelObjectVersionFilter;
+      } catch (e) {
+        console.log(e);
+      }
     }
 
     // If the tab is models or datasets, set the baseObjectClass filter
@@ -783,6 +810,21 @@ const OpPageBinding = () => {
       entity={params.entity}
       project={params.project}
       opName={params.itemName}
+    />
+  );
+};
+
+const CompareEvaluationsBinding = () => {
+  const {entity, project} = useParams<Browse3TabParams>();
+  const query = useURLSearchParamsDict();
+  const evaluationCallIds = useMemo(() => {
+    return JSON.parse(query.evaluationCallIds);
+  }, [query.evaluationCallIds]);
+  return (
+    <CompareEvaluationsPage
+      entity={entity}
+      project={project}
+      evaluationCallIds={evaluationCallIds}
     />
   );
 };

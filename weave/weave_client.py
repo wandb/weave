@@ -2,7 +2,6 @@ import dataclasses
 import datetime
 import typing
 import uuid
-from collections import namedtuple
 from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 
 import pydantic
@@ -15,7 +14,6 @@ from weave.table import Table
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
-    pydantic_asdict_one_level,
     pydantic_object_record,
 )
 from weave.trace.op import Op
@@ -25,10 +23,9 @@ from weave.trace.refs import (
     OpRef,
     Ref,
     TableRef,
-    parse_uri,
 )
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
-from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
+from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
@@ -37,11 +34,8 @@ from weave.trace_server.trace_server_interface import (
     CallStartReq,
     CallUpdateReq,
     EndedCallSchemaForInsert,
-    Feedback,
-    FeedbackQueryReq,
     ObjCreateReq,
     ObjQueryReq,
-    ObjQueryRes,
     ObjReadReq,
     ObjSchema,
     ObjSchemaForInsert,
@@ -49,12 +43,10 @@ from weave.trace_server.trace_server_interface import (
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
     TableCreateReq,
-    TableQueryReq,
     TableSchemaForInsert,
     TraceServerInterface,
     _CallsFilter,
     _ObjectVersionFilter,
-    _TableRowFilter,
 )
 
 if typing.TYPE_CHECKING:
@@ -97,10 +89,10 @@ def get_ref(obj: Any) -> Optional[ObjectRef]:
 
 
 def _get_direct_ref(obj: Any) -> Optional[Ref]:
-    if isinstance(obj, TraceTable):
+    if isinstance(obj, WeaveTable):
         # TODO: this path is odd. We want to use table_ref when serializing
-        # which is the direct ref to the table. But .ref on TraceTable is
-        # the "container ref", ie a ref to the root object that the TraceTable
+        # which is the direct ref to the table. But .ref on WeaveTable is
+        # the "container ref", ie a ref to the root object that the WeaveTable
         # is within, with extra pointing to the table.
         return obj.table_ref
     return getattr(obj, "ref", None)
@@ -215,7 +207,7 @@ class CallsIter:
         self.project_id = project_id
         self.filter = filter
 
-    def __getitem__(self, key: Union[slice, int]) -> TraceObject:
+    def __getitem__(self, key: Union[slice, int]) -> WeaveObject:
         if isinstance(key, slice):
             raise NotImplementedError("Slicing not supported")
         for i, call in enumerate(self):
@@ -223,7 +215,7 @@ class CallsIter:
                 return call
         raise IndexError(f"Index {key} out of range")
 
-    def __iter__(self) -> typing.Iterator[TraceObject]:
+    def __iter__(self) -> typing.Iterator[WeaveObject]:
         page_index = 0
         page_size = 10
         entity, project = self.project_id.split("/")
@@ -249,7 +241,7 @@ class CallsIter:
 
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
-) -> TraceObject:
+) -> WeaveObject:
     output = server_call.output
     call = Call(
         op_name=server_call.op_name,
@@ -265,7 +257,7 @@ def make_client_call(
     )
     if call.id is None:
         raise ValueError("Call ID is None")
-    return TraceObject(call, CallRef(entity, project, call.id), server, None)
+    return WeaveObject(call, CallRef(entity, project, call.id), server, None)
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
@@ -335,7 +327,6 @@ class WeaveClient:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             raise
 
-        # Probably bad form to mutate the ref here
         # At this point, `ref.digest` is one of three things:
         # 1. "latest" - the user asked for the latest version of the object
         # 2. "v###" - the user asked for a specific version of the object
@@ -343,7 +334,7 @@ class WeaveClient:
         #
         # However, we always want to resolve the ref to the digest. So
         # here, we just directly assign the digest.
-        ref.digest = read_res.obj.digest
+        ref = dataclasses.replace(ref, digest=read_res.obj.digest)
 
         data = read_res.obj.val
 
@@ -377,7 +368,7 @@ class WeaveClient:
         return CallsIter(self.server, self._project_id(), filter)
 
     @trace_sentry.global_trace_sentry.watch()
-    def call(self, call_id: str) -> TraceObject:
+    def call(self, call_id: str) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
@@ -423,8 +414,10 @@ class WeaveClient:
         else:
             op_str = op
 
-        self._save_nested_objects(inputs)
-        inputs_with_refs = map_to_refs(inputs)
+        inputs_redacted = redact_sensitive_keys(inputs)
+
+        self._save_nested_objects(inputs_redacted)
+        inputs_with_refs = map_to_refs(inputs_redacted)
         call_id = generate_id()
 
         if parent is None and use_stack:
@@ -487,9 +480,16 @@ class WeaveClient:
         summary = {}
         if call._children:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
-        elif isinstance(output, dict) and "usage" in output and "model" in output:
+        elif (
+            isinstance(original_output, dict)
+            and "usage" in original_output
+            and "model" in original_output
+        ):
             summary["usage"] = {}
-            summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
+            summary["usage"][original_output["model"]] = {
+                "requests": 1,
+                **original_output["usage"],
+            }
         elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
             # Handle the cases where we are emitting an object instead of a pre-serialized dict
             # In fact, this is going to become the more common case
@@ -811,3 +811,40 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     op = Op(op_fn)
     op.name = name
     return op
+
+
+REDACT_KEYS = ("api_key",)
+REDACTED_VALUE = "REDACTED"
+
+
+def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
+    # We should NEVER mutate reffed objects.
+    #
+    # 1. This code builds new objects that no longer have refs
+    # 2. Even if we did an in-place edit, that would invalidate the ref (since
+    # the ref is to the object's digest)
+    if get_ref(obj):
+        return obj
+
+    if isinstance(obj, dict):
+        dict_res = {}
+        for k, v in obj.items():
+            if k in REDACT_KEYS:
+                dict_res[k] = REDACTED_VALUE
+            else:
+                dict_res[k] = redact_sensitive_keys(v)
+        return dict_res
+
+    elif isinstance(obj, list):
+        list_res = []
+        for v in obj:
+            list_res.append(redact_sensitive_keys(v))
+        return list_res
+
+    elif isinstance(obj, tuple):
+        tuple_res = []
+        for v in obj:
+            tuple_res.append(redact_sensitive_keys(v))
+        return tuple(tuple_res)
+
+    return obj

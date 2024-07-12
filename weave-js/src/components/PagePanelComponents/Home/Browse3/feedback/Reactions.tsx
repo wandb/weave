@@ -139,14 +139,19 @@ export const Reactions = ({
     // TODO: Loading indicator?
     return null;
   }
+
+  // Always readonly if anonymous.
+  // TODO: Consider W&B admin privileges.
+  const viewer = userInfo ? userInfo.username : null;
+  const isReadonly = !viewer || !userInfo?.teams.includes(entity) || readonly;
   return (
     <ReactionsLoaded
-      viewer={userInfo.username}
+      viewer={viewer}
       reactions={feedback}
       onAddEmoji={onAddEmoji}
       onAddNote={onAddNote}
       onRemoveFeedback={onRemoveFeedback}
-      readonly={readonly}
+      readonly={isReadonly}
       forceVisible={forceVisible ?? false}
       twWrapperStyles={twWrapperStyles}
     />

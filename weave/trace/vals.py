@@ -2,7 +2,15 @@ import dataclasses
 import inspect
 import operator
 import typing
-from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
+from typing import (
+    Any,
+    Generator,
+    Iterator,
+    Literal,
+    Optional,
+    SupportsIndex,
+    Union,
+)
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
@@ -33,21 +41,21 @@ from weave.trace_server.trace_server_interface import (
 
 @dataclasses.dataclass
 class MutationSetitem:
-    path: list[str]
+    path: tuple[str, ...]
     operation: Literal["setitem"]
     args: tuple[str, Any]
 
 
 @dataclasses.dataclass
 class MutationSetattr:
-    path: list[str]
+    path: tuple[str, ...]
     operation: Literal["setattr"]
     args: tuple[str, Any]
 
 
 @dataclasses.dataclass
 class MutationAppend:
-    path: list[str]
+    path: tuple[str, ...]
     operation: Literal["append"]
     args: tuple[Any]
 
@@ -57,7 +65,7 @@ MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["appen
 
 
 def make_mutation(
-    path: list[str], operation: MutationOperation, args: tuple[Any, ...]
+    path: tuple[str, ...], operation: MutationOperation, args: tuple[Any, ...]
 ) -> Mutation:
     if operation == "setitem":
         if len(args) != 2 or not isinstance(args[0], str):
@@ -78,16 +86,16 @@ def make_mutation(
         raise ValueError(f"Unknown operation: {operation}")
 
 
-class Tracable:
+class Traceable:
     mutated_value: Any = None
     ref: RefWithExtra
     list_mutations: Optional[list] = None
     mutations: Optional[list[Mutation]] = None
-    root: "Tracable"
+    root: "Traceable"
     server: TraceServerInterface
 
     def add_mutation(
-        self, path: list[str], operation: MutationOperation, *args: Any
+        self, path: tuple[str, ...], operation: MutationOperation, *args: Any
     ) -> None:
         if self.mutations is None:
             self.mutations = []
@@ -162,13 +170,13 @@ def attribute_access_result(
     )
 
 
-class TraceObject(Tracable):
+class WeaveObject(Traceable):
     def __init__(
         self,
         val: Any,
         ref: RefWithExtra,
         server: TraceServerInterface,
-        root: typing.Optional[Tracable],
+        root: typing.Optional[Traceable],
     ) -> None:
         self._val = val
         self.ref = ref
@@ -208,13 +216,13 @@ class TraceObject(Tracable):
         return dir(self._val)
 
     def __repr__(self) -> str:
-        return f"TraceObject({self._val})"
+        return f"WeaveObject({self._val})"
 
     def __eq__(self, other: Any) -> bool:
         return self._val == other
 
 
-class TraceTable(Tracable):
+class WeaveTable(Traceable):
     filter: _TableRowFilter
 
     def __init__(
@@ -223,7 +231,7 @@ class TraceTable(Tracable):
         ref: Optional[RefWithExtra],
         server: TraceServerInterface,
         filter: _TableRowFilter,
-        root: typing.Optional[Tracable],
+        root: typing.Optional[Traceable],
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
@@ -297,7 +305,7 @@ class TraceTable(Tracable):
         self.root.add_mutation(self.ref.extra, "append", val)
 
 
-class TraceList(Tracable, list):
+class WeaveList(Traceable, list):
     def __init__(
         self,
         *args: Any,
@@ -305,7 +313,7 @@ class TraceList(Tracable, list):
     ):
         self.ref: RefWithExtra = kwargs.pop("ref")
         self.server: TraceServerInterface = kwargs.pop("server")
-        root: Optional[Tracable] = kwargs.pop("root", None)
+        root: Optional[Traceable] = kwargs.pop("root", None)
         if root is None:
             root = self
         self.root = root
@@ -324,10 +332,10 @@ class TraceList(Tracable, list):
             yield self[i]
 
     def __repr__(self) -> str:
-        return f"TraceList({super().__repr__()})"
+        return f"WeaveList({super().__repr__()})"
 
 
-class TraceDict(Tracable, dict):
+class WeaveDict(Traceable, dict):
     def __init__(
         self,
         *args: Any,
@@ -335,7 +343,7 @@ class TraceDict(Tracable, dict):
     ):
         self.ref: RefWithExtra = kwargs.pop("ref")
         self.server: TraceServerInterface = kwargs.pop("server")
-        root: Optional[Tracable] = kwargs.pop("root", None)
+        root: Optional[Traceable] = kwargs.pop("root", None)
         if root is None:
             root = self
         self.root = root
@@ -369,36 +377,36 @@ class TraceDict(Tracable, dict):
             yield k, self[k]
 
     def __iter__(self) -> Iterator[str]:
-        # Simply define this to so that d = TraceDict({'a': 1, 'b': 2})); d2 = dict(d)
+        # Simply define this to so that d = WeaveDict({'a': 1, 'b': 2})); d2 = dict(d)
         # works. The dict(d) constructor works differently if __iter__ is not defined
         # on d.
         return super().__iter__()
 
     def __repr__(self) -> str:
-        return f"TraceDict({super().__repr__()})"
+        return f"WeaveDict({super().__repr__()})"
 
 
 def make_trace_obj(
     val: Any,
     new_ref: RefWithExtra,
     server: TraceServerInterface,
-    root: Optional[Tracable],
+    root: Optional[Traceable],
     parent: Any = None,
 ) -> Any:
-    if isinstance(val, Tracable):
-        # If val is a TraceTable, we want to refer to it via the outer object
+    if isinstance(val, Traceable):
+        # If val is a WeaveTable, we want to refer to it via the outer object
         # that it is within, rather than via the TableRef. For example we
         # want Dataset row refs to be Dataset.rows[id] rather than table[id]
-        if isinstance(val, TraceTable):
+        if isinstance(val, WeaveTable):
             val.ref = new_ref
         return val
     if hasattr(val, "ref") and isinstance(val.ref, RefWithExtra):
-        # The Tracable check above does not currently work for Ops, where we
-        # directly attach a ref, or to our Boxed classes. We should use Tracable
+        # The Traceable check above does not currently work for Ops, where we
+        # directly attach a ref, or to our Boxed classes. We should use Traceable
         # for all of these, but for now we need to check for the ref attribute.
         return val
     # Derefence val and create the appropriate wrapper object
-    extra: list[str] = []
+    extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
         new_ref = val
         extra = val.extra
@@ -420,9 +428,9 @@ def make_trace_obj(
                     "Expected Table.ref or Table.table_ref to be TableRef"
                 )
             val_ref = val_table_ref
-        val = TraceTable(val_ref, new_ref, server, _TableRowFilter(), root)
+        val = WeaveTable(val_ref, new_ref, server, _TableRowFilter(), root)
     if isinstance(val, TableRef):
-        val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
+        val = WeaveTable(val, new_ref, server, _TableRowFilter(), root)
 
     if extra:
         # This is where extra resolution happens?
@@ -441,15 +449,15 @@ def make_trace_obj(
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
-                val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
+                val = WeaveTable(val, new_ref, server, _TableRowFilter(), root)
 
-    if not isinstance(val, Tracable):
+    if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return TraceObject(val, new_ref, server, root)
+            return WeaveObject(val, new_ref, server, root)
         elif isinstance(val, list):
-            return TraceList(val, ref=new_ref, server=server, root=root)
+            return WeaveList(val, ref=new_ref, server=server, root=root)
         elif isinstance(val, dict):
-            return TraceDict(val, ref=new_ref, server=server, root=root)
+            return WeaveDict(val, ref=new_ref, server=server, root=root)
     if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
         # This condition attempts to bind the current `self` to the attribute if
         # it happens to be both an `Op` and have a `self` argument. This is a
