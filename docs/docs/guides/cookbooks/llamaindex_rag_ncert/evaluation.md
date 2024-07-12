@@ -11,15 +11,46 @@ To iterate on any AI application, we need a way to systematically evaluate its p
 
 ## Building an Evaluation Dataset
 
-We built an evaluation dataset by scraping a question bank of solved question-answer pairs of the Flamigo textbook from [LearnCBSE](https://www.learncbse.in/chapter-wise-important-questions-class-12-english/). The dataset consists of 358 question-answer pairs corresponding to the 8 chapters from our knowledge base dataset. We log this dataset as a [`weave.Dataset`](https://wandb.github.io/weave/guides/core-types/datasets) which enables us to collect examples for evaluation and automatically track versions for accurate comparisons. The dataset consists of examples in the following format:
+We built an evaluation dataset by scraping a question bank of solved question-answer pairs of the Flamigo textbook from [LearnCBSE](https://www.learncbse.in/chapter-wise-important-questions-class-12-english/). The dataset consists of 358 question-answer pairs corresponding to the 8 chapters from our knowledge base in the following format:
 
-```json
+```python
 {
   "question": "What was the mood in the classroom when M. Hamel gave his last French lesson? ",
   "answer": "When M.Hamel was giving his last French ; lesson, the mood in the classroom was solemn and sombre. When he announced that this was their last French lesson everyone present in the classroom suddenly developed patriotic feelings for their native language and genuinely regretted ignoring their mother tongue.",
   "marks": "3-4",
   "chapter_name": "The Last Lesson"
 }
+```
+
+:::note
+
+Check out [this notebook](https://colab.research.google.com/github/wandb/weave/blob/master/docs/docs/guides/cookbooks/llamaindex_rag_ncert/notebooks/02_fetch_question_banks.ipynb) for the code to scrape the dataset and publish it on Weave.
+
+:::
+
+We log this dataset as a [`weave.Dataset`](../../core-types/datasets.md) which enables us to collect examples for evaluation and automatically track versions for accurate comparisons.
+
+```python
+# We scrape the data in a list of dictionaries, where each dictionary consists
+# of the same consistent schema as mentioned above. This data structure
+# serves as the rows of the dataset.
+question_bank = [
+    {
+        "question": "What was the mood in the classroom when M. Hamel gave his last French lesson? ",
+        "answer": "When M.Hamel was giving his last French ; lesson, the mood in the classroom was solemn and sombre. When he announced that this was their last French lesson everyone present in the classroom suddenly developed patriotic feelings for their native language and genuinely regretted ignoring their mother tongue.",
+        "marks": "3-4",
+        "chapter_name": "The Last Lesson"
+    },
+    ...
+]
+
+# Create the weave dataset
+dataset = weave.Dataset(
+    name="flamingos-prose-question-bank", rows=question_bank
+)
+
+# Publish the dataset
+weave.publish(dataset)
 ```
 
 | ![](./images/weave_evaluation_dataset.gif) |
