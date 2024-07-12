@@ -209,39 +209,44 @@ class CallsIter:
         self.server = server
         self.project_id = project_id
         self.filter = filter
-        self._cache = {}
+        self._page_size = 10
 
-    @lru_cache(maxsize=None)
+    # seems like this caching should be on the server, but it's here for now...
+    @lru_cache
+    def _fetch_page(self, index: int) -> list[CallSchema]:
+        response = self.server.calls_query(
+            CallsQueryReq(
+                project_id=self.project_id,
+                filter=self.filter,
+                offset=index * self._page_size,
+                limit=self._page_size,
+            )
+        )
+        return response.calls
+
     def __getitem__(self, key: Union[slice, int]) -> WeaveObject:
         if isinstance(key, slice):
             raise NotImplementedError("Slicing not supported")
-        for i, call in enumerate(self):
-            if i == key:
-                return call
-        raise IndexError(f"Index {key} out of range")
+
+        page_index = key // self._page_size
+        page_offset = key % self._page_size
+
+        calls = self._fetch_page(page_index)
+        if page_offset >= len(calls):
+            raise IndexError(f"Index {key} out of range")
+
+        call = calls[page_offset]
+        entity, project = self.project_id.split("/")
+        return make_client_call(entity, project, call, self.server)
 
     def __iter__(self) -> typing.Iterator[WeaveObject]:
-        page_index = 0
-        page_size = 10
-        entity, project = self.project_id.split("/")
+        index = 0
         while True:
-            response = self.server.calls_query(
-                CallsQueryReq(
-                    project_id=self.project_id,
-                    filter=self.filter,
-                    offset=page_index * page_size,
-                    limit=page_size,
-                )
-            )
-            page_data = response.calls
-            for call in page_data:
-                # TODO: if we want to be able to refer to call outputs
-                # we need to yield a ref-tracking call here.
-                yield make_client_call(entity, project, call, self.server)
-                # yield make_trace_obj(call, ValRef(call.id), self.server, None)
-            if len(page_data) < page_size:
+            try:
+                yield self[index]
+                index += 1
+            except IndexError:
                 break
-            page_index += 1
 
 
 def make_client_call(
