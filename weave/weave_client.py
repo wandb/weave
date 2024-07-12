@@ -1,8 +1,9 @@
 import dataclasses
 import datetime
+import inspect
 import typing
 import uuid
-from typing import Any, Dict, Optional, Sequence, TypedDict, Union
+from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
 
 import pydantic
 from requests import HTTPError
@@ -16,7 +17,8 @@ from weave.trace.object_record import (
     dataclass_object_record,
     pydantic_object_record,
 )
-from weave.trace.op import Op
+from weave.trace.op import Op, maybe_unbind_method
+from weave.trace.op import op as op_deco
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -409,7 +411,8 @@ class WeaveClient:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
             op = self._anonymous_ops[op]
         if isinstance(op, Op):
-            op_def_ref = self._save_op(op)
+            unbound_op = maybe_unbind_method(op)
+            op_def_ref = self._save_op(unbound_op)
             op_str = op_def_ref.uri()
         else:
             op_str = op
@@ -733,6 +736,10 @@ class WeaveClient:
         if name is None:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
+
+        if inspect.ismethod(op):
+            # this "func" is both a method AND an Op, but we need to cast to get dot access to its attributes
+            op = cast(op, Op)  # type: ignore
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
 
@@ -808,7 +815,7 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
             op_config = config
 
     op_fn.__name__ = name
-    op = Op(op_fn)
+    op = op_deco(op_fn)
     op.name = name
     return op
 
