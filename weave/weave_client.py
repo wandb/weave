@@ -4,7 +4,16 @@ import inspect
 import typing
 import uuid
 from functools import lru_cache
-from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
+from typing import (
+    Any,
+    Dict,
+    Iterator,
+    Optional,
+    Sequence,
+    TypedDict,
+    Union,
+    cast,
+)
 
 import pydantic
 from requests import HTTPError
@@ -224,29 +233,48 @@ class CallsIter:
         )
         return response.calls
 
-    def __getitem__(self, key: Union[slice, int]) -> WeaveObject:
-        if isinstance(key, slice):
-            raise NotImplementedError("Slicing not supported")
+    def _get_one(self, index: int) -> WeaveObject:
+        if index < 0:
+            raise IndexError("Negative indexing not supported")
 
-        page_index = key // self._page_size
-        page_offset = key % self._page_size
+        page_index = index // self._page_size
+        page_offset = index % self._page_size
 
         calls = self._fetch_page(page_index)
         if page_offset >= len(calls):
-            raise IndexError(f"Index {key} out of range")
+            raise IndexError(f"Index {index} out of range")
 
         call = calls[page_offset]
         entity, project = self.project_id.split("/")
         return make_client_call(entity, project, call, self.server)
 
-    def __iter__(self) -> typing.Iterator[WeaveObject]:
-        index = 0
-        while True:
+    def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
+        if (start := key.start or 0) < 0:
+            raise ValueError("Negative start not supported")
+        if (stop := key.stop) < 0:
+            raise ValueError("Negative stop not supported")
+        if (step := key.step or 1) < 0:
+            raise ValueError("Negative step not supported")
+
+        # result = []
+        for i in range(start, stop, step):
             try:
-                yield self[index]
-                index += 1
+                yield self._get_one(i)
+                # result.append(self._get_one(i))
             except IndexError:
                 break
+
+        # return result
+
+    def __getitem__(
+        self, key: Union[slice, int]
+    ) -> Union[WeaveObject, list[WeaveObject]]:
+        if isinstance(key, slice):
+            return list(self._get_slice(key))
+        return self._get_one(key)
+
+    def __iter__(self) -> typing.Iterator[WeaveObject]:
+        return self._get_slice(slice(0, None, 1))
 
 
 def make_client_call(
