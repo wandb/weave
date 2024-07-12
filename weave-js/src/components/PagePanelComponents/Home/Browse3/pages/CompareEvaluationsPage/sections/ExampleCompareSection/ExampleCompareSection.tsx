@@ -1,5 +1,5 @@
-import {Box} from '@material-ui/core';
-import {Circle} from '@mui/icons-material';
+import {Box, Tooltip} from '@material-ui/core';
+import {Circle, WarningAmberOutlined} from '@mui/icons-material';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -27,13 +27,26 @@ import {EvaluationComparisonState} from '../../ecpTypes';
 import {
   adjustValueForDisplay,
   dimensionId,
-  dimensionLabel,
   dimensionShouldMinimize,
   dimensionUnit,
+  flattenedDimensionPath,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
-import {ComparisonPill} from '../ScorecardSection/ScorecardSection';
-import {useFilteredAggregateRows} from './exampleCompareSectionUtil';
+import {
+  ComparisonPill,
+  SCORER_VARIATION_WARNING_EXPLANATION,
+  SCORER_VARIATION_WARNING_TITLE,
+} from '../ScorecardSection/ScorecardSection';
+import {
+  buildCompositeComparisonSummaryMetrics,
+  CompositeSummaryMetric,
+  CompositeSummaryScoreGroup,
+  DERIVED_SCORER_REF,
+} from '../ScorecardSection/summaryMetricUtil';
+import {
+  PivotedRow,
+  useFilteredAggregateRows,
+} from './exampleCompareSectionUtil';
 
 const SIDEBAR_WIDTH_PX = 250;
 const MIN_EVAL_WIDTH_PX = 350;
@@ -220,33 +233,33 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
+  const {compositeMetrics, resolvePeerDimension} = useMemo(
+    () => buildCompositeComparisonSummaryMetrics(props.state),
+    [props.state]
+  );
 
   if (target == null) {
     return <div>Filter resulted in 0 rows</div>;
   }
 
   // This section contains the primary helper variable for laying out the grid
-  const sortedScorers = _.sortBy(
-    Object.values(props.state.data.scorerMetricDimensions),
-    k => k.scorerDef.scorerOpOrObjRef
+  const scorerGroupNames = Object.keys(compositeMetrics).filter(
+    k => k !== DERIVED_SCORER_REF
   );
-  const uniqueScorerRefs = _.uniq(
-    sortedScorers.map(v => v.scorerDef.scorerOpOrObjRef)
-  );
+
   const derivedMetrics = Object.values(
     props.state.data.derivedMetricDimensions
   );
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
-  const numScorers = uniqueScorerRefs.length;
+  const numScorers = scorerGroupNames.length;
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
   const numOutputKeys = outputColumnKeys.length;
   const numDerivedMetrics = derivedMetrics.length;
   const numMetricsPerScorer = [
-    ...uniqueScorerRefs.map(scorer => {
-      return sortedScorers.filter(s => s.scorerDef.scorerOpOrObjRef === scorer)
-        .length;
+    ...scorerGroupNames.map(groupName => {
+      return Object.keys(compositeMetrics[groupName].metrics).length;
     }),
     numDerivedMetrics,
   ];
@@ -275,34 +288,63 @@ export const ExampleCompareSection: React.FC<{
   //   * `[DIMENSION][PROP]Comp` specific component for a dimension's property
   const BASELINE_EVAL_INDEX = 0;
 
-  const lookupIsDerivedMetric = (scorerIndex: number) => {
+  const lookupIsDerivedMetric = (scorerIndex: number): boolean => {
     return scorerIndex === numScorers;
   };
 
-  const lookupTrialsForEval = (evalIndex: number) => {
+  const lookupTrialsForEval = (evalIndex: number): PivotedRow[] => {
     const currEvalCallId = orderedCallIds[evalIndex];
     return target.originalRows.filter(
       row => row.evaluationCallId === currEvalCallId
     );
   };
 
-  const lookupSelectedTrialIndexForEval = (evalIndex: number) => {
+  const lookupSelectedTrialIndexForEval = (evalIndex: number): number => {
     const currEvalCallId = orderedCallIds[evalIndex];
     return selectedTrials[currEvalCallId] || 0;
   };
 
-  const lookupSelectedTrialForEval = (evalIndex: number) => {
+  const lookupSelectedTrialForEval = (
+    evalIndex: number
+  ): PivotedRow | undefined => {
     const trialsForThisEval = lookupTrialsForEval(evalIndex);
     return trialsForThisEval[lookupSelectedTrialIndexForEval(evalIndex)];
   };
 
+  const lookupScoreGroupForScorerIndex = (
+    scorerIndex: number
+  ): CompositeSummaryScoreGroup => {
+    return compositeMetrics[scorerGroupNames[scorerIndex]];
+  };
+
+  const lookupScoreGroupMetricsForScorerIndex = (scorerIndex: number) => {
+    return lookupScoreGroupForScorerIndex(scorerIndex).metrics;
+  };
+
+  const lookupUniqueScorerRefsForScorerIndex = (scorerIndex: number) => {
+    return Array.from(
+      new Set(
+        Object.values(
+          lookupScoreGroupForScorerIndex(scorerIndex).evalCallIdToScorerRef
+        )
+      )
+    );
+  };
+
   const lookupDimensionsForScorer = (scorerIndex: number) => {
     const isDerivedMetric = lookupIsDerivedMetric(scorerIndex);
-    return isDerivedMetric
-      ? derivedMetrics
-      : sortedScorers.filter(
-          s => s.scorerDef.scorerOpOrObjRef === uniqueScorerRefs[scorerIndex]
-        );
+    const lookupAnyDimensionForMetric = (sm: CompositeSummaryMetric) => {
+      return props.state.data.scorerMetricDimensions[
+        Object.values(sm.scorerRefToDimensionId)[0]
+      ];
+    };
+
+    if (isDerivedMetric) {
+      return derivedMetrics;
+    }
+    return Object.values(
+      lookupScoreGroupMetricsForScorerIndex(scorerIndex)
+    ).map(lookupAnyDimensionForMetric);
   };
 
   const lookupDimension = (scorerIndex: number, metricIndex: number) => {
@@ -325,11 +367,18 @@ export const ExampleCompareSection: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ) => {
-    const scoreId = lookupDimensionId(scorerIndex, metricIndex);
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
     const currEvalCallId = orderedCallIds[evalIndex];
+    const resolvedScoreId = resolvePeerDimension(
+      currEvalCallId,
+      lookupDimension(scorerIndex, metricIndex)
+    );
 
-    return targetTrial.scores[scoreId][currEvalCallId];
+    if (resolvedScoreId == null) {
+      return undefined;
+    }
+
+    return targetTrial.scores[dimensionId(resolvedScoreId)][currEvalCallId];
   };
 
   const lookupAggScorerMetricValue = (
@@ -337,10 +386,17 @@ export const ExampleCompareSection: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ) => {
-    const dimension = lookupDimension(scorerIndex, metricIndex);
-    const scoreId = dimensionId(dimension);
     const currEvalCallId = orderedCallIds[evalIndex];
-    return target.scores[scoreId][currEvalCallId];
+    const resolvedScoreId = resolvePeerDimension(
+      currEvalCallId,
+      lookupDimension(scorerIndex, metricIndex)
+    );
+
+    if (resolvedScoreId == null) {
+      return undefined;
+    }
+
+    return target.scores[dimensionId(resolvedScoreId)][currEvalCallId];
   };
 
   const lookupOutputValue = (evalIndex: number, outputPropIndex: number) => {
@@ -399,6 +455,9 @@ export const ExampleCompareSection: React.FC<{
   const evalSelectedTrialPredictCallComp = (evalIndex: number) => {
     const currEvalCallId = orderedCallIds[evalIndex];
     const selectedTrial = lookupSelectedTrialForEval(evalIndex);
+    if (selectedTrial == null) {
+      return null;
+    }
     const trialPredict = selectedTrial.predictAndScore._rawPredictTraceData;
     const [trialEntity, trialProject] =
       trialPredict?.project_id.split('/') ?? [];
@@ -552,7 +611,27 @@ export const ExampleCompareSection: React.FC<{
     if (lookupIsDerivedMetric(scorerIndex)) {
       return null;
     }
-    const scorerRef = uniqueScorerRefs[scorerIndex];
+    const scorerRefs = lookupUniqueScorerRefsForScorerIndex(scorerIndex);
+
+    let inner: JSX.Element | null = null;
+    if (scorerRefs.length === 0) {
+      inner = null;
+    } else if (scorerRefs.length === 1) {
+      const parsedRef = parseRef(scorerRefs[0]);
+      inner = <SmallRef objRef={parsedRef as WeaveObjectRef} iconOnly />;
+    } else {
+      inner = (
+        <Tooltip
+          title={
+            SCORER_VARIATION_WARNING_TITLE +
+            ': ' +
+            SCORER_VARIATION_WARNING_EXPLANATION
+          }>
+          <WarningAmberOutlined color="warning" />
+        </Tooltip>
+      );
+    }
+
     return (
       <VerticalBox
         style={{
@@ -562,7 +641,7 @@ export const ExampleCompareSection: React.FC<{
           height: '100%',
           paddingLeft: '2px',
         }}>
-        <SmallRef objRef={parseRef(scorerRef) as WeaveObjectRef} iconOnly />
+        {inner}
       </VerticalBox>
     );
   };
@@ -570,7 +649,9 @@ export const ExampleCompareSection: React.FC<{
   const scorerMetricKeyComp = (scorerIndex: number, metricIndex: number) => {
     const dimensionsForThisScorer = lookupDimensionsForScorer(scorerIndex);
     return (
-      <PropKey>{dimensionLabel(dimensionsForThisScorer[metricIndex])}</PropKey>
+      <PropKey>
+        {flattenedDimensionPath(dimensionsForThisScorer[metricIndex])}
+      </PropKey>
     );
   };
 
