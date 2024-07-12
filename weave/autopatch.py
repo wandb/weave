@@ -19,8 +19,8 @@ def autopatch() -> None:
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
     anthropic_patcher.attempt_patch()
-    cohere_patcher.attempt_patch()
     dspy_patcher.attempt_patch()
+    cohere_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -37,5 +37,5 @@ def reset_autopatch() -> None:
     litellm_patcher.undo_patch()
     llamaindex_patcher.undo_patch()
     anthropic_patcher.undo_patch()
-    cohere_patcher.undo_patch()
     dspy_patcher.undo_patch()
+    cohere_patcher.undo_patch()
