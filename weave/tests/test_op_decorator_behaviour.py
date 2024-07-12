@@ -75,7 +75,16 @@ def test_sync_func_call(client, func):
     assert call.inputs == {"a": 1}
     assert call.output == 2
 
+    ref = weave.publish(func)
+    func2 = ref.get()
 
+    call2 = func2.call(1)
+    assert isinstance(call2, Call)
+    assert call2.inputs == {"a": 1}
+    assert call2.output == 2
+
+
+@pytest.mark.asyncio
 async def test_async_func(client, afunc):
     assert await afunc(1) == 2
 
@@ -91,6 +100,14 @@ async def test_async_func_call(client, afunc):
     assert isinstance(call, Call)
     assert call.inputs == {"a": 1}
     assert call.output == 2
+
+    ref = weave.publish(afunc)
+    afunc2 = ref.get()
+
+    call2 = await afunc2.call(1)
+    assert isinstance(call2, Call)
+    assert call2.inputs == {"a": 1}
+    assert call2.output == 2
 
 
 def test_sync_method(client, weave_obj, py_obj):
