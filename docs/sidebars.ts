@@ -62,6 +62,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/together_ai",
             "guides/integrations/openrouter",
             "guides/integrations/local_models",
+            "guides/integrations/litellm",
           ],
         },
         {

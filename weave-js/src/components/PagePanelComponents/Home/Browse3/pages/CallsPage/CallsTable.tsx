@@ -888,10 +888,11 @@ const ExportRunsTableButton = ({
       className="mr-4"
       size="medium"
       variant="ghost"
-      onClick={() => tableRef.current?.exportDataAsCsv()}
       icon="export-share-upload"
       tooltip="Export to CSV"
-    />
+      onClick={() =>
+        tableRef.current?.exportDataAsCsv({includeColumnGroupsHeaders: false})
+      }/>
   </Box>
 );
 
