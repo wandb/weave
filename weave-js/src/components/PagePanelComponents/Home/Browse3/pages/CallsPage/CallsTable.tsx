@@ -892,7 +892,8 @@ const ExportRunsTableButton = ({
       tooltip="Export to CSV"
       onClick={() =>
         tableRef.current?.exportDataAsCsv({includeColumnGroupsHeaders: false})
-      }/>
+      }
+    />
   </Box>
 );
 
