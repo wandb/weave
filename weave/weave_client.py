@@ -3,6 +3,7 @@ import datetime
 import inspect
 import typing
 import uuid
+from functools import lru_cache
 from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
 
 import pydantic
@@ -208,7 +209,9 @@ class CallsIter:
         self.server = server
         self.project_id = project_id
         self.filter = filter
+        self._cache = {}
 
+    @lru_cache(maxsize=None)
     def __getitem__(self, key: Union[slice, int]) -> WeaveObject:
         if isinstance(key, slice):
             raise NotImplementedError("Slicing not supported")
