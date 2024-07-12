@@ -10,6 +10,11 @@ import {
   Autocomplete,
   Checkbox,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControl,
   ListItem,
   Tooltip,
@@ -77,6 +82,7 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
+const MAX_EXPORT_SIZE = 10_000;
 
 export const CallsTable: FC<{
   entity: string;
@@ -345,12 +351,46 @@ export const CallsTable: FC<{
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
+
+  // If we drill down, we should clear the selection
+  useEffect(() => {
+    if (effectiveFilter.parentId) {
+      setSelectedCalls([]);
+    }
+  }, [effectiveFilter.parentId]);
+
   const muiColumns = useMemo(() => {
     return [
       {
-        width: 40,
+        minWidth: 30,
+        width: 50,
         field: 'CustomCheckbox',
-        headerName: '',
+        sortable: false,
+        disableColumnMenu: true,
+        renderHeader: (params: any) => {
+          return (
+            <Checkbox
+              checked={
+                selectedCalls.length > 0 &&
+                selectedCalls.length ===
+                  tableData.filter(
+                    row => row.exception == null && row.ended_at != null
+                  ).length
+              }
+              onChange={() => {
+                // exclude non-successful calls from selection
+                const filtered = tableData.filter(
+                  row => row.exception == null && row.ended_at != null
+                );
+                if (selectedCalls.length === filtered.length) {
+                  setSelectedCalls([]);
+                } else {
+                  setSelectedCalls(filtered.map(row => row.id));
+                }
+              }}
+            />
+          );
+        },
         renderCell: (params: any) => {
           const rowId = params.id as string;
           const isSelected = selectedCalls.includes(rowId);
@@ -391,7 +431,7 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-  }, [columns.cols, selectedCalls]);
+  }, [columns.cols, selectedCalls, tableData]);
 
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
@@ -425,20 +465,6 @@ export const CallsTable: FC<{
     project,
     history,
   ]);
-
-  // Register Export Button
-  useEffect(() => {
-    addExtra('exportRunsTableButton', {
-      node: (
-        <ExportRunsTableButton
-          tableRef={apiRef}
-          selectedCalls={selectedCalls}
-        />
-      ),
-    });
-
-    return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, selectedCalls, addExtra, removeExtra]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -546,6 +572,18 @@ export const CallsTable: FC<{
               />
             </div>
           )}
+          <ManageExportButton
+            tableRef={apiRef}
+            selectedCalls={selectedCalls}
+            exportProps={{
+              entity,
+              project,
+              effectiveFilter,
+              filterModel,
+              sortModel,
+              expandedRefCols,
+            }}
+          />
         </>
       }>
       <StyledDataGrid
@@ -737,10 +775,10 @@ const getPeekId = (peekPath: string | null): string | null => {
 };
 
 const ExportRunsTableButton = ({
-  tableRef,
+  onClick,
   selectedCalls,
 }: {
-  tableRef: React.MutableRefObject<GridApiPro>;
+  onClick: () => void;
   selectedCalls: string[];
 }) => (
   <Box
@@ -753,18 +791,103 @@ const ExportRunsTableButton = ({
       className="mx-16"
       size="medium"
       variant="secondary"
-      onClick={() =>
-        tableRef.current?.exportDataAsCsv({
-          includeColumnGroupsHeaders: false,
-          getRowsToExport:
-            selectedCalls.length > 0 ? () => selectedCalls : undefined,
-        })
-      }
+      onClick={onClick}
       icon="export-share-upload">
       {selectedCalls.length > 0 ? `${selectedCalls.length}` : ''}
     </Button>
   </Box>
 );
+
+const ManageExportButton = ({
+  tableRef,
+  selectedCalls,
+  exportProps,
+}: {
+  tableRef: React.MutableRefObject<GridApiPro>;
+  selectedCalls: string[];
+  exportProps: any;
+}) => {
+  const [open, setOpen] = useState(false);
+
+  const handleExportAll = (
+    rows: Array<TraceCallSchema & {[key: string]: string}>
+  ) => {
+    // get current displayed rows
+    const currentRows = tableRef.current.getAllRowIds();
+
+    // update the table with all rows
+    tableRef.current.updateRows(rows);
+    tableRef.current.exportDataAsCsv({includeColumnGroupsHeaders: false});
+
+    const idsToDelete = rows
+      .map((row: any) => row.id)
+      .filter((id: any) => !currentRows.includes(id));
+
+    // delete the rows that added
+    tableRef.current.updateRows(
+      idsToDelete.map((rowId: any) => ({id: rowId, _action: 'delete'}))
+    );
+  };
+
+  const allPages = {pageSize: MAX_EXPORT_SIZE, page: 0};
+  const allCalls = useCallsForQuery(
+    exportProps.entity,
+    exportProps.project,
+    exportProps.effectiveFilter,
+    exportProps.filterModel,
+    exportProps.sortModel,
+    allPages,
+    exportProps.expandedRefCols
+  );
+  const [allRows, setAllRows] = useState<
+    Array<TraceCallSchema & {[key: string]: string}>
+  >([]);
+  useEffect(() => {
+    if (!allCalls.loading && allCalls.result) {
+      setAllRows(prepareFlattenedCallDataForTable(allCalls.result));
+    }
+  }, [allCalls.result, allCalls.loading]);
+
+  return (
+    <>
+      <ExportRunsTableButton
+        onClick={() => setOpen(true)}
+        selectedCalls={selectedCalls}
+      />
+      <Dialog open={open} onClose={() => setOpen(false)}>
+        <DialogTitle>Export to CSV</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Select the columns to export.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (selectedCalls.length === 0) {
+                handleExportAll(allRows);
+              } else {
+                tableRef.current?.exportDataAsCsv({
+                  includeColumnGroupsHeaders: false,
+                  getRowsToExport:
+                    selectedCalls.length > 0 ? () => selectedCalls : undefined,
+                });
+                setOpen(false);
+              }
+            }}
+            disabled={selectedCalls.length === 0 && allCalls.loading}>
+            {selectedCalls.length === 0 && allCalls.loading ? (
+              <LoadingDots />
+            ) : (
+              'Export'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+};
 
 const CompareEvaluationsTableButton: FC<{
   onClick: () => void;
