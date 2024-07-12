@@ -2,7 +2,6 @@ import dataclasses
 import inspect
 import operator
 import typing
-from types import MethodType
 from typing import (
     Any,
     Generator,
@@ -21,7 +20,7 @@ from weave.legacy import box
 from weave.table import Table
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op import Op
+from weave.trace.op import Op, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -146,13 +145,7 @@ def attribute_access_result(
 ) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
-        sig = inspect.signature(val_attr_val)
-
-        # bind it
-        if sig and sig.parameters.get("self"):
-            val_attr_val = MethodType(val_attr_val, self)
-            return val_attr_val
-        return val_attr_val
+        return maybe_bind_method(val_attr_val, self)
 
     ref = None
     try:

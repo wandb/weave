@@ -343,7 +343,28 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     return op_deco
 
 
-def maybe_bind_method(func: Callable) -> Union[Callable, MethodType]:
+def maybe_bind_method(func: Callable, self: Any = None) -> Union[Callable, MethodType]:
+    """Bind a function to any object (even if it's not a class)
+
+    If self is None, return the function as is.
+    """
     if (sig := inspect.signature(func)) and sig.parameters.get("self"):
-        return func.__get__(object())
+        return MethodType(func, self)
     return func
+
+
+def maybe_unbind_method(oplike: Union[Op, MethodType, partial]) -> Op:
+    """Unbind an Op-like method or partial to a plain Op function.
+
+    For:
+    - methods, remove set `self` param
+    - partials, remove any preset params
+    """
+    if isinstance(oplike, MethodType):
+        op = oplike.__func__
+    elif isinstance(oplike, partial):  # Handle cases op is defined as
+        op = oplike.func
+    else:
+        op = oplike
+
+    return cast(Op, op)
