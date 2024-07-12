@@ -414,8 +414,11 @@ export const CallsTable: FC<{
             params.row.exception != null || params.row.ended_at == null;
           let tooltipText = '';
           if (bulkDeleteMode) {
-            // No restrictions on bulk deletion
-            tooltipText = '';
+            if (selectedCalls.length >= MAX_BULK_DELETE) {
+              tooltipText = `Deletion limited to ${MAX_BULK_DELETE} items`;
+            } else {
+              tooltipText = '';
+            }
           } else if (disabledDueToNonSuccess) {
             tooltipText = 'Cannot compare non-successful evaluations';
           } else if (disabledDueToMax) {
