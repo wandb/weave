@@ -331,76 +331,31 @@ async def test_evaluation_summary_styles(client):
     my_dict_scorer_with_custom_bool_summary_call_0_0 = summary_block_0_0[2]
     my_dict_scorer_with_custom_dict_summary_call_0_0 = summary_block_0_0[3]
 
-    assert evaluate_call_0_0.output == {
-        "score_int": {"mean": 1.5},
-        "score_float": {"mean": 0.8333333333333333},
-        "score_bool": {"true_count": 1, "true_fraction": 0.5},
-        "score_dict": {
-            "d_int": {"mean": 1.5},
-            "d_float": {"mean": 0.8333333333333333},
-            "d_bool": {"true_count": 1, "true_fraction": 0.5},
-            "d_nested": {
-                "d_int": {"mean": 1.5},
-                "d_float": {"mean": 0.8333333333333333},
-                "d_bool": {"true_count": 1, "true_fraction": 0.5},
-            },
+    # Prediction Section
+    model_output = {"response": "A"}
+    model_1_latency = {"mean": Nearly(0, 1)}  # 0.005481123924255371
+    score_int_score = 1
+    score_float_score = 1.0
+    score_bool_score = True
+    score_dict_score = {
+        "d_int": score_int_score,
+        "d_float": score_float_score,
+        "d_bool": score_dict_score,
+        "d_nested": {
+            "d_int": score_int_score,
+            "d_float": score_float_score,
+            "d_bool": score_dict_score,
         },
-        "MyDictScorerWithCustomFloatSummary": 0.8333333333333333,
-        "MyDictScorerWithCustomBoolSummary": True,
-        "MyDictScorerWithCustomDictSummary": {
-            "float_avg": 0.8333333333333333,
-            "nested": {"bool_avg": 0.5},
-            "reason": "This is a custom test reason",
-        },
-        "model_latency": {"mean": Nearly(0, 1)},  # 0.005481123924255371
+        "reason": "This is a test reason",
     }
 
-    assert predict_and_score_call_0_0.output == {
-        "model_output": {"response": "A"},
-        "scores": {
-            "score_int": 1,
-            "score_float": 1.0,
-            "score_bool": True,
-            "score_dict": {
-                "d_int": 1,
-                "d_float": 1.0,
-                "d_bool": True,
-                "d_nested": {"d_int": 1, "d_float": 1.0, "d_bool": True},
-                "reason": "This is a test reason",
-            },
-            "MyDictScorerWithCustomFloatSummary": {
-                "d_int": 1,
-                "d_float": 1.0,
-                "d_bool": True,
-                "d_nested": {"d_int": 1, "d_float": 1.0, "d_bool": True},
-                "reason": "This is a test reason",
-            },
-            "MyDictScorerWithCustomBoolSummary": {
-                "d_int": 1,
-                "d_float": 1.0,
-                "d_bool": True,
-                "d_nested": {"d_int": 1, "d_float": 1.0, "d_bool": True},
-                "reason": "This is a test reason",
-            },
-            "MyDictScorerWithCustomDictSummary": {
-                "d_int": 1,
-                "d_float": 1.0,
-                "d_bool": True,
-                "d_nested": {"d_int": 1, "d_float": 1.0, "d_bool": True},
-                "reason": "This is a test reason",
-            },
-        },
-        "model_latency": Nearly(0, 1),
-    }
+    # Prediction
+    assert predict_call_0_0.output == model_output
 
-    assert predict_call_0_0.output == {"response": "A"}
-
-    assert score_int_call_0_0.output == 1
-
-    assert score_float_call_0_0.output == 1.0
-
-    assert score_bool_call_0_0.output == True
-
+    # Prediction Scores
+    assert score_int_call_0_0.output == score_int_score
+    assert score_float_call_0_0.output == score_float_score
+    assert score_bool_call_0_0.output == score_bool_score
     assert (
         score_dict_call_0_0.output
         == my_dict_scorer_with_custom_float_score_call_0_0.output
@@ -415,36 +370,69 @@ async def test_evaluation_summary_styles(client):
         }
     )
 
-    assert summary_call_0_0.output == {
-        "score_int": {"mean": 1.5},
-        "score_float": {"mean": 0.8333333333333333},
-        "score_bool": {"true_count": 1, "true_fraction": 0.5},
-        "score_dict": {
-            "d_int": {"mean": 1.5},
-            "d_float": {"mean": 0.8333333333333333},
-            "d_bool": {"true_count": 1, "true_fraction": 0.5},
-            "d_nested": {
-                "d_int": {"mean": 1.5},
-                "d_float": {"mean": 0.8333333333333333},
-                "d_bool": {"true_count": 1, "true_fraction": 0.5},
-            },
+    # Predict And Score Group
+    assert predict_and_score_call_0_0.output == {
+        "model_output": model_output,
+        "scores": {
+            "score_int": score_int_score,
+            "score_float": score_float_score,
+            "score_bool": score_bool_score,
+            "score_dict": score_dict_score,
+            "MyDictScorerWithCustomFloatSummary": score_dict_score,
+            "MyDictScorerWithCustomBoolSummary": score_dict_score,
+            "MyDictScorerWithCustomDictSummary": score_dict_score,
         },
-        "MyDictScorerWithCustomFloatSummary": 0.8333333333333333,
-        "MyDictScorerWithCustomBoolSummary": True,
-        "MyDictScorerWithCustomDictSummary": {
-            "float_avg": 0.8333333333333333,
-            "nested": {"bool_avg": 0.5},
-            "reason": "This is a custom test reason",
-        },
-        "model_latency": {"mean": Nearly(0, 1)},
+        "model_latency": model_1_latency,
     }
 
-    assert (
-        my_dict_scorer_with_custom_float_summary_call_0_0.output == 0.8333333333333333
-    )
-    assert my_dict_scorer_with_custom_bool_summary_call_0_0.output == True
-    assert my_dict_scorer_with_custom_dict_summary_call_0_0.output == {
+    # Summary section
+    score_int_auto_summary = {"mean": 1.5}
+    score_float_auto_summary = {"mean": 0.8333333333333333}
+    score_bool_auto_summary = {"true_count": 1, "true_fraction": 0.5}
+    dict_scorer_float_summary = 0.8333333333333333
+    dict_scorer_bool_summary = True
+    dict_scorer_dict_summary = {
         "float_avg": 0.8333333333333333,
         "nested": {"bool_avg": 0.5},
         "reason": "This is a custom test reason",
     }
+    model_latency = {"mean": Nearly(0, 1)}  # 0.005481123924255371
+
+    # Summarizers
+    assert (
+        my_dict_scorer_with_custom_float_summary_call_0_0.output
+        == dict_scorer_float_summary
+    )
+    assert (
+        my_dict_scorer_with_custom_bool_summary_call_0_0.output
+        == dict_scorer_bool_summary
+    )
+    assert (
+        my_dict_scorer_with_custom_dict_summary_call_0_0.output
+        == dict_scorer_dict_summary
+    )
+
+    # Final Summary
+    assert (
+        evaluate_call_0_0.output
+        == summary_call_0_0.output
+        == {
+            "score_int": score_int_auto_summary,
+            "score_float": score_float_auto_summary,
+            "score_bool": score_bool_auto_summary,
+            "score_dict": {
+                "d_int": score_int_auto_summary,
+                "d_float": score_float_auto_summary,
+                "d_bool": score_bool_auto_summary,
+                "d_nested": {
+                    "d_int": score_int_auto_summary,
+                    "d_float": score_float_auto_summary,
+                    "d_bool": score_bool_auto_summary,
+                },
+            },
+            "MyDictScorerWithCustomFloatSummary": dict_scorer_float_summary,
+            "MyDictScorerWithCustomBoolSummary": dict_scorer_bool_summary,
+            "MyDictScorerWithCustomDictSummary": dict_scorer_dict_summary,
+            "model_latency": model_latency,
+        }
+    )
