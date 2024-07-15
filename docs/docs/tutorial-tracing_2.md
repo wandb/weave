@@ -76,27 +76,28 @@ print(result)
 
 **Nested functions**
 
-When you run the above code you will see the the inputs and outputs from the two nested functions, as well as the automatically-logged OpenAI trace.
+When you run the above code you will see the the inputs and outputs from the two nested functions (`extract_dinos` and `count_dinos`), as well as the automatically-logged OpenAI trace.
 
 ![Nested Weave Trace](../static/img/tutorial_tracing_2_nested_dinos.png)
- 
-
-<!-- ![Nested Weave Trace](../static/img/tutorial_tracing_2_nested.png) -->
 
 
 ## Tracking metadata
 
-Tracking metadata can be done easily by using the `weave.attributes` context manger at call time.
+Tracking metadata can be done easily by using the `weave.attributes` context manger and passing it a dictionary of the metadata to track at call time.
+
+Continuing our example from above:
 
 ```python
+import weave 
+
 weave.init('jurassic-park')
 
 sentence = """I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), \
 both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant \
 Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below."""
 
+# track metadata alongside our previously defined function
 # highlight-next-line
-# track metadata alongside your function call
 with weave.attributes({'user_id': 'lukas', 'env': 'production'}):
     result = dino_tracker(sentence)
 ```
@@ -110,24 +111,23 @@ To track system attributes, such as a System Prompt, we recommend using [weave M
 
 ## Exporting call data
 
-Exporting data from a Weave call can be useful if further post-processing is needed in other tools.
+Exporting data from a Weave call such as the inputs, outputs and summary usage data can be useful if further post-processing is needed in other tools or pipelines.
 
 **Get the weave call ID**
 
-To export all the data and metadata from a call you just need the call ID, which can be found in the "Use" tab in the call's view
+To export all the data and metadata from a call you just need the Weave call ID, which can be found in the "Use" tab in the particular call's view
 
 ![Nested Weave Trace](../static/img/tutorial_tracing_2_call_uri.png)
 
-After initialising the weave client, you can then use `weave.call` to retrieve the call object which includes the input, output and metadata of that particular call.
-
 **Export the call data**
 
-Once you have the call ID you can get the inputs, outputs and metadata that was logged to that call.
+After initialising the weave client, you can then use use the call ID to retrieve the call object which includes the input, output and metadata of that particular call:
 
 ```python
 import weave
 
 client = weave.init("morgan/jurassic-park")
+# highlight-next-line
 call = client.call("dce2d44c-9b7d-457b-90ae-62d7e4b3aa58")
 ```
 
@@ -138,7 +138,7 @@ call.output["n_dinosaurs"]
 >>> 3
 ```
 
-Export the inputs:
+Export the input to the call:
 ```python
 call.input["sentence"]
 
