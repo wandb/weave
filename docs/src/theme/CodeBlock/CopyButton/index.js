@@ -12,12 +12,12 @@ export default function CopyButton({code, className}) {
     // Track the copy event
     // Only line added to the swizzled component
     window.analytics?.track(
-      'Copied weave docs code', 
+      'Weave Docs: Code copied', 
       {code: typeof code == 'string' ? 
         code.slice(0, 100) : 
         'code is not string'}
     );
-    
+
     copy(code);
     setIsCopied(true);
     copyTimeout.current = window.setTimeout(() => {
