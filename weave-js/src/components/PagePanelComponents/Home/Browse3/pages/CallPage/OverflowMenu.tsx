@@ -16,12 +16,14 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
 
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
+import { useOrgName } from '@wandb/weave/common/hooks/useOrganization';
+import { useViewerUserInfo2 } from '@wandb/weave/common/hooks/useViewerUserInfo';
+
 export const OverflowMenu: FC<{
-  entity: string;
-  project: string;
   selectedCalls: TraceCallSchema[];
   setIsRenaming: (isEditing: boolean) => void;
-}> = ({selectedCalls, setIsRenaming, entity, project}) => {
+}> = ({selectedCalls, setIsRenaming}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
@@ -123,6 +125,12 @@ export const ConfirmDeleteModal: FC<{
   setConfirmDelete: (confirmDelete: boolean) => void;
   onDeleteCallback?: () => void;
 }> = ({calls, confirmDelete, setConfirmDelete, onDeleteCallback}) => {
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {loading: orgNameLoading, orgName} = useOrgName({
+    entityName: userInfoLoaded?.username ?? '',
+    skip: viewerLoading,
+  });
   const {useCallsDeleteFunc} = useWFHooks();
   const callsDelete = useCallsDeleteFunc();
   const closePeek = useClosePeek();
@@ -159,6 +167,13 @@ export const ConfirmDeleteModal: FC<{
       );
     });
     Promise.all(deletePromises).then(() => {
+      userEvents.deleteClicked({
+        callIds: calls.map(call => `${call.project_id}/${call.id}`),
+        numCalls: calls.length,
+        userId: userInfoLoaded?.id ?? '',
+        organizationName: orgName,
+        entityName: userInfoLoaded?.username ?? '',
+      });
       setDeleteLoading(false);
       setConfirmDelete(false);
       onDeleteCallback?.();
@@ -201,7 +216,7 @@ export const ConfirmDeleteModal: FC<{
       <DialogActions $align="left">
         <Button
           variant="destructive"
-          disabled={error != null || deleteLoading}
+          disabled={error != null || deleteLoading || orgNameLoading}
           onClick={onDelete}>
           {calls.length > 1 ? 'Delete calls' : 'Delete call'}
         </Button>
