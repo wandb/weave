@@ -60,6 +60,7 @@ const sidebars: SidebarsConfig = {
           items: [
             "guides/integrations/openai",
             "guides/integrations/anthropic",
+            "guides/integrations/cohere",
             "guides/integrations/mistral",
             "guides/integrations/llamaindex",
             "guides/integrations/dspy",
