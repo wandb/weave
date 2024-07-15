@@ -3,7 +3,7 @@
 
 import time
 import typing
-from typing import Optional
+from typing import Optional, Union
 import os
 import contextlib
 import dataclasses
@@ -47,9 +47,8 @@ from . import types_numpy as _types_numpy
 
 from . import errors
 from weave.legacy.decorators import weave_class, mutation, type
-from weave.trace.op import op
+from weave.trace.op import Op, op
 
-from weave.trace.op import Op
 from . import usage_analytics
 from weave.legacy.context import (
     use_fixed_server_port,

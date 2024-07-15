@@ -92,23 +92,21 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     if isinstance(obj, list):
         return [from_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):
-        val_type = obj.get("_type")
-        if val_type is not None:
-            del obj["_type"]
-            if val_type == "ObjectRecord":
-                return ObjectRecord(
-                    {k: from_json(v, project_id, server) for k, v in obj.items()}
-                )
-            elif val_type == "CustomWeaveType":
-                files = _load_custom_obj_files(project_id, server, obj["files"])
-                return custom_objs.decode_custom_obj(
-                    obj["weave_type"], files, obj.get("load_op")
-                )
-            else:
-                return ObjectRecord(
-                    {k: from_json(v, project_id, server) for k, v in obj.items()}
-                )
-        return {k: from_json(v, project_id, server) for k, v in obj.items()}
+        if (val_type := obj.pop("_type", None)) is None:
+            return {k: from_json(v, project_id, server) for k, v in obj.items()}
+        elif val_type == "ObjectRecord":
+            return ObjectRecord(
+                {k: from_json(v, project_id, server) for k, v in obj.items()}
+            )
+        elif val_type == "CustomWeaveType":
+            files = _load_custom_obj_files(project_id, server, obj["files"])
+            return custom_objs.decode_custom_obj(
+                obj["weave_type"], files, obj.get("load_op")
+            )
+        else:
+            return ObjectRecord(
+                {k: from_json(v, project_id, server) for k, v in obj.items()}
+            )
     elif isinstance(obj, str) and obj.startswith("weave://"):
         return parse_uri(obj)
 
