@@ -35,4 +35,5 @@ vcrpy==6.0.1
 mistralai>=0.1.8
 litellm>=1.36.1
 llama-index>=0.10.35
+cohere>=5.5.8
 anthropic>=0.18.0

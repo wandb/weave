@@ -16,6 +16,7 @@ from weave.legacy.monitoring.monitor import _get_global_monitor
 from weave.legacy.monitoring.openai.models import *
 from weave.legacy.monitoring.openai.util import *
 from weave.trace.op import Op
+from weave.trace.op import op as op_deco
 from weave import client_context
 
 old_create = openai.resources.chat.completions.Completions.create
@@ -24,7 +25,7 @@ old_async_create = openai.resources.chat.completions.AsyncCompletions.create
 create_op_name = "openai.chat.completions.create"
 create_op: typing.Union[str, Op] = create_op_name
 try:
-    create_op = Op(old_create)
+    create_op = op_deco(old_create)
     create_op.name = create_op_name
 except Exception as e:
     pass
