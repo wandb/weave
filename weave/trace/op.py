@@ -342,7 +342,15 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
-            wrapper.name = func.__qualname__ if is_method else func.__name__  # type: ignore
+
+            name = func.__qualname__ if is_method else func.__name__
+
+            # funcs and methods defined inside another func will have the
+            # name prefixed with {outer}.<locals>.{func_name}
+            # this is noisy for us, so we strip it out
+            name = name.split(".<locals>.")[-1]
+
+            wrapper.name = name  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
