@@ -11,11 +11,11 @@ hide_table_of_contents: true
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing AI applications, without introducing cognitive overhead.
 
-**[Get started](/quickstart)** by decorating Python functions with `@weave.op()`. 
+**[Get started](/tutorial-tracing_1)** by decorating Python functions with `@weave.op()`. 
 
 ![Weave Hero](../static/img/weave-hero.png)
 
-Seriously, try the 🍪 **[quickstart](/quickstart)** 🍪 or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Seriously, try the 🍪 **[quickstart](/tutorial-tracing_1)** 🍪 or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 You can use Weave to:
 - Log and debug language model inputs, outputs, and traces
@@ -54,4 +54,4 @@ Weave's **tools** layer contains utilities for making use of Weave objects.
 
 ## What's next?
 
-Try the [Quickstart](/quickstart) to see Weave in action.
+Try the [Quickstart](/tutorial-tracing_1) to see Weave in action.
