@@ -58,7 +58,7 @@ and sets up the global state for the weave library.
 
 Args:
     project_name (str): The project name to use for the weave client.
-    ensure_project_exists (bool): If True, the client will not attempt to create the project
+    ensure_project_exists (bool): If False, the client will not attempt to create the project
 """
 
 
