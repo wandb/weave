@@ -15,6 +15,9 @@ import {
 } from '../../../../common/css/globals.styles';
 import {Loading} from '../../../Loading';
 
+// Class name constants
+export const SELECTED_FOR_DELETION = 'selected-for-deletion';
+
 // TODO: Handle night mode
 const backgroundColorHovered = hexToRGB(OBLIVION, 0.04);
 const backgroundColorSelected = hexToRGB(TEAL_300, 0.32);
@@ -79,7 +82,7 @@ export const StyledDataGrid = styled(
         backgroundColor: backgroundColorHoveredSelected,
       },
     },
-    '&.bg-red-100': {
+    [`&.${SELECTED_FOR_DELETION}`]: {
       backgroundColor: backgroundColorSelectedForDeletion,
       '&.Mui-hovered': {
         backgroundColor: backgroundColorSelectedForDeletion,

@@ -11,13 +11,15 @@ import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
 import {useClosePeek} from '../../context';
+import {CopyableId} from '../common/Id';
 import {useWFHooks} from '../wfReactInterface/context';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {opVersionRefOpName} from '../wfReactInterface/utilities';
 
 export const OverflowMenu: FC<{
   entity: string;
   project: string;
-  selectedCalls: CallSchema[];
+  selectedCalls: TraceCallSchema[];
   setIsRenaming: (isEditing: boolean) => void;
 }> = ({selectedCalls, setIsRenaming, entity, project}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -47,12 +49,7 @@ export const OverflowMenu: FC<{
     <>
       {confirmDelete && (
         <ConfirmDeleteModal
-          entity={entity}
-          project={project}
-          calls={selectedCalls.map(call => ({
-            callId: call.callId,
-            name: call.displayName ?? call.spanName,
-          }))}
+          calls={selectedCalls}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
         />
@@ -83,6 +80,18 @@ const CallName = styled.p`
 `;
 CallName.displayName = 'S.CallName';
 
+const CallNameRow = styled.div`
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+`;
+CallNameRow.displayName = 'S.CallNameRow';
+
+const CallIdDiv = styled.div`
+  margin-left: 4px;
+`;
+CallIdDiv.displayName = 'S.CallIdDiv';
+
 const DialogContent = styled(MaterialDialogContent)`
   padding: 0 32px !important;
 `;
@@ -109,20 +118,11 @@ DialogActions.displayName = 'S.DialogActions';
 const MAX_DELETED_CALLS_TO_SHOW = 10;
 
 export const ConfirmDeleteModal: FC<{
-  entity: string;
-  project: string;
-  calls: Array<{callId: string; name: string}>;
+  calls: TraceCallSchema[];
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
   onDeleteCallback?: () => void;
-}> = ({
-  entity,
-  project,
-  calls,
-  confirmDelete,
-  setConfirmDelete,
-  onDeleteCallback,
-}) => {
+}> = ({calls, confirmDelete, setConfirmDelete, onDeleteCallback}) => {
   const {useCallsDeleteFunc} = useWFHooks();
   const callsDelete = useCallsDeleteFunc();
   const closePeek = useClosePeek();
@@ -131,28 +131,39 @@ export const ConfirmDeleteModal: FC<{
 
   const [error, setError] = useState<string | null>(null);
 
+  // Deletion requires constant entity/project, break calls into groups
+  const makeProjectGroups = (mixedCalls: TraceCallSchema[]) => {
+    const projectGroups: {[key: string]: string[]} = {};
+    mixedCalls.forEach(call => {
+      projectGroups[call.project_id] = projectGroups[call.project_id] || [];
+      projectGroups[call.project_id].push(call.id);
+    });
+    return projectGroups;
+  };
+
   const onDelete = () => {
     if (calls.length === 0) {
       setError('No call(s) selected');
       return;
     }
     setDeleteLoading(true);
-    callsDelete(
-      entity,
-      project,
-      calls.map(call => call.callId)
-    )
-      .catch(() => {
-        setError(
-          `Failed to delete call(s) ${calls.map(call => call.name).join(', ')}`
-        );
-      })
-      .then(() => {
-        setDeleteLoading(false);
-        setConfirmDelete(false);
-        onDeleteCallback?.();
-        closePeek();
-      });
+    const projectGroups = makeProjectGroups(calls);
+    const deletePromises: Array<Promise<void>> = [];
+    Object.keys(projectGroups).forEach(projectKey => {
+      const [entity, project] = projectKey.split('/');
+      deletePromises.push(
+        callsDelete(entity, project, projectGroups[projectKey]).catch(() => {
+          const callNames = calls.map(callDisplayName);
+          setError(`Failed to delete call(s) ${callNames.join(', ')}`);
+        })
+      );
+    });
+    Promise.all(deletePromises).then(() => {
+      setDeleteLoading(false);
+      setConfirmDelete(false);
+      onDeleteCallback?.();
+      closePeek();
+    });
   };
 
   return (
@@ -172,7 +183,14 @@ export const ConfirmDeleteModal: FC<{
           </p>
         )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
-          <CallName key={call.callId}>{call.name}</CallName>
+          <CallNameRow>
+            <div>
+              <CallName key={call.id}>{callDisplayName(call)}</CallName>
+            </div>
+            <CallIdDiv>
+              <CopyableId id={call.id} type="Call" />
+            </CallIdDiv>
+          </CallNameRow>
         ))}
         {calls.length > MAX_DELETED_CALLS_TO_SHOW && (
           <p style={{marginTop: '8px'}}>
@@ -196,4 +214,11 @@ export const ConfirmDeleteModal: FC<{
       </DialogActions>
     </Dialog>
   );
+};
+
+const callDisplayName = (call: TraceCallSchema) => {
+  if (call.display_name) {
+    return call.display_name;
+  }
+  return opVersionRefOpName(call.op_name);
 };

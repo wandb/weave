@@ -46,7 +46,7 @@ import {
   WeaveHeaderExtrasContext,
 } from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
-import {StyledDataGrid} from '../../StyledDataGrid';
+import {SELECTED_FOR_DELETION, StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
@@ -62,10 +62,7 @@ import {
 } from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
-import {
-  objectVersionNiceString,
-  opVersionRefOpName,
-} from '../wfReactInterface/utilities';
+import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
@@ -385,7 +382,10 @@ export const CallsTable: FC<{
               onCheckedChange={() => {
                 // if bulk delete move, select all calls
                 if (bulkDeleteMode) {
-                  if (selectedCalls.length === tableData.length) {
+                  if (
+                    selectedCalls.length ===
+                    Math.min(tableData.length, MAX_BULK_DELETE)
+                  ) {
                     setSelectedCalls([]);
                   } else {
                     setSelectedCalls(
@@ -397,7 +397,10 @@ export const CallsTable: FC<{
                   const filtered = tableData.filter(
                     row => row.exception == null && row.ended_at != null
                   );
-                  if (selectedCalls.length === filtered.length) {
+                  if (
+                    selectedCalls.length ===
+                    Math.min(filtered.length, MAX_EVAL_COMPARISONS)
+                  ) {
                     setSelectedCalls([]);
                   } else {
                     setSelectedCalls(
@@ -540,20 +543,10 @@ export const CallsTable: FC<{
     if (isReadonly) {
       return;
     }
-    const callsToDelete = tableData
-      .filter(call => selectedCalls.includes(call.id))
-      .map(call => {
-        return {
-          callId: call.id,
-          name: call.display_name ?? opVersionRefOpName(call.op_name),
-        };
-      });
     addExtra('deleteSelectedCallsModal', {
       node: (
         <ConfirmDeleteModal
-          entity={entity}
-          project={project}
-          calls={callsToDelete}
+          calls={tableData.filter(row => selectedCalls.includes(row.id))}
           confirmDelete={deleteConfirmModalOpen}
           setConfirmDelete={setDeleteConfirmModalOpen}
           onDeleteCallback={() => {
@@ -737,12 +730,11 @@ export const CallsTable: FC<{
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
-        getRowClassName={params => {
-          if (bulkDeleteMode && selectedCalls.includes(params.row.id)) {
-            return 'bg-red-100';
-          }
-          return '';
-        }}
+        getRowClassName={params =>
+          bulkDeleteMode && selectedCalls.includes(params.row.id)
+            ? SELECTED_FOR_DELETION
+            : ''
+        }
         onColumnWidthChange={newCol => {
           setUserDefinedColumnWidths(curr => {
             return {
