@@ -20,7 +20,7 @@ from weave.legacy import box
 from weave.table import Table
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op import Op
+from weave.trace.op import Op, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -145,7 +145,7 @@ def attribute_access_result(
 ) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
-        return val_attr_val
+        return maybe_bind_method(val_attr_val, self)
 
     ref = None
     try:
@@ -477,7 +477,7 @@ def make_trace_obj(
             raise MissingSelfInstanceError(
                 f"{val.name} Op requires a bound self instance. Must be called from an instance method."
             )
-        val = val.__get__(parent, type(parent))
+        val = val.__self__
     box_val = box.box(val)
     if isinstance(box_val, pydantic_v1.BaseModel):
         box_val.__dict__["ref"] = new_ref

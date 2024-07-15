@@ -193,6 +193,7 @@ export const getTokensAndCostFromUsage = (usage: {
 
   const costToolTip = (
     <Box>
+      <span style={{fontWeight: 600}}>Estimated Cost</span>
       {Object.keys(metrics.inputs.cost).map(model => (
         <Box key={model + 'input'} sx={tooltipRowStyles}>
           <span>{model === 'total' ? 'Input cost' : model}: </span>

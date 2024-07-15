@@ -12,6 +12,7 @@ import {
   Chip,
   FormControl,
   ListItem,
+  Tooltip,
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
@@ -75,6 +76,7 @@ import {useCallsForQuery} from './callsTableQuery';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
+const MAX_EVAL_COMPARISONS = 5;
 
 export const CallsTable: FC<{
   entity: string;
@@ -363,22 +365,39 @@ export const CallsTable: FC<{
         headerName: '',
         renderCell: (params: any) => {
           const rowId = params.id as string;
+          const isSelected = compareSelection.includes(rowId);
+          const disabledDueToMax =
+            compareSelection.length >= MAX_EVAL_COMPARISONS && !isSelected;
+          const disabledDueToNonSuccess =
+            params.row.exception != null || params.row.ended_at == null;
+          let tooltipText = '';
+          if (disabledDueToNonSuccess) {
+            tooltipText = 'Cannot compare non-successful evaluations';
+          } else if (disabledDueToMax) {
+            tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
+          }
+
           return (
-            <Checkbox
-              disabled={
-                params.row.exception != null || params.row.ended_at == null
-              }
-              checked={compareSelection.includes(rowId)}
-              onChange={() => {
-                if (compareSelection.includes(rowId)) {
-                  setCompareSelection(
-                    compareSelection.filter(id => id !== rowId)
-                  );
-                } else {
-                  setCompareSelection([...compareSelection, rowId]);
-                }
-              }}
-            />
+            <Tooltip title={tooltipText} placement="right" arrow>
+              {/* https://mui.com/material-ui/react-tooltip/ */}
+              {/* By default disabled elements like <button> do not trigger user interactions */}
+              {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
+              <span>
+                <Checkbox
+                  disabled={disabledDueToNonSuccess || disabledDueToMax}
+                  checked={isSelected}
+                  onChange={() => {
+                    if (isSelected) {
+                      setCompareSelection(
+                        compareSelection.filter(id => id !== rowId)
+                      );
+                    } else {
+                      setCompareSelection([...compareSelection, rowId]);
+                    }
+                  }}
+                />
+              </span>
+            </Tooltip>
           );
         },
       },
@@ -730,7 +749,9 @@ const ExportRunsTableButton = ({
       className="mx-16"
       size="medium"
       variant="secondary"
-      onClick={() => tableRef.current?.exportDataAsCsv()}
+      onClick={() =>
+        tableRef.current?.exportDataAsCsv({includeColumnGroupsHeaders: false})
+      }
       icon="export-share-upload">
       Export to CSV
     </Button>

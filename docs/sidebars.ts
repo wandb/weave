@@ -55,6 +55,7 @@ const sidebars: SidebarsConfig = {
           items: [
             "guides/integrations/openai",
             "guides/integrations/anthropic",
+            "guides/integrations/cohere",
             "guides/integrations/mistral",
             "guides/integrations/llamaindex",
             "guides/integrations/dspy",
@@ -62,6 +63,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/together_ai",
             "guides/integrations/openrouter",
             "guides/integrations/local_models",
+            "guides/integrations/litellm",
           ],
         },
         {

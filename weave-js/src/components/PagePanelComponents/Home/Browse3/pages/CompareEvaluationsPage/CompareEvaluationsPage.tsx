@@ -3,6 +3,7 @@
  */
 
 import {Box} from '@material-ui/core';
+import {Alert} from '@mui/material';
 import React, {FC, useCallback, useContext} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -148,7 +149,9 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC = props => {
   const {state} = useCompareEvaluationsState();
-
+  const showExampleFilter =
+    Object.keys(state.data.evaluationCalls).length === 2;
+  const showExamples = Object.keys(state.data.resultRows).length > 0;
   return (
     <Box
       sx={{
@@ -165,10 +168,34 @@ const CompareEvaluationsPageInner: React.FC = props => {
         <ComparisonDefinitionSection state={state} />
         <SummaryPlots state={state} />
         <ScorecardSection state={state} />
-        {Object.keys(state.data.models).length === 2 && (
-          <ExampleFilterSection state={state} />
+        {showExamples ? (
+          <>
+            {showExampleFilter && <ExampleFilterSection state={state} />}
+            <ResultExplorer state={state} />
+          </>
+        ) : (
+          <VerticalBox
+            sx={{
+              // alignItems: '',
+              paddingLeft: STANDARD_PADDING,
+              paddingRight: STANDARD_PADDING,
+              width: '100%',
+              overflow: 'auto',
+            }}>
+            <Box
+              sx={{
+                fontSize: '1.5em',
+                fontWeight: 'bold',
+              }}>
+              Examples
+            </Box>
+            <Alert severity="info">
+              The selected evaluations' datasets have 0 rows in common, try
+              comparing evaluations with datasets that have at least one row in
+              common.
+            </Alert>
+          </VerticalBox>
         )}
-        <ResultExplorer state={state} />
       </VerticalBox>
     </Box>
   );

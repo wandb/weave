@@ -251,6 +251,10 @@ const RE_TRAILING_INT = /\d+$/;
 const getCallSortExampleRow = (call: CallSchema): number => {
   const {example} = call.rawSpan.inputs;
   if (example) {
+    // If not a string, we don't know how to sort.
+    if (!_.isString(example)) {
+      return Number.POSITIVE_INFINITY;
+    }
     const match = example.match(RE_TRAILING_INT);
     if (match) {
       return parseInt(match[0], 10);

@@ -8,7 +8,9 @@ import {
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
 import {hexToRGB} from '../../../../../../../../common/css/utils';
+import {parseRef} from '../../../../../../../../react';
 import {Icon, IconNames} from '../../../../../../../Icon';
+import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {CallLink, ObjectVersionLink} from '../../../common/Links';
 import {
   BOX_RADIUS,
@@ -83,6 +85,20 @@ export const EvaluationModelLink: React.FC<{
       icon={<ModelIcon />}
     />
   );
+};
+
+export const EvaluationDatasetLink: React.FC<{
+  callId: string;
+  state: EvaluationComparisonState;
+}> = props => {
+  const evaluationCall = props.state.data.evaluationCalls[props.callId];
+  const evaluationObj =
+    props.state.data.evaluations[evaluationCall.evaluationRef];
+  const parsed = parseRef(evaluationObj.datasetRef);
+  if (!parsed) {
+    return null;
+  }
+  return <SmallRef objRef={parsed} />;
 };
 
 const ModelIcon: React.FC = () => {

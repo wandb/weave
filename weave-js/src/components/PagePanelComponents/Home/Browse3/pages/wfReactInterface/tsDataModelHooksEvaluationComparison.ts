@@ -21,7 +21,6 @@ import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
   DerivedMetricDefinition,
-  EvaluationCall,
   EvaluationComparisonData,
   EvaluationEvaluateCallSchema,
   isBinaryScore,
@@ -100,7 +99,7 @@ const fetchEvaluationComparisonData = async (
   //            2.3.1.1: Fetch the prediction
   //            2.3.1.1: Fetch the scores
   // 1: populate the evaluationCalls
-  const evalRes = await traceServerClient.callsQuery({
+  const evalRes = await traceServerClient.callsStreamQuery({
     project_id: projectId,
     filter: {call_ids: evaluationCallIds},
   });
@@ -116,7 +115,7 @@ const fetchEvaluationComparisonData = async (
         modelRef: call.inputs.model,
         summaryMetrics: {}, // These cannot be filled out yet since we don't know the IDs yet
         _rawEvaluationTraceData: call as EvaluationEvaluateCallSchema,
-      } as EvaluationCall,
+      },
     ])
   );
 
@@ -297,7 +296,7 @@ const fetchEvaluationComparisonData = async (
 
   // 4. Populate the predictions and scores
   const evalTraceIds = evalRes.calls.map(call => call.trace_id);
-  const evalTraceRes = await traceServerClient.callsQuery({
+  const evalTraceRes = await traceServerClient.callsStreamQuery({
     project_id: projectId,
     filter: {trace_ids: evalTraceIds},
   });
@@ -333,7 +332,7 @@ const fetchEvaluationComparisonData = async (
       const evaluationCallId = parentPredictAndScore.parent_id!;
 
       const split = '/attr/rows/id/';
-      if (exampleRef.includes(split)) {
+      if (typeof exampleRef === 'string' && exampleRef.includes(split)) {
         const parts = exampleRef.split(split);
         if (parts.length === 2) {
           const maybeDigest = parts[1];
@@ -376,7 +375,7 @@ const fetchEvaluationComparisonData = async (
                 parentPredictAndScore.id
               ] = {
                 callId: parentPredictAndScore.id,
-                firstExampleRef: exampleRef,
+                exampleRef,
                 rowDigest,
                 modelRef,
                 evaluationCallId,
@@ -513,6 +512,16 @@ const fetchEvaluationComparisonData = async (
       }
     }
   });
+
+  // Filter out non-intersecting rows
+  result.resultRows = Object.fromEntries(
+    Object.entries(result.resultRows).filter(([digest, row]) => {
+      return (
+        Object.values(row.evaluations).length ===
+        Object.values(result.evaluationCalls).length
+      );
+    })
+  );
 
   return result;
 };
