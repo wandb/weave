@@ -133,7 +133,7 @@ jobs:
           DD_SERVICE: weave-python
           DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
-        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && pip install 'dspy>=0.1.5' && pip install pydantic -U  && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && pip install 'dspy-ai>=0.1.5' && pip install pydantic -U  && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
 
   # nbmake:
   #   name: Run notebooks with nbmake
