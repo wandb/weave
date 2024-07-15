@@ -40,7 +40,7 @@ class MyModel(Model):
 
     @weave.op()
     def predict(self, question: str):
-        # here's where you would add your LLM call and return the output
+        # Here's where you would add your LLM call and return the output
         return {"generated_text": "Hello, " + question + self.prompt}
 
 
