@@ -14,7 +14,7 @@ from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
 
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
-    temp_read_dir: Optional[tempfile.TemporaryDirectory]
+    temp_read_dir: Optional[str]
     path_contents: dict[str, bytes]
 
     def __init__(
@@ -72,8 +72,8 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         if path not in self.path_contents:
             raise FileNotFoundError(path)
 
-        self.temp_read_dir = tempfile.TemporaryDirectory()
-        write_path = os.path.join(self.temp_read_dir.name, path)
+        self.temp_read_dir = tempfile.mkdtemp()
+        write_path = os.path.join(self.temp_read_dir, path)
         with open(write_path, "wb") as f:
             f.write(self.path_contents[path])
             f.flush()
