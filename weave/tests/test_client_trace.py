@@ -1316,8 +1316,10 @@ def test_bound_op_retrieval(client):
     assert obj2.op_with_custom_type(1) == 2
 
     my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
-    with pytest.raises(MissingSelfInstanceError):
-        my_op2 = my_op_ref.get()
+    assert my_op_ref is None, "Must call get on the instance!"
+
+    my_op_ref2 = weave_client.get_ref(obj2.op_with_custom_type)
+    assert my_op_ref2 is not None
 
 
 @pytest.mark.skip("Not implemented: general bound op designation")
