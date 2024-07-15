@@ -60,7 +60,6 @@ export const makeTrackEvent = <
     }
 
     if (shouldTrack) {
-      console.log("TRACKING", eventName, eventData);
       // note that the type guarantees array of length 1
       Analytics.track(eventName as unknown as string, eventData[0] ?? {});
     }

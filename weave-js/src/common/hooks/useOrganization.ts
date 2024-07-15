@@ -16,7 +16,13 @@ export const ORGANIZATION_QUERY = gql`
   }
 `;
 
-export const useOrgName = ({entityName, skip}: {entityName: string, skip?: boolean}) => {
+export const useOrgName = ({
+  entityName,
+  skip,
+}: {
+  entityName: string;
+  skip?: boolean;
+}) => {
   const [orgName, setOrgName] = useState<string | null>(null);
   const isMounted = useIsMounted();
 

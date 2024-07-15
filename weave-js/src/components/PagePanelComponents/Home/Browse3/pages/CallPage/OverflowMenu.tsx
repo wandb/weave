@@ -5,20 +5,19 @@ import {
   DialogTitle as MaterialDialogTitle,
 } from '@material-ui/core';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useClosePeek} from '../../context';
 import {CopyableId} from '../common/Id';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
-
-import * as userEvents from '../../../../../../integrations/analytics/userEvents';
-import { useOrgName } from '@wandb/weave/common/hooks/useOrganization';
-import { useViewerUserInfo2 } from '@wandb/weave/common/hooks/useViewerUserInfo';
 
 export const OverflowMenu: FC<{
   selectedCalls: TraceCallSchema[];

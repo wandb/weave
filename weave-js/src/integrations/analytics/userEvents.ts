@@ -1,4 +1,4 @@
-import { makeTrackEvent } from "./makeTrackEvent";
+import {makeTrackEvent} from './makeTrackEvent';
 
 export const deleteClicked = makeTrackEvent<
   {
@@ -15,7 +15,10 @@ export const deleteClicked = makeTrackEvent<
     callIds: {
       description: 'IDs of calls deleted';
       exampleValues: [
-        ['bb5621fd-91bc-42af-b017-1a34e3250330', 'b2136295-edc5-4778-9304-0fa36c9541a4'],
+        [
+          'bb5621fd-91bc-42af-b017-1a34e3250330',
+          'b2136295-edc5-4778-9304-0fa36c9541a4'
+        ],
         ['bb5621fd-91bc-42af-b017-1a34e3250330']
       ];
     };

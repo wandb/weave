@@ -66,8 +66,6 @@ export const CallOverview: React.FC<{
         <Reactions weaveRef={refCall} forceVisible={true} />
         <OverflowBin>
           <OverflowMenu
-            entity={call.entity}
-            project={call.project}
             selectedCalls={traceCalls}
             setIsRenaming={() => {
               editableCallDisplayNameRef.current?.startEditing(
