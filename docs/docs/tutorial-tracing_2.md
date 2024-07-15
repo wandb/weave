@@ -5,7 +5,7 @@ hide_table_of_contents: true
 
 # Track data flows and app metadata
 
-In the [Track LLM inputs & outputs](/tutorial-tracing_1) tutorial, the basics of tracking inputs and outputs of LLMs was explained.
+In the [Track LLM inputs & outputs](/tutorial-tracing_1) tutorial, the basics of tracking the inputs and outputs of your LLMs was covered.
 
 In this tutorial you will learn how to:
 - **Track data** as it flows though your application
@@ -14,9 +14,9 @@ In this tutorial you will learn how to:
 
 ## Tracking nested function calls
 
-LLM-powered applications can contain multiple LLMs calls and additional data processing and validation logic that is important to monitor. Weave will keep track of the parent-child relationships in nested functions as long as `weave.op()` is added to every function you'd like to track. 
+LLM-powered applications can contain multiple LLMs calls and additional data processing and validation logic that is important to monitor. Even deep nested call structures common in many apps, Weave will keep track of the parent-child relationships in nested functions as long as `weave.op()` is added to every function you'd like to track. 
 
-Building on our [basic tracing example](/tutorial-tracing_1), we will now add additional logic to count the returned items from our LLM and wrap them all in a higher level function:
+Building on our [basic tracing example](/tutorial-tracing_1), we will now add additional logic to count the returned items from our LLM and wrap them all in a higher level function. We'll then add `weave.op()` to trace every function, its call order and its parent-child relationship:
 
 ```python
 import weave
@@ -48,6 +48,7 @@ def extract_dinos(sentence: str) -> dict:
 # highlight-next-line
 @weave.op()
 def count_dinos(dino_data: dict) -> int:
+    # count the number of items in the returned list
     k = list(dino_data.keys())[0]
     return len(dino_data[k])
 
@@ -56,9 +57,9 @@ def count_dinos(dino_data: dict) -> int:
 def dino_tracker(sentence: str) -> dict:
     # extract dinosaurs using a LLM
     dino_data = extract_dinos(sentence)
-    dino_data = json.loads(dino_data)
-
+    
     # count the number of dinosaurs returned
+    dino_data = json.loads(dino_data)
     n_dinos = count_dinos(dino_data)
     return {"n_dinosaurs": n_dinos, "dinosaurs": dino_data}
 

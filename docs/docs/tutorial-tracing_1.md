@@ -44,6 +44,7 @@ from openai import OpenAI
 client = OpenAI(api_key="...")
 
 # highlight-next-line
+# Weave will track the inputs, outputs and code of this function
 @weave.op()
 def extract_dinos(sentence: str) -> dict:
     response = client.chat.completions.create(
@@ -64,6 +65,7 @@ their `common_name`, and whether its `diet` is a herbivore or carnivore"""
     return response.choices[0].message.content
 
 # highlight-next-line
+# Initialise the weave project
 weave.init('jurassic-park')
 
 sentence = """I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), \
