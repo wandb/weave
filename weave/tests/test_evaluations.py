@@ -35,6 +35,15 @@ def op_name_from_ref(ref: str) -> str:
     return ref.split("/")[-1].split(":")[0]
 
 
+class MyModel(Model):
+    prompt: str
+
+    @weave.op()
+    def predict(self, question: str):
+        # here's where you would add your LLM call and return the output
+        return {"generated_text": "Hello, " + question + self.prompt}
+
+
 async def do_quickstart():
     """This is the basic example from the README/quickstart/docs"""
     examples = [
@@ -50,14 +59,6 @@ async def do_quickstart():
     @weave.op()
     def match_score2(expected: dict, model_output: dict) -> dict:
         return {"match": expected == model_output["generated_text"]}
-
-    class MyModel(Model):
-        prompt: str
-
-        @weave.op()
-        def predict(self, question: str):
-            # here's where you would add your LLM call and return the output
-            return {"generated_text": "Hello, " + question + self.prompt}
 
     model = MyModel(prompt="World")
     evaluation = Evaluation(dataset=examples, scorers=[match_score1, match_score2])
