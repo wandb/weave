@@ -28,6 +28,7 @@ import {ReactComponent as ImportChevronDown} from '../../assets/icons/icon-chevr
 import {ReactComponent as ImportChevronNext} from '../../assets/icons/icon-chevron-next.svg';
 import {ReactComponent as ImportChevronUp} from '../../assets/icons/icon-chevron-up.svg';
 import {ReactComponent as ImportCircle} from '../../assets/icons/icon-circle.svg';
+import {ReactComponent as ImportClearAll} from '../../assets/icons/icon-clear-all.svg';
 import {ReactComponent as ImportClose} from '../../assets/icons/icon-close.svg';
 import {ReactComponent as ImportCloud} from '../../assets/icons/icon-cloud.svg';
 import {ReactComponent as ImportCodeAlt} from '../../assets/icons/icon-code-alt.svg';
@@ -132,6 +133,8 @@ import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/ico
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
+import {ReactComponent as ImportPanelAutoGen} from '../../assets/icons/icon-panel-auto-gen.svg';
+import {ReactComponent as ImportPanelManual} from '../../assets/icons/icon-panel-manual.svg';
 import {ReactComponent as ImportParentBackUp} from '../../assets/icons/icon-parent-back-up.svg';
 import {ReactComponent as ImportPause} from '../../assets/icons/icon-pause.svg';
 import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg';
@@ -330,6 +333,9 @@ export const IconChevronUp = (props: SVGIconProps) => (
 );
 export const IconCircle = (props: SVGIconProps) => (
   <ImportCircle {...updateIconProps(props)} />
+);
+export const IconClearAll = (props: SVGIconProps) => (
+  <ImportClearAll {...updateIconProps(props)} />
 );
 export const IconClose = (props: SVGIconProps) => (
   <ImportClose {...updateIconProps(props)} />
@@ -642,6 +648,12 @@ export const IconPanTool1 = (props: SVGIconProps) => (
 );
 export const IconPanel = (props: SVGIconProps) => (
   <ImportPanel {...updateIconProps(props)} />
+);
+export const IconPanelAutoGen = (props: SVGIconProps) => (
+  <ImportPanelAutoGen {...updateIconProps(props)} />
+);
+export const IconPanelManual = (props: SVGIconProps) => (
+  <ImportPanelManual {...updateIconProps(props)} />
 );
 export const IconParentBackUp = (props: SVGIconProps) => (
   <ImportParentBackUp {...updateIconProps(props)} />
@@ -976,6 +988,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'chevron-next': IconChevronNext,
   'chevron-up': IconChevronUp,
   circle: IconCircle,
+  'clear-all': IconClearAll,
   close: IconClose,
   cloud: IconCloud,
   'code-alt': IconCodeAlt,
@@ -1080,6 +1093,8 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
+  'panel-auto-gen': IconPanelAutoGen,
+  'panel-manual': IconPanelManual,
   'parent-back-up': IconParentBackUp,
   pause: IconPause,
   paused: IconPaused,
