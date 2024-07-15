@@ -106,18 +106,23 @@ export const CallsTable: FC<{
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
+  const isReadonly =
+    loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
+
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
 
   // Register Export Button
   useEffect(() => {
     addExtra('exportRunsTableButton', {
-      node: <ExportRunsTableButton tableRef={apiRef} />,
+      node: (
+        <ExportRunsTableButton tableRef={apiRef} rightmostButton={isReadonly} />
+      ),
       order: 2,
     });
 
     return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, addExtra, removeExtra]);
+  }, [apiRef, isReadonly, addExtra, removeExtra]);
 
   // Table State consists of:
   // 1. Filter (Structured Filter)
@@ -505,8 +510,6 @@ export const CallsTable: FC<{
   ]);
 
   // Register Delete Button
-  const isReadonly =
-    loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   useEffect(() => {
     if (isReadonly) {
@@ -871,8 +874,10 @@ const getPeekId = (peekPath: string | null): string | null => {
 
 const ExportRunsTableButton = ({
   tableRef,
+  rightmostButton = false,
 }: {
   tableRef: React.MutableRefObject<GridApiPro>;
+  rightmostButton?: boolean;
 }) => (
   <Box
     sx={{
@@ -881,7 +886,7 @@ const ExportRunsTableButton = ({
       alignItems: 'center',
     }}>
     <Button
-      className="mr-4"
+      className={rightmostButton ? 'mr-16' : 'mr-4'}
       size="medium"
       variant="ghost"
       icon="export-share-upload"
