@@ -180,6 +180,8 @@ class Evaluation(Object):
             print("model_output failed")
             traceback.print_exc()
             model_output = None
+
+        # This is a bug - should instead look at the call end - start
         model_latency = time.time() - model_start_time
 
         scores = {}

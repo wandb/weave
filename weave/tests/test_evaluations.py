@@ -136,18 +136,32 @@ async def test_basic_evaluation(client):
         )
 
 
+@weave.op
+def gpt_mocker(question: str):
+    return {
+        "response": str(question),
+        "model": "gpt-4o-2024-05-13",
+        "usage": {
+            "requests": 1,
+            "completion_tokens": 28,
+            "prompt_tokens": 11,
+            "total_tokens": 39,
+        },
+    }
+
+
 class SimpleModel(Model):
     @weave.op()
     def predict(self, question: str):
-        question = question.strip(".") if len(question) % 2 == 0 else question
-        return {"response": question}
+        res = gpt_mocker(question.strip(".") if len(question) % 2 == 1 else question)
+        return {"response": res["response"]}
 
 
 class SimpleModelWithConfidence(Model):
     @weave.op()
     def predict(self, question: str):
-        question = question.strip(".") if len(question) % 2 == 1 else question
-        return {"response": question, "confidence": 1 / len(question)}
+        res = gpt_mocker(question.strip(".") if len(question) % 2 == 0 else question)
+        return {"response": res["response"], "confidence": 1 / (len(res) + 1)}
 
 
 def score_int(expected: str, model_output: dict) -> int:
@@ -246,7 +260,12 @@ class MyDictScorerWithCustomDictSummary(weave.Scorer):
 
 
 @pytest.mark.asyncio
-async def test_evaluation_summary_styles(client):
+async def test_evaluation_data_topology(client):
+    """We support a number of different types of scorers, and we want to ensure that
+    the data stored matches the expected structure. This test is a bit more complex
+    than the previous one, as it involves multiple models and scorers. Importantly,
+    the construction of the Eval Comparison page relies on this structure.
+    """
     examples = [
         {"question": "A.", "expected": "A"},
         {"question": "BB.", "expected": "BB"},
@@ -266,10 +285,10 @@ async def test_evaluation_summary_styles(client):
     )
 
     model1 = SimpleModel()
-    res1 = await evaluation.evaluate(model1)
+    await evaluation.evaluate(model1)
 
     model2 = SimpleModelWithConfidence()
-    res2 = await evaluation.evaluate(model2)
+    await evaluation.evaluate(model2)
 
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -277,11 +296,12 @@ async def test_evaluation_summary_styles(client):
         )
     )
     flattened = flatten_calls(calls.calls)
-    assert len(flattened) == 46
+    assert len(flattened) == 50
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
     predict_and_score_block = lambda model_pred_name: [
         ("Evaluation.predict_and_score", 1),
         (model_pred_name, 2),
+        ("gpt_mocker", 3),
         ("score_int", 2),
         ("score_float", 2),
         ("score_bool", 2),
@@ -313,54 +333,73 @@ async def test_evaluation_summary_styles(client):
     flat_calls = [c[0] for c in flattened]
 
     # Next, we will assert some application-specific details about the calls
-    eval_block_0 = flat_calls[: len(eval_block(""))]
-    evaluate_call_0_0 = eval_block_0[0]
-    predict_and_score_block_0_0 = eval_block_0[1 : 1 + len(predict_and_score_block(""))]
-    predict_and_score_call_0_0 = predict_and_score_block_0_0[0]
-    predict_call_0_0 = predict_and_score_block_0_0[1]
-    score_int_call_0_0 = predict_and_score_block_0_0[2]
-    score_float_call_0_0 = predict_and_score_block_0_0[3]
-    score_bool_call_0_0 = predict_and_score_block_0_0[4]
-    score_dict_call_0_0 = predict_and_score_block_0_0[5]
-    my_dict_scorer_with_custom_float_score_call_0_0 = predict_and_score_block_0_0[6]
-    my_dict_scorer_with_custom_bool_score_call_0_0 = predict_and_score_block_0_0[7]
-    my_dict_scorer_with_custom_dict_score_call_0_0 = predict_and_score_block_0_0[8]
-    summary_block_0_0 = eval_block_0[-len(summary_block) :]
-    summary_call_0_0 = summary_block_0_0[0]
-    my_dict_scorer_with_custom_float_summary_call_0_0 = summary_block_0_0[1]
-    my_dict_scorer_with_custom_bool_summary_call_0_0 = summary_block_0_0[2]
-    my_dict_scorer_with_custom_dict_summary_call_0_0 = summary_block_0_0[3]
+    eval_block = flat_calls[len(eval_block("")) :]
+    evaluate_call = eval_block[0]
+    predict_and_score_block = eval_block[1 : 1 + len(predict_and_score_block(""))]
+    predict_and_score_call = predict_and_score_block[0]
+    predict_call = predict_and_score_block[1]
+    # gtp_mock_call = predict_and_score_block[2]
+    score_int_call = predict_and_score_block[3]
+    score_float_call = predict_and_score_block[4]
+    score_bool_call = predict_and_score_block[5]
+    score_dict_call = predict_and_score_block[6]
+    my_dict_scorer_with_custom_float_score_call = predict_and_score_block[6]
+    my_dict_scorer_with_custom_bool_score_call = predict_and_score_block[7]
+    my_dict_scorer_with_custom_dict_score_call = predict_and_score_block[8]
+    summary_block = eval_block[-len(summary_block) :]
+    summary_call = summary_block[0]
+    my_dict_scorer_with_custom_float_summary_call = summary_block[1]
+    my_dict_scorer_with_custom_bool_summary_call = summary_block[2]
+    my_dict_scorer_with_custom_dict_summary_call = summary_block[3]
 
     # Prediction Section
-    model_output = {"response": "A"}
-    model_1_latency = {"mean": Nearly(0, 1)}  # 0.005481123924255371
+    confidence = 1 / 4
+    model_output = {
+        "response": "A",
+        "confidence": confidence,
+    }
+    # BUG: latency reported includes weave internal latency
+    # actual_latency = (predict_call.ended_at - predict_call.started_at).total_seconds()
+    actual_latency = Nearly(0, 1)
+    model_1_latency = {"mean": actual_latency}
     score_int_score = 1
     score_float_score = 1.0
     score_bool_score = True
     score_dict_score = {
         "d_int": score_int_score,
         "d_float": score_float_score,
-        "d_bool": score_dict_score,
+        "d_bool": score_bool_score,
         "d_nested": {
             "d_int": score_int_score,
             "d_float": score_float_score,
-            "d_bool": score_dict_score,
+            "d_bool": score_bool_score,
         },
         "reason": "This is a test reason",
     }
+    predict_usage = {
+        "usage": {
+            "gpt-4o-2024-05-13": {
+                "requests": 1,
+                "completion_tokens": 28,
+                "prompt_tokens": 11,
+                "total_tokens": 39,
+            }
+        }
+    }
 
     # Prediction
-    assert predict_call_0_0.output == model_output
+    assert predict_call.output == model_output
+    assert predict_call.summary == predict_usage
 
     # Prediction Scores
-    assert score_int_call_0_0.output == score_int_score
-    assert score_float_call_0_0.output == score_float_score
-    assert score_bool_call_0_0.output == score_bool_score
+    assert score_int_call.output == score_int_score
+    assert score_float_call.output == score_float_score
+    assert score_bool_call.output == score_bool_score
     assert (
-        score_dict_call_0_0.output
-        == my_dict_scorer_with_custom_float_score_call_0_0.output
-        == my_dict_scorer_with_custom_dict_score_call_0_0.output
-        == my_dict_scorer_with_custom_bool_score_call_0_0.output
+        score_dict_call.output
+        == my_dict_scorer_with_custom_float_score_call.output
+        == my_dict_scorer_with_custom_dict_score_call.output
+        == my_dict_scorer_with_custom_bool_score_call.output
         == {
             "d_int": 1,
             "d_float": 1.0,
@@ -371,7 +410,7 @@ async def test_evaluation_summary_styles(client):
     )
 
     # Predict And Score Group
-    assert predict_and_score_call_0_0.output == {
+    assert predict_and_score_call.output == {
         "model_output": model_output,
         "scores": {
             "score_int": score_int_score,
@@ -382,10 +421,13 @@ async def test_evaluation_summary_styles(client):
             "MyDictScorerWithCustomBoolSummary": score_dict_score,
             "MyDictScorerWithCustomDictSummary": score_dict_score,
         },
-        "model_latency": model_1_latency,
+        "model_latency": actual_latency,
     }
 
     # Summary section
+    model_output_summary = {
+        "confidence": {"mean": confidence},
+    }
     score_int_auto_summary = {"mean": 1.5}
     score_float_auto_summary = {"mean": 0.8333333333333333}
     score_bool_auto_summary = {"true_count": 1, "true_fraction": 0.5}
@@ -396,26 +438,43 @@ async def test_evaluation_summary_styles(client):
         "nested": {"bool_avg": 0.5},
         "reason": "This is a custom test reason",
     }
-    model_latency = {"mean": Nearly(0, 1)}  # 0.005481123924255371
+    model_latency = {"mean": Nearly(0, 1)}
+    predict_usage_summary = {
+        "usage": {
+            "gpt-4o-2024-05-13": {
+                "requests": predict_usage["usage"]["gpt-4o-2024-05-13"]["requests"] * 2,
+                "completion_tokens": predict_usage["usage"]["gpt-4o-2024-05-13"][
+                    "completion_tokens"
+                ]
+                * 2,
+                "prompt_tokens": predict_usage["usage"]["gpt-4o-2024-05-13"][
+                    "prompt_tokens"
+                ]
+                * 2,
+                "total_tokens": predict_usage["usage"]["gpt-4o-2024-05-13"][
+                    "total_tokens"
+                ]
+                * 2,
+            }
+        }
+    }
 
     # Summarizers
     assert (
-        my_dict_scorer_with_custom_float_summary_call_0_0.output
+        my_dict_scorer_with_custom_float_summary_call.output
         == dict_scorer_float_summary
     )
     assert (
-        my_dict_scorer_with_custom_bool_summary_call_0_0.output
-        == dict_scorer_bool_summary
+        my_dict_scorer_with_custom_bool_summary_call.output == dict_scorer_bool_summary
     )
     assert (
-        my_dict_scorer_with_custom_dict_summary_call_0_0.output
-        == dict_scorer_dict_summary
+        my_dict_scorer_with_custom_dict_summary_call.output == dict_scorer_dict_summary
     )
 
     # Final Summary
     assert (
-        evaluate_call_0_0.output
-        == summary_call_0_0.output
+        evaluate_call.output
+        == summary_call.output
         == {
             "score_int": score_int_auto_summary,
             "score_float": score_float_auto_summary,
@@ -434,5 +493,7 @@ async def test_evaluation_summary_styles(client):
             "MyDictScorerWithCustomBoolSummary": dict_scorer_bool_summary,
             "MyDictScorerWithCustomDictSummary": dict_scorer_dict_summary,
             "model_latency": model_latency,
+            "model_output": model_output_summary,
         }
     )
+    assert evaluate_call.summary == predict_usage_summary
