@@ -388,7 +388,9 @@ export const CallsTable: FC<{
                   if (selectedCalls.length === tableData.length) {
                     setSelectedCalls([]);
                   } else {
-                    setSelectedCalls(tableData.map(row => row.id));
+                    setSelectedCalls(
+                      tableData.map(row => row.id).slice(0, MAX_BULK_DELETE)
+                    );
                   }
                 } else {
                   // exclude non-successful calls from selection
@@ -398,7 +400,9 @@ export const CallsTable: FC<{
                   if (selectedCalls.length === filtered.length) {
                     setSelectedCalls([]);
                   } else {
-                    setSelectedCalls(filtered.map(row => row.id));
+                    setSelectedCalls(
+                      filtered.map(row => row.id).slice(0, MAX_EVAL_COMPARISONS)
+                    );
                   }
                 }
               }}
