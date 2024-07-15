@@ -33,7 +33,6 @@ def groq_accumulator(
                 )
             else:
                 choices.append(choice)
-        pprint(f"{value.object=}")
         acc = ChatCompletion(
             id=value.id,
             choices=choices,
@@ -51,11 +50,12 @@ def groq_accumulator(
 
     if value.choices:
         for idx, choice in enumerate(value.choices):
-            acc.choices[idx].message += choice.message
-            if acc.choices[idx].function_call:
-                acc.choices[idx].function_call.append(choice.function_call)
-            if acc.choices[idx].tool_call:
-                acc.choices[idx].tool_call.append(choice.tool_call)
+            if acc.choices[idx].message.content:
+                acc.choices[idx].message.content += choice.delta.content
+            if acc.choices[idx].message.function_call:
+                acc.choices[idx].message.function_call.append(choice.delta.function_call)
+            if acc.choices[idx].message.tool_call:
+                acc.choices[idx].message.tool_call.append(choice.delta.tool_call)
 
     return acc
 
