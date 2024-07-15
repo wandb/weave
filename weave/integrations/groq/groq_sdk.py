@@ -1,11 +1,10 @@
 import importlib
-from typing import Callable, Dict, List, Optional
-
-from rich import print as pprint
+from typing import Callable, Dict, Optional
 
 from groq.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
 from groq.types.chat.chat_completion import Choice
 from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
+from rich import print as pprint
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -15,30 +14,32 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 def groq_accumulator(
     acc: Optional[ChatCompletion], value: ChatCompletionChunk
 ) -> ChatCompletion:
-    # if acc is None:
-    #     choices = []
-    #     for choice in value.choices:
-    #         if isinstance(value.choices[0], ChoiceChunk):
-    #             choices.append(
-    #                 Choice(
-    #                     message=ChatCompletionMessage(
-    #                         content=choice.delta.content,
-    #                         role=choice.delta.role,
-    #                         function_call=choice.delta.function_call,
-    #                         tool_call=choice.delta.tool_calls,
-    #                     ),
-    #                     finish_reason=choice.finish_reason,
-    #                     index=choice.index,
-    #                     logprobs=choice.logprobs,
-    #                 )
-    #             )
-    #         else:
-    #             choices.append(choice)
+    if acc is None:
+        choices = []
+        for choice in value.choices:
+            if isinstance(value.choices[0], ChoiceChunk):
+                choices.append(
+                    Choice(
+                        message=ChatCompletionMessage(
+                            content=choice.delta.content,
+                            role=choice.delta.role,
+                            function_call=choice.delta.function_call,
+                            tool_call=choice.delta.tool_calls,
+                        ),
+                        finish_reason="stop",
+                        index=choice.index,
+                        logprobs=choice.logprobs,
+                    )
+                )
+            else:
+                choices.append(choice)
+        pprint(f"{value.object=}")
         acc = ChatCompletion(
             id=value.id,
-            choices=value.choices,
+            choices=choices,
             created=value.created,
-            object=value.object,
+            model=value.model,
+            object="chat.completion",
             system_fingerprint=value.system_fingerprint,
             usage=value.usage,
         )
