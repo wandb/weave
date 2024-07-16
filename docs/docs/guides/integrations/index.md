@@ -5,11 +5,11 @@ Weave contains automatic logging integrations for popular LLMs and orchestration
   - **[OpenAI](/guides/integrations/openai)**
   - **[Anthropic](/guides/integrations/anthropic)**
   - **[Cohere](/guides/integrations/cohere)**
-  - **[MistralAI](/guides/integrations/mistralai)**
+  - **[MistralAI](/guides/integrations/mistral)**
   - **[LlamaIndex](/guides/integrations/llamaindex)**
   - **[DSPy](/guides/integrations/dspy)**
   - **[Google Gemini](/guides/integrations/google-gemini)**
-  - **[Together AI](/guides/integrations/together-ai)**
-  - **[Open Router](/guides/integrations/open-router)**
+  - **[Together AI](/guides/integrations/together_ai)**
+  - **[Open Router](/guides/integrations/openrouter)**
   - **[Local Models](/guides/integrations/local_models)**
   - **[LiteLLM](/guides/integrations/litellm)**
