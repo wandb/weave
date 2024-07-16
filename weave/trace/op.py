@@ -7,7 +7,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Coroutine,
     Dict,
     Mapping,
     Optional,
@@ -20,7 +19,7 @@ from typing import (
 
 from weave import call_context, client_context
 from weave.legacy import context_state
-from weave.trace import box
+from weave.trace.call import execute_call as _execute_call
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -165,55 +164,55 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     )
 
 
-def _execute_call(
-    __op: Op,
-    call: Any,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    func = __op.resolve_fn
-    client = client_context.weave_client.require_weave_client()
-    has_finished = False
+# def _execute_call(
+#     __op: Op,
+#     call: Any,
+#     *args: Any,
+#     **kwargs: Any,
+# ) -> Any:
+#     func = __op.resolve_fn
+#     client = client_context.weave_client.require_weave_client()
+#     has_finished = False
 
-    def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
-        nonlocal has_finished
-        if has_finished:
-            raise ValueError("Should not call finish more than once")
-        client.finish_call(call, output, exception)
-        if not call_context.get_current_call():
-            print_call_link(call)
+#     def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
+#         nonlocal has_finished
+#         if has_finished:
+#             raise ValueError("Should not call finish more than once")
+#         client.finish_call(call, output, exception)
+#         if not call_context.get_current_call():
+#             print_call_link(call)
 
-    def on_output(output: Any) -> Any:
-        if handler := getattr(__op, "_on_output_handler", None):
-            return handler(output, finish, call.inputs)
-        finish(output)
-        return output
+#     def on_output(output: Any) -> Any:
+#         if handler := getattr(__op, "_on_output_handler", None):
+#             return handler(output, finish, call.inputs)
+#         finish(output)
+#         return output
 
-    try:
-        res = func(*args, **kwargs)
-    except BaseException as e:
-        finish(exception=e)
-        raise
-    else:
-        res = box.box(res)  # TODO: can we get rid of this?
+#     try:
+#         res = func(*args, **kwargs)
+#     except BaseException as e:
+#         finish(exception=e)
+#         raise
+#     else:
+#         res = box.box(res)  # TODO: can we get rid of this?
 
-    if inspect.iscoroutine(res):
-        awaitable = res
+#     if inspect.iscoroutine(res):
+#         awaitable = res
 
-        async def _call_async() -> Coroutine[Any, Any, Any]:
-            try:
-                call_context.push_call(call)
-                output = await awaitable
-                return on_output(output)
-            except BaseException as e:
-                finish(exception=e)
-                raise
-            finally:
-                call_context.pop_call(call.id)
+#         async def _call_async() -> Coroutine[Any, Any, Any]:
+#             try:
+#                 call_context.push_call(call)
+#                 output = await awaitable
+#                 return on_output(output)
+#             except BaseException as e:
+#                 finish(exception=e)
+#                 raise
+#             finally:
+#                 call_context.pop_call(call.id)
 
-        return _call_async()
-    else:
-        return on_output(res)
+#         return _call_async()
+#     else:
+#         return on_output(res)
 
 
 def call(op: Op, *args: Any, **kwargs: Any) -> Any:
