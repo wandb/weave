@@ -12,9 +12,9 @@ from typing import (
 from weave import call_context, client_context
 from weave.trace import box
 from weave.trace.constants import TRACE_CALL_EMOJI
-from weave.trace.op import Op
 
 if TYPE_CHECKING:
+    from weave.trace.op import Op
     from weave.weave_client import Call
 
 
