@@ -25,7 +25,7 @@ def print_call_link(call: "Call") -> None:
     print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
-def create_finish_func(call: Call, client: Any) -> Callable:
+def create_finish_func(call: "Call", client: Any) -> Callable:
     has_finished = False
 
     def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
@@ -40,7 +40,7 @@ def create_finish_func(call: Call, client: Any) -> Callable:
     return finish
 
 
-def create_on_output_func(__op: Op, finish: Callable, call: Call) -> Callable:
+def create_on_output_func(__op: Op, finish: Callable, call: "Call") -> Callable:
     def on_output(output: Any) -> Any:
         if handler := getattr(__op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
@@ -50,7 +50,7 @@ def create_on_output_func(__op: Op, finish: Callable, call: Call) -> Callable:
     return on_output
 
 
-def _execute_call_sync(__op: Op, call: Call, *args: Any, **kwargs: Any) -> T:
+def _execute_call_sync(__op: Op, call: "Call", *args: Any, **kwargs: Any) -> T:
     func = __op.resolve_fn
     client = client_context.weave_client.require_weave_client()
 
@@ -68,7 +68,7 @@ def _execute_call_sync(__op: Op, call: Call, *args: Any, **kwargs: Any) -> T:
 
 
 async def _execute_call_async(
-    __op: Op, call: Call, *args: Any, **kwargs: Any
+    __op: Op, call: "Call", *args: Any, **kwargs: Any
 ) -> Coroutine[Any, Any, T]:
     func = __op.resolve_fn
     client = client_context.weave_client.require_weave_client()
@@ -89,7 +89,7 @@ async def _execute_call_async(
 
 
 def execute_call(
-    __op: Op, call: Call, *args: Any, **kwargs: Any
+    __op: Op, call: "Call", *args: Any, **kwargs: Any
 ) -> Union[T, Coroutine[Any, Any, T]]:
     func = __op.resolve_fn
     if inspect.iscoroutinefunction(func):
