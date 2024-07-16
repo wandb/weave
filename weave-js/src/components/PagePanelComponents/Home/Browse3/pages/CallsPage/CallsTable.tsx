@@ -62,6 +62,7 @@ import {
 } from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
@@ -549,7 +550,9 @@ export const CallsTable: FC<{
     addExtra('deleteSelectedCallsModal', {
       node: (
         <ConfirmDeleteModal
-          calls={tableData.filter(row => selectedCalls.includes(row.id))}
+          calls={tableData
+            .filter(row => selectedCalls.includes(row.id))
+            .map(traceCallToUICallSchema)}
           confirmDelete={deleteConfirmModalOpen}
           setConfirmDelete={setDeleteConfirmModalOpen}
           onDeleteCallback={() => {

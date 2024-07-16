@@ -4,7 +4,6 @@ import styled from 'styled-components';
 import EditableField from '../../../../../../common/components/EditableField';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Reactions} from '../../feedback/Reactions';
-import {prepareFlattenedCallDataForTable} from '../CallsPage/callsTableDataProcessing';
 import {EditableCallName} from '../common/EditableCallName';
 import {CopyableId} from '../common/Id';
 import {StatusChip} from '../common/StatusChip';
@@ -48,9 +47,6 @@ export const CallOverview: React.FC<{
   const refCall = makeRefCall(call.entity, call.project, call.callId);
   const editableCallDisplayNameRef = React.useRef<EditableField>(null);
 
-  // CallSchema -> TraceCallSchema
-  const traceCalls = prepareFlattenedCallDataForTable([call]);
-
   return (
     <>
       <Overview>
@@ -66,7 +62,7 @@ export const CallOverview: React.FC<{
         <Reactions weaveRef={refCall} forceVisible={true} />
         <OverflowBin>
           <OverflowMenu
-            selectedCalls={traceCalls}
+            selectedCalls={[call]}
             setIsRenaming={() => {
               editableCallDisplayNameRef.current?.startEditing(
                 new MouseEvent('click') as unknown as SyntheticEvent

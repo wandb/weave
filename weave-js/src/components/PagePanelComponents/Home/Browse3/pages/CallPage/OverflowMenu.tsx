@@ -16,11 +16,10 @@ import * as userEvents from '../../../../../../integrations/analytics/userEvents
 import {useClosePeek} from '../../context';
 import {CopyableId} from '../common/Id';
 import {useWFHooks} from '../wfReactInterface/context';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
-import {opVersionRefOpName} from '../wfReactInterface/utilities';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const OverflowMenu: FC<{
-  selectedCalls: TraceCallSchema[];
+  selectedCalls: CallSchema[];
   setIsRenaming: (isEditing: boolean) => void;
 }> = ({selectedCalls, setIsRenaming}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -119,7 +118,7 @@ DialogActions.displayName = 'S.DialogActions';
 const MAX_DELETED_CALLS_TO_SHOW = 10;
 
 export const ConfirmDeleteModal: FC<{
-  calls: TraceCallSchema[];
+  calls: CallSchema[];
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
   onDeleteCallback?: () => void;
@@ -139,11 +138,12 @@ export const ConfirmDeleteModal: FC<{
   const [error, setError] = useState<string | null>(null);
 
   // Deletion requires constant entity/project, break calls into groups
-  const makeProjectGroups = (mixedCalls: TraceCallSchema[]) => {
+  const makeProjectGroups = (mixedCalls: CallSchema[]) => {
     const projectGroups: {[key: string]: string[]} = {};
     mixedCalls.forEach(call => {
-      projectGroups[call.project_id] = projectGroups[call.project_id] || [];
-      projectGroups[call.project_id].push(call.id);
+      const projectKey = `${call.project}/${call.callId}`;
+      projectGroups[projectKey] = projectGroups[projectKey] || [];
+      projectGroups[projectKey].push(call.callId);
     });
     return projectGroups;
   };
@@ -167,7 +167,9 @@ export const ConfirmDeleteModal: FC<{
     });
     Promise.all(deletePromises).then(() => {
       userEvents.deleteClicked({
-        callIds: calls.map(call => `${call.project_id}/${call.id}`),
+        callIds: calls.map(
+          call => `${call.entity}/${call.project}/${call.callId}`
+        ),
         numCalls: calls.length,
         userId: userInfoLoaded?.id ?? '',
         organizationName: orgName,
@@ -199,10 +201,10 @@ export const ConfirmDeleteModal: FC<{
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
           <CallNameRow>
             <div>
-              <CallName key={call.id}>{callDisplayName(call)}</CallName>
+              <CallName key={call.callId}>{callDisplayName(call)}</CallName>
             </div>
             <CallIdDiv>
-              <CopyableId id={call.id} type="Call" />
+              <CopyableId id={call.callId} type="Call" />
             </CallIdDiv>
           </CallNameRow>
         ))}
@@ -230,9 +232,9 @@ export const ConfirmDeleteModal: FC<{
   );
 };
 
-const callDisplayName = (call: TraceCallSchema) => {
-  if (call.display_name) {
-    return call.display_name;
+const callDisplayName = (call: CallSchema) => {
+  if (call.displayName) {
+    return call.displayName;
   }
-  return opVersionRefOpName(call.op_name);
+  return call.spanName;
 };
