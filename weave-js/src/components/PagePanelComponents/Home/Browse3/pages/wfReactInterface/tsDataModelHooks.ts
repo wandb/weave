@@ -1282,7 +1282,7 @@ const isValidTraceCall = (callRes: traceServerClient.TraceCallSchema) => {
   return !('detail' in callRes);
 };
 
-const traceCallToUICallSchema = (
+export const traceCallToUICallSchema = (
   traceCall: traceServerClient.TraceCallSchema
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
