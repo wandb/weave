@@ -7,6 +7,8 @@ hide_table_of_contents: true
 
 To iterate on an application, we need a way to evaluate if it's improving. To do so, a common practice is to test it against the same set of examples when there is a change. Weave has a first-class way to track evaluations with `Model` & `Evaluation` classes. We have built the APIs to make minimal assumptions to allow for the flexibility to support a wide array of use-cases.
 
+![Weave Hero](../static/img/evals-hero.png)
+
 ## 1. Build a `Model`
 
 `Model`s store and version information about your system, such as prompts, temperatures, and more.
