@@ -3,13 +3,13 @@ sidebar_position: 2
 hide_table_of_contents: true
 ---
 
-# Tutorial: Collecting Feedback
+# Tutorial: Using Expert and User Feedback to Improve Evaluation
 
 Gathering feedback from end users of your application is a useful way to get signal on how to improve it. 
 
 In this tutorial, we'll show how to collect feedback from users of for a RAG-based Knowledge Chatbot using Weave. 
 
-## Use Case - Collecting Feedback to Improve Evaluation Pipeline
+# Background
 In order to successfully deploy LLM apps that correspond to the users' expectation it's important to have an evaluation pipeline that produces representative metrics for both the specific user group and the specific set of use-cases. The easiest way to do that is to directly gather feedback from the users of the application. 
 
 ### Feedback Types
@@ -36,46 +36,13 @@ So far we have found that a combination of all three types of feedback is the mo
 2. **2nd Evaluation:** We deploy the RAG chatbot to a specific group of users and let them ask some questions and encourage them to give some direct feedback (reaction + notes). We track their reactions as positive and negative rates as live evaluation while it's running in production. 
 3. **3rd Evaluation:** We pull all question-answer-pairs with a negative reaction into an annotation UI and let experts annotate the given answer with help of the given feedback from the user. We save back the new annotated samples as a new version of the existing evaluation dataset and run evaluations again.
 
-## Getting Started
+# Implementation
 
-To start collecting feedback within your application, the first step is to track your function with the @weave.op decorator. Here’s how:
+Since in this tutorial we'll focus on setting up the user and expert feedback loop we skip the synthetic datset generation step and directly jump to the 2nd evaluation step. 
 
-```python
-@weave.op
-def predict(input_data):
-    # Your prediction logic here
-    return some_output
-```
+## 1. Gathering User Feedback from Production
 
-Once your function is set up as a Weave operation, you can call it as usual:
-
-```python
-output = predict(input_data="your data here")
-```
-
-However, to attach feedback, you need the `call` object, which is obtained by using the `.call()` method:
-
-```python
-call = predict.call(input_data="your data here")
-```
-
-This call object is needed for attaching feedback to the specific response.
-After making the call, you can access the output of the operation using:
-
-```python
-output = call.output
-```
-
-## Attaching Feedback
-
-Feedback is attached directly to the call object. For instance, if you want to add a positive reaction (e.g., 👍) to indicate that the LLM response has passed a vibe check, you can do so by:
-
-```python
-call.feedback.add_reaction("👍") # vibe check: passed
-```
-
-## Set up Streamlit Application
-
+### 1.1 Tracking Calls in Production
 Here we're going to set up a minimal Streamlit app to serve to our end users:
 
 ```python
@@ -143,9 +110,45 @@ Save this to a file called `feedback.py`. We can run it with `streamlit run feed
 Now, you can interact with this application and click the feedback buttons after each response. 
 Visit the Weave UI to see the attached feedback.
 
-## Building Automatic Evaluations using Feedback
 
-### Retrieving calls
+### 1.2 User Feedback Collection through App UI
+This is where the easy Weave Feedback API truly shines. Feedback is attached directly to the call object. For instance, if you want to add a positive reaction (e.g., 👍) to indicate that the LLM response has passed a vibe check, you can do so by:
+
+```python
+@weave.op
+def predict(input_data):
+    # Your prediction logic here
+    return some_output
+```
+
+Once your function is set up as a Weave operation, you can call it as usual:
+
+```python
+output = predict(input_data="your data here")
+```
+
+However, to attach feedback, you need the `call` object, which is obtained by using the `.call()` method:
+
+```python
+call = predict.call(input_data="your data here")
+```
+
+This call object is needed for attaching feedback to the specific response.
+After making the call, you can access the output of the operation using:
+
+```python
+output = call.output
+```
+
+```python
+call.feedback.add_reaction("👍") # vibe check: passed
+```
+
+## 2. Gathering Expert Feedback from Annotation UI
+
+### 2.1 Fetch Production Calls based on User Feedback
+
+ Retrieving calls
 
 ```python
 import weave
@@ -154,11 +157,11 @@ thumbs_down = client.feedback(reaction="👎")
 calls = thumbs_down.refs().calls()
 ```
 
-### Setting up Evaluation
+### 2.2 Expert Feedback through Annotation UI
+
+Setting up Evaluation
 
 ```python
 dataset_examples = [call.inputs['prompt'] for call in calls] # prompt is the input argument to our chat_response call
 dataset = weave.Dataset(name='good_examples', rows=dataset_examples)
-
-
 ```
