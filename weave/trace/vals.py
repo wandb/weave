@@ -482,7 +482,16 @@ def make_trace_obj(
     if isinstance(box_val, pydantic_v1.BaseModel):
         box_val.__dict__["ref"] = new_ref
     elif box_val is None or isinstance(box_val, bool):
-        pass  # not traceable
+        # We intentionally don't box None and bools because it's imposible to
+        # make them behave like the underlying True/False/None objects in python.
+        # This is unlike other objects (dict, list, int) that can be inherited
+        # from and compared.
+
+        # The tradeoff we're making here is:
+        # 1. We won't ref track bools or None when passed into a call; but
+        # 2. Users can compare them pythonically (e.g. `x is None` vs. `x == None`)
+
+        pass
     else:
         setattr(box_val, "ref", new_ref)
     return box_val
