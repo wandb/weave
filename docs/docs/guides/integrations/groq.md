@@ -38,12 +38,6 @@ chat_completion = client.chat.completions.create(
 |---|
 | Weave will now track and log all LLM calls made through the Groq library. You can view the traces in the Weave web interface. |
 
-:::warning
-
-The Weave integration with Groq supports both sync and async chat completions. However, streaming is not yet supported.
-
-:::
-
 ## Track your own ops
 
 Wrapping a function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
