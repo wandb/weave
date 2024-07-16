@@ -246,7 +246,7 @@ def test_model_predict(
     )
 
     res = claude_translator.predict("There is a bug in my code!", "Spanish")
-    assert res != None
+    assert res is not None
 
     call = claude_translator.predict.calls()[0]  # type: ignore
     assert dict(call.summary["usage"]["claude-3-5-sonnet-20240620"]) == {

@@ -24,7 +24,7 @@ def test_op_return_sync_empty(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == None
+    assert res.calls[0].output is None
 
 
 @pytest.mark.asyncio
@@ -45,7 +45,7 @@ async def test_op_return_async_empty(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == None
+    assert res.calls[0].output is None
 
 
 def test_op_return_sync_obj(client):
@@ -249,7 +249,7 @@ def test_op_return_sync_generator_never_iter(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == None
+    assert res.calls[0].output is None
 
 
 @pytest.mark.asyncio
@@ -275,7 +275,7 @@ async def test_op_return_async_generator_never_iter(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == None
+    assert res.calls[0].output is None
 
 
 def test_op_return_sync_iterator_never_iter(client):
@@ -309,7 +309,7 @@ def test_op_return_sync_iterator_never_iter(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == None
+    assert res.calls[0].output is None
 
 
 @pytest.mark.asyncio
@@ -344,7 +344,7 @@ async def test_op_return_async_iterator_never_iter(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == None
+    assert res.calls[0].output is None
 
 
 def test_op_return_sync_generator_partial(client):

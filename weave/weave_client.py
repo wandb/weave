@@ -1,9 +1,8 @@
 import dataclasses
 import datetime
-import inspect
 import typing
 import uuid
-from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
+from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 
 import pydantic
 from requests import HTTPError
@@ -76,7 +75,7 @@ def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
 
 def get_obj_name(val: Any) -> str:
     name = getattr(val, "name", None)
-    if name == None:
+    if name is None:
         if isinstance(val, ObjectRecord):
             name = val._class_name
         else:
@@ -737,10 +736,10 @@ class WeaveClient:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
 
-        if inspect.ismethod(op):
-            # this "func" is both a method AND an Op, but we need to cast to get dot access to its attributes
-            op = cast(op, Op)  # type: ignore
-        op.ref = op_def_ref  # type: ignore
+        # setattr(op, "ref", op_def_ref) fails here
+        # op.ref = op_def_ref fails here
+        # Seems to be the only way to set the ref on the op
+        op.__dict__["ref"] = op_def_ref
         return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()
