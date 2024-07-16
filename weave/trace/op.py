@@ -315,9 +315,6 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    # if wrapper.__self__ is not None:  # type: ignore
-                    #     args = (wrapper.__self__,) + args  # type: ignore
-
                     if client_context.weave_client.get_weave_client() is None:
                         return await func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
@@ -332,9 +329,6 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    # if wrapper.__self__ is not None:  # type: ignore
-                    #     args = (wrapper.__self__,) + args  # type: ignore
-
                     if client_context.weave_client.get_weave_client() is None:
                         return func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
@@ -379,7 +373,7 @@ def maybe_bind_method(func: Callable, self: Any = None) -> Union[Callable, Metho
     """
     if (sig := inspect.signature(func)) and sig.parameters.get("self"):
         if inspect.ismethod(func) and id(func.__self__) != id(self):
-            raise ValueError("Cannot bind a method to an object")
+            raise ValueError("Cannot re-bind a method to an new object")
         return MethodType(func, self)
     return func
 
