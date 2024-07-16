@@ -19,7 +19,8 @@ from typing import (
 )
 
 from weave import call_context, client_context
-from weave.legacy import box, context_state
+from weave.legacy import context_state
+from weave.trace import box
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -196,12 +197,6 @@ def _execute_call(
         raise
     else:
         res = box.box(res)  # TODO: can we get rid of this?
-    # We cannot let BoxedNone or BoxedBool escape into the user's code
-    # since they cannot pass instance checks for None or bool.
-    if isinstance(res, box.BoxedNone):
-        res = None
-    if isinstance(res, box.BoxedBool):
-        res = res.val
 
     if inspect.iscoroutine(res):
         awaitable = res
