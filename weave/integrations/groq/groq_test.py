@@ -76,7 +76,7 @@ def test_groq_quickstart(
         for (c, d) in flatten_calls(weave_server_respose.calls)
     ]
     assert flatened_calls_list == [
-        ("groq.resources.chat.completions.Completions.create", 0),
+        ("groq.chat.completions.create", 0),
     ]
 
     call = weave_server_respose.calls[0]
@@ -136,7 +136,7 @@ def test_groq_async_chat_completion(
         for (c, d) in flatten_calls(weave_server_respose.calls)
     ]
     assert flatened_calls_list == [
-        ("groq.resources.chat.completions.AsyncCompletions.create", 0),
+        ("groq.async.chat.completions.create", 0),
     ]
 
     call = weave_server_respose.calls[0]
@@ -203,7 +203,7 @@ def test_groq_streaming_chat_completion(
         for (c, d) in flatten_calls(weave_server_respose.calls)
     ]
     assert flatened_calls_list == [
-        ("groq.resources.chat.completions.Completions.create", 0),
+        ("groq.chat.completions.create", 0),
     ]
 
     call = weave_server_respose.calls[0]
@@ -295,7 +295,7 @@ def test_groq_async_streaming_chat_completion(
         for (c, d) in flatten_calls(weave_server_respose.calls)
     ]
     assert flatened_calls_list == [
-        ("groq.resources.chat.completions.AsyncCompletions.create", 0),
+        ("groq.async.chat.completions.create", 0),
     ]
 
     call = weave_server_respose.calls[0]
@@ -473,9 +473,9 @@ def test_groq_tool_call(
     ]
     assert flatened_calls_list == [
         ("run_conversation", 0),
-        ("groq.resources.chat.completions.Completions.create", 1),
+        ("groq.chat.completions.create", 1),
         ("get_game_score", 1),
-        ("groq.resources.chat.completions.Completions.create", 1),
+        ("groq.chat.completions.create", 1),
     ]
 
     call_0 = weave_server_respose.calls[0]

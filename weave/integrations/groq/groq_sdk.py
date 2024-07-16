@@ -102,13 +102,13 @@ groq_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("groq.resources.chat.completions"),
             "Completions.create",
-            groq_wrapper(name="groq.resources.chat.completions.Completions.create"),
+            groq_wrapper(name="groq.chat.completions.create"),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("groq.resources.chat.completions"),
             "AsyncCompletions.create",
             groq_wrapper(
-                name="groq.resources.chat.completions.AsyncCompletions.create"
+                name="groq.async.chat.completions.create"
             ),
         ),
     ]

@@ -36,18 +36,18 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA1yRMY/cIBSE+/wK69V4hcHGhjrNNVeliyKLxY81FwwscLqLVv7vkU9ZF2lH82lm
-        NA9wCygwq65mS76Vdhkpt6KVVMi2nwxrNZto21uDYrSaWqRAIF7f0NR/4MXELXmsLgYgYDLqiguo
-        bmRUMNHJjsAWF/SgwHu9ad5O13bqJDvca3QGC6ifD3BhwU9QlMCGpegbgnpAjh5BgS7FlapDPZgY
-        KoYj/ceKjdHJVe2baJuXsDjduNK84kfzHf3qLrAT8PGWcrwWUOHdewLWBVfWOaMuMYCCUmOC/ReB
-        92doynFLda7xN4ZyLCGn5DYERS+U8klyTuVR57n+BP5TT0b0wyAHRqDGqv1pZ+JUntaO8l4y0e0E
-        yp9ScZutCzfMKbuv5TbN08j1IKgcORD4nG853o/uX39mvM+0e2MYqLgz5HSiYsil71BPHxr2/dtf
-        AAAA//8DAJNlPS/5AQAA
+        H4sIAAAAAAAAA1SRvW6sMBSE+zwFOrVZYRsMuL5NmlTpogh5zQG819iO7fyuePeIKIuUdjSfZkZz
+        BTOCBL2orNdgS871KOqmLdnIVFk3XJdn3vZl03VCjLxtprYCAv58QZ1/wZP2a7CYjXdAQEdUGUeQ
+        tGWUNrShjMDqR7QgwVq1Kl5257KjPdvdizcaE8inKxg34gfIisCKKakZQV4heosgQaVkUlYu74x3
+        Gd2e/rhgoVUwWdnCT8W9G40qTCoe8L34h3YxJ9gIWD+H6M8JpHu1lsBknEnLEFEl70BCyj7A9kzg
+        9RYaol9DHrL/jy7tS8ghmRVBVqeq4l3DRVvvdW7rD6D/qx6MaHjXi45A9lnZw87EodystOI9EzXb
+        CKTPlHEdJuNmjCGan+VTGIQSbUsV9hoIfAxz9C97958/I74MFb2wz/4r9m/TMkeMlzCLqa5EXcO2
+        3X0DAAD//wMAppLzr/kBAAA=
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 8a11aafd7d903bb0-BOM
+      - 8a43c43ad8ee84aa-BOM
       Cache-Control:
       - private, max-age=0, no-store, no-cache, must-revalidate
       Connection:
@@ -57,12 +57,12 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 10 Jul 2024 15:43:11 GMT
+      - Tue, 16 Jul 2024 17:38:33 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=BiRtGBggtrRLbkp.uAXiIVucZg08lHWd8AUCEO56bPQ-1720626191-1.0.1.1-5AZH4Hxnaj8H9hM8NEn.631XcYw559Sg_.mmAP9pdwt1yD09w_ihxASl9X1gHmCCTt4qZdg5FLepSmGZuf37qA;
-        path=/; expires=Wed, 10-Jul-24 16:13:11 GMT; domain=.groq.com; HttpOnly; Secure;
+      - __cf_bm=XjD2R47lrgX5IkhuK0QZ.zDhpdLZE6CrqOD6Xpq3LLU-1721151513-1.0.1.1-R7DSA_9GguS_u6olZIdQxHq31EiVXwVBblDrI.9u9b3.N.u2wGo5wxVAxN4OIzPWu1eWLVe86.A87FTHclKyWg;
+        path=/; expires=Tue, 16-Jul-24 18:08:33 GMT; domain=.groq.com; HttpOnly; Secure;
         SameSite=None
       Transfer-Encoding:
       - chunked
@@ -85,7 +85,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 10.285714ms
       x-request-id:
-      - req_01j2en06q2e308065rs41ea8wa
+      - req_01j2y9zr9vfhgrerjpg6f40644
     status:
       code: 200
       message: OK
