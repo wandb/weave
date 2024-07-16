@@ -13,6 +13,29 @@ import numpy as np
 T = typing.TypeVar("T")
 
 
+class HasBoxedRepr:
+    val: typing.Any
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} ({self.val})>"
+
+
+class BoxedBool(HasBoxedRepr):
+    _id: typing.Optional[int] = None
+
+    def __init__(self, val: bool) -> None:
+        self.val = val
+
+    def __bool__(self) -> bool:
+        return self.val
+
+    def __hash__(self) -> int:
+        return hash(self.val)
+
+    def __eq__(self, other: typing.Any) -> bool:
+        return self.val == other
+
+
 class BoxedInt(int):
     _id: typing.Optional[int] = None
 
@@ -26,7 +49,7 @@ class BoxedStr(str):
 
 
 class BoxedDatetime(datetime.datetime):
-    def __eq__(self, other):
+    def __eq__(self, other: typing.Any) -> bool:
         return (
             isinstance(other, datetime.datetime)
             and self.timestamp() == other.timestamp()
@@ -34,7 +57,7 @@ class BoxedDatetime(datetime.datetime):
 
 
 class BoxedTimedelta(datetime.timedelta):
-    def __eq__(self, other):
+    def __eq__(self, other: typing.Any) -> bool:
         return (
             isinstance(other, datetime.timedelta)
             and self.total_seconds() == other.total_seconds()
@@ -43,11 +66,11 @@ class BoxedTimedelta(datetime.timedelta):
 
 # See https://numpy.org/doc/stable/user/basics.subclassing.html
 class BoxedNDArray(np.ndarray):
-    def __new__(cls, input_array):
+    def __new__(cls, input_array: typing.Any) -> BoxedNDArray:
         obj = np.asarray(input_array).view(cls)
         return obj
 
-    def __array_finalize__(self, obj):
+    def __array_finalize__(self, obj: typing.Any) -> None:
         if obj is None:
             return
 
