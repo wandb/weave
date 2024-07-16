@@ -91,7 +91,7 @@ def get_ref(obj: Any) -> Optional[ObjectRef]:
 
 def remove_ref(obj: Any) -> None:
     if get_ref(obj) is not None:
-        del obj.ref
+        obj.ref = None
 
 
 def _get_direct_ref(obj: Any) -> Optional[Ref]:
@@ -666,11 +666,12 @@ class WeaveClient:
         return ref
 
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
-        ref = get_ref(obj)
-        if ref is not None:
+        if (ref := get_ref(obj)) is not None:
+            # Obj has an existing ref, check if ref is to the correct project
             if ref.project == self.project:
+                # Use the cached ref instead of recreating
                 return
-            # Strip stale refs created in different projects, and recreate
+            # Ref is to different project, remove and recreate
             remove_ref(obj)
 
         if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
