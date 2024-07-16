@@ -387,8 +387,8 @@ export const CallsTable: FC<{
                   : 'indeterminate'
               }
               onCheckedChange={() => {
-                // if bulk delete move, select all calls
-                if (bulkDeleteMode) {
+                // if bulk delete move, or not eval table, select all calls
+                if (bulkDeleteMode || !isEvaluateTable) {
                   if (
                     selectedCalls.length ===
                     Math.min(tableData.length, MAX_BULK_DELETE)
@@ -427,21 +427,26 @@ export const CallsTable: FC<{
           const disabledDueToNonSuccess =
             params.row.exception != null || params.row.ended_at == null;
           let tooltipText = '';
-          if (bulkDeleteMode) {
+          if (bulkDeleteMode || !isEvaluateTable) {
             if (selectedCalls.length >= MAX_BULK_DELETE) {
               tooltipText = `Deletion limited to ${MAX_BULK_DELETE} items`;
             } else {
               tooltipText = '';
             }
-          } else if (disabledDueToNonSuccess) {
-            tooltipText = 'Cannot compare non-successful evaluations';
-          } else if (disabledDueToMax) {
-            tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
+          } else {
+            if (disabledDueToNonSuccess) {
+              tooltipText = 'Cannot compare non-successful evaluations';
+            } else if (disabledDueToMax) {
+              tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
+            }
           }
 
-          const disabled = bulkDeleteMode
-            ? selectedCalls.length >= MAX_BULK_DELETE
-            : disabledDueToNonSuccess || disabledDueToMax;
+          let disabled = false;
+          if ((bulkDeleteMode || !isEvaluateTable) && !isSelected) {
+            disabled = selectedCalls.length >= MAX_BULK_DELETE;
+          } else if (isEvaluateTable) {
+            disabled = disabledDueToNonSuccess || disabledDueToMax;
+          }
 
           return (
             <Tooltip title={tooltipText} placement="right" arrow>
@@ -469,7 +474,7 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-  }, [columns.cols, selectedCalls, tableData, bulkDeleteMode]);
+  }, [columns.cols, selectedCalls, tableData, bulkDeleteMode, isEvaluateTable]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
