@@ -1252,6 +1252,7 @@ def test_attributes_on_ops(client):
 
     assert len(res.calls) == 1
     assert res.calls[0].attributes == {
+        "custom": "attribute",
         "weave": {
             "client_version": weave.version.VERSION,
             "source": "python-sdk",
