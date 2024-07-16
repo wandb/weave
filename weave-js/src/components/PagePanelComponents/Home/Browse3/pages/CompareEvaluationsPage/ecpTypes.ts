@@ -58,6 +58,7 @@ export type ScorerMetricDimension = {
   scorerDef: ScorerDefinition;
   metricSubPath: string[];
   scoreType: 'binary' | 'continuous';
+  isAutoSummarized: boolean;
 };
 
 export type DerivedMetricDefinition = {
@@ -162,6 +163,7 @@ export type EvaluationComparisonData = {
     [metricDimensionId: string]: DerivedMetricDefinition;
   };
   scorerMetricDimensions: {[metricDimensionId: string]: ScorerMetricDimension};
+  customSummaryMetricDimensions: {[metricDimensionId: string]: ScorerMetricDimension};
 };
 
 export type PredictAndScoreCall = {
