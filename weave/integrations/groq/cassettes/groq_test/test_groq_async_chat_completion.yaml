@@ -2,9 +2,9 @@ interactions:
 - request:
     body: '{"messages": [{"role": "system", "content": "You are a psychiatrist helping
       young minds"}, {"role": "user", "content": "I panicked during the test, even
-      though I knew everything on the test paper."}], "model": "llama3-70b-8192",
-      "max_tokens": 360, "seed": 42, "stop": null, "stream": false, "temperature":
-      0.3, "top_p": 1}'
+      though I knew everything on the test paper."}], "model": "llama3-8b-8192", "max_tokens":
+      360, "seed": 42, "stop": null, "stream": false, "temperature": 0.3, "top_p":
+      1}'
     headers:
       accept:
       - application/json
@@ -13,7 +13,7 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '322'
+      - '321'
       content-type:
       - application/json
       host:
@@ -39,23 +39,25 @@ interactions:
   response:
     body:
       string: !!binary |
-        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
+        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
+        BAAA
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 8a11ab88bd4346c0-BOM
+      - 8a422a066cbe48e0-BOM
       Cache-Control:
       - private, max-age=0, no-store, no-cache, must-revalidate
       Connection:
@@ -65,12 +67,12 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 10 Jul 2024 15:43:33 GMT
+      - Tue, 16 Jul 2024 12:58:31 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=18oUIrmnfwHsi9eqIdZQdlxjfI9MJKtpH1ATTea6A5o-1720626213-1.0.1.1-aqA5e5LKF2L_OJ0aPGQrTSbkCTmAALgOhRwUF3CGjG911aZxN3ORT1YvTip6KdCMVrQn_4oKo5YP0KQ.NtSNrQ;
-        path=/; expires=Wed, 10-Jul-24 16:13:33 GMT; domain=.groq.com; HttpOnly; Secure;
+      - __cf_bm=Tz_doD4879mvEDi2xy_xHenFB8xZesNDnpeFry063Ow-1721134711-1.0.1.1-gL2RVdYq.JK4jsOndLXJNwDMwdrzG8pXbbPHY1AMBQ9qeijusrcmxJ28enfz7V9cpfStTwhWZ1a9wSJOuUTp5A;
+        path=/; expires=Tue, 16-Jul-24 13:28:31 GMT; domain=.groq.com; HttpOnly; Secure;
         SameSite=None
       Transfer-Encoding:
       - chunked
@@ -81,19 +83,19 @@ interactions:
       via:
       - 1.1 google
       x-ratelimit-limit-requests:
-      - '50000'
+      - '100000'
       x-ratelimit-limit-tokens:
-      - '30000'
+      - '70000'
       x-ratelimit-remaining-requests:
-      - '49999'
+      - '99999'
       x-ratelimit-remaining-tokens:
-      - '29961'
+      - '69961'
       x-ratelimit-reset-requests:
-      - 1.728s
+      - 864ms
       x-ratelimit-reset-tokens:
-      - 78ms
+      - 33.428571ms
       x-request-id:
-      - req_01j2en0wfbf3vrfajrqphkbrcw
+      - req_01j2xsz040e8wshk2jaxqsbh4b
     status:
       code: 200
       message: OK
