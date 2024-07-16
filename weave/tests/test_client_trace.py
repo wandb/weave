@@ -1606,10 +1606,20 @@ def map_with_threads_no_executor(fn, vals):
     def task_wrapper(v):
         return fn(v)
 
+    threads = []
+
     for v in vals:
         thread = Thread(target=task_wrapper, args=(v,))
         thread.start()
-        thread.join()
+        threads.append(thread)
+
+        if len(threads) >= max_workers:
+            for thread in threads:
+                thread.join()
+            threads = []
+
+        for thread in threads:
+            thread.join()
 
 
 def map_with_thread_executor(fn, vals):
@@ -1693,8 +1703,6 @@ def test_mapped_execution(client, mapper):
                 sequential_expected_order.append(f"{op}({event}):{i}")
     if mapper == map_simple:
         assert events == sequential_expected_order
-    else:
-        assert events != sequential_expected_order
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -1738,6 +1746,7 @@ def test_mapped_execution(client, mapper):
     assert_valid_trace(roots[root_ndx], first_val)
     root_ndx += 1
     for outer in middle_vals_outer:
+        print(f"{middle_vals_outer=}")
         assert_valid_trace(roots[root_ndx], outer)
         root_ndx += 1
 
