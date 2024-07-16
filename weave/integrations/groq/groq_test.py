@@ -183,13 +183,14 @@ def test_groq_streaming_chat_completion(
         top_p=1,
         stop=None,
         stream=True,
+        seed=42,
     )
 
     all_content = ""
     for chunk in stream:
         if chunk.choices[0].delta.content is not None:
             all_content += chunk.choices[0].delta.content
-    
+
     weave_server_respose = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
@@ -207,3 +208,33 @@ def test_groq_streaming_chat_completion(
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output.model == "llama3-8b-8192"
+    assert output.object == "chat.completion"
+    assert output.usage.completion_tokens == 533
+    assert output.usage.prompt_tokens == 29
+    assert output.usage.total_tokens == 562
+    assert output.usage.completion_time > 0
+    assert output.usage.prompt_time > 0
+    assert output.usage.queue_time > 0
+    assert output.usage.total_time > 0
+
+    assert len(output.choices) == 1
+    assert output.choices[0].finish_reason == "stop"
+    assert output.choices[0].index == 0
+    assert output.choices[0].message.role == "assistant"
+    assert (
+        output.choices[0].message.content
+        == """Fast language models have gained significant attention in recent years due to their ability to process and generate human-like language at incredibly high speeds. Here are some reasons why fast language models are important:
+
+1. **Real-time Applications**: Fast language models can be used in real-time applications such as chatbots, virtual assistants, and language translation systems. They can quickly respond to user queries, making them more interactive and engaging.
+2. **Efficient Processing**: Fast language models can process large amounts of text data quickly, making them ideal for tasks such as sentiment analysis, text classification, and topic modeling. This efficiency is particularly important in applications where speed is critical, such as in customer service or emergency response systems.
+3. **Improved Responsiveness**: Fast language models can respond quickly to user input, reducing the latency and improving the overall user experience. This is particularly important in applications where users expect instant responses, such as in gaming or social media platforms.
+4. **Scalability**: Fast language models can handle large volumes of data and scale up or down as needed, making them suitable for applications with varying traffic patterns.
+5. **Advancements in AI Research**: Fast language models have enabled researchers to explore new areas of natural language processing (NLP), such as language generation, question answering, and dialogue systems. This has led to significant advancements in AI research and the development of more sophisticated language models.
+6. **Improved Language Understanding**: Fast language models can be fine-tuned for specific tasks, such as named entity recognition, part-of-speech tagging, and dependency parsing. This has led to improved language understanding and better performance in various NLP tasks.
+7. **Enhanced User Experience**: Fast language models can be used to create more personalized and engaging user experiences, such as recommending products or services based on user preferences and behavior.
+8. **Cost-Effective**: Fast language models can be more cost-effective than traditional language models, as they require less computational resources and can be deployed on cloud-based infrastructure.
+9. **Faster Development Cycles**: Fast language models can accelerate the development cycle of language-based applications, enabling developers to iterate and refine their models more quickly.
+10. **Broader Adoption**: Fast language models have made NLP more accessible to a broader range of developers and organizations, enabling them to build language-based applications without requiring extensive expertise in NLP.
+
+In summary, fast language models have revolutionized the field of NLP, enabling the development of more efficient, scalable, and responsive language-based applications. Their importance lies in their ability to process and generate human-like language at incredible speeds, making them a crucial component of many modern AI systems."""
+    )

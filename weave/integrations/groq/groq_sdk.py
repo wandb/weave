@@ -15,6 +15,7 @@ def groq_accumulator(
     from groq.types.chat import ChatCompletion, ChatCompletionMessage
     from groq.types.chat.chat_completion import Choice
     from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
+    from groq.types.completion_usage import CompletionUsage
 
     if acc is None:
         choices = []
@@ -42,13 +43,25 @@ def groq_accumulator(
             model=value.model,
             object="chat.completion",
             system_fingerprint=value.system_fingerprint,
-            usage=value.usage,
+            usage=CompletionUsage(
+                completion_tokens=0,
+                prompt_tokens=0,
+                total_tokens=0,
+                completion_time=0,
+                prompt_time=0,
+                queue_time=0,
+                total_time=0,
+            ),
         )
 
-    if value.usage:
-        acc.usage.completion_tokens += value.usage.completion_tokens
-        acc.usage.prompt_tokens += value.usage.prompt_tokens
-        acc.usage.total_tokens += value.usage.total_tokens
+    if value.x_groq is not None and value.x_groq.usage is not None:
+        acc.usage.completion_tokens += value.x_groq.usage.completion_tokens
+        acc.usage.prompt_tokens += value.x_groq.usage.prompt_tokens
+        acc.usage.total_tokens += value.x_groq.usage.total_tokens
+        acc.usage.completion_time += value.x_groq.usage.completion_time
+        acc.usage.prompt_time += value.x_groq.usage.prompt_time
+        acc.usage.queue_time += value.x_groq.usage.queue_time
+        acc.usage.total_time += value.x_groq.usage.total_time
 
     if value.choices:
         for idx, choice in enumerate(value.choices):
