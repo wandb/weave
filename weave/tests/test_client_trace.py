@@ -1746,7 +1746,6 @@ def test_mapped_execution(client, mapper):
     assert_valid_trace(roots[root_ndx], first_val)
     root_ndx += 1
     for outer in middle_vals_outer:
-        print(f"{middle_vals_outer=}")
         assert_valid_trace(roots[root_ndx], outer)
         root_ndx += 1
 
