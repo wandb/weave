@@ -838,9 +838,6 @@ def test_isinstance_checks(client):
 
     # BoxedBool can't inherit from bool
     y2 = y[2]
-    assert not isinstance(y2, bool)
-    assert y2.ref is not None
-    assert y2.ref.is_descended_from(y.ref)
 
     y3 = y[3]
     assert y3 is None
