@@ -7,16 +7,34 @@ hide_table_of_contents: true
 
 Gathering feedback from end users of your application is a useful way to get signal on how to improve it. 
 
-In this tutorial, we'll show how to collect feedback from users of your application using Weave. Because collecting feedback is slow and expensive, we'll use the feedback we've collected to build an evaluation dataset which we can use for automated evaluation.
+In this tutorial, we'll show how to collect feedback from users of for a RAG-based Knowledge Chatbot using Weave. 
 
 ## Use Case - Collecting Feedback to Improve Evaluation Pipeline
-In order to successfully deploy LLM apps that correspond to the users' expectation it's important to have an evaluation pipeline that produces representative metrics for both the user group and the specific set of use-cases. In order to build such a pipeline, we need to collect feedback from users. For a Q&A Chatbot this could be done in the following way:
+In order to successfully deploy LLM apps that correspond to the users' expectation it's important to have an evaluation pipeline that produces representative metrics for both the specific user group and the specific set of use-cases. The easiest way to do that is to directly gather feedback from the users of the application. 
 
-1. We generate a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions
-2. We do some first baseline evaluations before deploying the Chatbot to some first users
-3. We let the user ask some questions and give some direct feedback (reaction + note)
-4. We pull all question-answer-pairs with a :-1: reaction and let experts annotate the given answer with help of the given feedback from the user
-5. We save back the new annotated samples as a new version of the existing evaluation dataset and run evaluations again
+### Feedback Types
+We consider three different types of feedback that are useful to improve the evaluation pipeline:
+
+1. **User Feedback:** The user gives direct feedback on the answer of the chatbot. This can be done by either giving a reaction (e.g. thumbs up or thumbs down) or by writing a note.
+
+    * **Pro**: This gives the clearest signal on the performance of the app since the question and the feedback are directly from the user.
+    * **Con**: This also gives the noisiest signal since it's subject to the user's mood, the user's understanding of the question, and the user's understanding of the answer.
+
+2. **Expert Feedback:** An expert annotates the answer of the chatbot. This can be done by either giving a score or by writing a note.
+
+    * **Pro**: This gives a more neutral signal on the performance of the app since it's from an expert.
+    * **Con**: This might give a less representative signal since it's not from the user. Also it's more expensive to collect this feedback since it requires experts to annotate the data.
+    
+3. **Synthetic Feedback:** We generate a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions.
+
+    * **Pro**: This is the most cost effective option that can be representative without needing to gather and annotate a lot of production data. It also gives the broadest signal before gathering very large datasets since it's generated from the documents that the app is supposed to use to answer the questions.
+    * **Con**: This might give a less nuanced signal since it's generated from the documents and not from the user. Also it's more expensive to collect this feedback since it requires generating the data.
+
+So far we have found that a combination of all three types of feedback is the most effective way to improve the evaluation pipeline. The following tutorial will guide you through a systematic evaluation pipeline that uses all three types of feedback with Weave:
+
+1. **1st Evaluation**: We evaluate our RAG chatbot on a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions. 
+2. **2nd Evaluation:** We deploy the RAG chatbot to a specific group of users and let them ask some questions and encourage them to give some direct feedback (reaction + notes). We track their reactions as positive and negative rates as live evaluation while it's running in production. 
+3. **3rd Evaluation:** We pull all question-answer-pairs with a negative reaction into an annotation UI and let experts annotate the given answer with help of the given feedback from the user. We save back the new annotated samples as a new version of the existing evaluation dataset and run evaluations again.
 
 ## Getting Started
 
