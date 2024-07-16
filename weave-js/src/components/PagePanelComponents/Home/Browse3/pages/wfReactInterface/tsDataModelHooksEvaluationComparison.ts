@@ -477,12 +477,6 @@ const fetchEvaluationComparisonData = async (
                     scoreType: 'continuous',
                   };
                   const metricDimensionId = dimensionId(metricDimension);
-                  console.log(
-                    'result.scorerMetricDimensions',
-                    result.scorerMetricDimensions,
-                    'metricDimensionId',
-                    metricDimensionId
-                  );
                   if (
                     result.scorerMetricDimensions[metricDimensionId] != null
                   ) {
