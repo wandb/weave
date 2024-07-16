@@ -78,6 +78,10 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
 
+export const DEFAULT_SORT_CALLS: GridSortModel = [
+  {field: 'started_at', sort: 'desc'},
+];
+
 export const CallsTable: FC<{
   entity: string;
   project: string;
@@ -90,6 +94,9 @@ export const CallsTable: FC<{
 
   columnVisibilityModel?: GridColumnVisibilityModel;
   setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
+
+  sortModel?: GridSortModel;
+  setSortModel?: (newModel: GridSortModel) => void;
 }> = ({
   entity,
   project,
@@ -99,6 +106,8 @@ export const CallsTable: FC<{
   hideControls,
   columnVisibilityModel,
   setColumnVisibilityModel,
+  sortModel,
+  setSortModel,
 }) => {
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
@@ -139,15 +148,7 @@ export const CallsTable: FC<{
   const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
 
   // 3. Sort
-  const [sortModelInner, setSortModel] = useState<GridSortModel>([
-    {field: 'started_at', sort: 'desc'},
-  ]);
-  // Ensure that we always have a default sort
-  const sortModel: GridSortModel = useMemo(() => {
-    return sortModelInner.length === 0
-      ? [{field: 'started_at', sort: 'desc'}]
-      : sortModelInner;
-  }, [sortModelInner]);
+  const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
 
   const defaultPageSize = 100;
   // 4. Pagination
@@ -196,7 +197,7 @@ export const CallsTable: FC<{
     project,
     effectiveFilter,
     filterModel,
-    sortModel,
+    sortModelResolved,
     paginationModel,
     expandedRefCols
   );
@@ -445,6 +446,23 @@ export const CallsTable: FC<{
       }
     : undefined;
 
+  const onSortModelChange = useCallback(
+    (newModel: GridSortModel) => {
+      if (!setSortModel || callsLoading) {
+        return;
+      }
+      // The Grid calls this function when the columns change, removing
+      // sort items whose field is no longer in the columns. However, the user
+      // might have been sorting on an output, and the output columns might
+      // not have been determined yet. So skip setting the sort model in this case.
+      if (!muiColumns.some(col => col.field.startsWith('output'))) {
+        return;
+      }
+      setSortModel(newModel);
+    },
+    [callsLoading, setSortModel, muiColumns]
+  );
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -577,7 +595,7 @@ export const CallsTable: FC<{
         // SORT SECTION START
         sortingMode="server"
         sortModel={sortModel}
-        onSortModelChange={newModel => setSortModel(newModel)}
+        onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // FILTER SECTION START
         filterMode="server"
