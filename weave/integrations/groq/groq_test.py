@@ -3,7 +3,6 @@ import os
 from typing import Any, Optional
 
 import pytest
-from groq import AsyncGroq, Groq
 
 import weave
 from weave.trace_server import trace_server_interface as tsi
@@ -47,6 +46,8 @@ def op_name_from_ref(ref: str) -> str:
 def test_groq_quickstart(
     client: weave.weave_client.WeaveClient,
 ) -> None:
+    from groq import Groq
+
     groq_client = Groq(
         api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"),
     )
@@ -98,6 +99,8 @@ def test_groq_quickstart(
 def test_groq_async_chat_completion(
     client: weave.weave_client.WeaveClient,
 ) -> None:
+    from groq import AsyncGroq
+
     groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"))
 
     async def complete_chat() -> None:
@@ -152,3 +155,55 @@ Can you tell me more about what happened during the test? What were some of the 
 
 Also, how did you prepare for the test beforehand? Did you feel confident about the material, or were there any areas where you felt a bit uncertain?"""
     )
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_groq_streaming_chat_completion(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    from groq import Groq
+
+    groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"))
+
+    stream = groq_client.chat.completions.create(
+        messages=[
+            {"role": "system", "content": "you are a helpful assistant."},
+            {
+                "role": "user",
+                "content": "Explain the importance of fast language models",
+            },
+        ],
+        model="llama3-8b-8192",
+        temperature=0.5,
+        max_tokens=1024,
+        top_p=1,
+        stop=None,
+        stream=True,
+    )
+
+    all_content = ""
+    for chunk in stream:
+        if chunk.choices[0].delta.content is not None:
+            all_content += chunk.choices[0].delta.content
+    
+    weave_server_respose = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client._project_id())
+    )
+    assert len(weave_server_respose.calls) == 1
+
+    flatened_calls_list = [
+        (op_name_from_ref(c.op_name), d)
+        for (c, d) in flatten_calls(weave_server_respose.calls)
+    ]
+    assert flatened_calls_list == [
+        ("groq.resources.chat.completions.Completions.create", 0),
+    ]
+
+    call = weave_server_respose.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.model == "llama3-8b-8192"

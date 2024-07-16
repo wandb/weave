@@ -1,10 +1,8 @@
 import importlib
-from typing import Callable, Dict, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Optional
 
-from groq.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
-from groq.types.chat.chat_completion import Choice
-from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
-from rich import print as pprint
+if TYPE_CHECKING:
+    from groq.types.chat import ChatCompletion, ChatCompletionChunk
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -12,8 +10,12 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
 def groq_accumulator(
-    acc: Optional[ChatCompletion], value: ChatCompletionChunk
-) -> ChatCompletion:
+    acc: Optional["ChatCompletion"], value: "ChatCompletionChunk"
+) -> "ChatCompletion":
+    from groq.types.chat import ChatCompletion, ChatCompletionMessage
+    from groq.types.chat.chat_completion import Choice
+    from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
+
     if acc is None:
         choices = []
         for choice in value.choices:
@@ -50,7 +52,6 @@ def groq_accumulator(
 
     if value.choices:
         for idx, choice in enumerate(value.choices):
-            pprint(f"{acc.choices[idx].message.content=}")
             if isinstance(acc.choices[idx].message.content, str) and isinstance(
                 choice.delta.content, str
             ):
