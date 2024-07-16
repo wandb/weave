@@ -1610,15 +1610,16 @@ def map_with_threads_no_executor(fn, vals):
 
     for v in vals:
         thread = Thread(target=task_wrapper, args=(v,))
+        thread.start()
         threads.append(thread)
 
-    # run threads in batches
-    for i in range(0, len(threads), max_workers):
-        batch = threads[i : i + max_workers]
-        for thread in batch:
-            thread.start()
-        for thread in batch:
-            thread.join()
+        if len(threads) >= max_workers:
+            for thread in threads:
+                thread.join()
+            threads = []
+
+    for thread in threads:
+        thread.join()
 
 
 def map_with_thread_executor(fn, vals):
