@@ -1,9 +1,8 @@
 import dataclasses
 import datetime
-import inspect
 import typing
 import uuid
-from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
+from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 
 import pydantic
 from requests import HTTPError
@@ -737,9 +736,6 @@ class WeaveClient:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
 
-        if inspect.ismethod(op):
-            # this "func" is both a method AND an Op, but we need to cast to get dot access to its attributes
-            op = cast(Op, op)
         # setattr(op, "ref", op_def_ref) fails here
         # op.ref = op_def_ref fails here
         # Seems to be the only way to set the ref on the op
