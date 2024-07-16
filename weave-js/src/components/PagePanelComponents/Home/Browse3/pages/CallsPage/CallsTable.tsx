@@ -18,6 +18,7 @@ import {
   GridApiPro,
   GridColumnVisibilityModel,
   GridFilterModel,
+  GridLogicOperator,
   GridPaginationModel,
   GridPinnedColumns,
   GridRowSelectionModel,
@@ -41,10 +42,12 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
+import {Tailwind} from '../../../../../Tailwind';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveHeaderExtrasContext,
 } from '../../context';
+import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -104,6 +107,10 @@ export const DEFAULT_PIN_CALLS: GridPinnedColumns = {
 export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
+export const DEFAULT_FILTER_CALLS: GridFilterModel = {
+  items: [],
+  logicOperator: GridLogicOperator.And,
+};
 
 const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
@@ -126,6 +133,9 @@ export const CallsTable: FC<{
   pinModel?: GridPinnedColumns;
   setPinModel?: (newModel: GridPinnedColumns) => void;
 
+  filterModel?: GridFilterModel;
+  setFilterModel?: (newModel: GridFilterModel) => void;
+
   sortModel?: GridSortModel;
   setSortModel?: (newModel: GridSortModel) => void;
 
@@ -142,6 +152,8 @@ export const CallsTable: FC<{
   setColumnVisibilityModel,
   pinModel,
   setPinModel,
+  filterModel,
+  setFilterModel,
   sortModel,
   setSortModel,
   paginationModel,
@@ -190,7 +202,7 @@ export const CallsTable: FC<{
   );
 
   // 2. Filter (Unstructured Filter)
-  const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
+  const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
 
   // 3. Sort
   const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
@@ -237,7 +249,7 @@ export const CallsTable: FC<{
     entity,
     project,
     effectiveFilter,
-    filterModel,
+    filterModelResolved,
     sortModelResolved,
     paginationModelResolved,
     expandedRefCols
@@ -274,6 +286,27 @@ export const CallsTable: FC<{
     [callsResult]
   );
 
+  const onAddFilter =
+    filterModel && setFilterModel
+      ? (field: string, value: any) => {
+          const operator =
+            typeof value === 'number' ? '(number): =' : '(string): equals';
+          const newModel = {
+            ...filterModel,
+            items: [
+              ...filterModel.items,
+              {
+                id: filterModel.items.length,
+                field,
+                operator,
+                value,
+              },
+            ],
+          };
+          setFilterModel(newModel);
+        }
+      : undefined;
+
   // Column Management: Build the columns needed for the table
   const {columns, setUserDefinedColumnWidths} = useCallsTableColumns(
     entity,
@@ -283,7 +316,8 @@ export const CallsTable: FC<{
     expandedRefCols,
     onCollapse,
     onExpand,
-    columnIsRefExpanded
+    columnIsRefExpanded,
+    onAddFilter
   );
 
   // Now, there are 4 primary controls:
@@ -380,7 +414,7 @@ export const CallsTable: FC<{
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
     setFilter({});
-    setFilterModel({items: []});
+    setFilterModel && setFilterModel({items: []});
   }, [setFilter]);
 
   // CPR (Tim) - (GeneralRefactoring): Remove this, and add a slot for empty content that can be calculated
@@ -579,6 +613,24 @@ export const CallsTable: FC<{
     [callsLoading, setPinModel]
   );
 
+  // const onFilterModelChange = useCallback(
+  //   (newModel: GridFilterModel) => {
+  //     if (!setFilterModel || callsLoading) {
+  //       return;
+  //     }
+  //     // The Grid calls this function when the columns change, removing
+  //     // sort items whose field is no longer in the columns. However, the user
+  //     // might have been sorting on an output, and the output columns might
+  //     // not have been determined yet. So skip setting the sort model in this case.
+  //     if (!muiColumns.some(col => col.field.startsWith('output'))) {
+  //       return;
+  //     }
+  //     console.log('onFilterModelChange');
+  //     setFilterModel(newModel);
+  //   },
+  //   [callsLoading, setFilterModel, muiColumns]
+  // );
+
   const onSortModelChange = useCallback(
     (newModel: GridSortModel) => {
       if (!setSortModel || callsLoading) {
@@ -612,52 +664,62 @@ export const CallsTable: FC<{
       filterListSx={{
         pb: 1,
         display: hideControls ? 'none' : 'flex',
+        alignItems: 'center',
       }}
       filterListItems={
-        <>
-          <ListItem sx={{minWidth: '190px'}}>
-            <FormControl fullWidth>
-              <Autocomplete
-                PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-                size="small"
-                // Temp disable multiple for simplicity - may want to re-enable
-                // multiple
-                limitTags={1}
-                disabled={Object.keys(frozenFilter ?? {}).includes(
-                  'opVersions'
-                )}
-                value={selectedOpVersionOption}
-                onChange={(event, newValue) => {
-                  if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
-                    setFilter({
-                      ...filter,
-                      opVersionRefs: [],
-                    });
-                  } else {
-                    setFilter({
-                      ...filter,
-                      opVersionRefs: newValue ? [newValue] : [],
-                    });
+        <Tailwind style={{display: 'contents'}}>
+          <div style={{flex: '0 0 auto'}}>
+            <ListItem sx={{minWidth: 190, width: 320}}>
+              <FormControl fullWidth>
+                <Autocomplete
+                  PaperComponent={paperProps => <StyledPaper {...paperProps} />}
+                  size="small"
+                  // Temp disable multiple for simplicity - may want to re-enable
+                  // multiple
+                  limitTags={1}
+                  disabled={Object.keys(frozenFilter ?? {}).includes(
+                    'opVersions'
+                  )}
+                  value={selectedOpVersionOption}
+                  onChange={(event, newValue) => {
+                    if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
+                      setFilter({
+                        ...filter,
+                        opVersionRefs: [],
+                      });
+                    } else {
+                      setFilter({
+                        ...filter,
+                        opVersionRefs: newValue ? [newValue] : [],
+                      });
+                    }
+                  }}
+                  renderInput={renderParams => (
+                    <StyledTextField
+                      {...renderParams}
+                      label={OP_FILTER_GROUP_HEADER}
+                      sx={{maxWidth: '350px'}}
+                    />
+                  )}
+                  getOptionLabel={option => {
+                    return opVersionOptions[option]?.title ?? 'loading...';
+                  }}
+                  disableClearable={
+                    selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
                   }
-                }}
-                renderInput={renderParams => (
-                  <StyledTextField
-                    {...renderParams}
-                    label={OP_FILTER_GROUP_HEADER}
-                    sx={{maxWidth: '350px'}}
-                  />
-                )}
-                getOptionLabel={option => {
-                  return opVersionOptions[option]?.title ?? 'loading...';
-                }}
-                disableClearable={
-                  selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-                }
-                groupBy={option => opVersionOptions[option]?.group}
-                options={Object.keys(opVersionOptions)}
-              />
-            </FormControl>
-          </ListItem>
+                  groupBy={option => opVersionOptions[option]?.group}
+                  options={Object.keys(opVersionOptions)}
+                />
+              </FormControl>
+            </ListItem>
+          </div>
+          {filterModel && setFilterModel && (
+            <FilterPanel
+              filterModel={filterModel}
+              columnInfo={columns}
+              setFilterModel={setFilterModel}
+            />
+          )}
           {selectedInputObjectVersion && (
             <Chip
               label={`Input: ${objectVersionNiceString(
@@ -695,9 +757,8 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          <div style={{flex: '1 1 auto'}} />
           {columnVisibilityModel && setColumnVisibilityModel && (
-            <div>
+            <div style={{flex: '0 0 auto'}}>
               <ManageColumnsButton
                 columnInfo={columns}
                 columnVisibilityModel={columnVisibilityModel}
@@ -705,14 +766,14 @@ export const CallsTable: FC<{
               />
             </div>
           )}
-        </>
+        </Tailwind>
       }>
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility
         disableColumnMenu={false}
         // ColumnFilter is definitely useful
-        disableColumnFilter={false}
+        disableColumnFilter={true}
         disableMultipleColumnsFiltering={false}
         // ColumnPinning seems to be required in DataGridPro, else it crashes.
         // However, in this case it is also useful.
@@ -741,9 +802,9 @@ export const CallsTable: FC<{
         onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // FILTER SECTION START
-        filterMode="server"
-        filterModel={filterModel}
-        onFilterModelChange={newModel => setFilterModel(newModel)}
+        // filterMode="server"
+        // filterModel={filterModelComplete}
+        // onFilterModelChange={onFilterModelChange}
         // FILTER SECTION END
         // PAGINATION SECTION START
         pagination
@@ -786,7 +847,7 @@ export const CallsTable: FC<{
                 return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
               } else if (
                 effectiveFilter.traceRootsOnly &&
-                filterModel.items.length === 0
+                filterModelResolved.items.length === 0
               ) {
                 return <Empty {...EMPTY_PROPS_TRACES} />;
               }

@@ -1,5 +1,6 @@
 import {
   GridColumnVisibilityModel,
+  GridFilterModel,
   GridPaginationModel,
   GridPinnedColumns,
   GridSortModel,
@@ -40,6 +41,9 @@ export const CallsPage: FC<{
 
   pinModel: GridPinnedColumns;
   setPinModel: (newModel: GridPinnedColumns) => void;
+
+  filterModel: GridFilterModel;
+  setFilterModel: (newModel: GridFilterModel) => void;
 
   sortModel: GridSortModel;
   setSortModel: (newModel: GridSortModel) => void;
@@ -94,6 +98,8 @@ export const CallsPage: FC<{
                 setColumnVisibilityModel={props.setColumnVisibilityModel}
                 pinModel={props.pinModel}
                 setPinModel={props.setPinModel}
+                filterModel={props.filterModel}
+                setFilterModel={props.setFilterModel}
                 sortModel={props.sortModel}
                 setSortModel={props.setSortModel}
                 paginationModel={props.paginationModel}

@@ -60,7 +60,7 @@ export const Analytics = {
         );
       }
     } else if (trackCall && !initialized) {
-      captureMessage('Segment not initialized, event is lost.');
+      // captureMessage('Segment not initialized, event is lost.');
     } else if (!trackCall) {
       captureMessage('Tracking event lost. Check Segment initialization.');
     }

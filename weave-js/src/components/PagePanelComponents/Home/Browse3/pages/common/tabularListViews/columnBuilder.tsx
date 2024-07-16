@@ -188,7 +188,8 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
   onCollapse?: (col: string) => void,
   onExpand?: (col: string) => void,
   columnIsFilterable?: (col: string) => boolean,
-  columnIsSortable?: (col: string) => boolean
+  columnIsSortable?: (col: string) => boolean,
+  onAddFilter?: (field: string, value: any) => void
 ) => {
   const cols: Array<GridColDef<T>> = [];
 
@@ -245,7 +246,8 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       flex: 1,
       minWidth: 150,
       field: key,
-      filterable: columnIsFilterable && columnIsFilterable(key),
+      // filterable: columnIsFilterable && columnIsFilterable(key),
+      filterable: false,
       sortable: columnIsSortable && columnIsSortable(key),
       filterOperators: allOperators,
       headerName: key,
@@ -275,17 +277,28 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         if (val === undefined) {
           return <NotApplicable />;
         }
+        const onClickCapture = onAddFilter
+          ? (e: React.MouseEvent) => {
+              // event.altKey - pressed Option key on Macs
+              if (e.altKey) {
+                e.stopPropagation();
+                onAddFilter(key, val);
+              }
+            }
+          : undefined;
         return (
           <ErrorBoundary>
-            {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
+            <div onClickCapture={onClickCapture}>
+              {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
             into `CellValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
             Table-specific data structure and we might not want to leak that into the
             rest of the system*/}
-            {isExpandedRefWithValueAsTableRef(val) ? (
-              <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
-            ) : (
-              <CellValue value={val} />
-            )}
+              {isExpandedRefWithValueAsTableRef(val) ? (
+                <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
+              ) : (
+                <CellValue value={val} />
+              )}
+            </div>
           </ErrorBoundary>
         );
       },

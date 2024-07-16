@@ -84,6 +84,7 @@ export const useCallsForQuery = (
     return {$expr: filterByRaw} as Query;
   }, [filterByRaw]);
 
+  // console.log({lowLevelFilter, filterBy});
   const calls = useCalls(
     entity,
     project,
