@@ -8,6 +8,7 @@ from typing import Any, Callable, Optional, Union
 
 from rich import print
 from rich.console import Console
+from rich.progress import Progress
 
 import weave
 from weave.flow import util
@@ -265,8 +266,6 @@ class Evaluation(Object):
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
         eval_rows = []
 
-        start_time = time.time()
-
         async def eval_example(example: dict) -> dict:
             try:
                 eval_row = await self.predict_and_score(model, example)
@@ -279,28 +278,25 @@ class Evaluation(Object):
             return eval_row
 
         n_complete = 0
-        # with console.status("Evaluating...") as status:
         dataset = typing.cast(Dataset, self.dataset)
         _rows = dataset.rows
         trial_rows = list(_rows) * self.trials
-        async for example, eval_row in util.async_foreach(
-            trial_rows, eval_example, get_weave_parallelism()
-        ):
-            n_complete += 1
-            duration = time.time() - start_time
-            print(f"Evaluated {n_complete} of {len(trial_rows)} examples")
-            # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
-            # )
-            if eval_row == None:
-                eval_row = {"model_output": None, "scores": {}}
-            if eval_row["scores"] == None:
-                eval_row["scores"] = {}
-            for scorer in self.scorers or []:
-                scorer_name, _, _ = get_scorer_attributes(scorer)
-                if scorer_name not in eval_row["scores"]:
-                    eval_row["scores"][scorer_name] = {}
-            eval_rows.append(eval_row)
+        with Progress() as progress:
+            task = progress.add_task("Evaluating", total=len(trial_rows))
+            async for example, eval_row in util.async_foreach(
+                trial_rows, eval_example, get_weave_parallelism()
+            ):
+                n_complete += 1
+                progress.update(task, advance=1)
+                if eval_row == None:
+                    eval_row = {"model_output": None, "scores": {}}
+                if eval_row["scores"] == None:
+                    eval_row["scores"] = {}
+                for scorer in self.scorers or []:
+                    scorer_name, _, _ = get_scorer_attributes(scorer)
+                    if scorer_name not in eval_row["scores"]:
+                        eval_row["scores"][scorer_name] = {}
+                eval_rows.append(eval_row)
 
         summary = await self.summarize(eval_rows)
 
