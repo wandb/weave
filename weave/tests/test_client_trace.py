@@ -1606,19 +1606,9 @@ def map_with_threads_no_executor(fn, vals):
     def task_wrapper(v):
         return fn(v)
 
-    threads = []
-
     for v in vals:
         thread = Thread(target=task_wrapper, args=(v,))
         thread.start()
-        threads.append(thread)
-
-        if len(threads) >= max_workers:
-            for thread in threads:
-                thread.join()
-            threads = []
-
-    for thread in threads:
         thread.join()
 
 
