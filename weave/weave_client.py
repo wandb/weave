@@ -746,7 +746,7 @@ class WeaveClient:
                 # Use cached ref
                 return op.ref
             # Ref is to different project, remove and recreate
-            remove_ref(op)
+            # remove_ref(op)
         if name is None:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)

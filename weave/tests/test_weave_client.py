@@ -21,6 +21,7 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    OpRef,
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
@@ -498,6 +499,45 @@ def test_op_mismatch_project_ref(client):
     op = list(client._op_calls(hello_world))[0]
     assert op.project_id == "shawn/test-project2"
     assert op.op_name.split("/op/")[0] == "weave:///shawn/test-project2"
+
+
+def test_object_mismatch_project_ref(client):
+    client.project = "test-project"
+
+    class MyObject:
+        def __init__(self, value):
+            self.value = value
+
+    obj = MyObject(10)
+    ref = client._save_object(obj, "my-object")
+    assert ref.project == "test-project"
+
+    client.project = "test-project2"
+    ref2 = client._save_object(obj, "my-object")
+    assert ref2.project == "test-project2"
+
+
+def test_object_mismatch_project_ref_nested(client):
+    client.project = "test-project"
+
+    @weave.op()
+    def hello_world():
+        return "Hello world"
+
+    hello_world()
+    op = list(client._op_calls(hello_world))[0]
+    assert op.project_id == "shawn/test-project"
+
+    client.project = "test-project2"
+
+    nested = {"a": hello_world}
+    ref2 = client._save_object(nested, "my-object")
+    assert ref2.project == "test-project2"
+
+    out = client.get(ref2)
+    assert isinstance(out["a"], OpRef)
+    assert out["a"].name == "op-hello-world"
+    assert out["a"].project_id == "shawn/test-project2"
 
 
 def test_saveload_customtype(client, strict_op_saving):
