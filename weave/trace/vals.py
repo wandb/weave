@@ -477,9 +477,9 @@ def make_trace_obj(
             raise MissingSelfInstanceError(
                 f"{val.name} Op requires a bound self instance. Must be called from an instance method."
             )
-        val = val.__self__
+        val = maybe_bind_method(val, parent)
     box_val = box.box(val)
-    if isinstance(box_val, pydantic_v1.BaseModel):
+    if isinstance(box_val, pydantic_v1.BaseModel) or isinstance(val, Op):
         box_val.__dict__["ref"] = new_ref
     else:
         setattr(box_val, "ref", new_ref)

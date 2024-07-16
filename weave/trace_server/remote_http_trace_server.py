@@ -7,8 +7,8 @@ import requests
 import tenacity
 from pydantic import BaseModel, ValidationError
 
+from weave.environment import weave_trace_server_url
 from weave.legacy.wandb_interface import project_creator
-from weave.trace_server import environment as wf_env
 
 from . import trace_server_interface as tsi
 from .async_batch_processor import AsyncBatchProcessor
@@ -108,7 +108,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
-        return cls(wf_env.wf_trace_server_url(), should_batch)
+        return cls(weave_trace_server_url(), should_batch)
 
     def set_auth(self, auth: t.Tuple[str, str]) -> None:
         self._auth = auth
