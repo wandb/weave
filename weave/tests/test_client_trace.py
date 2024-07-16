@@ -1335,10 +1335,12 @@ def test_bound_op_retrieval(client):
     assert obj2.op_with_custom_type(1) == 2
 
     my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
-    assert my_op_ref is None, "Must call get on the instance!"
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref.get()
 
     my_op_ref2 = weave_client.get_ref(obj2.op_with_custom_type)
-    assert my_op_ref2 is not None
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref2.get()
 
 
 @pytest.mark.skip("Not implemented: general bound op designation")
@@ -1595,7 +1597,7 @@ def test_single_primitive_output(client):
     assert isinstance(b, bool)
     assert b == True
     assert isinstance(c, type(None))
-    assert c == None
+    assert c is None
     assert isinstance(d, dict)
     assert isinstance(d["a"], int)
     assert isinstance(d["b"], bool)
@@ -1611,7 +1613,7 @@ def test_single_primitive_output(client):
     assert len(inner_res.calls) == 4
     assert inner_res.calls[0].output == 1
     assert inner_res.calls[1].output == True
-    assert inner_res.calls[2].output == None
+    assert inner_res.calls[2].output is None
     assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
 
 
@@ -2227,6 +2229,7 @@ def test_sort_and_filter_through_refs(client):
         assert inner_res.count == count
 
 
+
 def test_call_has_client_version(client):
     @weave.op
     def test():
@@ -2254,3 +2257,33 @@ def test_user_cannot_modify_call_weave_dict(client):
 
     # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
     # but at that point you're on your own :)
+
+
+class BasicModel(weave.Model):
+    @weave.op()
+    def predict(self, x):
+        return {"answer": "42"}
+
+
+def test_model_save(client):
+    model = BasicModel()
+    assert model.predict(1) == {"answer": "42"}
+    model_ref = weave.publish(model)
+    assert model.predict(1) == {"answer": "42"}
+    model2 = model_ref.get()
+    assert model2.predict(1) == {"answer": "42"}
+
+    inner_res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._ObjectVersionFilter(
+                is_op=False, latest_only=True, base_object_classes=["Model"]
+            ),
+        )
+    )
+
+    assert len(inner_res.objs) == 1
+    expected_predict_op = inner_res.objs[0].val["predict"]
+    assert isinstance(expected_predict_op, str) and expected_predict_op.startswith(
+        "weave:///"
+    )

@@ -9,7 +9,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
+import {GridColumnVisibilityModel, GridSortModel} from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {Loading} from '@wandb/weave/components/Loading';
@@ -53,10 +53,12 @@ import {
   WeaveflowPeekContext,
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
+import {getValidSortModel} from './Browse3/grid/sort';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
+import {DEFAULT_SORT_CALLS} from './Browse3/pages/CallsPage/CallsTable';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
@@ -683,6 +685,20 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  const sortModel = useMemo(
+    () => getValidSortModel(query.sort, DEFAULT_SORT_CALLS),
+    [query.sort]
+  );
+  const setSortModel = (newModel: GridSortModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    if (newModel.length === 0) {
+      newQuery.delete('sort');
+    } else {
+      newQuery.set('sort', JSON.stringify(newModel));
+    }
+    history.push({search: newQuery.toString()});
+  };
+
   return (
     <CallsPage
       entity={entity}
@@ -691,6 +707,8 @@ const CallsPageBinding = () => {
       onFilterUpdate={onFilterUpdate}
       columnVisibilityModel={columnVisibilityModel}
       setColumnVisibilityModel={setColumnVisibilityModel}
+      sortModel={sortModel}
+      setSortModel={setSortModel}
     />
   );
 };

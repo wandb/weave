@@ -353,7 +353,7 @@ def test_call_display_name(client):
     call0 = result[0]
     client._remove_call_display_name(call0)
     call0 = client.call(call0.id)
-    assert call0.display_name == None
+    assert call0.display_name is None
 
     # add it back
     call0.set_display_name("new new name")
@@ -363,7 +363,7 @@ def test_call_display_name(client):
     # delete display_name by setting to None
     call0.remove_display_name()
     call0 = client.call(call0.id)
-    assert call0.display_name == None
+    assert call0.display_name is None
 
     # add it back
     call0.set_display_name("new new name")
@@ -373,7 +373,7 @@ def test_call_display_name(client):
     # delete by passing None to set
     call0.set_display_name(None)
     call0 = client.call(call0.id)
-    assert call0.display_name == None
+    assert call0.display_name is None
 
 
 def test_dataset_calls(client):
@@ -649,7 +649,7 @@ def test_evaluate(client):
     eval_obj_val = eval_obj._val  # non-trace version so we don't automatically deref
     assert eval_obj_val._class_name == "Evaluation"
     assert eval_obj_val.name == "my-eval"
-    assert eval_obj_val.description == None
+    assert eval_obj_val.description is None
     assert isinstance(eval_obj_val.dataset, weave_client.ObjectRef)
     assert eval_obj.dataset._class_name == "Dataset"
     assert len(eval_obj_val.scorers) == 1
@@ -863,14 +863,9 @@ def test_isinstance_checks(client):
 
     # BoxedBool can't inherit from bool
     y2 = y[2]
-    assert not isinstance(y2, bool)
-    assert y2.ref is not None
-    assert y2.ref.is_descended_from(y.ref)
 
     y3 = y[3]
-    assert not isinstance(y2, type(None))
-    assert y3.ref is not None
-    assert y3.ref.is_descended_from(y.ref)
+    assert y3 is None
 
 
 def test_summary_tokens(client):

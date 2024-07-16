@@ -1,4 +1,4 @@
-import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
+import {GridColumnVisibilityModel, GridSortModel} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {FC, useMemo} from 'react';
 
@@ -32,6 +32,9 @@ export const CallsPage: FC<{
 
   columnVisibilityModel: GridColumnVisibilityModel;
   setColumnVisibilityModel: (newModel: GridColumnVisibilityModel) => void;
+
+  sortModel: GridSortModel;
+  setSortModel: (newModel: GridSortModel) => void;
 }> = props => {
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
@@ -78,6 +81,8 @@ export const CallsPage: FC<{
                 onFilterUpdate={setFilter}
                 columnVisibilityModel={props.columnVisibilityModel}
                 setColumnVisibilityModel={props.setColumnVisibilityModel}
+                sortModel={props.sortModel}
+                setSortModel={props.setSortModel}
               />
             ),
           },
