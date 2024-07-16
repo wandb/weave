@@ -282,7 +282,7 @@ class WeaveKeyDict(dict):
     This dictionary is not intended to be set directly.
     """
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: Any, value: Any) -> None:
         raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
 
 
@@ -292,7 +292,7 @@ class AttributesDict(dict):
     The `weave` key is reserved for internal use and cannot be set directly.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__()
         dict.__setitem__(self, "weave", WeaveKeyDict())
 
@@ -305,16 +305,16 @@ class AttributesDict(dict):
                 else:
                     self[key] = value
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: Any, value: Any) -> None:
         if key == "weave":
             raise KeyError("Cannot set 'weave' directly -- for internal use only!")
         super().__setitem__(key, value)
 
-    def _set_weave_item(self, subkey, value):
+    def _set_weave_item(self, subkey: Any, value: Any) -> None:
         """Internal method to set items in the 'weave' subdictionary."""
         dict.__setitem__(self["weave"], subkey, value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"
 
 
