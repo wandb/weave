@@ -211,7 +211,9 @@ def test_call_create(client):
         exception=None,
         summary={},
         _children=[],
-        attributes={},
+        attributes={
+            "weave_client_version": weave.version.VERSION,
+        },
     )
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
@@ -229,7 +231,9 @@ def test_calls_query(client):
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call0.id,
-        attributes={},
+        attributes={
+            "weave_client_version": weave.version.VERSION,
+        },
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -238,7 +242,9 @@ def test_calls_query(client):
         parent_id=call0.id,
         inputs={"a": 6, "b": 11},
         id=call1.id,
-        attributes={},
+        attributes={
+            "weave_client_version": weave.version.VERSION,
+        },
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
