@@ -1,6 +1,7 @@
 import asyncio
 import dataclasses
 import json
+import platform
 import re
 import signal
 
@@ -212,7 +213,13 @@ def test_call_create(client):
         summary={},
         _children=[],
         attributes={
-            "weave_client_version": weave.version.VERSION,
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+            },
         },
     )
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
@@ -232,7 +239,13 @@ def test_calls_query(client):
         inputs={"a": 5, "b": 10},
         id=call0.id,
         attributes={
-            "weave_client_version": weave.version.VERSION,
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+            },
         },
     )
     assert result[1] == weave_client.Call(
@@ -243,7 +256,13 @@ def test_calls_query(client):
         inputs={"a": 6, "b": 11},
         id=call1.id,
         attributes={
-            "weave_client_version": weave.version.VERSION,
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+            },
         },
     )
     client.finish_call(call2, None)
