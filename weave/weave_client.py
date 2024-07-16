@@ -276,6 +276,11 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
 
 
 class WeaveKeyDict(dict):
+    """A dict representing the 'weave' subdictionary of a call's attributes.
+
+    This dictionary is not intended to be set directly.
+    """
+
     def __setitem__(self, key, value):
         raise KeyError(
             "Cannot modify 'weave' subdictionary directly. Use set_weave_item() method of the parent dictionary."
@@ -283,6 +288,11 @@ class WeaveKeyDict(dict):
 
 
 class AttributesDict(dict):
+    """A dict representing the attributes of a call.
+
+    The `weave` key is reserved for internal use and cannot be set directly.
+    """
+
     def __init__(self, **kwargs):
         super().__init__()
         self["weave"] = WeaveKeyDict()
@@ -292,7 +302,7 @@ class AttributesDict(dict):
                 if key == "weave":
                     if isinstance(value, dict):
                         for subkey, subvalue in value.items():
-                            self.set_weave_item(subkey, subvalue)
+                            self.__set_weave_item(subkey, subvalue)
                 else:
                     self[key] = value
 
@@ -301,7 +311,7 @@ class AttributesDict(dict):
             raise KeyError("Cannot set 'weave' directly. Use set_weave_item() method.")
         super().__setitem__(key, value)
 
-    def set_weave_item(self, subkey, value):
+    def __set_weave_item(self, subkey, value):
         """Internal method to set items in the 'weave' subdictionary."""
         dict.__setitem__(self["weave"], subkey, value)
 
@@ -471,7 +481,7 @@ class WeaveClient:
             attributes = {}
 
         attributes = AttributesDict(**attributes)
-        attributes.set_weave_item("weave_client_version", version.VERSION)
+        attributes.__set_weave_item("weave_client_version", version.VERSION)
 
         call = Call(
             op_name=op_str,
