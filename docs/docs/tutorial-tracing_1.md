@@ -43,8 +43,8 @@ from openai import OpenAI
 
 client = OpenAI(api_key="...")
 
-# highlight-next-line
 # Weave will track the inputs, outputs and code of this function
+# highlight-next-line
 @weave.op()
 def extract_dinos(sentence: str) -> dict:
     response = client.chat.completions.create(
@@ -64,8 +64,9 @@ their `common_name`, and whether its `diet` is a herbivore or carnivore"""
         )
     return response.choices[0].message.content
 
-# highlight-next-line
+
 # Initialise the weave project
+# highlight-next-line
 weave.init('jurassic-park')
 
 sentence = """I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), \
@@ -80,7 +81,7 @@ When you call the `extract_dinos` function Weave will output a link to view your
 
 ## 3. Automated LLM library logging
 
-Calls made to OpenAI, Anthropic and [many more LLM libraries](/integrations/index) are automatically tracked with Weave, with **LLM metadata**, **token usage** and **cost** being logged automatically. If your LLM library isn't currently one of our integrations you can track calls to other LLMs libraries or frameworks easily by wrapping them with `@weave.op()`
+Calls made to OpenAI, Anthropic and [many more LLM libraries](guides/integrations/) are automatically tracked with Weave, with **LLM metadata**, **token usage** and **cost** being logged automatically. If your LLM library isn't currently one of our integrations you can track calls to other LLMs libraries or frameworks easily by wrapping them with `@weave.op()`
 
 
 ## 4. See traces of your application in your project

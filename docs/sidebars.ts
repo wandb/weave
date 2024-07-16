@@ -51,7 +51,7 @@ const sidebars: SidebarsConfig = {
         {
           type: "category",
           label: "Integrations",
-          link: { type: "doc", id: "guides/integrations/index" },
+          link: { type: "doc", id: "guides/integrations/" },
           items: [
             "guides/integrations/openai",
             "guides/integrations/anthropic",
