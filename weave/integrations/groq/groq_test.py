@@ -255,7 +255,6 @@ def test_groq_async_streaming_chat_completion(
     groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"))
 
     async def generate_reponse() -> str:
-
         chat_streaming = await groq_client.chat.completions.create(
             messages=[
                 {
