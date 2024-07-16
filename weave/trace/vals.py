@@ -482,7 +482,7 @@ def make_trace_obj(
     if isinstance(box_val, pydantic_v1.BaseModel):
         box_val.__dict__["ref"] = new_ref
     else:
-        if box_val is not None:
+        if box_val is not None and not isinstance(box_val, bool):
             setattr(box_val, "ref", new_ref)
     return box_val
 
