@@ -2216,7 +2216,9 @@ class BasicModel(weave.Model):
 
 def test_model_save(client):
     model = BasicModel()
+    assert model.predict(1) == {"answer": "42"}
     model_ref = weave.publish(model)
+    assert model.predict(1) == {"answer": "42"}
     model2 = model_ref.get()
     assert model2.predict(1) == {"answer": "42"}
 
