@@ -4,7 +4,6 @@ import datetime
 import os
 import typing
 from collections import defaultdict, namedtuple
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from contextvars import copy_context
 
@@ -13,7 +12,7 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from weave import weave_client
+from weave import ThreadPoolExecutor, weave_client
 from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, WeaveObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -1625,7 +1624,7 @@ def map_with_copying_thread_executor(fn, vals):
     "mapper",
     [
         map_simple,
-        # map_with_thread_executor, # <-- Currently this is failing! Fix me (:
+        map_with_thread_executor,  # <-- Currently this is failing! Fix me (:
         # map_with_copying_thread_executor, # <-- Flakes in CI
     ],
 )
