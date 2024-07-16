@@ -2,6 +2,7 @@ import asyncio
 import dataclasses
 import datetime
 import os
+import time
 import typing
 from collections import defaultdict, namedtuple
 from concurrent.futures import ThreadPoolExecutor
@@ -2206,3 +2207,38 @@ def test_sort_and_filter_through_refs(client):
         )
 
         assert inner_res.count == count
+
+
+def test_calls_iter_slice(client):
+    @weave.op
+    def func(x):
+        return x
+
+    for i in range(10):
+        func(i)
+
+    calls = func.calls()
+    calls_subset = calls[2:5]
+    assert len(calls_subset) == 3
+
+
+def test_calls_iter_cached(client):
+    @weave.op
+    def func(x):
+        return x
+
+    for i in range(20):
+        func(i)
+
+    calls = func.calls()
+
+    elapsed_times = []
+    for i in range(3):
+        start_time = time.time()
+        c = calls[0]
+        end_time = time.time()
+        elapsed_times.append(end_time - start_time)
+
+    # cached lookup should be way faster!
+    assert elapsed_times[0] > elapsed_times[1] * 10
+    assert elapsed_times[0] > elapsed_times[2] * 10
