@@ -17,7 +17,7 @@ def groq_accumulator(
     if acc is None:
         choices = []
         for choice in value.choices:
-            if isinstance(value.choices[0], ChoiceChunk):
+            if isinstance(choice, ChoiceChunk):
                 choices.append(
                     Choice(
                         message=ChatCompletionMessage(
@@ -50,10 +50,15 @@ def groq_accumulator(
 
     if value.choices:
         for idx, choice in enumerate(value.choices):
-            if acc.choices[idx].message.content:
+            pprint(f"{acc.choices[idx].message.content=}")
+            if isinstance(acc.choices[idx].message.content, str) and isinstance(
+                choice.delta.content, str
+            ):
                 acc.choices[idx].message.content += choice.delta.content
             if acc.choices[idx].message.function_call:
-                acc.choices[idx].message.function_call.append(choice.delta.function_call)
+                acc.choices[idx].message.function_call.append(
+                    choice.delta.function_call
+                )
             if acc.choices[idx].message.tool_call:
                 acc.choices[idx].message.tool_call.append(choice.delta.tool_call)
 
