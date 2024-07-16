@@ -13,29 +13,6 @@ import numpy as np
 T = TypeVar("T")
 
 
-class HasBoxedRepr:
-    val: Any
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} ({self.val})>"
-
-
-class BoxedBool(HasBoxedRepr):
-    _id: int | None = None
-
-    def __init__(self, val: bool) -> None:
-        self.val = val
-
-    def __bool__(self) -> bool:
-        return self.val
-
-    def __hash__(self) -> int:
-        return hash(self.val)
-
-    def __eq__(self, other: Any) -> bool:
-        return self.val == other
-
-
 class BoxedInt(int):
     _id: int | None = None
 
