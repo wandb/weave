@@ -309,9 +309,25 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
         sig = inspect.signature(func)
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
+        is_generator = inspect.isgeneratorfunction(func)
+        is_async_generator = inspect.isasyncgenfunction(func)
 
         def create_wrapper(func: Callable) -> Op:
-            if is_async:
+            if is_async_generator:
+
+                @wraps(func)
+                async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    if client_context.weave_client.get_weave_client() is None:
+                        async for item in func(*args, **kwargs):
+                            yield item
+                    else:
+                        call = _create_call(wrapper, *args, **kwargs)
+                        async for item in _execute_call(
+                            wrapper, call, *args, __return_type="value", **kwargs
+                        ):
+                            yield item
+
+            elif is_async:
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -325,7 +341,19 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         __return_type="value",
                         **kwargs,
                     )
-            else:
+
+            elif is_generator:
+
+                @wraps(func)
+                def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    if client_context.weave_client.get_weave_client() is None:
+                        yield from func(*args, **kwargs)
+                    else:
+                        call = _create_call(wrapper, *args, **kwargs)
+                        yield from _execute_call(
+                            wrapper, call, *args, __return_type="value", **kwargs
+                        )
+            else:  # is sync func
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
