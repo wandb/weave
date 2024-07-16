@@ -668,9 +668,9 @@ class WeaveClient:
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         ref = get_ref(obj)
         if ref is not None:
-            return
-        # Strip stale refs created in different projects
-        if ref.project != self.project:
+            if ref.project == self.project:
+                return
+            # Strip stale refs created in different projects, and recreate
             remove_ref(obj)
 
         if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
