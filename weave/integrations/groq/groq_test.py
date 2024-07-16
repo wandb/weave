@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import pytest
 
@@ -387,7 +387,7 @@ def test_groq_tool_call(
             return json.dumps({"team_name": team_name, "score": "unknown"})
 
     @weave.op()
-    def run_conversation(user_prompt: str) -> str:
+    def run_conversation(user_prompt: str) -> Union[str, None]:
         # Step 1: send the conversation and available functions to the model
         messages = [
             {
@@ -459,6 +459,7 @@ def test_groq_tool_call(
                 model="llama3-70b-8192", messages=messages, seed=42
             )  # get a new response from the model where it can see the function response
             return second_response.choices[0].message.content
+        return None
 
     response = run_conversation("What was the score of the Warriors game?")
 
