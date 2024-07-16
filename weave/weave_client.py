@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import inspect
+import platform
 import typing
 import uuid
 from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
@@ -479,7 +480,11 @@ class WeaveClient:
             attributes = {}
 
         attributes = AttributesDict(**attributes)
-        attributes._set_weave_item("weave_client_version", version.VERSION)
+        attributes._set_weave_item("client_version", version.VERSION)
+        attributes._set_weave_item("source", "python-sdk")
+        attributes._set_weave_item("os_name", platform.system())
+        attributes._set_weave_item("os_version", platform.version())
+        attributes._set_weave_item("os_release", platform.release())
 
         call = Call(
             op_name=op_str,
