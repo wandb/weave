@@ -82,7 +82,6 @@ def init_weave(
     # case we're on a new thread.
     wandb_api.init()
     wandb_context = wandb_api.get_wandb_api_context()
-    wandb_api.check_base_url()
     if wandb_context is None:
         import wandb
 
@@ -98,7 +97,6 @@ def init_weave(
     api_key = None
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
-        wandb_api.check_api_key(api_key)
     remote_server = init_weave_get_server(api_key)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
