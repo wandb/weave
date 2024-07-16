@@ -315,8 +315,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    if wrapper.__self__ is not None:
-                        args = (wrapper.__self__,) + args
+                    if wrapper.__self__ is not None:  # type: ignore
+                        args = (wrapper.__self__,) + args  # type: ignore
 
                     if client_context.weave_client.get_weave_client() is None:
                         return await func(*args, **kwargs)
@@ -332,8 +332,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    if wrapper.__self__ is not None:
-                        args = (wrapper.__self__,) + args
+                    if wrapper.__self__ is not None:  # type: ignore
+                        args = (wrapper.__self__,) + args  # type: ignore
 
                     if client_context.weave_client.get_weave_client() is None:
                         return func(*args, **kwargs)
@@ -356,7 +356,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             wrapper.calls = partial(calls, wrapper)  # type: ignore
 
             wrapper.__call__ = wrapper  # type: ignore
-            wrapper.__self__ = None
+            wrapper.__self__ = None  # type: ignore
 
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
