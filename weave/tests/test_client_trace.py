@@ -2206,3 +2206,12 @@ def test_sort_and_filter_through_refs(client):
         )
 
         assert inner_res.count == count
+
+
+def test_call_has_client_version(client):
+    @weave.op
+    def test():
+        return 1
+
+    c = test.call()
+    assert "weave_client_version" in c.attributes

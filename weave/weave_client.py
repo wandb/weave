@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
 import pydantic
 from requests import HTTPError
 
-from weave import call_context, client_context, trace_sentry, urls
+from weave import call_context, client_context, trace_sentry, urls, version
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
@@ -435,6 +435,8 @@ class WeaveClient:
 
         if attributes is None:
             attributes = {}
+
+        attributes["weave_client_version"] = version.VERSION
 
         call = Call(
             op_name=op_str,
