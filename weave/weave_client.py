@@ -89,6 +89,11 @@ def get_ref(obj: Any) -> Optional[ObjectRef]:
     return getattr(obj, "ref", None)
 
 
+def remove_ref(obj: Any) -> None:
+    if get_ref(obj) is not None:
+        del obj.ref
+
+
 def _get_direct_ref(obj: Any) -> Optional[Ref]:
     if isinstance(obj, WeaveTable):
         # TODO: this path is odd. We want to use table_ref when serializing
@@ -661,8 +666,13 @@ class WeaveClient:
         return ref
 
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
-        if get_ref(obj) is not None:
+        ref = get_ref(obj)
+        if ref is not None:
             return
+        # Strip stale refs created in different projects
+        if ref.project != self.project:
+            remove_ref(obj)
+
         if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
