@@ -9,8 +9,6 @@ from pydantic import (
     model_validator,
 )
 
-# import pydantic
-from weave.legacy import box
 from weave.trace.op import ObjectRef, Op, call
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.weave_client import get_ref

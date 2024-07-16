@@ -1,7 +1,6 @@
 import typing
 from typing import Any
 
-from weave.legacy import box
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri

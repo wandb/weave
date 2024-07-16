@@ -197,10 +197,6 @@ def _execute_call(
         raise
     else:
         res = box.box(res)  # TODO: can we get rid of this?
-    # We cannot let BoxedBool escape into the user's code
-    # since they cannot pass instance checks for None or bool.
-    if isinstance(res, box.BoxedBool):
-        res = res.val
 
     if inspect.iscoroutine(res):
         awaitable = res

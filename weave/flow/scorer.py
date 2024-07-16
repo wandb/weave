@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 import weave
 from weave.flow.obj import Object
-from weave.legacy import box
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 
@@ -47,7 +46,7 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
     data = [x for x in data if x is not None]
     val = data[0]
 
-    if isinstance(val, (bool, box.BoxedBool)):
+    if isinstance(val, bool):
         return {
             "true_count": (true_count := sum(1 for x in data if x)),
             "true_fraction": true_count / len(data),
