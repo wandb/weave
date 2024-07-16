@@ -2206,3 +2206,31 @@ def test_sort_and_filter_through_refs(client):
         )
 
         assert inner_res.count == count
+
+
+class BasicModel(weave.Model):
+    @weave.op()
+    def predict(self, x):
+        return {"answer": "42"}
+
+
+def test_model_save(client):
+    model = BasicModel()
+    model_ref = weave.publish(model)
+    model2 = model_ref.get()
+    assert model2.predict(1) == {"answer": "42"}
+
+    inner_res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._ObjectVersionFilter(
+                is_op=False, latest_only=True, base_object_classes=["Model"]
+            ),
+        )
+    )
+
+    assert len(inner_res.objs) == 1
+    expected_predict_op = inner_res.objs[0].val["predict"]
+    assert isinstance(expected_predict_op, str) and expected_predict_op.startswith(
+        "weave:///"
+    )
