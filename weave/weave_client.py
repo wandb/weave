@@ -275,6 +275,40 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
     return result
 
 
+class WeaveKeyDict(dict):
+    def __setitem__(self, key, value):
+        raise KeyError(
+            "Cannot modify 'weave' subdictionary directly. Use set_weave_item() method of the parent dictionary."
+        )
+
+
+class AttributesDict(dict):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self["weave"] = WeaveKeyDict()
+
+        if kwargs:
+            for key, value in kwargs.items():
+                if key == "weave":
+                    if isinstance(value, dict):
+                        for subkey, subvalue in value.items():
+                            self.set_weave_item(subkey, subvalue)
+                else:
+                    self[key] = value
+
+    def __setitem__(self, key, value):
+        if key == "weave":
+            raise KeyError("Cannot set 'weave' directly. Use set_weave_item() method.")
+        super().__setitem__(key, value)
+
+    def set_weave_item(self, subkey, value):
+        """Internal method to set items in the 'weave' subdictionary."""
+        dict.__setitem__(self["weave"], subkey, value)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({super().__repr__()})"
+
+
 class WeaveClient:
     server: TraceServerInterface
 
@@ -436,7 +470,8 @@ class WeaveClient:
         if attributes is None:
             attributes = {}
 
-        attributes["weave_client_version"] = version.VERSION
+        attributes = AttributesDict(**attributes)
+        attributes.set_weave_item("weave_client_version", version.VERSION)
 
         call = Call(
             op_name=op_str,
