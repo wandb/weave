@@ -372,6 +372,8 @@ def maybe_bind_method(func: Callable, self: Any = None) -> Union[Callable, Metho
     If self is None, return the function as is.
     """
     if (sig := inspect.signature(func)) and sig.parameters.get("self"):
+        if inspect.ismethod(func) and id(func.__self__) != id(self):
+            raise ValueError("Cannot re-bind a method to an new object")
         return MethodType(func, self)
     return func
 
