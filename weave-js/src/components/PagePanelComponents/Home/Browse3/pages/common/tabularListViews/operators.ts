@@ -6,6 +6,7 @@ import {
   GridFilterItem,
   GridFilterOperator,
 } from '@mui/x-data-grid';
+import _ from 'lodash';
 
 import {Query} from '../../wfReactInterface/traceServerClientInterface/query';
 
@@ -88,6 +89,14 @@ export const operationConverter = (
     return {
       $eq: [{$getField: item.field}, {$literal: item.value}],
     };
+  } else if (item.operator === '(string): in') {
+    const values = _.isArray(item.value)
+      ? item.value
+      : item.value.split(',').map((v: string) => v.trim());
+    const clauses = values.map((v: string) => ({
+      $eq: [{$getField: item.field}, {$literal: v}],
+    }));
+    return {$or: clauses};
   } else if (item.operator === '(number): =') {
     if (item.value === '') {
       return null;
@@ -171,7 +180,7 @@ export const operationConverter = (
       return null;
     }
     return {
-      $eq: [{$getField: item.field}, {$literal: item.value}],
+      $eq: [{$getField: item.field}, {$literal: `${item.value}`}],
     };
   } else if (item.operator === '(date): after') {
     if (item.value === '') {
@@ -194,6 +203,6 @@ export const operationConverter = (
       ],
     };
   } else {
-    throw new Error('Unsupported operator');
+    throw new Error(`Unsupported operator: ${item.operator}`);
   }
 };
