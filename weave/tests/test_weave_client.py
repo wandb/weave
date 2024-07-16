@@ -480,6 +480,26 @@ def test_saveload_op(client):
     assert obj2["b"].name == "op-add3"
 
 
+def test_op_mismatch_project_ref(client):
+    client.project = "test-project"
+
+    @weave.op()
+    def hello_world():
+        return "Hello world"
+
+    hello_world()
+    op = list(client._op_calls(hello_world))[0]
+    assert op.project_id == "shawn/test-project"
+    assert op.op_name.split("/op/")[0] == "weave:///shawn/test-project"
+
+    client.project = "test-project2"
+    hello_world()
+
+    op = list(client._op_calls(hello_world))[0]
+    assert op.project_id == "shawn/test-project2"
+    assert op.op_name.split("/op/")[0] == "weave:///shawn/test-project2"
+
+
 def test_saveload_customtype(client, strict_op_saving):
     class MyCustomObj:
         a: int
