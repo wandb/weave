@@ -1,4 +1,5 @@
 import inspect
+import traceback
 import typing
 from functools import partial, wraps
 from types import MethodType
@@ -8,7 +9,6 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
-    Literal,
     Mapping,
     Optional,
     Protocol,
@@ -169,7 +169,6 @@ def _execute_call(
     __op: Op,
     call: Any,
     *args: Any,
-    __return_type: Literal["call", "value"] = "call",
     **kwargs: Any,
 ) -> Any:
     func = __op.resolve_fn
@@ -205,8 +204,7 @@ def _execute_call(
             try:
                 call_context.push_call(call)
                 output = await awaitable
-                res2 = on_output(output)
-                return call if __return_type == "call" else res2
+                return on_output(output)
             except BaseException as e:
                 finish(exception=e)
                 raise
@@ -215,13 +213,18 @@ def _execute_call(
 
         return _call_async()
     else:
-        res2 = on_output(res)
-        return call if __return_type == "call" else res2
+        return on_output(res)
 
 
 def call(op: Op, *args: Any, **kwargs: Any) -> Any:
     c = _create_call(op, *args, **kwargs)
-    return _execute_call(op, c, *args, **kwargs)
+    try:
+        _execute_call(op, c, *args, **kwargs)
+    except Exception as e:
+        print("WARNING: Error executing call")
+        traceback.print_exc()
+    finally:
+        return c
 
 
 def calls(op: Op) -> "CallsIter":
@@ -313,13 +316,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if client_context.weave_client.get_weave_client() is None:
                         return await func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return await _execute_call(
-                        wrapper,  # type: ignore
-                        call,
-                        *args,
-                        __return_type="value",
-                        **kwargs,
-                    )
+                    return await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
             else:
 
                 @wraps(func)
@@ -327,13 +324,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if client_context.weave_client.get_weave_client() is None:
                         return func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return _execute_call(
-                        wrapper,  # type: ignore
-                        call,
-                        *args,
-                        __return_type="value",
-                        **kwargs,
-                    )
+                    return _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
