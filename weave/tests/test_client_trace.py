@@ -2242,3 +2242,34 @@ def test_calls_iter_cached(client):
     # cached lookup should be way faster!
     assert elapsed_times[0] > elapsed_times[1] * 10
     assert elapsed_times[0] > elapsed_times[2] * 10
+
+
+def test_calls_iter_different_value_same_page_cached(client):
+    @weave.op
+    def func(x):
+        return x
+
+    for i in range(20):
+        func(i)
+
+    calls = func.calls()
+
+    start_time1 = time.time()
+    c1 = calls[0]
+    end_time1 = time.time()
+    elapsed_time1 = end_time1 - start_time1
+
+    # default page size is 10, so these lookups should be cached too
+    start_time2 = time.time()
+    c2 = calls[1]
+    end_time2 = time.time()
+    elapsed_time2 = end_time2 - start_time2
+
+    start_time3 = time.time()
+    c3 = calls[2]
+    end_time3 = time.time()
+    elapsed_time3 = end_time3 - start_time3
+
+    # cached lookup should be way faster!
+    assert elapsed_time1 > elapsed_time2 * 10
+    assert elapsed_time1 > elapsed_time3 * 10
