@@ -6,6 +6,21 @@ from typing import Any, Callable, Iterable, Iterator, Optional
 
 
 class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
+    """A ThreadPoolExecutor that runs functions with the context of the caller.
+
+    This is a drop-in replacement for ThreadPoolExecutor that ensures that calls
+    behave as expected inside the executor.  You can achieve the same effect
+    without this class by instead writing:
+
+    with ThreadPoolExecutor() as executor:
+        contexts = [copy_context() for _ in range(len(vals))]
+
+        def _wrapped_fn(*args):
+            return contexts.pop().run(fn, *args)
+
+        executor.map(_wrapped_fn, vals)
+    """
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.contexts: list[Context] = []
@@ -41,6 +56,13 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
 
 
 class ContextAwareThread(_Thread):
+    """A Thread that runs functions with the context of the caller.
+
+    This is a drop-in replacement for Thread that ensures that calls behave as
+    expected inside the thread.  You can achieve the same effect without this
+    class by instead writing:
+    """
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.context = copy_context()
