@@ -12,7 +12,7 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from weave import ThreadPoolExecutor, weave_client
+from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, WeaveObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -1602,7 +1602,25 @@ def map_simple(fn, vals):
 max_workers = 3
 
 
-# This is a standard way to execute a map operation with thread executor.
+def map_with_threads_no_executor(fn, vals):
+    def task_wrapper(v):
+        return fn(v)
+
+    threads = []
+
+    for v in vals:
+        thread = Thread(target=task_wrapper, args=(v,))
+        threads.append(thread)
+
+    # run threads in batches
+    for i in range(0, len(threads), max_workers):
+        batch = threads[i : i + max_workers]
+        for thread in batch:
+            thread.start()
+        for thread in batch:
+            thread.join()
+
+
 def map_with_thread_executor(fn, vals):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(fn, vals)
@@ -1624,7 +1642,8 @@ def map_with_copying_thread_executor(fn, vals):
     "mapper",
     [
         map_simple,
-        map_with_thread_executor,  # <-- Currently this is failing! Fix me (:
+        map_with_threads_no_executor,
+        map_with_thread_executor,
         # map_with_copying_thread_executor, # <-- Flakes in CI
     ],
 )

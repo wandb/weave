@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import copy_context
 from functools import partial
+from threading import Thread as _Thread
 
 
 class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
@@ -28,5 +29,16 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
         return context.run(fn, *args, **kwargs)
 
 
+class ContextAwareThread(_Thread):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.context = copy_context()
+        self.result = None
+
+    def run(self):
+        self.result = self.context.run(super().run)
+
+
 # rename for cleaner export
 ThreadPoolExecutor = ContextAwareThreadPoolExecutor
+Thread = ContextAwareThread
