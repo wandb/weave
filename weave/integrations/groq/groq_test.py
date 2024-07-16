@@ -333,7 +333,7 @@ def test_groq_tool_call(
 
     from groq import Groq
 
-    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY", "DUMMY_API_KEY"))
 
     @weave.op()
     def get_game_score(team_name: str) -> str:
