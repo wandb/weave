@@ -95,7 +95,6 @@ export const ScorecardSection: React.FC<{
   const {compositeSummaryMetrics} = useMemo(() => {
     return buildCompositeComparisonSummaryMetrics(props.state);
   }, [props.state]);
-  console.log({compositeSummaryMetrics});
 
   const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
 

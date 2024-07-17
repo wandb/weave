@@ -259,6 +259,9 @@ const fetchEvaluationComparisonData = async (
         value: model_latency.mean,
         sourceCallId: evalCallId,
       };
+      result.scoreMetrics[metricId] = {
+        ...modelLatencyMetricDimension,
+      };
     }
 
     // Total Tokens
@@ -277,6 +280,9 @@ const fetchEvaluationComparisonData = async (
       evalCall.summaryMetrics[metricId] = {
         value: totalTokens,
         sourceCallId: evalCallId,
+      };
+      result.scoreMetrics[metricId] = {
+        ...totalTokensMetricDimension,
       };
     }
   });
