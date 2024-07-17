@@ -3,7 +3,6 @@
  * * Really try to cleanup the code - specifically:
  *    * there is a lot of slopiness with react memoing
  *    * There is a lot of slopiness in symbol names and files
- * * See all code TODOs
  * * Remember to cleanup unused symbols (knip)
  *  * Test each of the example pages
  *    * URLS:
