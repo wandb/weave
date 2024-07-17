@@ -1,6 +1,5 @@
 import inspect
 import traceback
-import typing
 from functools import partial, wraps
 from types import MethodType
 from typing import (
@@ -8,7 +7,6 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Mapping,
     Optional,
     Protocol,
     Union,
@@ -17,67 +15,17 @@ from typing import (
     runtime_checkable,
 )
 
-from weave import call_context, client_context
+from weave import client_context
 from weave.legacy import context_state
 from weave.trace.call import execute_call as _execute_call
-from weave.trace.context import call_attributes
-from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 
-from .constants import TRACE_CALL_EMOJI
-
 if TYPE_CHECKING:
-    from weave.weave_client import Call, CallsIter
-
-try:
-    from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
-except ImportError:
-    OPENAI_NOT_GIVEN = None
-
-try:
-    from cohere.base_client import COHERE_NOT_GIVEN
-except ImportError:
-    COHERE_NOT_GIVEN = None
-
-try:
-    from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
-except ImportError:
-    ANTHROPIC_NOT_GIVEN = None
-
-
-def print_call_link(call: "Call") -> None:
-    print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
+    from weave.weave_client import CallsIter
 
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
-
-
-def value_is_sentinel(param: Any) -> bool:
-    return (
-        param.default is None
-        or param.default is OPENAI_NOT_GIVEN
-        or param.default is COHERE_NOT_GIVEN
-        or param.default is ANTHROPIC_NOT_GIVEN
-    )
-
-
-def _apply_fn_defaults_to_inputs(
-    fn: typing.Callable, inputs: Mapping[str, typing.Any]
-) -> dict[str, typing.Any]:
-    inputs = {**inputs}
-    sig = inspect.signature(fn)
-    for param_name, param in sig.parameters.items():
-        if param_name not in inputs:
-            if param.default != inspect.Parameter.empty and not value_is_sentinel(
-                param
-            ):
-                inputs[param_name] = param.default
-            if param.kind == inspect.Parameter.VAR_POSITIONAL:
-                inputs[param_name] = tuple()
-            elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                inputs[param_name] = dict()
-    return inputs
 
 
 @runtime_checkable
@@ -135,84 +83,6 @@ def _is_unbound_method(func: Callable) -> bool:
     is_method = params and params[0].name in {"self", "cls"}
 
     return bool(is_method)
-
-
-def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
-    client = client_context.weave_client.require_weave_client()
-
-    try:
-        inputs = func.signature.bind(*args, **kwargs).arguments
-    except TypeError as e:
-        raise OpCallError(f"Error calling {func.name}: {e}")
-    inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
-
-    # This should probably be configurable, but for now we redact the api_key
-    if "api_key" in inputs_with_defaults:
-        inputs_with_defaults["api_key"] = "REDACTED"
-
-    # If/When we do memoization, this would be a good spot
-
-    parent_call = call_context.get_current_call()
-    client._save_nested_objects(inputs_with_defaults)
-    attributes = call_attributes.get()
-
-    return client.create_call(
-        func,
-        inputs_with_defaults,
-        parent_call,
-        attributes=attributes,
-    )
-
-
-# def _execute_call(
-#     __op: Op,
-#     call: Any,
-#     *args: Any,
-#     **kwargs: Any,
-# ) -> Any:
-#     func = __op.resolve_fn
-#     client = client_context.weave_client.require_weave_client()
-#     has_finished = False
-
-#     def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
-#         nonlocal has_finished
-#         if has_finished:
-#             raise ValueError("Should not call finish more than once")
-#         client.finish_call(call, output, exception)
-#         if not call_context.get_current_call():
-#             print_call_link(call)
-
-#     def on_output(output: Any) -> Any:
-#         if handler := getattr(__op, "_on_output_handler", None):
-#             return handler(output, finish, call.inputs)
-#         finish(output)
-#         return output
-
-#     try:
-#         res = func(*args, **kwargs)
-#     except BaseException as e:
-#         finish(exception=e)
-#         raise
-#     else:
-#         res = box.box(res)  # TODO: can we get rid of this?
-
-#     if inspect.iscoroutine(res):
-#         awaitable = res
-
-#         async def _call_async() -> Coroutine[Any, Any, Any]:
-#             try:
-#                 call_context.push_call(call)
-#                 output = await awaitable
-#                 return on_output(output)
-#             except BaseException as e:
-#                 finish(exception=e)
-#                 raise
-#             finally:
-#                 call_context.pop_call(call.id)
-
-#         return _call_async()
-#     else:
-#         return on_output(res)
 
 
 def call(op: Op, *args: Any, **kwargs: Any) -> Any:
