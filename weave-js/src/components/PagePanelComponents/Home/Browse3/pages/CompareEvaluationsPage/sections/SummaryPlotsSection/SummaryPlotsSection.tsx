@@ -81,6 +81,7 @@ export const SummaryPlots: React.FC<{
     </VerticalBox>
   );
 };
+
 const normalizeValues = (values: Array<number | undefined>): number[] => {
   // find the max value
   // find the power of 2 that is greater than the max value
@@ -89,6 +90,7 @@ const normalizeValues = (values: Array<number | undefined>): number[] => {
   const maxPower = Math.ceil(Math.log2(maxVal));
   return values.map(val => (val ? val / 2 ** maxPower : 0));
 };
+
 const useNormalizedPlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): RadarPlotData => {
