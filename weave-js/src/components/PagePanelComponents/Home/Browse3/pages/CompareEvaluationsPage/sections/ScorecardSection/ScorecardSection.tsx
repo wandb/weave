@@ -18,6 +18,7 @@ import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {
+  CompositeScoreMetrics,
   DERIVED_SCORER_REF,
   evalCallIdToScorerRefs,
   resolveDimension,
@@ -31,10 +32,7 @@ import {
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
-import {
-  resolveSummaryMetricResultForEvaluateCall,
-  resolveSummaryMetricValueForEvaluateCall,
-} from '../../ecpUtil';
+import {resolveSummaryMetricResultForEvaluateCall} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
 import {HorizontalBox} from '../../Layout';
 import {
@@ -407,35 +405,20 @@ export const ScorecardSection: React.FC<{
                       {metricKey}
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
-                      // TODO: this can be simplified
-                      const baselineDimension = resolveDimension(
-                        compositeSummaryMetrics,
+                      const baseline = resolveSummaryMetricResult(
                         props.state.baselineEvaluationCallId,
                         groupName,
-                        metricKey
-                      );
-                      const baseline = baselineDimension
-                        ? resolveSummaryMetricValueForEvaluateCall(
-                            baselineDimension,
-                            props.state.data.evaluationCalls[
-                              props.state.baselineEvaluationCallId
-                            ]
-                          )
-                        : undefined;
-
-                      const compareDimension = resolveDimension(
+                        metricKey,
                         compositeSummaryMetrics,
+                        props.state
+                      )?.value;
+                      const metric = resolveSummaryMetricResult(
                         evalCallId,
                         groupName,
-                        metricKey
+                        metricKey,
+                        compositeSummaryMetrics,
+                        props.state
                       );
-                      const metric = compareDimension
-                        ? resolveSummaryMetricResultForEvaluateCall(
-                            compareDimension,
-                            props.state.data.evaluationCalls[evalCallId]
-                          )
-                        : undefined;
-
                       const value = metric?.value;
                       const sourceCallId = metric?.sourceCallId;
 
@@ -550,4 +533,26 @@ export const ComparisonPill: React.FC<{
       color={color}
     />
   );
+};
+
+const resolveSummaryMetricResult = (
+  evalCallId: string,
+  groupName: string,
+  metricKey: string,
+  compositeSummaryMetrics: CompositeScoreMetrics,
+  state: EvaluationComparisonState
+) => {
+  const baselineDimension = resolveDimension(
+    compositeSummaryMetrics,
+    evalCallId,
+    groupName,
+    metricKey
+  );
+  const baseline = baselineDimension
+    ? resolveSummaryMetricResultForEvaluateCall(
+        baselineDimension,
+        state.data.evaluationCalls[evalCallId]
+      )
+    : undefined;
+  return baseline;
 };
