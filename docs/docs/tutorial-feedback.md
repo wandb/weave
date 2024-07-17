@@ -4,8 +4,7 @@ hide_table_of_contents: true
 ---
 
 # Tutorial: Using Expert and User Feedback to Improve Evaluation
-
-Gathering feedback from end users of your application is a useful way to get signal on how to improve it. 
+Gathering feedback from end users of your application is essential to effectively improve your production LLM app. 
 
 In this tutorial, we'll show how to collect feedback from users of for a RAG-based Knowledge Chatbot using Weave. 
 
@@ -15,35 +14,43 @@ In order to successfully deploy LLM apps that correspond to the users' expectati
 ### Feedback Types
 We consider three different types of feedback that are useful to improve the evaluation pipeline:
 
-1. **User Feedback:** The user gives direct feedback on the answer of the chatbot. This can be done by either giving a reaction (e.g. thumbs up or thumbs down) or by writing a note.
+1. **User Feedback:** The user gives direct feedback on the answer of the chatbot. This can be done by only giving a reaction (e.g. thumbs up or thumbs down) or by also writing a note.
 
-    * **Pro**: This gives the clearest signal on the performance of the app since the question and the feedback are directly from the user.
-    * **Con**: This also gives the noisiest signal since it's subject to the user's mood, the user's understanding of the question, and the user's understanding of the answer.
+    * **Pro**: This gives the most direct signal on the performance of the app since the question and the feedback are directly from the user from the app context.
+    * **Con**: This also gives the noisiest signal since it's subject to the user's mood, the user's understanding of the question, and the user's understanding of the answer. Also it only gives a feedback for the final generation and not for the intermediate steps of the generation process which make it harder to improve specific components of the app (e.g. retrieval or generation of the RAG).
 
-2. **Expert Feedback:** An expert annotates the answer of the chatbot. This can be done by either giving a score or by writing a note.
+2. **Expert Feedback:** An expert annotates the answer of the chatbot. This can be done by either requiring only a score or by also writing a note.
 
-    * **Pro**: This gives a more neutral signal on the performance of the app since it's from an expert.
-    * **Con**: This might give a less representative signal since it's not from the user. Also it's more expensive to collect this feedback since it requires experts to annotate the data.
+    * **Pro**: This gives a more neutral and clear signal on the performance of the app since it's coming from an expert.
+    * **Con**: This might give a less representative signal since it's not from the user actually using the app. Also it's more expensive to collect this feedback since it requires to hire experts/annotators to annotate the data.
     
-3. **Synthetic Feedback:** We generate a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions.
+3. **Synthetic Feedback:** Using one or multiple LLM judges to evaluate the answer of the chatbot. This can also be done by only giving a score or by also requiring an explanation.
 
-    * **Pro**: This is the most cost effective option that can be representative without needing to gather and annotate a lot of production data. It also gives the broadest signal before gathering very large datasets since it's generated from the documents that the app is supposed to use to answer the questions.
-    * **Con**: This might give a less nuanced signal since it's generated from the documents and not from the user. Also it's more expensive to collect this feedback since it requires generating the data.
+    * **Pro**: This is more cost-effective than annotators and can be done before deploying the app. Also it can be done for multiple LLMs at the same time which can be used to mitigate judge bias.
+    * **Con**: This might give a less representative or hallucinated signal compared to the user or expert feedback.
 
-So far we have found that a combination of all three types of feedback is the most effective way to improve the evaluation pipeline. The following tutorial will guide you through a systematic evaluation pipeline that uses all three types of feedback with Weave:
+So far we have found that a combination of all three types of feedback is the most effective way to improve the evaluation pipeline. The following tutorial will guide you through the creation of a systematic evaluation pipeline that uses all three types of feedback with Weave:
 
-1. **1st Evaluation**: We evaluate our RAG chatbot on a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions. 
-2. **2nd Evaluation:** We deploy the RAG chatbot to a specific group of users and let them ask some questions and encourage them to give some direct feedback (reaction + notes). We track their reactions as positive and negative rates as live evaluation while it's running in production. 
-3. **3rd Evaluation:** We pull all question-answer-pairs with a negative reaction into an annotation UI and let experts annotate the given answer with help of the given feedback from the user. We save back the new annotated samples as a new version of the existing evaluation dataset and run evaluations again.
+1. **1st Evaluation (synthetic):**: We use LLM judges to evaluate our RAG chatbot on a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions. 
+2. **2nd Evaluation (user):** We deploy the RAG chatbot to a specific group of users and let them ask some questions and encourage them to give some direct feedback (reaction + notes). We track their reactions as positive and negative rates as live evaluation while it's running in production. 
+3. **3rd Evaluation (expert):** We pull all question-answer-pairs with a negative reaction into an annotation UI and let experts annotate the given answer with help of the given feedback from the user. We save back the new annotated samples as a new version of the existing evaluation dataset and run evaluations again.
+
+:::note
+Regardless of the type of feedback generating a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions is a good manner to generate a first representative evaluation dataset (question-answer-sources-pairs) that can be used to evaluate the RAG chatbot before gathering enough production data.
+:::
 
 # Implementation
-
-Since in this tutorial we'll focus on setting up the user and expert feedback loop we skip the synthetic datset generation step and directly jump to the 2nd evaluation step. 
+In this tutorial we'll focus on setting up the user and expert feedback loop so we'll skip the synthetic datset generation step and LLM evaluation step and directly jump to the user and expert feedback steps.
 
 ## 1. Gathering User Feedback from Production
 
 ### 1.1 Tracking Calls in Production
-Here we're going to set up a minimal Streamlit app to serve to our end users:
+Here we're going to set up a minimal Streamlit app to serve to our end users. As you can see we only need weave-specific code in two places: 
+
+```TODO: change chatbot and below code```
+
+* retrieving the newest model developed on Weave 
+* adding a decorator to the production function calls (might not even be necessary)
 
 ```python
 import weave
@@ -88,6 +95,7 @@ def get_and_process_prompt():
                 st.session_state.messages.append({"role": "assistant", "content": call.output})
         
 def init_weave():
+    # highlight-next-line
     client = weave.init('feedback-example')
 
 def init_chat_history():
@@ -106,28 +114,30 @@ if __name__ == "__main__":
     main()
 ```
 
-Save this to a file called `feedback.py`. We can run it with `streamlit run feedback.py`. 
+Save this to a file called `chatbot.py`. We can run it with `streamlit run chatbot.py`. 
 Now, you can interact with this application and click the feedback buttons after each response. 
 Visit the Weave UI to see the attached feedback.
 
 
 ### 1.2 User Feedback Collection through App UI
-This is where the easy Weave Feedback API truly shines. Feedback is attached directly to the call object. For instance, if you want to add a positive reaction (e.g., 👍) to indicate that the LLM response has passed a vibe check, you can do so by:
+Again the Weave Feedback API faciliates this greatly. Feedback can be attached directly to the existing production trace using a single line of code. In this case we want to give the user the possibility to add a positive or negatve reaction along with an optional note.
 
+If we consider our decorated prediction function as:
 ```python
+# highlight-next-line
 @weave.op
 def predict(input_data):
     # Your prediction logic here
     return some_output
 ```
 
-Once your function is set up as a Weave operation, you can call it as usual:
+We can use it as usal to deliver some model response to the user:
 
 ```python
-output = predict(input_data="your data here")
+output = predict(input_data="your data here") # user question through the App UI
 ```
 
-However, to attach feedback, you need the `call` object, which is obtained by using the `.call()` method:
+To attach feedback, you need the `call` object, which is obtained by using the `.call()` method:
 
 ```python
 call = predict.call(input_data="your data here")
@@ -141,27 +151,121 @@ output = call.output
 ```
 
 ```python
-call.feedback.add_reaction("👍") # vibe check: passed
+call.feedback.add_reaction("👍") # user reaction through the App UI
 ```
 
 ## 2. Gathering Expert Feedback from Annotation UI
 
 ### 2.1 Fetch Production Calls based on User Feedback
+To use the user feedback to improve our model, we need to fetch the production calls. However, since there are probably a lot of production calls we only want to retrieve the problematic calls that were rated as bad by the users (the 👎 ones).
 
- Retrieving calls
-
+This can be done very easily in Weave by defining feedback calls with a specific "reaction":
 ```python
 import weave
 client = weave.init('feedback-example')
+# highlight-next-line
 thumbs_down = client.feedback(reaction="👎")
 calls = thumbs_down.refs().calls()
 ```
 
 ### 2.2 Expert Feedback through Annotation UI
+Now we only need to display these production calls in a annotation UI for experts to annotate them. This can be done with different specialized tools or in a simple Streamlit app.
 
-Setting up Evaluation
+In the following we have created a simple Streamlite app that extracts the last emoji and comment attached to the trace and displays it along the user query, the model response, and the used source documents.
 
-```python
-dataset_examples = [call.inputs['prompt'] for call in calls] # prompt is the input argument to our chat_response call
-dataset = weave.Dataset(name='good_examples', rows=dataset_examples)
+```python 
+import weave
+import pandas as pd
+import streamlit as st
+
+@st.cache_resource
+def start_weave(entity: str, project_name: str):
+    # highlight-next-line
+    return weave.init(entity + "/" + project_name)
+
+@st.cache_resource
+def assemble_feedback_data(entity:str, project_name: str) -> pd.DataFrame:
+    data = []
+    client = start_weave(entity, project_name)
+    # highlight-next-line
+    thumbs_down = client.feedback(reaction=feedback_name)
+    # highlight-next-line
+    calls = thumbs_down.refs().calls()
+    print(calls)
+    for call in calls:
+        last_reaction, last_comment = None, None
+        for f in call.feedback[::-1]:
+            if f.feedback_type == "wandb.reaction.1":
+                last_reaction = f.payload["emoji"]
+            elif f.feedback_type == "wandb.note.1":
+                last_comment = f.payload["note"]
+            if last_reaction and last_comment:
+                break
+
+        # NOTE: this can be easily customized based on the needed feedback structure
+        data.append({
+            # prediction - used as question and target answer and url in dataset
+            "query": call.inputs['example']['query'],
+            "prediction": call.output["model_output"]["result"]["content"],
+            "used_main_source": call.output["model_output"]["source_documents"][0]["url"],
+            # feedback - used to guide the annotation
+            "feedback_reaction": last_reaction,
+            "feedback_comment": last_comment,
+        })
+    return pd.DataFrame(data)
+
+# store the calls in a pandas DF
+weave_dataset_df = assemble_feedback_data("prod_team", "rag_project")
 ```
+
+Now we're using Streamlit's power to create a simple annotation UI with a single line of code:
+```python
+edited_df = st.data_editor(weave_dataset_df, num_rows="dynamic")
+```
+
+And finally save the new changes as a new version of the existing evaluation dataset:
+```python
+dataset_name = st.text_input("Enter Existing Dataset NAME:VERSION", "gen_eval_dataset:latest")
+dataset_name = dataset_name.split(":")[0]
+
+# get the exisiting dataset as a list of dictionaries
+# highlight-next-line
+rows = [dict(elem) for elem in weave.ref(dataset_name).get().rows]
+
+# add the newly annotated production 👎 calls to the existing dataset
+for elem in edited_df.to_dict(orient="records"):
+    rows.append(
+        {
+            "query": elem["query"], 
+            "answer": elem["prediction"], 
+            "main_source": elem["used_main_source"],
+        }
+    )
+
+# update the dataset with the new rows
+if st.button("Update Dataset"):
+    # highlight-next-line
+    dataset = weave.Dataset(
+        # highlight-next-line
+        name=dataset_name, 
+        # highlight-next-line
+        rows=rows,
+    # highlight-next-line
+    )
+    # highlight-next-line
+    weave.publish(dataset)
+    st.success("Successfully updated data to Weave!", icon="✅")
+```
+
+In the following you can a screenshot of the simple annotation UI and of the resulting dataset.
+
+`TODO: add screenshots once the simplified annotoation UI and workspace are done`
+![Annotation UI](./static/img/annotation_ui.png)
+![Weave Dataset](../static/img/annotation_ui.png)
+
+## 3. Run new Evaluation with the new Dataset
+After gathering new 👎 feedback and annotating it, we can now run our evaluation code again. This time we will use the new version of the evaluation dataset and use the comparison feature to understand how the impact of 👎 calls impacted the model performance. Of course it also makes sense to include positive annotated calls into the dataset to balance evaluation dataset. 
+
+For more information on the evaluation workflow see the [Evaluation](./tutorial-eval.md) tutorial for more details.
+
+`TODO: add link to the eval comparison here too`
