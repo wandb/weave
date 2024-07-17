@@ -482,22 +482,6 @@ def test_saveload_op(client):
     assert obj2["b"].name == "op-add3"
 
 
-def test_op_mismatch_project_ref(client):
-    client.project = "test-project"
-
-    @weave.op()
-    def hello_world():
-        return "Hello world"
-
-    ref1 = client._save_object(hello_world, "my-op")
-    assert ref1.project == "test-project"
-
-    client.project = "test-project2"
-
-    ref2 = client._save_object(hello_world, "my-op")
-    assert ref2.project == "test-project2"
-
-
 def test_object_mismatch_project_ref(client):
     client.project = "test-project"
 
@@ -509,12 +493,14 @@ def test_object_mismatch_project_ref(client):
             return self.prompt.format(input=input)
 
     obj = MyModel(prompt="input is: {input}")
-    ref = client._save_object(obj, "my-object")
-    assert ref.project == "test-project"
 
     client.project = "test-project2"
-    ref2 = client._save_object(obj, "my-object")
-    assert ref2.project == "test-project2"
+    obj.predict("x")
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+    assert calls[0].project_id == "shawn/test-project2"
+    assert "weave:///shawn/test-project2/op" in str(calls[0].op_name)
 
 
 def test_object_mismatch_project_ref_nested(client):
@@ -524,26 +510,38 @@ def test_object_mismatch_project_ref_nested(client):
     def hello_world():
         return "Hello world"
 
-    original_op_ref = client._save_op(hello_world)
-    assert original_op_ref.project == "test-project"
+    hello_world()
 
+    calls = list(client.calls())
+    assert len(calls) == 1
+    assert calls[0].project_id == "shawn/test-project"
+    assert "weave:///shawn/test-project/op" in str(calls[0].op_name)
+
+    ### Now change project in client, simulating new init
     client.project = "test-project2"
-
     nested = {"a": hello_world}
 
-    ref2 = client._save_object(nested, "my-object")
-    assert ref2.project == "test-project2"
+    client.save(nested, "my-object")
 
-    ref3 = weave_client.get_ref(hello_world)
-    assert ref3.project == "test-project2"
+    nested["a"]()
 
-    out = client.get(ref2)
-    assert out.ref.project == "test-project2"
+    calls = list(client.calls())
+    assert len(calls) == 1
+    assert calls[0].project_id == "shawn/test-project2"
+    assert "weave:///shawn/test-project2/op" in str(calls[0].op_name)
 
-    opref = dict.__getitem__(out, "a")
-    assert isinstance(opref, OpRef)
-    assert opref.name == "hello_world"
-    assert opref.project == "test-project2"
+    # also assert the op and objects are correct in db
+    res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
+    assert len(res.objs) == 2
+
+    op = res.objs[0]
+    assert op.object_id == "hello_world"
+    assert op.project_id == "shawn/test-project2"
+    assert op.kind == "op"
+
+    obj = res.objs[1]
+    assert obj.object_id == "my-object"
+    assert obj.project_id == "shawn/test-project2"
 
 
 def test_saveload_customtype(client, strict_op_saving):
