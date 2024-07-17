@@ -1,5 +1,7 @@
 import dataclasses
 import datetime
+import platform
+import sys
 import typing
 import uuid
 from functools import lru_cache
@@ -16,7 +18,7 @@ from typing import (
 import pydantic
 from requests import HTTPError
 
-from weave import call_context, client_context, trace_sentry, urls
+from weave import call_context, client_context, trace_sentry, urls, version
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
@@ -309,6 +311,48 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
     return result
 
 
+class WeaveKeyDict(dict):
+    """A dict representing the 'weave' subdictionary of a call's attributes.
+
+    This dictionary is not intended to be set directly.
+    """
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
+
+
+class AttributesDict(dict):
+    """A dict representing the attributes of a call.
+
+    The `weave` key is reserved for internal use and cannot be set directly.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__()
+        dict.__setitem__(self, "weave", WeaveKeyDict())
+
+        if kwargs:
+            for key, value in kwargs.items():
+                if key == "weave":
+                    if isinstance(value, dict):
+                        for subkey, subvalue in value.items():
+                            self._set_weave_item(subkey, subvalue)
+                else:
+                    self[key] = value
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        if key == "weave":
+            raise KeyError("Cannot set 'weave' directly -- for internal use only!")
+        super().__setitem__(key, value)
+
+    def _set_weave_item(self, subkey: Any, value: Any) -> None:
+        """Internal method to set items in the 'weave' subdictionary."""
+        dict.__setitem__(self["weave"], subkey, value)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({super().__repr__()})"
+
+
 class WeaveClient:
     server: TraceServerInterface
 
@@ -469,6 +513,14 @@ class WeaveClient:
 
         if attributes is None:
             attributes = {}
+
+        attributes = AttributesDict(**attributes)
+        attributes._set_weave_item("client_version", version.VERSION)
+        attributes._set_weave_item("source", "python-sdk")
+        attributes._set_weave_item("os_name", platform.system())
+        attributes._set_weave_item("os_version", platform.version())
+        attributes._set_weave_item("os_release", platform.release())
+        attributes._set_weave_item("sys_version", sys.version)
 
         call = Call(
             op_name=op_str,
