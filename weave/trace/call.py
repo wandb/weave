@@ -96,7 +96,7 @@ def create_on_output_func(__op: "Op", finish: Callable, call: "Call") -> Callabl
     return on_output
 
 
-def _execute_call_sync(__op: "Op", call: "Call", *args: Any, **kwargs: Any) -> T:
+def _execute_call_sync(__op: "Op", call: "Call", *args: Any, **kwargs: Any) -> Any:
     func = __op.resolve_fn
     client = client_context.weave_client.require_weave_client()
 
