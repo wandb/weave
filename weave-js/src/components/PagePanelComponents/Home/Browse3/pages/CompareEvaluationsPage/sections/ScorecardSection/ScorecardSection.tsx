@@ -13,8 +13,10 @@ import {WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
 import {CellValue} from '../../../../../Browse2/CellValue';
+import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
+import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {
   DERIVED_SCORER_REF,
   evalCallIdToScorerRefs,
@@ -40,8 +42,6 @@ import {
   EvaluationDatasetLink,
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
-import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
-import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 
 export const SCORER_VARIATION_WARNING_TITLE = 'Scoring inconsistency detected';
 export const SCORER_VARIATION_WARNING_EXPLANATION =

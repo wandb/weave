@@ -1,12 +1,11 @@
-import { useCallback } from 'react';
-import { useHistory } from 'react-router-dom';
+import {useCallback} from 'react';
+import {useHistory} from 'react-router-dom';
 
-import { useWeaveflowRouteContext } from '../../context';
-
+import {useWeaveflowRouteContext} from '../../context';
 
 export const usePeekCall = (entity: string, project: string) => {
   const history = useHistory();
-  const { peekingRouter } = useWeaveflowRouteContext();
+  const {peekingRouter} = useWeaveflowRouteContext();
 
   return useCallback(
     (callId: string) => {

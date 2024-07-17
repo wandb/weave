@@ -364,9 +364,12 @@ const fetchEvaluationComparisonData = async (
       .map(call => [call.id, call])
   );
 
-  const summaryOps = evalTraceRes.calls.filter(call =>
-    call.op_name.includes('Evaluation.summarize:') && call.parent_id && evaluationCallIds.includes(call.parent_id)
-  )
+  const summaryOps = evalTraceRes.calls.filter(
+    call =>
+      call.op_name.includes('Evaluation.summarize:') &&
+      call.parent_id &&
+      evaluationCallIds.includes(call.parent_id)
+  );
 
   // Fill in the autosummary source calls
   summaryOps.forEach(summarizedOp => {
@@ -375,13 +378,18 @@ const fetchEvaluationComparisonData = async (
     if (evalCall == null) {
       return;
     }
-    Object.entries(evalCall.summaryMetrics).forEach(([metricId, metricResult]) => {
-      if (result.summaryMetrics[metricId].source === 'scorer' || 
-        // Special case that the model latency is also a summary metric calc
-        metricDefinitionId(modelLatencyMetricDimension) === metricId)
-      {metricResult.sourceCallId = summarizedOp.id;}
-    })
-  })
+    Object.entries(evalCall.summaryMetrics).forEach(
+      ([metricId, metricResult]) => {
+        if (
+          result.summaryMetrics[metricId].source === 'scorer' ||
+          // Special case that the model latency is also a summary metric calc
+          metricDefinitionId(modelLatencyMetricDimension) === metricId
+        ) {
+          metricResult.sourceCallId = summarizedOp.id;
+        }
+      }
+    );
+  });
 
   // Next, we need to build the predictions object
   evalTraceRes.calls.forEach(traceCall => {
@@ -535,31 +543,40 @@ const fetchEvaluationComparisonData = async (
 
               recursiveAddScore(results, []);
             } else {
-              //pass
+              // pass
             }
           }
         }
       }
     } else {
-      const maybeParentSummaryOp = summaryOps.find(op => op.id === traceCall.parent_id)
+      const maybeParentSummaryOp = summaryOps.find(
+        op => op.id === traceCall.parent_id
+      );
       const isSummaryChild = maybeParentSummaryOp != null;
       const isProbablyBoundScoreCall = scorerRefs.has(
-        traceCall.inputs.self ?? ""
+        traceCall.inputs.self ?? ''
       );
-      const isSummaryOp = traceCall.op_name.includes('summarize:')
-      console.log(isSummaryChild , isProbablyBoundScoreCall , isSummaryOp, isSummaryChild && isProbablyBoundScoreCall && isSummaryOp)
+      const isSummaryOp = traceCall.op_name.includes('summarize:');
+      console.log(
+        isSummaryChild,
+        isProbablyBoundScoreCall,
+        isSummaryOp,
+        isSummaryChild && isProbablyBoundScoreCall && isSummaryOp
+      );
       if (isSummaryChild && isProbablyBoundScoreCall && isSummaryOp) {
         // Now fill in the source of the eval score
-        const evalCallId = maybeParentSummaryOp!.parent_id!
-        const evalCall = result.evaluationCalls[evalCallId]
+        const evalCallId = maybeParentSummaryOp!.parent_id!;
+        const evalCall = result.evaluationCalls[evalCallId];
         if (evalCall == null) {
           return;
         }
-        Object.entries(evalCall.summaryMetrics).forEach(([metricId, metricResult] )=> {
-          if (metricId.startsWith(traceCall.inputs.self)) {
-            metricResult.sourceCallId = traceCall.id
+        Object.entries(evalCall.summaryMetrics).forEach(
+          ([metricId, metricResult]) => {
+            if (metricId.startsWith(traceCall.inputs.self)) {
+              metricResult.sourceCallId = traceCall.id;
+            }
           }
-        })
+        );
       }
     }
   });
