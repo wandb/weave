@@ -11,9 +11,7 @@ from typing import (
     Sequence,
     TypedDict,
     Union,
-    cast,
 )
-from typing import Any, Dict, Optional, Sequence, TypedDict, Union
 
 import pydantic
 from requests import HTTPError
