@@ -274,7 +274,9 @@ def create_wrapper_sync(
 # Surprisingly, the async `client.chat.completions.create` does not pass
 # `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
 # it manually here...
-def create_wrapper_async(name: str):
+def create_wrapper_async(
+    name: str,
+) -> typing.Callable[[typing.Callable], typing.Callable]:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         "We need to do this so we can check if `stream` is used"
 

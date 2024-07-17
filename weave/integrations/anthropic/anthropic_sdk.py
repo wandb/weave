@@ -90,7 +90,9 @@ def create_wrapper_async(
     def wrapper(fn: typing.Callable) -> typing.Callable:
         def _fn_wrapper(fn: typing.Callable) -> typing.Callable:
             @wraps(fn)
-            async def _async_wrapper(*args, **kwargs):
+            async def _async_wrapper(
+                *args: typing.Any, **kwargs: typing.Any
+            ) -> typing.Any:
                 return await fn(*args, **kwargs)
 
             return _async_wrapper
