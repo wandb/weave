@@ -2276,7 +2276,7 @@ def test_calls_iter_different_value_same_page_cached(client):
     assert elapsed_time1 > elapsed_time2 * 10
     assert elapsed_time1 > elapsed_time3 * 10
 
-    
+
 class BasicModel(weave.Model):
     @weave.op()
     def predict(self, x):
