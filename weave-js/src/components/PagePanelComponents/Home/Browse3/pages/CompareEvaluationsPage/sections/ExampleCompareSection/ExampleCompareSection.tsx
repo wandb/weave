@@ -526,7 +526,6 @@ export const ExampleCompareSection: React.FC<{
       lookupDimension(scorerIndex, metricIndex)
     );
 
-    console.log({targetTrial, resolvedScoreId});
     if (resolvedScoreId == null) {
       return undefined;
     }

@@ -92,9 +92,10 @@ export const ScorecardSection: React.FC<{
   }, [modelProps]);
   const [diffOnly, setDiffOnly] = React.useState(true);
 
-  const {compositeSummaryMetrics: compositeMetrics} = useMemo(() => {
+  const {compositeSummaryMetrics} = useMemo(() => {
     return buildCompositeComparisonSummaryMetrics(props.state);
   }, [props.state]);
+  console.log({compositeSummaryMetrics});
 
   const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
 
@@ -300,7 +301,7 @@ export const ScorecardSection: React.FC<{
           Metrics
         </GridCell>
         {/* Score Rows */}
-        {Object.entries(compositeMetrics).map(([key, def]) => {
+        {Object.entries(compositeSummaryMetrics).map(([key, def]) => {
           const uniqueScorerRefs = Array.from(
             new Set(Object.values(def.evalCallIdToScorerRef))
           );

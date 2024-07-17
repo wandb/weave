@@ -85,10 +85,8 @@ export const resolveSummaryMetricValueForEvaluateCall = (
   evaluateCall: EvaluationCall
 ): MetricValueType | undefined => {
   const score = resolveSummaryMetricResultForEvaluateCall(dim, evaluateCall);
-  if (isBinarySummaryScore(score)) {
-    return score.true_fraction;
-  } else if (isContinuousSummaryScore(score)) {
-    return score.mean;
+  if (score) {
+    return score.value
   }
   return undefined;
 };
