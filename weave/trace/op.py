@@ -6,12 +6,12 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Coroutine,
     Dict,
     Literal,
     Mapping,
     Optional,
     Protocol,
-    TypeVar,
     Union,
     cast,
     overload,
@@ -165,9 +165,6 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     )
 
 
-T = TypeVar("T")
-
-
 def create_finish_func(call: "Call", client: Any) -> Callable:
     has_finished = False
 
@@ -207,11 +204,11 @@ def _execute_call(
     finish = create_finish_func(call, client)
     on_output = create_on_output_func(__op, finish, call)
 
-    def process(res):
+    def process(res: Any) -> Any:
         res = box.box(res)
         return call if __return_type == "call" else on_output(res)
 
-    def handle_exception(e):
+    def handle_exception(e: Exception) -> Any:
         finish(exception=e)
         if __should_raise:
             raise
@@ -219,7 +216,7 @@ def _execute_call(
 
     if inspect.iscoroutinefunction(func):
 
-        async def _call_async():
+        async def _call_async() -> Coroutine[Any, Any, Any]:
             call_context.push_call(call)
             try:
                 res = await func(*args, **kwargs)
