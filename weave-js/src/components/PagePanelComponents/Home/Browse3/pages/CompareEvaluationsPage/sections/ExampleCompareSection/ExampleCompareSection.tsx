@@ -335,22 +335,28 @@ export const ExampleCompareSection: React.FC<{
           };
         }
 
-        const evals = Object.entries(props.state.data.evaluations)
-          .filter(([evalCallId, evaluation]) => {
+        const evals = Object.values(props.state.data.evaluationCalls)
+          .filter(evaluationCall => {
+            const evaluation =
+              props.state.data.evaluations[evaluationCall.evaluationRef];
             return (
               metric.scorerOpOrObjRef == null ||
               evaluation.scorerRefs.includes(metric.scorerOpOrObjRef)
             );
           })
-          .map(([evalCallId, evaluation]) => {
-            return evalCallId;
+          .map(evaluationCall => {
+            return evaluationCall.callId;
           });
 
         metricKeyPath.scorerRefs[ref].evalCallIds = evals;
       }
     );
     return composite;
-  }, [props.state.data.evaluations, props.state.data.scoreMetrics]);
+  }, [
+    props.state.data.evaluationCalls,
+    props.state.data.evaluations,
+    props.state.data.scoreMetrics,
+  ]);
 
   const resolvePeerDimension: ResolvePeerDimensionFn = (
     evalCallId: string,
@@ -358,7 +364,6 @@ export const ExampleCompareSection: React.FC<{
   ) => {
     const groupName = groupNameForMetric(peerDimension);
     const keyPath = flattenedDimensionPath(peerDimension);
-
     return Object.values(
       compositeScoreMetrics[groupName].metrics[keyPath].scorerRefs
     ).find(scorerRef => scorerRef.evalCallIds.includes(evalCallId))?.metric;
@@ -521,6 +526,7 @@ export const ExampleCompareSection: React.FC<{
       lookupDimension(scorerIndex, metricIndex)
     );
 
+    console.log({targetTrial, resolvedScoreId});
     if (resolvedScoreId == null) {
       return undefined;
     }
