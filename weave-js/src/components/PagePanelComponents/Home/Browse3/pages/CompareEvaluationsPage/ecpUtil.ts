@@ -2,8 +2,6 @@ import {
   EvaluationCall,
   getScoreKeyNameFromScorerRef,
   isBinaryScore,
-  isBinarySummaryScore,
-  isContinuousSummaryScore,
   MetricDefinition,
   metricDefinitionId,
   MetricResult,
@@ -28,14 +26,12 @@ export const adjustValueForDisplay = (
 };
 
 export const flattenedDimensionPath = (dim: MetricDefinition): string => {
-  const paths = [...dim.metricSubPath]
+  const paths = [...dim.metricSubPath];
   if (dim.source === 'scorer') {
     if (dim.scorerOpOrObjRef == null) {
-      throw new Error(
-        'scorerOpOrObjRef must be defined for scorer metric'
-      );
-    } 
-    paths.unshift(getScoreKeyNameFromScorerRef(dim.scorerOpOrObjRef))
+      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
+    }
+    paths.unshift(getScoreKeyNameFromScorerRef(dim.scorerOpOrObjRef));
   }
   return paths.join('.');
 };
@@ -86,7 +82,7 @@ export const resolveSummaryMetricValueForEvaluateCall = (
 ): MetricValueType | undefined => {
   const score = resolveSummaryMetricResultForEvaluateCall(dim, evaluateCall);
   if (score) {
-    return score.value
+    return score.value;
   }
   return undefined;
 };

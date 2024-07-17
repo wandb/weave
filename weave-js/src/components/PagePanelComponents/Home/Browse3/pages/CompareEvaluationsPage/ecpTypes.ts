@@ -1,4 +1,18 @@
-import { parseRef, WeaveObjectRef } from '../../../../../../react';
+/**
+ * TODO:
+ * * Add Model Metrics to the entire system: collect them in the hooks & display them in the UI
+ * * Remember to cleanup unused symbols (knip)
+ * * Test each of the example pages
+ * * Really try to cleanup the code - specifically:
+ *    * the summary metrics scorecard and the comparison view now have a lot of similar code
+ *    * there is a lot of slopiness with react memoing
+ *    * There is a lot of slopiness in symbol names and files
+ * * // TODO: Verify this fallback is correct - i think this is not correct
+ * * Audit all the source call ids (sourceCallId:)
+ * * See all code TODOs
+ */
+
+import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {
   TraceCallSchema,
   TraceObjSchema,
@@ -54,8 +68,6 @@ type MetricType = 'score' | 'summary';
 
 export type MetricDefinition = {
   metricSubPath: string[];
-  // TODO: Not sure if this is used anymore - should review afterwards
-  // TODO: Remember to cleanup unused symbols
   scoreType: 'binary' | 'continuous';
   source: SourceType;
   scorerOpOrObjRef?: string;

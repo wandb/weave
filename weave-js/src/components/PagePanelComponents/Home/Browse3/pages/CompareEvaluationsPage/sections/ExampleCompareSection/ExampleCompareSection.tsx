@@ -43,9 +43,6 @@ import {
   SCORER_VARIATION_WARNING_TITLE,
 } from '../ScorecardSection/ScorecardSection';
 import {
-  buildCompositeComparisonSummaryMetrics,
-  CompositeSummaryMetric,
-  CompositeSummaryScoreGroup,
   DERIVED_SCORER_REF,
   OUTPUT_SCORER_REF,
   ResolvePeerDimensionFn,
@@ -331,7 +328,7 @@ export const ExampleCompareSection: React.FC<{
         if (!metricKeyPath.scorerRefs[ref]) {
           metricKeyPath.scorerRefs[ref] = {
             evalCallIds: [],
-            metric: metric,
+            metric,
           };
         }
 

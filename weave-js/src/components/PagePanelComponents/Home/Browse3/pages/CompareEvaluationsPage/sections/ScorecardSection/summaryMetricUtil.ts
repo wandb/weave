@@ -1,4 +1,8 @@
-import {EvaluationComparisonState, getScoreKeyNameFromScorerRef, MetricDefinition} from '../../ecpTypes';
+import {
+  EvaluationComparisonState,
+  getScoreKeyNameFromScorerRef,
+  MetricDefinition,
+} from '../../ecpTypes';
 import {
   adjustValueForDisplay,
   dimensionUnit,
@@ -43,9 +47,7 @@ const dimensionKeys = (
     scorerGroupName = OUTPUT_SCORER_REF;
   } else {
     if (dimension.scorerOpOrObjRef == null) {
-      throw new Error(
-        'scorerOpOrObjRef must be defined for scorer metric'
-      );
+      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
     }
     scorerGroupName = getScoreKeyNameFromScorerRef(dimension.scorerOpOrObjRef);
   }

@@ -217,7 +217,7 @@ const fetchEvaluationComparisonData = async (
             // TODO: WOuld be nicer if this was the actual summary call itself
             sourceCallId: evalCallId,
           };
-        } else if (typeof scoreVal === 'number' ) {
+        } else if (typeof scoreVal === 'number') {
           const metricDimension: MetricDefinition = {
             scoreType: 'continuous',
             metricSubPath: currPath,
@@ -541,7 +541,6 @@ const fetchEvaluationComparisonData = async (
 
   return result;
 };
-
 
 const modelLatencyMetricDimension: MetricDefinition = {
   source: 'derived',
