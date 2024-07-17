@@ -235,7 +235,9 @@ def should_use_accumulator(inputs: typing.Dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Callable]:
+def create_wrapper_sync(
+    name: str,
+) -> typing.Callable[[typing.Callable], typing.Callable]:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         "We need to do this so we can check if `stream` is used"
 
@@ -309,7 +311,7 @@ symbol_patchers = [
     SymbolPatcher(
         lambda: importlib.import_module("openai.resources.chat.completions"),
         "Completions.create",
-        create_wrapper(name="openai.chat.completions.create"),
+        create_wrapper_sync(name="openai.chat.completions.create"),
     ),
     SymbolPatcher(
         lambda: importlib.import_module("openai.resources.chat.completions"),
