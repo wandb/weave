@@ -2,6 +2,11 @@ import _ from 'lodash';
 import {useMemo} from 'react';
 
 import {flattenObject} from '../../../../../Browse2/browse2Util';
+import {
+  buildCompositeMetricsMap,
+  CompositeScoreMetrics,
+  resolvePeerDimension,
+} from '../../compositeMetricsUtil';
 import {getOrderedCallIds} from '../../ecpState';
 import {
   EvaluationComparisonState,
@@ -9,10 +14,6 @@ import {
   PredictAndScoreCall,
 } from '../../ecpTypes';
 import {resolveScoreMetricValueForPASCall} from '../../ecpUtil';
-import {
-  buildCompositeComparisonSummaryMetrics,
-  ResolvePeerDimensionFn,
-} from '../ScorecardSection/summaryMetricUtil';
 
 type RowBase = {
   id: string;
@@ -81,7 +82,7 @@ const rowIsSelected = (
     };
   },
   state: EvaluationComparisonState,
-  resolvePeerDimension: ResolvePeerDimensionFn
+  compositeMetricsMap: CompositeScoreMetrics
 ) => {
   const compareDims = state.comparisonDimensions;
 
@@ -98,6 +99,7 @@ const rowIsSelected = (
     return Object.entries(compareDim.rangeSelection).every(
       ([evalCallId, range]) => {
         const resolvedPeerDim = resolvePeerDimension(
+          compositeMetricsMap,
           evalCallId,
           state.data.scoreMetrics[compareDim.metricId]
         );
@@ -117,6 +119,10 @@ const rowIsSelected = (
 
 export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
+  const compositeMetricsMap = useMemo(
+    () => buildCompositeMetricsMap(state.data, 'score'),
+    [state.data]
+  );
 
   const flattenedRows = useMemo(() => {
     const rows: FlattenedRow[] = [];
@@ -246,15 +252,13 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const filteredRows = useMemo(() => {
     const aggregatedAsList = Object.values(aggregatedRows);
     const compareDims = state.comparisonDimensions;
-    const {resolvePeerDimension} =
-      buildCompositeComparisonSummaryMetrics(state);
     let res = aggregatedAsList;
     if (compareDims != null && compareDims.length > 0) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
         return rowIsSelected(
           aggregatedRows[digest].scores,
           state,
-          resolvePeerDimension
+          compositeMetricsMap
         );
       });
 
@@ -281,7 +285,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       });
     }
     return res;
-  }, [aggregatedRows, state]);
+  }, [aggregatedRows, compositeMetricsMap, state]);
 
   const inputColumnKeys = useMemo(() => {
     const keys = new Set<string>();

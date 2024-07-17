@@ -21,11 +21,15 @@ import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
 import {isRef} from '../../../common/util';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
+import {
+  buildCompositeMetricsMap,
+  CompositeSummaryMetricGroupKeyPath,
+  resolvePeerDimension,
+} from '../../compositeMetricsUtil';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {
   EvaluationComparisonState,
   getMetricIds,
-  getScoreKeyNameFromScorerRef,
   MetricDefinition,
   metricDefinitionId,
   MetricValueType,
@@ -45,7 +49,6 @@ import {
 import {
   DERIVED_SCORER_REF,
   OUTPUT_SCORER_REF,
-  ResolvePeerDimensionFn,
 } from '../ScorecardSection/summaryMetricUtil';
 import {
   PivotedRow,
@@ -245,126 +248,10 @@ export const ExampleCompareSection: React.FC<{
   //   [props.state]
   // );
 
-  type CompositeSummaryMetricGroupKeyPath = {
-    scorerRefs: {
-      [scoreRef: string]: {
-        evalCallIds: string[];
-        metric: MetricDefinition;
-      };
-    };
-  };
-
-  type CompositeScoreMetricGroup = {
-    scorerRefs: string[];
-    metrics: {
-      [keyPath: string]: CompositeSummaryMetricGroupKeyPath;
-    };
-  };
-
-  type CompositeScoreMetrics = {
-    [groupName: string]: CompositeScoreMetricGroup;
-  };
-
-  const groupNameForMetric = (metric: MetricDefinition): string => {
-    let groupName = '';
-
-    if (metric.source === 'model_output') {
-      groupName = OUTPUT_SCORER_REF;
-    } else if (metric.source === 'derived') {
-      groupName = DERIVED_SCORER_REF;
-    } else if (metric.source === 'scorer') {
-      if (metric.scorerOpOrObjRef == null) {
-        throw new Error('scorerOpOrObjRef must be defined for scorer metric');
-      }
-      groupName = getScoreKeyNameFromScorerRef(metric.scorerOpOrObjRef);
-    }
-    return groupName;
-  };
-
-  const refForMetric = (metric: MetricDefinition): string => {
-    let ref = '';
-    if (metric.source === 'model_output') {
-      ref = OUTPUT_SCORER_REF;
-    } else if (metric.source === 'derived') {
-      ref = DERIVED_SCORER_REF;
-    } else if (metric.source === 'scorer') {
-      if (metric.scorerOpOrObjRef == null) {
-        throw new Error('scorerOpOrObjRef must be defined for scorer metric');
-      }
-
-      ref = metric.scorerOpOrObjRef;
-    }
-    return ref;
-  };
-
-  const compositeScoreMetrics = useMemo(() => {
-    const composite: CompositeScoreMetrics = {};
-    Object.entries(props.state.data.scoreMetrics).forEach(
-      ([metricId, metric]) => {
-        const groupName = groupNameForMetric(metric);
-        const ref = refForMetric(metric);
-
-        if (!composite[groupName]) {
-          composite[groupName] = {
-            scorerRefs: [],
-            metrics: {},
-          };
-        }
-        const metricGroup = composite[groupName];
-        if (!metricGroup.scorerRefs.includes(ref)) {
-          metricGroup.scorerRefs.push(ref);
-        }
-
-        const keyPath = flattenedDimensionPath(metric);
-
-        if (!metricGroup.metrics[keyPath]) {
-          metricGroup.metrics[keyPath] = {
-            scorerRefs: {},
-          };
-        }
-
-        const metricKeyPath = metricGroup.metrics[keyPath];
-
-        if (!metricKeyPath.scorerRefs[ref]) {
-          metricKeyPath.scorerRefs[ref] = {
-            evalCallIds: [],
-            metric,
-          };
-        }
-
-        const evals = Object.values(props.state.data.evaluationCalls)
-          .filter(evaluationCall => {
-            const evaluation =
-              props.state.data.evaluations[evaluationCall.evaluationRef];
-            return (
-              metric.scorerOpOrObjRef == null ||
-              evaluation.scorerRefs.includes(metric.scorerOpOrObjRef)
-            );
-          })
-          .map(evaluationCall => {
-            return evaluationCall.callId;
-          });
-
-        metricKeyPath.scorerRefs[ref].evalCallIds = evals;
-      }
-    );
-    return composite;
-  }, [
-    props.state.data.evaluationCalls,
-    props.state.data.evaluations,
-    props.state.data.scoreMetrics,
-  ]);
-
-  const resolvePeerDimension: ResolvePeerDimensionFn = (
-    evalCallId: string,
-    peerDimension: MetricDefinition
-  ) => {
-    const groupName = groupNameForMetric(peerDimension);
-    const keyPath = flattenedDimensionPath(peerDimension);
-    return Object.values(
-      compositeScoreMetrics[groupName].metrics[keyPath].scorerRefs
-    ).find(scorerRef => scorerRef.evalCallIds.includes(evalCallId))?.metric;
-  };
+  const compositeScoreMetrics = useMemo(
+    () => buildCompositeMetricsMap(props.state.data, 'score'),
+    [props.state.data]
+  );
 
   if (target == null) {
     return <div>Filter resulted in 0 rows</div>;
@@ -519,6 +406,7 @@ export const ExampleCompareSection: React.FC<{
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
     const currEvalCallId = orderedCallIds[evalIndex];
     const resolvedScoreId = resolvePeerDimension(
+      compositeScoreMetrics,
       currEvalCallId,
       lookupDimension(scorerIndex, metricIndex)
     );
@@ -539,6 +427,7 @@ export const ExampleCompareSection: React.FC<{
   ): MetricValueType | undefined => {
     const currEvalCallId = orderedCallIds[evalIndex];
     const resolvedScoreId = resolvePeerDimension(
+      compositeScoreMetrics,
       currEvalCallId,
       lookupDimension(scorerIndex, metricIndex)
     );
