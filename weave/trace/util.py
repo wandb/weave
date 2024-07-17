@@ -8,17 +8,23 @@ from typing import Any, Callable, Iterable, Iterator, Optional
 class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
     """A ThreadPoolExecutor that runs functions with the context of the caller.
 
-    This is a drop-in replacement for ThreadPoolExecutor that ensures that calls
-    behave as expected inside the executor.  You can achieve the same effect
-    without this class by instead writing:
+    This is a drop-in replacement for concurrent.futures.ThreadPoolExecutor that
+    ensures weave calls behave as expected inside the executor.  Weave requires
+    certain contextvars to be set (see call_context.py), but new threads do not
+    automatically copy context from the parent, which can cause the call context
+    to be lost -- not good!  This class automates contextvar copying so using
+    this executor "just works" as the user probably expects.
 
-    with ThreadPoolExecutor() as executor:
+    You can achieve the same effect without this class by instead writing:
+    ```
+    with concurrent.futures.ThreadPoolExecutor() as executor:
         contexts = [copy_context() for _ in range(len(vals))]
 
         def _wrapped_fn(*args):
             return contexts.pop().run(fn, *args)
 
         executor.map(_wrapped_fn, vals)
+    ```
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -58,9 +64,24 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
 class ContextAwareThread(_Thread):
     """A Thread that runs functions with the context of the caller.
 
-    This is a drop-in replacement for Thread that ensures that calls behave as
-    expected inside the thread.  You can achieve the same effect without this
-    class by instead writing:
+    This is a drop-in replacement for threading.Thread that ensures calls behave
+    as expected inside the thread.  Weave requires certain contextvars to be set
+    (see call_context.py), but new threads do not automatically copy context from
+    the parent, which can cause the call context to be lost -- not good!  This
+    class automates contextvar copying so using this thread "just works" as the
+    user probaly expects.
+
+    You can achieve the same effect without this class by instead writing:
+    ```
+    def run_with_context(func, *args, **kwargs):
+        context = copy_context()
+        def wrapper():
+            context.run(func, *args, **kwargs)
+        return wrapper
+
+    thread = threading.Thread(target=run_with_context(your_func, *args, **kwargs))
+    thread.start()
+    ```
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
