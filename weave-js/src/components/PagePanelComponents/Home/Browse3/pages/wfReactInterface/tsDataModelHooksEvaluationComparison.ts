@@ -95,7 +95,7 @@ import {
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 
 /**
- * Primary react hook for fetching evaluation comparison data. This could be 
+ * Primary react hook for fetching evaluation comparison data. This could be
  * moved into the Trace Server hooks at some point, hence the location of the file.
  */
 export const useEvaluationComparisonData = (
@@ -132,11 +132,10 @@ export const useEvaluationComparisonData = (
   }, [data]);
 };
 
-
 /**
- * This function is responsible for building the data structure used to describe 
+ * This function is responsible for building the data structure used to describe
  * the comparison of evaluations. It is a complex function that fetches data from
- * the trace server and builds a normalized data structure. 
+ * the trace server and builds a normalized data structure.
  */
 const fetchEvaluationComparisonData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
@@ -659,7 +658,6 @@ const fetchEvaluationComparisonData = async (
 
   return result;
 };
-
 
 /// Non exported helpers below
 
