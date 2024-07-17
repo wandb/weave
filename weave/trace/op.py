@@ -6,12 +6,12 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Coroutine,
     Dict,
     Literal,
     Mapping,
     Optional,
     Protocol,
+    TypeVar,
     Union,
     cast,
     overload,
@@ -165,63 +165,78 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     )
 
 
-def _execute_call(
-    __op: Op,
-    call: Any,
-    *args: Any,
-    __return_type: Literal["call", "value"] = "call",
-    **kwargs: Any,
-) -> Any:
-    func = __op.resolve_fn
-    client = client_context.weave_client.require_weave_client()
+T = TypeVar("T")
+
+
+def create_finish_func(call: "Call", client: Any) -> Callable:
     has_finished = False
 
     def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
         nonlocal has_finished
         if has_finished:
             raise ValueError("Should not call finish more than once")
+
         client.finish_call(call, output, exception)
         if not call_context.get_current_call():
             print_call_link(call)
 
+    return finish
+
+
+def create_on_output_func(__op: "Op", finish: Callable, call: "Call") -> Callable:
     def on_output(output: Any) -> Any:
         if handler := getattr(__op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
         finish(output)
         return output
 
-    try:
-        res = func(*args, **kwargs)
-    except BaseException as e:
-        finish(exception=e)
-        raise
-    else:
-        res = box.box(res)  # TODO: can we get rid of this?
+    return on_output
 
-    if inspect.iscoroutine(res):
-        awaitable = res
 
-        async def _call_async() -> Coroutine[Any, Any, Any]:
+def _execute_call(
+    __op: Op,
+    call: Any,
+    *args: Any,
+    __return_type: Literal["call", "value"] = "call",
+    __should_raise: bool = True,
+    **kwargs: Any,
+) -> Any:
+    func = __op.resolve_fn
+    client = client_context.weave_client.require_weave_client()
+
+    finish = create_finish_func(call, client)
+    on_output = create_on_output_func(__op, finish, call)
+
+    if inspect.iscoroutinefunction(func):
+
+        async def _call_async():
             try:
                 call_context.push_call(call)
-                output = await awaitable
-                res2 = on_output(output)
-                return call if __return_type == "call" else res2
-            except BaseException as e:
+                res = await func(*args, **kwargs)
+                res = box.box(res)
+                return on_output(res)
+            except Exception as e:
                 finish(exception=e)
-                raise
+                if __should_raise:
+                    raise
             finally:
                 call_context.pop_call(call.id)
 
         return _call_async()
     else:
-        res2 = on_output(res)
-        return call if __return_type == "call" else res2
+        try:
+            res = func(*args, **kwargs)
+        except Exception as e:
+            finish(exception=e)
+            raise
+        else:
+            res = box.box(res)
+        return on_output(res)
 
 
 def call(op: Op, *args: Any, **kwargs: Any) -> Any:
     c = _create_call(op, *args, **kwargs)
-    return _execute_call(op, c, *args, **kwargs)
+    return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
 
 def calls(op: Op) -> "CallsIter":
