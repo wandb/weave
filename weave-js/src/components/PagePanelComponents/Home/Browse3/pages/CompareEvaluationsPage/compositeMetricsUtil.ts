@@ -5,10 +5,7 @@ import {
   MetricType,
 } from './ecpTypes';
 import {flattenedDimensionPath} from './ecpUtil';
-import {
-  DERIVED_SCORER_REF,
-  OUTPUT_SCORER_REF,
-} from './sections/ScorecardSection/summaryMetricUtil';
+import {DERIVED_SCORER_REF} from './sections/ScorecardSection/summaryMetricUtil';
 
 export type CompositeSummaryMetricGroupKeyPath = {
   scorerRefs: {

@@ -46,10 +46,7 @@ import {
   SCORER_VARIATION_WARNING_EXPLANATION,
   SCORER_VARIATION_WARNING_TITLE,
 } from '../ScorecardSection/ScorecardSection';
-import {
-  DERIVED_SCORER_REF,
-  OUTPUT_SCORER_REF,
-} from '../ScorecardSection/summaryMetricUtil';
+import {DERIVED_SCORER_REF} from '../ScorecardSection/summaryMetricUtil';
 import {
   PivotedRow,
   useFilteredAggregateRows,
@@ -259,7 +256,7 @@ export const ExampleCompareSection: React.FC<{
 
   // This section contains the primary helper variable for laying out the grid
   const metricGroupNames = Object.keys(compositeScoreMetrics).filter(
-    k => k !== DERIVED_SCORER_REF && k !== OUTPUT_SCORER_REF
+    k => k !== DERIVED_SCORER_REF
   );
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;

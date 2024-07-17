@@ -11,8 +11,6 @@ import {
 } from '../../ecpUtil';
 
 export const DERIVED_SCORER_REF = '__DERIVED__';
-// TODO: Make a section for this!
-export const OUTPUT_SCORER_REF = '__MODEL_OUTPUT__';
 
 type CompositeSummaryMetric = {
   scorerRefToDimensionId: {[scorerRef: string]: string};
@@ -51,7 +49,7 @@ const dimensionKeys = (
   } else {
     throw new Error(`Unknown metric source: ${dimension.source}`);
   }
-  return { 
+  return {
     scorerGroupName,
     dimensionPath: flattenedDimensionPath(dimension),
   };
