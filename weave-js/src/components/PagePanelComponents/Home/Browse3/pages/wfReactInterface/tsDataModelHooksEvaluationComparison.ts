@@ -167,7 +167,6 @@ const fetchEvaluationComparisonData = async (
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
       const score = evalCall._rawEvaluationTraceData.output[scorerKey];
-      console.log('scorerKey', scorerKey, scorerRef, score);
       // const scorerDef: ScorerDefinition = {
       //   scorerOpOrObjRef: scorerRef,
       //   likelyTopLevelKeyName: scorerKey,
