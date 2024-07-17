@@ -87,9 +87,7 @@ def make_mutation(
 
 
 class Traceable:
-    mutated_value: Any = None
     ref: RefWithExtra
-    list_mutations: Optional[list] = None
     mutations: Optional[list[Mutation]] = None
     root: "Traceable"
     server: TraceServerInterface
