@@ -94,6 +94,10 @@ import {
 } from '../wfReactInterface/tsDataModelHooks';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 
+/**
+ * Primary react hook for fetching evaluation comparison data. This could be 
+ * moved into the Trace Server hooks at some point, hence the location of the file.
+ */
 export const useEvaluationComparisonData = (
   entity: string,
   project: string,
@@ -127,6 +131,13 @@ export const useEvaluationComparisonData = (
     return {loading: false, result: data};
   }, [data]);
 };
+
+
+/**
+ * This function is responsible for building the data structure used to describe 
+ * the comparison of evaluations. It is a complex function that fetches data from
+ * the trace server and builds a normalized data structure. 
+ */
 const fetchEvaluationComparisonData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
   entity: string,
@@ -226,11 +237,6 @@ const fetchEvaluationComparisonData = async (
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
       const score = evaluationCallCache[evalCall.callId].output[scorerKey];
-      // const scorerDef: ScorerDefinition = {
-      //   scorerOpOrObjRef: scorerRef,
-      //   likelyTopLevelKeyName: scorerKey,
-      // };
-
       const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
         if (isBinarySummaryScore(scoreVal)) {
           const metricDimension: MetricDefinition = {
@@ -654,6 +660,9 @@ const fetchEvaluationComparisonData = async (
   return result;
 };
 
+
+/// Non exported helpers below
+
 const modelLatencyMetricDimension: MetricDefinition = {
   source: 'derived',
   scoreType: 'continuous',
@@ -695,7 +704,6 @@ const isContinuousSummaryScore = (
 const isContinuousScore = (score: any): score is number => {
   return typeof score === 'number';
 };
-///
 
 type BinarySummaryScore = {
   true_count: number;
