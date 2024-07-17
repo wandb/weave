@@ -164,7 +164,15 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     )
 
 
-def create_finish_func(call: "Call", client: Any) -> Callable:
+def _execute_call(
+    __op: Op,
+    call: Any,
+    *args: Any,
+    __should_raise: bool = True,
+    **kwargs: Any,
+) -> Any:
+    func = __op.resolve_fn
+    client = client_context.weave_client.require_weave_client()
     has_finished = False
 
     def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
@@ -176,31 +184,11 @@ def create_finish_func(call: "Call", client: Any) -> Callable:
         if not call_context.get_current_call():
             print_call_link(call)
 
-    return finish
-
-
-def create_on_output_func(__op: "Op", finish: Callable, call: "Call") -> Callable:
     def on_output(output: Any) -> Any:
         if handler := getattr(__op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
         finish(output)
         return output
-
-    return on_output
-
-
-def _execute_call(
-    __op: Op,
-    call: Any,
-    *args: Any,
-    __should_raise: bool = True,
-    **kwargs: Any,
-) -> Any:
-    func = __op.resolve_fn
-    client = client_context.weave_client.require_weave_client()
-
-    finish = create_finish_func(call, client)
-    on_output = create_on_output_func(__op, finish, call)
 
     def process(res: Any) -> Any:
         res = box.box(res)
