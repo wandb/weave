@@ -17,7 +17,7 @@ from typing import (
 
 from weave import client_context
 from weave.legacy import context_state
-from weave.trace.call import execute_call as _execute_call
+from weave.trace.call import create_call, execute_call
 from weave.trace.refs import ObjectRef
 
 if TYPE_CHECKING:
@@ -86,14 +86,14 @@ def _is_unbound_method(func: Callable) -> bool:
 
 
 def call(op: Op, *args: Any, **kwargs: Any) -> Any:
-    c = _create_call(op, *args, **kwargs)
+    _call = create_call(op, *args, **kwargs)
     try:
-        _execute_call(op, c, *args, **kwargs)
+        return execute_call(op, _call, *args, **kwargs)
     except Exception as e:
         print("WARNING: Error executing call")
         traceback.print_exc()
     finally:
-        return c
+        return _call
 
 
 def calls(op: Op) -> "CallsIter":
