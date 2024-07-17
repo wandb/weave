@@ -1,12 +1,18 @@
+import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {
+  BinarySummaryScore,
+  BinaryValue,
+  ContinuousSummaryScore,
+  ContinuousValue,
   EvaluationCall,
-  getScoreKeyNameFromScorerRef,
-  isBinaryScore,
+  EvaluationComparisonData,
   MetricDefinition,
-  metricDefinitionId,
+  MetricDefinitionMap,
   MetricResult,
+  MetricType,
   MetricValueType,
   PredictAndScoreCall,
+  SourceType,
 } from './ecpTypes';
 
 export const adjustValueForDisplay = (
@@ -85,4 +91,62 @@ export const resolveSummaryMetricValueForEvaluateCall = (
     return score.value;
   }
   return undefined;
+};
+
+export const getMetricIds = (
+  data: EvaluationComparisonData,
+  type: MetricType,
+  source: SourceType
+): MetricDefinitionMap => {
+  const metrics = type === 'score' ? data.scoreMetrics : data.summaryMetrics;
+  return Object.fromEntries(
+    Object.entries(metrics).filter(([k, v]) => v.source === source)
+  );
+};
+
+export const getScoreKeyNameFromScorerRef = (scorerRef: string) => {
+  const parsed = parseRef(scorerRef) as WeaveObjectRef;
+  return parsed.artifactName;
+};
+
+export const metricDefinitionId = (metricDef: MetricDefinition): string => {
+  const path = metricDef.metricSubPath
+    .map(p => {
+      return p.replace('.', '\\.');
+    })
+    .join('.');
+  if (metricDef.source === 'derived') {
+    return `derived#${path}`;
+  } else if (metricDef.source === 'scorer') {
+    if (metricDef.scorerOpOrObjRef == null) {
+      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
+    }
+    return `${metricDef.scorerOpOrObjRef}#${path}`;
+  } else {
+    throw new Error(`Unknown metric source: ${metricDef.source}`);
+  }
+};
+export const isBinaryScore = (score: any): score is BinaryValue => {
+  return typeof score === 'boolean';
+};
+
+export const isBinarySummaryScore = (
+  score: any
+): score is BinarySummaryScore => {
+  return (
+    typeof score === 'object' &&
+    score != null &&
+    'true_count' in score &&
+    'true_fraction' in score
+  );
+};
+
+export const isContinuousSummaryScore = (
+  score: any
+): score is ContinuousSummaryScore => {
+  return typeof score === 'object' && score != null && 'mean' in score;
+};
+
+export const isContinuousScore = (score: any): score is ContinuousValue => {
+  return typeof score === 'number';
 };

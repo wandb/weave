@@ -18,7 +18,7 @@ import {
   EVAL_DEF_HEIGHT,
   STANDARD_BORDER,
 } from '../../ecpConstants';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
 
 export const EvaluationDefinition: React.FC<{

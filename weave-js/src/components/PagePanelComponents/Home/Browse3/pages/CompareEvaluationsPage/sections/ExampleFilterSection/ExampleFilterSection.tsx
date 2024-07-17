@@ -13,12 +13,9 @@ import {
 } from '../../compositeMetricsUtil';
 import {PLOT_HEIGHT, STANDARD_PADDING} from '../../ecpConstants';
 import {MAX_PLOT_DOT_SIZE, MIN_PLOT_DOT_SIZE} from '../../ecpConstants';
-import {
-  EvaluationComparisonState,
-  isBinaryScore,
-  isContinuousScore,
-  metricDefinitionId,
-} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
+import {isBinaryScore, isContinuousScore} from '../../ecpUtil';
+import {metricDefinitionId} from '../../ecpUtil';
 import {
   flattenedDimensionPath,
   resolveScoreMetricResultForPASCall,

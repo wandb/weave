@@ -21,18 +21,15 @@ import {isRef} from '../../../common/util';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
-  CompositeSummaryMetricGroupKeyPath,
+  CompositeSummaryMetricGroupForKeyPath,
   resolvePeerDimension,
 } from '../../compositeMetricsUtil';
-import {DERIVED_SCORER_REF} from '../../compositeMetricsUtil';
+import {DERIVED_SCORER_REF_PLACEHOLDER} from '../../compositeMetricsUtil';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
-import {
-  EvaluationComparisonState,
-  getMetricIds,
-  MetricDefinition,
-  metricDefinitionId,
-  MetricValueType,
-} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
+import {MetricDefinition, MetricValueType} from '../../ecpTypes';
+import {metricDefinitionId} from '../../ecpUtil';
+import {getMetricIds} from '../../ecpUtil';
 import {
   adjustValueForDisplay,
   dimensionShouldMinimize,
@@ -244,7 +241,7 @@ export const ExampleCompareSection: React.FC<{
 
   // This section contains the primary helper variable for laying out the grid
   const metricGroupNames = Object.keys(compositeScoreMetrics).filter(
-    k => k !== DERIVED_SCORER_REF
+    k => k !== DERIVED_SCORER_REF_PLACEHOLDER
   );
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
@@ -346,7 +343,7 @@ export const ExampleCompareSection: React.FC<{
   ): MetricDefinition[] => {
     const isDerivedMetric = lookupIsDerivedMetric(scorerIndex);
     const lookupAnyDimensionForMetric = (
-      sm: CompositeSummaryMetricGroupKeyPath
+      sm: CompositeSummaryMetricGroupForKeyPath
     ) => {
       return Object.values(sm.scorerRefs)[0].metric;
     };

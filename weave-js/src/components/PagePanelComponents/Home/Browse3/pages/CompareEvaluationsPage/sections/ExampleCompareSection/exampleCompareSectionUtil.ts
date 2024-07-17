@@ -8,11 +8,9 @@ import {
   resolvePeerDimension,
 } from '../../compositeMetricsUtil';
 import {getOrderedCallIds} from '../../ecpState';
-import {
-  EvaluationComparisonState,
-  metricDefinitionId,
-  PredictAndScoreCall,
-} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
+import {PredictAndScoreCall} from '../../ecpTypes';
+import {metricDefinitionId} from '../../ecpUtil';
 import {resolveScoreMetricValueForPASCall} from '../../ecpUtil';
 
 type RowBase = {

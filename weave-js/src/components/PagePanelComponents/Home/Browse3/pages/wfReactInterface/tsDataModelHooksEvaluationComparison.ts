@@ -9,6 +9,64 @@
  * we are bypassing the normal caching layer used by the other hooks. By
  * decoupling this part of the code, we can more pointedly improve performance
  * without changing the component interfaces.
+ *
+ *
+ * Notes on the shape of Evaluation Data:
+ * * Scorers here are not as well defined as they should be. Let's get a better
+ *   understanding:
+ * 1. Scorers can come in 2 flavors: Ops or Object Classes. Ops are pure
+ *    functions whereas Object Classes have a `score` method and optionally a
+ *    `summarize` method. If not provided, the summarization will recursively
+ *    `auto_summarize` the outputs of the `score` method. Therefore we have the
+ *    following scorer types:
+ *    - Ops
+ *    - Object Classes (auto_summarize)
+ *    - Object Classes (summarize)
+ * 2. The output of a scorer can be a boolean or a number (or a possibly-nested
+ *    dictionary of such values)
+ *    - For sake of processing, we call each leaf path of the `score` or
+ *      `summarize` output a "metric"
+ *            - Leaf paths of `score` method are: `ScoreMetric`
+ *            - Leaf path of `summarize` method are: `SummaryMetric`
+ * 3. Autosummarization works by operating on the leaf nodes of the output
+ *    dictionary and applying a summarization function:
+ *    - For binary values: {"true_count": X, "true_fraction": Y}
+ *       - Note: we typically ignore "true_count" and only use "true_fraction"
+ *         for binary values
+ *    - For continuous values: {'mean': X}
+ * 4. Custom summarization has no rules - it is yet again a primitive or
+ *    possibly-nested dictionary of primitives.
+ * 5. An evaluation can have any number of scorers.
+ * 6. Scorers are versioned - meaning Scorers of the same name should be
+ *    conceptually comparable, but might vary in implementation.
+ *
+ * Now, how do we walk through the data?
+ * * EvaluationObj -> DatasetObjRef (via inputs.dataset)
+ * * EvaluationObj -> ScoreOpRef[]  (via inputs.scorers)
+ * * EvaluateCall -> ModelObjRef (via inputs.model)
+ * * EvaluateCall -> EvaluationObjRef (via op_name)
+ * * EvaluateCall -> {[scoreName: string]: SummaryMetric} (via output)
+ * * EvaluateCall -> (derived metric special case) Model Latency (via output.model_latency)
+ * * EvaluateCall -> (derived metric special case) Token Usage (via summary.usage) - flawed as it includes non-model tokens
+ * * PredictAndScoreCall -> EvaluateCall (via parent_id callId)
+ * * ModelPredictCall -> ModelRef (via inputs.self)
+ * * ModelPredictCall -> DatasetRowRef (via inputs.example).
+ * * DatasetRowRef -> DatasetObjRef (via string parsing) - fragile due to ref structure
+ * * DatasetRowRef -> Digest (via string parsing) - fragile and happens to be the last part of the ref
+ * * ModelPredictCall -> PredictAndScoreCall (via parent_id callId)
+ * * ModelPredictCall -> Output (via output)
+ * * ModelPredictCall -> (derived metric special case) Model Latency (via end_time - start_time)
+ * * ModelPredictCall -> (derived metric special case) Token Usage (via summary.usage)
+ * * ScoreCall -> PredictAndScoreCall (via parent_id callId)
+ * * ScoreCall -> ScoreOpRef (via inputs.self)
+ * * ScoreCall -> ScoreMetric (via output)
+ * * ScoreOp (optional) -> ScorerObjRef (via inputs.self)
+ * * DatasetObj -> DatasetRow[] (via api TableQuery)
+ * * DatasetRow -> RowDigest (via digest)
+ * * DatasetRow -> RowValue (via val)
+ *
+ * * Critical: DatasetRows have a Digest which can be used to associate the same data
+ *  across different datasets.
  */
 
 import _ from 'lodash';
@@ -22,14 +80,16 @@ import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
   EvaluationComparisonData,
   EvaluationEvaluateCallSchema,
-  getScoreKeyNameFromScorerRef,
+  MetricDefinition,
+} from '../CompareEvaluationsPage/ecpTypes';
+import {
   isBinaryScore,
   isBinarySummaryScore,
   isContinuousScore,
   isContinuousSummaryScore,
-  MetricDefinition,
-  metricDefinitionId,
-} from '../CompareEvaluationsPage/ecpTypes';
+} from '../CompareEvaluationsPage/ecpUtil';
+import {metricDefinitionId} from '../CompareEvaluationsPage/ecpUtil';
+import {getScoreKeyNameFromScorerRef} from '../CompareEvaluationsPage/ecpUtil';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {

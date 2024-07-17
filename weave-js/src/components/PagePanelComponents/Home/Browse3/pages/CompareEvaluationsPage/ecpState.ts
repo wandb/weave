@@ -2,8 +2,15 @@ import {useMemo} from 'react';
 
 import {useEvaluationComparisonData} from '../wfReactInterface/tsDataModelHooksEvaluationComparison';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
-import {ComparisonDimensionsType, getMetricIds} from './ecpTypes';
-import {EvaluationComparisonState} from './ecpTypes';
+import {ComparisonDimensionsType, EvaluationComparisonData} from './ecpTypes';
+import {getMetricIds} from './ecpUtil';
+
+export type EvaluationComparisonState = {
+  data: EvaluationComparisonData;
+  baselineEvaluationCallId: string;
+  comparisonDimensions?: ComparisonDimensionsType;
+  selectedInputDigest?: string;
+};
 
 export const useEvaluationComparisonState = (
   entity: string,

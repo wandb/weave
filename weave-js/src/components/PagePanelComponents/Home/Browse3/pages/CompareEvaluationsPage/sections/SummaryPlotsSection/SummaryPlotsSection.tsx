@@ -10,7 +10,7 @@ import {
   STANDARD_PADDING,
 } from '../../ecpConstants';
 import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
 import {
   flattenedDimensionPath,
   resolveSummaryMetricValueForEvaluateCall,

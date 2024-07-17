@@ -15,10 +15,10 @@ import _ from 'lodash';
 
 import {
   EvaluationComparisonData,
-  getScoreKeyNameFromScorerRef,
   MetricDefinition,
   MetricType,
 } from './ecpTypes';
+import {getScoreKeyNameFromScorerRef} from './ecpUtil';
 import {flattenedDimensionPath} from './ecpUtil';
 
 export const DERIVED_SCORER_REF_PLACEHOLDER = '__DERIVED__';

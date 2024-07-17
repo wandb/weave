@@ -19,7 +19,7 @@ import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {
   CompositeScoreMetrics,
-  DERIVED_SCORER_REF,
+  DERIVED_SCORER_REF_PLACEHOLDER,
   evalCallIdToScorerRefs,
   resolveDimension,
 } from '../../compositeMetricsUtil';
@@ -31,7 +31,7 @@ import {
 } from '../../ecpConstants';
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
 import {resolveSummaryMetricResultForEvaluateCall} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
 import {HorizontalBox} from '../../Layout';
@@ -336,7 +336,7 @@ export const ScorecardSection: React.FC<{
           ) as WeaveObjectRef | null;
           return (
             <React.Fragment key={groupName}>
-              {groupName !== DERIVED_SCORER_REF && (
+              {groupName !== DERIVED_SCORER_REF_PLACEHOLDER && (
                 <>
                   <GridCell
                     style={{
