@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import platform
+import sys
 import typing
 import uuid
 from functools import lru_cache
@@ -519,6 +520,7 @@ class WeaveClient:
         attributes._set_weave_item("os_name", platform.system())
         attributes._set_weave_item("os_version", platform.version())
         attributes._set_weave_item("os_release", platform.release())
+        attributes._set_weave_item("sys_version", sys.version)
 
         call = Call(
             op_name=op_str,

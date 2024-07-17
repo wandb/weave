@@ -3,6 +3,7 @@ import dataclasses
 import datetime
 import os
 import platform
+import sys
 import time
 import typing
 from collections import defaultdict, namedtuple
@@ -85,6 +86,7 @@ def test_simple_op(client):
                 "os_name": platform.system(),
                 "os_version": platform.version(),
                 "os_release": platform.release(),
+                "sys_version": sys.version,
             },
         },
     )
@@ -1260,6 +1262,7 @@ def test_attributes_on_ops(client):
             "os_name": platform.system(),
             "os_version": platform.version(),
             "os_release": platform.release(),
+            "sys_version": sys.version,
         },
     }
 
@@ -2258,8 +2261,8 @@ def test_user_cannot_modify_call_weave_dict(client):
     # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
     # but at that point you're on your own :)
 
-    
-    def test_calls_iter_slice(client):
+
+def test_calls_iter_slice(client):
     @weave.op
     def func(x):
         return x

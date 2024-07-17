@@ -4,6 +4,7 @@ import json
 import platform
 import re
 import signal
+import sys
 
 import pydantic
 import pytest
@@ -219,6 +220,7 @@ def test_call_create(client):
                 "os_name": platform.system(),
                 "os_version": platform.version(),
                 "os_release": platform.release(),
+                "sys_version": sys.version,
             },
         },
     )
@@ -245,6 +247,7 @@ def test_calls_query(client):
                 "os_name": platform.system(),
                 "os_version": platform.version(),
                 "os_release": platform.release(),
+                "sys_version": sys.version,
             },
         },
     )
@@ -262,6 +265,7 @@ def test_calls_query(client):
                 "os_name": platform.system(),
                 "os_version": platform.version(),
                 "os_release": platform.release(),
+                "sys_version": sys.version,
             },
         },
     )
