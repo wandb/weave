@@ -1,6 +1,7 @@
 import abc
 import datetime
 import typing
+from typing import Protocol
 
 from pydantic import BaseModel, Field
 
@@ -411,100 +412,36 @@ class FileContentReadRes(BaseModel):
     content: bytes
 
 
-class TraceServerInterface:
-    def ensure_project_exists(self, entity: str, project: str) -> None:
-        pass
+class TraceServerInterface(Protocol):
+    def ensure_project_exists(self, entity: str, project: str) -> None: ...
 
     # Call API
-    @abc.abstractmethod
-    def call_start(self, req: CallStartReq) -> CallStartRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def call_end(self, req: CallEndReq) -> CallEndRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def call_read(self, req: CallReadReq) -> CallReadRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_query_stream(self, req: CallsQueryReq) -> typing.Iterator[CallSchema]:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
-        raise NotImplementedError()
+    def call_start(self, req: CallStartReq) -> CallStartRes: ...
+    def call_end(self, req: CallEndReq) -> CallEndRes: ...
+    def call_read(self, req: CallReadReq) -> CallReadRes: ...
+    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
+    def calls_query_stream(self, req: CallsQueryReq) -> typing.Iterator[CallSchema]: ...
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
+    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
 
     # Op API
-    @abc.abstractmethod
-    def op_create(self, req: OpCreateReq) -> OpCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def op_read(self, req: OpReadReq) -> OpReadRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def ops_query(self, req: OpQueryReq) -> OpQueryRes:
-        raise NotImplementedError()
+    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
+    def op_read(self, req: OpReadReq) -> OpReadRes: ...
+    def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
     # Obj API
-    @abc.abstractmethod
-    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def table_create(self, req: TableCreateReq) -> TableCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def table_query(self, req: TableQueryReq) -> TableQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def file_create(self, req: FileCreateReq) -> FileCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
-        raise NotImplementedError()
+    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
+    def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
+    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+    def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+    def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
+    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
+    def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
+    def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
+    def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
+    def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
+    def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
 
 
 # These symbols are used in the WB Trace Server and it is not safe
