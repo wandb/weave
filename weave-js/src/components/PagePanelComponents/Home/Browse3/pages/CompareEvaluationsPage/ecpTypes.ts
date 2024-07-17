@@ -157,13 +157,6 @@ export type PredictAndScoreCall = {
   _rawPredictTraceData?: TraceCallSchema;
 };
 
-type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
-
-export type ComparisonDimensionsType = Array<{
-  metricId: string;
-  rangeSelection?: RangeSelection;
-}>;
-
 export type EvaluationCall = {
   callId: string;
   name: string;

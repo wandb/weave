@@ -4,7 +4,7 @@ import React, {useMemo} from 'react';
 import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
 import {useEvaluationComparisonState} from './ecpState';
 import {EvaluationComparisonState} from './ecpState';
-import {ComparisonDimensionsType} from './ecpTypes';
+import {ComparisonDimensionsType} from './ecpState';
 
 const CompareEvaluationsContext = React.createContext<{
   state: EvaluationComparisonState;

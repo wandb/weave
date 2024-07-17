@@ -20,7 +20,7 @@ import {
 } from './compareEvaluationsContext';
 import {STANDARD_PADDING} from './ecpConstants';
 import {EvaluationComparisonState} from './ecpState';
-import {ComparisonDimensionsType} from './ecpTypes';
+import {ComparisonDimensionsType} from './ecpState';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
