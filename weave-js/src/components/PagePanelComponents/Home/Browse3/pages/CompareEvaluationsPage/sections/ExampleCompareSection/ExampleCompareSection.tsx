@@ -2,7 +2,6 @@ import {Box, Tooltip} from '@material-ui/core';
 import {Circle, WarningAmberOutlined} from '@mui/icons-material';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
-import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {
@@ -16,7 +15,6 @@ import {Button} from '../../../../../../../Button';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
-import {useWeaveflowRouteContext} from '../../../../context';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
 import {isRef} from '../../../common/util';
@@ -41,6 +39,7 @@ import {
   dimensionUnit,
   flattenedDimensionPath,
 } from '../../ecpUtil';
+import {usePeekCall} from '../../hooks';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {
   ComparisonPill,
@@ -223,20 +222,9 @@ export const ExampleCompareSection: React.FC<{
     [evalCallId: string]: number;
   }>({});
 
-  const history = useHistory();
-  const {peekingRouter} = useWeaveflowRouteContext();
-
-  const onScorerClick = useCallback(
-    (callId: string) => {
-      const to = peekingRouter.callUIUrl(
-        props.state.data.entity,
-        props.state.data.project,
-        '',
-        callId
-      );
-      history.push(to);
-    },
-    [history, peekingRouter, props.state.data.entity, props.state.data.project]
+  const onScorerClick = usePeekCall(
+    props.state.data.entity,
+    props.state.data.project
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
