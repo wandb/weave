@@ -17,7 +17,7 @@ from typing import (
 
 from weave import client_context
 from weave.legacy import context_state
-from weave.trace.call import create_call, execute_call
+from weave.trace.call import _execute_call_async, _execute_call_sync, create_call
 from weave.trace.refs import ObjectRef
 
 if TYPE_CHECKING:
@@ -85,10 +85,21 @@ def _is_unbound_method(func: Callable) -> bool:
     return bool(is_method)
 
 
-def call(op: Op, *args: Any, **kwargs: Any) -> Any:
+def _call_sync(op: Op, *args: Any, **kwargs: Any) -> Any:
     _call = create_call(op, *args, **kwargs)
     try:
-        return execute_call(op, _call, *args, **kwargs)
+        return _execute_call_sync(op, _call, *args, **kwargs)
+    except Exception as e:
+        print("WARNING: Error executing call")
+        traceback.print_exc()
+    finally:
+        return _call
+
+
+async def _call_async(op: Op, *args: Any, **kwargs: Any) -> Any:
+    _call = create_call(op, *args, **kwargs)
+    try:
+        return await _execute_call_async(op, _call, *args, **kwargs)
     except Exception as e:
         print("WARNING: Error executing call")
         traceback.print_exc()
@@ -185,7 +196,9 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if client_context.weave_client.get_weave_client() is None:
                         return await func(*args, **kwargs)
                     call = create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return await execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    return await _execute_call_async(wrapper, call, *args, **kwargs)  # type: ignore
+
+                wrapper.call = partial(_call_async, wrapper)  # type: ignore
             else:
 
                 @wraps(func)
@@ -193,7 +206,9 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if client_context.weave_client.get_weave_client() is None:
                         return func(*args, **kwargs)
                     call = create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    return _execute_call_sync(wrapper, call, *args, **kwargs)  # type: ignore
+
+                wrapper.call = partial(_call_sync, wrapper)  # type: ignore
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
@@ -209,7 +224,6 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
-            wrapper.call = partial(call, wrapper)  # type: ignore
             wrapper.calls = partial(calls, wrapper)  # type: ignore
 
             wrapper.__call__ = wrapper  # type: ignore
