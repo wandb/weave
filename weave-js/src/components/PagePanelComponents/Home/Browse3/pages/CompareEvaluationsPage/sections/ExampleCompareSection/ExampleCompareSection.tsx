@@ -220,10 +220,6 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
-  // const {compositeSummaryMetrics, resolvePeerDimension} = useMemo(
-  //   () => buildCompositeComparisonSummaryMetrics(props.state),
-  //   [props.state]
-  // );
 
   const compositeScoreMetrics = useMemo(
     () => buildCompositeMetricsMap(props.state.data, 'score'),
@@ -261,22 +257,6 @@ export const ExampleCompareSection: React.FC<{
     numDerivedScores,
   ];
   const totalMetrics = _.sum(numMetricsPerScorer);
-
-  // const derivedSummaries = Object.values(
-  //   getMetricIds(props.state.data, 'summary', 'derived')
-  // );
-  // const numSummaryScorers = metricGroupNames.length;
-
-  // const numDerivedSummaries = derivedSummaries.length;
-
-  // const numMetricsPerSummaryScorer = [
-  //   ...metricGroupNames.map(groupName => {
-  //     return Object.keys(compositeSummaryMetrics[groupName].metrics).length;
-  //   }),
-  //   numDerivedScores,
-  // ];
-
-  // const totalSummaryMetrics = _.sum(numMetricsPerSummaryScorer);
 
   // This section contains a bunch of helper functions used to lookup
   // data for the grid layout. Originally all this stuff was inlined
