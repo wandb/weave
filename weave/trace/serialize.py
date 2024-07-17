@@ -1,7 +1,6 @@
 import typing
 from typing import Any
 
-from weave.legacy import box
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
@@ -29,7 +28,7 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     elif isinstance(obj, dict):
         return {k: to_json(v, project_id, server) for k, v in obj.items()}
 
-    if isinstance(obj, (int, float, str, bool, box.BoxedNone)) or obj is None:
+    if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
 
     encoded = custom_objs.encode_custom_obj(obj)

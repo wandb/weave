@@ -16,8 +16,8 @@ from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
 from weave.client_context.weave_client import get_weave_client
-from weave.legacy import box
 from weave.table import Table
+from weave.trace import box
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import Op, maybe_bind_method
@@ -250,7 +250,7 @@ class WeaveTable(Traceable):
         # load the entire set of rows the first time we need anything. However
         # the previous implementation loaded the entire set of rows for every action
         # so this is still better.
-        if self._loaded_rows == None:
+        if self._loaded_rows is None:
             self._loaded_rows = [row for row in self._remote_iter()]
 
         return typing.cast(typing.List[typing.Dict], self._loaded_rows)
@@ -477,10 +477,21 @@ def make_trace_obj(
             raise MissingSelfInstanceError(
                 f"{val.name} Op requires a bound self instance. Must be called from an instance method."
             )
-        val = val.__self__
+        val = maybe_bind_method(val, parent)
     box_val = box.box(val)
-    if isinstance(box_val, pydantic_v1.BaseModel):
+    if isinstance(box_val, pydantic_v1.BaseModel) or isinstance(val, Op):
         box_val.__dict__["ref"] = new_ref
+    elif box_val is None or isinstance(box_val, bool):
+        # We intentionally don't box None and bools because it's imposible to
+        # make them behave like the underlying True/False/None objects in python.
+        # This is unlike other objects (dict, list, int) that can be inherited
+        # from and compared.
+
+        # The tradeoff we're making here is:
+        # 1. We won't ref track bools or None when passed into a call; but
+        # 2. Users can compare them pythonically (e.g. `x is None` vs. `x == None`)
+
+        pass
     else:
         setattr(box_val, "ref", new_ref)
     return box_val

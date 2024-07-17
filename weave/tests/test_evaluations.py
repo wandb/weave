@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional
+from typing import Any, Optional
 
 import pytest
 
@@ -101,8 +101,15 @@ async def test_basic_evaluation(client):
     ]
     assert got == exp
 
-    def is_object_ref_with_name(val: str, name: str):
-        return val.startswith(f"weave:///shawn/test-project/object/{name}:")
+    def is_object_ref_with_name(val: Any, name: str):
+        return isinstance(val, str) and val.startswith(
+            f"weave:///shawn/test-project/object/{name}:"
+        )
+
+    def is_op_ref_with_name(val: Any, name: str):
+        return isinstance(val, str) and val.startswith(
+            f"weave:///shawn/test-project/op/{name}:"
+        )
 
     ## Assertion Category 1: Here we make some application-specific assertions about the
     # structure of the calls, specifically for evaluation-specific UI elements
@@ -126,3 +133,14 @@ async def test_basic_evaluation(client):
         assert is_object_ref_with_name(
             flattened_calls[i][0].inputs["example"], "Dataset"
         )
+
+    objs = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi._ObjectVersionFilter(base_object_classes=["Model"]),
+        )
+    )
+    assert len(objs.objs) == 1
+    model_obj = objs.objs[0]
+    expected_predict_ref = model_obj.val["predict"]
+    assert is_op_ref_with_name(expected_predict_ref, "MyModel.predict")
