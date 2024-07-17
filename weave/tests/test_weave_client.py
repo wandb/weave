@@ -27,6 +27,7 @@ from weave.trace.refs import (
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
 from weave.trace_server.trace_server_interface import (
+    _ObjectVersionFilter,
     FileContentReadReq,
     FileCreateReq,
     RefsReadBatchReq,
@@ -489,17 +490,13 @@ def test_op_mismatch_project_ref(client):
     def hello_world():
         return "Hello world"
 
-    hello_world()
-    op = list(client._op_calls(hello_world))[0]
-    assert op.project_id == "shawn/test-project"
-    assert op.op_name.split("/op/")[0] == "weave:///shawn/test-project"
+    ref1 = client._save_object(hello_world, "my-op")
+    assert ref1.project == "test-project"
 
     client.project = "test-project2"
-    hello_world()
 
-    op = list(client._op_calls(hello_world))[0]
-    assert op.project_id == "shawn/test-project2"
-    assert op.op_name.split("/op/")[0] == "weave:///shawn/test-project2"
+    ref2 = client._save_object(hello_world, "my-op")
+    assert ref2.project == "test-project2"
 
 
 def test_object_mismatch_project_ref(client):
@@ -528,23 +525,26 @@ def test_object_mismatch_project_ref_nested(client):
     def hello_world():
         return "Hello world"
 
-    hello_world()
-    op = list(client._op_calls(hello_world))[0]
-    assert op.project_id == "shawn/test-project"
+    original_op_ref = client._save_op(hello_world)
+    assert original_op_ref.project == "test-project"
 
     client.project = "test-project2"
 
-    class MyObject(weave.Object):
-        hello_world: Callable
+    nested = {"a": hello_world}
 
-    nested = MyObject(hello_world=hello_world)
     ref2 = client._save_object(nested, "my-object")
     assert ref2.project == "test-project2"
 
+    ref3 = weave_client.get_ref(hello_world)
+    assert ref3.project == "test-project2"
+
     out = client.get(ref2)
-    assert isinstance(out.hello_world, OpRef)
-    assert out.hello_world.name == "op-hello-world"
-    assert out.hello_world.project_id == "shawn/test-project2"
+    assert out.ref.project == "test-project2"
+
+    opref = dict.__getitem__(out, "a")
+    assert isinstance(opref, OpRef)
+    assert opref.name == "hello_world"
+    assert opref.project == "test-project2"
 
 
 def test_saveload_customtype(client, strict_op_saving):
