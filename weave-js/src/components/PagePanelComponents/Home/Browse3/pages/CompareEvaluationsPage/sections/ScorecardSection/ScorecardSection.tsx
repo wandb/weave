@@ -40,6 +40,8 @@ import {
   EvaluationDatasetLink,
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
+import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
+import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 
 export const SCORER_VARIATION_WARNING_TITLE = 'Scoring inconsistency detected';
 export const SCORER_VARIATION_WARNING_EXPLANATION =
@@ -437,9 +439,9 @@ export const ScorecardSection: React.FC<{
                       const value = metric?.value;
                       const sourceCallId = metric?.sourceCallId;
 
+                      const valueIsNumber = typeof value === 'number';
                       const dataIsNumber =
-                        typeof value === 'number' &&
-                        typeof baseline === 'number';
+                        valueIsNumber && typeof baseline === 'number';
 
                       const onClick = sourceCallId
                         ? () => onCallClick(sourceCallId)
@@ -462,14 +464,22 @@ export const ScorecardSection: React.FC<{
                               style={{
                                 alignItems: 'center',
                               }}>
-                              <span
+                              <HorizontalBox
                                 style={{
                                   minWidth: '70px',
+                                  gap: '4px',
                                 }}>
-                                <CellValue value={value} />
+                                {valueIsNumber ? (
+                                  <ValueViewNumber
+                                    value={value}
+                                    fractionDigits={4}
+                                  />
+                                ) : (
+                                  <CellValueBoolean value={value} />
+                                )}
                                 {group.metrics[metricKey]
                                   .scorerAgnosticMetricDef.unit ?? ''}
-                              </span>
+                              </HorizontalBox>
                               {dataIsNumber && (
                                 <ComparisonPill
                                   value={value}
