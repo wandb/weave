@@ -92,7 +92,7 @@ export const ScorecardSection: React.FC<{
   }, [modelProps]);
   const [diffOnly, setDiffOnly] = React.useState(true);
 
-  const {compositeMetrics} = useMemo(() => {
+  const {compositeSummaryMetrics: compositeMetrics} = useMemo(() => {
     return buildCompositeComparisonSummaryMetrics(props.state);
   }, [props.state]);
 

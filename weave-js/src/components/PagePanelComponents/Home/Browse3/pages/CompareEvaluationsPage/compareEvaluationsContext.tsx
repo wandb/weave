@@ -61,7 +61,6 @@ export const CompareEvaluationsProvider: React.FC<{
     comparisonDimensions,
     selectedInputDigest
   );
-  console.log({initialState});
 
   const value = useMemo(() => {
     if (initialState.loading || initialState.result == null) {

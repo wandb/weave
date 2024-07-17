@@ -1,5 +1,6 @@
 import {
   EvaluationCall,
+  getScoreKeyNameFromScorerRef,
   isBinaryScore,
   isBinarySummaryScore,
   isContinuousSummaryScore,
@@ -27,7 +28,16 @@ export const adjustValueForDisplay = (
 };
 
 export const flattenedDimensionPath = (dim: MetricDefinition): string => {
-  return dim.metricSubPath.join('.');
+  const paths = [...dim.metricSubPath]
+  if (dim.source === 'scorer') {
+    if (dim.scorerOpOrObjRef == null) {
+      throw new Error(
+        'scorerOpOrObjRef must be defined for scorer metric'
+      );
+    } 
+    paths.unshift(getScoreKeyNameFromScorerRef(dim.scorerOpOrObjRef))
+  }
+  return paths.join('.');
 };
 
 export const dimensionUnit = (

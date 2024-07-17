@@ -25,6 +25,7 @@ import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {
   EvaluationComparisonState,
   getMetricIds,
+  getScoreKeyNameFromScorerRef,
   MetricDefinition,
   metricDefinitionId,
   MetricValueType,
@@ -46,6 +47,8 @@ import {
   CompositeSummaryMetric,
   CompositeSummaryScoreGroup,
   DERIVED_SCORER_REF,
+  OUTPUT_SCORER_REF,
+  ResolvePeerDimensionFn,
 } from '../ScorecardSection/summaryMetricUtil';
 import {
   PivotedRow,
@@ -240,42 +243,174 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
-  const {compositeMetrics, resolvePeerDimension} = useMemo(
-    () => buildCompositeComparisonSummaryMetrics(props.state),
-    [props.state]
-  );
+  // const {compositeSummaryMetrics, resolvePeerDimension} = useMemo(
+  //   () => buildCompositeComparisonSummaryMetrics(props.state),
+  //   [props.state]
+  // );
+
+  type CompositeSummaryMetricGroupKeyPath = {
+    scorerRefs: {
+      [scoreRef: string]: {
+        evalCallIds: string[];
+        metric: MetricDefinition;
+      };
+    };
+  };
+
+  type CompositeScoreMetricGroup = {
+    scorerRefs: string[];
+    metrics: {
+      [keyPath: string]: CompositeSummaryMetricGroupKeyPath;
+    };
+  };
+
+  type CompositeScoreMetrics = {
+    [groupName: string]: CompositeScoreMetricGroup;
+  };
+
+  const groupNameForMetric = (metric: MetricDefinition): string => {
+    let groupName = '';
+
+    if (metric.source === 'model_output') {
+      groupName = OUTPUT_SCORER_REF;
+    } else if (metric.source === 'derived') {
+      groupName = DERIVED_SCORER_REF;
+    } else if (metric.source === 'scorer') {
+      if (metric.scorerOpOrObjRef == null) {
+        throw new Error('scorerOpOrObjRef must be defined for scorer metric');
+      }
+      groupName = getScoreKeyNameFromScorerRef(metric.scorerOpOrObjRef);
+    }
+    return groupName;
+  };
+
+  const refForMetric = (metric: MetricDefinition): string => {
+    let ref = '';
+    if (metric.source === 'model_output') {
+      ref = OUTPUT_SCORER_REF;
+    } else if (metric.source === 'derived') {
+      ref = DERIVED_SCORER_REF;
+    } else if (metric.source === 'scorer') {
+      if (metric.scorerOpOrObjRef == null) {
+        throw new Error('scorerOpOrObjRef must be defined for scorer metric');
+      }
+
+      ref = metric.scorerOpOrObjRef;
+    }
+    return ref;
+  };
+
+  const compositeScoreMetrics = useMemo(() => {
+    const composite: CompositeScoreMetrics = {};
+    Object.entries(props.state.data.scoreMetrics).forEach(
+      ([metricId, metric]) => {
+        const groupName = groupNameForMetric(metric);
+        const ref = refForMetric(metric);
+
+        if (!composite[groupName]) {
+          composite[groupName] = {
+            scorerRefs: [],
+            metrics: {},
+          };
+        }
+        const metricGroup = composite[groupName];
+        if (!metricGroup.scorerRefs.includes(ref)) {
+          metricGroup.scorerRefs.push(ref);
+        }
+
+        const keyPath = flattenedDimensionPath(metric);
+
+        if (!metricGroup.metrics[keyPath]) {
+          metricGroup.metrics[keyPath] = {
+            scorerRefs: {},
+          };
+        }
+
+        const metricKeyPath = metricGroup.metrics[keyPath];
+
+        if (!metricKeyPath.scorerRefs[ref]) {
+          metricKeyPath.scorerRefs[ref] = {
+            evalCallIds: [],
+            metric: metric,
+          };
+        }
+
+        const evals = Object.entries(props.state.data.evaluations)
+          .filter(([evalCallId, evaluation]) => {
+            return (
+              metric.scorerOpOrObjRef == null ||
+              evaluation.scorerRefs.includes(metric.scorerOpOrObjRef)
+            );
+          })
+          .map(([evalCallId, evaluation]) => {
+            return evalCallId;
+          });
+
+        metricKeyPath.scorerRefs[ref].evalCallIds = evals;
+      }
+    );
+    return composite;
+  }, [props.state.data.evaluations, props.state.data.scoreMetrics]);
+
+  const resolvePeerDimension: ResolvePeerDimensionFn = (
+    evalCallId: string,
+    peerDimension: MetricDefinition
+  ) => {
+    const groupName = groupNameForMetric(peerDimension);
+    const keyPath = flattenedDimensionPath(peerDimension);
+
+    return Object.values(
+      compositeScoreMetrics[groupName].metrics[keyPath].scorerRefs
+    ).find(scorerRef => scorerRef.evalCallIds.includes(evalCallId))?.metric;
+  };
 
   if (target == null) {
     return <div>Filter resulted in 0 rows</div>;
   }
 
   // This section contains the primary helper variable for laying out the grid
-  const scorerGroupNames = Object.keys(compositeMetrics).filter(
-    k => k !== DERIVED_SCORER_REF
-  );
-
-  const derivedMetrics = Object.values(
-    getMetricIds(props.state.data, 'score', 'derived')
+  const metricGroupNames = Object.keys(compositeScoreMetrics).filter(
+    k => k !== DERIVED_SCORER_REF && k !== OUTPUT_SCORER_REF
   );
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
-  const numScorers = scorerGroupNames.length;
   const inputColumnKeys = Object.keys(target.input);
   const numInputProps = inputColumnKeys.length;
   const numOutputKeys = outputColumnKeys.length;
-  const numDerivedMetrics = derivedMetrics.length;
-  const numMetricsPerScorer = [
-    ...scorerGroupNames.map(groupName => {
-      return Object.keys(compositeMetrics[groupName].metrics).length;
-    }),
-    numDerivedMetrics,
-  ];
-  const totalMetrics = _.sum(numMetricsPerScorer);
+
   const numTrials = orderedCallIds.map(leafId => {
     return target.originalRows.filter(row => row.evaluationCallId === leafId)
       .length;
   });
   const numEvals = numTrials.length;
+  const derivedScores = Object.values(
+    getMetricIds(props.state.data, 'score', 'derived')
+  );
+  const numMetricScorers = metricGroupNames.length;
+  const numDerivedScores = derivedScores.length;
+  const numMetricsPerScorer = [
+    ...metricGroupNames.map(groupName => {
+      return Object.keys(compositeScoreMetrics[groupName].metrics).length;
+    }),
+    numDerivedScores,
+  ];
+  const totalMetrics = _.sum(numMetricsPerScorer);
+
+  // const derivedSummaries = Object.values(
+  //   getMetricIds(props.state.data, 'summary', 'derived')
+  // );
+  // const numSummaryScorers = metricGroupNames.length;
+
+  // const numDerivedSummaries = derivedSummaries.length;
+
+  // const numMetricsPerSummaryScorer = [
+  //   ...metricGroupNames.map(groupName => {
+  //     return Object.keys(compositeSummaryMetrics[groupName].metrics).length;
+  //   }),
+  //   numDerivedScores,
+  // ];
+
+  // const totalSummaryMetrics = _.sum(numMetricsPerSummaryScorer);
 
   // This section contains a bunch of helper functions used to lookup
   // data for the grid layout. Originally all this stuff was inlined
@@ -296,7 +431,7 @@ export const ExampleCompareSection: React.FC<{
   const BASELINE_EVAL_INDEX = 0;
 
   const lookupIsDerivedMetric = (scorerIndex: number): boolean => {
-    return scorerIndex === numScorers;
+    return scorerIndex === numMetricScorers;
   };
 
   const lookupTrialsForEval = (evalIndex: number): PivotedRow[] => {
@@ -318,42 +453,32 @@ export const ExampleCompareSection: React.FC<{
     return trialsForThisEval[lookupSelectedTrialIndexForEval(evalIndex)];
   };
 
-  const lookupScoreGroupForScorerIndex = (
-    scorerIndex: number
-  ): CompositeSummaryScoreGroup => {
-    return compositeMetrics[scorerGroupNames[scorerIndex]];
+  const lookupScoreGroupForScorerIndex = (scorerIndex: number) => {
+    return compositeScoreMetrics[metricGroupNames[scorerIndex]];
   };
 
-  const lookupScoreGroupMetricsForScorerIndex = (
-    scorerIndex: number
-  ): CompositeSummaryScoreGroup['metrics'] => {
+  const lookupScoreGroupMetricsForScorerIndex = (scorerIndex: number) => {
     return lookupScoreGroupForScorerIndex(scorerIndex).metrics;
   };
 
   const lookupUniqueScorerRefsForScorerIndex = (
     scorerIndex: number
   ): string[] => {
-    return Array.from(
-      new Set(
-        Object.values(
-          lookupScoreGroupForScorerIndex(scorerIndex).evalCallIdToScorerRef
-        )
-      )
-    );
+    return lookupScoreGroupForScorerIndex(scorerIndex).scorerRefs;
   };
 
   const lookupDimensionsForScorer = (
     scorerIndex: number
   ): MetricDefinition[] => {
     const isDerivedMetric = lookupIsDerivedMetric(scorerIndex);
-    const lookupAnyDimensionForMetric = (sm: CompositeSummaryMetric) => {
-      return props.state.data.scoreMetrics[
-        Object.values(sm.scorerRefToDimensionId)[0]
-      ];
+    const lookupAnyDimensionForMetric = (
+      sm: CompositeSummaryMetricGroupKeyPath
+    ) => {
+      return Object.values(sm.scorerRefs)[0].metric;
     };
 
     if (isDerivedMetric) {
-      return derivedMetrics;
+      return derivedScores;
     }
     return Object.values(
       lookupScoreGroupMetricsForScorerIndex(scorerIndex)

@@ -88,7 +88,7 @@ const normalizeValues = (values: Array<number | undefined>): number[] => {
 const useNormalizedPlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): RadarPlotData => {
-  const {compositeMetrics} = useMemo(() => {
+  const {compositeSummaryMetrics: compositeMetrics} = useMemo(() => {
     return buildCompositeComparisonSummaryMetrics(state);
   }, [state]);
   const callIds = useMemo(() => {

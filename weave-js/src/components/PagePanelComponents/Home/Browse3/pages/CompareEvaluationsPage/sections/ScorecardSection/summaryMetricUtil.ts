@@ -63,7 +63,7 @@ export type ResolvePeerDimensionFn = (
 export const buildCompositeComparisonSummaryMetrics = (
   state: EvaluationComparisonState
 ): {
-  compositeMetrics: CompositeComparisonSummaryMetrics;
+  compositeSummaryMetrics: CompositeComparisonSummaryMetrics;
   resolvePeerDimension: ResolvePeerDimensionFn;
 } => {
   const compositeMetrics: CompositeComparisonSummaryMetrics = {};
@@ -219,5 +219,5 @@ export const buildCompositeComparisonSummaryMetrics = (
     ); // TODO: Verify this fallback is correct
   };
 
-  return {compositeMetrics, resolvePeerDimension};
+  return {compositeSummaryMetrics: compositeMetrics, resolvePeerDimension};
 };

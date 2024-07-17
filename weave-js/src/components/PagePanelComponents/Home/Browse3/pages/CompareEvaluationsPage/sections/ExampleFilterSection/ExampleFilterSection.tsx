@@ -297,7 +297,7 @@ const DimensionPicker: React.FC<{
   state: EvaluationComparisonState;
   dimensionIndex: number;
 }> = props => {
-  const {compositeMetrics: derivedMetrics} = useMemo(
+  const {compositeSummaryMetrics: derivedMetrics} = useMemo(
     () => buildCompositeComparisonSummaryMetrics(props.state),
     [props.state]
   );
