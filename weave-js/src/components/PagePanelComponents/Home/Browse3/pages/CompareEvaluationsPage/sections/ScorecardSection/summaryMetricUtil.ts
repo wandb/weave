@@ -7,7 +7,8 @@ import {
 } from '../../ecpUtil';
 
 export const DERIVED_SCORER_REF = '__DERIVED__';
-export const OUTPUT_SCORER_REF = '__DERIVED__';
+// TODO: Make a section for this!
+const OUTPUT_SCORER_REF = '__MODEL_OUTPUT__';
 
 export type CompositeSummaryMetric = {
   scorerRefToDimensionId: {[scorerRef: string]: string};
@@ -25,11 +26,11 @@ export type CompositeSummaryScoreGroup = {
   };
 };
 
-export type CompositeComparisonSummaryMetrics = {
+type CompositeComparisonSummaryMetrics = {
   [scorerGroupName: string]: CompositeSummaryScoreGroup;
 };
 
-export const dimensionKeys = (
+const dimensionKeys = (
   dimension: MetricDefinition
 ): {
   scorerGroupName: string;

@@ -48,8 +48,8 @@ export const isContinuousScore = (score: any): score is ContinuousValue => {
   return typeof score === 'number';
 };
 
-export type SourceType = 'derived' | 'scorer' | 'model_output';
-export type MetricType = 'score' | 'summary';
+type SourceType = 'derived' | 'scorer' | 'model_output';
+type MetricType = 'score' | 'summary';
 
 export type MetricDefinition = {
   metricSubPath: string[];
@@ -82,25 +82,25 @@ export const metricDefinitionId = (metricDef: MetricDefinition): string => {
   }
 };
 
-export const metricIdToDefinition = (
-  data: EvaluationComparisonData,
-  scoreOrSummary: 'score' | 'summary',
-  metricId: string
-): MetricDefinition => {
-  if (scoreOrSummary === 'score') {
-    if (!(metricId in data.scoreMetrics)) {
-      throw new Error(`Metric ID ${metricId} not found in scoreMetrics`);
-    }
-    return data.scoreMetrics[metricId];
-  } else if (scoreOrSummary === 'summary') {
-    if (!(metricId in data.summaryMetrics)) {
-      throw new Error(`Metric ID ${metricId} not found in summaryMetrics`);
-    }
-    return data.summaryMetrics[metricId];
-  } else {
-    throw new Error(`Unknown scoreOrSummary: ${scoreOrSummary}`);
-  }
-};
+// const metricIdToDefinition = (
+//   data: EvaluationComparisonData,
+//   scoreOrSummary: 'score' | 'summary',
+//   metricId: string
+// ): MetricDefinition => {
+//   if (scoreOrSummary === 'score') {
+//     if (!(metricId in data.scoreMetrics)) {
+//       throw new Error(`Metric ID ${metricId} not found in scoreMetrics`);
+//     }
+//     return data.scoreMetrics[metricId];
+//   } else if (scoreOrSummary === 'summary') {
+//     if (!(metricId in data.summaryMetrics)) {
+//       throw new Error(`Metric ID ${metricId} not found in summaryMetrics`);
+//     }
+//     return data.summaryMetrics[metricId];
+//   } else {
+//     throw new Error(`Unknown scoreOrSummary: ${scoreOrSummary}`);
+//   }
+// };
 
 export type MetricValueType = BinaryValue | ContinuousValue;
 
@@ -136,7 +136,7 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
   };
 };
 
-export type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
+type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
 
 type DatasetRow = {
   digest: string;
