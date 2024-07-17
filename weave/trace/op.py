@@ -207,36 +207,37 @@ def _execute_call(
     finish = create_finish_func(call, client)
     on_output = create_on_output_func(__op, finish, call)
 
+    def process(res):
+        res = box.box(res)
+        return call if __return_type == "call" else on_output(res)
+
+    def handle_exception(e):
+        finish(exception=e)
+        if __should_raise:
+            raise
+        return call if __return_type == "call" else None
+
     if inspect.iscoroutinefunction(func):
 
-        async def execute_async():
+        async def _call_async():
             call_context.push_call(call)
             try:
                 res = await func(*args, **kwargs)
-                return on_output(box.box(res))
             except Exception as e:
-                finish(exception=e)
-                if __should_raise:
-                    raise
-                return None
+                return handle_exception(e)
+            else:
+                return process(res)
             finally:
                 call_context.pop_call(call.id)
 
-        result = execute_async()
+        return _call_async()
     else:
-        call_context.push_call(call)
         try:
             res = func(*args, **kwargs)
-            result = on_output(box.box(res))
         except Exception as e:
-            finish(exception=e)
-            if __should_raise:
-                raise
-            result = None
-        finally:
-            call_context.pop_call(call.id)
-
-    return call if __return_type == "call" else result
+            handle_exception(e)
+        else:
+            return process(res)
 
 
 def call(op: Op, *args: Any, **kwargs: Any) -> Any:
