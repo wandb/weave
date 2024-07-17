@@ -217,9 +217,12 @@ def _execute_call(
                 finish(exception=e)
                 if __should_raise:
                     raise
+                else:
+                    return call if __return_type == "call" else None
             else:
                 res = box.box(res)
-                return on_output(res)
+                res2 = on_output(res)
+                return call if __return_type == "call" else res2
             finally:
                 call_context.pop_call(call.id)
 
@@ -231,9 +234,12 @@ def _execute_call(
             finish(exception=e)
             if __should_raise:
                 raise
+            else:
+                return call if __return_type == "call" else None
         else:
             res = box.box(res)
-            return on_output(res)
+            res2 = on_output(res)
+            return call if __return_type == "call" else res2
 
 
 def call(op: Op, *args: Any, **kwargs: Any) -> Any:
