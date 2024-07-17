@@ -1,3 +1,16 @@
+/**
+ * This file contains a few utilities for working with the
+ * `MetricDefinitionMap`s in the `EvaluationComparisonData` object. The
+ * `EvaluationComparisonData` state is a normalized representation of the data,
+ * which is good for not duplicating data, but does present some challenges when
+ * trying to build the final rendering of the data. As an application-specific
+ * consideration, when comparing evaluations, metrics can be represented by the
+ * `CompositeScoreMetricGroup` form - where there is a top-level group for each
+ * "scorer", then a list of metrics that are associated with that scorer.
+ * Importantly, different versions of a scorer might be used in different
+ * evaluations, so we need to be able to resolve the correct metric for a given
+ * evaluation.
+ */
 import {
   EvaluationComparisonData,
   getScoreKeyNameFromScorerRef,
@@ -5,7 +18,8 @@ import {
   MetricType,
 } from './ecpTypes';
 import {flattenedDimensionPath} from './ecpUtil';
-import {DERIVED_SCORER_REF} from './sections/ScorecardSection/summaryMetricUtil';
+
+export const DERIVED_SCORER_REF = '__DERIVED__';
 
 export type CompositeSummaryMetricGroupKeyPath = {
   scorerRefs: {

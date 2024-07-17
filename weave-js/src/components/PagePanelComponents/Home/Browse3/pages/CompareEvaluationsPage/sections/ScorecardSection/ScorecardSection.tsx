@@ -15,6 +15,8 @@ import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
+import {DERIVED_SCORER_REF} from '../../compositeMetricsUtil';
+import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
   STANDARD_BORDER,
@@ -29,10 +31,6 @@ import {
   EvaluationDatasetLink,
   EvaluationModelLink,
 } from '../ComparisonDefinitionSection/EvaluationDefinition';
-import {
-  buildCompositeComparisonSummaryMetrics,
-  DERIVED_SCORER_REF,
-} from './summaryMetricUtil';
 
 export const SCORER_VARIATION_WARNING_TITLE = 'Scoring inconsistency detected';
 export const SCORER_VARIATION_WARNING_EXPLANATION =
@@ -95,7 +93,7 @@ export const ScorecardSection: React.FC<{
   const [diffOnly, setDiffOnly] = React.useState(true);
 
   const {compositeSummaryMetrics} = useMemo(() => {
-    return buildCompositeComparisonSummaryMetrics(props.state);
+    return buildCompositeMetricsMap(props.state.data, 'summary');
   }, [props.state]);
 
   const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;

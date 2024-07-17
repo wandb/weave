@@ -26,6 +26,7 @@ import {
   CompositeSummaryMetricGroupKeyPath,
   resolvePeerDimension,
 } from '../../compositeMetricsUtil';
+import {DERIVED_SCORER_REF} from '../../compositeMetricsUtil';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {
   EvaluationComparisonState,
@@ -46,7 +47,6 @@ import {
   SCORER_VARIATION_WARNING_EXPLANATION,
   SCORER_VARIATION_WARNING_TITLE,
 } from '../ScorecardSection/ScorecardSection';
-import {DERIVED_SCORER_REF} from '../ScorecardSection/summaryMetricUtil';
 import {
   PivotedRow,
   useFilteredAggregateRows,

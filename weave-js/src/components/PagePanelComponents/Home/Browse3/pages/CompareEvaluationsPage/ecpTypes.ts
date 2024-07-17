@@ -1,7 +1,6 @@
 /**
  * TODO:
  * * Really try to cleanup the code - specifically:
- *    * the summary metrics scorecard and the comparison view now have a lot of similar code
  *    * there is a lot of slopiness with react memoing
  *    * There is a lot of slopiness in symbol names and files
  * * // TODO: Verify this fallback is correct - i think this is not correct
