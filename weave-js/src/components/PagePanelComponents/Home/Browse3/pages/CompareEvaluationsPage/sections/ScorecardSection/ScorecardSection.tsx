@@ -14,8 +14,11 @@ import {Pill, TagColorName} from '../../../../../../../Tag';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
-import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
-import {DERIVED_SCORER_REF} from '../../compositeMetricsUtil';
+import {
+  DERIVED_SCORER_REF,
+  evalCallIdToScorerRefs,
+  resolveDimension,
+} from '../../compositeMetricsUtil';
 import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
@@ -25,6 +28,7 @@ import {
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
+import {resolveSummaryMetricValueForEvaluateCall} from '../../ecpUtil';
 import {HorizontalBox} from '../../Layout';
 import {
   EvaluationCallLink,
@@ -92,7 +96,7 @@ export const ScorecardSection: React.FC<{
   }, [modelProps]);
   const [diffOnly, setDiffOnly] = React.useState(true);
 
-  const {compositeSummaryMetrics} = useMemo(() => {
+  const compositeSummaryMetrics = useMemo(() => {
     return buildCompositeMetricsMap(props.state.data, 'summary');
   }, [props.state]);
 
@@ -300,17 +304,18 @@ export const ScorecardSection: React.FC<{
           Metrics
         </GridCell>
         {/* Score Rows */}
-        {Object.entries(compositeSummaryMetrics).map(([key, def]) => {
+        {Object.entries(compositeSummaryMetrics).map(([groupName, group]) => {
+          const evalCallIdToScorerRef = evalCallIdToScorerRefs(group);
           const uniqueScorerRefs = Array.from(
-            new Set(Object.values(def.evalCallIdToScorerRef))
+            new Set(Object.values(evalCallIdToScorerRef))
           );
           const scorersAreComparable = uniqueScorerRefs.length === 1;
           const scorerRefParsed = parseRefMaybe(
             uniqueScorerRefs[0]
           ) as WeaveObjectRef | null;
           return (
-            <React.Fragment key={key}>
-              {key !== DERIVED_SCORER_REF && (
+            <React.Fragment key={groupName}>
+              {groupName !== DERIVED_SCORER_REF && (
                 <>
                   <GridCell
                     style={{
@@ -320,11 +325,7 @@ export const ScorecardSection: React.FC<{
                       textAlign: 'left',
                     }}>
                     {scorersAreComparable ? (
-                      scorerRefParsed ? (
-                        <SmallRef objRef={scorerRefParsed} />
-                      ) : (
-                        def.scorerName ?? ''
-                      )
+                      scorerRefParsed && <SmallRef objRef={scorerRefParsed} />
                     ) : (
                       <Alert
                         severity="warning"
@@ -345,7 +346,7 @@ export const ScorecardSection: React.FC<{
                   </GridCell>
                   {evalCallIds.map((evalCallId, mNdx) => {
                     const innerScorerRefParsed = parseRefMaybe(
-                      def.evalCallIdToScorerRef[evalCallId]
+                      evalCallIdToScorerRef[evalCallId]
                     ) as WeaveObjectRef | null;
                     return (
                       <GridCell
@@ -366,35 +367,62 @@ export const ScorecardSection: React.FC<{
                   })}
                 </>
               )}
-              {Object.keys(def.metrics).map((metricKey, metricNdx) => {
+              {Object.keys(group.metrics).map((metricKey, metricNdx) => {
                 return (
                   <React.Fragment key={metricKey}>
                     <GridCell
                       style={{
                         gridColumnEnd: 'span 2',
                         borderBottom:
-                          metricNdx === Object.keys(def.metrics).length - 1
+                          metricNdx === Object.keys(group.metrics).length - 1
                             ? '1px solid #ccc'
                             : '',
                         fontWeight: 'bold',
                         textAlign: 'right',
                         textOverflow: 'ellipsis',
                       }}>
-                      {def.metrics[metricKey].metricLabel}
+                      {metricKey}
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
-                      const baseline =
-                        def.metrics[metricKey].evalScores[
-                          props.state.baselineEvaluationCallId
-                        ];
-                      const value =
-                        def.metrics[metricKey].evalScores[evalCallId];
+                      // TODO: this can be simplified
+                      const baselineDimension = resolveDimension(
+                        compositeSummaryMetrics,
+                        props.state.baselineEvaluationCallId,
+                        groupName,
+                        metricKey
+                      );
+                      const baseline = baselineDimension
+                        ? resolveSummaryMetricValueForEvaluateCall(
+                            baselineDimension,
+                            props.state.data.evaluationCalls[
+                              props.state.baselineEvaluationCallId
+                            ]
+                          )
+                        : undefined;
+
+                      const compareDimension = resolveDimension(
+                        compositeSummaryMetrics,
+                        evalCallId,
+                        groupName,
+                        metricKey
+                      );
+                      const value = compareDimension
+                        ? resolveSummaryMetricValueForEvaluateCall(
+                            compareDimension,
+                            props.state.data.evaluationCalls[evalCallId]
+                          )
+                        : undefined;
+
+                      const dataIsNumber =
+                        typeof value === 'number' &&
+                        typeof baseline === 'number';
                       return (
                         <GridCell
                           key={evalCallId}
                           style={{
                             borderBottom:
-                              metricNdx === Object.keys(def.metrics).length - 1
+                              metricNdx ===
+                              Object.keys(group.metrics).length - 1
                                 ? '1px solid #ccc'
                                 : '',
                           }}>
@@ -407,20 +435,29 @@ export const ScorecardSection: React.FC<{
                                 style={{
                                   minWidth: '70px',
                                 }}>
-                                <ValueViewNumber
+                                <CellValue value={value} />
+                                {/* <ValueViewNumber
                                   fractionDigits={SIGNIFICANT_DIGITS}
                                   value={value}
-                                />
-                                {def.metrics[metricKey].unit}
+                                /> */}
+                                {group.metrics[metricKey]
+                                  .scorerAgnosticMetricDef.unit ?? ''}
                               </span>
-                              <ComparisonPill
-                                value={value}
-                                baseline={baseline}
-                                metricUnit={def.metrics[metricKey].unit}
-                                metricLowerIsBetter={
-                                  def.metrics[metricKey].lowerIsBetter
-                                }
-                              />
+                              {dataIsNumber && (
+                                <ComparisonPill
+                                  value={value}
+                                  baseline={baseline}
+                                  metricUnit={
+                                    group.metrics[metricKey]
+                                      .scorerAgnosticMetricDef.unit ?? ''
+                                  }
+                                  metricLowerIsBetter={
+                                    group.metrics[metricKey]
+                                      .scorerAgnosticMetricDef.shouldMinimize ??
+                                    false
+                                  }
+                                />
+                              )}
                             </HorizontalBox>
                           ) : (
                             <NotApplicable />

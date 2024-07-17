@@ -1,10 +1,7 @@
 import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
-import {
-  buildCompositeMetricsMap,
-  resolvePeerDimension,
-} from '../../compositeMetricsUtil';
+import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
   PLOT_HEIGHT,
@@ -14,7 +11,10 @@ import {
 } from '../../ecpConstants';
 import {getOrderedCallIds} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
-import {resolveSummaryMetricValueForEvaluateCall} from '../../ecpUtil';
+import {
+  flattenedDimensionPath,
+  resolveSummaryMetricValueForEvaluateCall,
+} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
@@ -127,8 +127,9 @@ const useNormalizedPlotDataFromMetrics = (
             callIds.map((key, i) => [key, normalizedValues[i]])
           );
 
-        const metricLabel =
-          Object.values(metric.scorerRefs)[0].metric.metricSubPath[0] ?? '';
+        const metricLabel = flattenedDimensionPath(
+          Object.values(metric.scorerRefs)[0].metric
+        );
         return {
           metricLabel,
           evalScores,

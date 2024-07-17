@@ -175,8 +175,6 @@ const fetchEvaluationComparisonData = async (
       const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
         if (isBinarySummaryScore(scoreVal)) {
           const metricDimension: MetricDefinition = {
-            // dimensionType: 'scorerMetric',
-            // scorerDef: {...scorerDef},
             scoreType: 'binary',
             metricSubPath: currPath,
             source: 'scorer',
@@ -186,7 +184,7 @@ const fetchEvaluationComparisonData = async (
           result.summaryMetrics[metricId] = metricDimension;
           evalCall.summaryMetrics[metricId] = {
             value: scoreVal.true_fraction,
-            // TODO: WOuld be nicer if this was the actual summary call itself
+            // Later on this will be updated to the Summary or CustomScorer's Summary Call
             sourceCallId: evalCallId,
           };
         } else if (isContinuousSummaryScore(scoreVal)) {
@@ -200,7 +198,7 @@ const fetchEvaluationComparisonData = async (
           result.summaryMetrics[metricId] = metricDimension;
           evalCall.summaryMetrics[metricId] = {
             value: scoreVal.mean,
-            // TODO: WOuld be nicer if this was the actual summary call itself
+            // Later on this will be updated to the Summary or CustomScorer's Summary Call
             sourceCallId: evalCallId,
           };
         } else if (typeof scoreVal === 'boolean') {
@@ -214,7 +212,7 @@ const fetchEvaluationComparisonData = async (
           result.summaryMetrics[metricId] = metricDimension;
           evalCall.summaryMetrics[metricId] = {
             value: scoreVal,
-            // TODO: WOuld be nicer if this was the actual summary call itself
+            // Later on this will be updated to the Summary or CustomScorer's Summary Call
             sourceCallId: evalCallId,
           };
         } else if (typeof scoreVal === 'number') {
@@ -228,7 +226,7 @@ const fetchEvaluationComparisonData = async (
           result.summaryMetrics[metricId] = metricDimension;
           evalCall.summaryMetrics[metricId] = {
             value: scoreVal,
-            // TODO: WOuld be nicer if this was the actual summary call itself
+            // Later on this will be updated to the Summary or CustomScorer's Summary Call
             sourceCallId: evalCallId,
           };
         } else if (
@@ -518,7 +516,9 @@ const fetchEvaluationComparisonData = async (
 
               recursiveAddScore(results, []);
             } else {
-              // pass
+              // TODO: Update the SourceCall for auto-generated metrics to the summarizer
+              // TODO: Update the SourceCall for custom metrics to the summary call of the custom scorer
+              console.log("Couldn't determine if this was a predict or score", traceCall)
             }
           }
         }

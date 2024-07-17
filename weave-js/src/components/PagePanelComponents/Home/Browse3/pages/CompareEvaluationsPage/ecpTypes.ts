@@ -3,8 +3,10 @@
  * * Really try to cleanup the code - specifically:
  *    * there is a lot of slopiness with react memoing
  *    * There is a lot of slopiness in symbol names and files
- * * // TODO: Verify this fallback is correct - i think this is not correct
- * * Audit all the source call ids (sourceCallId:)
+ * *  // TODO: Update the SourceCall for auto-generated metrics to the summarizer
+ * *  // TODO: Update the SourceCall for custom metrics to the summary call of the custom scorer
+ * * Add click ability to the summary metrics
+             
  * * See all code TODOs
  * * Remember to cleanup unused symbols (knip)
  *  * Test each of the example pages

@@ -11,6 +11,8 @@
  * evaluations, so we need to be able to resolve the correct metric for a given
  * evaluation.
  */
+import _ from 'lodash';
+
 import {
   EvaluationComparisonData,
   getScoreKeyNameFromScorerRef,
@@ -22,6 +24,7 @@ import {flattenedDimensionPath} from './ecpUtil';
 export const DERIVED_SCORER_REF = '__DERIVED__';
 
 export type CompositeSummaryMetricGroupKeyPath = {
+  scorerAgnosticMetricDef: Omit<MetricDefinition, 'scorerOpOrObjRef'>;
   scorerRefs: {
     [scoreRef: string]: {
       evalCallIds: string[];
@@ -62,9 +65,37 @@ export const resolvePeerDimension = (
 ): MetricDefinition | undefined => {
   const groupName = groupNameForMetric(peerDimension);
   const keyPath = flattenedDimensionPath(peerDimension);
+  return resolveDimension(
+    compositeScoreMetrics,
+    evalCallId,
+    groupName,
+    keyPath
+  );
+};
+
+export const resolveDimension = (
+  compositeScoreMetrics: CompositeScoreMetrics,
+  evalCallId: string,
+  groupName: string,
+  keyPath: string
+): MetricDefinition | undefined => {
   return Object.values(
     compositeScoreMetrics[groupName].metrics[keyPath].scorerRefs
   ).find(scorerRef => scorerRef.evalCallIds.includes(evalCallId))?.metric;
+};
+
+export const evalCallIdToScorerRefs = (
+  metricGroup: CompositeScoreMetricGroup
+): {[evalCallId: string]: string} => {
+  const res: {[evalCallId: string]: string} = {};
+  Object.entries(metricGroup.metrics).forEach(([keyPath, scorerRefs]) => {
+    Object.entries(scorerRefs.scorerRefs).forEach(
+      ([scorerRef, {evalCallIds}]) => {
+        evalCallIds.forEach(evalCallId => (res[evalCallId] = scorerRef));
+      }
+    );
+  });
+  return res;
 };
 
 const refForMetric = (metric: MetricDefinition): string => {
@@ -113,6 +144,7 @@ export const buildCompositeMetricsMap = (
 
     if (!metricGroup.metrics[keyPath]) {
       metricGroup.metrics[keyPath] = {
+        scorerAgnosticMetricDef: _.omit(metric, 'scorerOpOrObjRef'),
         scorerRefs: {},
       };
     }
