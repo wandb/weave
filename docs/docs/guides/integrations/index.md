@@ -10,6 +10,7 @@ Weave contains automatic logging integrations for popular LLMs and orchestration
   - **[DSPy](/guides/integrations/dspy)**
   - **[Google Gemini](/guides/integrations/google-gemini)**
   - **[Together AI](/guides/integrations/together_ai)**
+  - **[Groq](/guides/integrations/groq)**
   - **[Open Router](/guides/integrations/openrouter)**
   - **[Local Models](/guides/integrations/local_models)**
   - **[LiteLLM](/guides/integrations/litellm)**

@@ -93,7 +93,7 @@ examples = [
 
 Here, we'll use a default scoring class `MultiTaskBinaryClassificationF1` and we'll also define our own `fruit_name_score` scoring function.
 
-Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions. The `fruit` key needs to be outputed by the model's predict function and must also be existing as a column in the dataset (or outputed by the `preprocess_model_input` function if defined).
+Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions. The `fruit` key needs to be outputted by the model's predict function and must also be existing as a column in the dataset (or outputted by the `preprocess_model_input` function if defined).
 
 ```python
 import weave
@@ -108,11 +108,11 @@ def fruit_name_score(target: dict, model_output: dict) -> dict:
 # highlight-next-line
 evaluation = weave.Evaluation(
     # highlight-next-line
-    dataset=examples, 
+    dataset=examples,
     # highlight-next-line
     scorers=[
         # highlight-next-line
-        MultiTaskBinaryClassificationF1(class_names=["fruit", "color", "flavor"]), 
+        MultiTaskBinaryClassificationF1(class_names=["fruit", "color", "flavor"]),
         # highlight-next-line
         fruit_name_score
     # highlight-next-line
@@ -125,7 +125,7 @@ print(asyncio.run(evaluation.evaluate(model)))
 # await evaluation.evaluate(model)
 ```
 
-In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information. 
+In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information.
 
 ## 4. Pulling it all together
 
