@@ -106,10 +106,7 @@ export type MetricValueType = BinaryValue | ContinuousValue;
 
 export type MetricResult = {
   value: MetricValueType;
-  sourceCall: {
-    callId: string;
-    _rawTraceData: TraceCallSchema;
-  };
+  sourceCallId: string;
 };
 
 export type EvaluationEvaluateCallSchema = TraceCallSchema & {

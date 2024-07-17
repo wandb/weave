@@ -107,9 +107,11 @@ const SingleDimensionFilter: React.FC<{
   )!;
 
   const targetComparisonDimension =
-    props.state.comparisonDimensions?.[props.dimensionIndex]!;
-  const targetDimension =
-    props.state.data.summaryMetrics[targetComparisonDimension.metricId];
+    props.state.comparisonDimensions?.[props.dimensionIndex];
+
+  const targetDimension = targetComparisonDimension
+    ? props.state.data.summaryMetrics[targetComparisonDimension.metricId]
+    : undefined;
 
   const xIsPercentage = targetDimension?.scoreType === 'binary';
   const yIsPercentage = targetDimension?.scoreType === 'binary';
@@ -300,10 +302,11 @@ const DimensionPicker: React.FC<{
     [props.state]
   );
   const targetComparisonDimension =
-    props.state.comparisonDimensions?.[props.dimensionIndex]!;
+    props.state.comparisonDimensions?.[props.dimensionIndex];
 
-  const currDimension =
-    props.state.data.scoreMetrics[targetComparisonDimension.metricId];
+  const currDimension = targetComparisonDimension
+    ? props.state.data.scoreMetrics[targetComparisonDimension.metricId]
+    : undefined;
   const {setComparisonDimensions} = useCompareEvaluationsState();
 
   const dimensionMap: {[dimensionId: string]: MetricDefinition} =

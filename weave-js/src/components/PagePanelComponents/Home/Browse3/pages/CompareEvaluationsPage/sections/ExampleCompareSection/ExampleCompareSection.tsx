@@ -20,7 +20,6 @@ import {useWeaveflowRouteContext} from '../../../../context';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
 import {isRef} from '../../../common/util';
-import {TraceCallSchema} from '../../../wfReactInterface/traceServerClient';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {
@@ -228,13 +227,16 @@ export const ExampleCompareSection: React.FC<{
   const {peekingRouter} = useWeaveflowRouteContext();
 
   const onScorerClick = useCallback(
-    (scorerCall: TraceCallSchema) => {
-      const [entityName, projectName] = scorerCall.project_id.split('/');
-      const callId = scorerCall.id;
-      const to = peekingRouter.callUIUrl(entityName, projectName, '', callId);
+    (callId: string) => {
+      const to = peekingRouter.callUIUrl(
+        props.state.data.entity,
+        props.state.data.project,
+        '',
+        callId
+      );
       history.push(to);
     },
-    [history, peekingRouter]
+    [history, peekingRouter, props.state.data.entity, props.state.data.project]
   );
 
   const {ref1, ref2} = useLinkHorizontalScroll();
@@ -627,8 +629,7 @@ export const ExampleCompareSection: React.FC<{
     }
     return () =>
       onScorerClick(
-        targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCall
-          ._rawTraceData
+        targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCallId
       );
   };
 

@@ -185,11 +185,8 @@ const fetchEvaluationComparisonData = async (
           result.summaryMetrics[metricId] = metricDimension;
           evalCall.summaryMetrics[metricId] = {
             value: scoreVal.true_fraction,
-            sourceCall: {
-              // TODO: WOuld be nicer if this was the actual summary call itself
-              callId: evalCallId,
-              _rawTraceData: evalCall._rawEvaluationTraceData,
-            },
+            // TODO: WOuld be nicer if this was the actual summary call itself
+            sourceCallId: evalCallId,
           };
         } else if (isContinuousSummaryScore(scoreVal)) {
           const metricDimension: MetricDefinition = {
@@ -202,11 +199,8 @@ const fetchEvaluationComparisonData = async (
           result.summaryMetrics[metricId] = metricDimension;
           evalCall.summaryMetrics[metricId] = {
             value: scoreVal.mean,
-            sourceCall: {
-              // TODO: WOuld be nicer if this was the actual summary call itself
-              callId: evalCallId,
-              _rawTraceData: evalCall._rawEvaluationTraceData,
-            },
+            // TODO: WOuld be nicer if this was the actual summary call itself
+            sourceCallId: evalCallId,
           };
         } else if (
           scoreVal != null &&
@@ -234,10 +228,7 @@ const fetchEvaluationComparisonData = async (
       };
       evalCall.summaryMetrics[metricId] = {
         value: model_latency.mean,
-        sourceCall: {
-          callId: evalCallId,
-          _rawTraceData: evalCall._rawEvaluationTraceData,
-        },
+        sourceCallId: evalCallId,
       };
     }
 
@@ -256,10 +247,7 @@ const fetchEvaluationComparisonData = async (
       };
       evalCall.summaryMetrics[metricId] = {
         value: totalTokens,
-        sourceCall: {
-          callId: evalCallId,
-          _rawTraceData: evalCall._rawEvaluationTraceData,
-        },
+        sourceCallId: evalCallId,
       };
     }
   });
@@ -433,10 +421,7 @@ const fetchEvaluationComparisonData = async (
                   ).getTime() -
                     convertISOToDate(traceCall.started_at).getTime()) /
                   1000, // why is this different than the predictandscore model latency?
-                sourceCall: {
-                  callId: traceCall.id,
-                  _rawTraceData: traceCall,
-                },
+                sourceCallId: traceCall.id,
               };
 
               // Add total tokens
@@ -450,10 +435,7 @@ const fetchEvaluationComparisonData = async (
               );
               predictAndScoreFinal.scoreMetrics[totalTokensmetricId] = {
                 value: totalTokens,
-                sourceCall: {
-                  callId: traceCall.id,
-                  _rawTraceData: traceCall,
-                },
+                sourceCallId: traceCall.id,
               };
             } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
               const results = traceCall.output as any;
@@ -474,10 +456,7 @@ const fetchEvaluationComparisonData = async (
                   const metricId = metricDefinitionId(metricDimension);
                   result.scoreMetrics[metricId] = metricDimension;
                   predictAndScoreFinal.scoreMetrics[metricId] = {
-                    sourceCall: {
-                      callId: traceCall.id,
-                      _rawTraceData: traceCall,
-                    },
+                    sourceCallId: traceCall.id,
                     value: scoreVal,
                   };
                 } else if (isContinuousScore(scoreVal)) {
@@ -491,10 +470,7 @@ const fetchEvaluationComparisonData = async (
                   result.scoreMetrics[metricId] = metricDimension;
 
                   predictAndScoreFinal.scoreMetrics[metricId] = {
-                    sourceCall: {
-                      callId: traceCall.id,
-                      _rawTraceData: traceCall,
-                    },
+                    sourceCallId: traceCall.id,
                     value: scoreVal,
                   };
                 } else if (
