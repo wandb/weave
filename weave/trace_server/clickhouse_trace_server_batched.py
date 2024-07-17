@@ -725,9 +725,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[
-                str, list[refs_internal.InternalObjectRef]
-            ] = defaultdict(list)
+            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
+                defaultdict(list)
+            )
             for ref in refs:
                 refs_by_project_id[ref.project_id].append(ref)
             for project_id, project_refs in refs_by_project_id.items():
