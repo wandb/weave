@@ -55,7 +55,7 @@ const dimensionKeys = (
   };
 };
 
-export type ResolvePeerDimensionFn = (
+type ResolvePeerDimensionFn = (
   evalCallId: string,
   peerDimension: MetricDefinition
 ) => MetricDefinition | undefined;

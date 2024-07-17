@@ -41,13 +41,7 @@ const groupNameForMetric = (metric: MetricDefinition): string => {
   return groupName;
 };
 
-export type ResolvePeerDimensionFn2 = (
-  compositeScoreMetrics: CompositeScoreMetrics,
-  evalCallId: string,
-  peerDimension: MetricDefinition
-) => MetricDefinition | undefined;
-
-export const resolvePeerDimension: ResolvePeerDimensionFn2 = (
+export const resolvePeerDimension = (
   compositeScoreMetrics: CompositeScoreMetrics,
   evalCallId: string,
   peerDimension: MetricDefinition
