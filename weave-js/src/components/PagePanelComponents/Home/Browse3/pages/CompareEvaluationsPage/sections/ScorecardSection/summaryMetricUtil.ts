@@ -43,15 +43,15 @@ const dimensionKeys = (
   let scorerGroupName = '';
   if (dimension.source === 'derived') {
     scorerGroupName = DERIVED_SCORER_REF;
-  } else if (dimension.source === 'model_output') {
-    scorerGroupName = OUTPUT_SCORER_REF;
-  } else {
+  } else if (dimension.source === 'scorer') {
     if (dimension.scorerOpOrObjRef == null) {
       throw new Error('scorerOpOrObjRef must be defined for scorer metric');
     }
     scorerGroupName = getScoreKeyNameFromScorerRef(dimension.scorerOpOrObjRef);
+  } else {
+    throw new Error(`Unknown metric source: ${dimension.source}`);
   }
-  return {
+  return { 
     scorerGroupName,
     dimensionPath: flattenedDimensionPath(dimension),
   };
@@ -79,9 +79,7 @@ export const buildCompositeComparisonSummaryMetrics = (
           if (scorerMetricsDimension != null) {
             const dimKeys = dimensionKeys(scorerMetricsDimension);
             let scorerRef = '';
-            if (scorerMetricsDimension.source === 'model_output') {
-              scorerRef = OUTPUT_SCORER_REF;
-            } else if (scorerMetricsDimension.source === 'derived') {
+            if (scorerMetricsDimension.source === 'derived') {
               scorerRef = DERIVED_SCORER_REF;
             } else if (scorerMetricsDimension.source === 'scorer') {
               if (scorerMetricsDimension.scorerOpOrObjRef == null) {

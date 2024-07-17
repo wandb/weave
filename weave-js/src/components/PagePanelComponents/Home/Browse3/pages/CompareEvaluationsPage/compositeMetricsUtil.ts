@@ -33,9 +33,7 @@ export type CompositeScoreMetrics = {
 const groupNameForMetric = (metric: MetricDefinition): string => {
   let groupName = '';
 
-  if (metric.source === 'model_output') {
-    groupName = OUTPUT_SCORER_REF;
-  } else if (metric.source === 'derived') {
+  if (metric.source === 'derived') {
     groupName = DERIVED_SCORER_REF;
   } else if (metric.source === 'scorer') {
     if (metric.scorerOpOrObjRef == null) {
@@ -66,9 +64,7 @@ export const resolvePeerDimension: ResolvePeerDimensionFn2 = (
 
 const refForMetric = (metric: MetricDefinition): string => {
   let ref = '';
-  if (metric.source === 'model_output') {
-    ref = OUTPUT_SCORER_REF;
-  } else if (metric.source === 'derived') {
+  if (metric.source === 'derived') {
     ref = DERIVED_SCORER_REF;
   } else if (metric.source === 'scorer') {
     if (metric.scorerOpOrObjRef == null) {

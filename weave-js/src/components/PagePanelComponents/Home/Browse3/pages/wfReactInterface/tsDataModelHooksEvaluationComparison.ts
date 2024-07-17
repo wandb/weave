@@ -245,8 +245,6 @@ const fetchEvaluationComparisonData = async (
       recursiveAddScore(score, []);
     });
 
-    // TODO: Add Model Output Summary Here
-
     // Add the derived metrics
     // Model latency
     const model_latency = evalCall._rawEvaluationTraceData.output.model_latency;
@@ -442,7 +440,6 @@ const fetchEvaluationComparisonData = async (
               ];
 
             if (isProbablyPredictCall) {
-              // TODO: Add Model Output Scores Here
               predictAndScoreFinal._rawPredictTraceData = traceCall;
 
               // Add model latency and tokens

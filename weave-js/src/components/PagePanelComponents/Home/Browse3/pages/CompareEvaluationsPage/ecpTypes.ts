@@ -1,6 +1,5 @@
 /**
  * TODO:
- * * Add Model Metrics to the entire system: collect them in the hooks & display them in the UI
  * * Test each of the example pages
  * * Really try to cleanup the code - specifically:
  *    * the summary metrics scorecard and the comparison view now have a lot of similar code
@@ -122,7 +121,7 @@ export const isContinuousScore = (score: any): score is ContinuousValue => {
   return typeof score === 'number';
 };
 
-type SourceType = 'derived' | 'scorer' | 'model_output';
+type SourceType = 'derived' | 'scorer'; // In the future, we can add `model_output` to capture self-reported model metrics
 export type MetricType = 'score' | 'summary';
 
 export type MetricDefinition = {
@@ -142,8 +141,6 @@ export const metricDefinitionId = (metricDef: MetricDefinition): string => {
     .join('.');
   if (metricDef.source === 'derived') {
     return `derived#${path}`;
-  } else if (metricDef.source === 'model_output') {
-    return `model_output#${path}`;
   } else if (metricDef.source === 'scorer') {
     if (metricDef.scorerOpOrObjRef == null) {
       throw new Error('scorerOpOrObjRef must be defined for scorer metric');
