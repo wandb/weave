@@ -677,9 +677,7 @@ const isBinaryScore = (score: any): score is boolean => {
   return typeof score === 'boolean';
 };
 
-export const isBinarySummaryScore = (
-  score: any
-): score is BinarySummaryScore => {
+const isBinarySummaryScore = (score: any): score is BinarySummaryScore => {
   return (
     typeof score === 'object' &&
     score != null &&
@@ -688,7 +686,7 @@ export const isBinarySummaryScore = (
   );
 };
 
-export const isContinuousSummaryScore = (
+const isContinuousSummaryScore = (
   score: any
 ): score is ContinuousSummaryScore => {
   return typeof score === 'object' && score != null && 'mean' in score;
@@ -699,16 +697,16 @@ const isContinuousScore = (score: any): score is number => {
 };
 ///
 
-export type BinarySummaryScore = {
+type BinarySummaryScore = {
   true_count: number;
   true_fraction: number;
 };
 
-export type ContinuousSummaryScore = {
+type ContinuousSummaryScore = {
   mean: number;
 };
 
-export type EvaluationEvaluateCallSchema = TraceCallSchema & {
+type EvaluationEvaluateCallSchema = TraceCallSchema & {
   inputs: TraceCallSchema['inputs'] & {
     self: string;
     model: string;

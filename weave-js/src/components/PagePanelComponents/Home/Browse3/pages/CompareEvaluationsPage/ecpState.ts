@@ -31,7 +31,7 @@ export type ComparisonDimensionsType = Array<{
   rangeSelection?: RangeSelection;
 }>;
 
-export type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
+type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
 
 /**
  * Fetches the data and populates some default values for the state object. THis is the primary
