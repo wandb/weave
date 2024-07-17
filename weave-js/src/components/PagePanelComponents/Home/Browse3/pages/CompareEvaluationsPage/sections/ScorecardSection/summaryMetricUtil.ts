@@ -14,7 +14,7 @@ export const DERIVED_SCORER_REF = '__DERIVED__';
 // TODO: Make a section for this!
 export const OUTPUT_SCORER_REF = '__MODEL_OUTPUT__';
 
-export type CompositeSummaryMetric = {
+type CompositeSummaryMetric = {
   scorerRefToDimensionId: {[scorerRef: string]: string};
   metricLabel: string;
   unit: string;
@@ -22,7 +22,7 @@ export type CompositeSummaryMetric = {
   evalScores: {[evalCallId: string]: number | undefined};
 };
 
-export type CompositeSummaryScoreGroup = {
+type CompositeSummaryScoreGroup = {
   evalCallIdToScorerRef: {[evalCallId: string]: string}; // multiple means we might not have apples to apples comparison
   scorerName: string;
   metrics: {
