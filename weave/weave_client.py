@@ -91,7 +91,10 @@ def get_ref(obj: Any) -> Optional[ObjectRef]:
 
 def remove_ref(obj: Any) -> None:
     if get_ref(obj) is not None:
-        obj.ref = None
+        if "ref" in obj.__dict__:  # for methods
+            obj.__dict__["ref"] = None
+        else:
+            obj.ref = None
 
 
 def _get_direct_ref(obj: Any) -> Optional[Ref]:

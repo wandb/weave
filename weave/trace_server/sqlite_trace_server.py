@@ -545,7 +545,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             # first get version count
             cursor.execute(
                 """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
-                (req.obj.project_id, req_obj.object_id),
+                (req_obj.project_id, req_obj.object_id),
             )
             version_index = cursor.fetchone()[0]
 

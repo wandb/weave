@@ -3,6 +3,7 @@ import dataclasses
 import json
 import re
 import signal
+from typing import Callable
 
 import pydantic
 import pytest
@@ -504,11 +505,14 @@ def test_op_mismatch_project_ref(client):
 def test_object_mismatch_project_ref(client):
     client.project = "test-project"
 
-    class MyObject:
-        def __init__(self, value):
-            self.value = value
+    class MyModel(weave.Model):
+        prompt: str
 
-    obj = MyObject(10)
+        @weave.op()
+        def predict(self, input):
+            return self.prompt.format(input=input)
+
+    obj = MyModel(prompt="input is: {input}")
     ref = client._save_object(obj, "my-object")
     assert ref.project == "test-project"
 
@@ -530,14 +534,17 @@ def test_object_mismatch_project_ref_nested(client):
 
     client.project = "test-project2"
 
-    nested = {"a": hello_world}
+    class MyObject(weave.Object):
+        hello_world: Callable
+
+    nested = MyObject(hello_world=hello_world)
     ref2 = client._save_object(nested, "my-object")
     assert ref2.project == "test-project2"
 
     out = client.get(ref2)
-    assert isinstance(out["a"], OpRef)
-    assert out["a"].name == "op-hello-world"
-    assert out["a"].project_id == "shawn/test-project2"
+    assert isinstance(out.hello_world, OpRef)
+    assert out.hello_world.name == "op-hello-world"
+    assert out.hello_world.project_id == "shawn/test-project2"
 
 
 def test_saveload_customtype(client, strict_op_saving):
