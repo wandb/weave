@@ -15,7 +15,6 @@ from weave.trace import box
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
-from weave.trace.op import Op
 
 if TYPE_CHECKING:
     from weave.trace.op import Op
@@ -163,7 +162,7 @@ def create_call(func: "Op", *args: Any, **kwargs: Any) -> "Call":
     )
 
 
-async def _call_async(op: Op, *args: Any, **kwargs: Any) -> Any:
+async def _call_async(op: "Op", *args: Any, **kwargs: Any) -> Any:
     _call = create_call(op, *args, **kwargs)
     try:
         return await _execute_call_async(op, _call, *args, **kwargs)
@@ -174,7 +173,7 @@ async def _call_async(op: Op, *args: Any, **kwargs: Any) -> Any:
         return _call
 
 
-def _call_sync(op: Op, *args: Any, **kwargs: Any) -> Any:
+def _call_sync(op: "Op", *args: Any, **kwargs: Any) -> Any:
     _call = create_call(op, *args, **kwargs)
     try:
         return _execute_call_sync(op, _call, *args, **kwargs)

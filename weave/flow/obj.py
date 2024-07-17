@@ -1,3 +1,4 @@
+import inspect
 from functools import partial
 from typing import Any, Optional
 
@@ -9,7 +10,8 @@ from pydantic import (
     model_validator,
 )
 
-from weave.trace.op import ObjectRef, Op, call
+from weave.trace.call import _call_async, _call_sync
+from weave.trace.op import ObjectRef, Op
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.weave_client import get_ref
 
@@ -80,7 +82,12 @@ class Object(BaseModel):
         for k in dir(self):
             if not k.startswith("__") and isinstance(getattr(self, k), Op):
                 op = getattr(self, k)
-                op.__dict__["call"] = partial(call, op, self)
+                if inspect.iscoroutinefunction(op.resolve_fn):
+                    call = partial(_call_async, op, self)
+                else:
+                    call = partial(_call_sync, op, self)
+
+                op.__dict__["call"] = call
 
 
 # Enable ref tracking for Weave.Object
