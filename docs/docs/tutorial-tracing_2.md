@@ -126,9 +126,9 @@ After initialising the weave client, you can then use use the call ID to retriev
 ```python
 import weave
 
-client = weave.init("morgan/jurassic-park")
+weave_client = weave.init("morgan/jurassic-park")
 # highlight-next-line
-call = client.call("dce2d44c-9b7d-457b-90ae-62d7e4b3aa58")
+call = weave_client.call("dce2d44c-9b7d-457b-90ae-62d7e4b3aa58")
 ```
 
 Export one of the call outputs:
