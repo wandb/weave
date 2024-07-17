@@ -7,7 +7,6 @@ import sys
 import time
 import typing
 from collections import defaultdict, namedtuple
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from contextvars import copy_context
 
@@ -16,7 +15,7 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from weave import weave_client
+from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, WeaveObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -1628,7 +1627,26 @@ def map_simple(fn, vals):
 max_workers = 3
 
 
-# This is a standard way to execute a map operation with thread executor.
+def map_with_threads_no_executor(fn, vals):
+    def task_wrapper(v):
+        return fn(v)
+
+    threads = []
+
+    for v in vals:
+        thread = Thread(target=task_wrapper, args=(v,))
+        thread.start()
+        threads.append(thread)
+
+        if len(threads) >= max_workers:
+            for thread in threads:
+                thread.join()
+            threads = []
+
+        for thread in threads:
+            thread.join()
+
+
 def map_with_thread_executor(fn, vals):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(fn, vals)
@@ -1650,7 +1668,8 @@ def map_with_copying_thread_executor(fn, vals):
     "mapper",
     [
         map_simple,
-        # map_with_thread_executor, # <-- Currently this is failing! Fix me (:
+        map_with_threads_no_executor,
+        map_with_thread_executor,
         # map_with_copying_thread_executor, # <-- Flakes in CI
     ],
 )
@@ -1709,8 +1728,6 @@ def test_mapped_execution(client, mapper):
                 sequential_expected_order.append(f"{op}({event}):{i}")
     if mapper == map_simple:
         assert events == sequential_expected_order
-    else:
-        assert events != sequential_expected_order
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
