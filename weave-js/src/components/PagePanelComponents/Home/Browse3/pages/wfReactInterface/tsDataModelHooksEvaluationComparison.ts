@@ -22,6 +22,7 @@ import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
   EvaluationComparisonData,
   EvaluationEvaluateCallSchema,
+  getScoreKeyNameFromScorerRef,
   isBinaryScore,
   isBinarySummaryScore,
   isContinuousScore,
@@ -166,6 +167,7 @@ const fetchEvaluationComparisonData = async (
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
       const score = evalCall._rawEvaluationTraceData.output[scorerKey];
+      console.log('scorerKey', scorerKey, scorerRef, score);
       // const scorerDef: ScorerDefinition = {
       //   scorerOpOrObjRef: scorerRef,
       //   likelyTopLevelKeyName: scorerKey,
@@ -199,6 +201,34 @@ const fetchEvaluationComparisonData = async (
           result.summaryMetrics[metricId] = metricDimension;
           evalCall.summaryMetrics[metricId] = {
             value: scoreVal.mean,
+            // TODO: WOuld be nicer if this was the actual summary call itself
+            sourceCallId: evalCallId,
+          };
+        } else if (typeof scoreVal === 'boolean') {
+          const metricDimension: MetricDefinition = {
+            scoreType: 'binary',
+            metricSubPath: currPath,
+            source: 'scorer',
+            scorerOpOrObjRef: scorerRef,
+          };
+          const metricId = metricDefinitionId(metricDimension);
+          result.summaryMetrics[metricId] = metricDimension;
+          evalCall.summaryMetrics[metricId] = {
+            value: scoreVal,
+            // TODO: WOuld be nicer if this was the actual summary call itself
+            sourceCallId: evalCallId,
+          };
+        } else if (typeof scoreVal === 'number' ) {
+          const metricDimension: MetricDefinition = {
+            scoreType: 'continuous',
+            metricSubPath: currPath,
+            source: 'scorer',
+            scorerOpOrObjRef: scorerRef,
+          };
+          const metricId = metricDefinitionId(metricDimension);
+          result.summaryMetrics[metricId] = metricDimension;
+          evalCall.summaryMetrics[metricId] = {
+            value: scoreVal,
             // TODO: WOuld be nicer if this was the actual summary call itself
             sourceCallId: evalCallId,
           };
@@ -506,10 +536,7 @@ const fetchEvaluationComparisonData = async (
 
   return result;
 };
-const getScoreKeyNameFromScorerRef = (scorerRef: string) => {
-  const parsed = parseRef(scorerRef) as WeaveObjectRef;
-  return parsed.artifactName;
-};
+
 
 const modelLatencyMetricDimension: MetricDefinition = {
   source: 'derived',

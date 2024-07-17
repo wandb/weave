@@ -1,3 +1,4 @@
+import { parseRef, WeaveObjectRef } from '../../../../../../react';
 import {
   TraceCallSchema,
   TraceObjSchema,
@@ -227,4 +228,9 @@ export const getMetricIds = (
   return Object.fromEntries(
     Object.entries(metrics).filter(([k, v]) => v.source === source)
   );
+};
+
+export const getScoreKeyNameFromScorerRef = (scorerRef: string) => {
+  const parsed = parseRef(scorerRef) as WeaveObjectRef;
+  return parsed.artifactName;
 };

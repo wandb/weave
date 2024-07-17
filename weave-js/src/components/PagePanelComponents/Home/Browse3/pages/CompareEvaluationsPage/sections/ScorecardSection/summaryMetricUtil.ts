@@ -1,4 +1,4 @@
-import {EvaluationComparisonState, MetricDefinition} from '../../ecpTypes';
+import {EvaluationComparisonState, getScoreKeyNameFromScorerRef, MetricDefinition} from '../../ecpTypes';
 import {
   adjustValueForDisplay,
   dimensionUnit,
@@ -8,7 +8,7 @@ import {
 
 export const DERIVED_SCORER_REF = '__DERIVED__';
 // TODO: Make a section for this!
-const OUTPUT_SCORER_REF = '__MODEL_OUTPUT__';
+export const OUTPUT_SCORER_REF = '__MODEL_OUTPUT__';
 
 export type CompositeSummaryMetric = {
   scorerRefToDimensionId: {[scorerRef: string]: string};
@@ -42,7 +42,12 @@ const dimensionKeys = (
   } else if (dimension.source === 'model_output') {
     scorerGroupName = OUTPUT_SCORER_REF;
   } else {
-    scorerGroupName = dimension.metricSubPath[0];
+    if (dimension.scorerOpOrObjRef == null) {
+      throw new Error(
+        'scorerOpOrObjRef must be defined for scorer metric'
+      );
+    }
+    scorerGroupName = getScoreKeyNameFromScorerRef(dimension.scorerOpOrObjRef);
   }
   return {
     scorerGroupName,
