@@ -259,13 +259,10 @@ if st.button("Update Dataset"):
 
 In the following you can a screenshot of the simple annotation UI and of the resulting dataset.
 
-`TODO: add screenshots once the simplified annotoation UI and workspace are done`
-![Annotation UI](./static/img/annotation_ui.png)
-![Weave Dataset](../static/img/annotation_ui.png)
+![Annotation UI](../static/img/expert_annotation_ui.png)
+![Weave Dataset](../static/img/new_annotated_dataset_weave.png)
 
 ## 3. Run new Evaluation with the new Dataset
 After gathering new 👎 feedback and annotating it, we can now run our evaluation code again. This time we will use the new version of the evaluation dataset and use the comparison feature to understand how the impact of 👎 calls impacted the model performance. Of course it also makes sense to include positive annotated calls into the dataset to balance evaluation dataset. 
 
 For more information on the evaluation workflow see the [Evaluation](./tutorial-eval.md) tutorial for more details.
-
-`TODO: add link to the eval comparison here too`
