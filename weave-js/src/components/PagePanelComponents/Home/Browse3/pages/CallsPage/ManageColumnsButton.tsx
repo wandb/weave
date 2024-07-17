@@ -8,6 +8,7 @@ import {Switch} from '@wandb/weave/components';
 import classNames from 'classnames';
 import React, {useCallback, useRef, useState} from 'react';
 
+import {maybePluralize} from '../../../../../../core/util/string';
 import {Button} from '../../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../../DraggablePopups';
 import {TextField} from '../../../../../Form/TextField';
@@ -27,8 +28,19 @@ export const ManageColumnsButton = ({
   setColumnVisibilityModel,
 }: ManageColumnsButtonProps) => {
   const [search, setSearch] = useState('');
+  const lowerSearch = search.toLowerCase();
+  const filteredCols = search
+    ? columnInfo.cols.filter((col: GridColDef<TraceCallSchema>) => {
+        const value = col.field;
+        const label = col.headerName ?? value;
+        return label.toLowerCase().includes(lowerSearch);
+      })
+    : columnInfo.cols;
+  const numToggleable = filteredCols.filter(col => col.hideable ?? true).length;
+  const buttonSuffix = search ? `(${numToggleable})` : 'all';
+
   const ref = useRef<HTMLDivElement>(null);
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : ref.current);
     setSearch('');
@@ -36,6 +48,9 @@ export const ManageColumnsButton = ({
 
   const open = Boolean(anchorEl);
   const id = open ? 'simple-popper' : undefined;
+  const numHidden = Object.values(columnVisibilityModel).filter(
+    v => v === false
+  ).length;
 
   const toggleColumnShow = useCallback(
     (key: string) => {
@@ -49,22 +64,22 @@ export const ManageColumnsButton = ({
     [columnVisibilityModel, setColumnVisibilityModel]
   );
   const onHideAll = () => {
-    const newModel = columnInfo.cols.reduce((acc, col) => {
+    const newModel = {...columnVisibilityModel};
+    for (const col of filteredCols) {
       if (col.hideable ?? true) {
-        acc[col.field] = false;
+        newModel[col.field] = false;
       }
-      return acc;
-    }, {} as GridColumnVisibilityModel);
+    }
     setColumnVisibilityModel(newModel);
   };
   const onShowAll = () => {
-    const newModel = columnInfo.cols.reduce((acc, col) => {
+    const newModel = {...columnVisibilityModel};
+    for (const col of filteredCols) {
       // If a column is not hideable, we also don't need to explicitly show it.
       if (col.hideable ?? true) {
-        acc[col.field] = true;
+        newModel[col.field] = true;
       }
-      return acc;
-    }, {} as GridColumnVisibilityModel);
+    }
     setColumnVisibilityModel(newModel);
   };
 
@@ -100,21 +115,14 @@ export const ManageColumnsButton = ({
         onClose={() => setAnchorEl(null)}
         TransitionComponent={DraggableGrow}>
         <Tailwind>
-          <div className="min-w-[300px] p-12">
+          <div className="min-w-[360px] p-12">
             <DraggableHandle>
               <div className="flex items-center pb-8">
-                <div className="flex-auto font-semibold">Manage columns</div>
-                <div>
-                  <Button
-                    size="small"
-                    variant="ghost"
-                    icon="close"
-                    tooltip="Close column management"
-                    onClick={e => {
-                      e.stopPropagation();
-                      setAnchorEl(null);
-                    }}
-                  />
+                <div className="flex-auto text-xl font-semibold">
+                  Manage columns
+                </div>
+                <div className="ml-16 text-moon-500">
+                  {maybePluralize(numHidden, 'hidden column', 's')}
                 </div>
               </div>
             </DraggableHandle>
@@ -174,16 +182,18 @@ export const ManageColumnsButton = ({
                 size="small"
                 variant="quiet"
                 icon="hide-hidden"
+                disabled={numToggleable === 0}
                 onClick={onHideAll}>
-                Hide all
+                {`Hide ${buttonSuffix}`}
               </Button>
               <div className="flex-auto" />
               <Button
                 size="small"
                 variant="quiet"
                 icon="show-visible"
+                disabled={numToggleable === 0}
                 onClick={onShowAll}>
-                Show all
+                {`Show ${buttonSuffix}`}
               </Button>
             </div>
           </div>

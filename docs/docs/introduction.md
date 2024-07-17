@@ -15,7 +15,7 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 
 ![Weave Hero](../static/img/weave-hero.png)
 
-Seriously, try the 🍪 **[quickstart](/quickstart)** 🍪 or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Seriously, try the 🍪 **[quickstart](/quickstart)** 🍪 or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab" onClick={()=>{window.analytics?.track("Weave Docs: Quickstart colab clicked")}}><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 You can use Weave to:
 - Log and debug language model inputs, outputs, and traces
@@ -37,12 +37,22 @@ Weave's **tracking** layer brings immutable tracing and versioning to your progr
   - **[Objects](/guides/tracking/objects)**: Weave's extensible serialization lets you easily version, track, and share Python objects.
   - **[Ops](/guides/tracking/ops)**: Versioned, reproducible functions, with automatic tracing.
   - **[Tracing](/guides/tracking/tracing)**: Automatic organization of function calls and data lineage.
+  - **[Feedback](/guides/tracking/feedback)**: Simple utilities to capture user feedback and attach them to the underlying tracked call.
 
-Weave's **integrations** is a batteries-included experience for other libraries, systems, and best practices.
+
+Weave offers **integrations** with many language model APIs and LLM frameworks to streamline tracking and evaluation:
 
   - **[OpenAI](/guides/integrations/openai)**: automatic tracking for openai api calls
-  - [soon] Langchain auto-logging
-  - [soon] llama-index auto-logging
+  - **[Anthropic](/guides/integrations/anthropic)**
+  - **[Cohere](/guides/integrations/cohere)**
+  - **[MistralAI](/guides/integrations/mistral)**
+  - **[LlamaIndex](/guides/integrations/llamaindex)**
+  - **[DSPy](/guides/integrations/dspy)**
+  - **[Google Gemini](/guides/integrations/google-gemini)**
+  - **[Together AI](/guides/integrations/together_ai)**
+  - **[Open Router](/guides/integrations/openrouter)**
+  - **[Local Models](/guides/integrations/local_models)**
+  - **[LiteLLM](/guides/integrations/litellm)**
 
 Weave's **tools** layer contains utilities for making use of Weave objects.
   

@@ -19,7 +19,8 @@ from typing import (
 )
 
 from weave import call_context, client_context
-from weave.legacy import box, context_state
+from weave.legacy import context_state
+from weave.trace import box
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -196,12 +197,6 @@ def _execute_call(
         raise
     else:
         res = box.box(res)  # TODO: can we get rid of this?
-    # We cannot let BoxedNone or BoxedBool escape into the user's code
-    # since they cannot pass instance checks for None or bool.
-    if isinstance(res, box.BoxedNone):
-        res = None
-    if isinstance(res, box.BoxedBool):
-        res = res.val
 
     if inspect.iscoroutine(res):
         awaitable = res
@@ -342,7 +337,15 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
-            wrapper.name = func.__qualname__ if is_method else func.__name__  # type: ignore
+
+            name = func.__qualname__ if is_method else func.__name__
+
+            # funcs and methods defined inside another func will have the
+            # name prefixed with {outer}.<locals>.{func_name}
+            # this is noisy for us, so we strip it out
+            name = name.split(".<locals>.")[-1]
+
+            wrapper.name = name  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
@@ -372,6 +375,8 @@ def maybe_bind_method(func: Callable, self: Any = None) -> Union[Callable, Metho
     If self is None, return the function as is.
     """
     if (sig := inspect.signature(func)) and sig.parameters.get("self"):
+        if inspect.ismethod(func) and id(func.__self__) != id(self):
+            raise ValueError("Cannot re-bind a method to an new object")
         return MethodType(func, self)
     return func
 

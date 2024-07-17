@@ -1,9 +1,17 @@
 import dataclasses
 import datetime
-import inspect
 import typing
 import uuid
-from typing import Any, Dict, Optional, Sequence, TypedDict, Union, cast
+from functools import lru_cache
+from typing import (
+    Any,
+    Dict,
+    Iterator,
+    Optional,
+    Sequence,
+    TypedDict,
+    Union,
+)
 
 import pydantic
 from requests import HTTPError
@@ -76,7 +84,7 @@ def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
 
 def get_obj_name(val: Any) -> str:
     name = getattr(val, "name", None)
-    if name == None:
+    if name is None:
         if isinstance(val, ObjectRecord):
             name = val._class_name
         else:
@@ -208,37 +216,63 @@ class CallsIter:
         self.server = server
         self.project_id = project_id
         self.filter = filter
+        self._page_size = 10
 
-    def __getitem__(self, key: Union[slice, int]) -> WeaveObject:
+    # seems like this caching should be on the server, but it's here for now...
+    @lru_cache
+    def _fetch_page(self, index: int) -> list[CallSchema]:
+        # caching in here means that any other CallsIter objects would also
+        # benefit from the cache
+        response = self.server.calls_query(
+            CallsQueryReq(
+                project_id=self.project_id,
+                filter=self.filter,
+                offset=index * self._page_size,
+                limit=self._page_size,
+            )
+        )
+        return response.calls
+
+    def _get_one(self, index: int) -> WeaveObject:
+        if index < 0:
+            raise IndexError("Negative indexing not supported")
+
+        page_index = index // self._page_size
+        page_offset = index % self._page_size
+
+        calls = self._fetch_page(page_index)
+        if page_offset >= len(calls):
+            raise IndexError(f"Index {index} out of range")
+
+        call = calls[page_offset]
+        entity, project = self.project_id.split("/")
+        return make_client_call(entity, project, call, self.server)
+
+    def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
+        if (start := key.start or 0) < 0:
+            raise ValueError("Negative start not supported")
+        if (stop := key.stop) is not None and stop < 0:
+            raise ValueError("Negative stop not supported")
+        if (step := key.step or 1) < 0:
+            raise ValueError("Negative step not supported")
+
+        i = start
+        while stop is None or i < stop:
+            try:
+                yield self._get_one(i)
+            except IndexError:
+                break
+            i += step
+
+    def __getitem__(
+        self, key: Union[slice, int]
+    ) -> Union[WeaveObject, list[WeaveObject]]:
         if isinstance(key, slice):
-            raise NotImplementedError("Slicing not supported")
-        for i, call in enumerate(self):
-            if i == key:
-                return call
-        raise IndexError(f"Index {key} out of range")
+            return list(self._get_slice(key))
+        return self._get_one(key)
 
     def __iter__(self) -> typing.Iterator[WeaveObject]:
-        page_index = 0
-        page_size = 10
-        entity, project = self.project_id.split("/")
-        while True:
-            response = self.server.calls_query(
-                CallsQueryReq(
-                    project_id=self.project_id,
-                    filter=self.filter,
-                    offset=page_index * page_size,
-                    limit=page_size,
-                )
-            )
-            page_data = response.calls
-            for call in page_data:
-                # TODO: if we want to be able to refer to call outputs
-                # we need to yield a ref-tracking call here.
-                yield make_client_call(entity, project, call, self.server)
-                # yield make_trace_obj(call, ValRef(call.id), self.server, None)
-            if len(page_data) < page_size:
-                break
-            page_index += 1
+        return self._get_slice(slice(0, None, 1))
 
 
 def make_client_call(
@@ -737,10 +771,10 @@ class WeaveClient:
             name = op.name
         op_def_ref = self._save_object_basic(op, name)
 
-        if inspect.ismethod(op):
-            # this "func" is both a method AND an Op, but we need to cast to get dot access to its attributes
-            op = cast(op, Op)  # type: ignore
-        op.ref = op_def_ref  # type: ignore
+        # setattr(op, "ref", op_def_ref) fails here
+        # op.ref = op_def_ref fails here
+        # Seems to be the only way to set the ref on the op
+        op.__dict__["ref"] = op_def_ref
         return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()
