@@ -27,7 +27,6 @@ from weave.trace.refs import (
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
 from weave.trace_server.trace_server_interface import (
-    _ObjectVersionFilter,
     FileContentReadReq,
     FileCreateReq,
     RefsReadBatchReq,
