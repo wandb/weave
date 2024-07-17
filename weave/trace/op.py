@@ -209,37 +209,34 @@ def _execute_call(
 
     if inspect.iscoroutinefunction(func):
 
-        async def _call_async():
+        async def execute_async():
             call_context.push_call(call)
             try:
                 res = await func(*args, **kwargs)
+                return on_output(box.box(res))
             except Exception as e:
                 finish(exception=e)
                 if __should_raise:
                     raise
-                else:
-                    return call if __return_type == "call" else None
-            else:
-                res = box.box(res)
-                res2 = on_output(res)
-                return call if __return_type == "call" else res2
+                return None
             finally:
                 call_context.pop_call(call.id)
 
-        return _call_async()
+        result = execute_async()
     else:
+        call_context.push_call(call)
         try:
             res = func(*args, **kwargs)
+            result = on_output(box.box(res))
         except Exception as e:
             finish(exception=e)
             if __should_raise:
                 raise
-            else:
-                return call if __return_type == "call" else None
-        else:
-            res = box.box(res)
-            res2 = on_output(res)
-            return call if __return_type == "call" else res2
+            result = None
+        finally:
+            call_context.pop_call(call.id)
+
+    return call if __return_type == "call" else result
 
 
 def call(op: Op, *args: Any, **kwargs: Any) -> Any:
