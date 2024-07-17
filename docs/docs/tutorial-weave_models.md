@@ -7,6 +7,7 @@ hide_table_of_contents: true
 
 Tracking the [inputs, outputs, metadata](/tutorial-tracing_1) as well as [data flowing through your app](/tutorial-tracing_2) is critical to understanding the performance of your system. However **versioning your app over time** is also critial to understand how modifications to your code or app attributes change your outputs. Weave's `Model` class is how these changes can be tracked in Weave. 
 
+
 In this tutorial you'll learn:
 
 - How to use Weave `Model` to track and version your app and its attributes.
@@ -102,10 +103,3 @@ print(result)
 ## Exporting and re-using a logged `weave.Model`
 
 info
-
-Some undocumented Model things:
-custom init - pydantic doesn’t like you changing attributes in a custom init, there’s a workaround where you have to call super.init after
-Underscore attributes are ignored by weave (more of a gotcha)
-predict can be invoke and something else I can’t remember
-you have to wrap additional methods in weave.op
-You can “get” them - this is only mentioned in the Objects page
