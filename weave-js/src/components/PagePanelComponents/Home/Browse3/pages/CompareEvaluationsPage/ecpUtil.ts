@@ -1,3 +1,10 @@
+/**
+ * This file contains a handful of utilities for working with the `EvaluationComparisonData` destructure.
+ * These are mostly convenience functions for extracting and resolving metrics from the data, but also
+ * include some helper functions for working with the `MetricDefinition` objects and constructing
+ * strings correctly.
+ */
+
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {
   EvaluationCall,
@@ -5,6 +12,7 @@ import {
   MetricDefinition,
   MetricDefinitionMap,
   MetricResult,
+  MetricType,
   MetricValueType,
   PredictAndScoreCall,
   SourceType,
@@ -29,10 +37,6 @@ export const dimensionUnit = (
     return '%';
   }
   return dim.unit ?? '';
-};
-
-export const dimensionShouldMinimize = (dim: MetricDefinition): boolean => {
-  return dim.shouldMinimize ?? false;
 };
 
 export const resolveScoreMetricResultForPASCall = (
@@ -72,7 +76,6 @@ export const resolveSummaryMetricValueForEvaluateCall = (
   return undefined;
 };
 
-export type MetricType = 'score' | 'summary';
 export const getMetricIds = (
   data: EvaluationComparisonData,
   type: MetricType,

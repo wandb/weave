@@ -14,7 +14,7 @@
 import _ from 'lodash';
 
 import {EvaluationComparisonData, MetricDefinition} from './ecpTypes';
-import {MetricType} from './ecpUtil';
+import {MetricType} from './ecpTypes';
 import {getScoreKeyNameFromScorerRef} from './ecpUtil';
 import {flattenedDimensionPath} from './ecpUtil';
 

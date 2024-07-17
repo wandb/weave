@@ -128,6 +128,11 @@ export type PredictAndScoreCall = {
 };
 
 /**
+ * While not used in this file, used to differentiate between score and summary metrics.
+ */
+export type MetricType = 'score' | 'summary';
+
+/**
  * A metric definition map maps metric ids to metric definitions.
  */
 export type MetricDefinitionMap = {[metricId: string]: MetricDefinition};

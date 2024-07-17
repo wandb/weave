@@ -30,11 +30,7 @@ import {EvaluationComparisonState} from '../../ecpState';
 import {MetricDefinition, MetricValueType} from '../../ecpTypes';
 import {metricDefinitionId} from '../../ecpUtil';
 import {getMetricIds} from '../../ecpUtil';
-import {
-  dimensionShouldMinimize,
-  dimensionUnit,
-  flattenedDimensionPath,
-} from '../../ecpUtil';
+import {dimensionUnit, flattenedDimensionPath} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {
@@ -560,7 +556,7 @@ export const ExampleCompareSection: React.FC<{
       isBinary
     );
 
-    const lowerIsBetter = dimensionShouldMinimize(dimension);
+    const lowerIsBetter = dimension.shouldMinimize ?? false;
 
     if (summaryMetric == null) {
       return <NotApplicable />;
