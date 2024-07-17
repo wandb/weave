@@ -1,4 +1,5 @@
 import inspect
+import traceback
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -7,7 +8,6 @@ from typing import (
     Mapping,
     Optional,
     TypeVar,
-    Union,
 )
 
 from weave import call_context, client_context
@@ -15,6 +15,7 @@ from weave.trace import box
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
+from weave.trace.op import Op
 
 if TYPE_CHECKING:
     from weave.trace.op import Op
@@ -134,16 +135,6 @@ async def _execute_call_async(
         call_context.pop_call(call.id)
 
 
-def execute_call(
-    __op: "Op", call: "Call", *args: Any, **kwargs: Any
-) -> Union[T, Coroutine[Any, Any, T]]:
-    func = __op.resolve_fn
-    if inspect.iscoroutinefunction(func):
-        return _execute_call_async(__op, call, *args, **kwargs)
-    else:
-        return _execute_call_sync(__op, call, *args, **kwargs)
-
-
 def create_call(func: "Op", *args: Any, **kwargs: Any) -> "Call":
     client = client_context.weave_client.require_weave_client()
 
@@ -170,3 +161,25 @@ def create_call(func: "Op", *args: Any, **kwargs: Any) -> "Call":
         parent_call,
         attributes=attributes,
     )
+
+
+async def _call_async(op: Op, *args: Any, **kwargs: Any) -> Any:
+    _call = create_call(op, *args, **kwargs)
+    try:
+        return await _execute_call_async(op, _call, *args, **kwargs)
+    except Exception:
+        print("WARNING: Error executing call")
+        traceback.print_exc()
+    finally:
+        return _call
+
+
+def _call_sync(op: Op, *args: Any, **kwargs: Any) -> Any:
+    _call = create_call(op, *args, **kwargs)
+    try:
+        return _execute_call_sync(op, _call, *args, **kwargs)
+    except Exception:
+        print("WARNING: Error executing call")
+        traceback.print_exc()
+    finally:
+        return _call

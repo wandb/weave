@@ -1,5 +1,4 @@
 import inspect
-import traceback
 from functools import partial, wraps
 from types import MethodType
 from typing import (
@@ -17,7 +16,13 @@ from typing import (
 
 from weave import client_context
 from weave.legacy import context_state
-from weave.trace.call import _execute_call_async, _execute_call_sync, create_call
+from weave.trace.call import (
+    _call_async,
+    _call_sync,
+    _execute_call_async,
+    _execute_call_sync,
+    create_call,
+)
 from weave.trace.refs import ObjectRef
 
 if TYPE_CHECKING:
@@ -83,28 +88,6 @@ def _is_unbound_method(func: Callable) -> bool:
     is_method = params and params[0].name in {"self", "cls"}
 
     return bool(is_method)
-
-
-def _call_sync(op: Op, *args: Any, **kwargs: Any) -> Any:
-    _call = create_call(op, *args, **kwargs)
-    try:
-        return _execute_call_sync(op, _call, *args, **kwargs)
-    except Exception as e:
-        print("WARNING: Error executing call")
-        traceback.print_exc()
-    finally:
-        return _call
-
-
-async def _call_async(op: Op, *args: Any, **kwargs: Any) -> Any:
-    _call = create_call(op, *args, **kwargs)
-    try:
-        return await _execute_call_async(op, _call, *args, **kwargs)
-    except Exception as e:
-        print("WARNING: Error executing call")
-        traceback.print_exc()
-    finally:
-        return _call
 
 
 def calls(op: Op) -> "CallsIter":
