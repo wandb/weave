@@ -1,5 +1,6 @@
 import {Box, Tooltip} from '@material-ui/core';
 import {Alert} from '@mui/material';
+import _ from 'lodash';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
@@ -10,6 +11,7 @@ import {
 import {WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
+import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
@@ -87,7 +89,7 @@ export const ScorecardSection: React.FC<{
   const propsWithDifferences = useMemo(() => {
     return Object.keys(modelProps).filter(prop => {
       const values = Object.values(modelProps[prop]);
-      return values.some((value, i) => i > 0 && value !== values[0]);
+      return values.some((value, i) => i > 0 && !_.isEqual(value, values[0]));
     });
   }, [modelProps]);
   const [diffOnly, setDiffOnly] = React.useState(true);
@@ -280,7 +282,7 @@ export const ScorecardSection: React.FC<{
                         maxHeight: '100px',
                         overflow: 'auto',
                       }}>
-                      {modelData[model]}
+                      <CellValue value={modelData[model]} />
                     </GridCell>
                   );
                 }
