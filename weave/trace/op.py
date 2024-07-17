@@ -8,7 +8,6 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
-    Literal,
     Mapping,
     Optional,
     Protocol,
@@ -194,7 +193,6 @@ def _execute_call(
     __op: Op,
     call: Any,
     *args: Any,
-    __return_type: Literal["call", "value"] = "call",
     __should_raise: bool = True,
     **kwargs: Any,
 ) -> Any:
@@ -206,13 +204,14 @@ def _execute_call(
 
     def process(res: Any) -> Any:
         res = box.box(res)
-        return call if __return_type == "call" else on_output(res)
+        res = on_output(res)
+        return res, call
 
     def handle_exception(e: Exception) -> Any:
         finish(exception=e)
         if __should_raise:
             raise
-        return call if __return_type == "call" else None
+        return None, call
 
     if inspect.iscoroutinefunction(func):
 
@@ -228,16 +227,23 @@ def _execute_call(
                 call_context.pop_call(call.id)
 
         return _call_async()
+
+    try:
+        res = func(*args, **kwargs)
+    except Exception as e:
+        handle_exception(e)
     else:
-        try:
-            res = func(*args, **kwargs)
-        except Exception as e:
-            handle_exception(e)
-        else:
-            return process(res)
+        return process(res)
+
+    return None, call
 
 
-def call(op: Op, *args: Any, **kwargs: Any) -> Any:
+def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
+    """
+    Executes the op and returns both the result and a Call representing the execution.
+
+    This function will never raise.  Any errors are captured in the Call object.
+    """
     c = _create_call(op, *args, **kwargs)
     return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
