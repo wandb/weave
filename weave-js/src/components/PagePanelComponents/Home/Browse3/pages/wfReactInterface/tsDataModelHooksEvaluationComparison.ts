@@ -79,18 +79,14 @@ import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
   EvaluationComparisonData,
-  EvaluationEvaluateCallSchema,
   MetricDefinition,
 } from '../CompareEvaluationsPage/ecpTypes';
-import {
-  isBinaryScore,
-  isBinarySummaryScore,
-  isContinuousScore,
-  isContinuousSummaryScore,
-} from '../CompareEvaluationsPage/ecpUtil';
 import {metricDefinitionId} from '../CompareEvaluationsPage/ecpUtil';
 import {getScoreKeyNameFromScorerRef} from '../CompareEvaluationsPage/ecpUtil';
-import {TraceServerClient} from '../wfReactInterface/traceServerClient';
+import {
+  TraceCallSchema,
+  TraceServerClient,
+} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {
   convertISOToDate,
@@ -162,6 +158,10 @@ const fetchEvaluationComparisonData = async (
     project_id: projectId,
     filter: {call_ids: evaluationCallIds},
   });
+  const evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema} =
+    Object.fromEntries(
+      evalRes.calls.map(call => [call.id, call as EvaluationEvaluateCallSchema])
+    );
   result.evaluationCalls = Object.fromEntries(
     evalRes.calls.map((call, ndx) => [
       call.id,
@@ -173,7 +173,6 @@ const fetchEvaluationComparisonData = async (
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
         summaryMetrics: {}, // These cannot be filled out yet since we don't know the IDs yet
-        _rawEvaluationTraceData: call as EvaluationEvaluateCallSchema,
       },
     ])
   );
@@ -226,7 +225,7 @@ const fetchEvaluationComparisonData = async (
     // Add the user-defined scores
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-      const score = evalCall._rawEvaluationTraceData.output[scorerKey];
+      const score = evaluationCallCache[evalCall.callId].output[scorerKey];
       // const scorerDef: ScorerDefinition = {
       //   scorerOpOrObjRef: scorerRef,
       //   likelyTopLevelKeyName: scorerKey,
@@ -305,7 +304,8 @@ const fetchEvaluationComparisonData = async (
 
     // Add the derived metrics
     // Model latency
-    const model_latency = evalCall._rawEvaluationTraceData.output.model_latency;
+    const model_latency =
+      evaluationCallCache[evalCall.callId].output.model_latency;
     if (model_latency != null) {
       const metricId = metricDefinitionId(modelLatencyMetricDimension);
       result.summaryMetrics[metricId] = {
@@ -324,9 +324,9 @@ const fetchEvaluationComparisonData = async (
     // TODO: This "mean" is incorrect - really should average across all model
     // calls since this includes LLM scorers
     const totalTokens = sum(
-      Object.values(evalCall._rawEvaluationTraceData.summary.usage ?? {}).map(
-        v => v.total_tokens
-      )
+      Object.values(
+        evaluationCallCache[evalCall.callId].summary.usage ?? {}
+      ).map(v => v.total_tokens)
     );
     if (totalTokens != null) {
       const metricId = metricDefinitionId(totalTokensMetricDimension);
@@ -672,3 +672,63 @@ const totalTokensMetricDimension: MetricDefinition = {
 const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
 };
+
+const isBinaryScore = (score: any): score is boolean => {
+  return typeof score === 'boolean';
+};
+
+export const isBinarySummaryScore = (
+  score: any
+): score is BinarySummaryScore => {
+  return (
+    typeof score === 'object' &&
+    score != null &&
+    'true_count' in score &&
+    'true_fraction' in score
+  );
+};
+
+export const isContinuousSummaryScore = (
+  score: any
+): score is ContinuousSummaryScore => {
+  return typeof score === 'object' && score != null && 'mean' in score;
+};
+
+const isContinuousScore = (score: any): score is number => {
+  return typeof score === 'number';
+};
+///
+
+export type BinarySummaryScore = {
+  true_count: number;
+  true_fraction: number;
+};
+
+export type ContinuousSummaryScore = {
+  mean: number;
+};
+
+export type EvaluationEvaluateCallSchema = TraceCallSchema & {
+  inputs: TraceCallSchema['inputs'] & {
+    self: string;
+    model: string;
+  };
+  output: TraceCallSchema['output'] & {
+    [scorer: string]: {
+      [score: string]: SummaryScore;
+    };
+  } & {
+    model_latency: ContinuousSummaryScore;
+  };
+  summary: TraceCallSchema['summary'] & {
+    usage?: {
+      [model: string]: {
+        requests?: number;
+        completion_tokens?: number;
+        prompt_tokens?: number;
+        total_tokens?: number;
+      };
+    };
+  };
+};
+type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;

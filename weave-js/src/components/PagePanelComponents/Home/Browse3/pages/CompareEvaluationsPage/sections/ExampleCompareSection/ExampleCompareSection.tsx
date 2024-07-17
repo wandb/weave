@@ -31,7 +31,6 @@ import {MetricDefinition, MetricValueType} from '../../ecpTypes';
 import {metricDefinitionId} from '../../ecpUtil';
 import {getMetricIds} from '../../ecpUtil';
 import {
-  adjustValueForDisplay,
   dimensionShouldMinimize,
   dimensionUnit,
   flattenedDimensionPath,
@@ -1039,4 +1038,20 @@ const useLinkHorizontalScroll = () => {
   }, [scroll1Handler, scroll2Handler]);
 
   return {ref1, ref2};
+};
+
+const adjustValueForDisplay = (
+  value: number | boolean | undefined,
+  isBooleanAggregate?: boolean
+): number | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'boolean') {
+    return value ? 100 : 0;
+  } else if (isBooleanAggregate) {
+    return value * 100;
+  } else {
+    return value;
+  }
 };

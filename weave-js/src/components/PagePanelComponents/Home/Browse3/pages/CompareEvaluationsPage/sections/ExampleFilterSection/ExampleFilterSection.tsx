@@ -14,7 +14,6 @@ import {
 import {PLOT_HEIGHT, STANDARD_PADDING} from '../../ecpConstants';
 import {MAX_PLOT_DOT_SIZE, MIN_PLOT_DOT_SIZE} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
-import {isBinaryScore, isContinuousScore} from '../../ecpUtil';
 import {metricDefinitionId} from '../../ecpUtil';
 import {
   flattenedDimensionPath,
@@ -342,4 +341,11 @@ const DimensionPicker: React.FC<{
       />
     </FormControl>
   );
+};
+
+const isBinaryScore = (score: any): score is boolean => {
+  return typeof score === 'boolean';
+};
+const isContinuousScore = (score: any): score is number => {
+  return typeof score === 'number';
 };

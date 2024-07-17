@@ -89,7 +89,6 @@ export type EvaluationCall = {
   name: string;
   color: string;
   summaryMetrics: MetricResultMap;
-  _rawEvaluationTraceData: EvaluationEvaluateCallSchema;
 };
 
 /**
@@ -146,47 +145,8 @@ export type MetricDefinition = {
  * A result map maps metric ids to metric results.
  */
 type MetricResultMap = {[metricId: string]: MetricResult};
-export type BinaryValue = boolean;
-export type ContinuousValue = number;
-export type MetricValueType = BinaryValue | ContinuousValue;
+export type MetricValueType = boolean | number;
 export type MetricResult = {
   value: MetricValueType;
   sourceCallId: string;
 };
-
-///
-
-export type BinarySummaryScore = {
-  true_count: number;
-  true_fraction: number;
-};
-
-export type ContinuousSummaryScore = {
-  mean: number;
-};
-
-export type EvaluationEvaluateCallSchema = TraceCallSchema & {
-  inputs: TraceCallSchema['inputs'] & {
-    self: string;
-    model: string;
-  };
-  output: TraceCallSchema['output'] & {
-    [scorer: string]: {
-      [score: string]: SummaryScore;
-    };
-  } & {
-    model_latency: ContinuousSummaryScore;
-  };
-  summary: TraceCallSchema['summary'] & {
-    usage?: {
-      [model: string]: {
-        requests?: number;
-        completion_tokens?: number;
-        prompt_tokens?: number;
-        total_tokens?: number;
-      };
-    };
-  };
-};
-
-type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;

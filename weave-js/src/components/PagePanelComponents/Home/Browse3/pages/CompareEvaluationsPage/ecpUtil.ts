@@ -1,9 +1,5 @@
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {
-  BinarySummaryScore,
-  BinaryValue,
-  ContinuousSummaryScore,
-  ContinuousValue,
   EvaluationCall,
   EvaluationComparisonData,
   MetricDefinition,
@@ -13,22 +9,6 @@ import {
   PredictAndScoreCall,
   SourceType,
 } from './ecpTypes';
-
-export const adjustValueForDisplay = (
-  value: number | boolean | undefined,
-  isBooleanAggregate?: boolean
-): number | undefined => {
-  if (value === undefined) {
-    return undefined;
-  }
-  if (isBinaryScore(value)) {
-    return value ? 100 : 0;
-  } else if (isBooleanAggregate) {
-    return value * 100;
-  } else {
-    return value;
-  }
-};
 
 export const flattenedDimensionPath = (dim: MetricDefinition): string => {
   const paths = [...dim.metricSubPath];
@@ -125,28 +105,4 @@ export const metricDefinitionId = (metricDef: MetricDefinition): string => {
   } else {
     throw new Error(`Unknown metric source: ${metricDef.source}`);
   }
-};
-export const isBinaryScore = (score: any): score is BinaryValue => {
-  return typeof score === 'boolean';
-};
-
-export const isBinarySummaryScore = (
-  score: any
-): score is BinarySummaryScore => {
-  return (
-    typeof score === 'object' &&
-    score != null &&
-    'true_count' in score &&
-    'true_fraction' in score
-  );
-};
-
-export const isContinuousSummaryScore = (
-  score: any
-): score is ContinuousSummaryScore => {
-  return typeof score === 'object' && score != null && 'mean' in score;
-};
-
-export const isContinuousScore = (score: any): score is ContinuousValue => {
-  return typeof score === 'number';
 };
