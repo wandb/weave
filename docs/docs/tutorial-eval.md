@@ -71,6 +71,10 @@ Checkout the [Models](/guides/core-types/models) guide to learn more.
 
 ## 2. Collect some examples
 
+:::note
+Don't have a dataset? Learn how to [collect user feedback](/tutorial-feedback) to build Evaluation datasets.
+:::
+
 ```python
 sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
 "Pounits are a bright green color and are more savory than sweet.",
