@@ -21,101 +21,68 @@ import {
 } from './ecpTypes';
 import {flattenedDimensionPath} from './ecpUtil';
 
-export const DERIVED_SCORER_REF = '__DERIVED__';
+export const DERIVED_SCORER_REF_PLACEHOLDER = '__DERIVED__';
 
-export type CompositeSummaryMetricGroupKeyPath = {
+/**
+ * A `CompositeScoreMetrics` object is a map from a group name to a
+ * `CompositeScoreMetricGroup`. The group name is the key used to group metrics
+ * together, and the `CompositeScoreMetricGroup` contains the metrics associated
+ * with that group.
+ */
+export type CompositeScoreMetrics = {
+  // `groupName` is most often the "Scorer" name (unversioned)
+  // But also includes a placeholder for derived metrics
+  [groupName: string]: CompositeScoreMetricGroup;
+};
+
+type CompositeScoreMetricGroup = {
+  // Contains a list of scorerRefs that are associated with this group
+  // Most typically these are all versions of the same scorer used
+  // across different evaluations
+  scorerRefs: string[];
+
+  // Contains a map from a flattened keyPath to a `CompositeSummaryMetricGroupKeyPath`
+  metrics: {
+    [keyPath: string]: CompositeSummaryMetricGroupForKeyPath;
+  };
+};
+
+/**
+ * A `CompositeSummaryMetricGroupForKeyPath` defines the metrics associated with
+ * a given keyPath. The `scorerAgnosticMetricDef` is the metric definition that
+ * is not specific to any scorer, and the `scorerRefs` is a map from scorerRefs
+ * to the metrics associated with that scorer. In an ideal case, there should be
+ * one scorerRef per keyPath, but this is not guaranteed.
+ */
+export type CompositeSummaryMetricGroupForKeyPath = {
+  // Useful for deriving properties about the metric that are not
+  // specific to a scorer
   scorerAgnosticMetricDef: Omit<MetricDefinition, 'scorerOpOrObjRef'>;
   scorerRefs: {
+    // Contains each of the versions of the scorer that are associated
+    // with this metric
     [scoreRef: string]: {
+      // Contains the list of evaluation call ids that are associated with
+      // this scorer
       evalCallIds: string[];
+      // Contains the metric definition
       metric: MetricDefinition;
     };
   };
 };
 
-type CompositeScoreMetricGroup = {
-  scorerRefs: string[];
-  metrics: {
-    [keyPath: string]: CompositeSummaryMetricGroupKeyPath;
-  };
-};
-
-export type CompositeScoreMetrics = {
-  [groupName: string]: CompositeScoreMetricGroup;
-};
-
-const groupNameForMetric = (metric: MetricDefinition): string => {
-  let groupName = '';
-
-  if (metric.source === 'derived') {
-    groupName = DERIVED_SCORER_REF;
-  } else if (metric.source === 'scorer') {
-    if (metric.scorerOpOrObjRef == null) {
-      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
-    }
-    groupName = getScoreKeyNameFromScorerRef(metric.scorerOpOrObjRef);
-  }
-  return groupName;
-};
-
-export const resolvePeerDimension = (
-  compositeScoreMetrics: CompositeScoreMetrics,
-  evalCallId: string,
-  peerDimension: MetricDefinition
-): MetricDefinition | undefined => {
-  const groupName = groupNameForMetric(peerDimension);
-  const keyPath = flattenedDimensionPath(peerDimension);
-  return resolveDimension(
-    compositeScoreMetrics,
-    evalCallId,
-    groupName,
-    keyPath
-  );
-};
-
-export const resolveDimension = (
-  compositeScoreMetrics: CompositeScoreMetrics,
-  evalCallId: string,
-  groupName: string,
-  keyPath: string
-): MetricDefinition | undefined => {
-  return Object.values(
-    compositeScoreMetrics[groupName].metrics[keyPath].scorerRefs
-  ).find(scorerRef => scorerRef.evalCallIds.includes(evalCallId))?.metric;
-};
-
-export const evalCallIdToScorerRefs = (
-  metricGroup: CompositeScoreMetricGroup
-): {[evalCallId: string]: string} => {
-  const res: {[evalCallId: string]: string} = {};
-  Object.entries(metricGroup.metrics).forEach(([keyPath, scorerRefs]) => {
-    Object.entries(scorerRefs.scorerRefs).forEach(
-      ([scorerRef, {evalCallIds}]) => {
-        evalCallIds.forEach(evalCallId => (res[evalCallId] = scorerRef));
-      }
-    );
-  });
-  return res;
-};
-
-const refForMetric = (metric: MetricDefinition): string => {
-  let ref = '';
-  if (metric.source === 'derived') {
-    ref = DERIVED_SCORER_REF;
-  } else if (metric.source === 'scorer') {
-    if (metric.scorerOpOrObjRef == null) {
-      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
-    }
-
-    ref = metric.scorerOpOrObjRef;
-  }
-  return ref;
-};
-
+/**
+ * Builds a `CompositeScoreMetrics` object from the `EvaluationComparisonData`.
+ * This is the primary utility for converting the normalized data into a form
+ * that is more useful for rendering the data.
+ */
 export const buildCompositeMetricsMap = (
   data: EvaluationComparisonData,
   mType: MetricType
 ): CompositeScoreMetrics => {
+  const composite: CompositeScoreMetrics = {};
+
+  // Get the metric definition map based on the metric type
   let metricDefinitionMap;
   if (mType === 'score') {
     metricDefinitionMap = data.scoreMetrics;
@@ -124,7 +91,8 @@ export const buildCompositeMetricsMap = (
   } else {
     throw new Error(`Invalid metric type: ${mType}`);
   }
-  const composite: CompositeScoreMetrics = {};
+
+  // Loop through each metric definition and build the composite map
   Object.entries(metricDefinitionMap).forEach(([metricId, metric]) => {
     const groupName = groupNameForMetric(metric);
     const ref = refForMetric(metric);
@@ -173,4 +141,89 @@ export const buildCompositeMetricsMap = (
     metricKeyPath.scorerRefs[ref].evalCallIds = evals;
   });
   return composite;
+};
+
+/**
+ * Resolves the metric definition for a given evaluation call id. This is
+ * often used when we have the MetricDefinition corresponding to the baseline
+ * evaluation, and we want to find the corresponding MetricDefinition for
+ * the peer evaluation.
+ */
+export const resolvePeerDimension = (
+  compositeScoreMetrics: CompositeScoreMetrics,
+  evalCallId: string,
+  peerDimension: MetricDefinition
+): MetricDefinition | undefined => {
+  const groupName = groupNameForMetric(peerDimension);
+  const keyPath = flattenedDimensionPath(peerDimension);
+  return resolveDimension(
+    compositeScoreMetrics,
+    evalCallId,
+    groupName,
+    keyPath
+  );
+};
+
+/**
+ * Resolves the metric definition for a given evaluation, group name, and key path.
+ * This is often used when we have the group name and key path corresponding to the baseline
+ * evaluation, and we want to find the corresponding MetricDefinition for the peer evaluation.
+ */
+export const resolveDimension = (
+  compositeScoreMetrics: CompositeScoreMetrics,
+  evalCallId: string,
+  groupName: string,
+  keyPath: string
+): MetricDefinition | undefined => {
+  return Object.values(
+    compositeScoreMetrics[groupName].metrics[keyPath].scorerRefs
+  ).find(scorerRef => scorerRef.evalCallIds.includes(evalCallId))?.metric;
+};
+
+/**
+ * Utility function to obtain a map from evaluation call id to scorer ref
+ * for a given `CompositeScoreMetricGroup`.
+ */
+export const evalCallIdToScorerRefs = (
+  metricGroup: CompositeScoreMetricGroup
+): {[evalCallId: string]: string} => {
+  const res: {[evalCallId: string]: string} = {};
+  Object.entries(metricGroup.metrics).forEach(([keyPath, scorerRefs]) => {
+    Object.entries(scorerRefs.scorerRefs).forEach(
+      ([scorerRef, {evalCallIds}]) => {
+        evalCallIds.forEach(evalCallId => (res[evalCallId] = scorerRef));
+      }
+    );
+  });
+  return res;
+};
+
+// Helper Functions
+
+const groupNameForMetric = (metric: MetricDefinition): string => {
+  let groupName = '';
+
+  if (metric.source === 'derived') {
+    groupName = DERIVED_SCORER_REF_PLACEHOLDER;
+  } else if (metric.source === 'scorer') {
+    if (metric.scorerOpOrObjRef == null) {
+      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
+    }
+    groupName = getScoreKeyNameFromScorerRef(metric.scorerOpOrObjRef);
+  }
+  return groupName;
+};
+
+const refForMetric = (metric: MetricDefinition): string => {
+  let ref = '';
+  if (metric.source === 'derived') {
+    ref = DERIVED_SCORER_REF_PLACEHOLDER;
+  } else if (metric.source === 'scorer') {
+    if (metric.scorerOpOrObjRef == null) {
+      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
+    }
+
+    ref = metric.scorerOpOrObjRef;
+  }
+  return ref;
 };
