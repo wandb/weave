@@ -140,7 +140,7 @@ def test_sync_method_call(client, weave_obj, py_obj):
         weave_obj_method2 = weave_obj_method_ref.get()
 
     with pytest.raises(errors.OpCallError):
-        call2 = py_obj.amethod.call(1)
+        call2 = py_obj.method.call(1)
 
 
 @pytest.mark.asyncio
