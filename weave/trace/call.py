@@ -162,23 +162,23 @@ def create_call(func: "Op", *args: Any, **kwargs: Any) -> "Call":
     )
 
 
-async def _call_async(op: "Op", *args: Any, **kwargs: Any) -> Any:
+async def _call_async(op: "Op", *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
     _call = create_call(op, *args, **kwargs)
     try:
-        return await _execute_call_async(op, _call, *args, **kwargs)
+        return await _execute_call_async(op, _call, *args, **kwargs), _call
     except Exception:
         print("WARNING: Error executing call")
         traceback.print_exc()
     finally:
-        return _call
+        return None, _call
 
 
-def _call_sync(op: "Op", *args: Any, **kwargs: Any) -> Any:
+def _call_sync(op: "Op", *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
     _call = create_call(op, *args, **kwargs)
     try:
-        return _execute_call_sync(op, _call, *args, **kwargs)
+        return _execute_call_sync(op, _call, *args, **kwargs), _call
     except Exception:
         print("WARNING: Error executing call")
         traceback.print_exc()
     finally:
-        return _call
+        return None, _call
