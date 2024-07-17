@@ -1,15 +1,13 @@
 import {
   EvaluationCall,
-  EvaluationMetricDimension,
   isBinaryScore,
   isBinarySummaryScore,
   isContinuousSummaryScore,
-  isDerivedMetricDefinition,
-  isScorerMetricDimension,
+  MetricDefinition,
+  metricDefinitionId,
   MetricResult,
+  MetricValueType,
   PredictAndScoreCall,
-  ScoreType,
-  SummaryScore,
 } from './ecpTypes';
 
 export const adjustValueForDisplay = (
@@ -28,92 +26,55 @@ export const adjustValueForDisplay = (
   }
 };
 
-export const flattenedDimensionPath = (
-  dim: EvaluationMetricDimension
-): string => {
-  if (isScorerMetricDimension(dim)) {
-    const parts = [dim.scorerDef.likelyTopLevelKeyName, ...dim.metricSubPath];
-    return parts.join('.');
-  } else if (isDerivedMetricDefinition(dim)) {
-    return dim.derivedMetricName;
-  } else {
-    throw new Error('Unknown dimension type');
-  }
+export const flattenedDimensionPath = (dim: MetricDefinition): string => {
+  return dim.metricSubPath.join('.');
 };
 
 export const dimensionUnit = (
-  dim: EvaluationMetricDimension,
+  dim: MetricDefinition,
   isAggregate?: boolean
 ): string => {
-  if (isScorerMetricDimension(dim)) {
-    if (isAggregate && dim.scoreType === 'binary') {
-      return '%';
-    }
-    return '';
-  } else if (isDerivedMetricDefinition(dim)) {
-    return dim.unit ?? '';
-  } else {
-    throw new Error('Unknown dimension type');
+  if (isAggregate && dim.scoreType === 'binary') {
+    return '%';
   }
+  return dim.unit ?? '';
 };
 
-export const dimensionShouldMinimize = (
-  dim: EvaluationMetricDimension
-): boolean => {
-  if (isScorerMetricDimension(dim)) {
-    return false;
-  } else if (isDerivedMetricDefinition(dim)) {
-    return dim.shouldMinimize ?? false;
-  } else {
-    throw new Error('Unknown dimension type');
-  }
+export const dimensionShouldMinimize = (dim: MetricDefinition): boolean => {
+  return dim.shouldMinimize ?? false;
 };
 
-export const dimensionId = (dim: EvaluationMetricDimension): string => {
-  if (isScorerMetricDimension(dim)) {
-    return dim.scorerDef.scorerOpOrObjRef + '#' + dim.metricSubPath.join('.');
-  } else if (isDerivedMetricDefinition(dim)) {
-    return dim.derivedMetricName;
-  } else {
-    throw new Error('Unknown dimension type');
-  }
-};
-export const resolveDimensionMetricResultForPASCall = (
-  dim: EvaluationMetricDimension,
+export const resolveScoreMetricResultForPASCall = (
+  dim: MetricDefinition,
   pasCall: PredictAndScoreCall
 ): MetricResult | undefined => {
-  if (isScorerMetricDimension(dim)) {
-    return pasCall.scorerMetrics[dimensionId(dim)];
-  } else if (isDerivedMetricDefinition(dim)) {
-    return pasCall.derivedMetrics[dimensionId(dim)];
-  } else {
-    throw new Error(`Unknown metric dimension type: ${dim}`);
-  }
+  const metricId = metricDefinitionId(dim);
+  return pasCall.scoreMetrics[metricId];
 };
 
-export const resolveDimensionValueForPASCall = (
-  dim: EvaluationMetricDimension,
+export const resolveScoreMetricValueForPASCall = (
+  dim: MetricDefinition,
   pasCall: PredictAndScoreCall
-): ScoreType | undefined => {
-  const metricResult = resolveDimensionMetricResultForPASCall(dim, pasCall);
+): MetricValueType | undefined => {
+  const metricResult = resolveScoreMetricResultForPASCall(dim, pasCall);
   if (metricResult) {
     return metricResult.value;
   }
   return undefined;
 };
 
-const resolveDimensionSummaryScoreForEvaluateCall = (
-  dim: EvaluationMetricDimension,
+const resolveSummaryMetricResultForEvaluateCall = (
+  dim: MetricDefinition,
   evaluateCall: EvaluationCall
-): SummaryScore | undefined => {
-  return evaluateCall.summaryMetrics[dimensionId(dim)];
+): MetricResult | undefined => {
+  return evaluateCall.summaryMetrics[metricDefinitionId(dim)];
 };
 
-export const resolveDimensionValueForEvaluateCall = (
-  dim: EvaluationMetricDimension,
+export const resolveSummaryMetricValueForEvaluateCall = (
+  dim: MetricDefinition,
   evaluateCall: EvaluationCall
-): number | undefined => {
-  const score = resolveDimensionSummaryScoreForEvaluateCall(dim, evaluateCall);
+): MetricValueType | undefined => {
+  const score = resolveSummaryMetricResultForEvaluateCall(dim, evaluateCall);
   if (isBinarySummaryScore(score)) {
     return score.true_fraction;
   } else if (isContinuousSummaryScore(score)) {

@@ -15,9 +15,9 @@ type BinarySummaryScore = {
   true_fraction: number;
 };
 
-type BinaryScore = boolean;
+type BinaryValue = boolean;
 
-export const isBinaryScore = (score: any): score is BinaryScore => {
+export const isBinaryScore = (score: any): score is BinaryValue => {
   return typeof score === 'boolean';
 };
 
@@ -42,48 +42,75 @@ export const isContinuousSummaryScore = (
   return typeof score === 'object' && score != null && 'mean' in score;
 };
 
-type ContinuousScore = number;
+type ContinuousValue = number;
 
-export const isContinuousScore = (score: any): score is ContinuousScore => {
+export const isContinuousScore = (score: any): score is ContinuousValue => {
   return typeof score === 'number';
 };
 
-export type ScorerDefinition = {
-  scorerOpOrObjRef: string;
-  likelyTopLevelKeyName: string;
-};
+export type SourceType = 'derived' | 'scorer' | 'model_output';
+export type MetricType = 'score' | 'summary';
 
-export type ScorerMetricDimension = {
-  dimensionType: 'scorerMetric';
-  scorerDef: ScorerDefinition;
+export type MetricDefinition = {
   metricSubPath: string[];
+  // TODO: Not sure if this is used anymore - should review afterwards
+  // TODO: Remember to cleanup unused symbols
   scoreType: 'binary' | 'continuous';
-  isAutoSummarized: boolean;
-};
-
-export type DerivedMetricDefinition = {
-  dimensionType: 'derivedMetric';
-  derivedMetricName: string;
-  scoreType: 'binary' | 'continuous';
+  source: SourceType;
+  scorerOpOrObjRef?: string;
   shouldMinimize?: boolean;
   unit?: string;
 };
 
-export const isScorerMetricDimension = (
-  dim: EvaluationMetricDimension
-): dim is ScorerMetricDimension => {
-  return typeof dim === 'object' && dim.dimensionType === 'scorerMetric';
+export const metricDefinitionId = (metricDef: MetricDefinition): string => {
+  const path = metricDef.metricSubPath
+    .map(p => {
+      return p.replace('.', '\\.');
+    })
+    .join('.');
+  if (metricDef.source === 'derived') {
+    return `derived#${path}`;
+  } else if (metricDef.source === 'model_output') {
+    return `model_output#${path}`;
+  } else if (metricDef.source === 'scorer') {
+    if (metricDef.scorerOpOrObjRef == null) {
+      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
+    }
+    return `${metricDef.scorerOpOrObjRef}#${path}`;
+  } else {
+    throw new Error(`Unknown metric source: ${metricDef.source}`);
+  }
 };
 
-export const isDerivedMetricDefinition = (
-  dim: EvaluationMetricDimension
-): dim is DerivedMetricDefinition => {
-  return typeof dim === 'object' && dim.dimensionType === 'derivedMetric';
+export const metricIdToDefinition = (
+  data: EvaluationComparisonData,
+  scoreOrSummary: 'score' | 'summary',
+  metricId: string
+): MetricDefinition => {
+  if (scoreOrSummary === 'score') {
+    if (!(metricId in data.scoreMetrics)) {
+      throw new Error(`Metric ID ${metricId} not found in scoreMetrics`);
+    }
+    return data.scoreMetrics[metricId];
+  } else if (scoreOrSummary === 'summary') {
+    if (!(metricId in data.summaryMetrics)) {
+      throw new Error(`Metric ID ${metricId} not found in summaryMetrics`);
+    }
+    return data.summaryMetrics[metricId];
+  } else {
+    throw new Error(`Unknown scoreOrSummary: ${scoreOrSummary}`);
+  }
 };
 
-export type EvaluationMetricDimension =
-  | ScorerMetricDimension
-  | DerivedMetricDefinition;
+export type MetricValueType = BinaryValue | ContinuousValue;
+
+export type MetricResult = {
+  value: MetricValueType;
+  sourceCall: {
+    callId: string;
+    _rawTraceData: TraceCallSchema;
+  };
+};
 
 export type EvaluationEvaluateCallSchema = TraceCallSchema & {
   inputs: TraceCallSchema['inputs'] & {
@@ -124,15 +151,6 @@ type ModelObj = {
   _rawModelObject: TraceObjSchema;
 };
 
-export type ScoreType = BinaryScore | ContinuousScore;
-export type MetricResult = {
-  value: ScoreType;
-  sourceCall: {
-    callId: string;
-    _rawScoreTraceData: TraceCallSchema;
-  };
-};
-
 export type EvaluationComparisonData = {
   entity: string;
   project: string;
@@ -159,12 +177,12 @@ export type EvaluationComparisonData = {
       };
     };
   };
-  derivedMetricDimensions: {
-    [metricDimensionId: string]: DerivedMetricDefinition;
-  };
-  scorerMetricDimensions: {[metricDimensionId: string]: ScorerMetricDimension};
-  customSummaryMetricDimensions: {[metricDimensionId: string]: ScorerMetricDimension};
+  scoreMetrics: MetricDefinitionMap;
+  summaryMetrics: MetricDefinitionMap;
 };
+
+type MetricDefinitionMap = {[metricId: string]: MetricDefinition};
+type MetricResultMap = {[metricId: string]: MetricResult};
 
 export type PredictAndScoreCall = {
   callId: string;
@@ -172,12 +190,7 @@ export type PredictAndScoreCall = {
   rowDigest: string;
   modelRef: string;
   evaluationCallId: string;
-  scorerMetrics: {
-    [metricDimensionId: string]: MetricResult;
-  };
-  derivedMetrics: {
-    [metricDimensionId: string]: MetricResult;
-  };
+  scoreMetrics: MetricResultMap;
   _rawPredictAndScoreTraceData: TraceCallSchema;
   _rawPredictTraceData?: TraceCallSchema;
 };
@@ -185,7 +198,7 @@ export type PredictAndScoreCall = {
 type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
 
 export type ComparisonDimensionsType = Array<{
-  dimension: EvaluationMetricDimension;
+  metricId: string;
   rangeSelection?: RangeSelection;
 }>;
 
@@ -195,9 +208,7 @@ export type EvaluationCall = {
   color: string;
   evaluationRef: string;
   modelRef: string;
-  summaryMetrics: {
-    [metricDimensionId: string]: SummaryScore;
-  };
+  summaryMetrics: MetricResultMap;
   _rawEvaluationTraceData: EvaluationEvaluateCallSchema;
 };
 
@@ -208,4 +219,15 @@ type EvaluationObj = {
   project: string;
   entity: string;
   _rawEvaluationObject: TraceObjSchema;
+};
+
+export const getMetricIds = (
+  data: EvaluationComparisonData,
+  type: MetricType,
+  source: SourceType
+): MetricDefinitionMap => {
+  const metrics = type === 'score' ? data.scoreMetrics : data.summaryMetrics;
+  return Object.fromEntries(
+    Object.entries(metrics).filter(([k, v]) => v.source === source)
+  );
 };

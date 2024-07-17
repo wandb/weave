@@ -2,7 +2,7 @@ import {useMemo} from 'react';
 
 import {useEvaluationComparisonData} from '../wfReactInterface/tsDataModelHooksEvaluationComparison';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
-import {ComparisonDimensionsType} from './ecpTypes';
+import {ComparisonDimensionsType, getMetricIds} from './ecpTypes';
 import {EvaluationComparisonState} from './ecpTypes';
 
 export const useEvaluationComparisonState = (
@@ -20,9 +20,11 @@ export const useEvaluationComparisonState = (
       return {loading: true, result: null};
     }
 
-    const scorerDimensions = Object.values(data.result.scorerMetricDimensions);
-    const derivedDimensions = Object.values(
-      data.result.derivedMetricDimensions
+    const scorerDimensions = Object.keys(
+      getMetricIds(data.result, 'score', 'scorer')
+    );
+    const derivedDimensions = Object.keys(
+      getMetricIds(data.result, 'score', 'derived')
     );
 
     let newComparisonDimensions = comparisonDimensions;
@@ -30,22 +32,22 @@ export const useEvaluationComparisonState = (
       newComparisonDimensions = [];
       if (scorerDimensions.length > 0) {
         newComparisonDimensions.push({
-          dimension: scorerDimensions[0],
+          metricId: scorerDimensions[0],
         });
         if (derivedDimensions.length > 0) {
           newComparisonDimensions.push({
-            dimension: derivedDimensions[0],
+            metricId: derivedDimensions[0],
           });
         }
       } else {
         if (derivedDimensions.length > 0) {
           newComparisonDimensions.push({
-            dimension: derivedDimensions[0],
+            metricId: derivedDimensions[0],
           });
         }
         if (derivedDimensions.length > 1) {
           newComparisonDimensions.push({
-            dimension: derivedDimensions[1],
+            metricId: derivedDimensions[1],
           });
         }
       }

@@ -3,8 +3,12 @@ import {useMemo} from 'react';
 
 import {flattenObject} from '../../../../../Browse2/browse2Util';
 import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState, PredictAndScoreCall} from '../../ecpTypes';
-import {dimensionId, resolveDimensionValueForPASCall} from '../../ecpUtil';
+import {
+  EvaluationComparisonState,
+  metricDefinitionId,
+  PredictAndScoreCall,
+} from '../../ecpTypes';
+import {resolveScoreMetricValueForPASCall} from '../../ecpUtil';
 import {
   buildCompositeComparisonSummaryMetrics,
   ResolvePeerDimensionFn,
@@ -80,6 +84,7 @@ const rowIsSelected = (
   resolvePeerDimension: ResolvePeerDimensionFn
 ) => {
   const compareDims = state.comparisonDimensions;
+
   if (compareDims == null || compareDims.length === 0) {
     return true;
   }
@@ -94,12 +99,12 @@ const rowIsSelected = (
       ([evalCallId, range]) => {
         const resolvedPeerDim = resolvePeerDimension(
           evalCallId,
-          compareDim.dimension
+          state.data.scoreMetrics[compareDim.metricId]
         );
         if (resolvedPeerDim == null) {
           return false;
         }
-        const values = scores[dimensionId(resolvedPeerDim)];
+        const values = scores[metricDefinitionId(resolvedPeerDim)];
         if (values[evalCallId] == null) {
           return false;
         }
@@ -133,12 +138,12 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   output: flattenObject({output}),
                   scores: Object.fromEntries(
                     [
-                      ...Object.entries(state.data.scorerMetricDimensions),
-                      ...Object.entries(state.data.derivedMetricDimensions),
+                      ...Object.entries(state.data.scoreMetrics),
+                      // ...Object.entries(state.data.derivedMetricDimensions),
                     ].map(([scoreKey, scoreVal]) => {
                       return [
                         scoreKey,
-                        resolveDimensionValueForPASCall(
+                        resolveScoreMetricValueForPASCall(
                           scoreVal,
                           predictAndScoreRes
                         ),
@@ -159,12 +164,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       }
     );
     return rows;
-  }, [
-    state.data.resultRows,
-    state.data.inputs,
-    state.data.scorerMetricDimensions,
-    state.data.derivedMetricDimensions,
-  ]);
+  }, [state.data.resultRows, state.data.inputs, state.data.scoreMetrics]);
 
   const pivotedRows = useMemo(() => {
     // Ok, so in this step we are going to pivot -
@@ -267,9 +267,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       const compareDim = compareDims[0];
       res = _.sortBy(res, row => {
         const values =
-          aggregatedRows[row.inputDigest].scores[
-            dimensionId(compareDim.dimension)
-          ];
+          aggregatedRows[row.inputDigest].scores[compareDim.metricId];
         const valuesAsNumbers = Object.values(values).map(v => {
           if (typeof v === 'number') {
             return v;

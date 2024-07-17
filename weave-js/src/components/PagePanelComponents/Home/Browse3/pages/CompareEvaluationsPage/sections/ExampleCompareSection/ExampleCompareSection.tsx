@@ -23,10 +23,15 @@ import {isRef} from '../../../common/util';
 import {TraceCallSchema} from '../../../wfReactInterface/traceServerClient';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {CIRCLE_SIZE, SIGNIFICANT_DIGITS} from '../../ecpConstants';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {
+  EvaluationComparisonState,
+  getMetricIds,
+  MetricDefinition,
+  metricDefinitionId,
+  MetricValueType,
+} from '../../ecpTypes';
 import {
   adjustValueForDisplay,
-  dimensionId,
   dimensionShouldMinimize,
   dimensionUnit,
   flattenedDimensionPath,
@@ -248,7 +253,7 @@ export const ExampleCompareSection: React.FC<{
   );
 
   const derivedMetrics = Object.values(
-    props.state.data.derivedMetricDimensions
+    getMetricIds(props.state.data, 'score', 'derived')
   );
 
   const inputRef = parseRef(target.inputRef) as WeaveObjectRef;
@@ -317,11 +322,15 @@ export const ExampleCompareSection: React.FC<{
     return compositeMetrics[scorerGroupNames[scorerIndex]];
   };
 
-  const lookupScoreGroupMetricsForScorerIndex = (scorerIndex: number) => {
+  const lookupScoreGroupMetricsForScorerIndex = (
+    scorerIndex: number
+  ): CompositeSummaryScoreGroup['metrics'] => {
     return lookupScoreGroupForScorerIndex(scorerIndex).metrics;
   };
 
-  const lookupUniqueScorerRefsForScorerIndex = (scorerIndex: number) => {
+  const lookupUniqueScorerRefsForScorerIndex = (
+    scorerIndex: number
+  ): string[] => {
     return Array.from(
       new Set(
         Object.values(
@@ -331,10 +340,12 @@ export const ExampleCompareSection: React.FC<{
     );
   };
 
-  const lookupDimensionsForScorer = (scorerIndex: number) => {
+  const lookupDimensionsForScorer = (
+    scorerIndex: number
+  ): MetricDefinition[] => {
     const isDerivedMetric = lookupIsDerivedMetric(scorerIndex);
     const lookupAnyDimensionForMetric = (sm: CompositeSummaryMetric) => {
-      return props.state.data.scorerMetricDimensions[
+      return props.state.data.scoreMetrics[
         Object.values(sm.scorerRefToDimensionId)[0]
       ];
     };
@@ -347,16 +358,25 @@ export const ExampleCompareSection: React.FC<{
     ).map(lookupAnyDimensionForMetric);
   };
 
-  const lookupDimension = (scorerIndex: number, metricIndex: number) => {
+  const lookupDimension = (
+    scorerIndex: number,
+    metricIndex: number
+  ): MetricDefinition => {
     const dimensionsForThisScorer = lookupDimensionsForScorer(scorerIndex);
     return dimensionsForThisScorer[metricIndex];
   };
 
-  const lookupDimensionId = (scorerIndex: number, metricIndex: number) => {
-    return dimensionId(lookupDimension(scorerIndex, metricIndex));
+  const lookupDimensionId = (
+    scorerIndex: number,
+    metricIndex: number
+  ): string => {
+    return metricDefinitionId(lookupDimension(scorerIndex, metricIndex));
   };
 
-  const lookupTargetTrial = (evalIndex: number, trialIndex: number) => {
+  const lookupTargetTrial = (
+    evalIndex: number,
+    trialIndex: number
+  ): PivotedRow => {
     const trialsForThisEval = lookupTrialsForEval(evalIndex);
     return trialsForThisEval[trialIndex];
   };
@@ -366,7 +386,7 @@ export const ExampleCompareSection: React.FC<{
     trialIndex: number,
     scorerIndex: number,
     metricIndex: number
-  ) => {
+  ): MetricValueType | undefined => {
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
     const currEvalCallId = orderedCallIds[evalIndex];
     const resolvedScoreId = resolvePeerDimension(
@@ -378,14 +398,16 @@ export const ExampleCompareSection: React.FC<{
       return undefined;
     }
 
-    return targetTrial.scores[dimensionId(resolvedScoreId)][currEvalCallId];
+    return targetTrial.scores[metricDefinitionId(resolvedScoreId)][
+      currEvalCallId
+    ];
   };
 
   const lookupAggScorerMetricValue = (
     evalIndex: number,
     scorerIndex: number,
     metricIndex: number
-  ) => {
+  ): MetricValueType | undefined => {
     const currEvalCallId = orderedCallIds[evalIndex];
     const resolvedScoreId = resolvePeerDimension(
       currEvalCallId,
@@ -396,10 +418,13 @@ export const ExampleCompareSection: React.FC<{
       return undefined;
     }
 
-    return target.scores[dimensionId(resolvedScoreId)][currEvalCallId];
+    return target.scores[metricDefinitionId(resolvedScoreId)][currEvalCallId];
   };
 
-  const lookupOutputValue = (evalIndex: number, outputPropIndex: number) => {
+  const lookupOutputValue = (
+    evalIndex: number,
+    outputPropIndex: number
+  ): any => {
     const currEvalCallId = orderedCallIds[evalIndex];
     const selectedTrial = lookupSelectedTrialForEval(evalIndex);
 
@@ -602,8 +627,8 @@ export const ExampleCompareSection: React.FC<{
     }
     return () =>
       onScorerClick(
-        targetTrial.predictAndScore.scorerMetrics[scoreId].sourceCall
-          ._rawScoreTraceData
+        targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCall
+          ._rawTraceData
       );
   };
 

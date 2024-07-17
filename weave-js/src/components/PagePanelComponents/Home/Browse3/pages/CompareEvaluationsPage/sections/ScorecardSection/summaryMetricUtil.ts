@@ -1,17 +1,13 @@
-import {
-  EvaluationComparisonState,
-  EvaluationMetricDimension,
-  isDerivedMetricDefinition,
-  isScorerMetricDimension,
-} from '../../ecpTypes';
+import {EvaluationComparisonState, MetricDefinition} from '../../ecpTypes';
 import {
   adjustValueForDisplay,
   dimensionUnit,
   flattenedDimensionPath,
-  resolveDimensionValueForEvaluateCall,
+  resolveSummaryMetricValueForEvaluateCall,
 } from '../../ecpUtil';
 
 export const DERIVED_SCORER_REF = '__DERIVED__';
+export const OUTPUT_SCORER_REF = '__DERIVED__';
 
 export type CompositeSummaryMetric = {
   scorerRefToDimensionId: {[scorerRef: string]: string};
@@ -34,30 +30,29 @@ export type CompositeComparisonSummaryMetrics = {
 };
 
 export const dimensionKeys = (
-  dimension: EvaluationMetricDimension
+  dimension: MetricDefinition
 ): {
   scorerGroupName: string;
   dimensionPath: string;
 } => {
-  if (isDerivedMetricDefinition(dimension)) {
-    return {
-      scorerGroupName: DERIVED_SCORER_REF,
-      dimensionPath: dimension.derivedMetricName,
-    };
-  } else if (isScorerMetricDimension(dimension)) {
-    return {
-      scorerGroupName: dimension.scorerDef.likelyTopLevelKeyName,
-      dimensionPath: flattenedDimensionPath(dimension),
-    };
+  let scorerGroupName = '';
+  if (dimension.source === 'derived') {
+    scorerGroupName = DERIVED_SCORER_REF;
+  } else if (dimension.source === 'model_output') {
+    scorerGroupName = OUTPUT_SCORER_REF;
   } else {
-    throw new Error('Unknown dimension type');
+    scorerGroupName = dimension.metricSubPath[0];
   }
+  return {
+    scorerGroupName,
+    dimensionPath: flattenedDimensionPath(dimension),
+  };
 };
 
 export type ResolvePeerDimensionFn = (
   evalCallId: string,
-  peerDimension: EvaluationMetricDimension
-) => EvaluationMetricDimension | undefined;
+  peerDimension: MetricDefinition
+) => MetricDefinition | undefined;
 
 export const buildCompositeComparisonSummaryMetrics = (
   state: EvaluationComparisonState
@@ -69,14 +64,29 @@ export const buildCompositeComparisonSummaryMetrics = (
   Object.entries(state.data.evaluationCalls).forEach(
     ([evalCallId, evaluationCall]) => {
       Object.entries(evaluationCall.summaryMetrics).forEach(
-        ([metricDimensionId, metricDimension]) => {
-          const scorerMetricsDimension =
-            state.data.scorerMetricDimensions[metricDimensionId];
-          const derivedMetricsDimension =
-            state.data.derivedMetricDimensions[metricDimensionId];
+        ([metricId, metricDimension]) => {
+          const scorerMetricsDimension = state.data.summaryMetrics[metricId];
+          // const derivedMetricsDimension =
+          //   state.data.derivedMetricDimensions[metricId];
           if (scorerMetricsDimension != null) {
             const dimKeys = dimensionKeys(scorerMetricsDimension);
-            const scorerRef = scorerMetricsDimension.scorerDef.scorerOpOrObjRef;
+            let scorerRef = '';
+            if (scorerMetricsDimension.source === 'model_output') {
+              scorerRef = OUTPUT_SCORER_REF;
+            } else if (scorerMetricsDimension.source === 'derived') {
+              scorerRef = DERIVED_SCORER_REF;
+            } else if (scorerMetricsDimension.source === 'scorer') {
+              if (scorerMetricsDimension.scorerOpOrObjRef == null) {
+                throw new Error(
+                  'scorerOpOrObjRef must be defined for scorer metric'
+                );
+              }
+              scorerRef = scorerMetricsDimension.scorerOpOrObjRef;
+            } else {
+              throw new Error(
+                `Unknown metric source: ${scorerMetricsDimension.source}`
+              );
+            }
             const unit = dimensionUnit(scorerMetricsDimension, true);
             const lowerIsBetter = false;
             if (compositeMetrics[dimKeys.scorerGroupName] == null) {
@@ -98,7 +108,7 @@ export const buildCompositeComparisonSummaryMetrics = (
                 dimKeys.dimensionPath
               ] = {
                 metricLabel: dimKeys.dimensionPath,
-                scorerRefToDimensionId: {[scorerRef]: metricDimensionId},
+                scorerRefToDimensionId: {[scorerRef]: metricId},
                 unit,
                 lowerIsBetter,
                 evalScores: {},
@@ -111,69 +121,69 @@ export const buildCompositeComparisonSummaryMetrics = (
             ) {
               compositeMetrics[dimKeys.scorerGroupName].metrics[
                 dimKeys.dimensionPath
-              ].scorerRefToDimensionId[scorerRef] = metricDimensionId;
+              ].scorerRefToDimensionId[scorerRef] = metricId;
             }
 
             compositeMetrics[dimKeys.scorerGroupName].metrics[
               dimKeys.dimensionPath
             ].evalScores[evaluationCall.callId] = adjustValueForDisplay(
-              resolveDimensionValueForEvaluateCall(
+              resolveSummaryMetricValueForEvaluateCall(
                 scorerMetricsDimension,
                 evaluationCall
               ),
               scorerMetricsDimension.scoreType === 'binary'
             );
-          } else if (derivedMetricsDimension != null) {
-            const dimKeys = dimensionKeys(derivedMetricsDimension);
-            const scorerRef = DERIVED_SCORER_REF;
-            const unit = dimensionUnit(derivedMetricsDimension, true);
-            const lowerIsBetter =
-              derivedMetricsDimension.shouldMinimize ?? false;
-            if (compositeMetrics[dimKeys.scorerGroupName] == null) {
-              compositeMetrics[dimKeys.scorerGroupName] = {
-                evalCallIdToScorerRef: {},
-                scorerName: dimKeys.scorerGroupName,
-                metrics: {},
-              };
-            }
-            compositeMetrics[dimKeys.scorerGroupName].evalCallIdToScorerRef[
-              evalCallId
-            ] = scorerRef;
+            // } else if (derivedMetricsDimension != null) {
+            //   const dimKeys = dimensionKeys(derivedMetricsDimension);
+            //   const scorerRef = DERIVED_SCORER_REF;
+            //   const unit = dimensionUnit(derivedMetricsDimension, true);
+            //   const lowerIsBetter =
+            //     derivedMetricsDimension.shouldMinimize ?? false;
+            //   if (compositeMetrics[dimKeys.scorerGroupName] == null) {
+            //     compositeMetrics[dimKeys.scorerGroupName] = {
+            //       evalCallIdToScorerRef: {},
+            //       scorerName: dimKeys.scorerGroupName,
+            //       metrics: {},
+            //     };
+            //   }
+            //   compositeMetrics[dimKeys.scorerGroupName].evalCallIdToScorerRef[
+            //     evalCallId
+            //   ] = scorerRef;
 
-            if (
-              compositeMetrics[dimKeys.scorerGroupName].metrics[
-                dimKeys.dimensionPath
-              ] == null
-            ) {
-              compositeMetrics[dimKeys.scorerGroupName].metrics[
-                dimKeys.dimensionPath
-              ] = {
-                metricLabel: dimKeys.dimensionPath,
-                scorerRefToDimensionId: {[scorerRef]: metricDimensionId},
-                unit,
-                lowerIsBetter,
-                evalScores: {},
-              };
-            }
-            if (
-              compositeMetrics[dimKeys.scorerGroupName].metrics[
-                dimKeys.dimensionPath
-              ].scorerRefToDimensionId[scorerRef] == null
-            ) {
-              compositeMetrics[dimKeys.scorerGroupName].metrics[
-                dimKeys.dimensionPath
-              ].scorerRefToDimensionId[scorerRef] = metricDimensionId;
-            }
+            //   if (
+            //     compositeMetrics[dimKeys.scorerGroupName].metrics[
+            //       dimKeys.dimensionPath
+            //     ] == null
+            //   ) {
+            //     compositeMetrics[dimKeys.scorerGroupName].metrics[
+            //       dimKeys.dimensionPath
+            //     ] = {
+            //       metricLabel: dimKeys.dimensionPath,
+            //       scorerRefToDimensionId: {[scorerRef]: metricId},
+            //       unit,
+            //       lowerIsBetter,
+            //       evalScores: {},
+            //     };
+            //   }
+            //   if (
+            //     compositeMetrics[dimKeys.scorerGroupName].metrics[
+            //       dimKeys.dimensionPath
+            //     ].scorerRefToDimensionId[scorerRef] == null
+            //   ) {
+            //     compositeMetrics[dimKeys.scorerGroupName].metrics[
+            //       dimKeys.dimensionPath
+            //     ].scorerRefToDimensionId[scorerRef] = metricId;
+            //   }
 
-            compositeMetrics[dimKeys.scorerGroupName].metrics[
-              dimKeys.dimensionPath
-            ].evalScores[evaluationCall.callId] = adjustValueForDisplay(
-              resolveDimensionValueForEvaluateCall(
-                derivedMetricsDimension,
-                evaluationCall
-              ),
-              derivedMetricsDimension.scoreType === 'binary'
-            );
+            //   compositeMetrics[dimKeys.scorerGroupName].metrics[
+            //     dimKeys.dimensionPath
+            //   ].evalScores[evaluationCall.callId] = adjustValueForDisplay(
+            //     resolveSummaryMetricValueForEvaluateCall(
+            //       derivedMetricsDimension,
+            //       evaluationCall
+            //     ),
+            //     derivedMetricsDimension.scoreType === 'binary'
+            //   );
           } else {
             throw new Error('Unknown metric dimension type');
           }
@@ -184,8 +194,8 @@ export const buildCompositeComparisonSummaryMetrics = (
 
   const resolvePeerDimension = (
     evalCallId: string,
-    peerDimension: EvaluationMetricDimension
-  ): EvaluationMetricDimension | undefined => {
+    peerDimension: MetricDefinition
+  ): MetricDefinition | undefined => {
     // Given the Target Dimension, get the scorer group & metricName -> basically gets the common identifier
     // Given the scorer group & the eval id, get the scorerRef       -> resolve part 1
     // Given the scorer group & the metric name, get the DerivedSummaryMetric -> resolve part 2 -> found common metric
@@ -198,9 +208,9 @@ export const buildCompositeComparisonSummaryMetrics = (
       compositeMetrics[scorerGroupName].metrics[dimensionPath]
         .scorerRefToDimensionId[scorerRef];
     return (
-      state.data.derivedMetricDimensions[dimensionId] ??
-      state.data.scorerMetricDimensions[dimensionId]
-    );
+      state.data.summaryMetrics[dimensionId] ??
+      state.data.scoreMetrics[dimensionId]
+    ); // TODO: Verify this fallback is correct
   };
 
   return {compositeMetrics, resolvePeerDimension};

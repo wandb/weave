@@ -20,17 +20,15 @@ import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {
-  DerivedMetricDefinition,
   EvaluationComparisonData,
   EvaluationEvaluateCallSchema,
   isBinaryScore,
   isBinarySummaryScore,
   isContinuousScore,
   isContinuousSummaryScore,
-  ScorerDefinition,
-  ScorerMetricDimension,
+  MetricDefinition,
+  metricDefinitionId,
 } from '../CompareEvaluationsPage/ecpTypes';
-import {dimensionId} from '../CompareEvaluationsPage/ecpUtil';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {
@@ -87,8 +85,8 @@ const fetchEvaluationComparisonData = async (
     inputs: {},
     models: {},
     resultRows: {},
-    derivedMetricDimensions: {},
-    scorerMetricDimensions: {},
+    scoreMetrics: {},
+    summaryMetrics: {},
   };
   // 1. Fetch the evaluation calls
   // 2. For each evaluation:
@@ -168,32 +166,48 @@ const fetchEvaluationComparisonData = async (
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
       const score = evalCall._rawEvaluationTraceData.output[scorerKey];
-      const scorerDef: ScorerDefinition = {
-        scorerOpOrObjRef: scorerRef,
-        likelyTopLevelKeyName: scorerKey,
-      };
+      // const scorerDef: ScorerDefinition = {
+      //   scorerOpOrObjRef: scorerRef,
+      //   likelyTopLevelKeyName: scorerKey,
+      // };
 
       const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
         if (isBinarySummaryScore(scoreVal)) {
-          const metricDimension: ScorerMetricDimension = {
-            dimensionType: 'scorerMetric',
-            scorerDef: {...scorerDef},
-            metricSubPath: currPath,
+          const metricDimension: MetricDefinition = {
+            // dimensionType: 'scorerMetric',
+            // scorerDef: {...scorerDef},
             scoreType: 'binary',
-          };
-          const metricDimensionId = dimensionId(metricDimension);
-          result.scorerMetricDimensions[metricDimensionId] = metricDimension;
-          evalCall.summaryMetrics[metricDimensionId] = scoreVal;
-        } else if (isContinuousSummaryScore(scoreVal)) {
-          const metricDimension: ScorerMetricDimension = {
-            dimensionType: 'scorerMetric',
-            scorerDef: {...scorerDef},
             metricSubPath: currPath,
-            scoreType: 'continuous',
+            source: 'scorer',
+            scorerOpOrObjRef: scorerRef,
           };
-          const metricDimensionId = dimensionId(metricDimension);
-          result.scorerMetricDimensions[metricDimensionId] = metricDimension;
-          evalCall.summaryMetrics[metricDimensionId] = scoreVal;
+          const metricId = metricDefinitionId(metricDimension);
+          result.summaryMetrics[metricId] = metricDimension;
+          evalCall.summaryMetrics[metricId] = {
+            value: scoreVal.true_fraction,
+            sourceCall: {
+              // TODO: WOuld be nicer if this was the actual summary call itself
+              callId: evalCallId,
+              _rawTraceData: evalCall._rawEvaluationTraceData,
+            },
+          };
+        } else if (isContinuousSummaryScore(scoreVal)) {
+          const metricDimension: MetricDefinition = {
+            scoreType: 'continuous',
+            metricSubPath: currPath,
+            source: 'scorer',
+            scorerOpOrObjRef: scorerRef,
+          };
+          const metricId = metricDefinitionId(metricDimension);
+          result.summaryMetrics[metricId] = metricDimension;
+          evalCall.summaryMetrics[metricId] = {
+            value: scoreVal.mean,
+            sourceCall: {
+              // TODO: WOuld be nicer if this was the actual summary call itself
+              callId: evalCallId,
+              _rawTraceData: evalCall._rawEvaluationTraceData,
+            },
+          };
         } else if (
           scoreVal != null &&
           typeof scoreVal === 'object' &&
@@ -208,15 +222,23 @@ const fetchEvaluationComparisonData = async (
       recursiveAddScore(score, []);
     });
 
+    // TODO: Add Model Output Summary Here
+
     // Add the derived metrics
     // Model latency
     const model_latency = evalCall._rawEvaluationTraceData.output.model_latency;
     if (model_latency != null) {
-      const metricDimensionId = dimensionId(modelLatencyMetricDimension);
-      result.derivedMetricDimensions[metricDimensionId] = {
+      const metricId = metricDefinitionId(modelLatencyMetricDimension);
+      result.summaryMetrics[metricId] = {
         ...modelLatencyMetricDimension,
       };
-      evalCall.summaryMetrics[metricDimensionId] = model_latency;
+      evalCall.summaryMetrics[metricId] = {
+        value: model_latency.mean,
+        sourceCall: {
+          callId: evalCallId,
+          _rawTraceData: evalCall._rawEvaluationTraceData,
+        },
+      };
     }
 
     // Total Tokens
@@ -228,11 +250,17 @@ const fetchEvaluationComparisonData = async (
       )
     );
     if (totalTokens != null) {
-      const metricDimensionId = dimensionId(totalTokensMetricDimension);
-      result.derivedMetricDimensions[metricDimensionId] = {
+      const metricId = metricDefinitionId(totalTokensMetricDimension);
+      result.summaryMetrics[metricId] = {
         ...totalTokensMetricDimension,
       };
-      evalCall.summaryMetrics[metricDimensionId] = {mean: totalTokens};
+      evalCall.summaryMetrics[metricId] = {
+        value: totalTokens,
+        sourceCall: {
+          callId: evalCallId,
+          _rawTraceData: evalCall._rawEvaluationTraceData,
+        },
+      };
     }
   });
 
@@ -379,8 +407,7 @@ const fetchEvaluationComparisonData = async (
                 rowDigest,
                 modelRef,
                 evaluationCallId,
-                scorerMetrics: {},
-                derivedMetrics: {},
+                scoreMetrics: {},
                 _rawPredictAndScoreTraceData: parentPredictAndScore,
                 _rawPredictTraceData: undefined,
               };
@@ -392,15 +419,14 @@ const fetchEvaluationComparisonData = async (
               ];
 
             if (isProbablyPredictCall) {
+              // TODO: Add Model Output Scores Here
               predictAndScoreFinal._rawPredictTraceData = traceCall;
 
               // Add model latency and tokens
-              const modelLatencyMetricDimensionId = dimensionId(
+              const modelLatencyMetricId = metricDefinitionId(
                 modelLatencyMetricDimension
               );
-              predictAndScoreFinal.derivedMetrics[
-                modelLatencyMetricDimensionId
-              ] = {
+              predictAndScoreFinal.scoreMetrics[modelLatencyMetricId] = {
                 value:
                   (convertISOToDate(
                     traceCall.ended_at ?? traceCall.started_at
@@ -409,12 +435,12 @@ const fetchEvaluationComparisonData = async (
                   1000, // why is this different than the predictandscore model latency?
                 sourceCall: {
                   callId: traceCall.id,
-                  _rawScoreTraceData: traceCall,
+                  _rawTraceData: traceCall,
                 },
               };
 
               // Add total tokens
-              const totalTokensMetricDimensionId = dimensionId(
+              const totalTokensmetricId = metricDefinitionId(
                 totalTokensMetricDimension
               );
               const totalTokens = sum(
@@ -422,13 +448,11 @@ const fetchEvaluationComparisonData = async (
                   (x: any) => x?.total_tokens ?? 0
                 )
               );
-              predictAndScoreFinal.derivedMetrics[
-                totalTokensMetricDimensionId
-              ] = {
+              predictAndScoreFinal.scoreMetrics[totalTokensmetricId] = {
                 value: totalTokens,
                 sourceCall: {
                   callId: traceCall.id,
-                  _rawScoreTraceData: traceCall,
+                  _rawTraceData: traceCall,
                 },
               };
             } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
@@ -439,59 +463,40 @@ const fetchEvaluationComparisonData = async (
                 scorerRef = traceCall.inputs.self;
               }
 
-              const likelyName = getScoreKeyNameFromScorerRef(scorerRef);
-              const scorerDef: ScorerDefinition = {
-                scorerOpOrObjRef: scorerRef,
-                likelyTopLevelKeyName: likelyName,
-              };
-
               const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
                 if (isBinaryScore(scoreVal)) {
-                  const metricDimension: ScorerMetricDimension = {
-                    dimensionType: 'scorerMetric',
-                    scorerDef: {...scorerDef},
-                    metricSubPath: currPath,
+                  const metricDimension: MetricDefinition = {
                     scoreType: 'binary',
-                  };
-                  const metricDimensionId = dimensionId(metricDimension);
-                  if (
-                    result.scorerMetricDimensions[metricDimensionId] != null
-                  ) {
-                    result.scorerMetricDimensions[metricDimensionId] =
-                      metricDimension;
-                    predictAndScoreFinal.scorerMetrics[metricDimensionId] = {
-                      sourceCall: {
-                        callId: traceCall.id,
-                        _rawScoreTraceData: traceCall,
-                      },
-                      value: scoreVal,
-                    };
-                  } else {
-                    console.error('Skipping metric', metricDimensionId);
-                  }
-                } else if (isContinuousScore(scoreVal)) {
-                  const metricDimension: ScorerMetricDimension = {
-                    dimensionType: 'scorerMetric',
-                    scorerDef: {...scorerDef},
                     metricSubPath: currPath,
-                    scoreType: 'continuous',
+                    source: 'scorer',
+                    scorerOpOrObjRef: scorerRef,
                   };
-                  const metricDimensionId = dimensionId(metricDimension);
-                  if (
-                    result.scorerMetricDimensions[metricDimensionId] != null
-                  ) {
-                    result.scorerMetricDimensions[metricDimensionId] =
-                      metricDimension;
-                    predictAndScoreFinal.scorerMetrics[metricDimensionId] = {
-                      sourceCall: {
-                        callId: traceCall.id,
-                        _rawScoreTraceData: traceCall,
-                      },
-                      value: scoreVal,
-                    };
-                  } else {
-                    console.error('Skipping metric', metricDimensionId);
-                  }
+                  const metricId = metricDefinitionId(metricDimension);
+                  result.scoreMetrics[metricId] = metricDimension;
+                  predictAndScoreFinal.scoreMetrics[metricId] = {
+                    sourceCall: {
+                      callId: traceCall.id,
+                      _rawTraceData: traceCall,
+                    },
+                    value: scoreVal,
+                  };
+                } else if (isContinuousScore(scoreVal)) {
+                  const metricDimension: MetricDefinition = {
+                    scoreType: 'continuous',
+                    metricSubPath: currPath,
+                    source: 'scorer',
+                    scorerOpOrObjRef: scorerRef,
+                  };
+                  const metricId = metricDefinitionId(metricDimension);
+                  result.scoreMetrics[metricId] = metricDimension;
+
+                  predictAndScoreFinal.scoreMetrics[metricId] = {
+                    sourceCall: {
+                      callId: traceCall.id,
+                      _rawTraceData: traceCall,
+                    },
+                    value: scoreVal,
+                  };
                 } else if (
                   scoreVal != null &&
                   typeof scoreVal === 'object' &&
@@ -530,18 +535,18 @@ const getScoreKeyNameFromScorerRef = (scorerRef: string) => {
   return parsed.artifactName;
 };
 
-const modelLatencyMetricDimension: DerivedMetricDefinition = {
-  dimensionType: 'derivedMetric',
+const modelLatencyMetricDimension: MetricDefinition = {
+  source: 'derived',
   scoreType: 'continuous',
-  derivedMetricName: 'Model Latency',
+  metricSubPath: ['Model Latency'],
   shouldMinimize: true,
   unit: ' ms',
 };
 
-const totalTokensMetricDimension: DerivedMetricDefinition = {
-  dimensionType: 'derivedMetric',
+const totalTokensMetricDimension: MetricDefinition = {
+  source: 'derived',
   scoreType: 'continuous',
-  derivedMetricName: 'Total Tokens',
+  metricSubPath: ['Total Tokens'],
   shouldMinimize: true,
   unit: '',
 };
