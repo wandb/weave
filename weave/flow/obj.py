@@ -85,7 +85,7 @@ class Object(BaseModel):
                 if inspect.iscoroutinefunction(op.resolve_fn):
                     call = partial(_call_async, op, self)
                 else:
-                    call = partial(_call_sync, op, self)
+                    call = partial(_call_sync, op, self)  # type: ignore
 
                 op.__dict__["call"] = call
 

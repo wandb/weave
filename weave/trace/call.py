@@ -162,7 +162,9 @@ def create_call(func: "Op", *args: Any, **kwargs: Any) -> "Call":
     )
 
 
-async def _call_async(op: "Op", *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
+async def _call_async(
+    op: "Op", *args: Any, **kwargs: Any
+) -> tuple[Optional[Coroutine[Any, Any, Any]], "Call"]:
     _call = create_call(op, *args, **kwargs)
     try:
         return await _execute_call_async(op, _call, *args, **kwargs), _call
