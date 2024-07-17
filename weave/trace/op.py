@@ -184,16 +184,16 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
                     if client_context.weave_client.get_weave_client() is None:
                         return await func(*args, **kwargs)
-                    call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    call = create_call(wrapper, *args, **kwargs)  # type: ignore
+                    return await execute_call(wrapper, call, *args, **kwargs)  # type: ignore
             else:
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
                     if client_context.weave_client.get_weave_client() is None:
                         return func(*args, **kwargs)
-                    call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    call = create_call(wrapper, *args, **kwargs)  # type: ignore
+                    return execute_call(wrapper, call, *args, **kwargs)  # type: ignore
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
