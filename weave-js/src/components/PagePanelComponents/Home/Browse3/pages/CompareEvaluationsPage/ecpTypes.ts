@@ -1,65 +1,54 @@
 /**
- * TODO:
- * * Really try to cleanup the code - specifically:
- *    * there is a lot of slopiness with react memoing
- *    * There is a lot of slopiness in symbol names and files
- * * Remember to cleanup unused symbols (knip)
- *  * Test each of the example pages
- *    * URLS:
- *       * Unit Test
- *       * https://app.wandb.test/timssweeney/dev_testing/weave/compare-evaluations?evaluationCallIds=%5B%22b473c999-0468-4692-a03c-4e5120112a3b%22%2C%222c8b8f41-b249-44b4-b2dc-ada94987dd7c%22%5D
- *       * Anish
- *       * https://app.wandb.test/a-sh0ts/arxiv-papers-anthropic-testv6-8/weave/compare-evaluations?evaluationCallIds=%5B%224d26e233-37ab-4134-8985-f3ed58bb5c73%22%2C%22c99bca2c-3798-4b24-b5e6-75b245f3a0c8%22%5D
- *       * Lavanya
- *       * https://app.wandb.test/lavanyashukla/nims_rag_2/weave/compare-evaluations?evaluationCallIds=%5B%227ca7836f-e055-42eb-94c5-1625b73af789%22%2C%221024b6c8-6707-4e61-9474-463ad424a067%22%5D
- *       * https://app.wandb.test/lavanyashukla/nims_rag_2/weave/compare-evaluations?evaluationCallIds=%5B%22fad0e96b-e9e3-4a84-8ce0-ad61dce5987e%22%2C%221024b6c8-6707-4e61-9474-463ad424a067%22%2C%227ca7836f-e055-42eb-94c5-1625b73af789%22%5D
- *       * https://app.wandb.test/lavanyashukla/nims_rag_2/weave/compare-evaluations?evaluationCallIds=%5B%223fd22e88-84a6-4f66-ba71-2f789d44aded%22%2C%227ca7836f-e055-42eb-94c5-1625b73af789%22%2C%221024b6c8-6707-4e61-9474-463ad424a067%22%2C%22d6358605-5c1d-4561-819d-179bb433a7a7%22%5D
- *       * Jason
- *       * https://app.wandb.test/jzhao/resume-bot-eval/weave/compare-evaluations?evaluationCallIds=%5B%22fecc2462-10c1-4a7b-a0b9-4e1726e5618d%22%2C%224bc16671-95b6-4044-94d4-b34417b44868%22%5D
- *       * Shawn
- *       * https://app.wandb.test/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%5D
- *       * https://app.wandb.test/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%5D
- *       * https://app.wandb.test/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%2C%2232f3e6bc-5488-4dd4-b9c4-801929f2c541%22%2C%2234c0a20f-657f-407e-bb33-277abbb9997f%22%5D
- *       * Adam
- *       * https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22eb4a3bed-5e67-4caf-a911-db4705f5254e%22%5D
- *       * https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22eb4a3bed-5e67-4caf-a911-db4705f5254e%22%2C%22c4345512-ef52-4112-a941-83fd6dac779f%22%5D
- *       * https://app.wandb.test/wandb-designers/signal-maven/weave/compare-evaluations?evaluationCallIds=%5B%22eb4a3bed-5e67-4caf-a911-db4705f5254e%22%2C%22c4345512-ef52-4112-a941-83fd6dac779f%22%2C%22bf5188ba-48cd-4c6d-91ea-e25464570c13%22%2C%228d76bb68-837e-4fff-8159-489958fd1f65%22%5D
- *    * Tests:
- *       * Loads
- *       * Charts look good
- *       * Scorecard looks good
- *       * Scorecard links work
- *       * Filters are changeable and selectable
- *       * Filtered data is correct
- *       * SummaryScorers link correctly (both single and mixed)
- *       * MetricScorers link correctly (both single and mixed)
- *       * MetricValues link to scoring call correctly
+ * Contains the primary data definition for the Evaluation Comparison Page. Note:
+ * `ecpState.ts` contains the state definition for the Evaluation Comparison Page.
+ *
+ * The `EvaluationComparisonData` fully defines a normalized data structure for the
+ * Comparing Evaluations.
  */
-
 import {
   TraceCallSchema,
   TraceObjSchema,
 } from '../wfReactInterface/traceServerClient';
 
 export type EvaluationComparisonData = {
+  // Entity and Project are constant across all calls
   entity: string;
   project: string;
-  evaluationCalls: {
-    [callId: string]: EvaluationCall;
-  };
+
+  // Evaluations are the Weave Objects that define the evaluation itself
   evaluations: {
     [objectRef: string]: EvaluationObj;
   };
+
+  // EvaluationCalls are the specific calls of an evaluation.
+  evaluationCalls: {
+    [callId: string]: EvaluationCall;
+  };
+
+  // Inputs are the intersection of all inputs used in the evaluations.
+  // Note, we are able to "merge" the same input digest even if it is
+  // used in different evaluations.
   inputs: {
     [rowDigest: string]: DatasetRow;
   };
+
+  // Models are the Weave Objects used to define the model logic and properties.
   models: {
     [modelRef: string]: ModelObj;
   };
+
+  // ResultRows are the actual results of running the evaluation against
+  // the inputs.
   resultRows: {
+    // Each rowDigest is a unique identifier for the input data.
     [rowDigest: string]: {
+      // Each RowDigest is further broken down by the evaluations that
+      // used the input.
       evaluations: {
         [evaluationCallId: string]: {
+          // Each evaluation is further broken down by the predictAndScore
+          // calls that were made. (The case where this is more than 1 is
+          // when the evaluation is using multiple trials)
           predictAndScores: {
             [predictAndScoreCallId: string]: PredictAndScoreCall;
           };
@@ -67,27 +56,83 @@ export type EvaluationComparisonData = {
       };
     };
   };
+
+  // ScoreMetrics define the metrics that are associated on each individual prediction
   scoreMetrics: MetricDefinitionMap;
+
+  // SummaryMetrics define the metrics that are associated with the evaluation as a whole
+  // often aggregated from the scoreMetrics.
   summaryMetrics: MetricDefinitionMap;
 };
 
-export type BinarySummaryScore = {
-  true_count: number;
-  true_fraction: number;
+/**
+ * The EvaluationObj is the primary object that defines the evaluation itself.
+ */
+type EvaluationObj = {
+  ref: string;
+  datasetRef: string;
+  scorerRefs: string[];
+  //
+  entity: string;
+  project: string;
+  _rawEvaluationObject: TraceObjSchema;
 };
 
-export type BinaryValue = boolean;
-
-export type ContinuousSummaryScore = {
-  mean: number;
+/**
+ * The EvaluationCall is the specific call of an evaluation.
+ */
+export type EvaluationCall = {
+  callId: string;
+  evaluationRef: string;
+  modelRef: string;
+  //
+  name: string;
+  color: string;
+  summaryMetrics: MetricResultMap;
+  _rawEvaluationTraceData: EvaluationEvaluateCallSchema;
 };
 
-export type ContinuousValue = number;
+/**
+ * The DatasetRow is the primary object that defines the input data.
+ */
+type DatasetRow = {
+  digest: string;
+  val: any;
+};
 
-// In the future, we can add `model_output` to capture self-reported model metrics
-export type SourceType = 'derived' | 'scorer';
-export type MetricType = 'score' | 'summary';
+/**
+ * The ModelObj is the primary object that defines the model logic and properties.
+ */
+type ModelObj = {
+  ref: string;
+  predictOpRef: string;
+  //
+  entity: string;
+  project: string;
+  properties: {[prop: string]: any};
+  _rawModelObject: TraceObjSchema;
+};
 
+/**
+ * The PredictAndScoreCall is the specific call of a model prediction and scoring.
+ * This is the aggregate view of the model prediction and scores for a given input.
+ */
+export type PredictAndScoreCall = {
+  callId: string;
+  exampleRef: string;
+  rowDigest: string;
+  modelRef: string;
+  evaluationCallId: string;
+  scoreMetrics: MetricResultMap;
+  _rawPredictAndScoreTraceData: TraceCallSchema;
+  _rawPredictTraceData?: TraceCallSchema;
+};
+
+/**
+ * A metric definition map maps metric ids to metric definitions.
+ */
+export type MetricDefinitionMap = {[metricId: string]: MetricDefinition};
+export type SourceType = 'derived' | 'scorer'; // In the future, we can add `model_output` to capture self-reported model metrics
 export type MetricDefinition = {
   metricSubPath: string[];
   scoreType: 'binary' | 'continuous';
@@ -97,11 +142,27 @@ export type MetricDefinition = {
   unit?: string;
 };
 
+/**
+ * A result map maps metric ids to metric results.
+ */
+type MetricResultMap = {[metricId: string]: MetricResult};
+export type BinaryValue = boolean;
+export type ContinuousValue = number;
 export type MetricValueType = BinaryValue | ContinuousValue;
-
 export type MetricResult = {
   value: MetricValueType;
   sourceCallId: string;
+};
+
+///
+
+export type BinarySummaryScore = {
+  true_count: number;
+  true_fraction: number;
+};
+
+export type ContinuousSummaryScore = {
+  mean: number;
 };
 
 export type EvaluationEvaluateCallSchema = TraceCallSchema & {
@@ -129,49 +190,3 @@ export type EvaluationEvaluateCallSchema = TraceCallSchema & {
 };
 
 type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
-
-type DatasetRow = {
-  digest: string;
-  val: any;
-};
-type ModelObj = {
-  ref: string;
-  predictOpRef: string;
-  properties: {[prop: string]: any};
-  project: string;
-  entity: string;
-  _rawModelObject: TraceObjSchema;
-};
-
-export type MetricDefinitionMap = {[metricId: string]: MetricDefinition};
-type MetricResultMap = {[metricId: string]: MetricResult};
-
-export type PredictAndScoreCall = {
-  callId: string;
-  exampleRef: string;
-  rowDigest: string;
-  modelRef: string;
-  evaluationCallId: string;
-  scoreMetrics: MetricResultMap;
-  _rawPredictAndScoreTraceData: TraceCallSchema;
-  _rawPredictTraceData?: TraceCallSchema;
-};
-
-export type EvaluationCall = {
-  callId: string;
-  name: string;
-  color: string;
-  evaluationRef: string;
-  modelRef: string;
-  summaryMetrics: MetricResultMap;
-  _rawEvaluationTraceData: EvaluationEvaluateCallSchema;
-};
-
-type EvaluationObj = {
-  ref: string;
-  datasetRef: string;
-  scorerRefs: string[];
-  project: string;
-  entity: string;
-  _rawEvaluationObject: TraceObjSchema;
-};

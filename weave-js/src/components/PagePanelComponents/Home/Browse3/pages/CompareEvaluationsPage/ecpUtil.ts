@@ -9,7 +9,6 @@ import {
   MetricDefinition,
   MetricDefinitionMap,
   MetricResult,
-  MetricType,
   MetricValueType,
   PredictAndScoreCall,
   SourceType,
@@ -93,6 +92,7 @@ export const resolveSummaryMetricValueForEvaluateCall = (
   return undefined;
 };
 
+export type MetricType = 'score' | 'summary';
 export const getMetricIds = (
   data: EvaluationComparisonData,
   type: MetricType,
