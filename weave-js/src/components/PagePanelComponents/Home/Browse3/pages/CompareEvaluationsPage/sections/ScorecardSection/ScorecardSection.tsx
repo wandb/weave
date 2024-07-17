@@ -6,6 +6,7 @@ import styled from 'styled-components';
 
 import {
   MOON_100,
+  MOON_300,
   MOON_600,
 } from '../../../../../../../../common/css/color.styles';
 import {WeaveObjectRef} from '../../../../../../../../react';
@@ -28,7 +29,11 @@ import {
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {getOrderedCallIds, getOrderedModelRefs} from '../../ecpState';
 import {EvaluationComparisonState} from '../../ecpTypes';
-import {resolveSummaryMetricValueForEvaluateCall} from '../../ecpUtil';
+import {
+  resolveSummaryMetricResultForEvaluateCall,
+  resolveSummaryMetricValueForEvaluateCall,
+} from '../../ecpUtil';
+import {usePeekCall} from '../../hooks';
 import {HorizontalBox} from '../../Layout';
 import {
   EvaluationCallLink,
@@ -44,9 +49,20 @@ const DATASET_VARIATION_WARNING_TITLE = 'Dataset inconsistency detected';
 const DATASET_VARIATION_WARNING_EXPLANATION =
   'The dataset varies between evaluations therefore aggregate metrics may not be directly comparable. Examples are limited to the intersection of the datasets.';
 
-const GridCell = styled.div`
+const GridCell = styled.div<{
+  button?: boolean;
+}>`
   padding: 6px 16px;
   min-width: 100px;
+  ${props =>
+    props.button &&
+    `
+    cursor: pointer;
+    transition: background-color 0.2s;
+    &:hover {
+      background-color: ${MOON_300};
+    }
+  `}
 `;
 
 export const ScorecardSection: React.FC<{
@@ -99,6 +115,11 @@ export const ScorecardSection: React.FC<{
   const compositeSummaryMetrics = useMemo(() => {
     return buildCompositeMetricsMap(props.state.data, 'summary');
   }, [props.state]);
+
+  const onCallClick = usePeekCall(
+    props.state.data.entity,
+    props.state.data.project
+  );
 
   const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
 
@@ -406,16 +427,24 @@ export const ScorecardSection: React.FC<{
                         groupName,
                         metricKey
                       );
-                      const value = compareDimension
-                        ? resolveSummaryMetricValueForEvaluateCall(
+                      const metric = compareDimension
+                        ? resolveSummaryMetricResultForEvaluateCall(
                             compareDimension,
                             props.state.data.evaluationCalls[evalCallId]
                           )
                         : undefined;
 
+                      const value = metric?.value;
+                      const sourceCallId = metric?.sourceCallId;
+
                       const dataIsNumber =
                         typeof value === 'number' &&
                         typeof baseline === 'number';
+
+                      const onClick = sourceCallId
+                        ? () => onCallClick(sourceCallId)
+                        : undefined;
+
                       return (
                         <GridCell
                           key={evalCallId}
@@ -425,7 +454,9 @@ export const ScorecardSection: React.FC<{
                               Object.keys(group.metrics).length - 1
                                 ? '1px solid #ccc'
                                 : '',
-                          }}>
+                          }}
+                          onClick={onClick}
+                          button={!!onClick}>
                           {value != null ? (
                             <HorizontalBox
                               style={{
@@ -436,10 +467,6 @@ export const ScorecardSection: React.FC<{
                                   minWidth: '70px',
                                 }}>
                                 <CellValue value={value} />
-                                {/* <ValueViewNumber
-                                  fractionDigits={SIGNIFICANT_DIGITS}
-                                  value={value}
-                                /> */}
                                 {group.metrics[metricKey]
                                   .scorerAgnosticMetricDef.unit ?? ''}
                               </span>

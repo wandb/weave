@@ -69,7 +69,7 @@ export const resolveScoreMetricValueForPASCall = (
   return undefined;
 };
 
-const resolveSummaryMetricResultForEvaluateCall = (
+export const resolveSummaryMetricResultForEvaluateCall = (
   dim: MetricDefinition,
   evaluateCall: EvaluationCall
 ): MetricResult | undefined => {
