@@ -65,6 +65,12 @@ if typing.TYPE_CHECKING:
     from . import ref_base
 
 
+# Controls if objects can have refs to projects not the WeaveClient project.
+# If False, object refs with with mismatching projects will be recreated.
+# If True, use existing ref to object in other project.
+ALLOW_MIXED_PROJECT_REFS = False
+
+
 def generate_id() -> str:
     return str(uuid.uuid4())
 
@@ -757,11 +763,13 @@ class WeaveClient:
 
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if (ref := get_ref(obj)) is not None:
-            # Obj has an existing ref, check if ref is to the correct project
-            if ref.project == self.project:
-                # Use the cached ref instead of recreating
+            if ALLOW_MIXED_PROJECT_REFS:
                 return
-            # Ref is to different project, remove and recreate
+
+            # Check if existing ref is to current project, if not,
+            # remove the ref and recreate it in the current project
+            if ref.project == self.project:
+                return
             remove_ref(obj)
 
         if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
