@@ -154,6 +154,16 @@ export const ConfirmDeleteModal: FC<{
       return;
     }
     setDeleteLoading(true);
+    userEvents.deleteClicked({
+      callIds: calls.map(
+        call => `${call.entity}/${call.project}/${call.callId}`
+      ),
+      numCalls: calls.length,
+      userId: userInfoLoaded?.id ?? '',
+      organizationName: orgName,
+      username: userInfoLoaded?.username ?? '',
+    });
+
     const projectGroups = makeProjectGroups(calls);
     const deletePromises: Array<Promise<void>> = [];
     Object.keys(projectGroups).forEach(projectKey => {
@@ -164,15 +174,6 @@ export const ConfirmDeleteModal: FC<{
     });
     Promise.all(deletePromises)
       .then(() => {
-        userEvents.deleteClicked({
-          callIds: calls.map(
-            call => `${call.entity}/${call.project}/${call.callId}`
-          ),
-          numCalls: calls.length,
-          userId: userInfoLoaded?.id ?? '',
-          organizationName: orgName,
-          entityName: userInfoLoaded?.username ?? '',
-        });
         setDeleteLoading(false);
         setConfirmDelete(false);
         onDeleteCallback?.();
