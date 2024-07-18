@@ -141,17 +141,17 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   input: flattenObject({input: datasetRow.val}),
                   output: flattenObject({output}),
                   scores: Object.fromEntries(
-                    [
-                      ...Object.entries(state.data.scoreMetrics),
-                    ].map(([scoreKey, scoreVal]) => {
-                      return [
-                        scoreKey,
-                        resolveScoreMetricValueForPASCall(
-                          scoreVal,
-                          predictAndScoreRes
-                        ),
-                      ];
-                    })
+                    [...Object.entries(state.data.scoreMetrics)].map(
+                      ([scoreKey, scoreVal]) => {
+                        return [
+                          scoreKey,
+                          resolveScoreMetricValueForPASCall(
+                            scoreVal,
+                            predictAndScoreRes
+                          ),
+                        ];
+                      }
+                    )
                   ),
                   path: [
                     rowDigest,

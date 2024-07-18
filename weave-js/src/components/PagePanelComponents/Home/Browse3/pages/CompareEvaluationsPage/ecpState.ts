@@ -132,7 +132,7 @@ export const getOrderedModelRefs = (state: EvaluationComparisonState) => {
 // Helpers
 
 // Consider merging with `EmojiDetails.tsx::moveToFront`
-const moveItemToFront = <T, >(arr: T[], item: T): T[] => {
+const moveItemToFront = <T>(arr: T[], item: T): T[] => {
   const index = arr.indexOf(item);
   if (index > -1) {
     arr.splice(index, 1);
