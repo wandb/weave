@@ -32,8 +32,8 @@ class EvaluationArgumentError(Exception):
 
 
 INVALID_MODEL_ERROR = (
-    "Evaluation.evaluate requires a Model or Op instance as the model argument. "
-    + "If you are using a function, wrap it with `weave.op` to create an Op instance."
+    "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
+    + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
 )
 
 
