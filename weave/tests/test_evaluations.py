@@ -4,6 +4,7 @@ import pytest
 
 import weave
 from weave import Evaluation, Model
+from weave.flow.eval import EvaluationArgumentError
 
 from ..trace_server import trace_server_interface as tsi
 
@@ -524,23 +525,25 @@ async def test_eval_supports_non_op_funcs(client):
         scorers=[function_score],
     )
 
-    res = await evaluation.evaluate(function_model)
+    with pytest.raises(EvaluationArgumentError):
+        res = await evaluation.evaluate(function_model)
 
-    assert res["function_score"] == {"correct": {"true_count": 0, "true_fraction": 0.0}}
+    # In the future, if we want to auto-opify, then uncomment the following assertions:
+    # assert res["function_score"] == {"correct": {"true_count": 0, "true_fraction": 0.0}}
 
-    calls = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client._project_id(),
-        )
-    )
-    assert len(calls.calls) == 4
-    shouldBeEvalRef = calls.calls[0].inputs["self"]
-    assert shouldBeEvalRef.startswith("weave:///")
-    gottenEval = weave.ref(shouldBeEvalRef).get()
+    # calls = client.server.calls_query(
+    #     tsi.CallsQueryReq(
+    #         project_id=client._project_id(),
+    #     )
+    # )
+    # assert len(calls.calls) == 4
+    # shouldBeEvalRef = calls.calls[0].inputs["self"]
+    # assert shouldBeEvalRef.startswith("weave:///")
+    # gottenEval = weave.ref(shouldBeEvalRef).get()
 
-    # 1: Assert that the scorer was correctly oped
-    gottenEval.scorers[0].ref.name == "function_score"
-    shouldBeModelRef = calls.calls[0].inputs["model"]
+    # # 1: Assert that the scorer was correctly oped
+    # gottenEval.scorers[0].ref.name == "function_score"
+    # shouldBeModelRef = calls.calls[0].inputs["model"]
 
-    # 2: Assert that the model was correctly oped
-    assert shouldBeModelRef.startswith("weave:///")
+    # # 2: Assert that the model was correctly oped
+    # assert shouldBeModelRef.startswith("weave:///")
