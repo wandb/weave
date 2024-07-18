@@ -4,8 +4,8 @@ import json
 import platform
 import re
 import signal
-from typing import Callable
 import sys
+from typing import Callable
 
 import pydantic
 import pytest
