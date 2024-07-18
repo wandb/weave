@@ -273,7 +273,7 @@ class Evaluation(Object):
 
     @weave.op()
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
-        if not isinstance(Op, Model) and not isinstance(model, Op):
+        if not isinstance(model, Model) and not isinstance(model, Op):
             raise EvaluationArgumentError(INVALID_MODEL_ERROR)
         eval_rows = []
 
