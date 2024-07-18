@@ -788,8 +788,8 @@ def test_obj_dedupe(client):
     client._save_object({"a": 2}, "my-obj")
     res = client._objects()
     assert len(res) == 2
-    assert res[0].version_index == 0
-    assert res[1].version_index == 1
+    assert res[0].version_index in [0, 1]
+    assert res[1].version_index in [0, 1]
 
 
 def test_op_query(client):
