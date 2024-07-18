@@ -541,6 +541,18 @@ export const opArtifactVersionAliases = makeArtifactVersionOp({
     ),
 });
 
+export const opArtifactVersionTags = makeArtifactVersionOp({
+  name: 'artifactVersion-tags',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns the tags for a ${docType('artifactVersion')}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `The tags for a ${docType('artifactVersion')}`,
+  returnType: inputTypes => list('Tag'),
+  resolver: ({artifactVersion}) => (artifactVersion.tags ?? []),
+});
+
 export const opArtifactVersionLink = makeArtifactVersionOp({
   name: 'artifactVersion-link',
   argTypes: artifactVersionArgTypes,
