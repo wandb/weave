@@ -310,7 +310,10 @@ const DimensionPicker: React.FC<{
   const dimensionMap = props.state.data.scoreMetrics;
 
   return (
-    <FormControl>
+    <FormControl
+      style={{
+        paddingTop: '6px',
+      }}>
       <Autocomplete
         size="small"
         disableClearable
