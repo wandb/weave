@@ -199,9 +199,9 @@ export const ConfirmDeleteModal: FC<{
           </p>
         )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
-          <CallNameRow>
+          <CallNameRow key={call.callId}>
             <div>
-              <CallName key={call.callId}>{callDisplayName(call)}</CallName>
+              <CallName>{callDisplayName(call)}</CallName>
             </div>
             <CallIdDiv>
               <CopyableId id={call.callId} type="Call" />

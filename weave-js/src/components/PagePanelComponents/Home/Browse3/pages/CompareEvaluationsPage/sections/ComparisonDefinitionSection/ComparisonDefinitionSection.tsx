@@ -4,7 +4,7 @@ import {Button} from '../../../../../../../Button';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {STANDARD_PADDING} from '../../ecpConstants';
 import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
 import {EvaluationDefinition} from './EvaluationDefinition';
 
