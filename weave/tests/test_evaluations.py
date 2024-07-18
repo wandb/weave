@@ -513,24 +513,20 @@ async def test_eval_supports_non_op_funcs(client):
     def function_model(sentence: str) -> dict:
         return ""
 
-    def fruit_name_score(target: dict, model_output: dict) -> dict:
+    def function_score(target: dict, model_output: dict) -> dict:
         return {"correct": target == model_output}
 
-    # Finally, we run an evaluation of this model.
-    # This will generate a prediction for each input example, and then score it with each scoring function.
     evaluation = weave.Evaluation(
         name="fruit_eval",
         dataset=[
             {"id": "0", "sentence": "a", "target": "b"},
         ],
-        scorers=[fruit_name_score],
+        scorers=[function_score],
     )
 
     res = await evaluation.evaluate(function_model)
 
-    assert res["fruit_name_score"] == {
-        "correct": {"true_count": 0, "true_fraction": 0.0}
-    }
+    assert res["function_score"] == {"correct": {"true_count": 0, "true_fraction": 0.0}}
 
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -538,5 +534,13 @@ async def test_eval_supports_non_op_funcs(client):
         )
     )
     assert len(calls.calls) == 4
-    shouldBeRef = calls.calls[0].inputs["model"]
-    assert shouldBeRef.startswith("weave:///")
+    shouldBeEvalRef = calls.calls[0].inputs["self"]
+    assert shouldBeEvalRef.startswith("weave:///")
+    gottenEval = weave.ref(shouldBeEvalRef).get()
+
+    # 1: Assert that the scorer was correctly oped
+    gottenEval.scorers[0].ref.name == "function_score"
+    shouldBeModelRef = calls.calls[0].inputs["model"]
+
+    # 2: Assert that the model was correctly oped
+    assert shouldBeModelRef.startswith("weave:///")
