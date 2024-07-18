@@ -622,12 +622,6 @@ const fetchEvaluationComparisonData = async (
         traceCall.inputs.self ?? ''
       );
       const isSummaryOp = traceCall.op_name.includes('summarize:');
-      console.log(
-        isSummaryChild,
-        isProbablyBoundScoreCall,
-        isSummaryOp,
-        isSummaryChild && isProbablyBoundScoreCall && isSummaryOp
-      );
       if (isSummaryChild && isProbablyBoundScoreCall && isSummaryOp) {
         // Now fill in the source of the eval score
         const evalCallId = maybeParentSummaryOp!.parent_id!;

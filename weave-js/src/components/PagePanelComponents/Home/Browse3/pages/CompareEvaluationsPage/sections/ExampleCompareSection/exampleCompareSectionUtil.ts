@@ -143,7 +143,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   scores: Object.fromEntries(
                     [
                       ...Object.entries(state.data.scoreMetrics),
-                      // ...Object.entries(state.data.derivedMetricDimensions),
                     ].map(([scoreKey, scoreVal]) => {
                       return [
                         scoreKey,

@@ -46,8 +46,7 @@ export const EvaluationCallLink: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const evaluationCall = props.state.data.evaluationCalls[props.callId];
-  const entity = props.state.data.entity;
-  const project = props.state.data.project;
+  const {entity, project} = props.state.data;
 
   return (
     <CallLink

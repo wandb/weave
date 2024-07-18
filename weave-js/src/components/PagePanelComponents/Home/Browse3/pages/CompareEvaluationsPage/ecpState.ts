@@ -1,5 +1,5 @@
 /**
- * This file defined `EvaluationComparisonState` which is the global state object used to
+ * This file defines `EvaluationComparisonState` which is the global state object used to
  * render the Evaluations Comparison Page. Furthermore, we defined a custom hook that is used
  * to fetch the data and populate some default values for the state object. Finally, we define
  * some helper functions.
@@ -20,7 +20,7 @@ export type EvaluationComparisonState = {
   data: EvaluationComparisonData;
   // The evaluation call id of the baseline model
   baselineEvaluationCallId: string;
-  // The dimensions to compare compare & filter results
+  // The dimensions to compare & filter results
   comparisonDimensions?: ComparisonDimensionsType;
   // The current digest which is in view
   selectedInputDigest?: string;
@@ -34,7 +34,7 @@ export type ComparisonDimensionsType = Array<{
 type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
 
 /**
- * Fetches the data and populates some default values for the state object. THis is the primary
+ * Fetches the data and populates some default values for the state object. This is the primary
  * bridge between react and the evaluation comparison data retrieval.
  */
 export const useEvaluationComparisonState = (

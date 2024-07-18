@@ -72,7 +72,6 @@ type EvaluationObj = {
   ref: string;
   datasetRef: string;
   scorerRefs: string[];
-  //
   entity: string;
   project: string;
   _rawEvaluationObject: TraceObjSchema;
@@ -85,7 +84,6 @@ export type EvaluationCall = {
   callId: string;
   evaluationRef: string;
   modelRef: string;
-  //
   name: string;
   color: string;
   summaryMetrics: MetricResultMap;
@@ -105,7 +103,6 @@ type DatasetRow = {
 type ModelObj = {
   ref: string;
   predictOpRef: string;
-  //
   entity: string;
   project: string;
   properties: {[prop: string]: any};
