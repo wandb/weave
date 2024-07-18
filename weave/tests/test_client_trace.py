@@ -2255,7 +2255,7 @@ def test_call_has_client_version(client):
     def test():
         return 1
 
-    c = test.call()
+    _, c = test.call()
     assert "weave" in c.attributes
     assert "client_version" in c.attributes["weave"]
 
