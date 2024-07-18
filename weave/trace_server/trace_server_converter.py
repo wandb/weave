@@ -92,7 +92,7 @@ def universal_int_to_ext_ref_converter(
             )
         external_project_id = int_to_ext_project_cache[project_id]
         if not external_project_id:
-            return ri.PRIVATE_WEAVE_STR
+            f"{ri.WEAVE_SCHEME}://///{tail}
         return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
 
     def mapper(obj: D) -> D:
