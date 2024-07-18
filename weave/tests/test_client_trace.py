@@ -2,9 +2,11 @@ import asyncio
 import dataclasses
 import datetime
 import os
+import platform
+import sys
+import time
 import typing
 from collections import defaultdict, namedtuple
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from contextvars import copy_context
 
@@ -13,10 +15,11 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from weave import weave_client
+from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, WeaveObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave.weave_client import Call
 
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
@@ -75,7 +78,16 @@ def test_simple_op(client):
         exception=None,
         output=6,
         summary={},
-        attributes={},
+        attributes={
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+                "sys_version": sys.version,
+            },
+        },
     )
 
 
@@ -1241,7 +1253,17 @@ def test_attributes_on_ops(client):
     )
 
     assert len(res.calls) == 1
-    assert res.calls[0].attributes == {"custom": "attribute"}
+    assert res.calls[0].attributes == {
+        "custom": "attribute",
+        "weave": {
+            "client_version": weave.version.VERSION,
+            "source": "python-sdk",
+            "os_name": platform.system(),
+            "os_version": platform.version(),
+            "os_release": platform.release(),
+            "sys_version": sys.version,
+        },
+    }
 
 
 def test_dataset_row_type(client):
@@ -1318,6 +1340,10 @@ def test_bound_op_retrieval(client):
     my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
     with pytest.raises(MissingSelfInstanceError):
         my_op2 = my_op_ref.get()
+
+    my_op_ref2 = weave_client.get_ref(obj2.op_with_custom_type)
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref2.get()
 
 
 @pytest.mark.skip("Not implemented: general bound op designation")
@@ -1574,7 +1600,7 @@ def test_single_primitive_output(client):
     assert isinstance(b, bool)
     assert b == True
     assert isinstance(c, type(None))
-    assert c == None
+    assert c is None
     assert isinstance(d, dict)
     assert isinstance(d["a"], int)
     assert isinstance(d["b"], bool)
@@ -1590,7 +1616,7 @@ def test_single_primitive_output(client):
     assert len(inner_res.calls) == 4
     assert inner_res.calls[0].output == 1
     assert inner_res.calls[1].output == True
-    assert inner_res.calls[2].output == None
+    assert inner_res.calls[2].output is None
     assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
 
 
@@ -1601,7 +1627,26 @@ def map_simple(fn, vals):
 max_workers = 3
 
 
-# This is a standard way to execute a map operation with thread executor.
+def map_with_threads_no_executor(fn, vals):
+    def task_wrapper(v):
+        return fn(v)
+
+    threads = []
+
+    for v in vals:
+        thread = Thread(target=task_wrapper, args=(v,))
+        thread.start()
+        threads.append(thread)
+
+        if len(threads) >= max_workers:
+            for thread in threads:
+                thread.join()
+            threads = []
+
+        for thread in threads:
+            thread.join()
+
+
 def map_with_thread_executor(fn, vals):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(fn, vals)
@@ -1623,7 +1668,8 @@ def map_with_copying_thread_executor(fn, vals):
     "mapper",
     [
         map_simple,
-        # map_with_thread_executor, # <-- Currently this is failing! Fix me (:
+        map_with_threads_no_executor,
+        map_with_thread_executor,
         # map_with_copying_thread_executor, # <-- Flakes in CI
     ],
 )
@@ -1682,8 +1728,6 @@ def test_mapped_execution(client, mapper):
                 sequential_expected_order.append(f"{op}({event}):{i}")
     if mapper == map_simple:
         assert events == sequential_expected_order
-    else:
-        assert events != sequential_expected_order
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -2204,3 +2248,128 @@ def test_sort_and_filter_through_refs(client):
         )
 
         assert inner_res.count == count
+
+
+def test_call_has_client_version(client):
+    @weave.op
+    def test():
+        return 1
+
+    _, c = test.call()
+    assert "weave" in c.attributes
+    assert "client_version" in c.attributes["weave"]
+
+
+def test_user_cannot_modify_call_weave_dict(client):
+    @weave.op
+    def test():
+        return 1
+
+    _, call = test.call()
+
+    call.attributes["test"] = 123
+
+    with pytest.raises(KeyError):
+        call.attributes["weave"] = {"anything": "blah"}
+
+    with pytest.raises(KeyError):
+        call.attributes["weave"]["anything"] = "blah"
+
+    # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
+    # but at that point you're on your own :)
+
+
+def test_calls_iter_slice(client):
+    @weave.op
+    def func(x):
+        return x
+
+    for i in range(10):
+        func(i)
+
+    calls = func.calls()
+    calls_subset = calls[2:5]
+    assert len(calls_subset) == 3
+
+
+def test_calls_iter_cached(client):
+    @weave.op
+    def func(x):
+        return x
+
+    for i in range(20):
+        func(i)
+
+    calls = func.calls()
+
+    elapsed_times = []
+    for i in range(3):
+        start_time = time.time()
+        c = calls[0]
+        end_time = time.time()
+        elapsed_times.append(end_time - start_time)
+
+    # cached lookup should be way faster!
+    assert elapsed_times[0] > elapsed_times[1] * 10
+    assert elapsed_times[0] > elapsed_times[2] * 10
+
+
+def test_calls_iter_different_value_same_page_cached(client):
+    @weave.op
+    def func(x):
+        return x
+
+    for i in range(20):
+        func(i)
+
+    calls = func.calls()
+
+    start_time1 = time.time()
+    c1 = calls[0]
+    end_time1 = time.time()
+    elapsed_time1 = end_time1 - start_time1
+
+    # default page size is 10, so these lookups should be cached too
+    start_time2 = time.time()
+    c2 = calls[1]
+    end_time2 = time.time()
+    elapsed_time2 = end_time2 - start_time2
+
+    start_time3 = time.time()
+    c3 = calls[2]
+    end_time3 = time.time()
+    elapsed_time3 = end_time3 - start_time3
+
+    # cached lookup should be way faster!
+    assert elapsed_time1 > elapsed_time2 * 10
+    assert elapsed_time1 > elapsed_time3 * 10
+
+
+class BasicModel(weave.Model):
+    @weave.op()
+    def predict(self, x):
+        return {"answer": "42"}
+
+
+def test_model_save(client):
+    model = BasicModel()
+    assert model.predict(1) == {"answer": "42"}
+    model_ref = weave.publish(model)
+    assert model.predict(1) == {"answer": "42"}
+    model2 = model_ref.get()
+    assert model2.predict(1) == {"answer": "42"}
+
+    inner_res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._ObjectVersionFilter(
+                is_op=False, latest_only=True, base_object_classes=["Model"]
+            ),
+        )
+    )
+
+    assert len(inner_res.objs) == 1
+    expected_predict_op = inner_res.objs[0].val["predict"]
+    assert isinstance(expected_predict_op, str) and expected_predict_op.startswith(
+        "weave:///"
+    )

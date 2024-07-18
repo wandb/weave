@@ -1,15 +1,12 @@
-from __future__ import annotations
-
 from collections import defaultdict
 from numbers import Number
-from typing import Any, Callable, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from pydantic import BaseModel
 
 import weave
 from weave.flow.obj import Object
-from weave.legacy import box
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 
@@ -19,11 +16,11 @@ class Scorer(Object):
         raise NotImplementedError
 
     @weave.op()
-    def summarize(self, score_rows: list) -> dict | None:
+    def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
 
 
-def stderr(data: Sequence[int | float]) -> float:
+def stderr(data: Sequence[Union[int, float]]) -> float:
     if len(data) > 1:
         sample_variance = np.var(data, ddof=1)
         return float(np.sqrt(sample_variance / len(data)))
@@ -31,7 +28,7 @@ def stderr(data: Sequence[int | float]) -> float:
         return 0
 
 
-def auto_summarize(data: list) -> dict[str, Any] | None:
+def auto_summarize(data: list) -> Optional[dict[str, Any]]:
     """Automatically summarize a list of (potentially nested) dicts.
 
     Computes:
@@ -49,7 +46,7 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     data = [x for x in data if x is not None]
     val = data[0]
 
-    if isinstance(val, (bool, box.BoxedBool)):
+    if isinstance(val, bool):
         return {
             "true_count": (true_count := sum(1 for x in data if x)),
             "true_fraction": true_count / len(data),
@@ -77,7 +74,7 @@ def get_scorer_attributes(
 ) -> Tuple[str, Callable, Callable]:
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
-        if scorer_name == None:
+        if scorer_name is None:
             scorer_name = scorer.__class__.__name__
         try:
             score_fn = scorer.score
@@ -116,7 +113,7 @@ class MultiTaskBinaryClassificationF1(Scorer):
     class_names: list[str]
 
     @weave.op()
-    def summarize(self, score_rows: list) -> dict | None:
+    def summarize(self, score_rows: list) -> Optional[dict]:
         result = {}
         cols = transpose(score_rows)
 
@@ -131,7 +128,7 @@ class MultiTaskBinaryClassificationF1(Scorer):
         return result
 
     @weave.op()
-    def score(self, target: dict, model_output: dict | None) -> dict:
+    def score(self, target: dict, model_output: Optional[dict]) -> dict:
         result = {}
         for class_name in self.class_names:
             class_label = target.get(class_name)

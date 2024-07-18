@@ -52,7 +52,7 @@ def test_pydantic_saveload(client):
 
     a2 = weave.ref("my-a").get()
     assert a2.name == "my-a"
-    assert a2.description == None
+    assert a2.description is None
     assert a2.model_name == "my-model"
 
 

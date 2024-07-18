@@ -8,7 +8,6 @@
 
 import {
   Autocomplete,
-  Checkbox,
   Chip,
   Dialog,
   DialogActions,
@@ -31,6 +30,7 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
+import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import React, {
   FC,
   useCallback,
@@ -42,6 +42,7 @@ import React, {
 } from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
@@ -49,9 +50,11 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveHeaderExtrasContext,
 } from '../../context';
+import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
-import {StyledDataGrid} from '../../StyledDataGrid';
+import {SELECTED_FOR_DELETION, StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
+import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -65,6 +68,7 @@ import {
 } from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
@@ -82,7 +86,17 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
-const MAX_EXPORT_SIZE = 10_000;
+const MAX_BULK_DELETE = 10;
+const MAX_EXPORT = 10_000;
+
+export const DEFAULT_SORT_CALLS: GridSortModel = [
+  {field: 'started_at', sort: 'desc'},
+];
+
+const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
+  pageSize: DEFAULT_PAGE_SIZE,
+  page: 0,
+};
 
 export const CallsTable: FC<{
   entity: string;
@@ -96,6 +110,12 @@ export const CallsTable: FC<{
 
   columnVisibilityModel?: GridColumnVisibilityModel;
   setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
+
+  sortModel?: GridSortModel;
+  setSortModel?: (newModel: GridSortModel) => void;
+
+  paginationModel?: GridPaginationModel;
+  setPaginationModel?: (newModel: GridPaginationModel) => void;
 }> = ({
   entity,
   project,
@@ -105,11 +125,31 @@ export const CallsTable: FC<{
   hideControls,
   columnVisibilityModel,
   setColumnVisibilityModel,
+  sortModel,
+  setSortModel,
+  paginationModel,
+  setPaginationModel,
 }) => {
+  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
+
+  const isReadonly =
+    loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
+
+  // Register Export Button
+  useEffect(() => {
+    addExtra('exportRunsTableButton', {
+      node: (
+        <ExportRunsTableButton tableRef={apiRef} rightmostButton={isReadonly} />
+      ),
+      order: 2,
+    });
+
+    return () => removeExtra('exportRunsTableButton');
+  }, [apiRef, isReadonly, addExtra, removeExtra]);
 
   // Table State consists of:
   // 1. Filter (Structured Filter)
@@ -136,22 +176,10 @@ export const CallsTable: FC<{
   const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
 
   // 3. Sort
-  const [sortModelInner, setSortModel] = useState<GridSortModel>([
-    {field: 'started_at', sort: 'desc'},
-  ]);
-  // Ensure that we always have a default sort
-  const sortModel: GridSortModel = useMemo(() => {
-    return sortModelInner.length === 0
-      ? [{field: 'started_at', sort: 'desc'}]
-      : sortModelInner;
-  }, [sortModelInner]);
+  const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
 
-  const defaultPageSize = 100;
   // 4. Pagination
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
-    pageSize: defaultPageSize,
-    page: 0,
-  });
+  const paginationModelResolved = paginationModel ?? DEFAULT_PAGINATION_CALLS;
 
   // 5. Expansion
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
@@ -193,8 +221,8 @@ export const CallsTable: FC<{
     project,
     effectiveFilter,
     filterModel,
-    sortModel,
-    paginationModel,
+    sortModelResolved,
+    paginationModelResolved,
     expandedRefCols
   );
 
@@ -349,21 +377,15 @@ export const CallsTable: FC<{
     project
   );
 
+  const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
+
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
-
-  // If we drill down, we should clear the selection
-  useEffect(() => {
-    if (effectiveFilter.parentId) {
-      setSelectedCalls([]);
-    }
-  }, [effectiveFilter.parentId]);
-
   const muiColumns = useMemo(() => {
     return [
       {
         minWidth: 30,
-        width: 50,
+        width: 38,
         field: 'CustomCheckbox',
         sortable: false,
         disableColumnMenu: true,
@@ -371,21 +393,40 @@ export const CallsTable: FC<{
           return (
             <Checkbox
               checked={
-                selectedCalls.length > 0 &&
-                selectedCalls.length ===
-                  tableData.filter(
-                    row => row.exception == null && row.ended_at != null
-                  ).length
+                selectedCalls.length === 0
+                  ? false
+                  : selectedCalls.length === tableData.length
+                  ? true
+                  : 'indeterminate'
               }
-              onChange={() => {
-                // exclude non-successful calls from selection
-                const filtered = tableData.filter(
-                  row => row.exception == null && row.ended_at != null
-                );
-                if (selectedCalls.length === filtered.length) {
-                  setSelectedCalls([]);
+              onCheckedChange={() => {
+                // if bulk delete move, or not eval table, select all calls
+                if (bulkDeleteMode || !isEvaluateTable) {
+                  if (
+                    selectedCalls.length ===
+                    Math.min(tableData.length, MAX_BULK_DELETE)
+                  ) {
+                    setSelectedCalls([]);
+                  } else {
+                    setSelectedCalls(
+                      tableData.map(row => row.id).slice(0, MAX_BULK_DELETE)
+                    );
+                  }
                 } else {
-                  setSelectedCalls(filtered.map(row => row.id));
+                  // exclude non-successful calls from selection
+                  const filtered = tableData.filter(
+                    row => row.exception == null && row.ended_at != null
+                  );
+                  if (
+                    selectedCalls.length ===
+                    Math.min(filtered.length, MAX_EVAL_COMPARISONS)
+                  ) {
+                    setSelectedCalls([]);
+                  } else {
+                    setSelectedCalls(
+                      filtered.map(row => row.id).slice(0, MAX_EVAL_COMPARISONS)
+                    );
+                  }
                 }
               }}
             />
@@ -399,10 +440,25 @@ export const CallsTable: FC<{
           const disabledDueToNonSuccess =
             params.row.exception != null || params.row.ended_at == null;
           let tooltipText = '';
-          if (disabledDueToNonSuccess) {
-            tooltipText = 'Cannot compare non-successful evaluations';
-          } else if (disabledDueToMax) {
-            tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
+          if (bulkDeleteMode || !isEvaluateTable) {
+            if (selectedCalls.length >= MAX_BULK_DELETE) {
+              tooltipText = `Deletion limited to ${MAX_BULK_DELETE} items`;
+            } else {
+              tooltipText = '';
+            }
+          } else {
+            if (disabledDueToNonSuccess) {
+              tooltipText = 'Cannot compare non-successful evaluations';
+            } else if (disabledDueToMax) {
+              tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
+            }
+          }
+
+          let disabled = false;
+          if ((bulkDeleteMode || !isEvaluateTable) && !isSelected) {
+            disabled = selectedCalls.length >= MAX_BULK_DELETE;
+          } else if (isEvaluateTable) {
+            disabled = disabledDueToNonSuccess || disabledDueToMax;
           }
 
           return (
@@ -412,9 +468,9 @@ export const CallsTable: FC<{
               {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
               <span>
                 <Checkbox
-                  disabled={disabledDueToNonSuccess || disabledDueToMax}
+                  disabled={disabled}
                   checked={isSelected}
-                  onChange={() => {
+                  onCheckedChange={() => {
                     if (isSelected) {
                       setSelectedCalls(
                         selectedCalls.filter(id => id !== rowId)
@@ -431,8 +487,9 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-  }, [columns.cols, selectedCalls, tableData]);
+  }, [columns.cols, selectedCalls, tableData, bulkDeleteMode, isEvaluateTable]);
 
+  // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
   useEffect(() => {
@@ -447,9 +504,13 @@ export const CallsTable: FC<{
               router.compareEvaluationsUri(entity, project, selectedCalls)
             );
           }}
-          disabled={selectedCalls.length === 0}
+          disabled={selectedCalls.length === 0 || bulkDeleteMode}
+          tooltipText={
+            bulkDeleteMode ? 'Cannot compare while bulk deleting' : undefined
+          }
         />
       ),
+      order: 1,
     });
 
     return () => removeExtra('compareEvaluations');
@@ -464,6 +525,71 @@ export const CallsTable: FC<{
     entity,
     project,
     history,
+    bulkDeleteMode,
+  ]);
+
+  // Register Delete Button
+  const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
+  useEffect(() => {
+    if (isReadonly) {
+      return;
+    }
+    addExtra('deleteSelectedCalls', {
+      node: (
+        <BulkDeleteButton
+          onConfirm={() => setDeleteConfirmModalOpen(true)}
+          disabled={selectedCalls.length === 0}
+          bulkDeleteModeToggle={mode => {
+            setBulkDeleteMode(mode);
+            if (!mode) {
+              setSelectedCalls([]);
+            }
+          }}
+          selectedCalls={selectedCalls}
+        />
+      ),
+      order: 3,
+    });
+
+    return () => removeExtra('deleteSelectedCalls');
+  }, [
+    addExtra,
+    removeExtra,
+    selectedCalls,
+    isEvaluateTable,
+    bulkDeleteMode,
+    isReadonly,
+  ]);
+
+  useEffect(() => {
+    if (isReadonly) {
+      return;
+    }
+    addExtra('deleteSelectedCallsModal', {
+      node: (
+        <ConfirmDeleteModal
+          calls={tableData
+            .filter(row => selectedCalls.includes(row.id))
+            .map(traceCallToUICallSchema)}
+          confirmDelete={deleteConfirmModalOpen}
+          setConfirmDelete={setDeleteConfirmModalOpen}
+          onDeleteCallback={() => {
+            setSelectedCalls([]);
+          }}
+        />
+      ),
+      order: -1,
+    });
+    return () => removeExtra('deleteSelectedCallsModal');
+  }, [
+    addExtra,
+    removeExtra,
+    selectedCalls,
+    deleteConfirmModalOpen,
+    isReadonly,
+    entity,
+    project,
+    tableData,
   ]);
 
   // Called in reaction to Hide column menu
@@ -472,6 +598,33 @@ export const CallsTable: FC<{
         setColumnVisibilityModel(newModel);
       }
     : undefined;
+
+  const onSortModelChange = useCallback(
+    (newModel: GridSortModel) => {
+      if (!setSortModel || callsLoading) {
+        return;
+      }
+      // The Grid calls this function when the columns change, removing
+      // sort items whose field is no longer in the columns. However, the user
+      // might have been sorting on an output, and the output columns might
+      // not have been determined yet. So skip setting the sort model in this case.
+      if (!muiColumns.some(col => col.field.startsWith('output'))) {
+        return;
+      }
+      setSortModel(newModel);
+    },
+    [callsLoading, setSortModel, muiColumns]
+  );
+
+  const onPaginationModelChange = useCallback(
+    (newModel: GridPaginationModel) => {
+      if (!setPaginationModel || callsLoading) {
+        return;
+      }
+      setPaginationModel(newModel);
+    },
+    [callsLoading, setPaginationModel]
+  );
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -617,7 +770,7 @@ export const CallsTable: FC<{
         // SORT SECTION START
         sortingMode="server"
         sortModel={sortModel}
-        onSortModelChange={newModel => setSortModel(newModel)}
+        onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // FILTER SECTION START
         filterMode="server"
@@ -629,8 +782,8 @@ export const CallsTable: FC<{
         rowCount={callsTotal}
         paginationMode="server"
         paginationModel={paginationModel}
-        onPaginationModelChange={newModel => setPaginationModel(newModel)}
-        pageSizeOptions={[defaultPageSize]}
+        onPaginationModelChange={onPaginationModelChange}
+        pageSizeOptions={[DEFAULT_PAGE_SIZE]}
         // PAGINATION SECTION END
         rowHeight={38}
         columns={muiColumns}
@@ -640,6 +793,11 @@ export const CallsTable: FC<{
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
+        getRowClassName={params =>
+          bulkDeleteMode && selectedCalls.includes(params.row.id)
+            ? SELECTED_FOR_DELETION
+            : ''
+        }
         onColumnWidthChange={newCol => {
           setUserDefinedColumnWidths(curr => {
             return {
@@ -775,124 +933,74 @@ const getPeekId = (peekPath: string | null): string | null => {
 };
 
 const ExportRunsTableButton = ({
-  onClick,
-  selectedCalls,
-}: {
-  onClick: () => void;
-  selectedCalls: string[];
-}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className="mx-16"
-      size="medium"
-      variant="secondary"
-      onClick={onClick}
-      icon="export-share-upload">
-      {selectedCalls.length > 0 ? `${selectedCalls.length}` : ''}
-    </Button>
-  </Box>
-);
-
-const ManageExportButton = ({
   tableRef,
   selectedCalls,
-  exportProps,
+  callQueryParams,
+  rightmostButton = false,
 }: {
   tableRef: React.MutableRefObject<GridApiPro>;
   selectedCalls: string[];
-  exportProps: any;
+  callQueryParams: any;
+  rightmostButton?: boolean;
 }) => {
-  const [open, setOpen] = useState(false);
 
-  const handleExportAll = (
-    rows: Array<TraceCallSchema & {[key: string]: string}>
-  ) => {
-    // get current displayed rows
-    const currentRows = tableRef.current.getAllRowIds();
+  const {useCalls} = useWFHooks();
 
-    // update the table with all rows
-    tableRef.current.updateRows(rows);
-    tableRef.current.exportDataAsCsv({includeColumnGroupsHeaders: false});
+  callQueryParams.opts = {
+    skip: selectedCalls.length > 0,
+    contentType: 'text/csv'
+  }
+  const callQuery = useCalls(
+    callQueryParams.entity,
+    callQueryParams.project,
+    callQueryParams.filter,
+    callQueryParams.limit,
+    callQueryParams.offset,
+    callQueryParams.sortBy,
+    callQueryParams.query,
+    callQueryParams.opts
+  )
 
-    const idsToDelete = rows
-      .map((row: any) => row.id)
-      .filter((id: any) => !currentRows.includes(id));
 
-    // delete the rows that added
-    tableRef.current.updateRows(
-      idsToDelete.map((rowId: any) => ({id: rowId, _action: 'delete'}))
-    );
+  const onClick = () => {
+    // selection export
+    if (selectedCalls.length > 0) {
+      return tableRef.current?.exportDataAsCsv({
+        includeColumnGroupsHeaders: false,
+        getRowsToExport: () => selectedCalls,
+      });
+    }
+
+    // full table export
+
   };
 
-  const allPages = {pageSize: MAX_EXPORT_SIZE, page: 0};
-  const allCalls = useCallsForQuery(
-    exportProps.entity,
-    exportProps.project,
-    exportProps.effectiveFilter,
-    exportProps.filterModel,
-    exportProps.sortModel,
-    allPages,
-    exportProps.expandedRefCols
-  );
-  const [allRows, setAllRows] = useState<
-    Array<TraceCallSchema & {[key: string]: string}>
-  >([]);
-  useEffect(() => {
-    if (!allCalls.loading && allCalls.result) {
-      setAllRows(prepareFlattenedCallDataForTable(allCalls.result));
-    }
-  }, [allCalls.result, allCalls.loading]);
-
   return (
-    <>
-      <ExportRunsTableButton
-        onClick={() => setOpen(true)}
-        selectedCalls={selectedCalls}
-      />
-      <Dialog open={open} onClose={() => setOpen(false)}>
-        <DialogTitle>Export to CSV</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Select the columns to export.</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button variant="ghost" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              if (selectedCalls.length === 0) {
-                handleExportAll(allRows);
-              } else {
-                tableRef.current?.exportDataAsCsv({
-                  includeColumnGroupsHeaders: false,
-                  getRowsToExport:
-                    selectedCalls.length > 0 ? () => selectedCalls : undefined,
-                });
-                setOpen(false);
-              }
-            }}
-            disabled={selectedCalls.length === 0 && allCalls.loading}>
-            {selectedCalls.length === 0 && allCalls.loading ? (
-              <LoadingDots />
-            ) : (
-              'Export'
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      {callQuery.loading ? <LoadingDots /> :
+        <Button
+          className={rightmostButton ? 'mr-16' : 'mr-4'}
+          size="medium"
+          variant="secondary"
+          onClick={onClick}
+          icon="export-share-upload">
+          {selectedCalls.length > 0 ? `${selectedCalls.length}` : ''}
+        </Button>
+      }
+    </Box>
   );
 };
 
 const CompareEvaluationsTableButton: FC<{
   onClick: () => void;
   disabled?: boolean;
-}> = ({onClick, disabled}) => (
+  tooltipText?: string;
+}> = ({onClick, disabled, tooltipText}) => (
   <Box
     sx={{
       height: '100%',
@@ -900,15 +1008,77 @@ const CompareEvaluationsTableButton: FC<{
       alignItems: 'center',
     }}>
     <Button
-      className="mx-16"
-      style={{
-        marginLeft: '0px',
-      }}
+      className="mx-4"
       size="medium"
+      variant="ghost"
       disabled={disabled}
       onClick={onClick}
-      icon="chart-scatterplot">
+      icon="chart-scatterplot"
+      tooltip={tooltipText}>
       Compare Evaluations
     </Button>
   </Box>
 );
+
+const BulkDeleteButton: FC<{
+  disabled?: boolean;
+  selectedCalls: string[];
+  onConfirm: () => void;
+  bulkDeleteModeToggle: (mode: boolean) => void;
+}> = ({disabled, selectedCalls, onConfirm, bulkDeleteModeToggle}) => {
+  const [deleteClicked, setDeleteClicked] = useState(false);
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      {deleteClicked ? (
+        <>
+          <Button
+            className="mx-4"
+            variant="ghost"
+            size="medium"
+            disabled={disabled}
+            onClick={onConfirm}
+            tooltip="Select rows with the checkbox to delete"
+            icon="delete">
+            Confirm
+          </Button>
+          <Button
+            className="ml-4 mr-16"
+            variant="ghost"
+            size="medium"
+            onClick={() => {
+              setDeleteClicked(false);
+              bulkDeleteModeToggle(false);
+            }}>
+            Exit delete mode
+          </Button>
+        </>
+      ) : selectedCalls.length > 0 ? (
+        <Button
+          className="ml-4 mr-16"
+          variant="ghost"
+          size="medium"
+          onClick={onConfirm}
+          tooltip="Select rows with the checkbox to delete"
+          icon="delete"
+        />
+      ) : (
+        <Button
+          className="ml-4 mr-16"
+          variant="ghost"
+          size="medium"
+          onClick={() => {
+            setDeleteClicked(true);
+            bulkDeleteModeToggle(true);
+          }}
+          tooltip="Select rows with the checkbox to delete"
+          icon="delete"
+        />
+      )}
+    </Box>
+  );
+};

@@ -22,9 +22,19 @@ from weave.flow.scorer import (
 )
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
-from weave.trace.op import BoundOp, Op
+from weave.trace.op import Op
 
 console = Console()
+
+
+class EvaluationArgumentError(Exception):
+    pass
+
+
+INVALID_MODEL_ERROR = (
+    "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
+    + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
+)
 
 
 def async_call(
@@ -91,7 +101,7 @@ class Evaluation(Object):
     trials: int = 1
 
     def model_post_init(self, __context: Any) -> None:
-        scorers = []
+        scorers: list[Union[Callable, Scorer, Op]] = []
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
@@ -111,14 +121,14 @@ class Evaluation(Object):
         if isinstance(self.dataset, list):
             self.dataset = Dataset(rows=self.dataset)
 
-        if self.name == None and self.dataset.name != None:
+        if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
     @weave.op()
     async def predict_and_score(
         self, model: Union[Callable, Model], example: dict
     ) -> dict:
-        if self.preprocess_model_input == None:
+        if self.preprocess_model_input is None:
             model_input = example
         else:
             model_input = self.preprocess_model_input(example)  # type: ignore
@@ -139,11 +149,6 @@ class Evaluation(Object):
         else:
             predict_signature = inspect.signature(model_predict)
         model_predict_arg_names = list(predict_signature.parameters.keys())
-        # If the op is a `BoundOp`, then the first arg is automatically added at
-        # call time and we should exclude it from the args required from the
-        # user.
-        if isinstance(model_predict, BoundOp):
-            model_predict_arg_names = model_predict_arg_names[1:]
 
         if isinstance(model_input, dict):
             model_predict_args = {
@@ -169,8 +174,6 @@ class Evaluation(Object):
                 for param in predict_signature.parameters.values()
                 if param.default == inspect.Parameter.empty
             ]
-            if isinstance(model_predict, BoundOp):
-                required_arg_names = required_arg_names[1:]
 
             message = textwrap.dedent(
                 f"""
@@ -198,12 +201,6 @@ class Evaluation(Object):
             else:
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
-
-            # If the op is a `BoundOp`, then the first arg is automatically added at
-            # call time and we should exclude it from the args required from the
-            # user.
-            if isinstance(score_arg_names, BoundOp):
-                score_arg_names = score_arg_names[1:]
 
             if "model_output" not in score_arg_names:
                 raise OpCallError(
@@ -233,8 +230,6 @@ class Evaluation(Object):
                     for param in score_signature.parameters.values()
                     if param.default == inspect.Parameter.empty
                 ]
-                if isinstance(score_fn, BoundOp):
-                    required_arg_names = required_arg_names[1:]
                 required_arg_names.remove("model_output")
 
                 message = textwrap.dedent(
@@ -278,6 +273,8 @@ class Evaluation(Object):
 
     @weave.op()
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
+        if not isinstance(model, Model) and not isinstance(model, Op):
+            raise EvaluationArgumentError(INVALID_MODEL_ERROR)
         eval_rows = []
 
         start_time = time.time()
@@ -307,10 +304,10 @@ class Evaluation(Object):
             # status.update(
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
-            if eval_row == None:
+            if eval_row is None:
                 eval_row = {"model_output": None, "scores": {}}
-            if eval_row["scores"] == None:
-                eval_row["scores"] = {}
+            else:
+                eval_row["scores"] = eval_row.get("scores", {})
             for scorer in self.scorers or []:
                 scorer_name, _, _ = get_scorer_attributes(scorer)
                 if scorer_name not in eval_row["scores"]:
