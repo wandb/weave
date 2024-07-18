@@ -10,6 +10,8 @@ import dataclasses
 from typing import Any
 import threading
 
+from weave.trace.vals import Traceable
+
 from . import urls
 
 from weave.legacy import graph as _graph
@@ -202,13 +204,21 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     """
     client = client_context.weave_client.require_weave_client()
 
-    save_name: str
-    if name:
-        save_name = name
-    elif hasattr(obj, "name"):
-        save_name = obj.name
-    else:
+    save_name = name if name else None
+    if save_name is None:
+        save_name = getattr(obj, "name", None)
+    if save_name is None:
+        save_name = getattr(obj, "_class_name", None)
+    if save_name is None:
         save_name = obj.__class__.__name__
+
+    if save_name == "WeaveList":
+        save_name = "list"
+
+    # When mutating an object, clear the ref so we can save a new one
+    # TODO: Still have a problem with hashes...
+    if isinstance(obj, Traceable) and obj.mutations:
+        obj.ref = None
 
     ref = client._save_object(obj, save_name, "latest")
 

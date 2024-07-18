@@ -40,10 +40,17 @@ from weave.trace_server.trace_server_interface import (
 
 
 @dataclasses.dataclass
-class MutationSetitem:
+class MutationSetitemObject:
     path: tuple[str, ...]
-    operation: Literal["setitem"]
+    operation: Literal["setitem_dict"]
     args: tuple[str, Any]
+
+
+@dataclasses.dataclass
+class MutationSetitemList:
+    path: tuple[str, ...]
+    operation: Literal["setitem_list"]
+    args: tuple[int, Any]
 
 
 @dataclasses.dataclass
@@ -60,18 +67,34 @@ class MutationAppend:
     args: tuple[Any]
 
 
-Mutation = Union[MutationSetattr, MutationSetitem, MutationAppend]
-MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["append"]]
+Mutation = Union[
+    MutationSetattr,
+    MutationSetitemObject,
+    MutationSetitemList,
+    MutationAppend,
+]
+MutationOperation = Literal[
+    "setitem_dict",
+    "setitem_list",
+    "setattr",
+    "append",
+]
 
 
 def make_mutation(
     path: tuple[str, ...], operation: MutationOperation, args: tuple[Any, ...]
 ) -> Mutation:
-    if operation == "setitem":
-        if len(args) != 2 or not isinstance(args[0], str):
+    print(f"Make Mutation with {path=} {operation=} {args=}")
+    if operation == "setitem_dict":
+        if len(args) != 2:
             raise ValueError("setitem mutation requires 2 args")
         args = typing.cast(tuple[str, Any], args)
-        return MutationSetitem(path, operation, args)
+        return MutationSetitemObject(path, operation, args)
+    elif operation == "setitem_list":
+        if len(args) != 2 or not isinstance(args[0], int):
+            raise ValueError("setitem_list mutation requires 2 args")
+        args = typing.cast(tuple[int, Any], args)
+        return MutationSetitemList(path, operation, args)
     elif operation == "setattr":
         if len(args) != 2 or not isinstance(args[0], str):
             raise ValueError("setattr mutation requires 2 args")
@@ -87,7 +110,7 @@ def make_mutation(
 
 
 class Traceable:
-    ref: RefWithExtra
+    ref: Optional[RefWithExtra]
     mutations: Optional[list[Mutation]] = None
     root: "Traceable"
     server: TraceServerInterface
@@ -97,6 +120,7 @@ class Traceable:
     ) -> None:
         if self.mutations is None:
             self.mutations = []
+        print(f"Add Mutation with {path=} {operation=} {args=}")
         self.mutations.append(make_mutation(path, operation, args))
 
     def save(self) -> ObjectRef:
@@ -268,13 +292,14 @@ class WeaveTable(Traceable):
                 )
             )
             for item in response.rows:
-                new_ref = self.ref.with_item(item.digest)
-                yield make_trace_obj(
-                    item.val,
-                    new_ref,
-                    self.server,
-                    self.root,
-                )
+                if self.ref is not None:
+                    new_ref = self.ref.with_item(item.digest)
+                    yield make_trace_obj(
+                        item.val,
+                        new_ref,
+                        self.server,
+                        self.root,
+                    )
                 i += 1
             if len(response.rows) < page_size:
                 break
@@ -321,9 +346,28 @@ class WeaveList(Traceable, list):
         if isinstance(i, slice):
             raise ValueError("Slices not yet supported")
         index = operator.index(i)
-        new_ref = self.ref.with_index(index)
+        if self.ref is None:
+            new_ref = None
+        else:
+            new_ref = self.ref.with_index(index)
         index_val = super().__getitem__(index)
+        # TODO: Can new_ref be None?
         return make_trace_obj(index_val, new_ref, self.server, self.root)
+
+    def __setitem__(self, i: Union[SupportsIndex, slice], value: Any) -> None:
+        print(f"Setting {i=} {value=}")
+        if isinstance(i, slice):
+            raise ValueError("Slices not yet supported")
+        if (index := operator.index(i)) > len(self):
+            raise IndexError("list assignment index out of range")
+        object.__getattribute__(self, "root").add_mutation(
+            self.ref, "setitem_list", index, value
+        )
+        super().__setitem__(index, value)
+
+    def append(self, item: Any) -> None:
+        object.__getattribute__(self, "root").add_mutation(self.ref, "append", item)
+        super().append(item)
 
     def __iter__(self) -> Iterator[Any]:
         for i in range(len(self)):
@@ -348,7 +392,10 @@ class WeaveDict(Traceable, dict):
         super().__init__(*args, **kwargs)
 
     def __getitem__(self, key: str) -> Any:
-        new_ref = self.ref.with_key(key)
+        if self.ref:
+            new_ref = self.ref.with_key(key)
+        else:
+            new_ref = None
         return make_trace_obj(super().__getitem__(key), new_ref, self.server, self.root)
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -361,7 +408,7 @@ class WeaveDict(Traceable, dict):
         if not isinstance(self.ref, ObjectRef):
             raise ValueError("Can only set items on object refs")
         super().__setitem__(key, value)
-        self.root.add_mutation(self.ref.extra, "setitem", key, value)
+        self.root.add_mutation(self.ref.extra, "setitem_dict", key, value)
 
     def keys(self):  # type: ignore
         return super().keys()

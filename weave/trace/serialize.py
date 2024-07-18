@@ -12,7 +12,15 @@ from weave.trace_server.trace_server_interface import (
 
 
 def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
-    if isinstance(obj, TableRef):
+    from weave.trace.vals import WeaveList, WeaveObject
+
+    print(f"to_json {obj=}")
+
+    if isinstance(obj, WeaveObject):
+        return to_json(obj._val, project_id, server)
+    elif isinstance(obj, WeaveList):
+        return [to_json(v, project_id, server) for v in obj]
+    elif isinstance(obj, TableRef):
         return obj.uri()
     elif isinstance(obj, ObjectRef):
         return obj.uri()

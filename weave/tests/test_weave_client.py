@@ -3,14 +3,13 @@ import dataclasses
 import json
 import platform
 import re
-import signal
 import sys
 from typing import Callable
 
 import pydantic
 import pytest
 import requests
-from pydantic import BaseModel
+from pydantic import Field
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
@@ -1060,3 +1059,102 @@ def test_weave_server(client):
     url = weave.serve(ref, thread=True)
     response = requests.post(url + "/predict", json={"input": "x"})
     assert response.json() == {"result": "input is: x"}
+
+
+def test_object_mutation_saving(client):
+    class Thing(weave.Object):
+        a: str
+        b: int
+        c: float
+
+    thing = Thing(a="hello", b=1, c=4.2)
+    ref = weave.publish(thing)
+
+    thing2 = ref.get()
+    assert thing2.a == "hello"
+    assert thing2.b == 1
+    assert thing2.c == 4.2
+
+    thing2.a = "new"  # TODO: Should we ignore this?
+    thing2.a = "newer"
+    thing2.b = 2
+
+    assert len(thing2.mutations) == 3
+
+    ref2 = weave.publish(thing2)
+    thing3 = ref2.get()
+    assert thing3.a == "newer"
+    assert thing3.b == 2
+    assert thing3.c == 4.2
+
+
+def test_list_mutation_saving(client):
+    lst = [1, 2, 3]
+    ref = weave.publish(lst)
+
+    lst2 = ref.get()
+    assert lst2 == [1, 2, 3]
+
+    lst2[0] = 100
+    lst2.append(4)
+    lst2.extend([5])
+    lst2 += [6]
+    ref2 = weave.publish(lst2)
+
+    lst3 = ref2.get()
+    assert lst3 == [100, 2, 3, 4, 5, 6]
+
+
+def test_dict_mutation_saving(client):
+    # TODO: Today we assume all the keys must be str?
+    d = {"a": 1, "b": 2}
+    ref = weave.publish(d)
+
+    d2 = ref.get()
+    assert d2 == {"a": 1, "b": 2}
+
+    d2["new_key"] = 3
+    d2["b"] = "new_value"
+    ref2 = weave.publish(d2)
+
+    d3 = ref2.get()
+    assert d3 == {"a": 1, "b": "new_value", "new_key": 3}
+
+
+def test_object_composite_mutation_saving(client):
+    class A(weave.Object):
+        b: int = 1
+
+    class C(weave.Object):
+        a: A = Field(default_factory=A)
+
+    class D(weave.Object):
+        a: A = Field(default_factory=A)
+        c: C = Field(default_factory=C)
+
+    d = D()
+    ref = weave.publish(d)
+
+    d2 = ref.get()
+    assert d2.a.b == 1
+    assert d2.c.a.b == 1
+
+    d2.a = A(b=2)
+    d2.c = C(a=A(b=3))
+    ref2 = weave.publish(d2)
+
+    d3 = ref2.get()
+    assert d3.a.b == 2
+    assert d3.c.a.b == 3
+
+
+def test_list_composite_mutation_saving(client):
+    raise
+
+
+def test_dict_composite_mutation_saving(client):
+    raise
+
+
+def test_multiple_composite_mutation_saving(client):
+    raise
