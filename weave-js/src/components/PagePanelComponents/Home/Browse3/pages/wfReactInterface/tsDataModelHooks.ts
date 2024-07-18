@@ -226,7 +226,7 @@ const useCallsNoExpansion = (
   offset?: number,
   sortBy?: traceServerClient.SortBy[],
   query?: Query,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  opts?: {skip?: boolean; refetchOnDelete?: boolean, acceptType?: traceServerClient.ContentType}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -274,6 +274,7 @@ const useCallsNoExpansion = (
     deepFilter,
     limit,
     opts?.skip,
+    opts?.acceptType,
     getTsClient,
     offset,
     sortBy,
@@ -336,6 +337,77 @@ const useCallsNoExpansion = (
     }
   }, [callRes, entity, project, opts?.skip]);
 };
+
+const useCallsStreamRaw = (
+  entity: string,
+  project: string,
+  filter: CallFilter,
+  limit?: number,
+  offset?: number,
+  sortBy?: traceServerClient.SortBy[],
+  query?: Query,
+  opts?: {skip?: boolean; contentType: traceServerClient.ContentType}
+): Loadable<String> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const [data, setData] =
+    useState<String | null>(null);
+  const deepFilter = useDeepMemo(filter);
+
+  const onSuccess = (res: String) => {
+    loadingRef.current = false;
+    setData(res);
+  }
+
+  const onError = (e: any) => {
+    loadingRef.current = false;
+    console.error(e);
+    setData(null);
+  }
+
+  useEffect(() => {
+    if (opts?.skip) {
+      return;
+    }
+    getTsClient().callsStreamQueryCsv({
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        op_names: deepFilter.opVersionRefs,
+        input_refs: deepFilter.inputObjectVersionRefs,
+        output_refs: deepFilter.outputObjectVersionRefs,
+        parent_ids: deepFilter.parentIds,
+        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter.callIds,
+        trace_roots_only: deepFilter.traceRootsOnly,
+        wb_run_ids: deepFilter.runIds,
+        wb_user_ids: deepFilter.userIds,
+      },
+      limit,
+      offset,
+      sort_by: sortBy,
+      query,
+    }).then(onSuccess).catch(onError);
+  }, [entity, project, deepFilter, opts?.skip, getTsClient]);
+
+  return useMemo(() => {
+    if (opts?.skip) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+    if (loadingRef.current || data == null) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+    return {
+      loading: false,
+      result: data,
+    };
+  }, [data, opts?.skip]);
+}
 
 const useCalls = (
   entity: string,
@@ -1363,6 +1435,7 @@ export const convertISOToDate = (iso: string): Date => {
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  useCallsStreamRaw,
   useCallsStats,
   useCallsDeleteFunc,
   useCallUpdateFunc,

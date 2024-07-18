@@ -72,6 +72,8 @@ interface TraceCallsFilter {
 
 export type SortBy = {field: string; direction: 'asc' | 'desc'};
 
+export type ContentType = '*/*' | 'application/jsonl' | 'application/json' | 'text/csv' | 'text/tab-separated-values';
+
 export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
@@ -319,12 +321,21 @@ export class TraceServerClient {
       req
     );
   };
+  callsStreamQueryCsv: (req: TraceCallsQueryReq) => Promise<String> =
+    (req) => {
+      return this.makeRequest<TraceCallsQueryReq, String>(
+        '/calls/stream_query',
+        req,
+        true,
+        'text/csv'
+      );
+    };
   callsStreamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
-    req => {
+    (req) => {
       const res = this.makeRequest<TraceCallsQueryReq, string>(
         '/calls/stream_query',
         req,
-        true
+        true,
       );
       return new Promise((resolve, reject) => {
         res
@@ -461,7 +472,8 @@ export class TraceServerClient {
   private makeRequest = async <QT, ST>(
     endpoint: string,
     req: QT,
-    returnText?: boolean
+    returnText?: boolean,
+    acceptType?: ContentType
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
     const reqBody = JSON.stringify(req);
@@ -489,6 +501,9 @@ export class TraceServerClient {
       // authentication.
       Authorization: 'Basic ' + btoa(':'),
     };
+    if (acceptType) {
+      headers['Accept'] = acceptType;
+    }
     const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
     if (useAdminPrivileges) {
       headers['use-admin-privileges'] = 'true';
@@ -501,6 +516,9 @@ export class TraceServerClient {
       body: reqBody,
     })
       .then(response => {
+        if (acceptType === 'text/csv') {
+          return response.blob()
+        }
         if (returnText) {
           return response.text();
         }

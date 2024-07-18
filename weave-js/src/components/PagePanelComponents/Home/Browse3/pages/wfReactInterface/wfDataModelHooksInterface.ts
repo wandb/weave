@@ -169,6 +169,16 @@ export type WFDataModelHooksInterface = {
     expandedRefColumns?: Set<string>,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
   ) => Loadable<CallSchema[]>;
+  useCallsStreamRaw: (
+    entity: string,
+    project: string,
+    filter: CallFilter,
+    limit?: number,
+    offset?: number,
+    sortBy?: traceServerClient.SortBy[],
+    query?: Query,
+    opts?: {skip?: boolean; contentType: traceServerClient.ContentType}
+  ) => LoadableWithError<string>;
   useCallsStats: (
     entity: string,
     project: string,

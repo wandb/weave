@@ -70,7 +70,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallFilter, OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {useCallsTableColumns} from './callsTableColumns';
@@ -83,6 +83,10 @@ import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
+
+import { saveAs } from 'file-saver';
+
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
@@ -138,18 +142,6 @@ export const CallsTable: FC<{
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
-
-  // Register Export Button
-  useEffect(() => {
-    addExtra('exportRunsTableButton', {
-      node: (
-        <ExportRunsTableButton tableRef={apiRef} rightmostButton={isReadonly} />
-      ),
-      order: 2,
-    });
-
-    return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, isReadonly, addExtra, removeExtra]);
 
   // Table State consists of:
   // 1. Filter (Structured Filter)
@@ -528,6 +520,32 @@ export const CallsTable: FC<{
     bulkDeleteMode,
   ]);
 
+  // Register Export Button
+  useEffect(() => {
+    addExtra('exportRunsTableButton', {
+      node: (
+        <ExportRunsTableButton 
+          pageName={isEvaluateTable ? "evaluations" : "calls"}
+          tableRef={apiRef} 
+          selectedCalls={selectedCalls}
+          callQueryParams={{
+            entity,
+            project,
+            filter: {
+              op_names: selectedOpVersionOption,
+              input_refs: selectedInputObjectVersion,
+              output_refs: selectedOutputObjectVersion,
+              parent_ids: selectedParentId,
+            }
+          }}
+          rightmostButton={isReadonly} />
+      ),
+      order: 2,
+    });
+
+    return () => removeExtra('exportRunsTableButton');
+  }, [apiRef, isReadonly, addExtra, removeExtra, entity, project]);
+
   // Register Delete Button
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   useEffect(() => {
@@ -725,18 +743,6 @@ export const CallsTable: FC<{
               />
             </div>
           )}
-          <ManageExportButton
-            tableRef={apiRef}
-            selectedCalls={selectedCalls}
-            exportProps={{
-              entity,
-              project,
-              effectiveFilter,
-              filterModel,
-              sortModel,
-              expandedRefCols,
-            }}
-          />
         </>
       }>
       <StyledDataGrid
@@ -935,45 +941,28 @@ const getPeekId = (peekPath: string | null): string | null => {
 const ExportRunsTableButton = ({
   tableRef,
   selectedCalls,
+  pageName,
   callQueryParams,
   rightmostButton = false,
 }: {
   tableRef: React.MutableRefObject<GridApiPro>;
   selectedCalls: string[];
   callQueryParams: any;
+  pageName: string;
   rightmostButton?: boolean;
 }) => {
+  const getTsClient = useGetTraceServerClientContext()
 
-  const {useCalls} = useWFHooks();
+  const fileName = `${pageName}-export.csv`
 
-  callQueryParams.opts = {
-    skip: selectedCalls.length > 0,
-    contentType: 'text/csv'
+  const downloadAll = () => {
+    getTsClient().callsStreamQueryCsv({
+      project_id: `${callQueryParams.entity}/${callQueryParams.project}`, 
+      limit: MAX_EXPORT,
+    }).then((res) => {
+      saveAs(res, fileName)
+    })
   }
-  const callQuery = useCalls(
-    callQueryParams.entity,
-    callQueryParams.project,
-    callQueryParams.filter,
-    callQueryParams.limit,
-    callQueryParams.offset,
-    callQueryParams.sortBy,
-    callQueryParams.query,
-    callQueryParams.opts
-  )
-
-
-  const onClick = () => {
-    // selection export
-    if (selectedCalls.length > 0) {
-      return tableRef.current?.exportDataAsCsv({
-        includeColumnGroupsHeaders: false,
-        getRowsToExport: () => selectedCalls,
-      });
-    }
-
-    // full table export
-
-  };
 
   return (
     <Box
@@ -982,16 +971,17 @@ const ExportRunsTableButton = ({
         display: 'flex',
         alignItems: 'center',
       }}>
-      {callQuery.loading ? <LoadingDots /> :
-        <Button
-          className={rightmostButton ? 'mr-16' : 'mr-4'}
-          size="medium"
-          variant="secondary"
-          onClick={onClick}
-          icon="export-share-upload">
-          {selectedCalls.length > 0 ? `${selectedCalls.length}` : ''}
-        </Button>
-      }
+      <Button
+        className={rightmostButton ? 'mr-16' : 'mr-4'}
+        size="medium"
+        variant="secondary"
+        onClick={selectedCalls.length > 0 ? () => tableRef.current?.exportDataAsCsv({
+          includeColumnGroupsHeaders: false,
+          fileName,
+        }) : downloadAll}
+        icon="export-share-upload">
+        {selectedCalls.length > 0 ? `${selectedCalls.length}` : ''}
+      </Button>
     </Box>
   );
 };

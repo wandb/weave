@@ -34,7 +34,8 @@ export const useCallsForQuery = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>
+  expandedColumns: Set<string>,
+  opts?: Record<string, any>
 ) => {
   const {useCalls, useCallsStats} = useWFHooks();
   const lowLevelFilter: CallFilter = useMemo(() => {
@@ -84,6 +85,13 @@ export const useCallsForQuery = (
     return {$expr: filterByRaw} as Query;
   }, [filterByRaw]);
 
+  const callOpts = useMemo(() => {
+    return {
+      refetchOnDelete: true,
+      ...opts,
+    };
+  }, [opts]);
+
   const calls = useCalls(
     entity,
     project,
@@ -93,9 +101,7 @@ export const useCallsForQuery = (
     sortBy,
     filterBy,
     expandedColumns,
-    {
-      refetchOnDelete: true,
-    }
+    callOpts
   );
 
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
