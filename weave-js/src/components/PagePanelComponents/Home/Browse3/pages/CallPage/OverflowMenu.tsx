@@ -154,38 +154,44 @@ export const ConfirmDeleteModal: FC<{
       return;
     }
     setDeleteLoading(true);
+    userEvents.deleteClicked({
+      callIds: calls.map(
+        call => `${call.entity}/${call.project}/${call.callId}`
+      ),
+      numCalls: calls.length,
+      userId: userInfoLoaded?.id ?? '',
+      organizationName: orgName,
+      username: userInfoLoaded?.username ?? '',
+    });
+
     const projectGroups = makeProjectGroups(calls);
     const deletePromises: Array<Promise<void>> = [];
     Object.keys(projectGroups).forEach(projectKey => {
       const [entity, project] = projectKey.split('/');
       deletePromises.push(
-        callsDelete(entity, project, projectGroups[projectKey]).catch(() => {
-          const callNames = calls.map(callDisplayName);
-          setError(`Failed to delete call(s) ${callNames.join(', ')}`);
-        })
+        callsDelete(entity, project, projectGroups[projectKey])
       );
     });
-    Promise.all(deletePromises).then(() => {
-      userEvents.deleteClicked({
-        callIds: calls.map(
-          call => `${call.entity}/${call.project}/${call.callId}`
-        ),
-        numCalls: calls.length,
-        userId: userInfoLoaded?.id ?? '',
-        organizationName: orgName,
-        entityName: userInfoLoaded?.username ?? '',
+    Promise.all(deletePromises)
+      .then(() => {
+        setDeleteLoading(false);
+        setConfirmDelete(false);
+        onDeleteCallback?.();
+        closePeek();
+      })
+      .catch(() => {
+        setError(`Error deleting call(s)`);
+        setDeleteLoading(false);
       });
-      setDeleteLoading(false);
-      setConfirmDelete(false);
-      onDeleteCallback?.();
-      closePeek();
-    });
   };
 
   return (
     <Dialog
       open={confirmDelete}
-      onClose={() => setConfirmDelete(false)}
+      onClose={() => {
+        setConfirmDelete(false);
+        setError(null);
+      }}
       maxWidth="xs"
       fullWidth>
       <DialogTitle>Delete {calls.length > 1 ? 'calls' : 'call'}</DialogTitle>
@@ -224,7 +230,10 @@ export const ConfirmDeleteModal: FC<{
         <Button
           variant="ghost"
           disabled={deleteLoading}
-          onClick={() => setConfirmDelete(false)}>
+          onClick={() => {
+            setConfirmDelete(false);
+            setError(null);
+          }}>
           Cancel
         </Button>
       </DialogActions>
