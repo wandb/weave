@@ -168,6 +168,14 @@ const fetchEvaluationComparisonData = async (
     project_id: projectId,
     filter: {call_ids: evaluationCallIds},
   });
+
+  // Kick off the trace query to get the actual trace data
+  const evalTraceIds = evalRes.calls.map(call => call.trace_id);
+  const evalTraceResProm = traceServerClient.callsStreamQuery({
+    project_id: projectId,
+    filter: {trace_ids: evalTraceIds},
+  });
+
   const evaluationCallCache: {[callId: string]: EvaluationEvaluateCallSchema} =
     Object.fromEntries(
       evalRes.calls.map(call => [call.id, call as EvaluationEvaluateCallSchema])
@@ -187,30 +195,20 @@ const fetchEvaluationComparisonData = async (
     ])
   );
 
-  // UGG! Move to backend
-  const objReadMany = (refs: string[]) => {
-    const proms = refs.map(ref => {
-      const parsed = parseRef(ref) as WeaveObjectRef;
-      return traceServerClient.objRead({
-        project_id: projectIdFromParts({
-          entity: parsed.entityName,
-          project: parsed.projectName,
-        }),
-        object_id: parsed.artifactName,
-        digest: parsed.artifactVersion,
-      });
-    });
-    return Promise.all(proms);
-  };
+  const evalRefs = evalRes.calls.map(call => call.inputs.self);
+  const modelRefs = evalRes.calls.map(call => call.inputs.model);
+  const combinedEvalAndModelObjs = await traceServerClient.readBatch({
+    refs: [...evalRefs, ...modelRefs],
+  });
+  const evalObjs = combinedEvalAndModelObjs.vals.slice(0, evalRefs.length);
+  const modelObjs = combinedEvalAndModelObjs.vals.slice(evalRefs.length);
 
   // 2. populate the actual evaluation objects
-  const evalRefs = evalRes.calls.map(call => call.inputs.self);
-  const evalObjRes = await objReadMany(evalRefs);
   result.evaluations = Object.fromEntries(
-    evalObjRes.map((objRes, objNdx) => {
+    evalObjs.map((objVal, objNdx) => {
       const ref = evalRefs[objNdx];
       const parsed = parseRef(ref) as WeaveObjectRef;
-      const objData = objRes.obj.val;
+      const objData = objVal;
       return [
         ref,
         {
@@ -219,7 +217,6 @@ const fetchEvaluationComparisonData = async (
           scorerRefs: objData.scorers,
           entity: parsed.entityName,
           project: parsed.projectName,
-          _rawEvaluationObject: objRes.obj,
         },
       ];
     })
@@ -349,13 +346,11 @@ const fetchEvaluationComparisonData = async (
   });
 
   // 3. populate the model objects
-  const modelRefs = evalRes.calls.map(call => call.inputs.model);
-  const modelObjRes = await objReadMany(modelRefs);
   result.models = Object.fromEntries(
-    modelObjRes.map((objRes, objNdx) => {
+    modelObjs.map((objVal, objNdx) => {
       const ref = modelRefs[objNdx];
       const parsed = parseRef(ref) as WeaveObjectRef;
-      const objData = objRes.obj.val;
+      const objData = objVal;
       return [
         ref,
         {
@@ -372,7 +367,6 @@ const fetchEvaluationComparisonData = async (
           predictOpRef: objData.predict,
           entity: parsed.entityName,
           project: parsed.projectName,
-          _rawModelObject: objRes.obj,
         },
       ];
     })
@@ -381,16 +375,8 @@ const fetchEvaluationComparisonData = async (
   // 3.5 Populate the inputs
   // We only ned 1 since we are going to effectively do an inner join on the rowDigest
   const datasetRef = Object.values(result.evaluations)[0].datasetRef as string;
-  const parsedDatasetRef = parseRef(datasetRef) as WeaveObjectRef;
-  const datasetObjRes = await traceServerClient.objRead({
-    project_id: projectIdFromParts({
-      entity: parsedDatasetRef.entityName,
-      project: parsedDatasetRef.projectName,
-    }),
-    digest: parsedDatasetRef.artifactVersion,
-    object_id: parsedDatasetRef.artifactName,
-  });
-  const rowsRef = datasetObjRes.obj.val.rows;
+  const datasetObjRes = await traceServerClient.readBatch({refs: [datasetRef]});
+  const rowsRef = datasetObjRes.vals[0].rows;
   const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
   const rowsQuery = await traceServerClient.tableQuery({
     project_id: projectIdFromParts({
@@ -407,11 +393,7 @@ const fetchEvaluationComparisonData = async (
   });
 
   // 4. Populate the predictions and scores
-  const evalTraceIds = evalRes.calls.map(call => call.trace_id);
-  const evalTraceRes = await traceServerClient.callsStreamQuery({
-    project_id: projectId,
-    filter: {trace_ids: evalTraceIds},
-  });
+  const evalTraceRes = await evalTraceResProm;
 
   // Create a set of all of the scorer refs
   const scorerRefs = new Set(
