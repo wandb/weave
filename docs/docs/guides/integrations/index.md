@@ -1,10 +1,17 @@
 # Weave Integrations
 
-The Weave ecosystem contains automatic logging integrations for popular AI libraries, and Weave components for common AI workflows and frameworks. Weave will automatically trace calls made via the following libraries and frameworks:
+Weave contains automatic logging integrations for popular LLMs and orchestration frameworks. Weave will automatically trace calls made via the following libraries:
 
-- [OpenAI](/guides/integrations/openai): the `openai` library.
-- [Anthropic](/guides/integrations/anthropic): the `anthropic-sdk-python` library.
-- [MistralAI](/guides/integrations/mistral): the `mistralai` library.
-- [LlamaIndex](/guides/integrations/llamaindex): the `llama-index` framework.
-- [LangChain](/guides/integrations/langchain): the `langchain` framework.
-- [LiteLLM](/guides/integrations/litellm): the `litellm` library.
+  - **[OpenAI](/guides/integrations/openai)**
+  - **[Anthropic](/guides/integrations/anthropic)**
+  - **[Cohere](/guides/integrations/cohere)**
+  - **[MistralAI](/guides/integrations/mistral)**
+  - **[LangChain](/guides/integrations/langchain)**
+  - **[LlamaIndex](/guides/integrations/llamaindex)**
+  - **[DSPy](/guides/integrations/dspy)**
+  - **[Google Gemini](/guides/integrations/google-gemini)**
+  - **[Together AI](/guides/integrations/together_ai)**
+  - **[Open Router](/guides/integrations/openrouter)**
+  - **[Local Models](/guides/integrations/local_models)**
+  - **[LiteLLM](/guides/integrations/litellm)**
+

@@ -1,0 +1,206 @@
+interactions:
+- request:
+    body: '{"message": "Hello, Async Cohere Stream!", "model": "command", "max_tokens":
+      1024, "stream": true}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '98'
+      content-type:
+      - application/json
+      host:
+      - api.cohere.com
+      user-agent:
+      - python-httpx/0.27.0
+      x-fern-language:
+      - Python
+      x-fern-sdk-name:
+      - cohere
+      x-fern-sdk-version:
+      - 5.5.8
+    method: POST
+    uri: https://api.cohere.com/v1/chat
+  response:
+    body:
+      string: '{"is_finished":false,"event_type":"stream-start","generation_id":"acb6b1be-aa45-43a3-9327-115dbb5bb0e3"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"Hey"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" there"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"!"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" If"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" you"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" need"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" any"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" information"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" or"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" assistance"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" at"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" all"}
+
+        {"is_finished":false,"event_type":"text-generation","text":","}
+
+        {"is_finished":false,"event_type":"text-generation","text":" feel"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" free"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" to"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" let"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" me"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" know"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"."}
+
+        {"is_finished":false,"event_type":"text-generation","text":" I"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"''ll"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" be"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" more"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" than"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" happy"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" to"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" provide"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" whatever"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" help"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" I"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" can"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" :"}
+
+        {"is_finished":false,"event_type":"text-generation","text":")."}
+
+        {"is_finished":false,"event_type":"text-generation","text":" \n\nGo"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" ahead"}
+
+        {"is_finished":false,"event_type":"text-generation","text":","}
+
+        {"is_finished":false,"event_type":"text-generation","text":" ask"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" me"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" anything"}
+
+        {"is_finished":false,"event_type":"text-generation","text":","}
+
+        {"is_finished":false,"event_type":"text-generation","text":" no"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" matter"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" how"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" random"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" or"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" specific"}
+
+        {"is_finished":false,"event_type":"text-generation","text":","}
+
+        {"is_finished":false,"event_type":"text-generation","text":" and"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" I"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"''ll"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" do"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" my"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" best"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" to"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" provide"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" you"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" with"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" a"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" thorough"}
+
+        {"is_finished":false,"event_type":"text-generation","text":" response"}
+
+        {"is_finished":false,"event_type":"text-generation","text":"!"}
+
+        {"is_finished":true,"event_type":"stream-end","response":{"response_id":"a5cc745b-a0c9-47cc-9a96-8e3748194b0e","text":"Hey
+        there! If you need any information or assistance at all, feel free to let
+        me know. I''ll be more than happy to provide whatever help I can :). \n\nGo
+        ahead, ask me anything, no matter how random or specific, and I''ll do my
+        best to provide you with a thorough response!","generation_id":"acb6b1be-aa45-43a3-9327-115dbb5bb0e3","chat_history":[{"role":"USER","message":"Hello,
+        Async Cohere Stream!"},{"role":"CHATBOT","message":"Hey there! If you need
+        any information or assistance at all, feel free to let me know. I''ll be more
+        than happy to provide whatever help I can :). \n\nGo ahead, ask me anything,
+        no matter how random or specific, and I''ll do my best to provide you with
+        a thorough response!"}],"finish_reason":"COMPLETE","meta":{"api_version":{"version":"1"},"billed_units":{"input_tokens":7,"output_tokens":64},"tokens":{"input_tokens":69,"output_tokens":65}}},"finish_reason":"COMPLETE"}
+
+        '
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 google
+      access-control-expose-headers:
+      - X-Debug-Trace-ID
+      cache-control:
+      - no-cache, no-store, no-transform, must-revalidate, private, max-age=0
+      content-type:
+      - application/stream+json
+      date:
+      - Thu, 04 Jul 2024 21:10:50 GMT
+      expires:
+      - Thu, 01 Jan 1970 00:00:00 UTC
+      pragma:
+      - no-cache
+      server:
+      - envoy
+      vary:
+      - Origin
+      x-accel-expires:
+      - '0'
+      x-debug-trace-id:
+      - c4e8ca2729f8c032ccbc2d0cdf4d5dcc
+      x-endpoint-monthly-call-limit:
+      - '1000'
+      x-envoy-upstream-service-time:
+      - '103'
+      x-trial-endpoint-call-limit:
+      - '40'
+      x-trial-endpoint-call-remaining:
+      - '39'
+    status:
+      code: 200
+      message: OK
+version: 1

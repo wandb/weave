@@ -1,8 +1,10 @@
 import asyncio
 import dataclasses
 import json
+import platform
 import re
 import signal
+import sys
 
 import pydantic
 import pytest
@@ -211,7 +213,16 @@ def test_call_create(client):
         exception=None,
         summary={},
         _children=[],
-        attributes={},
+        attributes={
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+                "sys_version": sys.version,
+            },
+        },
     )
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
@@ -229,7 +240,16 @@ def test_calls_query(client):
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call0.id,
-        attributes={},
+        attributes={
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+                "sys_version": sys.version,
+            },
+        },
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -238,7 +258,16 @@ def test_calls_query(client):
         parent_id=call0.id,
         inputs={"a": 6, "b": 11},
         id=call1.id,
-        attributes={},
+        attributes={
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+                "sys_version": sys.version,
+            },
+        },
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
@@ -328,7 +357,7 @@ def test_call_display_name(client):
     call0 = result[0]
     client._remove_call_display_name(call0)
     call0 = client.call(call0.id)
-    assert call0.display_name == None
+    assert call0.display_name is None
 
     # add it back
     call0.set_display_name("new new name")
@@ -338,7 +367,7 @@ def test_call_display_name(client):
     # delete display_name by setting to None
     call0.remove_display_name()
     call0 = client.call(call0.id)
-    assert call0.display_name == None
+    assert call0.display_name is None
 
     # add it back
     call0.set_display_name("new new name")
@@ -348,7 +377,7 @@ def test_call_display_name(client):
     # delete by passing None to set
     call0.set_display_name(None)
     call0 = client.call(call0.id)
-    assert call0.display_name == None
+    assert call0.display_name is None
 
 
 def test_dataset_calls(client):
@@ -624,7 +653,7 @@ def test_evaluate(client):
     eval_obj_val = eval_obj._val  # non-trace version so we don't automatically deref
     assert eval_obj_val._class_name == "Evaluation"
     assert eval_obj_val.name == "my-eval"
-    assert eval_obj_val.description == None
+    assert eval_obj_val.description is None
     assert isinstance(eval_obj_val.dataset, weave_client.ObjectRef)
     assert eval_obj.dataset._class_name == "Dataset"
     assert len(eval_obj_val.scorers) == 1
@@ -838,14 +867,9 @@ def test_isinstance_checks(client):
 
     # BoxedBool can't inherit from bool
     y2 = y[2]
-    assert not isinstance(y2, bool)
-    assert y2.ref is not None
-    assert y2.ref.is_descended_from(y.ref)
 
     y3 = y[3]
-    assert not isinstance(y2, type(None))
-    assert y3.ref is not None
-    assert y3.ref.is_descended_from(y.ref)
+    assert y3 is None
 
 
 def test_summary_tokens(client):

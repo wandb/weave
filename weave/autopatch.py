@@ -7,7 +7,9 @@ check if libraries are installed and imported and patch in the case that they ar
 
 def autopatch() -> None:
     from .integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from .integrations.cohere.cohere_sdk import cohere_patcher
     from .integrations.dspy.dspy_sdk import dspy_patcher
+    from .integrations.groq.groq_sdk import groq_patcher
     from .integrations.langchain.langchain import langchain_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
@@ -20,12 +22,16 @@ def autopatch() -> None:
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
     anthropic_patcher.attempt_patch()
+    groq_patcher.attempt_patch()
     dspy_patcher.attempt_patch()
+    cohere_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
     from .integrations.anthropic.anthropic_sdk import anthropic_patcher
+    from .integrations.cohere.cohere_sdk import cohere_patcher
     from .integrations.dspy.dspy_sdk import dspy_patcher
+    from .integrations.groq.groq_sdk import groq_patcher
     from .integrations.langchain.langchain import langchain_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
@@ -38,4 +44,6 @@ def reset_autopatch() -> None:
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
     anthropic_patcher.undo_patch()
+    groq_patcher.undo_patch()
     dspy_patcher.undo_patch()
+    cohere_patcher.undo_patch()
