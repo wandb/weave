@@ -563,12 +563,12 @@ def test_object_mismatch_project_ref_nested(client):
     res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
     assert len(res.objs) == 2
 
-    op = [x for x in res.objs if x.kind == "op"][0]
+    op = res.objs[0]
     assert op.object_id == "hello_world"
     assert op.project_id == "shawn/test-project2"
     assert op.kind == "op"
 
-    obj = [x for x in res.objs if x.kind == "object"][0]
+    obj = res.objs[1]
     assert obj.object_id == "my-object"
     assert obj.project_id == "shawn/test-project2"
 
@@ -817,8 +817,8 @@ def test_obj_dedupe(client):
     client._save_object({"a": 2}, "my-obj")
     res = client._objects()
     assert len(res) == 2
-    assert res[0].version_index in [0, 1]
-    assert res[1].version_index in [0, 1]
+    assert res[0].version_index == 0
+    assert res[1].version_index == 1
 
 
 def test_op_query(client):
