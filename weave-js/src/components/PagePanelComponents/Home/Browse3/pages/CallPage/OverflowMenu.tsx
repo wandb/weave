@@ -141,7 +141,7 @@ export const ConfirmDeleteModal: FC<{
   const makeProjectGroups = (mixedCalls: CallSchema[]) => {
     const projectGroups: {[key: string]: string[]} = {};
     mixedCalls.forEach(call => {
-      const projectKey = `${call.project}/${call.callId}`;
+      const projectKey = `${call.entity}/${call.project}`;
       projectGroups[projectKey] = projectGroups[projectKey] || [];
       projectGroups[projectKey].push(call.callId);
     });
