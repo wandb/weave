@@ -45,6 +45,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveHeaderExtrasContext,
 } from '../../context';
+import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {SELECTED_FOR_DELETION, StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
@@ -86,6 +87,11 @@ export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
 
+const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
+  pageSize: DEFAULT_PAGE_SIZE,
+  page: 0,
+};
+
 export const CallsTable: FC<{
   entity: string;
   project: string;
@@ -101,6 +107,9 @@ export const CallsTable: FC<{
 
   sortModel?: GridSortModel;
   setSortModel?: (newModel: GridSortModel) => void;
+
+  paginationModel?: GridPaginationModel;
+  setPaginationModel?: (newModel: GridPaginationModel) => void;
 }> = ({
   entity,
   project,
@@ -112,6 +121,8 @@ export const CallsTable: FC<{
   setColumnVisibilityModel,
   sortModel,
   setSortModel,
+  paginationModel,
+  setPaginationModel,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
@@ -161,12 +172,8 @@ export const CallsTable: FC<{
   // 3. Sort
   const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
 
-  const defaultPageSize = 100;
   // 4. Pagination
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
-    pageSize: defaultPageSize,
-    page: 0,
-  });
+  const paginationModelResolved = paginationModel ?? DEFAULT_PAGINATION_CALLS;
 
   // 5. Expansion
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
@@ -209,7 +216,7 @@ export const CallsTable: FC<{
     effectiveFilter,
     filterModel,
     sortModelResolved,
-    paginationModel,
+    paginationModelResolved,
     expandedRefCols
   );
 
@@ -604,6 +611,16 @@ export const CallsTable: FC<{
     [callsLoading, setSortModel, muiColumns]
   );
 
+  const onPaginationModelChange = useCallback(
+    (newModel: GridPaginationModel) => {
+      if (!setPaginationModel || callsLoading) {
+        return;
+      }
+      setPaginationModel(newModel);
+    },
+    [callsLoading, setPaginationModel]
+  );
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -748,8 +765,8 @@ export const CallsTable: FC<{
         rowCount={callsTotal}
         paginationMode="server"
         paginationModel={paginationModel}
-        onPaginationModelChange={newModel => setPaginationModel(newModel)}
-        pageSizeOptions={[defaultPageSize]}
+        onPaginationModelChange={onPaginationModelChange}
+        pageSizeOptions={[DEFAULT_PAGE_SIZE]}
         // PAGINATION SECTION END
         rowHeight={38}
         columns={muiColumns}
