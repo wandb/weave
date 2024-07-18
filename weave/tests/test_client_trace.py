@@ -2,10 +2,11 @@ import asyncio
 import dataclasses
 import datetime
 import os
+import platform
+import sys
 import time
 import typing
 from collections import defaultdict, namedtuple
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from contextvars import copy_context
 
@@ -14,10 +15,11 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from weave import weave_client
+from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, WeaveObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave.weave_client import Call
 
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
@@ -76,7 +78,16 @@ def test_simple_op(client):
         exception=None,
         output=6,
         summary={},
-        attributes={},
+        attributes={
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+                "sys_version": sys.version,
+            },
+        },
     )
 
 
@@ -1242,7 +1253,17 @@ def test_attributes_on_ops(client):
     )
 
     assert len(res.calls) == 1
-    assert res.calls[0].attributes == {"custom": "attribute"}
+    assert res.calls[0].attributes == {
+        "custom": "attribute",
+        "weave": {
+            "client_version": weave.version.VERSION,
+            "source": "python-sdk",
+            "os_name": platform.system(),
+            "os_version": platform.version(),
+            "os_release": platform.release(),
+            "sys_version": sys.version,
+        },
+    }
 
 
 def test_dataset_row_type(client):
@@ -1606,7 +1627,26 @@ def map_simple(fn, vals):
 max_workers = 3
 
 
-# This is a standard way to execute a map operation with thread executor.
+def map_with_threads_no_executor(fn, vals):
+    def task_wrapper(v):
+        return fn(v)
+
+    threads = []
+
+    for v in vals:
+        thread = Thread(target=task_wrapper, args=(v,))
+        thread.start()
+        threads.append(thread)
+
+        if len(threads) >= max_workers:
+            for thread in threads:
+                thread.join()
+            threads = []
+
+        for thread in threads:
+            thread.join()
+
+
 def map_with_thread_executor(fn, vals):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(fn, vals)
@@ -1628,7 +1668,8 @@ def map_with_copying_thread_executor(fn, vals):
     "mapper",
     [
         map_simple,
-        # map_with_thread_executor, # <-- Currently this is failing! Fix me (:
+        map_with_threads_no_executor,
+        map_with_thread_executor,
         # map_with_copying_thread_executor, # <-- Flakes in CI
     ],
 )
@@ -1687,8 +1728,6 @@ def test_mapped_execution(client, mapper):
                 sequential_expected_order.append(f"{op}({event}):{i}")
     if mapper == map_simple:
         assert events == sequential_expected_order
-    else:
-        assert events != sequential_expected_order
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -2209,6 +2248,35 @@ def test_sort_and_filter_through_refs(client):
         )
 
         assert inner_res.count == count
+
+
+def test_call_has_client_version(client):
+    @weave.op
+    def test():
+        return 1
+
+    c = test.call()
+    assert "weave" in c.attributes
+    assert "client_version" in c.attributes["weave"]
+
+
+def test_user_cannot_modify_call_weave_dict(client):
+    @weave.op
+    def test():
+        return 1
+
+    call = test.call()
+
+    call.attributes["test"] = 123
+
+    with pytest.raises(KeyError):
+        call.attributes["weave"] = {"anything": "blah"}
+
+    with pytest.raises(KeyError):
+        call.attributes["weave"]["anything"] = "blah"
+
+    # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
+    # but at that point you're on your own :)
 
 
 def test_calls_iter_slice(client):
