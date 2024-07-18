@@ -98,7 +98,9 @@ export const useCallsForQuery = (
     }
   );
 
-  const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy);
+  const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy, {
+    refetchOnDelete: true,
+  });
 
   const callResults = useMemo(() => {
     return calls.result ?? [];

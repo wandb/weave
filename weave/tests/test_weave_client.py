@@ -797,6 +797,24 @@ def test_refs_read_batch_dataset_rows(client):
     assert res.vals[1] == 6
 
 
+def test_refs_read_batch_multi_project(client):
+    client.project = "test111"
+    ref = client._save_object([1, 2, 3], "my-list")
+
+    client.project = "test222"
+    ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
+
+    client.project = "test333"
+    ref3 = client._save_object({"ab": [3, 4, 5]}, "my-obj-2")
+
+    refs = [ref.uri(), ref2.uri(), ref3.uri()]
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=refs))
+    assert len(res.vals) == 3
+    assert res.vals[0] == [1, 2, 3]
+    assert res.vals[1] == {"a": [3, 4, 5]}
+    assert res.vals[2] == {"ab": [3, 4, 5]}
+
+
 def test_large_files(client):
     class CoolCustomThing:
         a: str
