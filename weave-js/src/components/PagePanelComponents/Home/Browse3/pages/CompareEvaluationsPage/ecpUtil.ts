@@ -1,123 +1,111 @@
+/**
+ * This file contains a handful of utilities for working with the `EvaluationComparisonData` destructure.
+ * These are mostly convenience functions for extracting and resolving metrics from the data, but also
+ * include some helper functions for working with the `MetricDefinition` objects and constructing
+ * strings correctly.
+ */
+
+import {parseRef, WeaveObjectRef} from '../../../../../../react';
 import {
   EvaluationCall,
-  EvaluationMetricDimension,
-  isBinaryScore,
-  isBinarySummaryScore,
-  isContinuousSummaryScore,
-  isDerivedMetricDefinition,
-  isScorerMetricDimension,
+  EvaluationComparisonData,
+  MetricDefinition,
+  MetricDefinitionMap,
   MetricResult,
+  MetricType,
+  MetricValueType,
   PredictAndScoreCall,
-  ScoreType,
-  SummaryScore,
+  SourceType,
 } from './ecpTypes';
 
-export const adjustValueForDisplay = (
-  value: number | boolean | undefined,
-  isBooleanAggregate?: boolean
-): number | undefined => {
-  if (value === undefined) {
-    return undefined;
+export const flattenedDimensionPath = (dim: MetricDefinition): string => {
+  const paths = [...dim.metricSubPath];
+  if (dim.source === 'scorer') {
+    if (dim.scorerOpOrObjRef == null) {
+      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
+    }
+    paths.unshift(getScoreKeyNameFromScorerRef(dim.scorerOpOrObjRef));
   }
-  if (isBinaryScore(value)) {
-    return value ? 100 : 0;
-  } else if (isBooleanAggregate) {
-    return value * 100;
-  } else {
-    return value;
-  }
-};
-
-export const flattenedDimensionPath = (
-  dim: EvaluationMetricDimension
-): string => {
-  if (isScorerMetricDimension(dim)) {
-    const parts = [dim.scorerDef.likelyTopLevelKeyName, ...dim.metricSubPath];
-    return parts.join('.');
-  } else if (isDerivedMetricDefinition(dim)) {
-    return dim.derivedMetricName;
-  } else {
-    throw new Error('Unknown dimension type');
-  }
+  return paths.join('.');
 };
 
 export const dimensionUnit = (
-  dim: EvaluationMetricDimension,
+  dim: MetricDefinition,
   isAggregate?: boolean
 ): string => {
-  if (isScorerMetricDimension(dim)) {
-    if (isAggregate && dim.scoreType === 'binary') {
-      return '%';
-    }
-    return '';
-  } else if (isDerivedMetricDefinition(dim)) {
-    return dim.unit ?? '';
-  } else {
-    throw new Error('Unknown dimension type');
+  if (isAggregate && dim.scoreType === 'binary') {
+    return '%';
   }
+  return dim.unit ?? '';
 };
 
-export const dimensionShouldMinimize = (
-  dim: EvaluationMetricDimension
-): boolean => {
-  if (isScorerMetricDimension(dim)) {
-    return false;
-  } else if (isDerivedMetricDefinition(dim)) {
-    return dim.shouldMinimize ?? false;
-  } else {
-    throw new Error('Unknown dimension type');
-  }
-};
-
-export const dimensionId = (dim: EvaluationMetricDimension): string => {
-  if (isScorerMetricDimension(dim)) {
-    return dim.scorerDef.scorerOpOrObjRef + '#' + dim.metricSubPath.join('.');
-  } else if (isDerivedMetricDefinition(dim)) {
-    return dim.derivedMetricName;
-  } else {
-    throw new Error('Unknown dimension type');
-  }
-};
-export const resolveDimensionMetricResultForPASCall = (
-  dim: EvaluationMetricDimension,
+export const resolveScoreMetricResultForPASCall = (
+  dim: MetricDefinition,
   pasCall: PredictAndScoreCall
 ): MetricResult | undefined => {
-  if (isScorerMetricDimension(dim)) {
-    return pasCall.scorerMetrics[dimensionId(dim)];
-  } else if (isDerivedMetricDefinition(dim)) {
-    return pasCall.derivedMetrics[dimensionId(dim)];
-  } else {
-    throw new Error(`Unknown metric dimension type: ${dim}`);
-  }
+  const metricId = metricDefinitionId(dim);
+  return pasCall.scoreMetrics[metricId];
 };
 
-export const resolveDimensionValueForPASCall = (
-  dim: EvaluationMetricDimension,
+export const resolveScoreMetricValueForPASCall = (
+  dim: MetricDefinition,
   pasCall: PredictAndScoreCall
-): ScoreType | undefined => {
-  const metricResult = resolveDimensionMetricResultForPASCall(dim, pasCall);
+): MetricValueType | undefined => {
+  const metricResult = resolveScoreMetricResultForPASCall(dim, pasCall);
   if (metricResult) {
     return metricResult.value;
   }
   return undefined;
 };
 
-const resolveDimensionSummaryScoreForEvaluateCall = (
-  dim: EvaluationMetricDimension,
+export const resolveSummaryMetricResultForEvaluateCall = (
+  dim: MetricDefinition,
   evaluateCall: EvaluationCall
-): SummaryScore | undefined => {
-  return evaluateCall.summaryMetrics[dimensionId(dim)];
+): MetricResult | undefined => {
+  return evaluateCall.summaryMetrics[metricDefinitionId(dim)];
 };
 
-export const resolveDimensionValueForEvaluateCall = (
-  dim: EvaluationMetricDimension,
+export const resolveSummaryMetricValueForEvaluateCall = (
+  dim: MetricDefinition,
   evaluateCall: EvaluationCall
-): number | undefined => {
-  const score = resolveDimensionSummaryScoreForEvaluateCall(dim, evaluateCall);
-  if (isBinarySummaryScore(score)) {
-    return score.true_fraction;
-  } else if (isContinuousSummaryScore(score)) {
-    return score.mean;
+): MetricValueType | undefined => {
+  const score = resolveSummaryMetricResultForEvaluateCall(dim, evaluateCall);
+  if (score) {
+    return score.value;
   }
   return undefined;
+};
+
+export const getMetricIds = (
+  data: EvaluationComparisonData,
+  type: MetricType,
+  source: SourceType
+): MetricDefinitionMap => {
+  const metrics = type === 'score' ? data.scoreMetrics : data.summaryMetrics;
+  return Object.fromEntries(
+    Object.entries(metrics).filter(([k, v]) => v.source === source)
+  );
+};
+
+export const getScoreKeyNameFromScorerRef = (scorerRef: string) => {
+  const parsed = parseRef(scorerRef) as WeaveObjectRef;
+  return parsed.artifactName;
+};
+
+export const metricDefinitionId = (metricDef: MetricDefinition): string => {
+  const path = metricDef.metricSubPath
+    .map(p => {
+      return p.replace('.', '\\.');
+    })
+    .join('.');
+  if (metricDef.source === 'derived') {
+    return `derived#${path}`;
+  } else if (metricDef.source === 'scorer') {
+    if (metricDef.scorerOpOrObjRef == null) {
+      throw new Error('scorerOpOrObjRef must be defined for scorer metric');
+    }
+    return `${metricDef.scorerOpOrObjRef}#${path}`;
+  } else {
+    throw new Error(`Unknown metric source: ${metricDef.source}`);
+  }
 };

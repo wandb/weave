@@ -1,156 +1,51 @@
-import {
-  TraceCallSchema,
-  TraceObjSchema,
-} from '../wfReactInterface/traceServerClient';
-
-export type EvaluationComparisonState = {
-  data: EvaluationComparisonData;
-  baselineEvaluationCallId: string;
-  comparisonDimensions?: ComparisonDimensionsType;
-  selectedInputDigest?: string;
-};
-
-type BinarySummaryScore = {
-  true_count: number;
-  true_fraction: number;
-};
-
-type BinaryScore = boolean;
-
-export const isBinaryScore = (score: any): score is BinaryScore => {
-  return typeof score === 'boolean';
-};
-
-type ContinuousSummaryScore = {
-  mean: number;
-};
-
-export const isBinarySummaryScore = (
-  score: any
-): score is BinarySummaryScore => {
-  return (
-    typeof score === 'object' &&
-    score != null &&
-    'true_count' in score &&
-    'true_fraction' in score
-  );
-};
-
-export const isContinuousSummaryScore = (
-  score: any
-): score is ContinuousSummaryScore => {
-  return typeof score === 'object' && score != null && 'mean' in score;
-};
-
-type ContinuousScore = number;
-
-export const isContinuousScore = (score: any): score is ContinuousScore => {
-  return typeof score === 'number';
-};
-
-export type ScorerDefinition = {
-  scorerOpOrObjRef: string;
-  likelyTopLevelKeyName: string;
-};
-
-export type ScorerMetricDimension = {
-  dimensionType: 'scorerMetric';
-  scorerDef: ScorerDefinition;
-  metricSubPath: string[];
-  scoreType: 'binary' | 'continuous';
-};
-
-export type DerivedMetricDefinition = {
-  dimensionType: 'derivedMetric';
-  derivedMetricName: string;
-  scoreType: 'binary' | 'continuous';
-  shouldMinimize?: boolean;
-  unit?: string;
-};
-
-export const isScorerMetricDimension = (
-  dim: EvaluationMetricDimension
-): dim is ScorerMetricDimension => {
-  return typeof dim === 'object' && dim.dimensionType === 'scorerMetric';
-};
-
-export const isDerivedMetricDefinition = (
-  dim: EvaluationMetricDimension
-): dim is DerivedMetricDefinition => {
-  return typeof dim === 'object' && dim.dimensionType === 'derivedMetric';
-};
-
-export type EvaluationMetricDimension =
-  | ScorerMetricDimension
-  | DerivedMetricDefinition;
-
-export type EvaluationEvaluateCallSchema = TraceCallSchema & {
-  inputs: TraceCallSchema['inputs'] & {
-    self: string;
-    model: string;
-  };
-  output: TraceCallSchema['output'] & {
-    [scorer: string]: {
-      [score: string]: SummaryScore;
-    };
-  } & {
-    model_latency: ContinuousSummaryScore;
-  };
-  summary: TraceCallSchema['summary'] & {
-    usage?: {
-      [model: string]: {
-        requests?: number;
-        completion_tokens?: number;
-        prompt_tokens?: number;
-        total_tokens?: number;
-      };
-    };
-  };
-};
-
-export type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
-
-type DatasetRow = {
-  digest: string;
-  val: any;
-};
-type ModelObj = {
-  ref: string;
-  predictOpRef: string;
-  properties: {[prop: string]: any};
-  project: string;
-  entity: string;
-  _rawModelObject: TraceObjSchema;
-};
-
-export type ScoreType = BinaryScore | ContinuousScore;
-export type MetricResult = {
-  value: ScoreType;
-  sourceCall: {
-    callId: string;
-    _rawScoreTraceData: TraceCallSchema;
-  };
-};
+/**
+ * Contains the primary data definition for the Evaluation Comparison Page. Note:
+ * `ecpState.ts` contains the state definition for the Evaluation Comparison Page.
+ *
+ * The `EvaluationComparisonData` fully defines a normalized data structure for the
+ * Comparing Evaluations.
+ */
+import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 
 export type EvaluationComparisonData = {
+  // Entity and Project are constant across all calls
   entity: string;
   project: string;
-  evaluationCalls: {
-    [callId: string]: EvaluationCall;
-  };
+
+  // Evaluations are the Weave Objects that define the evaluation itself
   evaluations: {
     [objectRef: string]: EvaluationObj;
   };
+
+  // EvaluationCalls are the specific calls of an evaluation.
+  evaluationCalls: {
+    [callId: string]: EvaluationCall;
+  };
+
+  // Inputs are the intersection of all inputs used in the evaluations.
+  // Note, we are able to "merge" the same input digest even if it is
+  // used in different evaluations.
   inputs: {
     [rowDigest: string]: DatasetRow;
   };
+
+  // Models are the Weave Objects used to define the model logic and properties.
   models: {
     [modelRef: string]: ModelObj;
   };
+
+  // ResultRows are the actual results of running the evaluation against
+  // the inputs.
   resultRows: {
+    // Each rowDigest is a unique identifier for the input data.
     [rowDigest: string]: {
+      // Each RowDigest is further broken down by the evaluations that
+      // used the input.
       evaluations: {
         [evaluationCallId: string]: {
+          // Each evaluation is further broken down by the predictAndScore
+          // calls that were made. (The case where this is more than 1 is
+          // when the evaluation is using multiple trials)
           predictAndScores: {
             [predictAndScoreCallId: string]: PredictAndScoreCall;
           };
@@ -158,52 +53,97 @@ export type EvaluationComparisonData = {
       };
     };
   };
-  derivedMetricDimensions: {
-    [metricDimensionId: string]: DerivedMetricDefinition;
-  };
-  scorerMetricDimensions: {[metricDimensionId: string]: ScorerMetricDimension};
+
+  // ScoreMetrics define the metrics that are associated on each individual prediction
+  scoreMetrics: MetricDefinitionMap;
+
+  // SummaryMetrics define the metrics that are associated with the evaluation as a whole
+  // often aggregated from the scoreMetrics.
+  summaryMetrics: MetricDefinitionMap;
 };
 
+/**
+ * The EvaluationObj is the primary object that defines the evaluation itself.
+ */
+type EvaluationObj = {
+  ref: string;
+  datasetRef: string;
+  scorerRefs: string[];
+  entity: string;
+  project: string;
+};
+
+/**
+ * The EvaluationCall is the specific call of an evaluation.
+ */
+export type EvaluationCall = {
+  callId: string;
+  evaluationRef: string;
+  modelRef: string;
+  name: string;
+  color: string;
+  summaryMetrics: MetricResultMap;
+};
+
+/**
+ * The DatasetRow is the primary object that defines the input data.
+ */
+type DatasetRow = {
+  digest: string;
+  val: any;
+};
+
+/**
+ * The ModelObj is the primary object that defines the model logic and properties.
+ */
+type ModelObj = {
+  ref: string;
+  predictOpRef: string;
+  entity: string;
+  project: string;
+  properties: {[prop: string]: any};
+};
+
+/**
+ * The PredictAndScoreCall is the specific call of a model prediction and scoring.
+ * This is the aggregate view of the model prediction and scores for a given input.
+ */
 export type PredictAndScoreCall = {
   callId: string;
   exampleRef: string;
   rowDigest: string;
   modelRef: string;
   evaluationCallId: string;
-  scorerMetrics: {
-    [metricDimensionId: string]: MetricResult;
-  };
-  derivedMetrics: {
-    [metricDimensionId: string]: MetricResult;
-  };
+  scoreMetrics: MetricResultMap;
   _rawPredictAndScoreTraceData: TraceCallSchema;
   _rawPredictTraceData?: TraceCallSchema;
 };
 
-type RangeSelection = {[evalCallId: string]: {min: number; max: number}};
+/**
+ * While not used in this file, used to differentiate between score and summary metrics.
+ */
+export type MetricType = 'score' | 'summary';
 
-export type ComparisonDimensionsType = Array<{
-  dimension: EvaluationMetricDimension;
-  rangeSelection?: RangeSelection;
-}>;
-
-export type EvaluationCall = {
-  callId: string;
-  name: string;
-  color: string;
-  evaluationRef: string;
-  modelRef: string;
-  summaryMetrics: {
-    [metricDimensionId: string]: SummaryScore;
-  };
-  _rawEvaluationTraceData: EvaluationEvaluateCallSchema;
+/**
+ * A metric definition map maps metric ids to metric definitions.
+ */
+export type MetricDefinitionMap = {[metricId: string]: MetricDefinition};
+export type SourceType = 'derived' | 'scorer'; // In the future, we can add `model_output` to capture self-reported model metrics
+export type MetricDefinition = {
+  metricSubPath: string[];
+  scoreType: 'binary' | 'continuous';
+  source: SourceType;
+  scorerOpOrObjRef?: string;
+  shouldMinimize?: boolean;
+  unit?: string;
 };
 
-type EvaluationObj = {
-  ref: string;
-  datasetRef: string;
-  scorerRefs: string[];
-  project: string;
-  entity: string;
-  _rawEvaluationObject: TraceObjSchema;
+/**
+ * A result map maps metric ids to metric results.
+ */
+type MetricResultMap = {[metricId: string]: MetricResult};
+export type MetricValueType = boolean | number;
+export type MetricResult = {
+  value: MetricValueType;
+  sourceCallId: string;
 };

@@ -9,8 +9,6 @@ from pydantic import (
     model_validator,
 )
 
-# import pydantic
-from weave.legacy import box
 from weave.trace.op import ObjectRef, Op, call
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.weave_client import get_ref
@@ -48,8 +46,6 @@ class Object(BaseModel):
                 if k.startswith("_"):
                     continue
                 val = getattr(v, k)
-                if isinstance(val, box.BoxedNone):
-                    val = None
                 fields[k] = val
 
             # pydantic validation will construct a new pydantic object

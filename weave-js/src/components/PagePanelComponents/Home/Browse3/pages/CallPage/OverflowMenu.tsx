@@ -141,7 +141,7 @@ export const ConfirmDeleteModal: FC<{
   const makeProjectGroups = (mixedCalls: CallSchema[]) => {
     const projectGroups: {[key: string]: string[]} = {};
     mixedCalls.forEach(call => {
-      const projectKey = `${call.project}/${call.callId}`;
+      const projectKey = `${call.entity}/${call.project}`;
       projectGroups[projectKey] = projectGroups[projectKey] || [];
       projectGroups[projectKey].push(call.callId);
     });
@@ -199,9 +199,9 @@ export const ConfirmDeleteModal: FC<{
           </p>
         )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
-          <CallNameRow>
+          <CallNameRow key={call.callId}>
             <div>
-              <CallName key={call.callId}>{callDisplayName(call)}</CallName>
+              <CallName>{callDisplayName(call)}</CallName>
             </div>
             <CallIdDiv>
               <CopyableId id={call.callId} type="Call" />

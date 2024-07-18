@@ -1,13 +1,24 @@
 import dataclasses
 import datetime
+import platform
+import sys
 import typing
 import uuid
-from typing import Any, Dict, Optional, Sequence, TypedDict, Union
+from functools import lru_cache
+from typing import (
+    Any,
+    Dict,
+    Iterator,
+    Optional,
+    Sequence,
+    TypedDict,
+    Union,
+)
 
 import pydantic
 from requests import HTTPError
 
-from weave import call_context, client_context, trace_sentry, urls
+from weave import call_context, client_context, trace_sentry, urls, version
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
@@ -75,7 +86,7 @@ def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
 
 def get_obj_name(val: Any) -> str:
     name = getattr(val, "name", None)
-    if name == None:
+    if name is None:
         if isinstance(val, ObjectRecord):
             name = val._class_name
         else:
@@ -215,37 +226,63 @@ class CallsIter:
         self.server = server
         self.project_id = project_id
         self.filter = filter
+        self._page_size = 10
 
-    def __getitem__(self, key: Union[slice, int]) -> WeaveObject:
+    # seems like this caching should be on the server, but it's here for now...
+    @lru_cache
+    def _fetch_page(self, index: int) -> list[CallSchema]:
+        # caching in here means that any other CallsIter objects would also
+        # benefit from the cache
+        response = self.server.calls_query(
+            CallsQueryReq(
+                project_id=self.project_id,
+                filter=self.filter,
+                offset=index * self._page_size,
+                limit=self._page_size,
+            )
+        )
+        return response.calls
+
+    def _get_one(self, index: int) -> WeaveObject:
+        if index < 0:
+            raise IndexError("Negative indexing not supported")
+
+        page_index = index // self._page_size
+        page_offset = index % self._page_size
+
+        calls = self._fetch_page(page_index)
+        if page_offset >= len(calls):
+            raise IndexError(f"Index {index} out of range")
+
+        call = calls[page_offset]
+        entity, project = self.project_id.split("/")
+        return make_client_call(entity, project, call, self.server)
+
+    def _get_slice(self, key: slice) -> Iterator[WeaveObject]:
+        if (start := key.start or 0) < 0:
+            raise ValueError("Negative start not supported")
+        if (stop := key.stop) is not None and stop < 0:
+            raise ValueError("Negative stop not supported")
+        if (step := key.step or 1) < 0:
+            raise ValueError("Negative step not supported")
+
+        i = start
+        while stop is None or i < stop:
+            try:
+                yield self._get_one(i)
+            except IndexError:
+                break
+            i += step
+
+    def __getitem__(
+        self, key: Union[slice, int]
+    ) -> Union[WeaveObject, list[WeaveObject]]:
         if isinstance(key, slice):
-            raise NotImplementedError("Slicing not supported")
-        for i, call in enumerate(self):
-            if i == key:
-                return call
-        raise IndexError(f"Index {key} out of range")
+            return list(self._get_slice(key))
+        return self._get_one(key)
 
     def __iter__(self) -> typing.Iterator[WeaveObject]:
-        page_index = 0
-        page_size = 10
-        entity, project = self.project_id.split("/")
-        while True:
-            response = self.server.calls_query(
-                CallsQueryReq(
-                    project_id=self.project_id,
-                    filter=self.filter,
-                    offset=page_index * page_size,
-                    limit=page_size,
-                )
-            )
-            page_data = response.calls
-            for call in page_data:
-                # TODO: if we want to be able to refer to call outputs
-                # we need to yield a ref-tracking call here.
-                yield make_client_call(entity, project, call, self.server)
-                # yield make_trace_obj(call, ValRef(call.id), self.server, None)
-            if len(page_data) < page_size:
-                break
-            page_index += 1
+        return self._get_slice(slice(0, None, 1))
 
 
 def make_client_call(
@@ -280,6 +317,48 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
             else:
                 result[k] = result.get(k, 0) + v
     return result
+
+
+class WeaveKeyDict(dict):
+    """A dict representing the 'weave' subdictionary of a call's attributes.
+
+    This dictionary is not intended to be set directly.
+    """
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
+
+
+class AttributesDict(dict):
+    """A dict representing the attributes of a call.
+
+    The `weave` key is reserved for internal use and cannot be set directly.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__()
+        dict.__setitem__(self, "weave", WeaveKeyDict())
+
+        if kwargs:
+            for key, value in kwargs.items():
+                if key == "weave":
+                    if isinstance(value, dict):
+                        for subkey, subvalue in value.items():
+                            self._set_weave_item(subkey, subvalue)
+                else:
+                    self[key] = value
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        if key == "weave":
+            raise KeyError("Cannot set 'weave' directly -- for internal use only!")
+        super().__setitem__(key, value)
+
+    def _set_weave_item(self, subkey: Any, value: Any) -> None:
+        """Internal method to set items in the 'weave' subdictionary."""
+        dict.__setitem__(self["weave"], subkey, value)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({super().__repr__()})"
 
 
 class WeaveClient:
@@ -442,6 +521,14 @@ class WeaveClient:
 
         if attributes is None:
             attributes = {}
+
+        attributes = AttributesDict(**attributes)
+        attributes._set_weave_item("client_version", version.VERSION)
+        attributes._set_weave_item("source", "python-sdk")
+        attributes._set_weave_item("os_name", platform.system())
+        attributes._set_weave_item("os_version", platform.version())
+        attributes._set_weave_item("os_release", platform.release())
+        attributes._set_weave_item("sys_version", sys.version)
 
         call = Call(
             op_name=op_str,
