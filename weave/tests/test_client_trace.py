@@ -2265,7 +2265,7 @@ def test_user_cannot_modify_call_weave_dict(client):
     def test():
         return 1
 
-    call = test.call()
+    _, call = test.call()
 
     call.attributes["test"] = 123
 
