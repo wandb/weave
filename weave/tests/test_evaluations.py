@@ -8,15 +8,6 @@ from weave import Evaluation, Model
 from ..trace_server import trace_server_interface as tsi
 
 
-class Nearly:
-    def __init__(self, v: float, tol: float = 0.01) -> None:
-        self.v = v
-        self.tol = tol
-
-    def __eq__(self, other: float) -> bool:
-        return abs(self.v - other) < self.tol
-
-
 def flatten_calls(
     calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
 ) -> list:
@@ -157,7 +148,7 @@ async def test_basic_evaluation(client):
 @weave.op
 def gpt_mocker(question: str):
     return {
-        "response": str(question),
+        "response": question,
         "model": "gpt-4o-2024-05-13",
         "usage": {
             "requests": 1,
@@ -244,7 +235,7 @@ class MyDictScorerWithCustomFloatSummary(weave.Scorer):
 
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
-        float_avg = sum([row["d_float"] for row in score_rows]) / len(score_rows)
+        float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
         return float_avg
 
 
@@ -255,7 +246,7 @@ class MyDictScorerWithCustomBoolSummary(weave.Scorer):
 
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
-        float_avg = sum([row["d_float"] for row in score_rows]) / len(score_rows)
+        float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
         return float_avg > 0.5
 
 
@@ -266,8 +257,8 @@ class MyDictScorerWithCustomDictSummary(weave.Scorer):
 
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
-        float_avg = sum([row["d_float"] for row in score_rows]) / len(score_rows)
-        bool_avg = sum([1 if row["d_bool"] else 0 for row in score_rows]) / len(
+        float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
+        bool_avg = sum(1 if row["d_bool"] else 0 for row in score_rows) / len(
             score_rows
         )
         return {
@@ -378,7 +369,7 @@ async def test_evaluation_data_topology(client):
     }
     # BUG: latency reported includes weave internal latency
     # actual_latency = (predict_call.ended_at - predict_call.started_at).total_seconds()
-    actual_latency = Nearly(0, 1)
+    actual_latency = pytest.approx(0, abs=1)
     model_1_latency = {"mean": actual_latency}
     score_int_score = 1
     score_float_score = 1.0
@@ -456,7 +447,7 @@ async def test_evaluation_data_topology(client):
         "nested": {"bool_avg": 0.5},
         "reason": "This is a custom test reason",
     }
-    model_latency = {"mean": Nearly(0, 1)}
+    model_latency = {"mean": pytest.approx(0, abs=1)}
     predict_usage_summary = {
         "usage": {
             "gpt-4o-2024-05-13": {
