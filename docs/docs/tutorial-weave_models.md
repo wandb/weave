@@ -101,6 +101,10 @@ result = dinos.invoke(sentence)
 print(result)
 ```
 
+Now after calling `.invoke` you can see the trace in Weave **now tracks the model attributes as well as the code** for the model functions that have been decorated with `weave.op()`. You can see the model is also versioned, "v21" in this case, and if you click on the model **you can see all of the calls** that have used that version of the model
+
+[!Re-using a weave model](../static/img/tutorial-model_invoke3.png)
+
 ## Exporting and re-using a logged `weave.Model`
 Because Weave stores and versions Models that have been invoked, it is possible to export and re-use these models.
 
@@ -123,3 +127,7 @@ new_sentence = """I also saw a Ankylosaurus grazing on giant ferns"""
 new_result = new_dinos.invoke(new_sentence)
 print(new_result)
 ```
+
+Here you can now see the name Model version (v21) was used with the new input:
+
+[!Re-using a weave model](../static/img/tutorial-model_re-use.png)
