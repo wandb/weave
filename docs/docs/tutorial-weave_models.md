@@ -69,12 +69,6 @@ class ExtractDinos(weave.Model):
         return json.loads(dino_data)
 ```
 
-**A note on using `weave.Model`:**
-- You can use `predict` instead of `invoke` for the name of the function in your Weave `Model` if you prefer.
-- If you want other class methods to be tracked by weave they need to be wrapped in `weave.op()`
-- Attributes starting with an underscore are ignored by weave and won't be logged
-
-
 Now you can instantiate and call the model with `invoke`:
 
 ```python
@@ -103,7 +97,12 @@ print(result)
 
 Now after calling `.invoke` you can see the trace in Weave **now tracks the model attributes as well as the code** for the model functions that have been decorated with `weave.op()`. You can see the model is also versioned, "v21" in this case, and if you click on the model **you can see all of the calls** that have used that version of the model
 
-[!Re-using a weave model](../static/img/tutorial-model_invoke3.png)
+![Re-using a weave model](../static/img/tutorial-model_invoke3.png)
+
+**A note on using `weave.Model`:**
+- You can use `predict` instead of `invoke` for the name of the function in your Weave `Model` if you prefer.
+- If you want other class methods to be tracked by weave they need to be wrapped in `weave.op()`
+- Attributes starting with an underscore are ignored by weave and won't be logged
 
 ## Exporting and re-using a logged `weave.Model`
 Because Weave stores and versions Models that have been invoked, it is possible to export and re-use these models.
@@ -130,4 +129,4 @@ print(new_result)
 
 Here you can now see the name Model version (v21) was used with the new input:
 
-[!Re-using a weave model](../static/img/tutorial-model_re-use.png)
+![Re-using a weave model](../static/img/tutorial-model_re-use.png)
