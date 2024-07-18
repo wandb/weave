@@ -32,11 +32,10 @@ import json
 from openai import OpenAI
 
 import weave
-from weave import Model as WeaveModel
 
 @weave.op()
-def extract_dinos(wmodel: WeaveModel, sentence: str) -> dict:
-    response = client.chat.completions.create(
+def extract_dinos(wmodel: weave.Model, sentence: str) -> dict:
+    response = wmodel.client.chat.completions.create(
         model=wmodel.model_name,
         temperature=wmodel.temperature,
         messages=[
@@ -55,11 +54,12 @@ def extract_dinos(wmodel: WeaveModel, sentence: str) -> dict:
 
 # Sub-class with a weave.Model
 # highlight-next-line
-class ExtractDinos(WeaveModel):
+class ExtractDinos(weave.Model):
+    client: OpenAI = None
     model_name: str
     temperature: float
     system_prompt: str
-    
+
     # Ensure your function is called `invoke` or `predict`
     # highlight-next-line
     @weave.op()
@@ -86,6 +86,7 @@ names and whether its `diet` is a herbivore or carnivore, in JSON format."""
 
 # highlight-next-line
 dinos = ExtractDinos(
+    client=client,
     model_name='gpt-4o',
     temperature=0.4,
     system_prompt=system_prompt
@@ -101,5 +102,24 @@ print(result)
 ```
 
 ## Exporting and re-using a logged `weave.Model`
+Because Weave stores and versions Models that have been invoked, it is possible to export and re-use these models.
 
-info
+**Get the Model ref**
+In the Weave UI you can get the Model ref for a particular version
+
+
+**Using the Model**
+Once you have the URI of the Model object, you can export and re-use it. Not that the exported model is already initialised and ready to use:
+
+```
+# the exported weave model is already initialised and ready to be called
+# highlight-next-line
+new_dinos = weave.ref("weave:///morgan/jurassic-park/object/ExtractDinos:ey4udBU2MU23heQFJenkVxLBX4bmDsFk7vsGcOWPjY4").get()
+
+# set the client to the openai client again
+new_dinos.client = client
+
+new_sentence = """I also saw a Ankylosaurus grazing on giant ferns"""
+new_result = new_dinos.invoke(new_sentence)
+print(new_result)
+```
