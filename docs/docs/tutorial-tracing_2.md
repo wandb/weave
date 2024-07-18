@@ -33,7 +33,7 @@ def extract_dinos(sentence: str) -> dict:
         messages=[
             {
                 "role": "system",
-                "content": """Extract any dinorsaur `name`, their `common_name`, \
+                "content": """Extract any dinosaur `name`, their `common_name`, \
   names and whether its `diet` is a herbivore or carnivore, in JSON format."""
             },
             {
