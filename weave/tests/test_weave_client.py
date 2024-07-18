@@ -5,6 +5,7 @@ import platform
 import re
 import signal
 import sys
+from typing import Callable
 
 import pydantic
 import pytest
@@ -23,6 +24,7 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    OpRef,
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
@@ -507,6 +509,68 @@ def test_saveload_op(client):
     assert obj2["a"].name == "op-add2"
     assert isinstance(obj2["b"], op_def.OpDef)
     assert obj2["b"].name == "op-add3"
+
+
+def test_object_mismatch_project_ref(client):
+    client.project = "test-project"
+
+    class MyModel(weave.Model):
+        prompt: str
+
+        @weave.op()
+        def predict(self, input):
+            return self.prompt.format(input=input)
+
+    obj = MyModel(prompt="input is: {input}")
+
+    client.project = "test-project2"
+    obj.predict("x")
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+    assert calls[0].project_id == "shawn/test-project2"
+    assert "weave:///shawn/test-project2/op" in str(calls[0].op_name)
+
+
+def test_object_mismatch_project_ref_nested(client):
+    client.project = "test-project"
+
+    @weave.op()
+    def hello_world():
+        return "Hello world"
+
+    hello_world()
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+    assert calls[0].project_id == "shawn/test-project"
+    assert "weave:///shawn/test-project/op" in str(calls[0].op_name)
+
+    ### Now change project in client, simulating new init
+    client.project = "test-project2"
+    nested = {"a": hello_world}
+
+    client.save(nested, "my-object")
+
+    nested["a"]()
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+    assert calls[0].project_id == "shawn/test-project2"
+    assert "weave:///shawn/test-project2/op" in str(calls[0].op_name)
+
+    # also assert the op and objects are correct in db
+    res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
+    assert len(res.objs) == 2
+
+    op = [x for x in res.objs if x.kind == "op"][0]
+    assert op.object_id == "hello_world"
+    assert op.project_id == "shawn/test-project2"
+    assert op.kind == "op"
+
+    obj = [x for x in res.objs if x.kind == "object"][0]
+    assert obj.object_id == "my-object"
+    assert obj.project_id == "shawn/test-project2"
 
 
 def test_saveload_customtype(client, strict_op_saving):
