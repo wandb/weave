@@ -206,6 +206,13 @@ gql_prop_op(
     types.Boolean(),
 )
 
+gql_prop_op(
+    "artifactVersion-isLinkedToGlobalRegistry",
+    wdt.ArtifactVersionType,
+    "isLinkedToGlobalRegistry",
+    types.Boolean(),
+)
+
 
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
 def refine_metadata(
