@@ -1,17 +1,33 @@
+-- This is the current call stream query
+
+-- We get the lightly filtered call ids
+-- Then we get the calls with the heavy filters
+-- From the 100 limited calls we get their usage data
+-- From the llm ids in the usage data we get the prices and rank them
+-- We get the top ranked prices and discard the rest
+-- We join the top ranked prices with the usage data to get the token costs
+-- Finally we pull all the data from the calls and add a costs object
+
 WITH 
+    -- First we get lightly filtered calls, to optimize later for heavy filters
     filtered_calls AS (
         SELECT calls_merged.id AS id
         FROM calls_merged
-        WHERE project_id = {pb_25_0:String}
+        WHERE project_id = {pb_20_2:String}
         GROUP BY (project_id,
                 id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-                AND (any(calls_merged.parent_id) IS NULL))
+                AND (((any(calls_merged.op_name) IN {pb_20_0:Array(String)})
+                    AND (any(calls_merged.parent_id) IN {pb_20_1:Array(String)}))))
         ORDER BY any(calls_merged.started_at) DESC
         LIMIT 100
-        OFFSET 0),
+        OFFSET 0
+    ),
+        
+    -- Then we get all the calls we want, with all the data we need, with heavy filtering
     all_calls AS (
-        SELECT calls_merged.project_id AS project_id,
+        SELECT 
+            calls_merged.project_id AS project_id,
             calls_merged.id AS id,
             any(calls_merged.op_name) AS op_name,
             argMaxMerge(calls_merged.display_name) AS display_name,
@@ -19,8 +35,7 @@ WITH
             any(calls_merged.parent_id) AS parent_id,
             any(calls_merged.started_at) AS started_at,
             any(calls_merged.ended_at) AS ended_at,
-            any(calls_merged.exception) AS
-        exception,
+            any(calls_merged.exception) AS exception,
             any(calls_merged.attributes_dump) AS attributes_dump,
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump,
@@ -31,19 +46,13 @@ WITH
             any(calls_merged.wb_run_id) AS wb_run_id,
             any(calls_merged.deleted_at) AS deleted_at
         FROM calls_merged
-        WHERE project_id = {pb_25_1:String}
+        WHERE project_id = {pb_20_3:String}
         AND (id IN filtered_calls)
         GROUP BY (project_id,
                 id)
         ORDER BY any(calls_merged.started_at) DESC),
-    calls_with_usage AS (
-        SELECT
-            id,
-            started_at,
-            summary_dump,
-        FROM
-            all_calls
-    ),
+
+    -- From the all_calls we get the usage data for LLMs
     -- Generate a list of LLM IDs and their respective token counts from the JSON structure
     llm_usage AS (
         SELECT
@@ -57,15 +66,17 @@ WITH
                 )
             ) AS kv,
             kv.1 AS llm_id,
-            toFloat64OrZero(toString(JSONExtractInt(kv.2, 'requests'))) AS requests,
-            toFloat64OrZero(toString(JSONExtractInt(kv.2, 'prompt_tokens'))) AS prompt_tokens,
-            toFloat64OrZero(toString(JSONExtractInt(kv.2, 'completion_tokens'))) AS completion_tokens,
-            toFloat64OrZero(toString(JSONExtractInt(kv.2, 'total_tokens'))) AS total_tokens
+            JSONExtractInt(kv.2, 'requests') AS requests,
+            JSONExtractInt(kv.2, 'prompt_tokens') AS prompt_tokens,
+            JSONExtractInt(kv.2, 'completion_tokens') AS completion_tokens,
+            JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
         FROM
-            calls_with_usage
+            all_calls
         WHERE
             JSONLength(usage_raw) > 0
     ),
+
+    -- based on the llm_ids in the usage data we get all the prices and rank them
     -- Rank the rows in llm_token_prices based on the given conditions and effective_date
     ranked_prices AS (
         SELECT
@@ -98,6 +109,8 @@ WITH
         WHERE
             ltp.effective_date <= lu.started_at
     ),
+
+    -- Discard all but the top-ranked prices
     -- Filter to get the top-ranked prices for each llm_id and call id
     top_ranked_prices AS (
         SELECT
@@ -113,6 +126,7 @@ WITH
         WHERE
             rank = 1
     ),
+
     -- Join with the top-ranked prices to get the token costs
     usage_with_costs AS (
         SELECT
@@ -125,8 +139,8 @@ WITH
             trp.effective_date,
             trp.pricing_level,
             trp.filter_id,
-            toFloat64OrZero(toString(trp.input_token_cost)) AS prompt_token_cost,
-            toFloat64OrZero(toString(trp.output_token_cost)) AS completion_token_cost,
+            trp.input_token_cost AS prompt_token_cost,
+            trp.output_token_cost AS completion_token_cost,
             prompt_tokens * prompt_token_cost AS prompt_tokens_cost,
             completion_tokens * completion_token_cost AS completion_tokens_cost
         FROM
@@ -136,26 +150,29 @@ WITH
         ON
             lu.id = trp.id AND lu.llm_id = trp.llm_id
     )
+
+-- Final Select, which just pulls all the data from all_calls, and adds a costs object
 SELECT 
-    all_calls.project_id AS project_id, 
-    all_calls.id AS id, 
-    any(all_calls.op_name) AS op_name, 
-    all_calls.display_name, 
-    any(all_calls.trace_id) AS trace_id, 
-    any(all_calls.parent_id) AS parent_id, 
-    any(all_calls.started_at) AS started_at, 
-    any(all_calls.ended_at) AS ended_at, 
-    any(all_calls.exception) AS exception, 
-    any(all_calls.attributes_dump) AS attributes_dump, 
-    any(all_calls.inputs_dump) AS inputs_dump, 
-    any(all_calls.output_dump) AS output_dump, 
-    any(all_calls.summary_dump) AS summary_dump, 
-    array_concat_agg(all_calls.input_refs) AS input_refs, 
-    array_concat_agg(all_calls.output_refs) AS output_refs, 
-    any(all_calls.wb_user_id) AS wb_user_id, 
-    any(all_calls.wb_run_id) AS wb_run_id, 
-    any(all_calls.deleted_at) AS deleted_at,  
-    
+    all_calls.project_id AS project_id,
+    all_calls.id AS id,
+    any(all_calls.op_name) AS op_name,
+    all_calls.display_name,
+    any(all_calls.trace_id) AS trace_id,
+    any(all_calls.parent_id) AS parent_id,
+    any(all_calls.started_at) AS started_at,
+    any(all_calls.ended_at) AS ended_at,
+    any(all_calls.exception) AS exception,
+    any(all_calls.attributes_dump) AS attributes_dump,
+    any(all_calls.inputs_dump) AS inputs_dump,
+    any(all_calls.output_dump) AS output_dump,
+    any(all_calls.summary_dump) AS summary_dump,
+    array_concat_agg(all_calls.input_refs) AS input_refs,
+    array_concat_agg(all_calls.output_refs) AS output_refs,
+    any(all_calls.wb_user_id) AS wb_user_id,
+    any(all_calls.wb_run_id) AS wb_run_id,
+    any(all_calls.deleted_at) AS deleted_at,
+
+    -- Creates the cost object as a JSON string
     concat('{', arrayStringConcat(groupUniqArray(
         concat('"', llm_id, '":{',
             '"prompt_tokens":', toString(prompt_tokens), ',',
@@ -168,8 +185,8 @@ SELECT
             '"pricing_level":"', toString(pricing_level), '",',
             '"filter_id":"', toString(filter_id), '"}')
     ), ','), '}') AS costs
-    
-    FROM all_calls
-    JOIN usage_with_costs
-        ON all_calls.id = usage_with_costs.id
-    GROUP BY (all_calls.id, all_calls.project_id, all_calls.display_name)
+
+FROM all_calls
+JOIN usage_with_costs
+    ON all_calls.id = usage_with_costs.id
+GROUP BY (all_calls.id, all_calls.project_id, all_calls.display_name)

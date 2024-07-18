@@ -218,8 +218,6 @@ class CallsQuery(BaseModel):
     offset: typing.Optional[int] = None
 
     def add_field(self, field: str) -> "CallsQuery":
-        if field == "costs":
-            return self
         self.select_fields.append(get_field_by_name(field))
         return self
 
@@ -444,21 +442,30 @@ class CallsQuery(BaseModel):
         ), ','), '}') AS costs
         """
 
+        # because we are selecting from a subquery, we need to prefix the fields, but we dont want to run all aggregations again
+        # inparticular argMaxMerge throws an error when run twice on display_name
         select_fields_sql = ", ".join(
             'all_calls.' + field.field if isinstance(field, CallsMergedAggField) and field.agg_fn.__contains__('Merge') else field.as_select_sql(pb, "all_calls") for field in self.select_fields
         )
-
+    
         raw_sql = f"""
+        -- This is the current call stream query
+
+        -- We get the lightly filtered call ids
+        -- Then we get the calls with the heavy filters
+        -- From the 100 limited calls we get their usage data
+        -- From the llm ids in the usage data we get the prices and rank them
+        -- We get the top ranked prices and discard the rest
+        -- We join the top ranked prices with the usage data to get the token costs
+        -- Finally we pull all the data from the calls and add a costs object
+
+        -- First we get lightly filtered calls, to optimize later for heavy filters
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)}),
+
+        -- Then we get all the calls we want, with all the data we need, with heavy filtering
         all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
-        calls_with_usage AS (
-            SELECT
-                id,
-                started_at,
-                summary_dump,
-            FROM
-                all_calls
-        ),
+
+        -- From the all_calls we get the usage data for LLMs
         -- Generate a list of LLM IDs and their respective token counts from the JSON structure
         llm_usage AS (
             SELECT
@@ -472,15 +479,17 @@ class CallsQuery(BaseModel):
                     )
                 ) AS kv,
                 kv.1 AS llm_id,
-                toFloat64OrZero(toString(JSONExtractInt(kv.2, 'requests'))) AS requests,
-                toFloat64OrZero(toString(JSONExtractInt(kv.2, 'prompt_tokens'))) AS prompt_tokens,
-                toFloat64OrZero(toString(JSONExtractInt(kv.2, 'completion_tokens'))) AS completion_tokens,
-                toFloat64OrZero(toString(JSONExtractInt(kv.2, 'total_tokens'))) AS total_tokens
+                JSONExtractInt(kv.2, 'requests') AS requests,
+                JSONExtractInt(kv.2, 'prompt_tokens') AS prompt_tokens,
+                JSONExtractInt(kv.2, 'completion_tokens') AS completion_tokens,
+                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
             FROM
-                calls_with_usage
+                all_calls
             WHERE
                 JSONLength(usage_raw) > 0
         ),
+
+        -- based on the llm_ids in the usage data we get all the prices and rank them
         -- Rank the rows in llm_token_prices based on the given conditions and effective_date
         ranked_prices AS (
             SELECT
@@ -513,6 +522,8 @@ class CallsQuery(BaseModel):
             WHERE
                 ltp.effective_date <= lu.started_at
         ),
+
+        -- Discard all but the top-ranked prices
         -- Filter to get the top-ranked prices for each llm_id and call id
         top_ranked_prices AS (
             SELECT
@@ -528,6 +539,7 @@ class CallsQuery(BaseModel):
             WHERE
                 rank = 1
         ),
+
         -- Join with the top-ranked prices to get the token costs
         usage_with_costs AS (
             SELECT
@@ -540,8 +552,8 @@ class CallsQuery(BaseModel):
                 trp.effective_date,
                 trp.pricing_level,
                 trp.filter_id,
-                toFloat64OrZero(toString(trp.input_token_cost)) AS prompt_token_cost,
-                toFloat64OrZero(toString(trp.output_token_cost)) AS completion_token_cost,
+                trp.input_token_cost AS prompt_token_cost,
+                trp.output_token_cost AS completion_token_cost,
                 prompt_tokens * prompt_token_cost AS prompt_tokens_cost,
                 completion_tokens * completion_token_cost AS completion_tokens_cost
             FROM
@@ -551,7 +563,11 @@ class CallsQuery(BaseModel):
             ON
                 lu.id = trp.id AND lu.llm_id = trp.llm_id
         )
-        SELECT {select_fields_sql} ,  
+
+        -- Final Select, which just pulls all the data from all_calls, and adds a costs object
+        SELECT {select_fields_sql},  
+
+        -- Creates the cost object as a JSON string
         {cost_snippet}
         FROM all_calls
         JOIN usage_with_costs
@@ -566,9 +582,7 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        join_with_costs: typing.Optional[str] = None,
         id_subquery_name: typing.Optional[str] = None,
-        sub_query_name: typing.Optional[str] = None,
     ) -> str:
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
@@ -617,34 +631,9 @@ class CallsQuery(BaseModel):
             id_mask_sql = f"AND (id IN {_param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
         # TODO: We should also pull out id-masks from the dynamic query
 
-        join_with_costs_sql = ""
-        select_costs_sql = ""
-        if join_with_costs is not None:
-            join_with_costs_sql = f"""
-            JOIN {join_with_costs} AS usage_with_costs
-            ON calls_merged.id = usage_with_costs.id
-            """
-            select_costs_sql = """
-            , concat('{', arrayStringConcat(groupUniqArray(
-                concat('"', llm_id, '":{',
-                    '"prompt_tokens":', toString(prompt_tokens), ',',
-                    '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',',
-                    '"completion_tokens_cost":', toString(completion_tokens_cost), ',',
-                    '"completion_tokens":', toString(completion_tokens), ',',
-                    '"prompt_token_cost":', toString(prompt_token_cost), ',',
-                    '"completion_token_cost":', toString(completion_token_cost), ',',
-                    '"effective_date":"', toString(effective_date), '",',
-                    '"pricing_level":"', toString(pricing_level), '",',
-                    '"filter_id":"', toString(filter_id), '"}')
-            ), ','), '}') AS costs
-            """
-        table = sub_query_name or "calls_merged"
-
         raw_sql = f"""
         SELECT {select_fields_sql}
-        {select_costs_sql}
-        FROM {table}
-        {join_with_costs_sql}
+        FROM calls_merged
         WHERE project_id = {_param_slot(project_param, 'String')}
         {id_mask_sql}
         {id_subquery_sql}

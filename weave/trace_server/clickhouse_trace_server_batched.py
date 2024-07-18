@@ -1317,7 +1317,6 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
         id=ch_call.id,
-        costs=ch_call.costs,
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
         op_name=ch_call.op_name,
@@ -1331,6 +1330,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
         display_name=_empty_str_to_none(ch_call.display_name),
+        # Keeping this here to keep in sync, but costs doesnt exist on CallSchema
+        # costs=ch_call.costs,
     )
 
 
@@ -1339,7 +1340,6 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
     return dict(
         project_id=ch_call_dict.get("project_id"),
         id=ch_call_dict.get("id"),
-        costs=_nullable_dict_dump_to_dict(ch_call_dict.get("costs")),
         trace_id=ch_call_dict.get("trace_id"),
         parent_id=ch_call_dict.get("parent_id"),
         op_name=ch_call_dict.get("op_name"),
@@ -1353,6 +1353,9 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
         display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
+        # This is not on CallSchema, but we need it here so it doesnt get filtered out
+        # We construct costs at read time
+        costs=_nullable_dict_dump_to_dict(ch_call_dict.get("costs")),
     )
 
 
