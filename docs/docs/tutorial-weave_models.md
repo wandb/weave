@@ -5,7 +5,7 @@ hide_table_of_contents: true
 
 # App versioning
 
-Tracking the [inputs, outputs, metadata](/tutorial-tracing_1) as well as [data flowing through your app](/tutorial-tracing_2) is critical to understanding the performance of your system. However **versioning your app over time** is also critial to understand how modifications to your code or app attributes change your outputs. Weave's `Model` class is how these changes can be tracked in Weave. 
+Tracking the [inputs, outputs, metadata](/tutorial-tracing_1) as well as [data flowing through your app](/tutorial-tracing_2) is critical to understanding the performance of your system. However **versioning your app over time** is also critical to understand how modifications to your code or app attributes change your outputs. Weave's `Model` class is how these changes can be tracked in Weave. 
 
 
 In this tutorial you'll learn:
@@ -81,7 +81,7 @@ Now you can instantiate and call the model with `invoke`:
 weave.init('jurassic-park')
 client = OpenAI(api_key="...")
 
-system_prompt = """Extract any dinorsaur `name`, their `common_name`, \
+system_prompt = """Extract any dinosaur `name`, their `common_name`, \
 names and whether its `diet` is a herbivore or carnivore, in JSON format."""
 
 # highlight-next-line
@@ -113,7 +113,7 @@ In the Weave UI you can get the Model ref for a particular version
 
 
 **Using the Model**
-Once you have the URI of the Model object, you can export and re-use it. Not that the exported model is already initialised and ready to use:
+Once you have the URI of the Model object, you can export and re-use it. Note that the exported model is already initialised and ready to use:
 
 ```
 # the exported weave model is already initialised and ready to be called
