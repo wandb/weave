@@ -563,12 +563,12 @@ def test_object_mismatch_project_ref_nested(client):
     res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
     assert len(res.objs) == 2
 
-    op = res.objs[0]
+    op = [x for x in res.objs if x.kind == "op"][0]
     assert op.object_id == "hello_world"
     assert op.project_id == "shawn/test-project2"
     assert op.kind == "op"
 
-    obj = res.objs[1]
+    obj = [x for x in res.objs if x.kind == "object"][0]
     assert obj.object_id == "my-object"
     assert obj.project_id == "shawn/test-project2"
 
