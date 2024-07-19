@@ -41,6 +41,15 @@ B = TypeVar("B")
 
 
 class ExternalTraceServer(tsi.TraceServerInterface):
+    """Used to adapt the internal trace server to the external trace server.
+    This is done by converting the project_id, run_id, and user_id to their
+    internal representations before calling the internal trace server and
+    converting them back to their external representations before returning
+    them to the caller. Additionally, we convert references to their internal
+    representations before calling the internal trace server and convert them
+    back to their external representations before returning them to the caller.
+    """
+
     _internal_trace_server: tsi.TraceServerInterface
     _idc: IdConverter
 
