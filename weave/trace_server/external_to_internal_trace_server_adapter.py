@@ -172,7 +172,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
-            req.wb_user_id = self._idc.int_to_ext_user_id(req.wb_user_id)
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.calls_delete, req)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
@@ -195,7 +195,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
-            req.wb_user_id = self._idc.int_to_ext_user_id(req.wb_user_id)
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.call_update, req)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
