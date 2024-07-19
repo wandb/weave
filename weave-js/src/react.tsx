@@ -522,6 +522,23 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     '$', // End of the string
   ].join('')
 );
+const RE_WEAVE_OBJECT_REF_PATHNAME_PRIVATE = new RegExp(
+  [
+    '^', // Start of the string
+    // no entity
+    '/',
+    // no project
+    '/',
+    '(object|op)', // Weave kind
+    '/',
+    '([a-zA-Z0-9-_/. ]{1,128})', // Artifact name
+    ':',
+    '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
+    '/?', // Ref extra portion is optional
+    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    '$', // End of the string
+  ].join('')
+);
 const RE_WEAVE_TABLE_REF_PATHNAME = new RegExp(
   [
     '^', // Start of the string
@@ -569,7 +586,8 @@ export const parseRef = (ref: string): ObjectRef => {
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
   const decodedUri = decodeURIComponent(url.pathname);
-  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
+  const removeUriPrefix = decodedUri.replace(/^\/{1,3}/, '');
+  const splitUri = removeUriPrefix.split('/', splitLimit);
 
   if (splitUri.length !== splitLimit) {
     throw new Error(`Invalid Artifact URI: ${url}`);
@@ -625,6 +643,24 @@ export const parseRef = (ref: string): ObjectRef => {
         artifactName: callId,
         artifactVersion: '',
         artifactRefExtra: '',
+      };
+    }
+    const emptyObjectMatch = trimmed.match(RE_WEAVE_OBJECT_REF_PATHNAME_PRIVATE);
+    if (emptyObjectMatch !== null) {
+      const [
+        weaveKind,
+        artifactName,
+        artifactVersion,
+        artifactRefExtra,
+      ] = emptyObjectMatch.slice(1);
+      return {
+        scheme: 'weave',
+        entityName: '',
+        projectName: '',
+        weaveKind: weaveKind as WeaveKind,
+        artifactName,
+        artifactVersion,
+        artifactRefExtra: artifactRefExtra ?? '',
       };
     }
     const match = trimmed.match(RE_WEAVE_OBJECT_REF_PATHNAME);
