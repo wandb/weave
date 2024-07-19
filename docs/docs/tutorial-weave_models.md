@@ -114,7 +114,7 @@ In the Weave UI you can get the Model ref for a particular version
 **Using the Model**
 Once you have the URI of the Model object, you can export and re-use it. Note that the exported model is already initialised and ready to use:
 
-```
+```python
 # the exported weave model is already initialised and ready to be called
 # highlight-next-line
 new_dinos = weave.ref("weave:///morgan/jurassic-park/object/ExtractDinos:ey4udBU2MU23heQFJenkVxLBX4bmDsFk7vsGcOWPjY4").get()
