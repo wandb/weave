@@ -93,4 +93,4 @@ Calls made to OpenAI, Anthropic and [many more LLM libraries](guides/integration
 
 ## What's next?
 
-- Follow the [Tracking flows and app metadata](/tutorial-tracing_2) to start tracking and the data flowing through your app.
+- See [Tracking flows and app metadata](/tutorial-tracing_2) to start tracking and the data flowing through your app.
