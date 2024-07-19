@@ -5,8 +5,7 @@ hide_table_of_contents: true
 
 # Datasets
 
-`Dataset`s enable you to collect examples for evaluation and automatically track versions for accurate comparisons.
-Easily update datasets with the UI and download the latest version locally with a simple API.
+`Dataset`s enable you to collect examples for evaluation and automatically track versions for accurate comparisons. Use this to download the latest version locally with a simple API.
 
 This guide will show you how to:
 
