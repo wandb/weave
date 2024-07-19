@@ -201,7 +201,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
       callRes && 'call' in callRes
         ? traceCallToUICallSchema(callRes.call)
         : null;
-    if (callRes == null || loadingRef.current) {
+    if (loadingRef.current) {
       return {
         loading: true,
         result: null,
