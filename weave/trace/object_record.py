@@ -19,6 +19,11 @@ class ObjectRecord:
     def __repr__(self) -> str:
         return f"ObjectRecord({self.__dict__})"
 
+    def __rich_repr__(self):
+        for k, v in self.__dict__.items():
+            if not k.startswith("__"):
+                yield k, v
+
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, ObjectRecord):
             if self._class_name != other._class_name:

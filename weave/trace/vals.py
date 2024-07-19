@@ -218,6 +218,11 @@ class WeaveObject(Traceable):
     def __repr__(self) -> str:
         return f"WeaveObject({self._val})"
 
+    def __rich_repr__(self):
+        for k, v in self._val.__dict__.items():
+            if not k.startswith("__"):
+                yield k, v
+
     def __eq__(self, other: Any) -> bool:
         return self._val == other
 
