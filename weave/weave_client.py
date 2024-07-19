@@ -125,9 +125,17 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
+    if getattr(obj, "mutations", None):
+        print("This object has mutations, deleting the ref so we can save it")
+        obj.ref = None
+
     ref = _get_direct_ref(obj)
     if ref:
         return ref
+    if isinstance(obj, Ref):
+        # This works but is probably very expensive... what can we do instead?
+        obj = obj.get()
+
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
@@ -142,7 +150,11 @@ def map_to_refs(obj: Any) -> Any:
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
-
+    elif isinstance(obj, WeaveObject):
+        # We also have to consider WeaveObject now because you can modify it...
+        # But this change seems wrong because this func was supposed to operate on
+        # "real" objects, not WeaveObjects...
+        return obj.map_values(map_to_refs)
     return obj
 
 

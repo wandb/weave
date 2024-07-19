@@ -538,7 +538,10 @@ def make_trace_obj(
 
         pass
     else:
-        setattr(box_val, "ref", new_ref)
+        # This used to work but now that we allow assignment on ObjectRefs,
+        # we need another path!
+        if hasattr(box_val, "ref"):
+            setattr(box_val, "ref", new_ref)
     return box_val
 
 

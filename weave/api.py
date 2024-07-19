@@ -218,7 +218,8 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     # When mutating an object, clear the ref so we can save a new one
     # TODO: Still have a problem with hashes...
     if isinstance(obj, Traceable) and obj.mutations:
-        obj.ref = None
+        ...
+        # obj.ref = None
 
     ref = client._save_object(obj, save_name, "latest")
 
