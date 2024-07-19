@@ -4,6 +4,7 @@ import React from 'react';
 import {
   WANDB_ARTIFACT_REF_PREFIX,
   WEAVE_REF_PREFIX,
+  WEAVE_REF_PREFIX_EMPTY,
 } from '../wfReactInterface/constants';
 
 export const isPrimitive = (val: any) => {
@@ -18,11 +19,19 @@ export const isPrimitive = (val: any) => {
 };
 
 export const isRef = (value: any): boolean => {
-  return (
-    typeof value === 'string' &&
-    (value.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      value.startsWith(WEAVE_REF_PREFIX))
-  );
+  if (typeof value !== 'string') {
+    return false;
+  }
+  if (value.startsWith(WEAVE_REF_PREFIX_EMPTY)) {
+    return false;
+  }
+  if (
+    value.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+    value.startsWith(WEAVE_REF_PREFIX)
+  ) {
+    return true;
+  }
+  return false;
 };
 
 // Convert a list of objects into an object where the keys are integers

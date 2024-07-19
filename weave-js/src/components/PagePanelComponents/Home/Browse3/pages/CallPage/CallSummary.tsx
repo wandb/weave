@@ -36,7 +36,7 @@ export const CallSummary: React.FC<{
       <SimpleKeyValueTable
         data={{
           Operation:
-            parseRefMaybe(span.name) != null && parseRefMaybe(span.name)?.projectName ? (
+            parseRefMaybe(span.name) != null ? (
               <SmallRef
                 objRef={parseRefMaybe(span.name)!}
                 wfTable="OpVersion"
