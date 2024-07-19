@@ -114,7 +114,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         res = self._ref_apply(self._internal_trace_server.call_read, req)
         if res.call is None:
-            return tsi.CallReadRes(call=None)
+            return res
         if res.call.project_id != req.project_id:
             raise ValueError("Internal Error - Project Mismatch")
         res.call.project_id = original_project_id
