@@ -17,7 +17,7 @@ import {
   opVersionCache,
   refDataCache,
 } from './cache';
-import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
+import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX, WEAVE_REF_PREFIX_EMPTY} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {Query} from './traceServerClientInterface/query';
@@ -1323,20 +1323,28 @@ const isValidTraceCall = (callRes: traceServerClient.TraceCallSchema) => {
   return !('detail' in callRes);
 };
 
+export const emptyRefToSimpleName = (ref: string) => {
+  const trimmed = ref.replace(WEAVE_REF_PREFIX_EMPTY, '');
+  try {
+    return trimmed.split('/')[1].split(':')[0];
+  } catch (e) {
+    return trimmed;
+  }
+};
+
 export const traceCallToUICallSchema = (
   traceCall: traceServerClient.TraceCallSchema
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
   const parseSpanName = (opName: string) => {
+    if (opName.startsWith(WEAVE_REF_PREFIX_EMPTY)) {
+      return emptyRefToSimpleName(opName)
+    }
     if (
       opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
       opName.startsWith(WEAVE_REF_PREFIX)
     ) {
-      try {
-        return refUriToOpVersionKey(opName).opId;
-      } catch (e) {
-        return opName;
-      }
+      return refUriToOpVersionKey(opName).opId;
     }
     return opName;
   };

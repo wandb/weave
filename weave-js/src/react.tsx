@@ -68,6 +68,7 @@ import {trimStartChar} from './core/util/string';
 import {UseNodeValueServerExecutionError} from './errors';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
+import { WEAVE_REF_PREFIX_EMPTY } from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/constants';
 // import {useTraceUpdate} from './common/util/hooks';
 
 /**
@@ -569,8 +570,7 @@ export const parseRef = (ref: string): ObjectRef => {
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
   const decodedUri = decodeURIComponent(url.pathname);
-  const removeUriPrefix = decodedUri.replace(/^\/{1,3}/, '');
-  const splitUri = removeUriPrefix.split('/', splitLimit);
+  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
 
   if (splitUri.length !== splitLimit) {
     throw new Error(`Invalid Artifact URI: ${url}`);

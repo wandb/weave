@@ -1,8 +1,9 @@
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {isRef} from '../common/util';
-import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
+import {OBJECT_ATTR_EDGE_NAME, WEAVE_REF_PREFIX_EMPTY} from '../wfReactInterface/constants';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import { emptyRefToSimpleName } from '../wfReactInterface/tsDataModelHooks';
 import {
   EXPANDED_REF_REF_KEY,
   EXPANDED_REF_VAL_KEY,
@@ -137,6 +138,8 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
             }
           }
         }
+      } else if (typeof val === 'string' && val.startsWith(WEAVE_REF_PREFIX_EMPTY)) {
+        return [key, emptyRefToSimpleName(val)];
       }
       return [key, val];
     })
