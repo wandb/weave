@@ -17,7 +17,11 @@ import {
   opVersionCache,
   refDataCache,
 } from './cache';
-import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX, WEAVE_REF_PREFIX_EMPTY} from './constants';
+import {
+  WANDB_ARTIFACT_REF_PREFIX,
+  WEAVE_REF_PREFIX,
+  WEAVE_REF_PREFIX_EMPTY,
+} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {Query} from './traceServerClientInterface/query';
@@ -1338,7 +1342,7 @@ export const traceCallToUICallSchema = (
   const {entity, project} = projectIdToParts(traceCall.project_id);
   const parseSpanName = (opName: string) => {
     if (opName.startsWith(WEAVE_REF_PREFIX_EMPTY)) {
-      return emptyRefToSimpleName(opName)
+      return emptyRefToSimpleName(opName);
     }
     if (
       opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||

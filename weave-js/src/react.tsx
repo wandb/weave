@@ -68,7 +68,6 @@ import {trimStartChar} from './core/util/string';
 import {UseNodeValueServerExecutionError} from './errors';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
-import { WEAVE_REF_PREFIX_EMPTY } from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/constants';
 // import {useTraceUpdate} from './common/util/hooks';
 
 /**
