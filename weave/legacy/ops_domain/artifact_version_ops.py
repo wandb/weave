@@ -244,6 +244,14 @@ gql_direct_edge_op(
 )
 
 gql_direct_edge_op(
+    "artifactVersion-tags",
+    wdt.ArtifactVersionType,
+    "tags",
+    wdt.TagType,
+    is_many=True,
+)
+
+gql_direct_edge_op(
     "artifactVersion-artifactType",
     wdt.ArtifactVersionType,
     "artifactType",
