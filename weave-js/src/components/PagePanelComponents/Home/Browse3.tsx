@@ -66,7 +66,10 @@ import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
-import {DEFAULT_SORT_CALLS} from './Browse3/pages/CallsPage/CallsTable';
+import {
+  DEFAULT_COLUMN_VISIBILITY_CALLS,
+  DEFAULT_SORT_CALLS,
+} from './Browse3/pages/CallsPage/CallsTable';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
@@ -684,7 +687,7 @@ const CallsPageBinding = () => {
     try {
       return JSON.parse(query.cols);
     } catch (e) {
-      return {};
+      return DEFAULT_COLUMN_VISIBILITY_CALLS;
     }
   }, [query.cols]);
   const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
