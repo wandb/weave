@@ -58,7 +58,7 @@ D = typing.TypeVar("D")
 
 def universal_int_to_ext_ref_converter(
     obj: C,
-    convert_int_to_ext_project_id: typing.Callable[[str], str],
+    convert_int_to_ext_project_id: typing.Callable[[str], typing.Optional[str]],
 ) -> C:
     """Takes any object and recursively replaces all internal references with
     external references. The internal references are expected to be in the
