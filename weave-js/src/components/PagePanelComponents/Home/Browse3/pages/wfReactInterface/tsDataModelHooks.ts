@@ -226,7 +226,7 @@ const useCallsNoExpansion = (
   offset?: number,
   sortBy?: traceServerClient.SortBy[],
   query?: Query,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean, acceptType?: traceServerClient.ContentType}
+  opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -274,7 +274,6 @@ const useCallsNoExpansion = (
     deepFilter,
     limit,
     opts?.skip,
-    opts?.acceptType,
     getTsClient,
     offset,
     sortBy,
