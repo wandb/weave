@@ -248,7 +248,7 @@ class WeaveTable(Traceable):
     def __init__(
         self,
         table_ref: TableRef,
-        ref: RefWithExtra,
+        ref: Optional[RefWithExtra],
         server: TraceServerInterface,
         filter: _TableRowFilter,
         root: typing.Optional[Traceable],
@@ -406,10 +406,11 @@ class WeaveDict(Traceable, dict):
         return item
 
     def __getitem__(self, key: str) -> Any:
-        if self.ref:
-            new_ref = self.ref.with_key(key)
-        else:
-            new_ref = None
+        # if self.ref:
+        #     new_ref = self.ref.with_key(key)
+        # else:
+        #     new_ref = None
+        new_ref = self.ref.with_key(key)
         # return make_trace_obj(super().__getitem__(key), new_ref, self.server, self.root)
         return make_trace_obj(self._deref(key), new_ref, self.server, self.root)
 
@@ -577,8 +578,8 @@ def make_trace_obj(
     else:
         # This used to work but now that we allow assignment on ObjectRefs,
         # we need another path!
-        if hasattr(box_val, "ref"):
-            setattr(box_val, "ref", new_ref)
+        # if hasattr(box_val, "ref"):
+        setattr(box_val, "ref", new_ref)
     return box_val
 
 
