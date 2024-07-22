@@ -566,6 +566,7 @@ type Artifact {
   currentManifest: ArtifactManifest
   historyStep: Int64
   ttlDurationSeconds: Int64!
+  tags: [Tag!]!
 }
 
 type ArtifactManifestConnection {
