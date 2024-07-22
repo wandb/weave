@@ -550,7 +550,7 @@ export const opArtifactVersionTags = makeArtifactVersionOp({
   },
   returnValueDescription: `The tags for a ${docType('artifactVersion')}`,
   returnType: inputTypes => list('Tag'),
-  resolver: ({artifactVersion}) => (artifactVersion.tags ?? []),
+  resolver: ({artifactVersion}) => artifactVersion.tags ?? [],
 });
 
 export const opArtifactVersionLink = makeArtifactVersionOp({
