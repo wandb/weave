@@ -127,12 +127,15 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 def map_to_refs(obj: Any) -> Any:
     if getattr(obj, "mutations", None):
         print("This object has mutations, deleting the ref so we can save it")
+        obj._old_ref = obj.ref
         obj.ref = None
 
-    ref = _get_direct_ref(obj)
-    if ref:
-        return ref
-    if isinstance(obj, Ref):
+    # TODO: Need to edit this such that:
+    # 1. When an object has not changed, just return the ref
+    # 2. But if it's part of a change on an outer object, continue???
+    # if ref := _get_direct_ref(obj):
+    #     return ref
+    if isinstance(obj, ObjectRef):
         # This works but is probably very expensive... what can we do instead?
         obj = obj.get()
 

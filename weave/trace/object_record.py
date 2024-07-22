@@ -33,8 +33,8 @@ class ObjectRecord:
                 return False
         return True
 
-    def map_values(self, fn: Callable) -> "ObjectRecord":
-        return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
+    def map_values(self, fn: Callable, *args, **kwargs) -> "ObjectRecord":
+        return ObjectRecord({k: fn(v, *args, **kwargs) for k, v in self.__dict__.items()})
 
 
 PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
