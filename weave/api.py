@@ -219,6 +219,8 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
                 ref.name,
                 ref.digest,
             )
+        # TODO(gst): once frontend has direct dataset/model links
+        # elif isinstance(obj, _weave_client.Dataset):
         else:
             url = urls.object_version_path(
                 ref.entity,
