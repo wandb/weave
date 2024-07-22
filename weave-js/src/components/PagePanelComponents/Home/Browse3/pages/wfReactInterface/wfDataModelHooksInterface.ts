@@ -178,7 +178,7 @@ export type WFDataModelHooksInterface = {
     sortBy?: traceServerClient.SortBy[],
     query?: Query,
     opts?: {skip?: boolean; contentType: traceServerClient.ContentType}
-  ) => LoadableWithError<string>;
+  ) => Loadable<String>;
   useCallsStats: (
     entity: string,
     project: string,
