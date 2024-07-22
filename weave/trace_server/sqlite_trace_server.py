@@ -235,15 +235,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallEndRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        return tsi.CallReadRes(
-            call=self.calls_query(
-                tsi.CallsQueryReq(
-                    project_id=req.project_id,
-                    limit=1,
-                    filter=tsi._CallsFilter(call_ids=[req.id]),
-                )
-            ).calls[0]
-        )
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                limit=1,
+                filter=tsi._CallsFilter(call_ids=[req.id]),
+            )
+        ).calls
+        return tsi.CallReadRes(call=calls[0] if calls else None)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         print("REQ", req)
