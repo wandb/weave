@@ -19,8 +19,8 @@ import {
 } from './cache';
 import {
   WANDB_ARTIFACT_REF_PREFIX,
+  WEAVE_PRIVATE_PREFIX,
   WEAVE_REF_PREFIX,
-  WEAVE_REF_PREFIX_EMPTY,
 } from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -1327,8 +1327,8 @@ const isValidTraceCall = (callRes: traceServerClient.TraceCallSchema) => {
   return !('detail' in callRes);
 };
 
-export const emptyRefToSimpleName = (ref: string) => {
-  const trimmed = ref.replace(WEAVE_REF_PREFIX_EMPTY, '');
+export const privateRefToSimpleName = (ref: string) => {
+  const trimmed = ref.replace(`${WEAVE_PRIVATE_PREFIX}//`, '');
   try {
     return trimmed.split('/')[1].split(':')[0];
   } catch (e) {
@@ -1341,14 +1341,14 @@ export const traceCallToUICallSchema = (
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
   const parseSpanName = (opName: string) => {
-    if (opName.startsWith(WEAVE_REF_PREFIX_EMPTY)) {
-      return emptyRefToSimpleName(opName);
-    }
     if (
       opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
       opName.startsWith(WEAVE_REF_PREFIX)
     ) {
       return refUriToOpVersionKey(opName).opId;
+    }
+    if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
+      return privateRefToSimpleName(opName);
     }
     return opName;
   };
@@ -1362,7 +1362,8 @@ export const traceCallToUICallSchema = (
     displayName: traceCall.display_name ?? null,
     opVersionRef:
       traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
+      traceCall.op_name.startsWith(WEAVE_REF_PREFIX) ||
+      traceCall.op_name.startsWith(WEAVE_PRIVATE_PREFIX)
         ? traceCall.op_name
         : null,
     rawSpan: traceCallToLegacySpan(traceCall),

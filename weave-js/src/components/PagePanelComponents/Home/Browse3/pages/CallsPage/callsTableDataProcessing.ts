@@ -3,10 +3,10 @@ import {flattenObject} from '../../../Browse2/browse2Util';
 import {isRef} from '../common/util';
 import {
   OBJECT_ATTR_EDGE_NAME,
-  WEAVE_REF_PREFIX_EMPTY,
+  WEAVE_PRIVATE_PREFIX,
 } from '../wfReactInterface/constants';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
-import {emptyRefToSimpleName} from '../wfReactInterface/tsDataModelHooks';
+import {privateRefToSimpleName} from '../wfReactInterface/tsDataModelHooks';
 import {
   EXPANDED_REF_REF_KEY,
   EXPANDED_REF_VAL_KEY,
@@ -143,9 +143,9 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
         }
       } else if (
         typeof val === 'string' &&
-        val.startsWith(WEAVE_REF_PREFIX_EMPTY)
+        val.startsWith(WEAVE_PRIVATE_PREFIX)
       ) {
-        return [key, emptyRefToSimpleName(val)];
+        return [key, privateRefToSimpleName(val)];
       }
       return [key, val];
     })
