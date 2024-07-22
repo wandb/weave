@@ -4,7 +4,6 @@ import pytest
 
 import weave
 from weave import Evaluation, Model
-from weave.flow.eval import EvaluationArgumentError
 
 from ..trace_server import trace_server_interface as tsi
 
@@ -525,7 +524,7 @@ async def test_eval_supports_non_op_funcs(client):
         scorers=[function_score],
     )
 
-    with pytest.raises(EvaluationArgumentError):
+    with pytest.raises(ValueError):
         res = await evaluation.evaluate(function_model)
 
     # In the future, if we want to auto-opify, then uncomment the following assertions:

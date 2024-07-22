@@ -93,6 +93,15 @@ const MAX_EVAL_COMPARISONS = 5;
 const MAX_BULK_DELETE = 10;
 const MAX_EXPORT = 10_000;
 
+export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
+  'attributes.weave.client_version': false,
+  'attributes.weave.source': false,
+  'attributes.weave.os_name': false,
+  'attributes.weave.os_version': false,
+  'attributes.weave.os_release': false,
+  'attributes.weave.sys_version': false,
+};
+
 export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
