@@ -83,7 +83,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
         int_to_ext_project_cache = {}
 
-        def cached_int_to_ext_project_id(project_id: str) -> str:
+        def cached_int_to_ext_project_id(project_id: str) -> typing.Optional[str]:
             if project_id not in int_to_ext_project_cache:
                 int_to_ext_project_cache[project_id] = self._idc.int_to_ext_project_id(
                     project_id
@@ -226,7 +226,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         res = self._ref_apply(self._internal_trace_server.ops_query, req)
-        for op in res.ops:
+        for op in res.op_objs:
             if op.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             op.project_id = original_project_id

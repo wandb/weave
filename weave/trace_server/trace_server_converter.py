@@ -74,7 +74,7 @@ def universal_int_to_ext_ref_converter(
         The object with all internal references replaced with external
         references.
     """
-    int_to_ext_project_cache: dict[str, str] = {}
+    int_to_ext_project_cache: dict[str, typing.Optional[str]] = {}
 
     weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
 
