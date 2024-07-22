@@ -5,7 +5,7 @@ hide_table_of_contents: true
 
 # Together AI
 
-Togeher AI is a platform for building and finetuning generative AI models, focusing on Open Source LLMs, and allowing customers to fine-tune and host their own models. 
+Together AI is a platform for building and finetuning generative AI models, focusing on Open Source LLMs, and allowing customers to fine-tune and host their own models.
 
 :::info
 

@@ -8,7 +8,6 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
-    Literal,
     Mapping,
     Optional,
     Protocol,
@@ -19,7 +18,8 @@ from typing import (
 )
 
 from weave import call_context, client_context
-from weave.legacy import box, context_state
+from weave.legacy import context_state
+from weave.trace import box
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -168,7 +168,7 @@ def _execute_call(
     __op: Op,
     call: Any,
     *args: Any,
-    __return_type: Literal["call", "value"] = "call",
+    __should_raise: bool = True,
     **kwargs: Any,
 ) -> Any:
     func = __op.resolve_fn
@@ -179,6 +179,7 @@ def _execute_call(
         nonlocal has_finished
         if has_finished:
             raise ValueError("Should not call finish more than once")
+
         client.finish_call(call, output, exception)
         if not call_context.get_current_call():
             print_call_link(call)
@@ -189,44 +190,50 @@ def _execute_call(
         finish(output)
         return output
 
-    try:
-        res = func(*args, **kwargs)
-    except BaseException as e:
-        finish(exception=e)
-        raise
-    else:
-        res = box.box(res)  # TODO: can we get rid of this?
-    # We cannot let BoxedNone or BoxedBool escape into the user's code
-    # since they cannot pass instance checks for None or bool.
-    if isinstance(res, box.BoxedNone):
-        res = None
-    if isinstance(res, box.BoxedBool):
-        res = res.val
+    def process(res: Any) -> Any:
+        res = box.box(res)
+        res = on_output(res)
+        return res, call
 
-    if inspect.iscoroutine(res):
-        awaitable = res
+    def handle_exception(e: Exception) -> Any:
+        finish(exception=e)
+        if __should_raise:
+            raise
+        return None, call
+
+    if inspect.iscoroutinefunction(func):
 
         async def _call_async() -> Coroutine[Any, Any, Any]:
+            call_context.push_call(call)
             try:
-                call_context.push_call(call)
-                output = await awaitable
-                res2 = on_output(output)
-                return call if __return_type == "call" else res2
-            except BaseException as e:
-                finish(exception=e)
-                raise
+                res = await func(*args, **kwargs)
+            except Exception as e:
+                return handle_exception(e)
+            else:
+                return process(res)
             finally:
                 call_context.pop_call(call.id)
 
         return _call_async()
+
+    try:
+        res = func(*args, **kwargs)
+    except Exception as e:
+        handle_exception(e)
     else:
-        res2 = on_output(res)
-        return call if __return_type == "call" else res2
+        return process(res)
+
+    return None, call
 
 
-def call(op: Op, *args: Any, **kwargs: Any) -> Any:
+def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
+    """
+    Executes the op and returns both the result and a Call representing the execution.
+
+    This function will never raise.  Any errors are captured in the Call object.
+    """
     c = _create_call(op, *args, **kwargs)
-    return _execute_call(op, c, *args, **kwargs)
+    return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
 
 def calls(op: Op) -> "CallsIter":
@@ -318,13 +325,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if client_context.weave_client.get_weave_client() is None:
                         return await func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return await _execute_call(
-                        wrapper,  # type: ignore
-                        call,
-                        *args,
-                        __return_type="value",
-                        **kwargs,
-                    )
+                    res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    return res
             else:
 
                 @wraps(func)
@@ -332,17 +334,20 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if client_context.weave_client.get_weave_client() is None:
                         return func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return _execute_call(
-                        wrapper,  # type: ignore
-                        call,
-                        *args,
-                        __return_type="value",
-                        **kwargs,
-                    )
+                    res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    return res
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore
-            wrapper.name = func.__qualname__ if is_method else func.__name__  # type: ignore
+
+            name = func.__qualname__ if is_method else func.__name__
+
+            # funcs and methods defined inside another func will have the
+            # name prefixed with {outer}.<locals>.{func_name}
+            # this is noisy for us, so we strip it out
+            name = name.split(".<locals>.")[-1]
+
+            wrapper.name = name  # type: ignore
             wrapper.signature = sig  # type: ignore
             wrapper.ref = None  # type: ignore
 
@@ -372,6 +377,8 @@ def maybe_bind_method(func: Callable, self: Any = None) -> Union[Callable, Metho
     If self is None, return the function as is.
     """
     if (sig := inspect.signature(func)) and sig.parameters.get("self"):
+        if inspect.ismethod(func) and id(func.__self__) != id(self):
+            raise ValueError("Cannot re-bind a method to an new object")
         return MethodType(func, self)
     return func
 

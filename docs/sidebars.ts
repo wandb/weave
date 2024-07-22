@@ -61,6 +61,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/dspy",
             "guides/integrations/google-gemini",
             "guides/integrations/together_ai",
+            "guides/integrations/groq",
             "guides/integrations/openrouter",
             "guides/integrations/local_models",
             "guides/integrations/litellm",
