@@ -16,7 +16,7 @@ class IdConverter:
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def int_to_ext_project_id(self, project_id: str) -> str:
+    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
         raise NotImplementedError()
 
     @abc.abstractmethod
