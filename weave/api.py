@@ -212,16 +212,24 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
 
     ref = client._save_object(obj, save_name, "latest")
 
-    if isinstance(ref, _weave_client.ObjectRef):
+    if not isinstance(ref, _weave_client.ObjectRef):
+        return ref
+
+    if isinstance(ref, _weave_client.OpRef):
+        url = urls.op_version_path(
+            ref.entity,
+            ref.project,
+            ref.name,
+            ref.digest,
+        )
+    else:
         url = urls.object_version_path(
             ref.entity,
             ref.project,
             ref.name,
             ref.digest,
         )
-        print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
-
-    return ref
+    print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
 
 
 def ref(location: str) -> _weave_client.ObjectRef:
