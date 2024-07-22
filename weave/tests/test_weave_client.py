@@ -1244,6 +1244,3 @@ def test_mutation_saving_nested(client):
     assert g3.b.d == [["p", "q"], ["r", "s"]]
     assert g3.b.e == {"c": 9}
     assert g3.b.f == {"d": {"e": "f"}}
-
-    print(f"{g3=}")
-    raise

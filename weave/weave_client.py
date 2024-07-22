@@ -133,8 +133,8 @@ def map_to_refs(obj: Any) -> Any:
     # TODO: Need to edit this such that:
     # 1. When an object has not changed, just return the ref
     # 2. But if it's part of a change on an outer object, continue???
-    # if ref := _get_direct_ref(obj):
-    #     return ref
+    if ref := _get_direct_ref(obj):
+        return ref
     if isinstance(obj, ObjectRef):
         # This works but is probably very expensive... what can we do instead?
         obj = obj.get()
