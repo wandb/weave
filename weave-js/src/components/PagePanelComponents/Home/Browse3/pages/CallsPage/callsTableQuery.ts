@@ -17,7 +17,6 @@ import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
-
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
  * component and the underlying data hooks. In particular, it takes a high level
@@ -46,11 +45,12 @@ export const useCallsForQuery = (
   const offset = gridPage.page * gridPage.pageSize;
   const limit = gridPage.pageSize;
 
-  const sortBy = useDeepMemo(
-    useMemo(() => getSortBy(gridSort), [gridSort])
-  );
+  const sortBy = useDeepMemo(useMemo(() => getSortBy(gridSort), [gridSort]));
   const filterByRaw = useMemo(() => getFilterByRaw(gridFilter), [gridFilter]);
-  const filterBy: Query | undefined = useMemo(() => getFilterBy(filterByRaw), [filterByRaw]);
+  const filterBy: Query | undefined = useMemo(
+    () => getFilterBy(filterByRaw),
+    [filterByRaw]
+  );
 
   const callOpts = useMemo(() => {
     return {
@@ -103,18 +103,21 @@ export const useCallsExportStream = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel | null,
   limit: number,
-  skip: boolean,
+  skip: boolean
 ) => {
   const {useCallsStreamRaw} = useWFHooks();
 
   const sortBy = useDeepMemo(
-    useMemo(() => gridSort ? getSortBy(gridSort) : [], [gridSort])
+    useMemo(() => (gridSort ? getSortBy(gridSort) : []), [gridSort])
   );
   const lowLevelFilter: CallFilter = useMemo(() => {
     return convertHighLevelFilterToLowLevelFilter(filter);
   }, [filter]);
   const filterByRaw = useMemo(() => getFilterByRaw(gridFilter), [gridFilter]);
-  const filterBy: Query | undefined = useMemo(() => getFilterBy(filterByRaw), [filterByRaw]);
+  const filterBy: Query | undefined = useMemo(
+    () => getFilterBy(filterByRaw),
+    [filterByRaw]
+  );
 
   const {result, loading} = useCallsStreamRaw(
     entity,
@@ -125,7 +128,7 @@ export const useCallsExportStream = (
     sortBy,
     filterBy,
     {skip}
-  )
+  );
 
   const dataResult = useMemo(() => {
     return result ?? null;
@@ -133,12 +136,11 @@ export const useCallsExportStream = (
 
   return useMemo(() => {
     return {
-      loading: loading,
+      loading,
       result: loading ? null : dataResult,
     };
   }, [dataResult, loading]);
-}
-
+};
 
 const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
@@ -337,7 +339,9 @@ const operationConverter = (item: GridFilterItem): Query['$expr'] | null => {
   }
 };
 
-const getFilterByRaw = (gridFilter: GridFilterModel): Query['$expr'] | undefined => {
+const getFilterByRaw = (
+  gridFilter: GridFilterModel
+): Query['$expr'] | undefined => {
   const setItems = gridFilter.items.filter(item => item.value !== undefined);
 
   const convertedItems = setItems
@@ -368,7 +372,9 @@ const getSortBy = (gridSort: GridSortModel) => {
   });
 };
 
-const getFilterBy = (filterByRaw: Query['$expr'] | undefined): Query | undefined => {
+const getFilterBy = (
+  filterByRaw: Query['$expr'] | undefined
+): Query | undefined => {
   if (filterByRaw === undefined) {
     return undefined;
   }

@@ -346,47 +346,59 @@ const useCallsStreamRaw = (
   sortBy?: traceServerClient.SortBy[],
   query?: Query,
   opts?: {skip?: boolean; contentType?: traceServerClient.ContentType}
-): Loadable<String> => {
+): Loadable<string> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const [data, setData] =
-    useState<String | null>(null);
+  const [data, setData] = useState<string | null>(null);
   const deepFilter = useDeepMemo(filter);
 
-  const onSuccess = (res: String) => {
+  const onSuccess = (res: string) => {
     loadingRef.current = false;
     setData(res);
-  }
+  };
 
   const onError = (e: any) => {
     loadingRef.current = false;
     console.error(e);
     setData(null);
-  }
+  };
 
   useEffect(() => {
     if (opts?.skip) {
       return;
     }
-    getTsClient().callsStreamQueryCsv({
-      project_id: projectIdFromParts({entity, project}),
-      filter: {
-        op_names: deepFilter.opVersionRefs,
-        input_refs: deepFilter.inputObjectVersionRefs,
-        output_refs: deepFilter.outputObjectVersionRefs,
-        parent_ids: deepFilter.parentIds,
-        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter.callIds,
-        trace_roots_only: deepFilter.traceRootsOnly,
-        wb_run_ids: deepFilter.runIds,
-        wb_user_ids: deepFilter.userIds,
-      },
-      limit,
-      offset,
-      sort_by: sortBy,
-      query,
-    }).then(onSuccess).catch(onError);
-  }, [entity, project, deepFilter, opts?.skip, limit, offset, query, sortBy, getTsClient]);
+    getTsClient()
+      .callsStreamQueryCsv({
+        project_id: projectIdFromParts({entity, project}),
+        filter: {
+          op_names: deepFilter.opVersionRefs,
+          input_refs: deepFilter.inputObjectVersionRefs,
+          output_refs: deepFilter.outputObjectVersionRefs,
+          parent_ids: deepFilter.parentIds,
+          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+          call_ids: deepFilter.callIds,
+          trace_roots_only: deepFilter.traceRootsOnly,
+          wb_run_ids: deepFilter.runIds,
+          wb_user_ids: deepFilter.userIds,
+        },
+        limit,
+        offset,
+        sort_by: sortBy,
+        query,
+      })
+      .then(onSuccess)
+      .catch(onError);
+  }, [
+    entity,
+    project,
+    deepFilter,
+    opts?.skip,
+    limit,
+    offset,
+    query,
+    sortBy,
+    getTsClient,
+  ]);
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -406,7 +418,7 @@ const useCallsStreamRaw = (
       result: data,
     };
   }, [data, opts?.skip]);
-}
+};
 
 const useCalls = (
   entity: string,

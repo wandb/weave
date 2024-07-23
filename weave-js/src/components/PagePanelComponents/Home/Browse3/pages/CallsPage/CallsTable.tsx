@@ -24,8 +24,10 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {saveAs} from 'file-saver';
 import React, {
   FC,
   useCallback,
@@ -78,10 +80,6 @@ import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsExportStream, useCallsForQuery} from './callsTableQuery';
 import {ManageColumnsButton} from './ManageColumnsButton';
-
-import { saveAs } from 'file-saver';
-import { toast } from '@wandb/weave/common/components/elements/Toast';
-
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
@@ -529,9 +527,9 @@ export const CallsTable: FC<{
   useEffect(() => {
     addExtra('exportRunsTableButton', {
       node: (
-        <ExportRunsTableButton 
-          pageName={isEvaluateTable ? "evaluations" : "calls"}
-          tableRef={apiRef} 
+        <ExportRunsTableButton
+          pageName={isEvaluateTable ? 'evaluations' : 'calls'}
+          tableRef={apiRef}
           selectedCalls={selectedCalls}
           callQueryParams={{
             entity,
@@ -540,13 +538,26 @@ export const CallsTable: FC<{
             gridFilter: filterModel,
             gridSort: sortModel,
           }}
-          rightmostButton={isReadonly} />
+          rightmostButton={isReadonly}
+        />
       ),
       order: 2,
     });
 
     return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, isReadonly, isEvaluateTable, addExtra, removeExtra, selectedCalls, entity, project, effectiveFilter, filterModel, sortModel]);
+  }, [
+    apiRef,
+    isReadonly,
+    isEvaluateTable,
+    addExtra,
+    removeExtra,
+    selectedCalls,
+    entity,
+    project,
+    effectiveFilter,
+    filterModel,
+    sortModel,
+  ]);
 
   // Register Delete Button
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
@@ -959,8 +970,8 @@ const ExportRunsTableButton = ({
   pageName: string;
   rightmostButton?: boolean;
 }) => {
-  const [clicked, setClicked] = useState(false)
-  const fileName = `${pageName}-export`
+  const [clicked, setClicked] = useState(false);
+  const fileName = `${pageName}-export`;
   const {loading, result} = useCallsExportStream(
     callQueryParams.entity,
     callQueryParams.project,
@@ -969,33 +980,33 @@ const ExportRunsTableButton = ({
     callQueryParams.gridSort ?? null,
     MAX_EXPORT,
     !clicked
-  )
+  );
 
   useEffect(() => {
     if (!clicked || loading) {
       return;
     }
     if (!result) {
-      toast("Error, no calls to export", {type: "error"})
+      toast('Error, no calls to export', {type: 'error'});
     }
     if (result) {
       try {
-        saveAs(result, `${fileName}.csv`)
+        saveAs(result, `${fileName}.csv`);
       } catch {
-        toast("Error exporting calls", {type: "error"})
+        toast('Error exporting calls', {type: 'error'});
       } finally {
-        setClicked(false)
+        setClicked(false);
       }
     }
-  }, [clicked, result])
+  }, [clicked, loading, result, fileName]);
 
   const selectedExport = () => {
     tableRef.current?.exportDataAsCsv({
       includeColumnGroupsHeaders: false,
       getRowsToExport: () => selectedCalls,
       fileName,
-    })
-  }
+    });
+  };
 
   return (
     <Box
@@ -1009,8 +1020,10 @@ const ExportRunsTableButton = ({
         size="medium"
         variant="secondary"
         disabled={loading}
-        onClick={selectedCalls.length > 0 ? 
-          () => selectedExport() : () => setClicked(true)
+        onClick={
+          selectedCalls.length > 0
+            ? () => selectedExport()
+            : () => setClicked(true)
         }
         icon="export-share-upload">
         {selectedCalls.length > 0 ? `${selectedCalls.length}` : ''}
