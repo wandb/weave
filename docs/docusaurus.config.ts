@@ -2,6 +2,7 @@ import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 
+
 const config: Config = {
   title: "W&B Weave",
   tagline: "Confidently ship LLM applications.",
@@ -144,6 +145,12 @@ const config: Config = {
           block: { start: "highlight-start", end: "highlight-end" },
         },
       ],
+    },
+    docs: {
+      sidebar: {
+        hideable: true,
+        autoCollapseCategories: true,
+      },
     },
   } satisfies Preset.ThemeConfig,
 };
