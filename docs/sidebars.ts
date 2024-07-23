@@ -57,6 +57,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/anthropic",
             "guides/integrations/cohere",
             "guides/integrations/mistral",
+            "guides/integrations/langchain",
             "guides/integrations/llamaindex",
             "guides/integrations/dspy",
             "guides/integrations/google-gemini",
