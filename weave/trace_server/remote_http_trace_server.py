@@ -345,6 +345,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_create(
         self, req: t.Union[tsi.TableCreateReq, t.Dict[str, t.Any]]
     ) -> tsi.TableCreateRes:
+        # TODO: should use old style for older servers
+
         if isinstance(req, dict):
             req = tsi.TableCreateReq.model_validate(req)
         r = requests.post(
