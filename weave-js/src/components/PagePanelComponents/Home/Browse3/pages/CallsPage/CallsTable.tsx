@@ -81,7 +81,7 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
-const MAX_BULK_DELETE = 10;
+const MAX_SELECT = 10;
 
 export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
   'attributes.weave.client_version': false,
@@ -380,8 +380,6 @@ export const CallsTable: FC<{
     project
   );
 
-  const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
-
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const muiColumns = useMemo(() => {
@@ -403,33 +401,16 @@ export const CallsTable: FC<{
                   : 'indeterminate'
               }
               onCheckedChange={() => {
-                // if bulk delete move, or not eval table, select all calls
-                if (bulkDeleteMode || !isEvaluateTable) {
-                  if (
-                    selectedCalls.length ===
-                    Math.min(tableData.length, MAX_BULK_DELETE)
-                  ) {
-                    setSelectedCalls([]);
-                  } else {
-                    setSelectedCalls(
-                      tableData.map(row => row.id).slice(0, MAX_BULK_DELETE)
-                    );
-                  }
+                const maxForTable = isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT;
+                if (
+                  selectedCalls.length ===
+                  Math.min(tableData.length, maxForTable)
+                ) {
+                  setSelectedCalls([]);
                 } else {
-                  // exclude non-successful calls from selection
-                  const filtered = tableData.filter(
-                    row => row.exception == null && row.ended_at != null
+                  setSelectedCalls(
+                    tableData.map(row => row.id).slice(0, maxForTable)
                   );
-                  if (
-                    selectedCalls.length ===
-                    Math.min(filtered.length, MAX_EVAL_COMPARISONS)
-                  ) {
-                    setSelectedCalls([]);
-                  } else {
-                    setSelectedCalls(
-                      filtered.map(row => row.id).slice(0, MAX_EVAL_COMPARISONS)
-                    );
-                  }
                 }
               }}
             />
@@ -438,30 +419,14 @@ export const CallsTable: FC<{
         renderCell: (params: any) => {
           const rowId = params.id as string;
           const isSelected = selectedCalls.includes(rowId);
-          const disabledDueToMax =
-            selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected;
-          const disabledDueToNonSuccess =
-            params.row.exception != null || params.row.ended_at == null;
+          const disabled = !isSelected && (isEvaluateTable ? selectedCalls.length >= MAX_EVAL_COMPARISONS : selectedCalls.length >= MAX_SELECT);
           let tooltipText = '';
-          if (bulkDeleteMode || !isEvaluateTable) {
-            if (selectedCalls.length >= MAX_BULK_DELETE) {
-              tooltipText = `Deletion limited to ${MAX_BULK_DELETE} items`;
-            } else {
-              tooltipText = '';
-            }
-          } else {
-            if (disabledDueToNonSuccess) {
-              tooltipText = 'Cannot compare non-successful evaluations';
-            } else if (disabledDueToMax) {
+          if (isEvaluateTable) {
+            if (selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected) {
               tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
             }
-          }
-
-          let disabled = false;
-          if ((bulkDeleteMode || !isEvaluateTable) && !isSelected) {
-            disabled = selectedCalls.length >= MAX_BULK_DELETE;
-          } else if (isEvaluateTable) {
-            disabled = disabledDueToNonSuccess || disabledDueToMax;
+          } else if (selectedCalls.length >= MAX_SELECT && !isSelected) {
+            tooltipText = `Selection limited to ${MAX_SELECT} items`;
           }
 
           return (
@@ -490,7 +455,7 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-  }, [columns.cols, selectedCalls, tableData, bulkDeleteMode, isEvaluateTable]);
+  }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -499,6 +464,8 @@ export const CallsTable: FC<{
     if (!isEvaluateTable) {
       return;
     }
+    const selectedTableData = tableData.filter(row => selectedCalls.includes(row.id));
+    const disabled = selectedCalls.length === 0 || selectedCalls.length > MAX_EVAL_COMPARISONS || selectedTableData.some(row => row.exception != null || row.ended_at == null);
     addExtra('compareEvaluations', {
       node: (
         <CompareEvaluationsTableButton
@@ -507,9 +474,9 @@ export const CallsTable: FC<{
               router.compareEvaluationsUri(entity, project, selectedCalls)
             );
           }}
-          disabled={selectedCalls.length === 0 || bulkDeleteMode}
+          disabled={disabled}
           tooltipText={
-            bulkDeleteMode ? 'Cannot compare while bulk deleting' : undefined
+            disabled ? `Comparison limited to ${MAX_EVAL_COMPARISONS} valid evaluations` : undefined
           }
         />
       ),
@@ -529,7 +496,6 @@ export const CallsTable: FC<{
     entity,
     project,
     history,
-    bulkDeleteMode,
   ]);
 
   // Register Delete Button
@@ -541,15 +507,8 @@ export const CallsTable: FC<{
     addExtra('deleteSelectedCalls', {
       node: (
         <BulkDeleteButton
-          onConfirm={() => setDeleteConfirmModalOpen(true)}
+          onClick={() => setDeleteConfirmModalOpen(true)}
           disabled={selectedCalls.length === 0}
-          bulkDeleteModeToggle={mode => {
-            setBulkDeleteMode(mode);
-            if (!mode) {
-              setSelectedCalls([]);
-            }
-          }}
-          selectedCalls={selectedCalls}
         />
       ),
       order: 3,
@@ -561,7 +520,6 @@ export const CallsTable: FC<{
     removeExtra,
     selectedCalls,
     isEvaluateTable,
-    bulkDeleteMode,
     isReadonly,
   ]);
 
@@ -785,11 +743,11 @@ export const CallsTable: FC<{
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
-        getRowClassName={params =>
-          bulkDeleteMode && selectedCalls.includes(params.row.id)
-            ? SELECTED_FOR_DELETION
-            : ''
-        }
+        // getRowClassName={params =>
+        //   bulkDeleteMode && selectedCalls.includes(params.row.id)
+        //     ? SELECTED_FOR_DELETION
+        //     : ''
+        // }
         onColumnWidthChange={newCol => {
           setUserDefinedColumnWidths(curr => {
             return {
@@ -976,11 +934,8 @@ const CompareEvaluationsTableButton: FC<{
 
 const BulkDeleteButton: FC<{
   disabled?: boolean;
-  selectedCalls: string[];
-  onConfirm: () => void;
-  bulkDeleteModeToggle: (mode: boolean) => void;
-}> = ({disabled, selectedCalls, onConfirm, bulkDeleteModeToggle}) => {
-  const [deleteClicked, setDeleteClicked] = useState(false);
+  onClick: () => void;
+}> = ({disabled, onClick}) => {
   return (
     <Box
       sx={{
@@ -988,51 +943,15 @@ const BulkDeleteButton: FC<{
         display: 'flex',
         alignItems: 'center',
       }}>
-      {deleteClicked ? (
-        <>
-          <Button
-            className="mx-4"
-            variant="ghost"
-            size="medium"
-            disabled={disabled}
-            onClick={onConfirm}
-            tooltip="Select rows with the checkbox to delete"
-            icon="delete">
-            Confirm
-          </Button>
-          <Button
-            className="ml-4 mr-16"
-            variant="ghost"
-            size="medium"
-            onClick={() => {
-              setDeleteClicked(false);
-              bulkDeleteModeToggle(false);
-            }}>
-            Exit delete mode
-          </Button>
-        </>
-      ) : selectedCalls.length > 0 ? (
-        <Button
-          className="ml-4 mr-16"
-          variant="ghost"
-          size="medium"
-          onClick={onConfirm}
-          tooltip="Select rows with the checkbox to delete"
-          icon="delete"
-        />
-      ) : (
-        <Button
-          className="ml-4 mr-16"
-          variant="ghost"
-          size="medium"
-          onClick={() => {
-            setDeleteClicked(true);
-            bulkDeleteModeToggle(true);
-          }}
-          tooltip="Select rows with the checkbox to delete"
-          icon="delete"
-        />
-      )}
+      <Button
+        className="ml-4 mr-16"
+        variant="ghost"
+        size="medium"
+        disabled={disabled}
+        onClick={onClick}
+        tooltip="Select rows with the checkbox to delete"
+        icon="delete"
+      />
     </Box>
   );
 };
