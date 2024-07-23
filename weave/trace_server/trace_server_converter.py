@@ -58,7 +58,7 @@ D = typing.TypeVar("D")
 
 def universal_int_to_ext_ref_converter(
     obj: C,
-    convert_int_to_ext_project_id: typing.Callable[[str], str],
+    convert_int_to_ext_project_id: typing.Callable[[str], typing.Optional[str]],
 ) -> C:
     """Takes any object and recursively replaces all internal references with
     external references. The internal references are expected to be in the
@@ -74,7 +74,7 @@ def universal_int_to_ext_ref_converter(
         The object with all internal references replaced with external
         references.
     """
-    int_to_ext_project_cache: dict[str, str] = {}
+    int_to_ext_project_cache: dict[str, typing.Optional[str]] = {}
 
     weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
 
@@ -91,6 +91,8 @@ def universal_int_to_ext_ref_converter(
                 project_id
             )
         external_project_id = int_to_ext_project_cache[project_id]
+        if not external_project_id:
+            return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
         return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
 
     def mapper(obj: D) -> D:
