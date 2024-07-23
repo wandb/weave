@@ -89,6 +89,18 @@ def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
     return retry_state.outcome.result()
 
 
+retry_wrapper = tenacity.retry(
+    stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+    wait=tenacity.wait_exponential_jitter(
+        initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+    ),
+    retry=tenacity.retry_if_exception(_is_retryable_exception),
+    before_sleep=_log_retry,
+    retry_error_callback=_log_failure,
+    reraise=True,
+)
+
+
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
 
@@ -113,16 +125,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: t.Tuple[str, str]) -> None:
         self._auth = auth
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @retry_wrapper
     def _flush_calls(
         self,
         batch: t.List,
@@ -158,16 +161,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
         r.raise_for_status()
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @retry_wrapper
     def _generic_request_executor(
         self,
         url: str,
@@ -228,16 +222,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             if line:
                 yield res_model.model_validate(json.loads(line))
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @retry_wrapper
     def server_info(self) -> ServerInfoRes:
         r = requests.get(self.trace_server_url + "/server_info")
         r.raise_for_status()
@@ -356,11 +341,26 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
         )
 
+    @retry_wrapper
     def table_create(
         self, req: t.Union[tsi.TableCreateReq, t.Dict[str, t.Any]]
     ) -> tsi.TableCreateRes:
-        return self._generic_request(
-            "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
+        if isinstance(req, dict):
+            req = tsi.TableCreateReq.model_validate(req)
+        r = requests.post(
+            self.trace_server_url + "/table/create_stream",
+            auth=self._auth,
+            data={"project_id": req.project_id},
+            files={"file": ("rows.jsonl", jsonl_from_list_of_dicts(req.table.rows))},
+        )
+        r.raise_for_status()
+        return tsi.TableCreateRes.model_validate(r.json())
+
+    async def async_table_create(
+        self, req: tsi.AsyncTableCreateReq
+    ) -> tsi.TableCreateRes:
+        raise NotImplementedError(
+            "async_table_create is not implemented, use table_create"
         )
 
     def table_query(
@@ -377,16 +377,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
         )
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential_jitter(
-            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
-        ),
-        retry=tenacity.retry_if_exception(_is_retryable_exception),
-        before_sleep=_log_retry,
-        retry_error_callback=_log_failure,
-        reraise=True,
-    )
+    @retry_wrapper
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         r = requests.post(
             self.trace_server_url + "/files/create",
@@ -440,3 +431,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
         )
+
+
+def jsonl_from_list_of_dicts(list_of_dicts: t.List[t.Dict[str, t.Any]]) -> str:
+    final = ""
+    for d in list_of_dicts:
+        if not isinstance(d, dict):
+            raise ValueError(f"Expected dict, got {type(d)}")
+        final += json.dumps(d) + "\n"
+    return final

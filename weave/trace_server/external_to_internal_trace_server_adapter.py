@@ -1,6 +1,6 @@
 import abc
 import typing
-from typing import Callable, Iterator, TypeVar
+from typing import AsyncIterator, Callable, Iterator, Literal, TypeVar, Union
 
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
@@ -81,17 +81,59 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         )
         res = method(req_conv)
 
-        int_to_ext_project_cache = {}
+        return self._iterator_ref_apply(res, "int_to_ext")
 
-        def cached_int_to_ext_project_id(project_id: str) -> str:
-            if project_id not in int_to_ext_project_cache:
-                int_to_ext_project_cache[project_id] = self._idc.int_to_ext_project_id(
-                    project_id
-                )
-            return int_to_ext_project_cache[project_id]
+    def _iterator_ref_apply(
+        self,
+        itr: Iterator[B],
+        direction: Union[Literal["ext_to_int"], Literal["int_to_ext"]],
+    ) -> Iterator[B]:
+        cache = {}
 
-        for item in res:
-            yield universal_int_to_ext_ref_converter(item, cached_int_to_ext_project_id)
+        method = (
+            self._idc.ext_to_int_project_id
+            if direction == "ext_to_int"
+            else self._idc.int_to_ext_project_id
+        )
+        converter = (
+            universal_ext_to_int_ref_converter
+            if direction == "ext_to_int"
+            else universal_int_to_ext_ref_converter
+        )
+
+        def cached_method(project_id: str) -> str:
+            if project_id not in cache:
+                cache[project_id] = method(project_id)
+            return cache[project_id]
+
+        for item in itr:
+            yield converter(item, cached_method)
+
+    async def _async_iterator_ref_apply(
+        self,
+        itr: AsyncIterator[B],
+        direction: Union[Literal["ext_to_int"], Literal["int_to_ext"]],
+    ) -> AsyncIterator[B]:
+        cache = {}
+
+        method = (
+            self._idc.ext_to_int_project_id
+            if direction == "ext_to_int"
+            else self._idc.int_to_ext_project_id
+        )
+        converter = (
+            universal_ext_to_int_ref_converter
+            if direction == "ext_to_int"
+            else universal_int_to_ext_ref_converter
+        )
+
+        def cached_method(project_id: str) -> str:
+            if project_id not in cache:
+                cache[project_id] = method(project_id)
+            return cache[project_id]
+
+        async for item in itr:
+            yield converter(item, cached_method)
 
     # Standard API Below:
     def ensure_project_exists(self, entity: str, project: str) -> None:
@@ -257,7 +299,19 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
-        return self._ref_apply(self._internal_trace_server.table_create, req)
+        req.table.rows = self._iterator_ref_apply(req.table.rows, "ext_to_int")
+        return self._internal_trace_server.table_create(req)
+
+    async def async_table_create(
+        self, req: tsi.AsyncTableCreateReq
+    ) -> tsi.TableCreateRes:
+        new_req = tsi.AsyncTableCreateReq(
+            table=tsi.AsyncTableSchemaForInsert(
+                project_id=self._idc.ext_to_int_project_id(req.table.project_id),
+                rows=self._async_iterator_ref_apply(req.table.rows, "ext_to_int"),
+            )
+        )
+        return self._internal_trace_server.table_create(new_req)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)

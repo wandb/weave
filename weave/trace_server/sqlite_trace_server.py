@@ -647,6 +647,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableCreateRes(digest=digest)
 
+    async def async_table_create(
+        self, req: tsi.AsyncTableCreateReq
+    ) -> tsi.TableCreateRes:
+        new_rows = [row async for row in req.table.rows]
+        return self.table_create(
+            tsi.TableCreateReq(
+                table=tsi.TableSchemaForInsert(
+                    project_id=req.table.project_id, rows=new_rows
+                )
+            )
+        )
+
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
         if req.filter:

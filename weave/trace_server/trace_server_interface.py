@@ -120,7 +120,12 @@ class ObjSchemaForInsert(BaseModel):
 
 class TableSchemaForInsert(BaseModel):
     project_id: str
-    rows: list[typing.Any]
+    rows: typing.Iterator[typing.Dict[str, typing.Any]]
+
+
+class AsyncTableSchemaForInsert(BaseModel):
+    project_id: str
+    rows: typing.AsyncIterator[typing.Dict[str, typing.Any]]
 
 
 class CallStartReq(BaseModel):
@@ -290,6 +295,10 @@ class ObjQueryRes(BaseModel):
 
 class TableCreateReq(BaseModel):
     table: TableSchemaForInsert
+
+
+class AsyncTableCreateReq(BaseModel):
+    table: AsyncTableSchemaForInsert
 
 
 class TableRowSchema(BaseModel):
@@ -476,6 +485,10 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def table_create(self, req: TableCreateReq) -> TableCreateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    async def async_table_create(self, req: AsyncTableCreateReq) -> TableCreateRes:
         raise NotImplementedError()
 
     @abc.abstractmethod

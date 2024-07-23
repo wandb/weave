@@ -74,6 +74,8 @@ MAX_FLUSH_AGE = 15
 
 FILE_CHUNK_SIZE = 100000
 
+MAX_BATCH_INSERT_BYTES = 2**20  # 1MB
+
 MAX_DELETE_CALLS_COUNT = 100
 
 
@@ -602,6 +604,68 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         table_hasher = hashlib.sha256()
         for row_digest in row_digests:
             table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        self._insert(
+            "tables",
+            data=[(req.table.project_id, digest, row_digests)],
+            column_names=["project_id", "digest", "row_digests"],
+        )
+        return tsi.TableCreateRes(digest=digest)
+
+    async def async_table_create(
+        self, req: tsi.AsyncTableCreateReq
+    ) -> tsi.TableCreateRes:
+        # TODO: any way to share code with table_create?
+        row_digests = []
+        insert_rows = []
+        est_insert_bytes = 0
+
+        def flush():
+            if not insert_rows:
+                return
+
+            global est_insert_bytes
+            self._insert(
+                "table_rows",
+                data=insert_rows,
+                column_names=["project_id", "digest", "refs", "val_dump"],
+            )
+
+            for r in insert_rows:
+                row_digests.append(r[1])
+
+            insert_rows.clear()
+            est_insert_bytes = 0
+
+        async for r in req.table.rows:
+            if not isinstance(r, dict):
+                raise ValueError(
+                    f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
+                )
+            row_json = json.dumps(r)
+            new_insert_bytes = len(row_json)
+            if est_insert_bytes + new_insert_bytes > MAX_BATCH_INSERT_BYTES:
+                flush()
+
+            row_digest = str_digest(row_json)
+            insert_rows.append(
+                (
+                    req.table.project_id,
+                    row_digest,
+                    extract_refs_from_values(r),
+                    row_json,
+                )
+            )
+            est_insert_bytes += new_insert_bytes
+
+        flush()
+
+        table_hasher = hashlib.sha256()
+
+        for row_digest in row_digests:
+            table_hasher.update(row_digest.encode())
+
         digest = table_hasher.hexdigest()
 
         self._insert(
@@ -1229,11 +1293,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         data: typing.Sequence[typing.Sequence[typing.Any]],
         column_names: typing.List[str],
         settings: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> QuerySummary:
+    ) -> list[QuerySummary]:
         try:
-            return self.ch_client.insert(
+            summary = self.ch_client.insert(
                 table, data=data, column_names=column_names, settings=settings
             )
+            return [summary]
         except ValueError as e:
             if "negative shift count" in str(e):
                 # clickhouse_connect raises a weird error message like
@@ -1242,6 +1307,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # │    return 1 << (21 - int(log(row_size, 2)))
                 # │ValueError: negative shift count
                 # when we try to insert something that's too large.
+                if len(data) > 1:
+                    split_ndx = len(data) // 2
+                    part_1 = data[:split_ndx]
+                    part_2 = data[split_ndx:]
+                    part_1_res = self._insert(table, part_1, column_names, settings)
+                    part_2_res = self._insert(table, part_2, column_names, settings)
+                    return part_1_res + part_2_res
                 raise RequestTooLarge("Could not insert record")
             raise
 
