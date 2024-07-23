@@ -52,4 +52,4 @@ def get_class_source(cls: Callable) -> str:
     if segment is not None:
         return segment
 
-    raise ValueError(f"Class '{class_name}' not found in the notebook")
+    return ""

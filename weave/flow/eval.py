@@ -238,7 +238,11 @@ class Evaluation(Object):
                     """
                 )
                 raise OpCallError(message)
-            scores[scorer_name] = result
+            # this is a catchall in case the user's scorer function throws
+            except Exception as e:
+                pass
+            else:
+                scores[scorer_name] = result
 
         return {
             "model_output": model_output,

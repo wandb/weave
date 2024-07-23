@@ -32,8 +32,8 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
     """Automatically summarize a list of (potentially nested) dicts.
 
     Computes:
-        - avg for numeric cols
-        - count and fraction for boolean cols
+        - avg and none fraction for numeric cols
+        - count, true fraction, and none fraction for boolean cols
         - other col types are ignored
 
     If col is all None, result is None
@@ -43,20 +43,24 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
     """
     if not data:
         return {}
-    data = [x for x in data if x is not None]
+
     val = data[0]
 
     if isinstance(val, bool):
         return {
             "true_count": (true_count := sum(1 for x in data if x)),
             "true_fraction": true_count / len(data),
+            "none_fraction": sum(1 for x in data if x is None) / len(data),
         }
     elif isinstance(val, Number):
-        return {"mean": np.mean(data).item()}
+        return {
+            "mean": np.mean(data).item(),
+            "none_fraction": sum(1 for x in data if x is None) / len(data),
+        }
     elif isinstance(val, dict):
         result = {}
         for k in val:
-            if (summary := auto_summarize([x[k] for x in data])) is not None:
+            if (summary := auto_summarize([x.get(k) for x in data])) is not None:
                 if k in summary:
                     result.update(summary)
                 else:
