@@ -926,7 +926,7 @@ const CompareEvaluationsTableButton: FC<{
     <Button
       className="mx-4"
       size="medium"
-      variant="ghost"
+      variant="primary"
       disabled={disabled}
       onClick={onClick}
       icon="chart-scatterplot"
