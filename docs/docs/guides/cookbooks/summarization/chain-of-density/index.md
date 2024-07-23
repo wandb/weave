@@ -1,6 +1,7 @@
 # Arxiv PDF Summarization Bot using Chain of Density
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/examples/cookbooks/summarization/chain-of-density-arxiv.ipynb)
+![Eval Comparison](./media/eval_comparison.gif)
 
 This cookbook walks through the implementation of an AI-powered summarization bot that extracts concise, information-dense summaries from Arxiv papers using the Chain of Density technique. We'll use Anthropic's Claude API, the Arxiv API, PyPDF2 for PDF processing, and Weave for experiment tracking and evaluation.
 
@@ -29,6 +30,8 @@ This sets up Weave with a specific project name and initializes the Anthropic cl
 <summary>Click to Expand</summary>
 
 We implement functions to fetch relevant papers from the Arxiv database:
+
+![Generate Arxiv Query](./media/generate_arxiv_query_args.gif)
 
 ```python
 @weave.op()
@@ -81,7 +84,11 @@ def generate_arxiv_query_args(instruction, model="claude-3-sonnet-20240229"):
 
     # If no tool use was found, return a default query and the provided max_results
     return f"{instruction}", 5
+```
 
+![Fetch Arxiv Papers](./media/fetch_arxiv_papers.gif)
+
+```python
 @weave.op()
 def fetch_arxiv_papers(query, max_results=5):
     # Initialize the arxiv Client
@@ -112,6 +119,8 @@ These functions use Claude to generate an optimal Arxiv search query based on a 
 ## Creating Sample Arxiv Paper Objects
 
 For demonstration purposes, we create sample `ArxivPaper` objects:
+
+![Create Sample Arxiv Paper Objects](./media/arxiv_paper.gif)
 
 ```python
 arxiv_paper = ArxivPaper(
@@ -149,6 +158,8 @@ These functions handle loading PDFs into PyPDF2 making processing the PDFs easie
 One of the key challenges in processing academic papers is handling the visual content, which often includes both raster images and vector graphics. These visuals can contain crucial information that needs to be incorporated into our summarization process. To address this, we leverage Claude 3 Sonnet's advanced vision capabilities to convert these images into detailed textual descriptions.
 
 Here's the implementation of our main image processing function:
+
+![Extract Images](./media/model_extract_images.gif)
 
 ```python
 import base64
@@ -399,6 +410,8 @@ This approach allows us to handle the nuances of different image types within sc
 
 Finally, we integrate the image descriptions into the text of the paper:
 
+![Replace Images with Descriptions](./media/model_replace_image_with_descriptions.gif)
+
 ```python
 @weave.op()
 def replace_images_with_descriptions(paper, images):
@@ -418,6 +431,8 @@ By implementing this comprehensive image processing pipeline, we ensure that our
 ## Chain of Density Summarization
 
 The core of our summarization pipeline is then implemented in the following functions:
+
+![Chain of Density Summarization](./media/chain_of_density.gif)
 
 ### `summarize_current_summary`:
   - Forms the foundation of our Chain of Density implementation
@@ -591,6 +606,8 @@ This implementation leverages the Chain of Density technique to produce increasi
 
 We create a Weave Model object to encapsulate our summarization pipeline:
 
+![Weave Model Object](./media/model.gif)
+
 ```python
 class ArxivChainOfDensityPipeline(weave.Model):
     model: str = "claude-3-5-sonnet-20240620"
@@ -615,6 +632,8 @@ This class encapsulates our summarization pipeline as a Weave Model. By inheriti
 
 We create an evaluation dataset using sample Arxiv papers and instructions:
 
+![Evaluation Dataset](./media/eval_dataset.gif)
+
 ```python
 eval_papers = [arxiv_paper3]
 eval_instructions = [
@@ -631,6 +650,8 @@ This creates a Weave Dataset object that combines papers, instructions, and orig
 ## Evaluation Metrics
 
 We implement several evaluation metrics to assess the quality of our summaries:
+
+![Evaluation Metrics](./media/evals_main_screen.gif)
 
 ```python
 @weave.op()
@@ -951,6 +972,8 @@ These evaluation metrics collectively provide a robust framework for assessing t
 ## Running the Evaluation
 
 Finally, we set up and run the evaluation:
+
+![Evaluation Setup](./media/eval_comparison.gif)
 
 ```python
 models = [
