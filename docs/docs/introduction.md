@@ -46,6 +46,7 @@ Weave offers **integrations** with many language model APIs and LLM frameworks t
   - **[Anthropic](/guides/integrations/anthropic)**
   - **[Cohere](/guides/integrations/cohere)**
   - **[MistralAI](/guides/integrations/mistral)**
+  - **[LangChain](/guides/integrations/langchain)**
   - **[LlamaIndex](/guides/integrations/llamaindex)**
   - **[DSPy](/guides/integrations/dspy)**
   - **[Google Gemini](/guides/integrations/google-gemini)**
