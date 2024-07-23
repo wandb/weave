@@ -383,6 +383,7 @@ export const CallsTable: FC<{
         minWidth: 30,
         width: 38,
         field: 'CustomCheckbox',
+        disableExport: true,
         sortable: false,
         disableColumnMenu: true,
         renderHeader: (params: any) => {
@@ -959,7 +960,7 @@ const ExportRunsTableButton = ({
   rightmostButton?: boolean;
 }) => {
   const [clicked, setClicked] = useState(false)
-  const fileName = `${pageName}-export.csv`
+  const fileName = `${pageName}-export`
   const {loading, result} = useCallsExportStream(
     callQueryParams.entity,
     callQueryParams.project,
@@ -979,7 +980,7 @@ const ExportRunsTableButton = ({
     }
     if (result) {
       try {
-        saveAs(result, fileName)
+        saveAs(result, `${fileName}.csv`)
       } catch {
         toast("Error exporting calls", {type: "error"})
       } finally {
