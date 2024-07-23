@@ -56,12 +56,13 @@ def _local_path_and_download_url(
     md5_hex = hashutil.b64_to_hex_id(hashutil.B64MD5(manifest_entry["digest"]))
     base_url = base_url or weave_env.wandb_base_url()
     file_path = _file_path(art_uri, md5_hex)
+    entity_name = urllib.parse.quote(art_uri.entity_name or "_")
     # For artifactsV1 (legacy artifacts), the artifact's files cannot be fetched without the entity name, but
     # we substitute a '_' here anyway since artifact_uri.entity_name can be None accessed via an organization's
     # registry collection.
     if manifest.storage_layout == artifact_wandb.WandbArtifactManifest.StorageLayout.V1:
         return file_path, "{}/artifacts/{}/{}/{}".format(
-            base_url, art_uri.entity_name or "_", md5_hex, urllib.parse.quote(file_name)
+            base_url, entity_name or "_", md5_hex, urllib.parse.quote(file_name)
         )
     else:
         # TODO: storage_region
@@ -72,7 +73,7 @@ def _local_path_and_download_url(
         return file_path, "{}/artifactsV2/{}/{}/{}/{}/{}".format(
             base_url,
             storage_region,
-            art_uri.entity_name or "_",
+            entity_name or "_",
             urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
             md5_hex,
             urllib.parse.quote(file_name),

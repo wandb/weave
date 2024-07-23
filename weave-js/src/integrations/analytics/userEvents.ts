@@ -6,7 +6,7 @@ export const deleteClicked = makeTrackEvent<
     numCalls: number;
     userId: string;
     organizationName: string;
-    entityName: string;
+    username: string;
   },
   {
     _description: `User clicked the delete button`;
@@ -34,9 +34,9 @@ export const deleteClicked = makeTrackEvent<
       description: 'Name of organization';
       exampleValues: ['my-org'];
     };
-    entityName: {
-      description: 'Name of entity';
-      exampleValues: ['my-entity'];
+    username: {
+      description: 'Username of user deleting';
+      exampleValues: ['my-username'];
     };
   }
 >('Weave delete clicked');

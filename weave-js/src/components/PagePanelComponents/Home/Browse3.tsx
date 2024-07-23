@@ -9,7 +9,11 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import {GridColumnVisibilityModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {
+  GridColumnVisibilityModel,
+  GridPaginationModel,
+  GridSortModel,
+} from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {Loading} from '@wandb/weave/components/Loading';
@@ -53,12 +57,19 @@ import {
   WeaveflowPeekContext,
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
+import {
+  DEFAULT_PAGE_SIZE,
+  getValidPaginationModel,
+} from './Browse3/grid/pagination';
 import {getValidSortModel} from './Browse3/grid/sort';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
-import {DEFAULT_SORT_CALLS} from './Browse3/pages/CallsPage/CallsTable';
+import {
+  DEFAULT_COLUMN_VISIBILITY_CALLS,
+  DEFAULT_SORT_CALLS,
+} from './Browse3/pages/CallsPage/CallsTable';
 import {Empty} from './Browse3/pages/common/Empty';
 import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
@@ -676,7 +687,7 @@ const CallsPageBinding = () => {
     try {
       return JSON.parse(query.cols);
     } catch (e) {
-      return {};
+      return DEFAULT_COLUMN_VISIBILITY_CALLS;
     }
   }, [query.cols]);
   const setColumnVisibilityModel = (newModel: GridColumnVisibilityModel) => {
@@ -699,6 +710,27 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  const paginationModel = useMemo(
+    () => getValidPaginationModel(query.page, query.pageSize),
+    [query.page, query.pageSize]
+  );
+  const setPaginationModel = (newModel: GridPaginationModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    const {page, pageSize} = newModel;
+    // TODO: If we change page size, should we reset page to 0?
+    if (page === 0) {
+      newQuery.delete('page');
+    } else {
+      newQuery.set('page', page.toString());
+    }
+    if (pageSize === DEFAULT_PAGE_SIZE) {
+      newQuery.delete('pageSize');
+    } else {
+      newQuery.set('pageSize', pageSize.toString());
+    }
+    history.push({search: newQuery.toString()});
+  };
+
   return (
     <CallsPage
       entity={entity}
@@ -709,6 +741,8 @@ const CallsPageBinding = () => {
       setColumnVisibilityModel={setColumnVisibilityModel}
       sortModel={sortModel}
       setSortModel={setSortModel}
+      paginationModel={paginationModel}
+      setPaginationModel={setPaginationModel}
     />
   );
 };

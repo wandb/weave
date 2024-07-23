@@ -8,7 +8,6 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
-    Literal,
     Mapping,
     Optional,
     Protocol,
@@ -169,7 +168,7 @@ def _execute_call(
     __op: Op,
     call: Any,
     *args: Any,
-    __return_type: Literal["call", "value"] = "call",
+    __should_raise: bool = True,
     **kwargs: Any,
 ) -> Any:
     func = __op.resolve_fn
@@ -180,6 +179,7 @@ def _execute_call(
         nonlocal has_finished
         if has_finished:
             raise ValueError("Should not call finish more than once")
+
         client.finish_call(call, output, exception)
         if not call_context.get_current_call():
             print_call_link(call)
@@ -190,38 +190,50 @@ def _execute_call(
         finish(output)
         return output
 
-    try:
-        res = func(*args, **kwargs)
-    except BaseException as e:
-        finish(exception=e)
-        raise
-    else:
-        res = box.box(res)  # TODO: can we get rid of this?
+    def process(res: Any) -> Any:
+        res = box.box(res)
+        res = on_output(res)
+        return res, call
 
-    if inspect.iscoroutine(res):
-        awaitable = res
+    def handle_exception(e: Exception) -> Any:
+        finish(exception=e)
+        if __should_raise:
+            raise
+        return None, call
+
+    if inspect.iscoroutinefunction(func):
 
         async def _call_async() -> Coroutine[Any, Any, Any]:
+            call_context.push_call(call)
             try:
-                call_context.push_call(call)
-                output = await awaitable
-                res2 = on_output(output)
-                return call if __return_type == "call" else res2
-            except BaseException as e:
-                finish(exception=e)
-                raise
+                res = await func(*args, **kwargs)
+            except Exception as e:
+                return handle_exception(e)
+            else:
+                return process(res)
             finally:
                 call_context.pop_call(call.id)
 
         return _call_async()
+
+    try:
+        res = func(*args, **kwargs)
+    except Exception as e:
+        handle_exception(e)
     else:
-        res2 = on_output(res)
-        return call if __return_type == "call" else res2
+        return process(res)
+
+    return None, call
 
 
-def call(op: Op, *args: Any, **kwargs: Any) -> Any:
+def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
+    """
+    Executes the op and returns both the result and a Call representing the execution.
+
+    This function will never raise.  Any errors are captured in the Call object.
+    """
     c = _create_call(op, *args, **kwargs)
-    return _execute_call(op, c, *args, **kwargs)
+    return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
 
 def calls(op: Op) -> "CallsIter":
@@ -313,13 +325,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if client_context.weave_client.get_weave_client() is None:
                         return await func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return await _execute_call(
-                        wrapper,  # type: ignore
-                        call,
-                        *args,
-                        __return_type="value",
-                        **kwargs,
-                    )
+                    res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    return res
             else:
 
                 @wraps(func)
@@ -327,13 +334,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if client_context.weave_client.get_weave_client() is None:
                         return func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
-                    return _execute_call(
-                        wrapper,  # type: ignore
-                        call,
-                        *args,
-                        __return_type="value",
-                        **kwargs,
-                    )
+                    res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    return res
 
             # Tack these helpers on to our wrapper
             wrapper.resolve_fn = func  # type: ignore

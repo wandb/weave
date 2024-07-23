@@ -27,6 +27,12 @@ from weave.trace.op import Op
 console = Console()
 
 
+INVALID_MODEL_ERROR = (
+    "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
+    + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
+)
+
+
 def async_call(
     func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
 ) -> typing.Coroutine:
@@ -263,6 +269,8 @@ class Evaluation(Object):
 
     @weave.op()
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
+        if not isinstance(model, Model) and not isinstance(model, Op):
+            raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
 
         start_time = time.time()

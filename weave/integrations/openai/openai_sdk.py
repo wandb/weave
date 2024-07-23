@@ -235,7 +235,9 @@ def should_use_accumulator(inputs: typing.Dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Callable]:
+def create_wrapper_sync(
+    name: str,
+) -> typing.Callable[[typing.Callable], typing.Callable]:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         "We need to do this so we can check if `stream` is used"
 
@@ -269,17 +271,54 @@ def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Calla
     return wrapper
 
 
+# Surprisingly, the async `client.chat.completions.create` does not pass
+# `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
+# it manually here...
+def create_wrapper_async(
+    name: str,
+) -> typing.Callable[[typing.Callable], typing.Callable]:
+    def wrapper(fn: typing.Callable) -> typing.Callable:
+        "We need to do this so we can check if `stream` is used"
+
+        def _add_stream_options(fn: typing.Callable) -> typing.Callable:
+            @wraps(fn)
+            async def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+                if bool(kwargs.get("stream")) and kwargs.get("stream_options") is None:
+                    kwargs["stream_options"] = {"include_usage": True}
+                return await fn(*args, **kwargs)
+
+            return _wrapper
+
+        def _openai_stream_options_is_set(inputs: typing.Dict) -> bool:
+            if inputs.get("stream_options") is not None:
+                return True
+            return False
+
+        op = weave.op()(_add_stream_options(fn))
+        op.name = name  # type: ignore
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
+                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
+            ),
+            should_accumulate=should_use_accumulator,
+            on_finish_post_processor=openai_on_finish_post_processor,
+        )
+
+    return wrapper
+
+
 symbol_patchers = [
     # Patch the Completions.create method
     SymbolPatcher(
         lambda: importlib.import_module("openai.resources.chat.completions"),
         "Completions.create",
-        create_wrapper(name="openai.chat.completions.create"),
+        create_wrapper_sync(name="openai.chat.completions.create"),
     ),
     SymbolPatcher(
         lambda: importlib.import_module("openai.resources.chat.completions"),
         "AsyncCompletions.create",
-        create_wrapper(name="openai.chat.completions.create"),
+        create_wrapper_async(name="openai.chat.completions.create"),
     ),
 ]
 

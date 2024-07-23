@@ -116,10 +116,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 base_object_class TEXT,
                 refs TEXT,
                 val_dump TEXT,
-                digest TEXT UNIQUE,
+                digest TEXT,
                 version_index INTEGER,
                 is_latest INTEGER,
-                deleted_at TEXT
+                deleted_at TEXT,
+                primary key (project_id, kind, object_id, digest)
             )
         """
         )
@@ -128,7 +129,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             CREATE TABLE IF NOT EXISTS tables (
                 project_id TEXT,
                 digest TEXT UNIQUE,
-                row_digests STRING)
+                row_digests STRING
+            )
             """
         )
         cursor.execute(
@@ -136,15 +138,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             CREATE TABLE IF NOT EXISTS table_rows (
                 project_id TEXT,
                 digest TEXT UNIQUE,
-                val TEXT)
+                val TEXT
+            )
             """
         )
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS files (
                 project_id TEXT,
-                digest TEXT UNIQUE,
-                val BLOB)
+                digest TEXT,
+                val BLOB,
+                primary key (project_id, digest)
+            )
             """
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
@@ -230,15 +235,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallEndRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        return tsi.CallReadRes(
-            call=self.calls_query(
-                tsi.CallsQueryReq(
-                    project_id=req.project_id,
-                    limit=1,
-                    filter=tsi._CallsFilter(call_ids=[req.id]),
-                )
-            ).calls[0]
-        )
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                limit=1,
+                filter=tsi._CallsFilter(call_ids=[req.id]),
+            )
+        ).calls
+        return tsi.CallReadRes(call=calls[0] if calls else None)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         print("REQ", req)
@@ -541,7 +545,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             # first get version count
             cursor.execute(
                 """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
-                (req.obj.project_id, req_obj.object_id),
+                (req_obj.project_id, req_obj.object_id),
             )
             version_index = cursor.fetchone()[0]
 
@@ -883,7 +887,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         pred = " AND ".join(conditions or ["1 = 1"])
         cursor.execute(
             """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
-            + pred,
+            + pred
+            + " ORDER BY created_at ASC",
             (project_id,),
         )
         query_result = cursor.fetchall()

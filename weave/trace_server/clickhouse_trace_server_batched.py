@@ -309,7 +309,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 limit=1,
             )
         )
-        return tsi.CallReadRes(call=next(res))
+        try:
+            _call = next(res)
+        except StopIteration:
+            _call = None
+        return tsi.CallReadRes(call=_call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
@@ -725,30 +729,38 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            for ref_index, ref in enumerate(refs):
-                if ref.version == "latest":
-                    raise ValueError("Reading refs with `latest` is not supported")
+            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
+                defaultdict(list)
+            )
+            for ref in refs:
+                refs_by_project_id[ref.project_id].append(ref)
+            for project_id, project_refs in refs_by_project_id.items():
+                for ref_index, ref in enumerate(project_refs):
+                    if ref.version == "latest":
+                        raise ValueError("Reading refs with `latest` is not supported")
 
-                cache_key = make_ref_cache_key(ref)
+                    cache_key = make_ref_cache_key(ref)
 
-                if cache_key in root_val_cache:
-                    continue
+                    if cache_key in root_val_cache:
+                        continue
 
-                object_id_param_key = "object_id_" + str(ref_index)
-                version_param_key = "version_" + str(ref_index)
-                conds.append(
-                    f"object_id = {{{object_id_param_key}: String}} AND digest = {{{version_param_key}: String}}"
-                )
-                parameters[object_id_param_key] = ref.name
-                parameters[version_param_key] = ref.version
+                    object_id_param_key = "object_id_" + str(ref_index)
+                    version_param_key = "version_" + str(ref_index)
+                    conds.append(
+                        f"object_id = {{{object_id_param_key}: String}} AND digest = {{{version_param_key}: String}}"
+                    )
+                    parameters[object_id_param_key] = ref.name
+                    parameters[version_param_key] = ref.version
 
-            if len(conds) > 0:
-                conditions = [combine_conditions(conds, "OR")]
-                objs = self._select_objs_query(
-                    ref.project_id, conditions=conditions, parameters=parameters
-                )
-                for obj in objs:
-                    root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
+                if len(conds) > 0:
+                    conditions = [combine_conditions(conds, "OR")]
+                    objs = self._select_objs_query(
+                        project_id, conditions=conditions, parameters=parameters
+                    )
+                    for obj in objs:
+                        root_val_cache[make_obj_cache_key(obj)] = json.loads(
+                            obj.val_dump
+                        )
 
             return [root_val_cache[make_ref_cache_key(ref)] for ref in refs]
 

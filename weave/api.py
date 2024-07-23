@@ -1,5 +1,4 @@
-"""These are the top-level functions in the `import weave` namespace.
-"""
+"""These are the top-level functions in the `import weave` namespace."""
 
 import time
 import typing
@@ -213,14 +212,23 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     ref = client._save_object(obj, save_name, "latest")
 
     if isinstance(ref, _weave_client.ObjectRef):
-        url = urls.object_version_path(
-            ref.entity,
-            ref.project,
-            ref.name,
-            ref.digest,
-        )
+        if isinstance(ref, _weave_client.OpRef):
+            url = urls.op_version_path(
+                ref.entity,
+                ref.project,
+                ref.name,
+                ref.digest,
+            )
+        # TODO(gst): once frontend has direct dataset/model links
+        # elif isinstance(obj, _weave_client.Dataset):
+        else:
+            url = urls.object_version_path(
+                ref.entity,
+                ref.project,
+                ref.name,
+                ref.digest,
+            )
         print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
-
     return ref
 
 
@@ -338,7 +346,6 @@ def serve(
     if _util.is_notebook():
         thread = True
     if thread:
-
         t = threading.Thread(target=run, daemon=True)
         t.start()
         time.sleep(1)
