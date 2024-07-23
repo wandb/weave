@@ -47,7 +47,7 @@ import {
 } from '../../context';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
-import {SELECTED_FOR_DELETION, StyledDataGrid} from '../../StyledDataGrid';
+import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
@@ -401,7 +401,9 @@ export const CallsTable: FC<{
                   : 'indeterminate'
               }
               onCheckedChange={() => {
-                const maxForTable = isEvaluateTable ? MAX_EVAL_COMPARISONS : MAX_SELECT;
+                const maxForTable = isEvaluateTable
+                  ? MAX_EVAL_COMPARISONS
+                  : MAX_SELECT;
                 if (
                   selectedCalls.length ===
                   Math.min(tableData.length, maxForTable)
@@ -419,7 +421,11 @@ export const CallsTable: FC<{
         renderCell: (params: any) => {
           const rowId = params.id as string;
           const isSelected = selectedCalls.includes(rowId);
-          const disabled = !isSelected && (isEvaluateTable ? selectedCalls.length >= MAX_EVAL_COMPARISONS : selectedCalls.length >= MAX_SELECT);
+          const disabled =
+            !isSelected &&
+            (isEvaluateTable
+              ? selectedCalls.length >= MAX_EVAL_COMPARISONS
+              : selectedCalls.length >= MAX_SELECT);
           let tooltipText = '';
           if (isEvaluateTable) {
             if (selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected) {
@@ -464,8 +470,15 @@ export const CallsTable: FC<{
     if (!isEvaluateTable) {
       return;
     }
-    const selectedTableData = tableData.filter(row => selectedCalls.includes(row.id));
-    const disabled = selectedCalls.length === 0 || selectedCalls.length > MAX_EVAL_COMPARISONS || selectedTableData.some(row => row.exception != null || row.ended_at == null);
+    const selectedTableData = tableData.filter(row =>
+      selectedCalls.includes(row.id)
+    );
+    const disabled =
+      selectedCalls.length === 0 ||
+      selectedCalls.length > MAX_EVAL_COMPARISONS ||
+      selectedTableData.some(
+        row => row.exception != null || row.ended_at == null
+      );
     addExtra('compareEvaluations', {
       node: (
         <CompareEvaluationsTableButton
@@ -476,7 +489,9 @@ export const CallsTable: FC<{
           }}
           disabled={disabled}
           tooltipText={
-            disabled ? `Comparison limited to ${MAX_EVAL_COMPARISONS} valid evaluations` : undefined
+            disabled
+              ? `Comparison limited to ${MAX_EVAL_COMPARISONS} valid evaluations`
+              : undefined
           }
         />
       ),
@@ -515,13 +530,7 @@ export const CallsTable: FC<{
     });
 
     return () => removeExtra('deleteSelectedCalls');
-  }, [
-    addExtra,
-    removeExtra,
-    selectedCalls,
-    isEvaluateTable,
-    isReadonly,
-  ]);
+  }, [addExtra, removeExtra, selectedCalls, isEvaluateTable, isReadonly]);
 
   useEffect(() => {
     if (isReadonly) {
@@ -743,11 +752,6 @@ export const CallsTable: FC<{
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
-        // getRowClassName={params =>
-        //   bulkDeleteMode && selectedCalls.includes(params.row.id)
-        //     ? SELECTED_FOR_DELETION
-        //     : ''
-        // }
         onColumnWidthChange={newCol => {
           setUserDefinedColumnWidths(curr => {
             return {
