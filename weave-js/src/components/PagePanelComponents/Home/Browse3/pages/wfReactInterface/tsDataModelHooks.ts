@@ -345,7 +345,7 @@ const useCallsStreamRaw = (
   offset?: number,
   sortBy?: traceServerClient.SortBy[],
   query?: Query,
-  opts?: {skip?: boolean; contentType: traceServerClient.ContentType}
+  opts?: {skip?: boolean; contentType?: traceServerClient.ContentType}
 ): Loadable<String> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -386,7 +386,7 @@ const useCallsStreamRaw = (
       sort_by: sortBy,
       query,
     }).then(onSuccess).catch(onError);
-  }, [entity, project, deepFilter, opts?.skip, getTsClient]);
+  }, [entity, project, deepFilter, opts?.skip, limit, offset, query, sortBy, getTsClient]);
 
   return useMemo(() => {
     if (opts?.skip) {

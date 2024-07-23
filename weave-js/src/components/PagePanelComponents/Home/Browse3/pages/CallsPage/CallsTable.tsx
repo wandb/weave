@@ -9,11 +9,6 @@
 import {
   Autocomplete,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   FormControl,
   ListItem,
   Tooltip,
@@ -70,7 +65,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {CallFilter, OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {useCallsTableColumns} from './callsTableColumns';
@@ -81,11 +76,11 @@ import {useOpVersionOptions} from './callsTableFilter';
 import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
-import {useCallsForQuery} from './callsTableQuery';
+import {useCallsExportStream, useCallsForQuery} from './callsTableQuery';
 import {ManageColumnsButton} from './ManageColumnsButton';
-import { useGetTraceServerClientContext } from '../wfReactInterface/traceServerClientContext';
 
 import { saveAs } from 'file-saver';
+import { toast } from '@wandb/weave/common/components/elements/Toast';
 
 
 const OP_FILTER_GROUP_HEADER = 'Op';
@@ -540,12 +535,9 @@ export const CallsTable: FC<{
           callQueryParams={{
             entity,
             project,
-            filter: {
-              op_names: selectedOpVersionOption,
-              input_refs: selectedInputObjectVersion,
-              output_refs: selectedOutputObjectVersion,
-              parent_ids: selectedParentId,
-            }
+            filter: effectiveFilter,
+            gridFilter: filterModel,
+            gridSort: sortModel,
           }}
           rightmostButton={isReadonly} />
       ),
@@ -553,7 +545,7 @@ export const CallsTable: FC<{
     });
 
     return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, isReadonly, addExtra, removeExtra, entity, project]);
+  }, [apiRef, isReadonly, isEvaluateTable, addExtra, removeExtra, selectedCalls, entity, project, effectiveFilter, filterModel, sortModel]);
 
   // Register Delete Button
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
@@ -956,20 +948,51 @@ const ExportRunsTableButton = ({
 }: {
   tableRef: React.MutableRefObject<GridApiPro>;
   selectedCalls: string[];
-  callQueryParams: any;
+  callQueryParams: {
+    entity: string;
+    project: string;
+    filter: WFHighLevelCallFilter;
+    gridFilter: GridFilterModel;
+    gridSort?: GridSortModel;
+  };
   pageName: string;
   rightmostButton?: boolean;
 }) => {
-  const getTsClient = useGetTraceServerClientContext()
-
+  const [clicked, setClicked] = useState(false)
   const fileName = `${pageName}-export.csv`
+  const {loading, result} = useCallsExportStream(
+    callQueryParams.entity,
+    callQueryParams.project,
+    callQueryParams.filter,
+    callQueryParams.gridFilter,
+    callQueryParams.gridSort ?? null,
+    MAX_EXPORT,
+    !clicked
+  )
 
-  const downloadAll = () => {
-    getTsClient().callsStreamQueryCsv({
-      project_id: `${callQueryParams.entity}/${callQueryParams.project}`, 
-      limit: MAX_EXPORT,
-    }).then((res) => {
-      saveAs(res, fileName)
+  useEffect(() => {
+    if (!clicked || loading) {
+      return;
+    }
+    if (!result) {
+      toast("Error, no calls to export", {type: "error"})
+    }
+    if (result) {
+      try {
+        saveAs(result, fileName)
+      } catch {
+        toast("Error exporting calls", {type: "error"})
+      } finally {
+        setClicked(false)
+      }
+    }
+  }, [clicked, result])
+
+  const selectedExport = () => {
+    tableRef.current?.exportDataAsCsv({
+      includeColumnGroupsHeaders: false,
+      getRowsToExport: () => selectedCalls,
+      fileName,
     })
   }
 
@@ -984,10 +1007,10 @@ const ExportRunsTableButton = ({
         className={rightmostButton ? 'mr-16' : 'mr-4'}
         size="medium"
         variant="secondary"
-        onClick={selectedCalls.length > 0 ? () => tableRef.current?.exportDataAsCsv({
-          includeColumnGroupsHeaders: false,
-          fileName,
-        }) : downloadAll}
+        disabled={loading}
+        onClick={selectedCalls.length > 0 ? 
+          () => selectedExport() : () => setClicked(true)
+        }
         icon="export-share-upload">
         {selectedCalls.length > 0 ? `${selectedCalls.length}` : ''}
       </Button>
