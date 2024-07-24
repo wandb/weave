@@ -1,17 +1,18 @@
-import arxiv
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-import weave
+
 
 class Author(BaseModel):
     full_name: str
+
 
 class Link(BaseModel):
     href: str
     title: Optional[str] = None
     rel: Optional[str] = None
     content_type: Optional[str] = None
+
 
 class ArxivPaper(BaseModel):
     entry_id: str
@@ -31,6 +32,7 @@ class ArxivPaper(BaseModel):
     def __getitem__(self, key):
         return getattr(self, key)
 
+
 def convert_raw_arxiv_to_pydantic(paper):
     return ArxivPaper(
         entry_id=paper.entry_id,
@@ -44,7 +46,14 @@ def convert_raw_arxiv_to_pydantic(paper):
         doi=paper.doi,
         primary_category=paper.primary_category,
         categories=paper.categories,
-        links=[Link(href=link.href, title=link.title, rel=link.rel, content_type=link.content_type) 
-                for link in paper.links],
-        pdf_url=paper.pdf_url
+        links=[
+            Link(
+                href=link.href,
+                title=link.title,
+                rel=link.rel,
+                content_type=link.content_type,
+            )
+            for link in paper.links
+        ],
+        pdf_url=paper.pdf_url,
     )
