@@ -71,6 +71,54 @@ def test_table_create(client):
     assert result.rows[2].val["val"] == 3
 
 
+def test_table_update(client):
+    data = [
+        {"val": 1},
+        {"val": 2},
+        {"val": 3},
+    ]
+    res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id="test/test-project",
+                rows=data,
+            )
+        )
+    )
+    result = client.server.table_query(
+        TableQueryReq(project_id="test/test-project", digest=res.digest)
+    )
+    assert len(result.rows) == len(data)
+    for i, row in enumerate(result.rows):
+        assert row.val["val"] == data[i]["val"]
+
+    res = client.server.table_update(
+        tsi.TableUpdateReq(
+            project_id="test/test-project",
+            initial_digest=result.digest,
+            insert_rows=[
+                (1, {"val": 4}),
+            ],
+            pop_rows=[result.rows[0].digest],
+            append_rows=[
+                {"val": 5},
+            ],
+        )
+    )
+    final_data = [*data]
+    final_data.insert(1, {"val": 4})
+    final_data.pop(0)
+    final_data.append({"val": 5})
+
+    result = client.server.table_query(
+        TableQueryReq(project_id="test/test-project", digest=res.digest)
+    )
+
+    assert len(result.rows) == len(final_data)
+    for i, row in enumerate(result.rows):
+        assert row.val["val"] == final_data[i]["val"]
+
+
 @pytest.mark.skip()
 def test_table_append(server):
     table_ref = server.new_table([1, 2, 3])
