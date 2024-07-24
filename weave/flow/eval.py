@@ -247,8 +247,8 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: list) -> dict:
-        eval_table = list(eval_table)
+    async def summarize(self, eval_table: Dataset) -> dict:
+        eval_table = list(eval_table.rows)
         cols = transpose(eval_table)
         summary = {}
 
@@ -311,7 +311,12 @@ class Evaluation(Object):
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
 
-        summary = await self.summarize(Dataset.convert_to_table(eval_rows))
+        name = "Evaluation-results"
+        if self.name is not None:
+            name = self.name + "-results"
+
+        output_ds = Dataset(name=name, rows=eval_rows)
+        summary = await self.summarize(output_ds)
 
         print("Evaluation summary", summary)
 
