@@ -11,7 +11,6 @@ pyarrow>=14.0.1,<17.0.0
 
 # pydantic integration, and required by openai anyway
 openai>=1.0.0
-tiktoken>=0.4.0
 pydantic>=2.0.0
 
 # evaluation framework uses this for logging/status line at the moment.
@@ -34,7 +33,7 @@ numpy>=1.21
 wandb>=0.16.4
 graphql-core>3
 gql[requests]>=3.4.1
-# TEMPORARY: Up to, and including wandb==0.17.1, wandb does is not 
+# TEMPORARY: Up to, and including wandb==0.17.1, wandb does is not
 # compatible with numpy >= 2.0.0. This is a temporary fix until wandb
 # is updated to be compatible with numpy >= 2.0.0.
 numpy<2.0.0
