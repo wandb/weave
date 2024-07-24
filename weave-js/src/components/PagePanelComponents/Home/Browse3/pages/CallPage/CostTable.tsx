@@ -63,7 +63,7 @@ export const CostTable = ({costs}: {costs: {[key: string]: CostData}}) => {
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
       total_tokens: promptTokens + completionTokens,
-      cost: v.completion_tokens_cost + v.prompt_tokens_cost,
+      cost: (v.completion_tokens_cost ?? 0) + (v.prompt_tokens_cost ?? 0),
     };
   });
 

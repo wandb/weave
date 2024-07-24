@@ -37,25 +37,16 @@ export const formatTokenCost = (cost: number): string => {
   return `$${cost.toFixed(2)}`;
 };
 
-export type UsageData = {
-  requests: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  input_tokens?: number;
-  output_tokens?: number;
-};
-
 export type CostData = {
   requests: number;
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
 
-  prompt_tokens_cost?: number;
-  completion_tokens_cost?: number;
-  prompt_token_cost?: number;
-  completion_token_cost?: number;
+  prompt_tokens_cost: number;
+  completion_tokens_cost: number;
+  prompt_token_cost: number;
+  completion_token_cost: number;
 
   effective_date?: string;
 
@@ -67,9 +58,9 @@ export type CostData = {
   output_tokens?: number;
 };
 
-type CostDataKeys = keyof CostData;
-const isCostDataKey = (key: string): key is CostDataKeys => {
-  const costDataKeys: CostDataKeys[] = [
+type CostDataKey = keyof CostData;
+const isCostDataKey = (key: string): key is CostDataKey => {
+  const costDataKeys: CostDataKey[] = [
     'requests',
     'prompt_tokens',
     'completion_tokens',
@@ -81,7 +72,7 @@ const isCostDataKey = (key: string): key is CostDataKeys => {
     'prompt_token_cost',
     'completion_token_cost',
   ];
-  return costDataKeys.includes(key as CostDataKeys);
+  return costDataKeys.includes(key as CostDataKey);
 };
 
 export const TraceUsageStats = ({
@@ -138,9 +129,10 @@ export const getCostFromCellParams = (params: {[key: string]: any}) => {
             completion_tokens_cost: 0,
             prompt_token_cost: 0,
             completion_token_cost: 0,
-          };
+          } as CostData;
         }
-        costData[model][costKey] = params[key];
+        const costKeyTemp = costKey as keyof CostData;
+        costData[model][costKeyTemp] = params[key] as string | number;
       }
     }
   }

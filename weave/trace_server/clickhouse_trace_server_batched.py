@@ -377,7 +377,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for row in raw_res:
             yield tsi.CallSchema.model_validate(
-                _ch_call_dict_to_call_schema_dict(dict(zip(columns , row)))
+                _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
             )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:

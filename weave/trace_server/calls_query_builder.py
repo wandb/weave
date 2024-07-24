@@ -449,11 +449,14 @@ class CallsQuery(BaseModel):
         # inparticular argMaxMerge throws an error when run twice on display_name
         # We also filter out summary_dump, because we add costs to summary dump in the select statement
         select_fields_sql = ", ".join(
-            'all_calls.' + field.field if isinstance(field, CallsMergedAggField) and field.agg_fn.__contains__('Merge') else field.as_select_sql(pb, "all_calls")
+            "all_calls." + field.field
+            if isinstance(field, CallsMergedAggField)
+            and field.agg_fn.__contains__("Merge")
+            else field.as_select_sql(pb, "all_calls")
             for field in self.select_fields
-            if field.field != 'summary_dump'
+            if field.field != "summary_dump"
         )
-    
+
         raw_sql = f"""
         -- This is the current call stream query
 
@@ -495,13 +498,13 @@ class CallsQuery(BaseModel):
         )
 
         -- Final Select, which just pulls all the data from all_calls, and adds a costs object
-        SELECT {select_fields_sql},  
+        SELECT {select_fields_sql},
 
         -- Creates the cost object as a JSON string
         concat(
             -- Remove the last closing brace
-            left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1),  
-            ',"costs":', 
+            left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1),
+            ',"costs":',
             {cost_snippet},
             '}}'
         ) AS summary_dump
@@ -513,7 +516,7 @@ class CallsQuery(BaseModel):
         """
 
         return _safely_format_sql(raw_sql)
-    
+
     # From a calls table alias, get the usage data for LLMs
     def _get_llm_usage(self, table_alias: str) -> str:
         return f"""
@@ -560,8 +563,8 @@ class CallsQuery(BaseModel):
                 lu.requests,
                 ROW_NUMBER() OVER (
                     PARTITION BY lu.id, lu.llm_id
-                    ORDER BY 
-                        CASE 
+                    ORDER BY
+                        CASE
                             -- Order by pricing level then by effective_date
                             -- WHEN ltp.pricing_level = 'org' AND ltp.pricing_level_id = ORG_NAME THEN 1
                             WHEN ltp.pricing_level = 'project' AND ltp.pricing_level_id = '{self.project_id}' THEN 2
@@ -579,7 +582,7 @@ class CallsQuery(BaseModel):
             WHERE
                 ltp.effective_date <= lu.started_at
         """
-    
+
     # From the ranked prices, get the top ranked price for each llm_id
     def _get_top_ranked_prices(self, table_alias: str) -> str:
         return f"""
@@ -597,9 +600,11 @@ class CallsQuery(BaseModel):
             WHERE
                 rank = 1
         """
-    
+
     # Join the call usage data with the top ranked prices to get the token costs
-    def _join_usage_with_costs(self, usage_table_alias: str, price_table_alias: str) -> str:
+    def _join_usage_with_costs(
+        self, usage_table_alias: str, price_table_alias: str
+    ) -> str:
         return f"""
              SELECT
                 lu.id,
@@ -624,7 +629,7 @@ class CallsQuery(BaseModel):
             ON
                 lu.id = trp.id AND lu.llm_id = trp.llm_id
         """
-    
+
     def _as_sql_base_format(
         self,
         pb: ParamBuilder,
