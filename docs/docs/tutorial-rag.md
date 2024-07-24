@@ -170,6 +170,10 @@ evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_scor
 asyncio.run(evaluation.evaluate(model)) # note: you'll need to define a model to evaluate
 ```
 
+:::note
+Don't have a dataset? Learn how to [collect user feedback](/tutorial-feedback) to build Evaluation datasets.
+:::
+
 ### Optional: Defining a `Scorer` class
 In some applications we want to create custom evaluation classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. In order to do that Weave defines a list of ready-to-use `Scorer` classes and also makes it easy to create a custom `Scorer` - in the following we'll see how to create a custom `class CorrectnessLLMJudge(Scorer)`. 
 
@@ -414,4 +418,5 @@ We've also learned how to build more complex scoring functions, like an LLM judg
 
 ## What's next?
 
-Learn more about Weave's core types [Quickstart](/guides/core-types).
+- Learn about [Collecting User Feedback](/tutorial-feedback) to build Evaluation datasets.
+
