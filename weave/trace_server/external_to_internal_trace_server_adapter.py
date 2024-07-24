@@ -111,7 +111,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
     async def _async_iterator_ref_apply(
         self,
-        itr: AsyncIterator[B],
+        iter: AsyncIterator[B],
         direction: Union[Literal["ext_to_int"], Literal["int_to_ext"]],
     ) -> AsyncIterator[B]:
         cache = {}
@@ -132,7 +132,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 cache[project_id] = method(project_id)
             return cache[project_id]
 
-        async for item in itr:
+        async for item in iter:
             yield converter(item, cached_method)
 
     # Standard API Below:
@@ -311,7 +311,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 rows=self._async_iterator_ref_apply(req.table.rows, "ext_to_int"),
             )
         )
-        return self._internal_trace_server.table_create(new_req)
+        return await self._internal_trace_server.async_table_create(new_req)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)

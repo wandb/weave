@@ -120,12 +120,19 @@ class ObjSchemaForInsert(BaseModel):
 
 class TableSchemaForInsert(BaseModel):
     project_id: str
-    rows: typing.Iterator[typing.Dict[str, typing.Any]]
+    rows: list[typing.Dict[str, typing.Any]]
 
 
-class AsyncTableSchemaForInsert(BaseModel):
+# Cannot be a BaseModel due to the iterator
+class AsyncTableSchemaForInsert:
     project_id: str
     rows: typing.AsyncIterator[typing.Dict[str, typing.Any]]
+
+    def __init__(
+        self, project_id: str, rows: typing.AsyncIterator[typing.Dict[str, typing.Any]]
+    ):
+        self.project_id = project_id
+        self.rows = rows
 
 
 class CallStartReq(BaseModel):
@@ -297,8 +304,12 @@ class TableCreateReq(BaseModel):
     table: TableSchemaForInsert
 
 
-class AsyncTableCreateReq(BaseModel):
+# Cannot be a BaseModel due to the iterator
+class AsyncTableCreateReq:
     table: AsyncTableSchemaForInsert
+
+    def __init__(self, table: AsyncTableSchemaForInsert):
+        self.table = table
 
 
 class TableRowSchema(BaseModel):
