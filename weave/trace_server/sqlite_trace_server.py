@@ -680,17 +680,20 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         for update in req.updates:
             if isinstance(update, tsi.TableAppendSpec):
-                new_digest = add_new_row_needed_to_insert(update.row)
+                new_digest = add_new_row_needed_to_insert(update.append.row)
                 final_row_digests.append(new_digest)
             elif isinstance(update, tsi.TablePopSpec):
-                if update.index >= len(final_row_digests) or update.index < 0:
+                if update.pop.index >= len(final_row_digests) or update.pop.index < 0:
                     raise ValueError("Index out of range")
-                final_row_digests.pop(update.index)
+                final_row_digests.pop(update.pop.index)
             elif isinstance(update, tsi.TableInsertSpec):
-                if update.index > len(final_row_digests) or update.index < 0:
+                if (
+                    update.insert.index > len(final_row_digests)
+                    or update.insert.index < 0
+                ):
                     raise ValueError("Index out of range")
-                new_digest = add_new_row_needed_to_insert(update.row)
-                final_row_digests.insert(update.index, new_digest)
+                new_digest = add_new_row_needed_to_insert(update.insert.row)
+                final_row_digests.insert(update.insert.index, new_digest)
             else:
                 raise ValueError("Unrecognized update", update)
 
