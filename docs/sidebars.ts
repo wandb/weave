@@ -21,7 +21,7 @@ const sidebars: SidebarsConfig = {
     {
       type: "category",
       label: "Getting Started",
-      items: ["introduction", "quickstart", "tutorial-eval", "tutorial-rag"],
+      items: ["introduction", "tutorial-tracing_1", "tutorial-tracing_2", "tutorial-eval", "tutorial-rag"],
     },
     {
       type: "category",
@@ -57,6 +57,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/anthropic",
             "guides/integrations/cohere",
             "guides/integrations/mistral",
+            "guides/integrations/langchain",
             "guides/integrations/llamaindex",
             "guides/integrations/dspy",
             "guides/integrations/google-gemini",
