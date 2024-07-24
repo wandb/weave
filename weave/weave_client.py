@@ -377,6 +377,50 @@ class AttributesDict(dict):
         return f"{self.__class__.__name__}({super().__repr__()})"
 
 
+# TODO(gst): where does this go??
+def make_feedback_lookup_from_refs(
+    project_id: str, server: TraceServerInterface, weave_refs: list[str]
+) -> dict[str, Dict[str, Any]]:
+    or_cond = [
+        {
+            "$eq": [
+                {"$getField": "weave_ref"},
+                {"$literal": ref},
+            ]
+        }
+        for ref in weave_refs
+    ]
+
+    feedback_query_req = FeedbackQueryReq(
+        project_id=project_id,
+        fields=[
+            "feedback_type",
+            "weave_ref",
+            "payload",
+            "creator",
+            "created_at",
+            "wb_user_id",
+        ],
+        query=Query(**{"$expr": {"$or": or_cond}}),
+    )
+    feedback = server.feedback_query(req=feedback_query_req)
+    feedback_dict = {}
+    for fb in feedback.result:
+        ref = fb["weave_ref"]
+        _type = fb["feedback_type"]
+        payload = fb["payload"] | {
+            "creator": fb["creator"],
+            "wb_user_id": fb["wb_user_id"],
+            "created_at": fb["created_at"],
+        }
+        if ref not in feedback_dict:
+            feedback_dict[ref] = {}
+        if _type not in feedback_dict[ref]:
+            feedback_dict[ref][_type] = []
+        feedback_dict[ref][_type].append(payload)
+    return feedback_dict
+
+
 class WeaveClient:
     server: TraceServerInterface
 
@@ -476,12 +520,29 @@ class WeaveClient:
         if filter is None:
             filter = _CallsFilter()
 
+        page_size = 100
+
         class StringWriter:
             def write(self, line):
                 return line.replace("\n", "\\n")
 
-        text = ""
         writer = csv.writer(StringWriter(), delimiter=",", lineterminator="")
+
+        # hydrated model field headers
+
+        # TODO(gst): move this into a util somewhere
+        def flatten_dict(dd: dict, separator: str = ".", prefix: str = "") -> dict:
+            res = {}
+            for key, value in dd.items():
+                if isinstance(value, dict):
+                    res.update(flatten_dict(value, separator, prefix + key + separator))
+                else:
+                    res[prefix + key] = value
+            return res
+
+        out = []
+        header_fields = []
+        text = ""
 
         # get stats for progress bar
         stats = self.server.calls_query_stats(
@@ -491,19 +552,49 @@ class WeaveClient:
             )
         )
 
-        res = self.server.calls_query_stream_with_feedback(
-            CallsQueryReq(
+        # show progress bar when multi-page
+        if stats.count < page_size:
+            _range = [0]
+        else:
+            _range = tqdm(range((stats.count // page_size) + 1))
+
+        for index in _range:
+            req = CallsQueryReq(
                 project_id=self._project_id(),
                 filter=filter,
+                offset=index * page_size,
+                limit=page_size,
             )
-        )
+            response = self.server.calls_query(req=req)
 
-        for i in tqdm(range((stats.count) + 1)):
-            for row in res:
-                if i == 0:
-                    text += writer.writerow(row.keys()) + "\n"
-                text += writer.writerow(list(row.values())) + "\n"
+            weave_refs = [
+                make_client_call(self.entity, self.project, call, self.server).ref.uri()
+                for call in response.calls
+            ]
 
+            feedback_lookup = make_feedback_lookup_from_refs(
+                self._project_id(), self.server, weave_refs
+            )
+
+            for call, ref in zip(response.calls, weave_refs):
+                flattened_dict = flatten_dict(flatten_dict(call.model_dump()))
+                if index == 0 and not header_fields:
+                    # determine header fields from first data row
+                    header_fields += list(flattened_dict.keys())
+                    header_fields += ["feedback", "latency"]
+                    text += writer.writerow(header_fields) + "\n"
+
+                # hydrate with feedback
+                flattened_dict["feedback"] = feedback_lookup.get(ref, "")
+
+                # compute special columns
+                latency = call.ended_at - call.started_at
+                flattened_dict["latency"] = latency.total_seconds()
+
+                out += [list(flattened_dict.values())]
+
+            for row in out:
+                text += writer.writerow(row) + "\n"
         return text
 
     @trace_sentry.global_trace_sentry.watch()

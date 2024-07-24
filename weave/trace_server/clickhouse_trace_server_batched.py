@@ -384,59 +384,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
             )
 
-    def calls_query_stream_with_feedback(
-        self, req: tsi.CallsQueryReq
-    ) -> typing.Iterator[any]:
-        def flatten_dict(dd: dict, separator: str = ".", prefix: str = "") -> dict:
-            res = {}
-            for key, value in dd.items():
-                if isinstance(value, dict):
-                    res.update(flatten_dict(value, separator, prefix + key + separator))
-                else:
-                    res[prefix + key] = value
-            return res
-
-        # show progress bar when multi-page
-        page_size = 100
-        index = 0
-        while True:
-            req = tsi.CallsQueryReq(
-                project_id=self._project_id(),
-                filter=filter,
-                offset=index * page_size,
-                limit=page_size,
-            )
-            response = self.server.calls_query(req=req)
-
-            def _fake_ref(call: tsi.CallSchema) -> str:
-                return f"weave:///{self.entity}/{self.project}/call/{call.id}:fake"
-
-            weave_refs = [_fake_ref(call) for call in response.calls]
-            feedback_lookup = make_feedback_lookup_from_refs(
-                self._project_id(), self.server, weave_refs
-            )
-
-            for call, ref in zip(response.calls, weave_refs):
-                flattened_dict = flatten_dict(flatten_dict(call.model_dump()))
-                # if index == 0 and not header_fields:
-                # determine header fields from first data row
-                # header_fields += list(flattened_dict.keys())
-                # header_fields += ["feedback", "latency"]
-                # text += writer.writerow(header_fields) + "\n"
-
-                # hydrate with feedback
-                flattened_dict["feedback"] = feedback_lookup.get(ref, "")
-
-                # compute special columns
-                latency = call.ended_at - call.started_at
-                flattened_dict["latency"] = latency.total_seconds()
-
-                yield flattened_dict
-
-            if len(response.calls) < page_size:
-                break
-            index += 1
-
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
