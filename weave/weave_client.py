@@ -1,3 +1,4 @@
+import csv
 import dataclasses
 import datetime
 import platform
@@ -46,6 +47,7 @@ from weave.trace_server.trace_server_interface import (
     CallStartReq,
     CallUpdateReq,
     EndedCallSchemaForInsert,
+    FeedbackQueryReq,
     ObjCreateReq,
     ObjQueryReq,
     ObjReadReq,
@@ -227,12 +229,16 @@ class CallsIter:
     filter: _CallsFilter
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: _CallsFilter,
+        page_size: int = 10,
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
-        self._page_size = 10
+        self._page_size = page_size
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
@@ -460,6 +466,115 @@ class WeaveClient:
             filter = _CallsFilter()
 
         return CallsIter(self.server, self._project_id(), filter)
+
+    # @trace_sentry.global_trace_sentry.watch()
+    def calls_as_csv(self, filter: Optional[_CallsFilter] = None) -> any:
+        if filter is None:
+            filter = _CallsFilter()
+
+        page_size = 10
+        index = 0
+
+        class StringWriter:
+            def write(self, line):
+                return line.replace("\n", "\\n")
+
+        writer = csv.writer(StringWriter(), delimiter=",", lineterminator="")
+
+        # get any type in callSchema that can be dict (or any)
+        # call_dict_fields = [
+        #     field
+        #     for field, field_type in CallSchema.model_fields.items()
+        #     if field_type.annotation == Dict[str, Any]
+        #     or field_type.annotation == typing.Any
+        #     or field_type.annotation == typing.Optional[typing.Any]
+        #     or field_type.annotation == typing.Optional[Dict[str, Any]]
+        # ]
+        # header_fields = list(
+        #     set(CallSchema.model_fields.keys()) - set(call_dict_fields)
+        # )
+
+        # hydrated model field headers
+
+        def flatten_dict(dd: dict, separator: str = ".", prefix: str = "") -> dict:
+            res = {}
+            for key, value in dd.items():
+                if isinstance(value, dict):
+                    res.update(flatten_dict(value, separator, prefix + key + separator))
+                else:
+                    res[prefix + key] = value
+            return res
+
+        out = []
+        header_fields = []
+        text = ""
+
+        while True:
+            print("Batch", index)
+            req = CallsQueryReq(
+                project_id=self._project_id(),
+                filter=filter,
+                offset=index * page_size,
+                limit=page_size,
+            )
+            response = self.server.calls_query(req=req)
+
+            weave_object_call_batch = [
+                make_client_call(self.entity, self.project, call, self.server)
+                for call in response.calls
+            ]
+
+            or_cond = [
+                {
+                    "$eq": [
+                        {"$getField": "weave_ref"},
+                        {"$literal": call.ref.uri()},
+                    ]
+                }
+                for call in weave_object_call_batch
+            ]
+
+            feedback_query = Query(**{"$expr": {"$or": or_cond}})
+
+            # print(feedback_query)
+
+            feedback_query_req = FeedbackQueryReq(
+                project_id=self._project_id(),
+                fields=["feedback_type", "weave_ref", "payload"],
+                query=feedback_query,
+            )
+            feedback = self.server.feedback_query(req=feedback_query_req)
+
+            feedback_dict = {
+                feedback["weave_ref"]: feedback for feedback in feedback.result
+            }
+
+            for call, weave_object_call in zip(response.calls, weave_object_call_batch):
+                flattened_dict = flatten_dict(flatten_dict(call.model_dump()))
+                if index == 0 and not header_fields:
+                    header_fields += list(flattened_dict.keys())
+                    header_fields += ["feedback", "latency"]
+                    text += writer.writerow(header_fields) + "\n"
+
+                # hydrate with feedback
+                flattened_dict["feedback"] = feedback_dict.get(
+                    weave_object_call.ref.uri(), ""
+                )
+
+                # compute special columns
+                latency = call.ended_at - call.started_at
+                flattened_dict["latency"] = latency.total_seconds()
+
+                out += [list(flattened_dict.values())]
+
+            if len(response.calls) == 0 or len(response.calls) < page_size:
+                break
+            index += 1
+
+        for row in out:
+            text += writer.writerow(row) + "\n"
+
+        return text
 
     @trace_sentry.global_trace_sentry.watch()
     def call(self, call_id: str) -> WeaveObject:
