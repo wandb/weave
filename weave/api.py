@@ -9,6 +9,8 @@ import dataclasses
 from typing import Any
 import threading
 
+from weave.trace.vals import Traceable
+
 from . import urls
 
 from weave.legacy import graph as _graph
@@ -184,6 +186,21 @@ def local_client() -> typing.Iterator[_weave_client.WeaveClient]:
         inited_client.reset()
 
 
+def _get_save_name(obj: typing.Any, name: Optional[str] = None) -> str:
+    if name is not None:
+        return name
+    
+    save_name = name
+    if save_name is None:
+        save_name = getattr(obj, "name", None)
+    if save_name is None:
+        save_name = getattr(obj, "_class_name", None)
+    if save_name is None:
+        save_name = obj.__class__.__name__
+    
+    return save_name
+
+
 def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.ObjectRef:
     """Save and version a python object.
 
@@ -201,13 +218,11 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     """
     client = client_context.weave_client.require_weave_client()
 
-    save_name: str
-    if name:
-        save_name = name
-    elif hasattr(obj, "name"):
-        save_name = obj.name
-    else:
-        save_name = obj.__class__.__name__
+    save_name = _get_save_name(obj)
+    
+    if isinstance(obj, Traceable) and obj.mutations:
+        obj.ref = None
+        ...
 
     ref = client._save_object(obj, save_name, "latest")
 

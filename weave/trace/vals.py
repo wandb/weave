@@ -61,7 +61,7 @@ class MutationAppend:
 
 
 Mutation = Union[MutationSetattr, MutationSetitem, MutationAppend]
-MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["append"]]
+MutationOperation = Literal["setitem", "setattr", "append"]
 
 
 def make_mutation(
@@ -134,6 +134,12 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     # what they expect when they call `self.<name>`.
     self.__dict__[name] = res
     return res
+
+
+def maybe_deref(x):
+    if isinstance(x, ObjectRef):
+        return x.get()
+    return x
 
 
 def attribute_access_result(
