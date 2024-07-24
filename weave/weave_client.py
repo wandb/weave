@@ -125,7 +125,8 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
-    if getattr(obj, "mutations", None):
+    print(f"map_to_refs: {obj=}")
+    if getattr(obj, "mutations", None) and (ref := obj.ref) is not None:
         print("This object has mutations, deleting the ref so we can save it")
         obj._old_ref = obj.ref
         obj.ref = None

@@ -339,13 +339,15 @@ class WeaveList(Traceable, list):
         self.root = root
         super().__init__(*args, **kwargs)
 
+    def __rich_repr__(self):
+        yield from self
+
     # TODO: Maybe should be beside attribute_access_result?
-    def _deref(self, i):
+    def _maybe_deref(self, i):
         item = super().__getitem__(i)
         if isinstance(item, ObjectRef):
-            derefed = item.get()
-            self[i] = derefed
-            return derefed
+            item = item.get()
+            self[i] = item
         return item
 
     def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
@@ -356,8 +358,8 @@ class WeaveList(Traceable, list):
         # needing to be set on the obj in map_to_refs...
         ref = getattr(self, "ref", None) or getattr(self, "_old_ref")
         new_ref = ref.with_index(index)
-        # index_val = super().__getitem__(index)
-        index_val = self._deref(index)
+        print(f"Setting {new_ref=}")
+        index_val = self._maybe_deref(index)
         return make_trace_obj(index_val, new_ref, self.server, self.root)
 
     def __setitem__(self, i: Union[SupportsIndex, slice], value: Any) -> None:
@@ -365,22 +367,34 @@ class WeaveList(Traceable, list):
             raise ValueError("Slices not yet supported")
         if (index := operator.index(i)) > len(self):
             raise IndexError("list assignment index out of range")
-        object.__getattribute__(self, "root").add_mutation(
-            self.ref, "setitem_list", index, value
-        )
+        base_root = object.__getattribute__(self, "root")
+        base_root.add_mutation(self.ref, "setitem_list", index, value)
         super().__setitem__(index, value)
 
     def append(self, item: Any) -> None:
-        object.__getattribute__(self, "root").add_mutation(self.ref, "append", item)
+        base_root = object.__getattribute__(self, "root")
+        base_root.add_mutation(self.ref, "append", item)
         super().append(item)
 
     def __iter__(self) -> Iterator[Any]:
         for i in range(len(self)):
             yield self.__getitem__(i)
-            # yield self[i]
 
     def __repr__(self) -> str:
         return f"WeaveList({super().__repr__()})"
+    
+    def __eq__(self, other):
+        if not isinstance(other, list):
+            raise NotImplementedError
+        
+        if len(self) != len(other):
+            return False
+        
+        for v1, v2 in zip(self, other):
+            if v1 != v2:
+                return False
+        
+        return True
 
 
 class WeaveDict(Traceable, dict):
@@ -397,27 +411,25 @@ class WeaveDict(Traceable, dict):
         self.root = root
         super().__init__(*args, **kwargs)
 
-    def _deref(self, key):
+    def __rich_repr__(self):
+        yield from self.__dict__.items()
+
+    def _maybe_deref(self, key):
         item = super().__getitem__(key)
         if isinstance(item, ObjectRef):
-            derefed = item.get()
-            self[key] = derefed
-            return derefed
+            item = item.get()
+            self[key] = item
         return item
 
     def __getitem__(self, key: str) -> Any:
-        # if self.ref:
-        #     new_ref = self.ref.with_key(key)
-        # else:
-        #     new_ref = None
         new_ref = self.ref.with_key(key)
-        # return make_trace_obj(super().__getitem__(key), new_ref, self.server, self.root)
-        return make_trace_obj(self._deref(key), new_ref, self.server, self.root)
+        return make_trace_obj(self._maybe_deref(key), new_ref, self.server, self.root)
 
     def get(self, key: str, default: Any = None) -> Any:
         new_ref = self.ref.with_key(key)
+        v = super().get(key, default)
         return make_trace_obj(
-            super().get(key, default), new_ref, self.server, self.root
+            v, new_ref, self.server, self.root
         )
 
     def __setitem__(self, key: str, value: Any) -> None:
@@ -431,13 +443,11 @@ class WeaveDict(Traceable, dict):
 
     def values(self):  # type: ignore
         for k in self.keys():
-            # yield self[k]
-            yield self._deref(k)
+            yield self._maybe_deref(k)
 
     def items(self):  # type: ignore
         for k in self.keys():
-            # yield k, self[k]
-            yield k, self._deref(k)
+            yield k, self._maybe_deref(k)
 
     def __iter__(self) -> Iterator[str]:
         # Simply define this to so that d = WeaveDict({'a': 1, 'b': 2})); d2 = dict(d)
@@ -455,7 +465,7 @@ class WeaveDict(Traceable, dict):
     # # Do we need to implement all the other __dunder__ methods?
     def __eq__(self, other):
         if not isinstance(other, dict):
-            return NotImplemented
+            raise NotImplementedError
 
         if len(self) != len(other):
             return False
@@ -585,3 +595,16 @@ def make_trace_obj(
 
 class MissingSelfInstanceError(ValueError):
     pass
+
+
+# should implement efficient version too
+def materialize(x):
+    if isinstance(x, ObjectRef):
+        return x.get()
+    elif isinstance(x, list):
+        # should be "batch_materialize(x)"
+        return [materialize(v) for v in x]
+    elif isinstance(x, dict):
+        # should be "batch_materialize(x)"
+        return {k: materialize(v) for k, v in x.items()}
+    return x

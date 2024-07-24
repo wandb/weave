@@ -1093,8 +1093,6 @@ def test_list_mutation_saving(client):
     ref = weave.publish(lst)
 
     lst2 = ref.get()
-    print(f"{lst2=}")
-    print(f"{lst2.ref=}")
     assert lst2 == [1, 2, 3]
 
     lst2[0] = 100
@@ -1105,6 +1103,11 @@ def test_list_mutation_saving(client):
 
     lst3 = ref2.get()
     assert lst3 == [100, 2, 3, 4, 5, 6]
+
+    # lst2.append(4)
+    # ref2 = weave.publish(lst2)
+    # lst3 = ref2.get()
+
 
 
 def test_dict_mutation_saving(client):
