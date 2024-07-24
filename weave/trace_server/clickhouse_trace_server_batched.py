@@ -159,11 +159,6 @@ class SelectableCHCallSchema(BaseModel):
     ended_at: typing.Optional[datetime.datetime] = None
     exception: typing.Optional[str] = None
 
-    attributes_dump: str
-    inputs_dump: str
-    output_dump: typing.Optional[str] = None
-    summary_dump: typing.Optional[str] = None
-
     input_refs: typing.List[str]
     output_refs: typing.List[str]
 
@@ -171,6 +166,11 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
+
+    attributes_dump: str
+    inputs_dump: str
+    output_dump: typing.Optional[str] = None
+    summary_dump: typing.Optional[str] = None
 
 
 all_call_insert_columns = list(
@@ -376,8 +376,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         for row in raw_res:
-            yield tsi.CallSchemaWithCosts.model_validate(
-                _ch_call_dict_to_call_schema_dict(dict(zip([*columns, "costs"] , row)))
+            yield tsi.CallSchema.model_validate(
+                _ch_call_dict_to_call_schema_dict(dict(zip(columns , row)))
             )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -1330,8 +1330,6 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
         display_name=_empty_str_to_none(ch_call.display_name),
-        # Keeping this here to keep in sync, but costs doesnt exist on CallSchema
-        # costs=ch_call.costs,
     )
 
 
@@ -1353,9 +1351,6 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
         display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
-        # This is not on CallSchema, but we need it here so it doesnt get filtered out
-        # We construct costs at read time
-        costs=_nullable_dict_dump_to_dict(ch_call_dict.get("costs")),
     )
 
 

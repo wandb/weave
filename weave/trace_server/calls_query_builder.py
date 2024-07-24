@@ -436,16 +436,22 @@ class CallsQuery(BaseModel):
                 '"completion_tokens":', toString(completion_tokens), ',',
                 '"prompt_token_cost":', toString(prompt_token_cost), ',',
                 '"completion_token_cost":', toString(completion_token_cost), ',',
+                '"total_tokens":', toString(total_tokens), ',',
+                '"requests":', toString(requests), ',',
                 '"effective_date":"', toString(effective_date), '",',
+                '"provider_id":"', toString(provider_id), '",',
                 '"pricing_level":"', toString(pricing_level), '",',
-                '"filter_id":"', toString(filter_id), '"}')
-        ), ','), '}') AS costs
+                '"pricing_level_id":"', toString(pricing_level_id), '"}')
+        ), ','), '}')
         """
 
         # because we are selecting from a subquery, we need to prefix the fields, but we dont want to run all aggregations again
         # inparticular argMaxMerge throws an error when run twice on display_name
+        # We also filter out summary_dump, because we add costs to summary dump in the select statement
         select_fields_sql = ", ".join(
-            'all_calls.' + field.field if isinstance(field, CallsMergedAggField) and field.agg_fn.__contains__('Merge') else field.as_select_sql(pb, "all_calls") for field in self.select_fields
+            'all_calls.' + field.field if isinstance(field, CallsMergedAggField) and field.agg_fn.__contains__('Merge') else field.as_select_sql(pb, "all_calls")
+            for field in self.select_fields
+            if field.field != 'summary_dump'
         )
     
         raw_sql = f"""
@@ -468,6 +474,49 @@ class CallsQuery(BaseModel):
         -- From the all_calls we get the usage data for LLMs
         -- Generate a list of LLM IDs and their respective token counts from the JSON structure
         llm_usage AS (
+            {self._get_llm_usage("all_calls")}
+        ),
+
+        -- based on the llm_ids in the usage data we get all the prices and rank them
+        -- Rank the rows in llm_token_prices based on the given conditions and effective_date
+        ranked_prices AS (
+            {self._get_ranked_prices("llm_usage")}
+        ),
+
+        -- Discard all but the top-ranked prices
+        -- Filter to get the top-ranked prices for each llm_id and call id
+        top_ranked_prices AS (
+            {self._get_top_ranked_prices("ranked_prices")}
+        ),
+
+        -- Join with the top-ranked prices to get the token costs
+        usage_with_costs AS (
+           {self._join_usage_with_costs("llm_usage", "top_ranked_prices")}
+        )
+
+        -- Final Select, which just pulls all the data from all_calls, and adds a costs object
+        SELECT {select_fields_sql},  
+
+        -- Creates the cost object as a JSON string
+        concat(
+            -- Remove the last closing brace
+            left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1),  
+            ',"costs":', 
+            {cost_snippet},
+            '}}'
+        ) AS summary_dump
+
+        FROM all_calls
+        JOIN usage_with_costs
+            ON all_calls.id = usage_with_costs.id
+        GROUP BY (all_calls.id, all_calls.project_id, all_calls.display_name)
+        """
+
+        return _safely_format_sql(raw_sql)
+    
+    # From a calls table alias, get the usage data for LLMs
+    def _get_llm_usage(self, table_alias: str) -> str:
+        return f"""
             SELECT
                 id,
                 started_at,
@@ -480,18 +529,24 @@ class CallsQuery(BaseModel):
                 ) AS kv,
                 kv.1 AS llm_id,
                 JSONExtractInt(kv.2, 'requests') AS requests,
-                JSONExtractInt(kv.2, 'prompt_tokens') AS prompt_tokens,
-                JSONExtractInt(kv.2, 'completion_tokens') AS completion_tokens,
+                ifNull(
+                    JSONExtractInt(kv.2, 'input_tokens'),
+                    JSONExtractInt(kv.2, 'prompt_tokens')
+                ) AS prompt_tokens,
+                ifNull(
+                    JSONExtractInt(kv.2, 'output_tokens'),
+                    JSONExtractInt(kv.2, 'completion_tokens')
+                ) AS completion_tokens,
                 JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
             FROM
-                all_calls
+                {table_alias}
             WHERE
                 JSONLength(usage_raw) > 0
-        ),
+        """
 
-        -- based on the llm_ids in the usage data we get all the prices and rank them
-        -- Rank the rows in llm_token_prices based on the given conditions and effective_date
-        ranked_prices AS (
+    # From an llm usage query, get the ranked prices for each llm_id in the usage data
+    def _get_ranked_prices(self, table_alias: str) -> str:
+        return f"""
             SELECT
                 lu.id,
                 lu.llm_id,
@@ -500,32 +555,34 @@ class CallsQuery(BaseModel):
                 ltp.output_token_cost,
                 ltp.effective_date,
                 ltp.pricing_level,
-                ltp.filter_id,
+                ltp.pricing_level_id,
+                ltp.provider_id,
+                lu.requests,
                 ROW_NUMBER() OVER (
                     PARTITION BY lu.id, lu.llm_id
                     ORDER BY 
                         CASE 
                             -- Order by pricing level then by effective_date
-                            -- WHEN ltp.pricing_level = 'org' AND ltp.filter_id = ORG_NAME THEN 1
-                            WHEN ltp.pricing_level = 'project' AND ltp.filter_id = '{self.project_id}' THEN 2
-                            WHEN ltp.pricing_level = 'default' AND ltp.filter_id = 'default' THEN 3
+                            -- WHEN ltp.pricing_level = 'org' AND ltp.pricing_level_id = ORG_NAME THEN 1
+                            WHEN ltp.pricing_level = 'project' AND ltp.pricing_level_id = '{self.project_id}' THEN 2
+                            WHEN ltp.pricing_level = 'default' AND ltp.pricing_level_id = 'default' THEN 3
                             ELSE 4
                         END,
                         ltp.effective_date DESC
                 ) AS rank
             FROM
-                llm_usage AS lu
+                {table_alias} AS lu
             LEFT JOIN
                 llm_token_prices AS ltp
             ON
                 lu.llm_id = ltp.llm_id
             WHERE
                 ltp.effective_date <= lu.started_at
-        ),
-
-        -- Discard all but the top-ranked prices
-        -- Filter to get the top-ranked prices for each llm_id and call id
-        top_ranked_prices AS (
+        """
+    
+    # From the ranked prices, get the top ranked price for each llm_id
+    def _get_top_ranked_prices(self, table_alias: str) -> str:
+        return f"""
             SELECT
                 id,
                 llm_id,
@@ -533,51 +590,41 @@ class CallsQuery(BaseModel):
                 output_token_cost,
                 effective_date,
                 pricing_level,
-                filter_id
+                pricing_level_id,
+                provider_id
             FROM
-                ranked_prices
+                {table_alias}
             WHERE
                 rank = 1
-        ),
-
-        -- Join with the top-ranked prices to get the token costs
-        usage_with_costs AS (
-            SELECT
+        """
+    
+    # Join the call usage data with the top ranked prices to get the token costs
+    def _join_usage_with_costs(self, usage_table_alias: str, price_table_alias: str) -> str:
+        return f"""
+             SELECT
                 lu.id,
                 lu.llm_id,
                 lu.requests,
                 lu.prompt_tokens,
                 lu.completion_tokens,
                 lu.total_tokens,
+                lu.requests,
                 trp.effective_date,
                 trp.pricing_level,
-                trp.filter_id,
+                trp.pricing_level_id,
                 trp.input_token_cost AS prompt_token_cost,
                 trp.output_token_cost AS completion_token_cost,
+                trp.provider_id,
                 prompt_tokens * prompt_token_cost AS prompt_tokens_cost,
                 completion_tokens * completion_token_cost AS completion_tokens_cost
             FROM
-                llm_usage AS lu
+                {usage_table_alias} AS lu
             LEFT JOIN
-                top_ranked_prices AS trp
+                {price_table_alias} AS trp
             ON
                 lu.id = trp.id AND lu.llm_id = trp.llm_id
-        )
-
-        -- Final Select, which just pulls all the data from all_calls, and adds a costs object
-        SELECT {select_fields_sql},  
-
-        -- Creates the cost object as a JSON string
-        {cost_snippet}
-        FROM all_calls
-        JOIN usage_with_costs
-            ON all_calls.id = usage_with_costs.id
-        GROUP BY (all_calls.id, all_calls.project_id, all_calls.display_name)
         """
-
-        print(raw_sql, flush=True)
-        return _safely_format_sql(raw_sql)
-
+    
     def _as_sql_base_format(
         self,
         pb: ParamBuilder,

@@ -6,9 +6,14 @@ CREATE TABLE llm_token_prices (
     pricing_level String,
 
     /*
-    `filter_id`: The filter identifier for the token pricing. It can be 'default' or any other string. This allow with type to uniquely identify where the pricing applies.
+    `pricing_level_id`: The pricing level identifier for the token pricing. It can be 'default' or any other string(e.g. org id or project id). This allow with type to uniquely identify where the pricing applies.
     */
-    filter_id String,
+    pricing_level_id String,
+
+    /*
+    `provider`: The initial provider of the LLM, some LLMs are provided other than the default provider.
+    */
+    provider_id String,
 
     /*
     `llm_id`: The identifier for the language model. This links the pricing to a specific LLM.
@@ -18,7 +23,7 @@ CREATE TABLE llm_token_prices (
     /*
     `effective_date`: The date when the token pricing becomes effective.
     */
-    effective_date Date,
+    effective_date DateTime64(3) DEFAULT now64(3),
 
     /*
     `input_token_cost`: The cost of an input token in the specified LLM.
@@ -31,4 +36,4 @@ CREATE TABLE llm_token_prices (
     output_token_cost Float
 
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (pricing_level, filter_id, llm_id, effective_date);
+ORDER BY (pricing_level, pricing_level_id, provider_id, llm_id, effective_date);

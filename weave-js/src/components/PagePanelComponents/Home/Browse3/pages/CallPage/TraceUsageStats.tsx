@@ -2,17 +2,40 @@ import {Divider} from '@mui/material';
 import Box from '@mui/material/Box';
 import {Pill} from '@wandb/weave/components/Tag';
 import {formatNumber} from '@wandb/weave/core/util/number';
-import {
-  FORMAT_NUMBER_NO_DECIMALS,
-  formatTokenCost,
-  formatTokenCount,
-  getLLMTokenCost,
-} from '@wandb/weave/util/llmTokenCosts';
 import React, {ReactNode} from 'react';
 
 import {MOON_600} from '../../../../../../common/css/color.styles';
 import {IconName} from '../../../../../Icon';
 import {Tooltip} from '../../../../../Tooltip';
+
+export const FORMAT_NUMBER_NO_DECIMALS = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+  useGrouping: true,
+});
+
+// Number formatting function that formats numbers in the thousands and millions with 3 sigfigs
+export const formatTokenCount = (num: number): string => {
+  if (num < 10000) {
+    return FORMAT_NUMBER_NO_DECIMALS.format(num);
+  } else if (num >= 10000 && num < 1000000) {
+    // Format numbers in the thousands
+    const thousands = (num / 1000).toFixed(1);
+    return parseFloat(thousands).toString() + 'k';
+  }
+  // Format numbers in the millions
+  const millions = (num / 1000000).toFixed(2);
+  return parseFloat(millions).toString() + 'm';
+};
+
+export const formatTokenCost = (cost: number): string => {
+  if (cost === 0) {
+    return '$0.00';
+  } else if (cost < 0.01) {
+    return '$<0.01';
+  }
+  return `$${cost.toFixed(2)}`;
+};
 
 export type UsageData = {
   requests: number;
@@ -23,28 +46,53 @@ export type UsageData = {
   output_tokens?: number;
 };
 
-type UsageDataKeys = keyof UsageData;
-const isUsageDataKey = (key: string): key is UsageDataKeys => {
-  const usageDataKeys: UsageDataKeys[] = [
+export type CostData = {
+  requests: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+
+  prompt_tokens_cost?: number;
+  completion_tokens_cost?: number;
+  prompt_token_cost?: number;
+  completion_token_cost?: number;
+
+  effective_date?: string;
+
+  provider_id?: string;
+  pricing_level?: string;
+  pricing_level_id?: string;
+
+  input_tokens?: number;
+  output_tokens?: number;
+};
+
+type CostDataKeys = keyof CostData;
+const isCostDataKey = (key: string): key is CostDataKeys => {
+  const costDataKeys: CostDataKeys[] = [
     'requests',
     'prompt_tokens',
     'completion_tokens',
     'total_tokens',
     'input_tokens',
     'output_tokens',
+    'prompt_tokens_cost',
+    'completion_tokens_cost',
+    'prompt_token_cost',
+    'completion_token_cost',
   ];
-  return usageDataKeys.includes(key as UsageDataKeys);
+  return costDataKeys.includes(key as CostDataKeys);
 };
 
 export const TraceUsageStats = ({
-  usage,
+  costData,
   latency_s,
 }: {
-  usage: {[key: string]: UsageData};
+  costData: {[key: string]: CostData};
   latency_s: number;
 }) => {
   const {cost, tokens, costToolTip, tokenToolTip} =
-    getTokensAndCostFromUsage(usage);
+    getTokensAndCostFromCostData(costData);
 
   const latency =
     (latency_s < 0.01 ? '<0.01' : formatNumber(latency_s, 'Number')) + 's';
@@ -56,7 +104,7 @@ export const TraceUsageStats = ({
         alignItems: 'center',
       }}>
       <TraceStat icon="recent-clock" label={latency} />
-      {usage && (
+      {costData && (
         <>
           {/* Tokens */}
           <TraceStat
@@ -72,41 +120,45 @@ export const TraceUsageStats = ({
   );
 };
 
-export const getUsageFromCellParams = (params: {[key: string]: any}) => {
-  const usage: {[key: string]: UsageData} = {};
+export const getCostFromCellParams = (params: {[key: string]: any}) => {
+  const costData: {[key: string]: CostData} = {};
   for (const key in params) {
-    if (key.startsWith('summary.usage')) {
-      const usageKeys = key.replace('summary.usage.', '').split('.');
-      const usageKey = usageKeys.pop() || '';
-      if (isUsageDataKey(usageKey)) {
-        const model = usageKeys.join('.');
-        if (!usage[model]) {
-          usage[model] = {
+    if (key.startsWith('summary.costs')) {
+      const costKeys = key.replace('summary.costs.', '').split('.');
+      const costKey = costKeys.pop() || '';
+      if (isCostDataKey(costKey)) {
+        const model = costKeys.join('.');
+        if (!costData[model]) {
+          costData[model] = {
             requests: 0,
             prompt_tokens: 0,
             completion_tokens: 0,
             total_tokens: 0,
+            prompt_tokens_cost: 0,
+            completion_tokens_cost: 0,
+            prompt_token_cost: 0,
+            completion_token_cost: 0,
           };
         }
-        usage[model][usageKey] = params[key];
+        costData[model][costKey] = params[key];
       }
     }
   }
-  return usage;
+  return costData;
 };
 
 // This needs to updated eventually, to either include more possible keys or to be more dynamic
 // accounts for openai and anthropic usage objects (prompt_tokens, input_tokens)
-export const getInputTokens = (usage: UsageData) => {
-  return usage.input_tokens ?? usage.prompt_tokens ?? 0;
+export const getInputTokens = (cost: CostData) => {
+  return cost.input_tokens ?? cost.prompt_tokens ?? 0;
 };
 
-export const getOutputTokens = (usage: UsageData) => {
-  return usage.output_tokens ?? usage.completion_tokens ?? 0;
+export const getOutputTokens = (cost: CostData) => {
+  return cost.output_tokens ?? cost.completion_tokens ?? 0;
 };
 
-export const getTokensAndCostFromUsage = (usage: {
-  [key: string]: UsageData;
+export const getTokensAndCostFromCostData = (cost: {
+  [key: string]: CostData;
 }) => {
   const metrics: {
     inputs: {
@@ -129,12 +181,12 @@ export const getTokensAndCostFromUsage = (usage: {
       tokens: {total: 0},
     },
   };
-  if (usage) {
-    for (const model of Object.keys(usage)) {
-      const inputTokens = getInputTokens(usage[model]);
-      const outputTokens = getOutputTokens(usage[model]);
-      const inputCost = getLLMTokenCost(model, 'input', inputTokens);
-      const outputCost = getLLMTokenCost(model, 'output', outputTokens);
+  if (cost) {
+    for (const model of Object.keys(cost)) {
+      const inputTokens = getInputTokens(cost[model]);
+      const outputTokens = getOutputTokens(cost[model]);
+      const inputCost = cost[model].prompt_tokens_cost ?? 0;
+      const outputCost = cost[model].completion_tokens_cost ?? 0;
 
       metrics.inputs.cost[model] = inputCost;
       metrics.inputs.tokens[model] = inputTokens;
@@ -148,7 +200,7 @@ export const getTokensAndCostFromUsage = (usage: {
     }
   }
   const costNum = metrics.inputs.cost.total + metrics.outputs.cost.total;
-  const cost = formatTokenCost(costNum);
+  const formattedCost = formatTokenCost(costNum);
   const tokensNum = metrics.inputs.tokens.total + metrics.outputs.tokens.total;
   const tokens = formatTokenCount(tokensNum);
 
@@ -209,7 +261,14 @@ export const getTokensAndCostFromUsage = (usage: {
       ))}
     </Box>
   );
-  return {costNum, cost, tokensNum, tokens, costToolTip, tokenToolTip};
+  return {
+    costNum,
+    cost: formattedCost,
+    tokensNum,
+    tokens,
+    costToolTip,
+    tokenToolTip,
+  };
 };
 
 const TraceStat = ({

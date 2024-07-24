@@ -26,8 +26,8 @@ import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {Reactions} from '../../feedback/Reactions';
 import {
-  getTokensAndCostFromUsage,
-  getUsageFromCellParams,
+  getCostFromCellParams,
+  getTokensAndCostFromCostData,
 } from '../CallPage/TraceUsageStats';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
@@ -162,6 +162,9 @@ export const useCallsTableColumns = (
     };
   }, [columns, setUserDefinedColumnWidths]);
 };
+
+const HIDDEN_TABLE_COLUMNS = ['summary.usage.', 'summary.costs.'];
+
 function buildCallsTableColumns(
   entity: string,
   project: string,
@@ -180,8 +183,8 @@ function buildCallsTableColumns(
   colGroupingModel: GridColumnGroupingModel;
 } {
   // Filters summary.usage. because we add a derived column for tokens and cost
-  const filteredDynamicColumnNames = allDynamicColumnNames.filter(
-    c => !c.startsWith('summary.usage.')
+  const filteredDynamicColumnNames = allDynamicColumnNames.filter(c =>
+    HIDDEN_TABLE_COLUMNS.every(hidden => !c.startsWith(hidden))
   );
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
@@ -479,13 +482,13 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {tokensNum} = getTokensAndCostFromUsage(usage);
+      const costData = getCostFromCellParams(cellParams.row);
+      const {tokensNum} = getTokensAndCostFromCostData(costData);
       return tokensNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
+      const costData = getCostFromCellParams(cellParams.row);
+      const {tokens, tokenToolTip} = getTokensAndCostFromCostData(costData);
       return <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTip} />;
     },
   });
@@ -500,13 +503,13 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {costNum} = getTokensAndCostFromUsage(usage);
+      const costData = getCostFromCellParams(cellParams.row);
+      const {costNum} = getTokensAndCostFromCostData(costData);
       return costNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {cost, costToolTip} = getTokensAndCostFromUsage(usage);
+      const costData = getCostFromCellParams(cellParams.row);
+      const {cost, costToolTip} = getTokensAndCostFromCostData(costData);
       return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
     },
   });

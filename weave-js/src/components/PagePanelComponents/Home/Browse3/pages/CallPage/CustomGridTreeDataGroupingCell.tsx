@@ -202,7 +202,7 @@ export const CustomGridTreeDataGroupingCell: FC<
             </Box>
             {call?.rawSpan?.summary && (
               <TraceUsageStats
-                usage={call.rawSpan.summary.usage}
+                costData={call.rawSpan.summary.costs}
                 latency_s={call.rawSpan.summary.latency_s}
               />
             )}
