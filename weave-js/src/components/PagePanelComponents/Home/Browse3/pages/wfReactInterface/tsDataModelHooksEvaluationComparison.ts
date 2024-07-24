@@ -461,9 +461,11 @@ const fetchEvaluationComparisonData = async (
             const rowDigest = maybeDigest;
             const possiblePredictNames = ['predict', 'infer', 'forward'];
             const isProbablyPredictCall =
-              _.some(possiblePredictNames, name =>
+              (_.some(possiblePredictNames, name =>
                 traceCall.op_name.includes(`.${name}:`)
-              ) && modelRefs.includes(traceCall.inputs.self);
+              ) &&
+                modelRefs.includes(traceCall.inputs.self)) ||
+              modelRefs.includes(traceCall.op_name);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
             // WOW - super hacky. we have to do this b/c we support both instances and ops for scorers!
