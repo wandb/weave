@@ -473,12 +473,14 @@ export const CallsTable: FC<{
     const selectedTableData = tableData.filter(row =>
       selectedCalls.includes(row.id)
     );
-    const disabled =
-      selectedCalls.length === 0 ||
-      selectedCalls.length > MAX_EVAL_COMPARISONS ||
-      selectedTableData.some(
-        row => row.exception != null || row.ended_at == null
-      );
+    let disabledMessage: string | undefined = undefined;
+    if (selectedTableData.some(row => row.exception != null || row.ended_at == null)) {
+      disabledMessage = 'Cannot compare evaluations with errors or incomplete traces'
+    } else if (selectedCalls.length > MAX_EVAL_COMPARISONS) {
+      disabledMessage = `Comparison limited to ${MAX_EVAL_COMPARISONS} valid evaluations`
+    } else if (selectedCalls.length === 0) {
+      disabledMessage = 'No evaluations selected'
+    }
     addExtra('compareEvaluations', {
       node: (
         <CompareEvaluationsTableButton
@@ -487,12 +489,8 @@ export const CallsTable: FC<{
               router.compareEvaluationsUri(entity, project, selectedCalls)
             );
           }}
-          disabled={disabled}
-          tooltipText={
-            disabled
-              ? `Comparison limited to ${MAX_EVAL_COMPARISONS} valid evaluations`
-              : undefined
-          }
+          disabled={disabledMessage !== undefined}
+          tooltipText={disabledMessage}
         />
       ),
       order: 1,
