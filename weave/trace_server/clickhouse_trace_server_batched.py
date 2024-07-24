@@ -612,7 +612,95 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.TableCreateRes(digest=digest)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        raise NotImplementedError()
+        query = """
+            SELECT *
+            FROM (
+                    SELECT *,
+                        row_number() OVER (PARTITION BY project_id, digest) AS rn
+                    FROM tables
+                    WHERE project_id = {project_id:String} AND digest = {digest:String}
+                )
+            WHERE rn = 1
+            ORDER BY project_id, digest
+        """
+
+        row_digest_result_query = self.ch_client.query(
+            query,
+            parameters={
+                "project_id": req.project_id,
+                "digest": req.initial_digest,
+            },
+        )
+
+        if len(row_digest_result_query.result_rows) == 0:
+            raise NotFoundError(
+                f"Table {req.project_id}:{req.initial_digest} not found"
+            )
+
+        row_digests: list[typing.Optional[str]] = row_digest_result_query.result_rows[
+            0
+        ][2]
+        insert_rows = []
+
+        def add_insert_row(row_data: typing.Any) -> str:
+            if not isinstance(row_data, dict):
+                raise ValueError(
+                    f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{row_data}."""
+                )
+            row_json = json.dumps(row_data)
+            row_digest = str_digest(row_json)
+            insert_rows.append(
+                (
+                    req.project_id,
+                    row_digest,
+                    extract_refs_from_values(row_data),
+                    row_json,
+                )
+            )
+            return row_digest
+
+        # First, go through and replace popped digests with None
+        # Note: we do this first because we want the indexes referenced
+        # by the insert_rows to be correct, but not have the pop delete
+        # an insert. This allows for swapping a position
+        if req.pop_digests:
+            pop_digest_set = set(req.pop_digests)
+            for i, row_digest in enumerate(row_digests):
+                if row_digest in pop_digest_set:
+                    row_digests[i] = None
+
+        # Next, insert new rows
+        if req.insert_rows:
+            for ndx, row_data in req.insert_rows:
+                row_digest = add_insert_row(row_data)
+                row_digests.insert(ndx, row_digest)
+
+        # Append any rows
+        if req.append_rows:
+            for row_data in req.append_rows:
+                row_digest = add_insert_row(row_data)
+                row_digests.append(row_digest)
+
+        # Remove any None values
+        row_digests_final: list[str] = [r for r in row_digests if r is not None]
+
+        self._insert(
+            "table_rows",
+            data=insert_rows,
+            column_names=["project_id", "digest", "refs", "val_dump"],
+        )
+
+        table_hasher = hashlib.sha256()
+        for row_digest in row_digests_final:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        self._insert(
+            "tables",
+            data=[(req.project_id, digest, row_digests_final)],
+            column_names=["project_id", "digest", "row_digests"],
+        )
+        return tsi.TableCreateRes(digest=digest)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
