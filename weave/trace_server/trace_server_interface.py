@@ -120,7 +120,7 @@ class ObjSchemaForInsert(BaseModel):
 
 class TableSchemaForInsert(BaseModel):
     project_id: str
-    rows: list[typing.Any]
+    rows: list[dict[str, typing.Any]]
 
 
 class CallStartReq(BaseModel):
@@ -290,6 +290,20 @@ class ObjQueryRes(BaseModel):
 
 class TableCreateReq(BaseModel):
     table: TableSchemaForInsert
+
+
+class TableUpdateReq(BaseModel):
+    project_id: str
+    initial_digest: str
+    # insertions performed before popping so that it is easier for
+    # caller to know the index of insertion
+    insert_rows: typing.Optional[list[tuple[int, dict[str, typing.Any]]]] = None
+    pop_digests: typing.Optional[list[str]] = None
+    append_rows: typing.Optional[list[dict[str, typing.Any]]] = None
+
+
+class TableUpdateRes(BaseModel):
+    digest: str
 
 
 class TableRowSchema(BaseModel):
@@ -476,6 +490,10 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def table_create(self, req: TableCreateReq) -> TableCreateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def table_update(self, req: TableUpdateReq) -> TableUpdateRes:
         raise NotImplementedError()
 
     @abc.abstractmethod

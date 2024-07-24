@@ -611,6 +611,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return tsi.TableCreateRes(digest=digest)
 
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        raise NotImplementedError()
+
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
         parameters = {}
