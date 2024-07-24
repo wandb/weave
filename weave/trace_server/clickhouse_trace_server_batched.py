@@ -384,6 +384,59 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
             )
 
+    def calls_query_stream_with_feedback(
+        self, req: tsi.CallsQueryReq
+    ) -> typing.Iterator[any]:
+        def flatten_dict(dd: dict, separator: str = ".", prefix: str = "") -> dict:
+            res = {}
+            for key, value in dd.items():
+                if isinstance(value, dict):
+                    res.update(flatten_dict(value, separator, prefix + key + separator))
+                else:
+                    res[prefix + key] = value
+            return res
+
+        # show progress bar when multi-page
+        page_size = 100
+        index = 0
+        while True:
+            req = tsi.CallsQueryReq(
+                project_id=self._project_id(),
+                filter=filter,
+                offset=index * page_size,
+                limit=page_size,
+            )
+            response = self.server.calls_query(req=req)
+
+            def _fake_ref(call: tsi.CallSchema) -> str:
+                return f"weave:///{self.entity}/{self.project}/call/{call.id}:fake"
+
+            weave_refs = [_fake_ref(call) for call in response.calls]
+            feedback_lookup = make_feedback_lookup_from_refs(
+                self._project_id(), self.server, weave_refs
+            )
+
+            for call, ref in zip(response.calls, weave_refs):
+                flattened_dict = flatten_dict(flatten_dict(call.model_dump()))
+                # if index == 0 and not header_fields:
+                # determine header fields from first data row
+                # header_fields += list(flattened_dict.keys())
+                # header_fields += ["feedback", "latency"]
+                # text += writer.writerow(header_fields) + "\n"
+
+                # hydrate with feedback
+                flattened_dict["feedback"] = feedback_lookup.get(ref, "")
+
+                # compute special columns
+                latency = call.ended_at - call.started_at
+                flattened_dict["latency"] = latency.total_seconds()
+
+                yield flattened_dict
+
+            if len(response.calls) < page_size:
+                break
+            index += 1
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
@@ -729,9 +782,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
-                defaultdict(list)
-            )
+            refs_by_project_id: dict[
+                str, list[refs_internal.InternalObjectRef]
+            ] = defaultdict(list)
             for ref in refs:
                 refs_by_project_id[ref.project_id].append(ref)
             for project_id, project_refs in refs_by_project_id.items():
@@ -1519,3 +1572,46 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
+
+
+# TODO(gst): where does this go??
+def make_feedback_lookup_from_refs(
+    project_id: str, server: tsi.TraceServerInterface, weave_refs: list[str]
+) -> dict[str, typing.Dict[str, typing.Any]]:
+    or_cond = [
+        {
+            "$eq": [
+                {"$getField": "weave_ref"},
+                {"$literal": ref},
+            ]
+        }
+        for ref in weave_refs
+    ]
+
+    feedback_query_req = tsi.FeedbackQueryReq(
+        project_id=project_id,
+        fields=[
+            "feedback_type",
+            "weave_ref",
+            "payload",
+            "creator",
+            "created_at",
+            "wb_user_id",
+        ],
+        query=tsi.Query(**{"$expr": {"$or": or_cond}}),
+    )
+    feedback = server.feedback_query(req=feedback_query_req)
+    feedback_dict = {}
+    for fb in feedback.result:
+        ref = fb["weave_ref"]
+        _type = fb["feedback_type"]
+        payload = fb["payload"] | {
+            "creator": fb["creator"],
+            "wb_user_id": fb["wb_user_id"],
+            "created_at": fb["created_at"],
+        }
+        if ref not in feedback_dict:
+            feedback_dict[ref] = {}
+        if _type not in feedback_dict[ref]:
+            feedback_dict[ref][_type] = []
+        feedback_dict[ref][_type].append(payload)

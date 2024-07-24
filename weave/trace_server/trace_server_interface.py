@@ -445,6 +445,12 @@ class TraceServerInterface:
         raise NotImplementedError()
 
     @abc.abstractmethod
+    def calls_query_stream_with_feedback(
+        self, req: CallsQueryReq
+    ) -> typing.Iterator[any]:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
         raise NotImplementedError()
 

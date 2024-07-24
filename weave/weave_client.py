@@ -1,3 +1,4 @@
+from collections import defaultdict
 import csv
 import dataclasses
 import datetime
@@ -15,9 +16,11 @@ from typing import (
     TypedDict,
     Union,
 )
+import aiohttp
 
 import pydantic
 from requests import HTTPError
+from tqdm import tqdm
 
 from weave import call_context, client_context, trace_sentry, urls, version
 from weave.exception import exception_to_json_str
@@ -46,6 +49,7 @@ from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
+    CallsQueryStatsReq,
     EndedCallSchemaForInsert,
     FeedbackQueryReq,
     ObjCreateReq,
@@ -467,127 +471,40 @@ class WeaveClient:
 
         return CallsIter(self.server, self._project_id(), filter)
 
-    # @trace_sentry.global_trace_sentry.watch()
+    @trace_sentry.global_trace_sentry.watch()
     def calls_as_csv(self, filter: Optional[_CallsFilter] = None) -> any:
         if filter is None:
             filter = _CallsFilter()
-
-        page_size = 10
-        index = 0
 
         class StringWriter:
             def write(self, line):
                 return line.replace("\n", "\\n")
 
+        text = ""
         writer = csv.writer(StringWriter(), delimiter=",", lineterminator="")
 
-        # get any type in callSchema that can be dict (or any)
-        # call_dict_fields = [
-        #     field
-        #     for field, field_type in CallSchema.model_fields.items()
-        #     if field_type.annotation == Dict[str, Any]
-        #     or field_type.annotation == typing.Any
-        #     or field_type.annotation == typing.Optional[typing.Any]
-        #     or field_type.annotation == typing.Optional[Dict[str, Any]]
-        # ]
-        # header_fields = list(
-        #     set(CallSchema.model_fields.keys()) - set(call_dict_fields)
-        # )
-
-        # hydrated model field headers
-
-        def flatten_dict(dd: dict, separator: str = ".", prefix: str = "") -> dict:
-            res = {}
-            for key, value in dd.items():
-                if isinstance(value, dict):
-                    res.update(flatten_dict(value, separator, prefix + key + separator))
-                else:
-                    res[prefix + key] = value
-            return res
-
-        out = []
-        header_fields = []
-        text = ""
-
-        while True:
-            print("Batch", index)
-            req = CallsQueryReq(
+        # get stats for progress bar
+        stats = self.server.calls_query_stats(
+            CallsQueryStatsReq(
                 project_id=self._project_id(),
                 filter=filter,
-                offset=index * page_size,
-                limit=page_size,
-            )
-            response = self.server.calls_query(req=req)
-
-            weave_object_call_batch = [
-                make_client_call(self.entity, self.project, call, self.server)
-                for call in response.calls
-            ]
-
-            or_cond = [
-                {
-                    "$eq": [
-                        {"$getField": "weave_ref"},
-                        {"$literal": call.ref.uri()},
-                    ]
-                }
-                for call in weave_object_call_batch
-            ]
-
-            feedback_query = Query(**{"$expr": {"$or": or_cond}})
-
-            # print(feedback_query)
-
-            feedback_query_req = FeedbackQueryReq(
-                project_id=self._project_id(),
-                fields=["feedback_type", "weave_ref", "payload"],
-                query=feedback_query,
-            )
-            feedback = self.server.feedback_query(req=feedback_query_req)
-
-            feedback_dict = {
-                feedback["weave_ref"]: feedback for feedback in feedback.result
-            }
-
-            for call, weave_object_call in zip(response.calls, weave_object_call_batch):
-                flattened_dict = flatten_dict(flatten_dict(call.model_dump()))
-                if index == 0 and not header_fields:
-                    header_fields += list(flattened_dict.keys())
-                    header_fields += ["feedback", "latency"]
-                    text += writer.writerow(header_fields) + "\n"
-
-                # hydrate with feedback
-                flattened_dict["feedback"] = feedback_dict.get(
-                    weave_object_call.ref.uri(), ""
-                )
-
-                # compute special columns
-                latency = call.ended_at - call.started_at
-                flattened_dict["latency"] = latency.total_seconds()
-
-                out += [list(flattened_dict.values())]
-
-            if len(response.calls) == 0 or len(response.calls) < page_size:
-                break
-            index += 1
-
-        for row in out:
-            text += writer.writerow(row) + "\n"
-
-        return text
-
-    @trace_sentry.global_trace_sentry.watch()
-    def call(self, call_id: str) -> WeaveObject:
-        response = self.server.calls_query(
-            CallsQueryReq(
-                project_id=self._project_id(),
-                filter=_CallsFilter(call_ids=[call_id]),
             )
         )
-        if not response.calls:
-            raise ValueError(f"Call not found: {call_id}")
-        response_call = response.calls[0]
-        return make_client_call(self.entity, self.project, response_call, self.server)
+
+        res = self.server.calls_query_stream_with_feedback(
+            CallsQueryReq(
+                project_id=self._project_id(),
+                filter=filter,
+            )
+        )
+
+        for i in tqdm(range((stats.count) + 1)):
+            for row in res:
+                if i == 0:
+                    text += writer.writerow(row.keys()) + "\n"
+                text += writer.writerow(list(row.values())) + "\n"
+
+        return text
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
