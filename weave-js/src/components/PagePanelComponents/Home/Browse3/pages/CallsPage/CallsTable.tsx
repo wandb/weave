@@ -26,6 +26,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import React, {
   FC,
   useCallback,
@@ -332,7 +333,7 @@ export const CallsTable: FC<{
   // DataGrid Model Management
   const [pinnedColumnsModel, setPinnedColumnsModel] =
     useState<GridPinnedColumns>({
-      left: ['CustomCheckbox', 'op_name', 'feedback'],
+      left: ['CustomCheckbox', 'op_name', 'evaluatable_icon', 'feedback'],
     });
 
   // END OF CPR FACTORED CODE
@@ -383,7 +384,7 @@ export const CallsTable: FC<{
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const muiColumns = useMemo(() => {
-    return [
+    const cols = [
       {
         minWidth: 30,
         width: 38,
@@ -461,6 +462,37 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
+    if (isEvaluateTable) {
+      cols.push({
+        field: 'evaluatable_icon',
+        minWidth: 32,
+        width: 32,
+        sortable: false,
+        disableReorder: true,
+        resizable: false,
+        disableColumnMenu: true,
+        renderHeader: () => {
+          return '';
+        },
+        renderCell: (params: any) => {
+          const isEval =
+            isEvaluateTable &&
+            params.row.exception == null &&
+            params.row.ended_at != null;
+          return isEval ? (
+            <Tooltip title="Comparable evaluation" placement="right" arrow>
+              {/* Adjust left to remove default padding */}
+              <span style={{marginLeft: -10}}>
+                <IconOnlyPill icon="chart-scatterplot" color="teal" />
+              </span>
+            </Tooltip>
+          ) : (
+            ''
+          );
+        },
+      });
+    }
+    return cols;
   }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
 
   // Register Compare Evaluations Button
@@ -473,13 +505,18 @@ export const CallsTable: FC<{
     const selectedTableData = tableData.filter(row =>
       selectedCalls.includes(row.id)
     );
-    let disabledMessage: string | undefined = undefined;
-    if (selectedTableData.some(row => row.exception != null || row.ended_at == null)) {
-      disabledMessage = 'Cannot compare evaluations with errors or incomplete traces'
+    let disabledMessage: string | undefined;
+    if (
+      selectedTableData.some(
+        row => row.exception != null || row.ended_at == null
+      )
+    ) {
+      disabledMessage =
+        'Cannot compare evaluations with errors or incomplete traces';
     } else if (selectedCalls.length > MAX_EVAL_COMPARISONS) {
-      disabledMessage = `Comparison limited to ${MAX_EVAL_COMPARISONS} valid evaluations`
+      disabledMessage = `Comparison limited to ${MAX_EVAL_COMPARISONS} valid evaluations`;
     } else if (selectedCalls.length === 0) {
-      disabledMessage = 'No evaluations selected'
+      disabledMessage = 'No evaluations selected';
     }
     addExtra('compareEvaluations', {
       node: (
