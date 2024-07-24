@@ -259,6 +259,13 @@ class Evaluation(Object):
                     scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
                     scorer_stats = transpose(vals)
                     score_table = scorer_stats[scorer_name]
+
+                    # DO NOT CHECK IN
+                    # This is a big problem with our API right now
+                    ds = Dataset(rows=score_table)
+                    weave.publish(ds)
+                    score_table = ds.rows
+
                     scored = summarize_fn(score_table)
                     summary[scorer_name] = scored
             else:
@@ -315,6 +322,8 @@ class Evaluation(Object):
         if self.name is not None:
             name = self.name + "-results"
 
+        # DO NOT CHECK IN
+        # This is a big problem with our API right now
         output_ds = Dataset(name=name, rows=eval_rows)
         summary = await self.summarize(output_ds)
 

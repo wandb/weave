@@ -170,6 +170,39 @@ def attribute_access_result(
     )
 
 
+# def table_digest_access_result(
+#     self: object,
+#     val_attr_val: Any,
+#     digest: str,
+#     *,
+#     server: Optional[TraceServerInterface],
+# ) -> Any:
+#     ref = None
+#     try:
+#         ref = self.ref  # type: ignore
+#     except AttributeError:
+#         pass
+#     if ref is None:
+#         return val_attr_val
+
+#     if not isinstance(ref, RefWithExtra):
+#         raise ValueError("Expected ref to be RefWithExtra")
+
+#     new_ref = ref.with_item(digest)
+
+#     if server is None:
+#         return val_attr_val
+
+#     return make_trace_obj(
+#         val_attr_val,
+#         new_ref,
+#         server,
+#         None,  # TODO: not passing root, needed for mutate which is not implemented yet
+#         # self.root,
+#         self,
+#     )
+
+
 class WeaveObject(Traceable):
     def __init__(
         self,
