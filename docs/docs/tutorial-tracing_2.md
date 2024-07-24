@@ -108,53 +108,6 @@ It's recommended to use metadata tracking to track metadata at run time, e.g. us
 To track system attributes, such as a System Prompt, we recommend using [weave Models](guides/core-types/models)
 :::
 
-
-## Exporting call data
-
-Exporting data from a Weave call such as the inputs, outputs and summary usage data can be useful if further post-processing is needed in other tools or pipelines.
-
-**Get the weave call ID**
-
-To export all the data and metadata from a call you just need the Weave call ID, which can be found in the "Use" tab in the particular call's view
-
-![Nested Weave Trace](../static/img/tutorial_tracing_2_call_uri.png)
-
-**Export the call data**
-
-After initialising the weave client, you can then use use the call ID to retrieve the call object which includes the input, output and metadata of that particular call:
-
-```python
-import weave
-
-weave_client = weave.init("morgan/jurassic-park")
-# highlight-next-line
-call = weave_client.call("dce2d44c-9b7d-457b-90ae-62d7e4b3aa58")
-```
-
-Export one of the call outputs:
-```python
-call.output["n_dinosaurs"]
-
->>> 3
-```
-
-Export the input to the call:
-```python
-call.input["sentence"]
-
->>> """I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), 
-both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant 
-Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below."""
-```
-
-Export the usage status from the call summary:
-```python
-call.summary["usage"]
-
->>> WeaveDict({'gpt-4o-2024-05-13': {'requests': 1, 'completion_tokens': 109, 
-'prompt_tokens': 110, 'total_tokens': 219}})
-```
-
 ## What's next?
 
-- Follow the App Versioning guide to start tracking and the data flowing through your app.
+- Follow the [Build an Evaluation pipeline tutorial](/tutorial-eval) to start iteratively improving your applications.
