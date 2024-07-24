@@ -146,7 +146,7 @@ class CallReadReq(BaseModel):
 
 
 class CallReadRes(BaseModel):
-    call: CallSchema
+    call: typing.Optional[CallSchema]
 
 
 class CallsDeleteReq(BaseModel):

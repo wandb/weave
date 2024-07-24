@@ -143,6 +143,14 @@ def weave_server_url() -> str:
     return os.getenv("WEAVE_SERVER_URL", default)
 
 
+def weave_trace_server_url() -> str:
+    base_url = wandb_frontend_base_url()
+    default = "https://trace.wandb.ai"
+    if base_url != "https://api.wandb.ai":
+        default = base_url + "/traces"
+    return os.getenv("WF_TRACE_SERVER_URL", default)
+
+
 def wandb_base_url() -> str:
     settings = Settings()
     return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")

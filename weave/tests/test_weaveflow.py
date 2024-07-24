@@ -256,14 +256,15 @@ def test_subobj_ref_passing(client):
     assert res == {"in": 1, "out": 1}
 
 
+class MyModel(weave.Model):
+    a: int
+
+    @weave.op()
+    def predict(self, x: int) -> int:
+        return x + 1
+
+
 def test_op_method_name(client):
-    class MyModel(weave.Model):
-        a: int
-
-        @weave.op()
-        def predict(self, x: int) -> int:
-            return x + 1
-
     model = MyModel(a=1)
 
     assert model.predict.name == "MyModel.predict"

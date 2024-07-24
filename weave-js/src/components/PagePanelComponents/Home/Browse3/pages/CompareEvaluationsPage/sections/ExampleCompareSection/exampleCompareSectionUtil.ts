@@ -2,9 +2,16 @@ import _ from 'lodash';
 import {useMemo} from 'react';
 
 import {flattenObject} from '../../../../../Browse2/browse2Util';
+import {
+  buildCompositeMetricsMap,
+  CompositeScoreMetrics,
+  resolvePeerDimension,
+} from '../../compositeMetricsUtil';
 import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState, PredictAndScoreCall} from '../../ecpTypes';
-import {dimensionId, resolveDimensionValueForPASCall} from '../../ecpUtil';
+import {EvaluationComparisonState} from '../../ecpState';
+import {PredictAndScoreCall} from '../../ecpTypes';
+import {metricDefinitionId} from '../../ecpUtil';
+import {resolveScoreMetricValueForPASCall} from '../../ecpUtil';
 
 type RowBase = {
   id: string;
@@ -21,7 +28,7 @@ type FlattenedRow = RowBase & {
   scores: {[scoreId: string]: number | boolean | undefined};
 };
 
-type PivotedRow = RowBase & {
+export type PivotedRow = RowBase & {
   output: {[outputKey: string]: {[callId: string]: any}};
   scores: {[scoreId: string]: {[callId: string]: number | boolean}};
 };
@@ -72,9 +79,11 @@ const rowIsSelected = (
       [evaluationCallId: string]: number | undefined;
     };
   },
-  state: EvaluationComparisonState
+  state: EvaluationComparisonState,
+  compositeMetricsMap: CompositeScoreMetrics
 ) => {
   const compareDims = state.comparisonDimensions;
+
   if (compareDims == null || compareDims.length === 0) {
     return true;
   }
@@ -85,19 +94,33 @@ const rowIsSelected = (
     ) {
       return true;
     }
-    const values = scores[dimensionId(compareDim.dimension)];
-    return Object.entries(compareDim.rangeSelection).every(([key, val]) => {
-      if (values[key] == null) {
-        return false;
+    return Object.entries(compareDim.rangeSelection).every(
+      ([evalCallId, range]) => {
+        const resolvedPeerDim = resolvePeerDimension(
+          compositeMetricsMap,
+          evalCallId,
+          state.data.scoreMetrics[compareDim.metricId]
+        );
+        if (resolvedPeerDim == null) {
+          return false;
+        }
+        const values = scores[metricDefinitionId(resolvedPeerDim)];
+        if (values[evalCallId] == null) {
+          return false;
+        }
+        const rowVal = values[evalCallId] as number;
+        return range.min <= rowVal && rowVal <= range.max;
       }
-      const rowVal = values[key] as number;
-      return val.min <= rowVal && rowVal <= val.max;
-    });
+    );
   });
 };
 
 export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
+  const compositeMetricsMap = useMemo(
+    () => buildCompositeMetricsMap(state.data, 'score'),
+    [state.data]
+  );
 
   const flattenedRows = useMemo(() => {
     const rows: FlattenedRow[] = [];
@@ -114,22 +137,21 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   id: predictAndScoreRes.callId,
                   evaluationCallId: predictAndScoreRes.evaluationCallId,
                   inputDigest: datasetRow.digest,
-                  inputRef: predictAndScoreRes.firstExampleRef,
+                  inputRef: predictAndScoreRes.exampleRef,
                   input: flattenObject({input: datasetRow.val}),
                   output: flattenObject({output}),
                   scores: Object.fromEntries(
-                    [
-                      ...Object.entries(state.data.scorerMetricDimensions),
-                      ...Object.entries(state.data.derivedMetricDimensions),
-                    ].map(([scoreKey, scoreVal]) => {
-                      return [
-                        scoreKey,
-                        resolveDimensionValueForPASCall(
-                          scoreVal,
-                          predictAndScoreRes
-                        ),
-                      ];
-                    })
+                    [...Object.entries(state.data.scoreMetrics)].map(
+                      ([scoreKey, scoreVal]) => {
+                        return [
+                          scoreKey,
+                          resolveScoreMetricValueForPASCall(
+                            scoreVal,
+                            predictAndScoreRes
+                          ),
+                        ];
+                      }
+                    )
                   ),
                   path: [
                     rowDigest,
@@ -145,12 +167,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       }
     );
     return rows;
-  }, [
-    state.data.resultRows,
-    state.data.inputs,
-    state.data.scorerMetricDimensions,
-    state.data.derivedMetricDimensions,
-  ]);
+  }, [state.data.resultRows, state.data.inputs, state.data.scoreMetrics]);
 
   const pivotedRows = useMemo(() => {
     // Ok, so in this step we are going to pivot -
@@ -235,7 +252,11 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     let res = aggregatedAsList;
     if (compareDims != null && compareDims.length > 0) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
-        return rowIsSelected(aggregatedRows[digest].scores, state);
+        return rowIsSelected(
+          aggregatedRows[digest].scores,
+          state,
+          compositeMetricsMap
+        );
       });
 
       res = aggregatedAsList.filter(row =>
@@ -247,9 +268,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       const compareDim = compareDims[0];
       res = _.sortBy(res, row => {
         const values =
-          aggregatedRows[row.inputDigest].scores[
-            dimensionId(compareDim.dimension)
-          ];
+          aggregatedRows[row.inputDigest].scores[compareDim.metricId];
         const valuesAsNumbers = Object.values(values).map(v => {
           if (typeof v === 'number') {
             return v;
@@ -263,7 +282,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
       });
     }
     return res;
-  }, [aggregatedRows, state]);
+  }, [aggregatedRows, compositeMetricsMap, state]);
 
   const inputColumnKeys = useMemo(() => {
     const keys = new Set<string>();

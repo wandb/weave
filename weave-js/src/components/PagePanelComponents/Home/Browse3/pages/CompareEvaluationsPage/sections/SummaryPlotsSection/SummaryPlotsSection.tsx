@@ -1,6 +1,7 @@
 import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
+import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
   PLOT_HEIGHT,
@@ -9,12 +10,10 @@ import {
   STANDARD_PADDING,
 } from '../../ecpConstants';
 import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
 import {
-  dimensionLabel,
-  dimensionShouldMinimize,
-  dimensionUnit,
-  resolveDimensionValueForEvaluateCall,
+  flattenedDimensionPath,
+  resolveSummaryMetricValueForEvaluateCall,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
@@ -82,6 +81,7 @@ export const SummaryPlots: React.FC<{
     </VerticalBox>
   );
 };
+
 const normalizeValues = (values: Array<number | undefined>): number[] => {
   // find the max value
   // find the power of 2 that is greater than the max value
@@ -90,29 +90,53 @@ const normalizeValues = (values: Array<number | undefined>): number[] => {
   const maxPower = Math.ceil(Math.log2(maxVal));
   return values.map(val => (val ? val / 2 ** maxPower : 0));
 };
+
 const useNormalizedPlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): RadarPlotData => {
-  const metrics = useMemo(() => {
-    return summaryMetrics(state);
+  const compositeMetrics = useMemo(() => {
+    return buildCompositeMetricsMap(state.data, 'summary');
   }, [state]);
   const callIds = useMemo(() => {
     return getOrderedCallIds(state);
   }, [state]);
 
   return useMemo(() => {
-    const normalizedMetrics = metrics.map(metric => {
-      const keys = Object.keys(metric.values);
-      const values = keys.map(key => metric.values[key]);
-      const normalizedValues = normalizeValues(values);
+    const normalizedMetrics = Object.values(compositeMetrics)
+      .map(scoreGroup => Object.values(scoreGroup.metrics))
+      .flat()
+      .map(metric => {
+        const values = callIds.map(callId => {
+          const metricDimension = Object.values(metric.scorerRefs).find(
+            scorerRefData => scorerRefData.evalCallIds.includes(callId)
+          )?.metric;
+          if (!metricDimension) {
+            return undefined;
+          }
+          const val = resolveSummaryMetricValueForEvaluateCall(
+            metricDimension,
+            state.data.evaluationCalls[callId]
+          );
+          if (typeof val === 'boolean') {
+            return val ? 1 : 0;
+          } else {
+            return val;
+          }
+        });
+        const normalizedValues = normalizeValues(values);
+        const evalScores: {[evalCallId: string]: number | undefined} =
+          Object.fromEntries(
+            callIds.map((key, i) => [key, normalizedValues[i]])
+          );
 
-      return {
-        ...metric,
-        values: Object.fromEntries(
-          keys.map((key, i) => [key, normalizedValues[i]])
-        ),
-      };
-    });
+        const metricLabel = flattenedDimensionPath(
+          Object.values(metric.scorerRefs)[0].metric
+        );
+        return {
+          metricLabel,
+          evalScores,
+        };
+      });
     return Object.fromEntries(
       callIds.map(callId => {
         const evalCall = state.data.evaluationCalls[callId];
@@ -123,44 +147,15 @@ const useNormalizedPlotDataFromMetrics = (
             color: evalCall.color,
             metrics: Object.fromEntries(
               normalizedMetrics.map(metric => {
-                return [metric.path, metric.values[evalCall.callId]];
+                return [
+                  metric.metricLabel,
+                  metric.evalScores[evalCall.callId] ?? 0,
+                ];
               })
             ),
           },
         ];
       })
     );
-  }, [callIds, metrics, state.data.evaluationCalls]);
-};
-
-type SimplifiedSummaryMetric = {
-  path: string;
-  unit: string;
-  lowerIsBetter: boolean;
-  values: {[callId: string]: number | undefined};
-};
-
-const summaryMetrics = (
-  state: EvaluationComparisonState
-): SimplifiedSummaryMetric[] => {
-  const results: SimplifiedSummaryMetric[] = [];
-  const allEntries = [
-    ...Object.entries(state.data.scorerMetricDimensions),
-    ...Object.entries(state.data.derivedMetricDimensions),
-  ];
-  allEntries.forEach(([metricId, metric]) => {
-    results.push({
-      path: dimensionLabel(metric),
-      unit: dimensionUnit(metric),
-      lowerIsBetter: dimensionShouldMinimize(metric),
-      values: Object.fromEntries(
-        Object.entries(state.data.evaluationCalls).map(([callId, call]) => [
-          callId,
-          resolveDimensionValueForEvaluateCall(metric, call),
-        ])
-      ),
-    });
-  });
-
-  return results;
+  }, [callIds, compositeMetrics, state.data.evaluationCalls]);
 };

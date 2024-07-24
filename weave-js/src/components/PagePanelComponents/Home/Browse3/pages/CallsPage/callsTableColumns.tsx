@@ -55,6 +55,8 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {allOperators} from './callsTableQuery';
 
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
+
 export const useCallsTableColumns = (
   entity: string,
   project: string,
@@ -181,7 +183,7 @@ function buildCallsTableColumns(
 } {
   // Filters summary.usage. because we add a derived column for tokens and cost
   const filteredDynamicColumnNames = allDynamicColumnNames.filter(
-    c => !c.startsWith('summary.usage.')
+    c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
   );
 
   const cols: Array<GridColDef<TraceCallSchema>> = [

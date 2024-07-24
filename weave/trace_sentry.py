@@ -15,13 +15,16 @@ import functools
 import os
 import site
 import sys
-from types import TracebackType
-from typing import Any, Callable, Dict, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, Union
 
 if sys.version_info >= (3, 8):
     from typing import Literal
 else:
     from typing_extensions import Literal
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import ExcInfo
+
 
 import sentry_sdk  # type: ignore
 import sentry_sdk.utils  # type: ignore
@@ -103,11 +106,7 @@ class Sentry:
         exc: Union[
             str,
             BaseException,
-            Tuple[
-                Optional[Type[BaseException]],
-                Optional[BaseException],
-                Optional[TracebackType],
-            ],
+            "ExcInfo",
             None,
         ],
         handled: bool = False,

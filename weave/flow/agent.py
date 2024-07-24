@@ -1,4 +1,4 @@
-from typing import Any
+import typing
 
 import openai
 from openai._types import NotGiven
@@ -16,14 +16,14 @@ from weave.flow.tools import chat_call_tool_params, perform_tool_calls
 
 class AgentState(Object):
     # TODO: want openai types here.
-    history: list[Any] = Field(default_factory=list)
+    history: list[typing.Any] = Field(default_factory=list)
 
 
 class Agent(Object):
     model_name: str = "gpt-3.5-turbo"
     temperature: float = 0.7
     system_message: str
-    tools: list[Any] = Field(default_factory=list)
+    tools: list[typing.Any] = Field(default_factory=list)
 
     @weave.op()
     def step(self, state: AgentState) -> AgentState:

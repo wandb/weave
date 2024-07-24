@@ -7,17 +7,17 @@ import React, {useCallback, useMemo} from 'react';
 import {MOON_500} from '../../../../../../../../common/css/color.styles';
 import {StyledTextField} from '../../../../StyledTextField';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
+import {
+  buildCompositeMetricsMap,
+  resolvePeerDimension,
+} from '../../compositeMetricsUtil';
 import {PLOT_HEIGHT, STANDARD_PADDING} from '../../ecpConstants';
 import {MAX_PLOT_DOT_SIZE, MIN_PLOT_DOT_SIZE} from '../../ecpConstants';
+import {EvaluationComparisonState} from '../../ecpState';
+import {metricDefinitionId} from '../../ecpUtil';
 import {
-  EvaluationComparisonState,
-  isBinaryScore,
-  isContinuousScore,
-} from '../../ecpTypes';
-import {
-  dimensionId,
-  dimensionLabel,
-  resolveDimensionMetricResultForPASCall,
+  flattenedDimensionPath,
+  resolveScoreMetricResultForPASCall,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {useFilteredAggregateRows} from '../ExampleCompareSection/exampleCompareSectionUtil';
@@ -98,6 +98,10 @@ const SingleDimensionFilter: React.FC<{
   state: EvaluationComparisonState;
   dimensionIndex: number;
 }> = props => {
+  const compositeMetricsMap = useMemo(() => {
+    return buildCompositeMetricsMap(props.state.data, 'score');
+  }, [props.state.data]);
+
   const {setComparisonDimensions} = useCompareEvaluationsState();
   const baselineCallId = props.state.baselineEvaluationCallId;
   const compareCallId = Object.keys(props.state.data.evaluationCalls).find(
@@ -105,8 +109,11 @@ const SingleDimensionFilter: React.FC<{
   )!;
 
   const targetComparisonDimension =
-    props.state.comparisonDimensions?.[props.dimensionIndex]!;
-  const targetDimension = targetComparisonDimension.dimension;
+    props.state.comparisonDimensions?.[props.dimensionIndex];
+
+  const targetDimension = targetComparisonDimension
+    ? props.state.data.scoreMetrics[targetComparisonDimension.metricId]
+    : undefined;
 
   const xIsPercentage = targetDimension?.scoreType === 'binary';
   const yIsPercentage = targetDimension?.scoreType === 'binary';
@@ -122,85 +129,98 @@ const SingleDimensionFilter: React.FC<{
   const data = useMemo(() => {
     const series: Array<ScatterPlotPoint & {count: number}> = [];
     if (targetDimension != null) {
-      Object.entries(props.state.data.resultRows).forEach(([digest, row]) => {
-        const xVals: number[] = [];
-        const yVals: number[] = [];
-        Object.values(row.evaluations[baselineCallId].predictAndScores).forEach(
-          score => {
-            const val = resolveDimensionMetricResultForPASCall(
-              targetDimension,
+      const baselineTargetDimension = resolvePeerDimension(
+        compositeMetricsMap,
+        baselineCallId,
+        targetDimension
+      );
+      const compareTargetDimension = resolvePeerDimension(
+        compositeMetricsMap,
+        compareCallId,
+        targetDimension
+      );
+
+      if (baselineTargetDimension != null && compareTargetDimension != null) {
+        Object.entries(props.state.data.resultRows).forEach(([digest, row]) => {
+          const xVals: number[] = [];
+          const yVals: number[] = [];
+          Object.values(
+            row.evaluations[baselineCallId]?.predictAndScores ?? {}
+          ).forEach(score => {
+            const val = resolveScoreMetricResultForPASCall(
+              baselineTargetDimension,
               score
             );
-            if (val === undefined) {
+            if (val == null) {
               return;
             } else if (isBinaryScore(val.value)) {
               xVals.push(val.value ? 1 : 0);
             } else if (isContinuousScore(val.value)) {
               xVals.push(val.value);
             }
-          }
-        );
-        Object.values(
-          row.evaluations[compareCallId]?.predictAndScores ?? {}
-        ).forEach(score => {
-          const val = resolveDimensionMetricResultForPASCall(
-            targetDimension,
-            score
-          );
-          if (val === undefined) {
+          });
+          Object.values(
+            row.evaluations[compareCallId]?.predictAndScores ?? {}
+          ).forEach(score => {
+            const val = resolveScoreMetricResultForPASCall(
+              compareTargetDimension,
+              score
+            );
+            if (val == null) {
+              return;
+            } else if (isBinaryScore(val.value)) {
+              yVals.push(val.value ? 1 : 0);
+            } else if (isContinuousScore(val.value)) {
+              yVals.push(val.value);
+            }
+          });
+          if (xVals.length === 0 || yVals.length === 0) {
             return;
-          } else if (isBinaryScore(val.value)) {
-            yVals.push(val.value ? 1 : 0);
-          } else if (isContinuousScore(val.value)) {
-            yVals.push(val.value);
           }
+          series.push({
+            x: mean(xVals),
+            y: mean(yVals),
+            count: xVals.length,
+            size: MIN_PLOT_DOT_SIZE,
+            color: MOON_500,
+            selected: filteredDigest.has(digest),
+          });
         });
-        if (xVals.length === 0 || yVals.length === 0) {
-          return;
-        }
-        series.push({
-          x: mean(xVals),
-          y: mean(yVals),
-          count: xVals.length,
-          size: MIN_PLOT_DOT_SIZE,
-          color: MOON_500,
-          selected: filteredDigest.has(digest),
-        });
-      });
 
-      if (targetDimension.scoreType === 'binary') {
-        // Here we are going to further group the points by their x and y values
-        // since the points are going to be discrete, and stacked. Note, while it
-        // is true that each individual trial is either a 0 or 1, the mean of the
-        // trials can be a float.
-        const grouped = _.groupBy(series, point => `${point.x}-${point.y}`);
-        const counts = Object.values(grouped).map(points =>
-          sum(points.map(point => point.count))
-        );
-        const minCount = Math.min(...counts);
-        const maxCount = Math.max(...counts);
-        console.log(minCount, maxCount);
-        const sizeForCount = (count: number) => {
-          if (minCount === maxCount) {
-            return MIN_PLOT_DOT_SIZE;
-          }
-          return (
-            MIN_PLOT_DOT_SIZE +
-            ((count - minCount) / (maxCount - minCount)) *
-              (MAX_PLOT_DOT_SIZE - MIN_PLOT_DOT_SIZE)
+        if (targetDimension.scoreType === 'binary') {
+          // Here we are going to further group the points by their x and y values
+          // since the points are going to be discrete, and stacked. Note, while it
+          // is true that each individual trial is either a 0 or 1, the mean of the
+          // trials can be a float.
+          const grouped = _.groupBy(series, point => `${point.x}-${point.y}`);
+          const counts = Object.values(grouped).map(points =>
+            sum(points.map(point => point.count))
           );
-        };
-        return Object.values(grouped).map(points => {
-          const count = sum(points.map(point => point.count));
-          return {
-            x: points[0].x, // x is the same for all points in the group
-            y: points[0].y, // y is the same for all points in the group
-            size: sizeForCount(count),
-            count,
-            color: points[0].color,
-            selected: points.some(point => point.selected),
+          const minCount = Math.min(...counts);
+          const maxCount = Math.max(...counts);
+
+          const sizeForCount = (count: number) => {
+            if (minCount === maxCount) {
+              return MIN_PLOT_DOT_SIZE;
+            }
+            return (
+              MIN_PLOT_DOT_SIZE +
+              ((count - minCount) / (maxCount - minCount)) *
+                (MAX_PLOT_DOT_SIZE - MIN_PLOT_DOT_SIZE)
+            );
           };
-        });
+          return Object.values(grouped).map(points => {
+            const count = sum(points.map(point => point.count));
+            return {
+              x: points[0].x, // x is the same for all points in the group
+              y: points[0].y, // y is the same for all points in the group
+              size: sizeForCount(count),
+              count,
+              color: points[0].color,
+              selected: points.some(point => point.selected),
+            };
+          });
+        }
       }
     }
 
@@ -208,6 +228,7 @@ const SingleDimensionFilter: React.FC<{
   }, [
     baselineCallId,
     compareCallId,
+    compositeMetricsMap,
     filteredDigest,
     props.state.data.resultRows,
     targetDimension,
@@ -279,46 +300,43 @@ const DimensionPicker: React.FC<{
   dimensionIndex: number;
 }> = props => {
   const targetComparisonDimension =
-    props.state.comparisonDimensions?.[props.dimensionIndex]!;
+    props.state.comparisonDimensions?.[props.dimensionIndex];
 
-  const currDimension = targetComparisonDimension.dimension;
-  const dimensions = useMemo(() => {
-    return [
-      ...Object.values(props.state.data.derivedMetricDimensions),
-      ...Object.values(props.state.data.scorerMetricDimensions),
-    ];
-  }, [
-    props.state.data.derivedMetricDimensions,
-    props.state.data.scorerMetricDimensions,
-  ]);
+  const currDimension = targetComparisonDimension
+    ? props.state.data.scoreMetrics[targetComparisonDimension.metricId]
+    : undefined;
   const {setComparisonDimensions} = useCompareEvaluationsState();
 
-  const dimensionMap = useMemo(() => {
-    return Object.fromEntries(dimensions.map(dim => [dimensionId(dim), dim]));
-  }, [dimensions]);
+  const dimensionMap = props.state.data.scoreMetrics;
+
   return (
-    <FormControl>
+    <FormControl
+      style={{
+        paddingTop: '6px',
+      }}>
       <Autocomplete
         size="small"
         disableClearable
         limitTags={1}
-        value={currDimension ? dimensionId(currDimension) : undefined}
+        value={currDimension ? metricDefinitionId(currDimension) : undefined}
         onChange={(event, newValue) => {
           const res = props.state.comparisonDimensions
             ? [...props.state.comparisonDimensions]
             : [];
-          res[props.dimensionIndex].dimension = dimensionMap[newValue];
+          res[props.dimensionIndex].metricId = metricDefinitionId(
+            dimensionMap[newValue]
+          );
           res[props.dimensionIndex].rangeSelection = undefined;
           setComparisonDimensions(res);
         }}
         getOptionLabel={option => {
-          return dimensionLabel(dimensionMap[option]!);
+          return flattenedDimensionPath(dimensionMap[option]!);
         }}
         options={Object.keys(dimensionMap)}
         renderInput={renderParams => (
           <StyledTextField
             {...renderParams}
-            value={currDimension ? dimensionLabel(currDimension) : ''}
+            value={currDimension ? flattenedDimensionPath(currDimension) : ''}
             label={'Dimension'}
             sx={{width: '300px'}}
           />
@@ -326,4 +344,11 @@ const DimensionPicker: React.FC<{
       />
     </FormControl>
   );
+};
+
+const isBinaryScore = (score: any): score is boolean => {
+  return typeof score === 'boolean';
+};
+const isContinuousScore = (score: any): score is number => {
+  return typeof score === 'number';
 };
