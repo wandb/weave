@@ -77,29 +77,29 @@ def test_table_update(client):
         {"val": 2},
         {"val": 3},
     ]
-    res = client.server.table_create(
+    table_create_res = client.server.table_create(
         TableCreateReq(
             table=TableSchemaForInsert(
-                project_id="test/test-project",
+                project_id=client._project_id(),
                 rows=data,
             )
         )
     )
-    result = client.server.table_query(
-        TableQueryReq(project_id="test/test-project", digest=res.digest)
+    table_query_res = client.server.table_query(
+        TableQueryReq(project_id=client._project_id(), digest=table_create_res.digest)
     )
-    assert len(result.rows) == len(data)
-    for i, row in enumerate(result.rows):
+    assert len(table_query_res.rows) == len(data)
+    for i, row in enumerate(table_query_res.rows):
         assert row.val["val"] == data[i]["val"]
 
-    res = client.server.table_update(
+    table_create_res = client.server.table_update(
         tsi.TableUpdateReq(
-            project_id="test/test-project",
-            initial_digest=result.digest,
+            project_id=client._project_id(),
+            initial_digest=table_create_res.digest,
             insert_rows=[
                 (1, {"val": 4}),
             ],
-            pop_rows=[result.rows[0].digest],
+            pop_digests=[table_query_res.rows[0].digest],
             append_rows=[
                 {"val": 5},
             ],
@@ -110,13 +110,24 @@ def test_table_update(client):
     final_data.pop(0)
     final_data.append({"val": 5})
 
-    result = client.server.table_query(
-        TableQueryReq(project_id="test/test-project", digest=res.digest)
+    table_query_2_res = client.server.table_query(
+        TableQueryReq(project_id=client._project_id(), digest=table_create_res.digest)
     )
 
-    assert len(result.rows) == len(final_data)
-    for i, row in enumerate(result.rows):
+    assert len(table_query_2_res.rows) == len(final_data)
+    for i, row in enumerate(table_query_2_res.rows):
         assert row.val["val"] == final_data[i]["val"]
+
+    # Verify digests are equal to if we added directly
+    check_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=final_data,
+            )
+        )
+    )
+    assert check_res.digest == table_create_res.digest
 
 
 @pytest.mark.skip()

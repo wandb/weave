@@ -648,7 +648,77 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.TableCreateRes(digest=digest)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        raise NotImplementedError()
+        conn, cursor = get_conn_cursor(self.db_path)
+        # conds = ["project_id = {project_id: String}"]
+
+        cursor.execute(
+            """
+            SELECT
+                tables.row_digests
+            FROM
+                tables
+            WHERE
+                tables.project_id = ? AND
+                tables.digest = ?
+            """,
+            (req.project_id, req.initial_digest),
+        )
+        query_result = cursor.fetchall()
+        row_digests: list[Optional[str]] = json.loads(query_result[0][0])
+        insert_rows = []
+
+        def add_insert_row(row_data: Any) -> str:
+            if not isinstance(row_data, dict):
+                raise ValueError("All rows must be dictionaries")
+            row_json = json.dumps(row_data)
+            row_digest = str_digest(row_json)
+            insert_rows.append((req.project_id, row_digest, row_json))
+            return row_digest
+
+        # First, go through and replace popped digests with None
+        # Note: we do this first because we want the indexes referenced
+        # by the insert_rows to be correct, but not have the pop delete
+        # an insert. This allows for swapping a position
+        if req.pop_digests:
+            pop_digest_set = set(req.pop_digests)
+            for i, row_digest in enumerate(row_digests):
+                if row_digest in pop_digest_set:
+                    row_digests[i] = None
+
+        # Next, insert new rows
+        if req.insert_rows:
+            for ndx, row_data in req.insert_rows:
+                row_digest = add_insert_row(row_data)
+                row_digests.insert(ndx, row_digest)
+
+        # Append any rows
+        if req.append_rows:
+            for row_data in req.append_rows:
+                row_digest = add_insert_row(row_data)
+                row_digests.append(row_digest)
+
+        # Remove any None values
+        row_digests_final: list[str] = [r for r in row_digests if r is not None]
+
+        # Perform the actual DB inserts
+        with self.lock:
+            cursor.executemany(
+                "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
+                insert_rows,
+            )
+
+            table_hasher = hashlib.sha256()
+            for row_digest in row_digests_final:
+                table_hasher.update(row_digest.encode())
+            digest = table_hasher.hexdigest()
+
+            cursor.execute(
+                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
+                (req.project_id, digest, json.dumps(row_digests_final)),
+            )
+            conn.commit()
+
+        return tsi.TableUpdateRes(digest=digest)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
