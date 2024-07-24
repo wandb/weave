@@ -299,8 +299,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
-        req.table.rows = self._iterator_ref_apply(req.table.rows, "ext_to_int")
-        return self._internal_trace_server.table_create(req)
+        return self._ref_apply(self._internal_trace_server.table_create, req)
 
     async def async_table_create(
         self, req: tsi.AsyncTableCreateReq

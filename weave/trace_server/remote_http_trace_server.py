@@ -349,6 +349,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
         if isinstance(req, dict):
             req = tsi.TableCreateReq.model_validate(req)
+
+        req = t.cast(tsi.TableCreateReq, req)
         r = requests.post(
             self.trace_server_url + "/table/create_stream",
             auth=self._auth,

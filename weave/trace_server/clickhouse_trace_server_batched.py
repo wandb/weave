@@ -617,15 +617,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.AsyncTableCreateReq
     ) -> tsi.TableCreateRes:
         # TODO: any way to share code with table_create?
-        row_digests = []
-        insert_rows = []
+        row_digests: typing.List[str] = []
+        insert_rows: typing.List[typing.Tuple[str, str, typing.List[str], str]] = []
         est_insert_bytes = 0
 
-        def flush():
+        def flush() -> None:
+            nonlocal est_insert_bytes
+
             if not insert_rows:
                 return
 
-            global est_insert_bytes
             self._insert(
                 "table_rows",
                 data=insert_rows,
