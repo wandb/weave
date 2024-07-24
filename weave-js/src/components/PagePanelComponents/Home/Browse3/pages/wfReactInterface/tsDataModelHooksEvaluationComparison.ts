@@ -463,7 +463,9 @@ const fetchEvaluationComparisonData = async (
             const isProbablyPredictCall =
               (_.some(possiblePredictNames, name =>
                 traceCall.op_name.includes(`.${name}:`)
-              ) && modelRefs.includes(traceCall.inputs.self)) || modelRefs.includes(traceCall.op_name)
+              ) &&
+                modelRefs.includes(traceCall.inputs.self)) ||
+              modelRefs.includes(traceCall.op_name);
 
             const isProbablyScoreCall = scorerRefs.has(traceCall.op_name);
             // WOW - super hacky. we have to do this b/c we support both instances and ops for scorers!
@@ -623,7 +625,6 @@ const fetchEvaluationComparisonData = async (
   });
 
   // Filter out non-intersecting rows
-  console.log("result.resultRows", result.resultRows)
   result.resultRows = Object.fromEntries(
     Object.entries(result.resultRows).filter(([digest, row]) => {
       return (
@@ -632,7 +633,6 @@ const fetchEvaluationComparisonData = async (
       );
     })
   );
-  console.log("AFTER result.resultRows", result.resultRows)
 
   return result;
 };
