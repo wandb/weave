@@ -71,6 +71,65 @@ def test_table_create(client):
     assert result.rows[2].val["val"] == 3
 
 
+def test_table_update(client):
+    data = [
+        {"val": 1},
+        {"val": 2},
+        {"val": 3},
+    ]
+    table_create_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=data,
+            )
+        )
+    )
+    table_query_res = client.server.table_query(
+        TableQueryReq(project_id=client._project_id(), digest=table_create_res.digest)
+    )
+    assert len(table_query_res.rows) == len(data)
+    for i, row in enumerate(table_query_res.rows):
+        assert row.val["val"] == data[i]["val"]
+
+    table_create_res = client.server.table_update(
+        tsi.TableUpdateReq.model_validate(
+            dict(
+                project_id=client._project_id(),
+                base_digest=table_create_res.digest,
+                updates=[
+                    {"insert": {"index": 1, "row": {"val": 4}}},
+                    {"pop": {"index": 0}},
+                    {"append": {"row": {"val": 5}}},
+                ],
+            )
+        )
+    )
+    final_data = [*data]
+    final_data.insert(1, {"val": 4})
+    final_data.pop(0)
+    final_data.append({"val": 5})
+
+    table_query_2_res = client.server.table_query(
+        TableQueryReq(project_id=client._project_id(), digest=table_create_res.digest)
+    )
+
+    assert len(table_query_2_res.rows) == len(final_data)
+    for i, row in enumerate(table_query_2_res.rows):
+        assert row.val["val"] == final_data[i]["val"]
+
+    # Verify digests are equal to if we added directly
+    check_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=final_data,
+            )
+        )
+    )
+    assert check_res.digest == table_create_res.digest
+
+
 @pytest.mark.skip()
 def test_table_append(server):
     table_ref = server.new_table([1, 2, 3])

@@ -363,6 +363,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
         )
 
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        return self._generic_request(
+            "/table/update", req, tsi.TableCreateReq, tsi.TableCreateRes
+        )
+
     def table_query(
         self, req: t.Union[tsi.TableQueryReq, t.Dict[str, t.Any]]
     ) -> tsi.TableQueryRes:
