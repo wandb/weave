@@ -642,15 +642,15 @@ const fetchEvaluationComparisonData = async (
 const modelLatencyMetricDimension: MetricDefinition = {
   source: 'derived',
   scoreType: 'continuous',
-  metricSubPath: ['Model Latency'],
+  metricSubPath: ['Model Latency (avg)'],
   shouldMinimize: true,
-  unit: ' ms',
+  unit: 's',
 };
 
 const totalTokensMetricDimension: MetricDefinition = {
   source: 'derived',
   scoreType: 'continuous',
-  metricSubPath: ['Total Tokens'],
+  metricSubPath: ['Total Tokens (avg)'],
   shouldMinimize: true,
   unit: '',
 };
