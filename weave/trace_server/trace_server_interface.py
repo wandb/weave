@@ -305,8 +305,8 @@ class Table[OPERATION]Spec(BaseModel):
     [OPERATION]: Table[OPERATION]SpecInner
 ```
 
-Fundamentally, this allows us to 
-easily distinguish different operation types over the wire, and is quite readable. 
+Fundamentally, this allows us to easily distinguish different operation types
+over the wire, and is quite readable.
 Consider the payload:
 
 ```
@@ -328,9 +328,11 @@ Consider that if we did not have this nesting, we would have:
     ]
 }
 
-Which would require parsing the keys to make a heuristic "guess" as to what operation each entry is. 
-This is unacceptably fragile. An alternative is to include a "update_type" literal. This would certainly work,
-but stylistically, I prefer the former as it requires fewer JSON characters and is nicer for Pydantic to parse.
+Which would require parsing the keys to make a heuristic "guess" as to what
+operation each entry is. This is unacceptably fragile. An alternative is to
+include a "update_type" literal. This would certainly work, but stylistically, I
+prefer the former as it requires fewer JSON characters and is nicer for Pydantic
+to parse.
 {
     updates: [
         {update_type: 'append', row: ROW_DATA},

@@ -666,65 +666,49 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         query_result = cursor.fetchall()
         final_row_digests: list[str] = json.loads(query_result[0][0])
         new_rows_needed_to_insert = []
+        known_digests = set(final_row_digests)
 
         def add_new_row_needed_to_insert(row_data: Any) -> str:
             if not isinstance(row_data, dict):
                 raise ValueError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
             row_digest = str_digest(row_json)
-            new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
+            if row_digest not in known_digests:
+                new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
+                known_digests.add(row_digest)
             return row_digest
 
         for update in req.updates:
             if isinstance(update, tsi.TableAppendSpec):
-                pass
+                new_digest = add_new_row_needed_to_insert(update.row)
+                final_row_digests.append(new_digest)
             elif isinstance(update, tsi.TablePopSpec):
-                pass
+                if update.index >= len(final_row_digests) or update.index < 0:
+                    raise ValueError("Index out of range")
+                final_row_digests.pop(update.index)
             elif isinstance(update, tsi.TableInsertSpec):
-                pass
+                if update.index > len(final_row_digests) or update.index < 0:
+                    raise ValueError("Index out of range")
+                new_digest = add_new_row_needed_to_insert(update.row)
+                final_row_digests.insert(update.index, new_digest)
             else:
                 raise ValueError("Unrecognized update", update)
-
-        # First, go through and replace popped digests with None
-        # Note: we do this first because we want the indexes referenced
-        # by the insert_rows to be correct, but not have the pop delete
-        # an insert. This allows for swapping a position
-        if req.pop_digests:
-            pop_digest_set = set(req.pop_digests)
-            for i, row_digest in enumerate(row_digests):
-                if row_digest in pop_digest_set:
-                    row_digests[i] = None
-
-        # Next, insert new rows
-        if req.insert_rows:
-            for ndx, row_data in req.insert_rows:
-                row_digest = add_insert_row(row_data)
-                row_digests.insert(ndx, row_digest)
-
-        # Append any rows
-        if req.append_rows:
-            for row_data in req.append_rows:
-                row_digest = add_insert_row(row_data)
-                row_digests.append(row_digest)
-
-        # Remove any None values
-        row_digests_final: list[str] = [r for r in row_digests if r is not None]
 
         # Perform the actual DB inserts
         with self.lock:
             cursor.executemany(
                 "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
-                insert_rows,
+                new_rows_needed_to_insert,
             )
 
             table_hasher = hashlib.sha256()
-            for row_digest in row_digests_final:
+            for row_digest in final_row_digests:
                 table_hasher.update(row_digest.encode())
             digest = table_hasher.hexdigest()
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
-                (req.project_id, digest, json.dumps(row_digests_final)),
+                (req.project_id, digest, json.dumps(final_row_digests)),
             )
             conn.commit()
 

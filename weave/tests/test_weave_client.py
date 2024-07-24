@@ -93,16 +93,16 @@ def test_table_update(client):
         assert row.val["val"] == data[i]["val"]
 
     table_create_res = client.server.table_update(
-        tsi.TableUpdateReq(
-            project_id=client._project_id(),
-            base_digest=table_create_res.digest,
-            insert_rows=[
-                (1, {"val": 4}),
-            ],
-            pop_digests=[table_query_res.rows[0].digest],
-            append_rows=[
-                {"val": 5},
-            ],
+        tsi.TableUpdateReq.model_validate(
+            dict(
+                project_id=client._project_id(),
+                base_digest=table_create_res.digest,
+                updates=[
+                    {"insert": {"index": 1, "row": {"val": 4}}},
+                    {"pop": {"index": 0}},
+                    {"append": {"row": {"val": 5}}},
+                ],
+            )
         )
     )
     final_data = [*data]
