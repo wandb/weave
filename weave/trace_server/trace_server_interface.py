@@ -388,7 +388,6 @@ class TableRowSchema(BaseModel):
 
 class TableCreateRes(BaseModel):
     digest: str
-    # TODO: Add Row Digests
 
 
 class _TableRowFilter(BaseModel):
