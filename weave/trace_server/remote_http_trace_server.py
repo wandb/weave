@@ -93,13 +93,20 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
 
     # My current batching is not safe in notebooks, disable it for now
-    def __init__(self, trace_server_url: str, should_batch: bool = False):
+    def __init__(
+        self,
+        trace_server_url: str,
+        should_batch: bool = False,
+        *,
+        remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
+    ):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: t.Optional[t.Tuple[str, str]] = None
+        self.remote_request_bytes_limit = remote_request_bytes_limit
 
     def ensure_project_exists(self, entity: str, project: str) -> None:
         # TODO: This should happen in the wandb backend, not here, and it's slow
@@ -140,12 +147,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         estimated_bytes_per_item = encoded_bytes / len(batch)
         if _should_update_batch_size and estimated_bytes_per_item > 0:
             target_batch_size = int(
-                REMOTE_REQUEST_BYTES_LIMIT // estimated_bytes_per_item
+                self.remote_request_bytes_limit // estimated_bytes_per_item
             )
             self.call_processor.max_batch_size = max(1, target_batch_size)
 
         # If the batch is too big, recursively split it in half
-        if encoded_bytes > REMOTE_REQUEST_BYTES_LIMIT and len(batch) > 1:
+        if encoded_bytes > self.remote_request_bytes_limit and len(batch) > 1:
             split_idx = int(len(batch) // 2)
             self._flush_calls(batch[:split_idx], _should_update_batch_size=False)
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
@@ -184,10 +191,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             auth=self._auth,
             stream=stream,
         )
-        if r.status_code == 413 and "obj/create" in url:
-            raise requests.HTTPError(
-                "413 Client Error. Request too large. Try using a weave.Dataset() object."
-            )
         if r.status_code == 500:
             reason_val = r.text
             try:
@@ -359,14 +362,67 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_create(
         self, req: t.Union[tsi.TableCreateReq, t.Dict[str, t.Any]]
     ) -> tsi.TableCreateRes:
-        return self._generic_request(
-            "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
-        )
+        """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
+        due to the property that table creation can be decomposed into a series of
+        updates. This is useful when the table creation size is too big to be sent in
+        a single request. We can create an empty table first, then update the table
+        with the rows.
+        """
+        estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
+        print("START CREATE", estimated_bytes)
+        if estimated_bytes > self.remote_request_bytes_limit:
+            initialization_req = tsi.TableCreateReq(
+                table=tsi.TableSchemaForInsert(
+                    project_id=req.table.project_id,
+                    rows=[],
+                )
+            )
+            initialization_res = self.table_create(initialization_req)
+
+            update_req = tsi.TableUpdateReq(
+                project_id=req.table.project_id,
+                base_digest=initialization_res.digest,
+                updates=[
+                    tsi.TableAppendSpec(append=tsi.TableAppendSpecPayload(row=row))
+                    for row in req.table.rows
+                ],
+            )
+            update_res = self.table_update(update_req)
+
+            return tsi.TableCreateRes(digest=update_res.digest)
+        else:
+            print("EXECUTING CREATE", estimated_bytes)
+            return self._generic_request(
+                "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
+            )
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        return self._generic_request(
-            "/table/update", req, tsi.TableCreateReq, tsi.TableCreateRes
-        )
+        """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
+        due to the property that table updates can be decomposed into a series of
+        updates.
+        """
+        estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
+        print("START UPDATE", estimated_bytes)
+        if estimated_bytes > self.remote_request_bytes_limit and len(req.updates) > 1:
+            split_ndx = len(req.updates) // 2
+            first_half_req = tsi.TableUpdateReq(
+                project_id=req.project_id,
+                base_digest=req.base_digest,
+                updates=req.updates[:split_ndx],
+            )
+            first_half_res = self.table_update(first_half_req)
+            second_half_req = tsi.TableUpdateReq(
+                project_id=req.project_id,
+                base_digest=first_half_res.digest,
+                updates=req.updates[split_ndx:],
+            )
+            second_half_res = self.table_update(second_half_req)
+            return tsi.TableUpdateRes(digest=second_half_res.digest)
+        else:
+            print("EXECUTE UPDATE", estimated_bytes)
+            return self._generic_request(
+                "/table/update", req, tsi.TableCreateReq, tsi.TableCreateRes
+            )
 
     def table_query(
         self, req: t.Union[tsi.TableQueryReq, t.Dict[str, t.Any]]

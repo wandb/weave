@@ -1119,3 +1119,13 @@ def test_weave_server(client):
     url = weave.serve(ref, thread=True)
     response = requests.post(url + "/predict", json={"input": "x"})
     assert response.json() == {"result": "input is: x"}
+
+
+def row_gen(num_rows: int, approx_row_bytes: int = 1024):
+    for i in range(num_rows):
+        yield {"a": i, "b": "x" * approx_row_bytes}
+
+
+def test_table_partitioning(client):
+    dataset = weave.Dataset(rows=list(row_gen(10)))
+    # cl
