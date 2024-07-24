@@ -95,7 +95,7 @@ def test_table_update(client):
     table_create_res = client.server.table_update(
         tsi.TableUpdateReq(
             project_id=client._project_id(),
-            initial_digest=table_create_res.digest,
+            base_digest=table_create_res.digest,
             insert_rows=[
                 (1, {"val": 4}),
             ],

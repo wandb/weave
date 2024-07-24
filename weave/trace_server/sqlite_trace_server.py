@@ -661,19 +661,29 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 tables.project_id = ? AND
                 tables.digest = ?
             """,
-            (req.project_id, req.initial_digest),
+            (req.project_id, req.base_digest),
         )
         query_result = cursor.fetchall()
-        row_digests: list[Optional[str]] = json.loads(query_result[0][0])
-        insert_rows = []
+        final_row_digests: list[str] = json.loads(query_result[0][0])
+        new_rows_needed_to_insert = []
 
-        def add_insert_row(row_data: Any) -> str:
+        def add_new_row_needed_to_insert(row_data: Any) -> str:
             if not isinstance(row_data, dict):
                 raise ValueError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
             row_digest = str_digest(row_json)
-            insert_rows.append((req.project_id, row_digest, row_json))
+            new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
             return row_digest
+
+        for update in req.updates:
+            if isinstance(update, tsi.TableAppendSpec):
+                pass
+            elif isinstance(update, tsi.TablePopSpec):
+                pass
+            elif isinstance(update, tsi.TableInsertSpec):
+                pass
+            else:
+                raise ValueError("Unrecognized update", update)
 
         # First, go through and replace popped digests with None
         # Note: we do this first because we want the indexes referenced

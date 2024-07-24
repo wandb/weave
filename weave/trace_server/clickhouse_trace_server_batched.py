@@ -628,14 +628,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             query,
             parameters={
                 "project_id": req.project_id,
-                "digest": req.initial_digest,
+                "digest": req.base_digest,
             },
         )
 
         if len(row_digest_result_query.result_rows) == 0:
-            raise NotFoundError(
-                f"Table {req.project_id}:{req.initial_digest} not found"
-            )
+            raise NotFoundError(f"Table {req.project_id}:{req.base_digest} not found")
 
         row_digests: list[typing.Optional[str]] = row_digest_result_query.result_rows[
             0
