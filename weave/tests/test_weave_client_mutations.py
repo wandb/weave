@@ -41,9 +41,12 @@ def test_list_mutation_saving(client):
     lst2.append(4)
     lst2.extend([5])
     lst2 += [6]
+    print(f"{lst2=}")
     ref2 = weave.publish(lst2)
+    print(f"{ref2=}")
 
     lst3 = ref2.get()
+    print(f"{lst3=}")
     assert lst3 == [100, 2, 3, 4, 5, 6]
 
     # lst2.append(4)
