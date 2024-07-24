@@ -220,7 +220,7 @@ const DragDropProviderComp: FC<DragDropProviderProps> = ({
     }
 
     document.addEventListener('dragstart', dragstartHandler);
-    document.addEventListener('dragendHandler', dragendHandler);
+    document.addEventListener('dragend', dragendHandler);
     document.addEventListener('dragover', dragoverHandler);
     return () => {
       document.removeEventListener('mousemove', mousemoveHandler);
