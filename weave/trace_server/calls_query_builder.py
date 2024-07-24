@@ -532,13 +532,16 @@ class CallsQuery(BaseModel):
                 ) AS kv,
                 kv.1 AS llm_id,
                 JSONExtractInt(kv.2, 'requests') AS requests,
-                ifNull(
-                    JSONExtractInt(kv.2, 'input_tokens'),
-                    JSONExtractInt(kv.2, 'prompt_tokens')
+                -- Some libraries return input_tokens and output_tokens, others prompt_tokens and completion_tokens
+                if(
+                    JSONHas(kv.2, 'prompt_tokens'),
+                    JSONExtractInt(kv.2, 'prompt_tokens'),
+                    JSONExtractInt(kv.2, 'input_tokens')
                 ) AS prompt_tokens,
-                ifNull(
-                    JSONExtractInt(kv.2, 'output_tokens'),
-                    JSONExtractInt(kv.2, 'completion_tokens')
+                if(
+                    JSONHas(kv.2, 'completion_tokens'),
+                    JSONExtractInt(kv.2, 'completion_tokens'),
+                    JSONExtractInt(kv.2, 'output_tokens')
                 ) AS completion_tokens,
                 JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
             FROM

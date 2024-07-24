@@ -73,7 +73,7 @@ export const CostTable = ({costs}: {costs: {[key: string]: CostData}}) => {
       (acc, curr) => {
         const promptTokens = curr.input_tokens ?? curr.prompt_tokens;
         const completionTokens = curr.output_tokens ?? curr.completion_tokens;
-        acc.requests += parseInt(curr.requests, 10);
+        acc.requests += curr.requests;
         acc.prompt_tokens += promptTokens;
         acc.completion_tokens += completionTokens;
         acc.total_tokens += promptTokens + completionTokens;

@@ -52,10 +52,6 @@ class CallSchema(BaseModel):
     deleted_at: typing.Optional[datetime.datetime] = None
 
 
-class CallSchemaWithCosts(CallSchema):
-    costs: typing.Optional[typing.Dict[str, typing.Any]] = None
-
-
 # Essentially a partial of StartedCallSchema. Mods:
 # - id is not required (will be generated)
 # - trace_id is not required (will be generated)
