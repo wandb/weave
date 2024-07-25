@@ -10,7 +10,7 @@ export const useProjectSidebar = (
   hasModelsData: boolean,
   hasWeaveData: boolean,
   isLargeWorkspaceModeEnabled: boolean,
-  hasTraceBackend: boolean
+  hasTraceBackend: boolean = true
 ): FancyPageSidebarItem[] => {
   const showModelsData = hasModelsData || !hasTraceBackend;
   const showWeaveData = hasWeaveData && hasTraceBackend;
