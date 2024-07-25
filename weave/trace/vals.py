@@ -48,7 +48,7 @@ class MutationSetitemObject:
 
 @dataclasses.dataclass
 class MutationSetitemList:
-    path: tuple[str, ...]
+    path: tuple[int, ...]
     operation: Literal["setitem_list"]
     args: tuple[int, Any]
 
@@ -229,14 +229,13 @@ class WeaveObject(Traceable):
             base_root = object.__getattribute__(self, "root")
             base_root.add_mutation(full_path, "setattr", __name, __value)
 
-            object.__setattr__(self._val, __name, __value)
             self._mark_dirty()
 
             # I might be mixing things up here -- what is parent vs root?
             if hasattr(self, "parent") and isinstance(self.parent, Traceable):
                 self.parent._mark_dirty()
 
-            # return object.__setattr__(self._val, __name, __value)
+            return object.__setattr__(self._val, __name, __value)
 
     def __dir__(self) -> list[str]:
         return dir(self._val)

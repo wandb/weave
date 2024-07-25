@@ -81,8 +81,8 @@ def test_object_mutation_saving_nested(client):
     assert d2.a.b == 1
     assert d2.c.a.b == 1
 
-    d2.a = A(b=2)
-    d2.c = C(a=A(b=3))
+    d2.a = A(b=2)  # Replace the entire attr
+    d2.c.a.b = 3  # Mutate nested attr
     ref2 = weave.publish(d2)
 
     d3 = ref2.get()
@@ -182,24 +182,3 @@ def test_mutation_saving_nested(client):
     assert g3.b.d == [["p", "q"], ["r", "s"]]
     assert g3.b.e == {"c": 9}
     assert g3.b.f == {"d": {"e": "f"}}
-
-
-def test_object_mutation2(client):
-    class A(weave.Object):
-        b: int
-
-    class B(weave.Object):
-        a: A
-
-    class C(weave.Object):
-        b: B
-
-    c = C(b=B(a=A(b=1)))
-    ref = weave.publish(c)
-
-    c2 = ref.get()
-    c2.b.a.b = 2
-    ref2 = weave.publish(c2)
-
-    c3 = ref2.get()
-    assert c3.b.a.b == 2
