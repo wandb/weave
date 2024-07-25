@@ -6,6 +6,7 @@
 
 import classNames from 'classnames';
 import React, {ReactElement} from 'react';
+import {PopupProps} from 'semantic-ui-react';
 import {twMerge} from 'tailwind-merge';
 
 import {Icon, IconName} from '../Icon';
@@ -32,6 +33,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactElement | string;
   active?: boolean;
   tooltip?: string;
+  tooltipPosition?: PopupProps['position'];
   twWrapperStyles?: React.CSSProperties;
 };
 
@@ -47,6 +49,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       children,
       className = '',
       tooltip,
+      tooltipPosition,
       twWrapperStyles = {},
       ...htmlAttributes
     },
@@ -144,7 +147,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     if (tooltip) {
       // span is needed so tooltip works on disabled buttons
-      return <Tooltip content={tooltip} trigger={<span>{button}</span>} />;
+      return (
+        <Tooltip
+          content={tooltip}
+          trigger={<span>{button}</span>}
+          position={tooltipPosition}
+        />
+      );
     }
     return button;
   }
