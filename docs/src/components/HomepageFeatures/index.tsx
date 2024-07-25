@@ -13,7 +13,7 @@ const FeatureList: FeatureItem[] = [
   {
     title: "Try Weave",
     subtitle: "Track your first LLM application",
-    link: "/tutorial-tracing_1",
+    link: "/quickstart",
     background: "linear-gradient(135deg, #6e8efb, #a777e3)",
   },
   {

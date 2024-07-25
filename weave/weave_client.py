@@ -928,7 +928,10 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     return op
 
 
-REDACT_KEYS = ("api_key",)
+REDACT_KEYS = (
+    "api_key",
+    "Authorization",
+)
 REDACTED_VALUE = "REDACTED"
 
 

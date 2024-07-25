@@ -259,6 +259,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
         return self._ref_apply(self._internal_trace_server.table_create, req)
 
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.table_update, req)
+
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.table_query, req)

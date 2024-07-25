@@ -103,7 +103,7 @@ const config: Config = {
           items: [
             {
               label: "Documentation",
-              to: "/tutorial-tracing_1",
+              to: "/quickstart",
             },
           ],
         },
