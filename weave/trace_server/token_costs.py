@@ -1,5 +1,5 @@
 from . import trace_server_interface as tsi
-from .orm import Column, PreparedSelect, Table
+from .orm import Column, PreparedSelect, Table, ParamBuilder
 
 LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="pricing_level", type="string"),
@@ -81,7 +81,7 @@ LLM_USAGE_COLUMNS = [
 # WHERE
 #     JSONLength(usage_raw) > 0
 # From a calls table alias, get the usage data for LLMs
-def get_llm_usage(table_alias: str) -> PreparedSelect:
+def get_llm_usage(table_alias: str, param_builder: ParamBuilder) -> PreparedSelect:
     all_calls_table = calls_merged_table(table_alias)
 
     # Select fields
@@ -121,7 +121,7 @@ def get_llm_usage(table_alias: str) -> PreparedSelect:
         )
     )
 
-    prepared_query = select_query.prepare(database_type="clickhouse")
+    prepared_query = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
     return prepared_query
 
 
@@ -158,7 +158,7 @@ def get_llm_usage(table_alias: str) -> PreparedSelect:
 #     ltp.effective_date <= lu.started_at
 # From an llm usage query, get the ranked prices for each llm_id in the usage data
 def get_ranked_prices(
-    project_id: str, llm_usage_table_alias: str = "llm_usage"
+    project_id: str, llm_usage_table_alias: str, param_builder: ParamBuilder
 ) -> PreparedSelect:
     llm_usage_cols = [
         *LLM_USAGE_COLUMNS,
@@ -178,12 +178,12 @@ def get_ranked_prices(
         ORDER BY
             CASE
                 -- Order by pricing level then by effective_date
-                -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_NAME THEN 1
-                WHEN llm_token_prices.pricing_level = 'project' AND llm_token_prices.pricing_level_id = '{project_id}' THEN 2
-                WHEN llm_token_prices.pricing_level = 'default' AND llm_token_prices.pricing_level_id = 'default' THEN 3
+                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = 'org' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_NAME THEN 1
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = 'project' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = 'default' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = 'default' THEN 3
                 ELSE 4
             END,
-            llm_token_prices.effective_date DESC
+            {LLM_TOKEN_PRICES_TABLE_NAME}.effective_date DESC
     ) AS rank
     """
 
@@ -198,7 +198,7 @@ def get_ranked_prices(
                     "$expr": {
                         "$eq": [
                             {"$getField": f"{llm_usage_table_alias}.llm_id"},
-                            {"$getField": "llm_token_prices.llm_id"},
+                            {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.llm_id"},
                         ]
                     }
                 }
@@ -210,7 +210,7 @@ def get_ranked_prices(
                     "$expr": {
                         "$gte": [
                             {"$getField": f"{llm_usage_table_alias}.started_at"},
-                            {"$getField": "llm_token_prices.effective_date"},
+                            {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.effective_date"},
                         ]
                     }
                 }
@@ -218,7 +218,7 @@ def get_ranked_prices(
         )
     )
 
-    prepared_query = select_query.prepare(database_type="clickhouse")
+    prepared_query = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
     return prepared_query
 
 
@@ -236,7 +236,7 @@ def get_ranked_prices(
 # WHERE
 #     rank = 1
 # From the ranked prices, get the top ranked price for each llm_id
-def get_top_ranked_prices(table_alias: str) -> PreparedSelect:
+def get_top_ranked_prices(table_alias: str, param_builder: ParamBuilder) -> PreparedSelect:
     columns = [
         Column(name="id", type="string"),
         *LLM_TOKEN_PRICES_COLUMNS,
@@ -252,7 +252,7 @@ def get_top_ranked_prices(table_alias: str) -> PreparedSelect:
         )
     )
 
-    prepared_query = select_query.prepare(database_type="clickhouse")
+    prepared_query = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
     return prepared_query
 
 
@@ -280,7 +280,7 @@ def get_top_ranked_prices(table_alias: str) -> PreparedSelect:
 #     lu.id = trp.id AND lu.llm_id = trp.llm_id
 # Join the call usage data with the top ranked prices to get the token costs
 def join_usage_with_costs(
-    usage_table_alias: str, price_table_alias: str
+    usage_table_alias: str, price_table_alias: str, param_builder: ParamBuilder
 ) -> PreparedSelect:
     price_columns = [
         Column(name="id", type="string"),
@@ -333,5 +333,5 @@ def join_usage_with_costs(
         .join("LEFT", price_table, join_condition)
     )
 
-    prepared_select = select_query.prepare(database_type="clickhouse")
+    prepared_select = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
     return prepared_select

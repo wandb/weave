@@ -60,9 +60,17 @@ class ParamBuilder:
         param_name: typing.Optional[str] = None,
         param_type: typing.Optional[str] = None,
     ) -> str:
+        """Returns the placeholder for the target database type.
+
+        e.g. SQLite -> :limit
+        e.g. ClickHouse -> {limit:UInt64}
+        """
         param_name = param_name or self._prefix + str(len(self._params))
         self._params[param_name] = param_value
-        return param_name  # Return just the parameter name for manual replacem
+        if self._database_type == "clickhouse":
+            ptype = param_type or python_value_to_ch_type(param_value)
+            return f"{{{param_name}:{ptype}}}"
+        return ":" + param_name
 
     def get_params(self) -> typing.Dict[str, typing.Any]:
         return {**self._params}
@@ -205,7 +213,7 @@ class Join:
 class Select:
     table: Table
     all_columns: list[str]
-    joins: list[Join]  # List of tuples (join_type, table, left_col, right_col)
+    joins: list[Join]
 
     action: Action
 
@@ -387,11 +395,6 @@ class Select:
             sql += f"\nGROUP BY {joined_fields}"
 
         parameters = param_builder.get_params()
-        # Replace placeholders with actual values
-        for param_name, param_value in parameters.items():
-            if isinstance(param_value, str):
-                param_value = f"'{param_value}'"
-            sql = sql.replace(param_name, str(param_value))
 
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
 
@@ -531,8 +534,10 @@ def _transform_external_field_to_internal_field(
     param_builder = param_builder or ParamBuilder()
     raw_fields_used = set()
     json_path = None
+
+    # pops of table_prefix
     table_prefix = None
-    old_field = field
+    unprefixed_field = field
     if "." in field:
         table_prefix, field = field.split(".", 1)
 
@@ -548,7 +553,7 @@ def _transform_external_field_to_internal_field(
         field not in all_columns
         and field.lower() != "count(*)"
         and all(
-            substr not in old_field.lower()
+            substr not in unprefixed_field.lower()
             # TODO Josiah: this is a hack to allow some select fields to pass through, but it's not a good solution
             # Need to come up with a better way to handle this, eg selecting a field that is not in the table
             for substr in ["as", "usage_raw"]
@@ -556,7 +561,7 @@ def _transform_external_field_to_internal_field(
     ):
         raise ValueError(f"Unknown field: {field}")
 
-    raw_fields_used.add(old_field)
+    raw_fields_used.add(unprefixed_field)
     if json_path is not None:
         json_path_param = param_builder.add(json_path, None, "String")
         if cast == "exists":

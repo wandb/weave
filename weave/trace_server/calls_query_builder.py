@@ -510,7 +510,7 @@ class CallsQuery(BaseModel):
             )
         )
 
-        final_prepared_query = final_query.prepare(database_type="clickhouse")
+        final_prepared_query = final_query.prepare(database_type="clickhouse", param_builder=pb)
 
         raw_sql = f"""
         -- This is the current call stream query
@@ -532,29 +532,31 @@ class CallsQuery(BaseModel):
         -- From the all_calls we get the usage data for LLMs
         -- Generate a list of LLM IDs and their respective token counts from the JSON structure
         llm_usage AS (
-            {get_llm_usage("all_calls").sql}
+            {get_llm_usage("all_calls", param_builder=pb).sql}
         ),
 
         -- based on the llm_ids in the usage data we get all the prices and rank them
         -- Rank the rows in llm_token_prices based on the given conditions and effective_date
         ranked_prices AS (
-            {get_ranked_prices(self.project_id, "llm_usage").sql}
+            {get_ranked_prices(self.project_id, "llm_usage", param_builder=pb).sql}
         ),
 
         -- Discard all but the top-ranked prices
         -- Filter to get the top-ranked prices for each llm_id and call id
         top_ranked_prices AS (
-            {get_top_ranked_prices("ranked_prices").sql}
+            {get_top_ranked_prices("ranked_prices", param_builder=pb).sql}
         ),
 
         -- Join with the top-ranked prices to get the token costs
         usage_with_costs AS (
-           {join_usage_with_costs("llm_usage", "top_ranked_prices").sql}
+           {join_usage_with_costs("llm_usage", "top_ranked_prices", param_builder=pb).sql}
         )
 
         -- Final Select, which just pulls all the data from all_calls, and adds a costs object
         {final_prepared_query.sql}
         """
+
+        print(raw_sql, "flush=True")
 
         return _safely_format_sql(raw_sql)
 
