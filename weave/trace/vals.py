@@ -173,7 +173,14 @@ def attribute_access_result(
         return val_attr_val
 
     new_ref = ref.with_attr(attr_name)
-    return make_trace_obj(val_attr_val, new_ref, server, self.root, self)
+    return make_trace_obj(
+        val_attr_val,
+        new_ref,
+        server,
+        None,  # TODO: not passing root, needed for mutate which is not implemented yet
+        # self.root,
+        self,
+    )
 
 
 class WeaveObject(Traceable):
