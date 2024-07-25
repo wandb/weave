@@ -41,17 +41,10 @@ def test_list_mutation_saving(client):
     lst2.append(4)
     lst2.extend([5])
     lst2 += [6]
-    print(f"{lst2=}")
     ref2 = weave.publish(lst2)
-    print(f"{ref2=}")
 
     lst3 = ref2.get()
-    print(f"{lst3=}")
     assert lst3 == [100, 2, 3, 4, 5, 6]
-
-    # lst2.append(4)
-    # ref2 = weave.publish(lst2)
-    # lst3 = ref2.get()
 
 
 def test_dict_mutation_saving(client):
@@ -180,15 +173,11 @@ def test_mutation_saving_nested(client):
     g2.b.d = [["p", "q"], ["r", "s"]]
     g2.b.e = {"c": 9}
     g2.b.f = {"d": {"e": "f"}}
-    print(f"{g2=}")
-    print(f"{g2.b=}")
     ref2 = weave.publish(g2)
 
     g3 = ref2.get()
-    print(f"{g3=}")
     assert g3.a.b == 1
     assert g3.b.a.b == 2
-    print(f"{g3.b=}")
     assert g3.b.c == [7, 8]
     assert g3.b.d == [["p", "q"], ["r", "s"]]
     assert g3.b.e == {"c": 9}
@@ -209,27 +198,8 @@ def test_object_mutation2(client):
     ref = weave.publish(c)
 
     c2 = ref.get()
-    print(f"{c2=}")
     c2.b.a.b = 2
-    print(f"{c2.b.a.b=}")
-    # thing = B(a=A(b=2))
-    # print(f"{thing.a=}")
-    # c2.b = thing
-    print(f"{c2.b.a=}")
-    # c2.b.a = A(b=2)
-    # print(f">>> {c2.b.a.b=}")
-
-    print(f"{c2=}")
-    print(f"{c2._is_dirty=}")
-    print(f"{c2.b._is_dirty=}")
-    print(f"{c2.b.a._is_dirty=}")
-    print(f"{c2.b.a.b=}")
-
     ref2 = weave.publish(c2)
 
     c3 = ref2.get()
-    print(f"{c3=}")
-    print(f"{c3.b=}")
-    print(f"{c3.b.a=}")
-    print(f"{c3.b.a.b=}")
     assert c3.b.a.b == 2

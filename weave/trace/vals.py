@@ -101,7 +101,7 @@ def make_mutation(
 
 
 class Traceable:
-    ref: RefWithExtra
+    ref: Optional[RefWithExtra]
     mutations: Optional[list[Mutation]] = None
     root: "Traceable"
     server: TraceServerInterface
@@ -154,12 +154,6 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     # what they expect when they call `self.<name>`.
     self.__dict__[name] = res
     return res
-
-
-def maybe_deref(x):
-    if isinstance(x, ObjectRef):
-        return x.get()
-    return x
 
 
 def attribute_access_result(
@@ -227,27 +221,20 @@ class WeaveObject(Traceable):
             return object.__setattr__(self, __name, __value)
         else:
             if not isinstance(self.ref, ObjectRef):
-                # if not isinstance(self.ref, Ref):
-                print(f"MISSING OBJECT REF {self.ref=}")
-                # raise ValueError("Can only set attributes on object refs")
-
+                # We used to raise ValueError here to only set attributes on object refs
+                # but I don't understand why that's necessary.
                 full_path = (__name,)
             else:
                 full_path = self.ref.extra + (__name,)
             base_root = object.__getattribute__(self, "root")
             base_root.add_mutation(full_path, "setattr", __name, __value)
 
-            # setattr(self._val, __name, __value)
-            print(f"{__name=}, {__value=}")
             object.__setattr__(self._val, __name, __value)
-            print(f"{object.__getattribute__(self._val, __name)=}")
             self._mark_dirty()
 
+            # I might be mixing things up here -- what is parent vs root?
             if hasattr(self, "parent") and isinstance(self.parent, Traceable):
                 self.parent._mark_dirty()
-
-            if hasattr(self, "root") and isinstance(self.root, Traceable):
-                self.root._mark_dirty()
 
             # return object.__setattr__(self._val, __name, __value)
 
@@ -407,7 +394,7 @@ class WeaveDict(Traceable, dict):
         *args: Any,
         **kwargs: Any,
     ):
-        self.ref: RefWithExtra = kwargs.pop("ref")
+        self.ref: Optional[RefWithExtra] = kwargs.pop("ref")
         self.server: TraceServerInterface = kwargs.pop("server")
         root: Optional[Traceable] = kwargs.pop("root", None)
         if root is None:
@@ -475,7 +462,7 @@ class WeaveDict(Traceable, dict):
 
 def make_trace_obj(
     val: Any,
-    new_ref: RefWithExtra,
+    new_ref: Optional[RefWithExtra],  # Can this actually be None?
     server: TraceServerInterface,
     root: Optional[Traceable],
     parent: Any = None,
@@ -583,13 +570,8 @@ def make_trace_obj(
 
         pass
     else:
-        # This will work when the set value is an object, but not if it's a primitive...
-        setattr(box_val, "ref", new_ref)
-        # if hasattr(box_val, "ref"):
-        #     print(f"{new_ref=}")
-        #     setattr(box_val, "ref", new_ref)
-        # else:
-        #     print(f"wtf... {box_val=}")
+        if hasattr(box_val, "ref"):
+            setattr(box_val, "ref", new_ref)
     return box_val
 
 

@@ -125,7 +125,6 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
-    # maybe move ref removal logic here
     if ref := _get_direct_ref(obj):
         return ref
     if isinstance(obj, ObjectRef):
@@ -736,14 +735,12 @@ class WeaveClient:
     # is nicer for clients I think?
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        print(f"Saving object {val=}")
         self._save_nested_objects(val, name=name)
         return self._save_object_basic(val, name, branch)
 
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
-        print(f"Saving object basic {val=}")
         if getattr(val, "_is_dirty", False):
             val.ref = None
 
@@ -752,7 +749,6 @@ class WeaveClient:
         if isinstance(val, ObjectRef):
             return val
         json_val = to_json(val, self._project_id(), self.server)
-        print(f"About to save {json_val=}")
 
         response = self.server.obj_create(
             ObjCreateReq(
