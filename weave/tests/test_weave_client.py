@@ -1129,13 +1129,14 @@ def test_table_partitioning(network_proxy_client):
     In particular, the ability to partition large dataset
     creation into multiple updates
     """
-    client, remote_client = network_proxy_client
-    rows = list(row_gen(10, 1024))
-    exp_digest = "efa1a6a88e9e1366f9f64ab794f6dd11938d1772904f59df1f492558dc9bcb02"
+    client, remote_client, records = network_proxy_client
+    NUM_ROWS = 16
+    rows = list(row_gen(NUM_ROWS, 1024))
+    exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
 
     remote_client.remote_request_bytes_limit = (
-        10 * 1024 * 1.5
-    )  # buffer to ensure 1 request
+        100 * 1024
+    )  # very large buffer to ensure a single request
     res = remote_client.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
@@ -1145,10 +1146,11 @@ def test_table_partitioning(network_proxy_client):
         )
     )
     assert res.digest == exp_digest
+    assert len(records) == 1
 
     remote_client.remote_request_bytes_limit = (
-        2 * 1024
-    )  # Small enough to ensure multiple requests
+        1.5 * 1024
+    )  # Small enough to ensure each row is a separate request
     res = remote_client.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
@@ -1158,3 +1160,8 @@ def test_table_partitioning(network_proxy_client):
         )
     )
     assert res.digest == exp_digest
+    assert len(records) == (
+        1  # The first create call,
+        + 1  # the second  create
+        + NUM_ROWS  # updates
+    )

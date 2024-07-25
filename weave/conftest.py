@@ -461,12 +461,26 @@ def network_proxy_client(client):
     """
     app = FastAPI()
 
+    records = []
+
     @app.post("/table/create")
     def table_create(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        records.append(
+            (
+                "table_create",
+                req,
+            )
+        )
         return client.server.table_create(req)
 
     @app.post("/table/update")
     def table_update(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        records.append(
+            (
+                "table_update",
+                req,
+            )
+        )
         return client.server.table_update(req)
 
     with TestClient(app) as c:
@@ -481,6 +495,6 @@ def network_proxy_client(client):
         remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
             trace_server_url=""
         )
-        yield (client, remote_client)
+        yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
