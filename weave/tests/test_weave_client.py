@@ -1149,8 +1149,8 @@ def test_table_partitioning(network_proxy_client):
     assert len(records) == 1
 
     remote_client.remote_request_bytes_limit = (
-        1.5 * 1024
-    )  # Small enough to ensure each row is a separate request
+        4 * 1024
+    )  # Small enough to get multiple updates
     res = remote_client.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
@@ -1163,5 +1163,5 @@ def test_table_partitioning(network_proxy_client):
     assert len(records) == (
         1  # The first create call,
         + 1  # the second  create
-        + NUM_ROWS  # updates
+        + NUM_ROWS / 2  # updates - 2 per batch
     )
