@@ -576,8 +576,7 @@ def make_trace_obj(
 
         pass
     else:
-        if hasattr(box_val, "ref"):
-            setattr(box_val, "ref", new_ref)
+        setattr(box_val, "ref", new_ref)
     return box_val
 
 
