@@ -180,6 +180,8 @@ def test_mutation_saving_nested(client):
     g2.b.d = [["p", "q"], ["r", "s"]]
     g2.b.e = {"c": 9}
     g2.b.f = {"d": {"e": "f"}}
+    print(f"{g2=}")
+    print(f"{g2.b=}")
     ref2 = weave.publish(g2)
 
     g3 = ref2.get()
@@ -191,3 +193,42 @@ def test_mutation_saving_nested(client):
     assert g3.b.d == [["p", "q"], ["r", "s"]]
     assert g3.b.e == {"c": 9}
     assert g3.b.f == {"d": {"e": "f"}}
+
+
+def test_object_mutation2(client):
+    class A(weave.Object):
+        b: int
+
+    class B(weave.Object):
+        a: A
+
+    class C(weave.Object):
+        b: B
+
+    c = C(b=B(a=A(b=1)))
+    ref = weave.publish(c)
+
+    c2 = ref.get()
+    print(f"{c2=}")
+    # c2.b.a.b = 2
+    thing = B(a=A(b=2))
+    print(f"{thing.a=}")
+    c2.b = thing
+    print(f"{c2.b.a=}")
+    # c2.b.a = A(b=2)
+    # print(f">>> {c2.b.a.b=}")
+
+    print(f"{c2=}")
+    print(f"{c2._is_dirty=}")
+    # print(f"{c2.b._is_dirty=}")
+    # print(f"{c2.b.a._is_dirty=}")
+    print(f"{c2.b.a.b=}")
+
+    ref2 = weave.publish(c2)
+
+    c3 = ref2.get()
+    print(f"{c3=}")
+    print(f"{c3.b=}")
+    print(f"{c3.b.a=}")
+    print(f"{c3.b.a.b=}")
+    assert c3.b.a.b == 2

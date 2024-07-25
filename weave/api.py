@@ -8,7 +8,7 @@ import contextlib
 import dataclasses
 from typing import Any
 import threading
-
+import copy
 from weave.trace.vals import Traceable
 
 from . import urls
@@ -219,10 +219,12 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     client = client_context.weave_client.require_weave_client()
 
     save_name = _get_save_name(obj)
-    
-    if isinstance(obj, Traceable) and obj.mutations:
-        obj.ref = None
+
+    if isinstance(obj, Traceable) and (obj.mutations or obj._is_dirty):
+        # obj.ref = None
+        # new_obj = copy.deepcopy(obj._val)
         ...
+        
 
     ref = client._save_object(obj, save_name, "latest")
 

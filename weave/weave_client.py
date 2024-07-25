@@ -742,11 +742,15 @@ class WeaveClient:
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
+        if getattr(val, "_is_dirty", False):
+            val.ref = None
+
         is_opdef = isinstance(val, Op)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
         json_val = to_json(val, self._project_id(), self.server)
+        print(f"About to save {json_val=}")
 
         response = self.server.obj_create(
             ObjCreateReq(

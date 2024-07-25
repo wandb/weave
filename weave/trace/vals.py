@@ -101,12 +101,16 @@ def make_mutation(
 
 
 class Traceable:
-    mutated_value: Any = None
     ref: RefWithExtra
-    list_mutations: Optional[list] = None
     mutations: Optional[list[Mutation]] = None
     root: "Traceable"
     server: TraceServerInterface
+    _is_dirty: bool = False
+
+    def _mark_dirty(self):
+        self._is_dirty = True
+        if self.root is not self:
+            self.root._mark_dirty()
 
     def add_mutation(
         self, path: tuple[str, ...], operation: MutationOperation, *args: Any
@@ -114,6 +118,7 @@ class Traceable:
         if self.mutations is None:
             self.mutations = []
         self.mutations.append(make_mutation(path, operation, args))
+        self._mark_dirty()
 
     def save(self) -> ObjectRef:
         if not isinstance(self.ref, ObjectRef):
@@ -173,15 +178,7 @@ def attribute_access_result(
         return val_attr_val
 
     new_ref = ref.with_attr(attr_name)
-
-    return make_trace_obj(
-        val_attr_val,
-        new_ref,
-        server,
-        # None,  # TODO: not passing root, needed for mutate which is not implemented yet
-        self.root,
-        self,
-    )
+    return make_trace_obj(val_attr_val, new_ref, server, self.root, self)
 
 
 class WeaveObject(Traceable):
@@ -207,24 +204,37 @@ class WeaveObject(Traceable):
         val_attr_val = object.__getattribute__(self._val, __name)
         result = attribute_access_result(self, val_attr_val, __name, server=self.server)
         # Store the result on _val so we don't deref next time.
-        try:
-            object.__setattr__(self._val, __name, result)
-        except AttributeError:
-            # Happens if self._val.<name> is a property. Return the raw value instead
-            # of a Traceable value.
-            return val_attr_val
+
+        # try:
+        #     object.__setattr__(self._val, __name, result)
+        # except AttributeError:
+        #     # Happens if self._val.<name> is a property. Return the raw value instead
+        #     # of a Traceable value.
+        #     return val_attr_val
         return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
-        if __name in ["_val", "ref", "server", "root", "mutations"]:
+        if __name in ["_val", "ref", "server", "root", "mutations", "_is_dirty"]:
             return object.__setattr__(self, __name, __value)
         else:
             if not isinstance(self.ref, ObjectRef):
                 raise ValueError("Can only set attributes on object refs")
-            object.__getattribute__(self, "root").add_mutation(
-                self.ref.extra, "setattr", __name, __value
-            )
-            return object.__setattr__(self._val, __name, __value)
+
+            full_path = self.ref.extra + (__name,)
+            base_root = object.__getattribute__(self, "root")
+            base_root.add_mutation(full_path, "setattr", __name, __value)
+
+            # setattr(self._val, __name, __value)
+            object.__setattr__(self._val, __name, __value)
+            self._mark_dirty()
+
+            if hasattr(self, "parent") and isinstance(self.parent, Traceable):
+                self.parent._mark_dirty()
+
+            if hasattr(self, "root") and isinstance(self.root, Traceable):
+                self.root._mark_dirty()
+
+            # return object.__setattr__(self._val, __name, __value)
 
     def __dir__(self) -> list[str]:
         return dir(self._val)
@@ -512,7 +522,10 @@ def make_trace_obj(
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return WeaveObject(val, new_ref, server, root)
+            obj = WeaveObject(val, new_ref, server, root)
+            if parent:
+                obj.parent = parent
+            return obj
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root)
         elif isinstance(val, dict):
@@ -552,7 +565,10 @@ def make_trace_obj(
 
         pass
     else:
-        setattr(box_val, "ref", new_ref)
+        try:
+            setattr(box_val, "ref", new_ref)
+        except:
+            pass
     return box_val
 
 
