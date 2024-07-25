@@ -39,6 +39,7 @@ from weave.trace.refs import (
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (
+    _SortBy,
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
@@ -227,11 +228,16 @@ class CallsIter:
     filter: _CallsFilter
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: _CallsFilter,
+        sort_by: Optional[_SortBy] = None,
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
+        self.sort_by = sort_by
         self._page_size = 10
 
     # seems like this caching should be on the server, but it's here for now...
@@ -243,6 +249,7 @@ class CallsIter:
             CallsQueryReq(
                 project_id=self.project_id,
                 filter=self.filter,
+                sort_by=self.sort_by,
                 offset=index * self._page_size,
                 limit=self._page_size,
             )
