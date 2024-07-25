@@ -233,16 +233,18 @@ def test_graph_call_ordering_order_by(client):
     def my_op(a: int) -> int:
         return a + 1
 
-    for i in range(10):
+    for i in range(1, 6):
         my_op(i)
 
     sort_by = tsi._SortBy(field="started_at", direction="desc")
     calls = list(client.calls(sort_by=[sort_by]))
-    assert [call.inputs["a"] for call in calls] == list(range(9, -1, -1))
+    assert [call.inputs["a"] for call in calls] == [5, 4, 3, 2, 1]
 
-    sort_by = tsi._SortBy(field="output.a", direction="asc")
+    my_op(0)
+
+    sort_by = {"field": "output.a", "direction": "asc"}
     calls = list(client.calls(sort_by=[sort_by]))
-    assert [call.inputs["a"] for call in calls] == list(range(10))
+    assert [call.inputs["a"] for call in calls] == [0, 1, 2, 3, 4, 5]
 
 
 class OpCallSummary(BaseModel):
