@@ -27,6 +27,7 @@ const FIND_USER_QUERY = gql`
           email
           photoUrl
           deletedAt
+          username
         }
       }
     }
@@ -216,13 +217,13 @@ const UserInner = ({user, includeName, placement}: UserInnerProps) => {
 };
 
 type UserLinkProps = {
-  username: string | null;
+  userId: string | null;
   includeName?: boolean; // Default is to show avatar image only.
   placement?: TooltipProps['placement'];
 };
 
-export const UserLink = ({username, includeName, placement}: UserLinkProps) => {
-  const [user, setUser] = useState<UserResult>(username ? 'load' : 'NA');
+export const UserLink = ({userId, includeName, placement}: UserLinkProps) => {
+  const [user, setUser] = useState<UserResult>(userId ? 'load' : 'NA');
   useEffect(
     () => {
       if (user !== 'load') {
@@ -233,17 +234,14 @@ export const UserLink = ({username, includeName, placement}: UserLinkProps) => {
         .query({
           query: FIND_USER_QUERY as any,
           variables: {
-            username,
+            userId,
           },
         })
         .then(result => {
           const {edges} = result.data.users;
           if (edges.length > 0) {
             const u = edges[0].node;
-            setUser({
-              ...u,
-              username,
-            });
+            setUser(u);
           } else {
             setUser('error');
           }
@@ -262,7 +260,7 @@ export const UserLink = ({username, includeName, placement}: UserLinkProps) => {
     return <LoadingDots />;
   }
   if (user === 'error') {
-    return <div>{username}</div>;
+    return <div>{userId}</div>;
   }
   return (
     <UserInner user={user} placement={placement} includeName={includeName} />
