@@ -3,14 +3,13 @@ import dataclasses
 import json
 import platform
 import re
-import signal
 import sys
-from typing import Callable
 
 import pydantic
 import pytest
 import requests
-from pydantic import BaseModel
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
@@ -24,10 +23,10 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
-    OpRef,
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
+from weave.trace_server import remote_http_trace_server
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -1126,6 +1125,62 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-def test_table_partitioning(client):
-    dataset = weave.Dataset(rows=list(row_gen(10)))
-    # cl
+@pytest.fixture
+def network_proxy_client(client):
+    app = FastAPI()
+
+    @app.post("/table/create")
+    def table_create(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        return client.server.table_create(req)
+
+    @app.post("/table/update")
+    def table_update(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        return client.server.table_update(req)
+
+    with TestClient(app) as c:
+
+        def post(url, data=None, json=None, **kwargs):
+            kwargs.pop("stream", None)
+            return c.post(url, data=data, json=json, **kwargs)
+
+        orig_post = weave.trace_server.requests.post
+        weave.trace_server.requests.post = post
+
+        remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
+            trace_server_url=""
+        )
+        yield (client, remote_client)
+
+        weave.trace_server.requests.post = orig_post
+
+
+def test_table_partitioning(network_proxy_client):
+    client, remote_client = network_proxy_client
+    rows = list(row_gen(10, 1024))
+    exp_digest = "efa1a6a88e9e1366f9f64ab794f6dd11938d1772904f59df1f492558dc9bcb02"
+
+    remote_client.remote_request_bytes_limit = (
+        10 * 1024 * 1.5
+    )  # buffer to ensure 1 request
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+    assert res.digest == exp_digest
+
+    remote_client.remote_request_bytes_limit = (
+        2 * 1024
+    )  # Small enough to ensure multiple requests
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+    assert res.digest == exp_digest

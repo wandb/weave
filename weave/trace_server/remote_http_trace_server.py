@@ -369,7 +369,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         with the rows.
         """
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
-        print("START CREATE", estimated_bytes)
         if estimated_bytes > self.remote_request_bytes_limit:
             initialization_req = tsi.TableCreateReq(
                 table=tsi.TableSchemaForInsert(
@@ -391,7 +390,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
             return tsi.TableCreateRes(digest=update_res.digest)
         else:
-            print("EXECUTING CREATE", estimated_bytes)
             return self._generic_request(
                 "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
             )
@@ -402,7 +400,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         updates.
         """
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
-        print("START UPDATE", estimated_bytes)
         if estimated_bytes > self.remote_request_bytes_limit and len(req.updates) > 1:
             split_ndx = len(req.updates) // 2
             first_half_req = tsi.TableUpdateReq(
@@ -419,7 +416,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             second_half_res = self.table_update(second_half_req)
             return tsi.TableUpdateRes(digest=second_half_res.digest)
         else:
-            print("EXECUTE UPDATE", estimated_bytes)
             return self._generic_request(
                 "/table/update", req, tsi.TableCreateReq, tsi.TableCreateRes
             )
