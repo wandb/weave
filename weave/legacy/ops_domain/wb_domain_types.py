@@ -194,6 +194,9 @@ ArtifactAliasType = typing.cast(PartialObjectTypeGeneratorType, ArtifactAliasTyp
 class Tag(GQLBase):
     REQUIRED_FRAGMENT = """
         id
+        name
+        tagCategoryName
+        attributes
     """
 
 
