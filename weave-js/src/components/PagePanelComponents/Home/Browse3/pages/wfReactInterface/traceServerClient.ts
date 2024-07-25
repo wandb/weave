@@ -229,16 +229,8 @@ export type TraceFileContentReadRes = {
   content: string;
 };
 
-const DEFAULT_BATCH_INTERVAL = 150;
-const MAX_REFS_PER_BATCH = 1000;
-
-export class TraceServerClient {
+export class DirectTraceServerClient {
   private baseUrl: string;
-  private readBatchCollectors: Array<{
-    req: TraceRefsReadBatchReq;
-    resolvePromise: (res: TraceRefsReadBatchRes) => void;
-    rejectPromise: (err: any) => void;
-  }> = [];
   private inFlightFetchesRequests: Record<
     string,
     Record<
@@ -249,199 +241,163 @@ export class TraceServerClient {
       }>
     >
   > = {};
-  private onDeleteListeners: Array<() => void>;
-  private onRenameListeners: Array<() => void>;
 
   constructor(baseUrl: string) {
-    this.readBatchCollectors = [];
     this.inFlightFetchesRequests = {};
     this.baseUrl = baseUrl;
-    this.scheduleReadBatch();
-    this.onDeleteListeners = [];
-    this.onRenameListeners = [];
   }
 
-  /**
-   * Registers a callback to be called when a delete operation occurs.
-   * This method is purely for local notification within the client
-   *    and does not interact with the REST API.
-   *
-   * @param callback A function to be called when a delete operation is triggered.
-   * @returns A function to unregister the callback.
-   */
-  public registerOnDeleteListener(callback: () => void): () => void {
-    this.onDeleteListeners.push(callback);
-    return () => {
-      this.onDeleteListeners = this.onDeleteListeners.filter(
-        listener => listener !== callback
-      );
-    };
-  }
-  public registerOnRenameListener(callback: () => void): () => void {
-    this.onRenameListeners.push(callback);
-    return () => {
-      this.onRenameListeners = this.onRenameListeners.filter(
-        listener => listener !== callback
-      );
-    };
+  public callsDelete(req: TraceCallsDeleteReq): Promise<void> {
+    return this.makeRequest<TraceCallsDeleteReq, void>('/calls/delete', req);
   }
 
-  callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
-    const res = this.makeRequest<TraceCallsDeleteReq, void>(
-      '/calls/delete',
+  public callUpdate(req: TraceCallUpdateReq): Promise<void> {
+    return this.makeRequest<TraceCallUpdateReq, void>('/call/update', req);
+  }
+
+  public callsQuery(req: TraceCallsQueryReq): Promise<TraceCallsQueryRes> {
+    return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(
+      '/calls/query',
       req
-    ).then(() => {
-      this.onDeleteListeners.forEach(listener => listener());
-    });
-    return res;
-  };
-  callUpdate: (req: TraceCallUpdateReq) => Promise<void> = req => {
-    const res = this.makeRequest<TraceCallUpdateReq, void>(
-      '/call/update',
-      req
-    ).then(() => {
-      this.onRenameListeners.forEach(listener => listener());
-    });
-    return res;
-  };
-  callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
-    req => {
-      return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(
-        '/calls/query',
-        req
-      );
-    };
-  callsQueryStats: (
+    );
+  }
+
+  public callsQueryStats(
     req: TraceCallsQueryStatsReq
-  ) => Promise<TraceCallsQueryStatsRes> = req => {
+  ): Promise<TraceCallsQueryStatsRes> {
     return this.makeRequest<TraceCallsQueryStatsReq, TraceCallsQueryStatsRes>(
       '/calls/query_stats',
       req
     );
-  };
-  callsStreamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
-    req => {
-      const res = this.makeRequest<TraceCallsQueryReq, string>(
-        '/calls/stream_query',
-        req,
-        true
-      );
-      return new Promise((resolve, reject) => {
-        res
-          .then(content => {
-            // `content` is jsonl string, we need to parse it.
-            if (!content) {
-              resolve({calls: []});
-              return;
-            }
-            if (content.endsWith('\n')) {
-              content = content.slice(0, -1);
-            }
-            if (content === '') {
-              resolve({calls: []});
-              return;
-            }
-            const calls: TraceCallSchema[] = [];
-            const lines = content.split('\n');
-            let earlyTermination = false;
+  }
 
-            lines.forEach((line, lineIndex) => {
-              try {
-                calls.push(JSON.parse(line));
-              } catch (err) {
-                if (lineIndex === lines.length - 1 && lineIndex > 0) {
-                  // This is a very special case where the last line is not a
-                  // complete json object. This can happen if the stream is
-                  // terminated early. Instead of just failing, we can make a
-                  // new request to the server to resume the stream from the
-                  // last line. This should only occur projects with massive
-                  // trace data (> 150MB per my own testing)
-                  const newReq = {...req};
-                  const origOffset = req.offset || 0;
-                  newReq.offset = origOffset + lineIndex;
-                  console.debug(
-                    `Early stream termination, performing a new request resuming from ${newReq.offset}`
-                  );
-                  earlyTermination = true;
-                  this.callsStreamQuery(newReq)
-                    .then(innerRes => {
-                      calls.push(...innerRes.calls);
-                      resolve({calls});
-                    })
-                    .catch(err => {
-                      reject(err);
-                    });
-                  return;
-                } else {
-                  console.error(
-                    `Error parsing line ${lineIndex} of ${lines.length}: ${line}`
-                  );
-                }
+  public callsStreamQuery(
+    req: TraceCallsQueryReq
+  ): Promise<TraceCallsQueryRes> {
+    const res = this.makeRequest<TraceCallsQueryReq, string>(
+      '/calls/stream_query',
+      req,
+      true
+    );
+    return new Promise((resolve, reject) => {
+      res
+        .then(content => {
+          // `content` is jsonl string, we need to parse it.
+          if (!content) {
+            resolve({calls: []});
+            return;
+          }
+          if (content.endsWith('\n')) {
+            content = content.slice(0, -1);
+          }
+          if (content === '') {
+            resolve({calls: []});
+            return;
+          }
+          const calls: TraceCallSchema[] = [];
+          const lines = content.split('\n');
+          let earlyTermination = false;
+
+          lines.forEach((line, lineIndex) => {
+            try {
+              calls.push(JSON.parse(line));
+            } catch (err) {
+              if (lineIndex === lines.length - 1 && lineIndex > 0) {
+                // This is a very special case where the last line is not a
+                // complete json object. This can happen if the stream is
+                // terminated early. Instead of just failing, we can make a
+                // new request to the server to resume the stream from the
+                // last line. This should only occur projects with massive
+                // trace data (> 150MB per my own testing)
+                const newReq = {...req};
+                const origOffset = req.offset || 0;
+                newReq.offset = origOffset + lineIndex;
+                console.debug(
+                  `Early stream termination, performing a new request resuming from ${newReq.offset}`
+                );
+                earlyTermination = true;
+                this.callsStreamQuery(newReq)
+                  .then(innerRes => {
+                    calls.push(...innerRes.calls);
+                    resolve({calls});
+                  })
+                  .catch(err => {
+                    reject(err);
+                  });
+                return;
+              } else {
+                console.error(
+                  `Error parsing line ${lineIndex} of ${lines.length}: ${line}`
+                );
               }
-            });
-            if (!earlyTermination) {
-              resolve({calls});
             }
-          })
-          .catch(err => {
-            reject(err);
           });
-      });
-    };
-  callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = req => {
+          if (!earlyTermination) {
+            resolve({calls});
+          }
+        })
+        .catch(err => {
+          reject(err);
+        });
+    });
+  }
+
+  public callRead(req: TraceCallReadReq): Promise<TraceCallReadRes> {
     return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
       '/call/read',
       req
     );
-  };
-  objsQuery: (req: TraceObjQueryReq) => Promise<TraceObjQueryRes> = req => {
+  }
+
+  public objsQuery(req: TraceObjQueryReq): Promise<TraceObjQueryRes> {
     return this.makeRequest<TraceObjQueryReq, TraceObjQueryRes>(
       '/objs/query',
       req
     );
-  };
-  objRead: (req: TraceObjReadReq) => Promise<TraceObjReadRes> = req => {
+  }
+
+  public objRead(req: TraceObjReadReq): Promise<TraceObjReadRes> {
     return this.makeRequest<TraceObjReadReq, TraceObjReadRes>('/obj/read', req);
-  };
+  }
 
-  readBatch: (req: TraceRefsReadBatchReq) => Promise<TraceRefsReadBatchRes> =
-    req => {
-      return this.requestReadBatch(req);
-    };
+  public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
+    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
+      '/refs/read_batch',
+      req
+    );
+  }
 
-  tableQuery: (req: TraceTableQueryReq) => Promise<TraceTableQueryRes> =
-    req => {
-      return this.makeRequest<TraceTableQueryReq, TraceTableQueryRes>(
-        '/table/query',
-        req
-      );
-    };
+  public tableQuery(req: TraceTableQueryReq): Promise<TraceTableQueryRes> {
+    return this.makeRequest<TraceTableQueryReq, TraceTableQueryRes>(
+      '/table/query',
+      req
+    );
+  }
 
-  feedbackCreate: (req: FeedbackCreateReq) => Promise<FeedbackCreateRes> =
-    req => {
-      return this.makeRequest<FeedbackCreateReq, FeedbackCreateRes>(
-        '/feedback/create',
-        req
-      );
-    };
+  public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
+    return this.makeRequest<FeedbackCreateReq, FeedbackCreateRes>(
+      '/feedback/create',
+      req
+    );
+  }
 
-  feedbackQuery: (req: FeedbackQueryReq) => Promise<FeedbackQueryRes> = req => {
+  public feedbackQuery(req: FeedbackQueryReq): Promise<FeedbackQueryRes> {
     return this.makeRequest<FeedbackQueryReq, FeedbackQueryRes>(
       '/feedback/query',
       req
     );
-  };
+  }
 
-  feedbackPurge: (req: FeedbackPurgeReq) => Promise<FeedbackPurgeRes> = req => {
+  public feedbackPurge(req: FeedbackPurgeReq): Promise<FeedbackPurgeRes> {
     return this.makeRequest<FeedbackPurgeReq, FeedbackPurgeRes>(
       '/feedback/purge',
       req
     );
-  };
+  }
 
-  fileContent: (
+  public fileContent(
     req: TraceFileContentReadReq
-  ) => Promise<TraceFileContentReadRes> = req => {
+  ): Promise<TraceFileContentReadRes> {
     const res = this.makeRequest<TraceFileContentReadReq, string>(
       '/files/content',
       req,
@@ -456,7 +412,7 @@ export class TraceServerClient {
           reject(err);
         });
     });
-  };
+  }
 
   private makeRequest = async <QT, ST>(
     endpoint: string,
@@ -539,10 +495,74 @@ export class TraceServerClient {
 
     return prom;
   };
+}
 
-  private requestReadBatch: (
+const DEFAULT_BATCH_INTERVAL = 150;
+const MAX_REFS_PER_BATCH = 1000;
+
+export class TraceServerClient extends DirectTraceServerClient {
+  private readBatchCollectors: Array<{
+    req: TraceRefsReadBatchReq;
+    resolvePromise: (res: TraceRefsReadBatchRes) => void;
+    rejectPromise: (err: any) => void;
+  }> = [];
+  private onDeleteListeners: Array<() => void>;
+  private onRenameListeners: Array<() => void>;
+
+  constructor(baseUrl: string) {
+    super(baseUrl);
+    this.readBatchCollectors = [];
+    this.scheduleReadBatch();
+    this.onDeleteListeners = [];
+    this.onRenameListeners = [];
+  }
+
+  /**
+   * Registers a callback to be called when a delete operation occurs.
+   * This method is purely for local notification within the client
+   *    and does not interact with the REST API.
+   *
+   * @param callback A function to be called when a delete operation is triggered.
+   * @returns A function to unregister the callback.
+   */
+  public registerOnDeleteListener(callback: () => void): () => void {
+    this.onDeleteListeners.push(callback);
+    return () => {
+      this.onDeleteListeners = this.onDeleteListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
+  public registerOnRenameListener(callback: () => void): () => void {
+    this.onRenameListeners.push(callback);
+    return () => {
+      this.onRenameListeners = this.onRenameListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
+
+  public callsDelete(req: TraceCallsDeleteReq): Promise<void> {
+    const res = super.callsDelete(req).then(() => {
+      this.onDeleteListeners.forEach(listener => listener());
+    });
+    return res;
+  }
+
+  public callUpdate(req: TraceCallUpdateReq): Promise<void> {
+    const res = super.callUpdate(req).then(() => {
+      this.onRenameListeners.forEach(listener => listener());
+    });
+    return res;
+  }
+
+  public readBatch(req: TraceRefsReadBatchReq): Promise<TraceRefsReadBatchRes> {
+    return this.requestReadBatch(req);
+  }
+
+  private requestReadBatch(
     req: TraceRefsReadBatchReq
-  ) => Promise<TraceRefsReadBatchRes> = req => {
+  ): Promise<TraceRefsReadBatchRes> {
     return new Promise<TraceRefsReadBatchRes>((resolve, reject) => {
       this.readBatchCollectors.push({
         req,
@@ -550,9 +570,9 @@ export class TraceServerClient {
         rejectPromise: reject,
       });
     });
-  };
+  }
 
-  private doReadBatch = async () => {
+  private async doReadBatch() {
     if (this.readBatchCollectors.length === 0) {
       return;
     }
@@ -573,19 +593,16 @@ export class TraceServerClient {
       const refVals = req.refs.map(ref => valMap.get(ref));
       collector.resolvePromise({vals: refVals});
     });
-  };
+  }
 
-  private scheduleReadBatch = async () => {
+  private async scheduleReadBatch() {
     await this.doReadBatch();
     setTimeout(this.scheduleReadBatch, DEFAULT_BATCH_INTERVAL);
-  };
+  }
 
-  private readBatchDirect: (
+  private readBatchDirect(
     req: TraceRefsReadBatchReq
-  ) => Promise<TraceRefsReadBatchRes> = req => {
-    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
-      '/refs/read_batch',
-      req
-    );
-  };
+  ): Promise<TraceRefsReadBatchRes> {
+    return super.readBatch(req);
+  }
 }
