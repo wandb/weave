@@ -39,7 +39,6 @@ from weave.trace.refs import (
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (
-    _SortBy,
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
@@ -60,6 +59,7 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     _CallsFilter,
     _ObjectVersionFilter,
+    _SortBy,
 )
 
 if typing.TYPE_CHECKING:
@@ -226,14 +226,14 @@ class Call:
 class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
-    sort_by: _SortBy
+    sort_by: list[_SortBy]
 
     def __init__(
         self,
         server: TraceServerInterface,
         project_id: str,
         filter: _CallsFilter,
-        sort_by: _SortBy,
+        sort_by: list[_SortBy],
     ) -> None:
         self.server = server
         self.project_id = project_id
@@ -464,12 +464,14 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def calls(
-        self, filter: Optional[_CallsFilter] = None, sort_by: Optional[_SortBy] = None
+        self,
+        filter: Optional[_CallsFilter] = None,
+        sort_by: Optional[list[_SortBy]] = None,
     ) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
         if sort_by is None:
-            sort_by = _SortBy(field="started_at", direction="desc")
+            sort_by = [_SortBy(field="started_at", direction="asc")]
 
         return CallsIter(self.server, self._project_id(), filter, sort_by)
 
