@@ -425,3 +425,34 @@ def final_call_select_with_cost(
         database_type="clickhouse", param_builder=param_builder
     )
     return final_prepared_query
+
+
+def cost_query(
+    pb: ParamBuilder,
+    call_table_alias: str,
+    project_id: str,
+    select_fields: list[str],
+) -> str:
+    raw_sql = f"""
+        -- From a calls query we get the llm ids in the usage data
+        -- Then the prices and rank them
+        -- We get the top ranked prices and discard the rest
+        -- We join the top ranked prices with the usage data to get the token costs
+        -- Finally we pull all the data from the calls and add a costs object
+        
+        -- From the all_calls we get the usage data for LLMs
+        llm_usage AS ({get_llm_usage(pb, call_table_alias).sql}),
+
+        -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
+        ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql}),
+
+        -- Discard all but the top-ranked prices for each llm_id and call id
+        top_ranked_prices AS ({get_top_ranked_prices(pb, "ranked_prices").sql}),
+
+        -- Join with the top-ranked prices to get the token costs
+        usage_with_costs AS ({join_usage_with_costs(pb, "llm_usage", "top_ranked_prices").sql})
+
+        -- Final Select, which just pulls all the data from all_calls, and adds a costs object
+        {final_call_select_with_cost(pb, 'all_calls', 'usage_with_costs', select_fields).sql}
+    """
+    return raw_sql

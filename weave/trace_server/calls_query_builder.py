@@ -42,13 +42,7 @@ from weave.trace_server.orm import (
     python_value_to_ch_type,
     quote_json_path_parts,
 )
-from weave.trace_server.token_costs import (
-    final_call_select_with_cost,
-    get_llm_usage,
-    get_ranked_prices,
-    get_top_ranked_prices,
-    join_usage_with_costs,
-)
+from weave.trace_server.token_costs import cost_query
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -461,21 +455,16 @@ class CallsQuery(BaseModel):
         -- Then we get all the calls we want, with all the data we need, with heavy filtering
         all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
 
-        -- From the all_calls we get the usage data for LLMs
-        llm_usage AS ({get_llm_usage(pb, "all_calls").sql}),
-
-        -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-        ranked_prices AS ({get_ranked_prices(pb, "llm_usage", self.project_id).sql}),
-
-        -- Discard all but the top-ranked prices for each llm_id and call id
-        top_ranked_prices AS ({get_top_ranked_prices(pb, "ranked_prices").sql}),
-
-        -- Join with the top-ranked prices to get the token costs
-        usage_with_costs AS ({join_usage_with_costs(pb, "llm_usage", "top_ranked_prices").sql})
-
-        -- Final Select, which just pulls all the data from all_calls, and adds a costs object
-        {final_call_select_with_cost(pb, 'all_calls', 'usage_with_costs', final_select_fields).sql}
+        -- Add Cost to the summary dump, of each call
+        {cost_query(pb, "all_calls", self.project_id, final_select_fields)}
         """
+
+        # raw_sql = f"""
+        # WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
+        # {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
+        # """
+
+        # print(raw_sql, flush=True)
 
         return _safely_format_sql(raw_sql)
 
