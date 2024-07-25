@@ -81,7 +81,7 @@ export const Tag: FC<TagProps> = ({
   return nakedTag;
 };
 
-export type RemovableTagProps = TagProps & {
+export type RemovableTagProps = Omit<TagProps, 'isInteractive'> & {
   removeAction: ReactElement<typeof RemoveAction>;
 };
 export const RemovableTag: FC<RemovableTagProps> = ({
