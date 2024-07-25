@@ -109,6 +109,7 @@ class Traceable:
 
     def _mark_dirty(self):
         self._is_dirty = True
+        self.ref = None
         if self.root is not self:
             self.root._mark_dirty()
 
@@ -203,29 +204,43 @@ class WeaveObject(Traceable):
             pass
         val_attr_val = object.__getattribute__(self._val, __name)
         result = attribute_access_result(self, val_attr_val, __name, server=self.server)
-        # Store the result on _val so we don't deref next time.
 
-        # try:
-        #     object.__setattr__(self._val, __name, result)
-        # except AttributeError:
-        #     # Happens if self._val.<name> is a property. Return the raw value instead
-        #     # of a Traceable value.
-        #     return val_attr_val
+        # Store the result on _val so we don't deref next time.
+        try:
+            object.__setattr__(self._val, __name, result)
+        except AttributeError:
+            # Happens if self._val.<name> is a property. Return the raw value instead
+            # of a Traceable value.
+            return val_attr_val
         return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
-        if __name in ["_val", "ref", "server", "root", "mutations", "_is_dirty"]:
+        if __name in [
+            "_val",
+            "ref",
+            "server",
+            "root",
+            "mutations",
+            "_is_dirty",
+            "parent",
+        ]:
             return object.__setattr__(self, __name, __value)
         else:
             if not isinstance(self.ref, ObjectRef):
-                raise ValueError("Can only set attributes on object refs")
+                # if not isinstance(self.ref, Ref):
+                print(f"MISSING OBJECT REF {self.ref=}")
+                # raise ValueError("Can only set attributes on object refs")
 
-            full_path = self.ref.extra + (__name,)
+                full_path = (__name,)
+            else:
+                full_path = self.ref.extra + (__name,)
             base_root = object.__getattribute__(self, "root")
             base_root.add_mutation(full_path, "setattr", __name, __value)
 
             # setattr(self._val, __name, __value)
+            print(f"{__name=}, {__value=}")
             object.__setattr__(self._val, __name, __value)
+            print(f"{object.__getattribute__(self._val, __name)=}")
             self._mark_dirty()
 
             if hasattr(self, "parent") and isinstance(self.parent, Traceable):
@@ -405,22 +420,25 @@ class WeaveDict(Traceable, dict):
             new_ref = self.ref.with_key(key)
         else:
             new_ref = None
-        return make_trace_obj(super().__getitem__(key), new_ref, self.server, self.root)
+        v = super().__getitem__(key)
+        return make_trace_obj(v, new_ref, self.server, self.root)
 
     def get(self, key: str, default: Any = None) -> Any:
         if self.ref:
             new_ref = self.ref.with_key(key)
         else:
             new_ref = None
-        return make_trace_obj(
-            super().get(key, default), new_ref, self.server, self.root
-        )
+        v = super().get(key, default)
+        return make_trace_obj(v, new_ref, self.server, self.root)
 
     def __setitem__(self, key: str, value: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only set items on object refs")
+            full_path = (key,)
+            # raise ValueError("Can only set items on object refs")
+        else:
+            full_path = self.ref.extra + (key,)
         super().__setitem__(key, value)
-        self.root.add_mutation(self.ref.extra, "setitem_dict", key, value)
+        self.root.add_mutation(full_path, "setitem_dict", key, value)
 
     def keys(self):  # type: ignore
         return super().keys()
@@ -565,10 +583,13 @@ def make_trace_obj(
 
         pass
     else:
-        try:
-            setattr(box_val, "ref", new_ref)
-        except:
-            pass
+        # This will work when the set value is an object, but not if it's a primitive...
+        setattr(box_val, "ref", new_ref)
+        # if hasattr(box_val, "ref"):
+        #     print(f"{new_ref=}")
+        #     setattr(box_val, "ref", new_ref)
+        # else:
+        #     print(f"wtf... {box_val=}")
     return box_val
 
 

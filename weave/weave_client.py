@@ -736,12 +736,14 @@ class WeaveClient:
     # is nicer for clients I think?
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
+        print(f"Saving object {val=}")
         self._save_nested_objects(val, name=name)
         return self._save_object_basic(val, name, branch)
 
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
+        print(f"Saving object basic {val=}")
         if getattr(val, "_is_dirty", False):
             val.ref = None
 

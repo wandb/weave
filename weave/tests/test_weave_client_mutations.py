@@ -210,18 +210,19 @@ def test_object_mutation2(client):
 
     c2 = ref.get()
     print(f"{c2=}")
-    # c2.b.a.b = 2
-    thing = B(a=A(b=2))
-    print(f"{thing.a=}")
-    c2.b = thing
+    c2.b.a.b = 2
+    print(f"{c2.b.a.b=}")
+    # thing = B(a=A(b=2))
+    # print(f"{thing.a=}")
+    # c2.b = thing
     print(f"{c2.b.a=}")
     # c2.b.a = A(b=2)
     # print(f">>> {c2.b.a.b=}")
 
     print(f"{c2=}")
     print(f"{c2._is_dirty=}")
-    # print(f"{c2.b._is_dirty=}")
-    # print(f"{c2.b.a._is_dirty=}")
+    print(f"{c2.b._is_dirty=}")
+    print(f"{c2.b.a._is_dirty=}")
     print(f"{c2.b.a.b=}")
 
     ref2 = weave.publish(c2)
