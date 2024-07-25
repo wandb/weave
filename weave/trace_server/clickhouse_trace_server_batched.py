@@ -812,9 +812,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
-                defaultdict(list)
-            )
+            refs_by_project_id: dict[
+                str, list[refs_internal.InternalObjectRef]
+            ] = defaultdict(list)
             for ref in refs:
                 refs_by_project_id[ref.project_id].append(ref)
             for project_id, project_refs in refs_by_project_id.items():
@@ -1602,3 +1602,46 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
+
+
+# TODO(gst): where does this go??
+def make_feedback_lookup_from_refs(
+    project_id: str, server: tsi.TraceServerInterface, weave_refs: list[str]
+) -> dict[str, typing.Dict[str, typing.Any]]:
+    or_cond = [
+        {
+            "$eq": [
+                {"$getField": "weave_ref"},
+                {"$literal": ref},
+            ]
+        }
+        for ref in weave_refs
+    ]
+
+    feedback_query_req = tsi.FeedbackQueryReq(
+        project_id=project_id,
+        fields=[
+            "feedback_type",
+            "weave_ref",
+            "payload",
+            "creator",
+            "created_at",
+            "wb_user_id",
+        ],
+        query=tsi.Query(**{"$expr": {"$or": or_cond}}),
+    )
+    feedback = server.feedback_query(req=feedback_query_req)
+    feedback_dict = {}
+    for fb in feedback.result:
+        ref = fb["weave_ref"]
+        _type = fb["feedback_type"]
+        payload = fb["payload"] | {
+            "creator": fb["creator"],
+            "wb_user_id": fb["wb_user_id"],
+            "created_at": fb["created_at"],
+        }
+        if ref not in feedback_dict:
+            feedback_dict[ref] = {}
+        if _type not in feedback_dict[ref]:
+            feedback_dict[ref][_type] = []
+        feedback_dict[ref][_type].append(payload)

@@ -1,3 +1,5 @@
+from collections import defaultdict
+import csv
 import dataclasses
 import datetime
 import platform
@@ -14,9 +16,11 @@ from typing import (
     TypedDict,
     Union,
 )
+import aiohttp
 
 import pydantic
 from requests import HTTPError
+from tqdm import tqdm
 
 from weave import call_context, client_context, trace_sentry, urls, version
 from weave.exception import exception_to_json_str
@@ -45,7 +49,9 @@ from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
+    CallsQueryStatsReq,
     EndedCallSchemaForInsert,
+    FeedbackQueryReq,
     ObjCreateReq,
     ObjQueryReq,
     ObjReadReq,
@@ -227,12 +233,16 @@ class CallsIter:
     filter: _CallsFilter
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: _CallsFilter,
+        page_size: int = 10,
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
-        self._page_size = 10
+        self._page_size = page_size
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
@@ -367,6 +377,50 @@ class AttributesDict(dict):
         return f"{self.__class__.__name__}({super().__repr__()})"
 
 
+# TODO(gst): where does this go??
+def make_feedback_lookup_from_refs(
+    project_id: str, server: TraceServerInterface, weave_refs: list[str]
+) -> dict[str, Dict[str, Any]]:
+    or_cond = [
+        {
+            "$eq": [
+                {"$getField": "weave_ref"},
+                {"$literal": ref},
+            ]
+        }
+        for ref in weave_refs
+    ]
+
+    feedback_query_req = FeedbackQueryReq(
+        project_id=project_id,
+        fields=[
+            "feedback_type",
+            "weave_ref",
+            "payload",
+            "creator",
+            "created_at",
+            "wb_user_id",
+        ],
+        query=Query(**{"$expr": {"$or": or_cond}}),
+    )
+    feedback = server.feedback_query(req=feedback_query_req)
+    feedback_dict = {}
+    for fb in feedback.result:
+        ref = fb["weave_ref"]
+        _type = fb["feedback_type"]
+        payload = fb["payload"] | {
+            "creator": fb["creator"],
+            "wb_user_id": fb["wb_user_id"],
+            "created_at": fb["created_at"],
+        }
+        if ref not in feedback_dict:
+            feedback_dict[ref] = {}
+        if _type not in feedback_dict[ref]:
+            feedback_dict[ref][_type] = []
+        feedback_dict[ref][_type].append(payload)
+    return feedback_dict
+
+
 class WeaveClient:
     server: TraceServerInterface
 
@@ -462,17 +516,86 @@ class WeaveClient:
         return CallsIter(self.server, self._project_id(), filter)
 
     @trace_sentry.global_trace_sentry.watch()
-    def call(self, call_id: str) -> WeaveObject:
-        response = self.server.calls_query(
-            CallsQueryReq(
+    def calls_as_csv(self, filter: Optional[_CallsFilter] = None) -> any:
+        if filter is None:
+            filter = _CallsFilter()
+
+        page_size = 100
+
+        class StringWriter:
+            def write(self, line):
+                return line.replace("\n", "\\n")
+
+        writer = csv.writer(StringWriter(), delimiter=",", lineterminator="")
+
+        # hydrated model field headers
+
+        # TODO(gst): move this into a util somewhere
+        def flatten_dict(dd: dict, separator: str = ".", prefix: str = "") -> dict:
+            res = {}
+            for key, value in dd.items():
+                if isinstance(value, dict):
+                    res.update(flatten_dict(value, separator, prefix + key + separator))
+                else:
+                    res[prefix + key] = value
+            return res
+
+        out = []
+        header_fields = []
+        text = ""
+
+        # get stats for progress bar
+        stats = self.server.calls_query_stats(
+            CallsQueryStatsReq(
                 project_id=self._project_id(),
-                filter=_CallsFilter(call_ids=[call_id]),
+                filter=filter,
             )
         )
-        if not response.calls:
-            raise ValueError(f"Call not found: {call_id}")
-        response_call = response.calls[0]
-        return make_client_call(self.entity, self.project, response_call, self.server)
+
+        # show progress bar when multi-page
+        if stats.count < page_size:
+            _range = [0]
+        else:
+            _range = tqdm(range((stats.count // page_size) + 1))
+
+        for index in _range:
+            req = CallsQueryReq(
+                project_id=self._project_id(),
+                filter=filter,
+                offset=index * page_size,
+                limit=page_size,
+            )
+            response = self.server.calls_query(req=req)
+
+            weave_refs = [
+                make_client_call(self.entity, self.project, call, self.server).ref.uri()
+                for call in response.calls
+            ]
+
+            feedback_lookup = make_feedback_lookup_from_refs(
+                self._project_id(), self.server, weave_refs
+            )
+
+            for call, ref in zip(response.calls, weave_refs):
+                flattened_dict = flatten_dict(flatten_dict(call.model_dump()))
+                if index == 0 and not header_fields:
+                    # determine header fields from first data row
+                    header_fields += list(flattened_dict.keys())
+                    header_fields += ["feedback", "latency"]
+                    text += writer.writerow(header_fields) + "\n"
+
+                # hydrate with feedback
+                flattened_dict["feedback"] = feedback_lookup.get(ref, "")
+
+                # compute special columns
+                latency = call.ended_at - call.started_at
+                flattened_dict["latency"] = latency.total_seconds()
+
+                out += [list(flattened_dict.values())]
+
+            for row in out:
+                text += writer.writerow(row) + "\n"
+        return text
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
