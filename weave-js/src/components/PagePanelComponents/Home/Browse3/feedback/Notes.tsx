@@ -11,7 +11,7 @@ import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 
 type NotesProps = {
   notes: Feedback[];
-  viewer?: string | null;
+  currentViewerId?: string | null;
   readonly: boolean;
   note?: string;
   setNote?: (value: string) => void;
@@ -22,7 +22,7 @@ type NotesProps = {
 
 export const Notes = ({
   notes,
-  viewer,
+  currentViewerId,
   readonly,
   note,
   setNote,
@@ -79,6 +79,7 @@ export const Notes = ({
             style={{maxHeight: 480}}
             className="mt-12 flex flex-col gap-16 overflow-auto">
             {notes.map(n => {
+              // # TODO: Fix me
               const creator = n.creator ?? n.wb_user_id;
               return (
                 <div key={n.id} className="flex items-start">

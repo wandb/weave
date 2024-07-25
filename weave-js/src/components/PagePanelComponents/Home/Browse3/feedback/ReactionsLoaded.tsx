@@ -33,7 +33,7 @@ export const StyledTooltip = styled(
 }));
 
 type ReactionsLoadedProps = {
-  viewer: string | null;
+  currentViewerId: string | null;
   reactions: Feedback[];
   onAddEmoji: (emoji: string) => void;
   onAddNote: (note: string) => void;
@@ -44,7 +44,7 @@ type ReactionsLoadedProps = {
 };
 
 export const ReactionsLoaded = ({
-  viewer,
+  currentViewerId,
   reactions,
   onAddEmoji,
   onAddNote,
@@ -88,10 +88,10 @@ export const ReactionsLoaded = ({
 
   // TODO: Would need to revisit this if we want to support skin tones
   const onToggleEmoji = (emoji: string) => {
-    if (!viewer) {
+    if (!currentViewerId) {
       return;
     }
-    const userReactions = groupedByUser[viewer];
+    const userReactions = groupedByUser[currentViewerId];
     const existing = _.find(userReactions, r => r.payload.emoji === emoji);
     if (existing) {
       onRemoveFeedback(existing.id);
@@ -153,7 +153,7 @@ export const ReactionsLoaded = ({
               return (
                 <EmojiButton
                   key={group}
-                  viewer={viewer}
+                  currentViewerId={currentViewerId}
                   reactions={groupReactions}
                   onToggleEmoji={onToggleEmoji}
                   readonly={readonly}
@@ -242,7 +242,7 @@ export const ReactionsLoaded = ({
                 horizontal: 'left',
               }}>
               <Notes
-                viewer={viewer}
+                currentViewerId={currentViewerId}
                 readonly={readonly}
                 notes={notes}
                 note={note}

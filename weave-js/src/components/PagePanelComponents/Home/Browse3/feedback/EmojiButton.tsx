@@ -12,7 +12,7 @@ import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 import {EmojiDetails} from './EmojiDetails';
 
 type EmojiButtonProps = {
-  viewer: string | null;
+  currentViewerId: string | null;
   reactions: Feedback[];
   onToggleEmoji: (emoji: string) => void;
   readonly: boolean;
@@ -33,7 +33,7 @@ export const StyledTooltip = styled(
 }));
 
 export const EmojiButton = ({
-  viewer,
+  currentViewerId,
   reactions,
   onToggleEmoji,
   readonly,
@@ -41,9 +41,11 @@ export const EmojiButton = ({
   const emojis = reactions.map(r => r.payload.emoji);
   const emoji = _.uniq(emojis).join('');
   const count = reactions.length;
-  const includesUser = reactions.some(r => r.wb_user_id === viewer);
+  const includesUser = reactions.some(r => r.wb_user_id === currentViewerId);
 
-  const title = <EmojiDetails viewer={viewer} reactions={reactions} />;
+  const title = (
+    <EmojiDetails currentViewerId={currentViewerId} reactions={reactions} />
+  );
   const onClick = readonly
     ? undefined
     : () => {

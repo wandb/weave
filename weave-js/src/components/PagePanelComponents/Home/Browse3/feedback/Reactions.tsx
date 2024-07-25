@@ -146,7 +146,7 @@ export const Reactions = ({
   const isReadonly = !viewer || !userInfo?.teams.includes(entity) || readonly;
   return (
     <ReactionsLoaded
-      viewer={viewer}
+      currentViewerId={viewer}
       reactions={feedback}
       onAddEmoji={onAddEmoji}
       onAddNote={onAddNote}

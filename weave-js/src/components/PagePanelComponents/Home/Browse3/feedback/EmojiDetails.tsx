@@ -8,7 +8,7 @@ import {Tailwind} from '../../../../Tailwind';
 import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 
 type EmojiDetailsProps = {
-  viewer: string | null; // Username
+  currentViewerId: string | null;
   reactions: Feedback[];
   maxNames?: number;
 };
@@ -37,7 +37,7 @@ const englishJoiner = (list: string[]): string => {
 };
 
 export const EmojiDetails = ({
-  viewer,
+  currentViewerId,
   reactions,
   maxNames = 20,
 }: EmojiDetailsProps) => {
@@ -50,13 +50,14 @@ export const EmojiDetails = ({
       <div className="max-w-xs">
         <div className="text-center text-7xl">{emoji}</div>
         {Object.entries(groupedByAlias).map(([alias, aliasReactions]) => {
+          // # TODO: FIX ME!
           const names = aliasReactions.map(r => r.creator ?? r.wb_user_id);
-          moveToFront(names, viewer);
+          moveToFront(names, currentViewerId);
           if (names.length > maxNames) {
             names.splice(maxNames);
             names.push('others');
           }
-          if (names[0] === viewer) {
+          if (names[0] === currentViewerId) {
             names[0] = 'You (click to remove)';
           }
           const joined = englishJoiner(names);
