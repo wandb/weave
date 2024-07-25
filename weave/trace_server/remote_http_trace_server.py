@@ -368,6 +368,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         a single request. We can create an empty table first, then update the table
         with the rows.
         """
+        if isinstance(req, dict):
+            req = tsi.TableCreateReq.model_validate(req)
+        req = t.cast(tsi.TableCreateReq, req)
+
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit:
             initialization_req = tsi.TableCreateReq(
@@ -399,6 +403,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         due to the property that table updates can be decomposed into a series of
         updates.
         """
+        if isinstance(req, dict):
+            req = tsi.TableUpdateReq.model_validate(req)
+        req = t.cast(tsi.TableUpdateReq, req)
+
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit and len(req.updates) > 1:
             split_ndx = len(req.updates) // 2

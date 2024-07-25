@@ -8,8 +8,6 @@ import sys
 import pydantic
 import pytest
 import requests
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
@@ -26,7 +24,6 @@ from weave.trace.refs import (
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
-from weave.trace_server import remote_http_trace_server
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -1125,36 +1122,13 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-@pytest.fixture
-def network_proxy_client(client):
-    app = FastAPI()
-
-    @app.post("/table/create")
-    def table_create(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        return client.server.table_create(req)
-
-    @app.post("/table/update")
-    def table_update(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        return client.server.table_update(req)
-
-    with TestClient(app) as c:
-
-        def post(url, data=None, json=None, **kwargs):
-            kwargs.pop("stream", None)
-            return c.post(url, data=data, json=json, **kwargs)
-
-        orig_post = weave.trace_server.requests.post
-        weave.trace_server.requests.post = post
-
-        remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
-            trace_server_url=""
-        )
-        yield (client, remote_client)
-
-        weave.trace_server.requests.post = orig_post
-
-
 def test_table_partitioning(network_proxy_client):
+    """
+    This test is specifically testing the correctness
+    of the table partitioning logic in the remote client.
+    In particular, the ability to partition large dataset
+    creation into multiple updates
+    """
     client, remote_client = network_proxy_client
     rows = list(row_gen(10, 1024))
     exp_digest = "efa1a6a88e9e1366f9f64ab794f6dd11938d1772904f59df1f492558dc9bcb02"

@@ -9,8 +9,11 @@ import typing
 
 import numpy as np
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from flask.testing import FlaskClient
 
+import weave
 from weave import weave_init
 from weave.legacy import client as client_legacy
 from weave.legacy import context_state, io_service, serialize
@@ -442,3 +445,32 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         yield inited_client.client
     finally:
         inited_client.reset()
+
+
+@pytest.fixture
+def network_proxy_client(client):
+    app = FastAPI()
+
+    @app.post("/table/create")
+    def table_create(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        return client.server.table_create(req)
+
+    @app.post("/table/update")
+    def table_update(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        return client.server.table_update(req)
+
+    with TestClient(app) as c:
+
+        def post(url, data=None, json=None, **kwargs):
+            kwargs.pop("stream", None)
+            return c.post(url, data=data, json=json, **kwargs)
+
+        orig_post = weave.trace_server.requests.post
+        weave.trace_server.requests.post = post
+
+        remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
+            trace_server_url=""
+        )
+        yield (client, remote_client)
+
+        weave.trace_server.requests.post = orig_post
