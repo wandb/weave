@@ -104,14 +104,17 @@ class Traceable:
     ref: Optional[RefWithExtra]
     mutations: Optional[list[Mutation]] = None
     root: "Traceable"
+    parent: Optional["Traceable"] = None
     server: TraceServerInterface
     _is_dirty: bool = False
 
     def _mark_dirty(self):
         self._is_dirty = True
         self.ref = None
-        if self.root is not self:
-            self.root._mark_dirty()
+        print(f"Marking dirty {self=}")
+        if self.parent not in (self, None):
+            # print(f"Marking root dirty {self.parent._class_name=}")
+            self.parent._mark_dirty()
 
     def add_mutation(
         self, path: tuple[str, ...], operation: MutationOperation, *args: Any
@@ -172,13 +175,16 @@ def attribute_access_result(
     if server is None:
         return val_attr_val
 
+    root = getattr(self, "root", None)
     new_ref = ref.with_attr(attr_name)
+
     return make_trace_obj(
         val_attr_val,
         new_ref,
         server,
-        None,  # TODO: not passing root, needed for mutate which is not implemented yet
+        # None,  # TODO: not passing root, needed for mutate which is not implemented yet
         # self.root,
+        root,
         self,
     )
 
@@ -187,16 +193,16 @@ class WeaveObject(Traceable):
     def __init__(
         self,
         val: Any,
-        ref: RefWithExtra,
+        ref: Optional[RefWithExtra],
         server: TraceServerInterface,
         root: typing.Optional[Traceable],
+        parent: Optional[Traceable] = None,
     ) -> None:
         self._val = val
         self.ref = ref
         self.server = server
-        if root is None:
-            root = self
-        self.root = root
+        self.root = root or self
+        self.parent = parent
 
     def __getattribute__(self, __name: str) -> Any:
         try:
@@ -238,11 +244,32 @@ class WeaveObject(Traceable):
 
             self._mark_dirty()
 
-            # I might be mixing things up here -- what is parent vs root?
+            # This wont work for basic
+            if isinstance(__value, Traceable):
+                __value.parent = self
+
             if hasattr(self, "parent") and isinstance(self.parent, Traceable):
                 self.parent._mark_dirty()
 
-            return object.__setattr__(self._val, __name, __value)
+            # Something is wrong here.  The root of B should be A, and A should b C, and C should be D.
+            # # But they all have root D
+            # if isinstance(self.root, Traceable):
+            #     print(f"I am {__value=} and my root is {self.root=}")
+            #     self.root._mark_dirty()
+
+            # if hasattr(__value, "root"):
+            #     print(f"I am {__value=} and my root is {self=}")
+            #     __value.root = self
+
+            # if hasattr(self, "root") and isinstance(self.root, Traceable):
+            # self.root._mark_dirty()
+            # if hasattr(self, "root")
+
+            # if isinstance(__value, Traceable):
+            #     __value.root = self
+
+            # return object.__setattr__(self._val, __name, __value)
+            return setattr(self._val, __name, __value)
 
     def __dir__(self) -> list[str]:
         return dir(self._val)
@@ -533,10 +560,7 @@ def make_trace_obj(
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            obj = WeaveObject(val, new_ref, server, root)
-            if parent:
-                obj.parent = parent
-            return obj
+            return WeaveObject(val, new_ref, server, root, parent)
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root)
         elif isinstance(val, dict):
