@@ -120,7 +120,7 @@ class ObjSchemaForInsert(BaseModel):
 
 class TableSchemaForInsert(BaseModel):
     project_id: str
-    rows: list[typing.Any]
+    rows: list[dict[str, typing.Any]]
 
 
 class CallStartReq(BaseModel):
@@ -146,7 +146,7 @@ class CallReadReq(BaseModel):
 
 
 class CallReadRes(BaseModel):
-    call: CallSchema
+    call: typing.Optional[CallSchema]
 
 
 class CallsDeleteReq(BaseModel):
@@ -290,6 +290,95 @@ class ObjQueryRes(BaseModel):
 
 class TableCreateReq(BaseModel):
     table: TableSchemaForInsert
+
+
+"""
+The `TableUpdateSpec` pattern is as follows, where `OPERATION` is globally unique. This
+follows a similar pattern as our `Query` definitions.
+
+```
+class Table[OPERATION]SpecPayload(BaseModel):
+    ... # Payload for the operation
+
+
+class Table[OPERATION]Spec(BaseModel):
+    [OPERATION]: Table[OPERATION]SpecInner
+```
+
+Fundamentally, this allows us to easily distinguish different operation types
+over the wire, and is quite readable.
+Consider the payload:
+
+```
+{
+    updates: [
+        {append: {row: ROW_DATA}},
+        {pop: {index: POP_INDEX}},
+        {insert: {index: INSERT_INDEX, row: ROW_DATA}},
+    ]
+}
+```
+
+Consider that if we did not have this nesting, we would have:
+{
+    updates: [
+        {row: ROW_DATA},
+        {index: POP_INDEX},
+        {index: INSERT_INDEX, row: ROW_DATA},
+    ]
+}
+
+Which would require parsing the keys to make a heuristic "guess" as to what
+operation each entry is. This is unacceptably fragile. An alternative is to
+include a "update_type" literal. This would certainly work, but stylistically, I
+prefer the former as it requires fewer JSON characters and is nicer for Pydantic
+to parse.
+{
+    updates: [
+        {update_type: 'append', row: ROW_DATA},
+        {update_type: 'pop', index: POP_INDEX},
+        {update_type: 'insert', index: INSERT_INDEX, row: ROW_DATA},
+    ]
+}
+"""
+
+
+class TableAppendSpecPayload(BaseModel):
+    row: dict[str, typing.Any]
+
+
+class TableAppendSpec(BaseModel):
+    append: TableAppendSpecPayload
+
+
+class TablePopSpecPayload(BaseModel):
+    index: int
+
+
+class TablePopSpec(BaseModel):
+    pop: TablePopSpecPayload
+
+
+class TableInsertSpecPayload(BaseModel):
+    index: int
+    row: dict[str, typing.Any]
+
+
+class TableInsertSpec(BaseModel):
+    insert: TableInsertSpecPayload
+
+
+TableUpdateSpec = typing.Union[TableAppendSpec, TablePopSpec, TableInsertSpec]
+
+
+class TableUpdateReq(BaseModel):
+    project_id: str
+    base_digest: str
+    updates: list[TableUpdateSpec]
+
+
+class TableUpdateRes(BaseModel):
+    digest: str
 
 
 class TableRowSchema(BaseModel):
@@ -476,6 +565,10 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def table_create(self, req: TableCreateReq) -> TableCreateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def table_update(self, req: TableUpdateReq) -> TableUpdateRes:
         raise NotImplementedError()
 
     @abc.abstractmethod

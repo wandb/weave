@@ -355,7 +355,7 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
     def ext_to_int_project_id(self, project_id: str) -> str:
         return self._project_map.ext_to_int(project_id, simple_hash(project_id))
 
-    def int_to_ext_project_id(self, project_id: str) -> str:
+    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
         return self._project_map.int_to_ext(project_id, simple_hash(project_id))
 
     def ext_to_int_run_id(self, run_id: str) -> str:

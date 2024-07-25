@@ -443,7 +443,8 @@ export const useCallFlattenedTraceTree = (
     }
 
     if (parentCall) {
-      const siblingCount = childCallLookup[parentCall.callId]?.length - 1 ?? 0;
+      const childrenOfParent = childCallLookup[parentCall.callId];
+      const siblingCount = childrenOfParent ? childrenOfParent.length - 1 : 0;
       if (siblingCount) {
         rows.push({
           id: 'HIDDEN_SIBLING_COUNT',

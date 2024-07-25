@@ -1,6 +1,6 @@
 import {Box} from '@material-ui/core';
 import {Circle} from '@mui/icons-material';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {
   MOON_300,
@@ -8,17 +8,19 @@ import {
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
 import {hexToRGB} from '../../../../../../../../common/css/utils';
-import {parseRef} from '../../../../../../../../react';
+import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
 import {Icon, IconNames} from '../../../../../../../Icon';
 import {SmallRef} from '../../../../../Browse2/SmallRef';
 import {CallLink, ObjectVersionLink} from '../../../common/Links';
+import {useWFHooks} from '../../../wfReactInterface/context';
+import {ObjectVersionKey} from '../../../wfReactInterface/wfDataModelHooksInterface';
 import {
   BOX_RADIUS,
   CIRCLE_SIZE,
   EVAL_DEF_HEIGHT,
   STANDARD_BORDER,
 } from '../../ecpConstants';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
 
 export const EvaluationDefinition: React.FC<{
@@ -46,8 +48,8 @@ export const EvaluationCallLink: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const evaluationCall = props.state.data.evaluationCalls[props.callId];
-  const [entity, project] =
-    evaluationCall._rawEvaluationTraceData.project_id.split('/');
+  const {entity, project} = props.state.data;
+
   return (
     <CallLink
       entityName={entity}
@@ -71,16 +73,41 @@ export const EvaluationModelLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;
 }> = props => {
+  const {useObjectVersion} = useWFHooks();
   const evaluationCall = props.state.data.evaluationCalls[props.callId];
   const modelObj = props.state.data.models[evaluationCall.modelRef];
+  const objRef = useMemo(
+    () => parseRef(modelObj.ref) as WeaveObjectRef,
+    [modelObj.ref]
+  );
+  const objVersionKey = useMemo(() => {
+    return {
+      scheme: 'weave',
+      entity: objRef.entityName,
+      project: objRef.projectName,
+      weaveKind: objRef.weaveKind,
+      objectId: objRef.artifactName,
+      versionHash: objRef.artifactVersion,
+      path: '',
+      refExtra: objRef.artifactRefExtra,
+    } as ObjectVersionKey;
+  }, [
+    objRef.artifactName,
+    objRef.artifactRefExtra,
+    objRef.artifactVersion,
+    objRef.entityName,
+    objRef.projectName,
+    objRef.weaveKind,
+  ]);
+  const objectVersion = useObjectVersion(objVersionKey);
 
   return (
     <ObjectVersionLink
       entityName={modelObj.entity}
       projectName={modelObj.project}
-      objectName={modelObj._rawModelObject.object_id}
-      version={modelObj._rawModelObject.digest}
-      versionIndex={modelObj._rawModelObject.version_index}
+      objectName={objRef.artifactName}
+      version={objRef.artifactVersion}
+      versionIndex={objectVersion.result?.versionIndex ?? 0}
       color={MOON_800}
       icon={<ModelIcon />}
     />

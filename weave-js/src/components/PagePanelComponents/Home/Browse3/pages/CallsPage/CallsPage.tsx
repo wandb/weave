@@ -1,4 +1,8 @@
-import {GridColumnVisibilityModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {
+  GridColumnVisibilityModel,
+  GridPaginationModel,
+  GridSortModel,
+} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {FC, useMemo} from 'react';
 
@@ -35,6 +39,9 @@ export const CallsPage: FC<{
 
   sortModel: GridSortModel;
   setSortModel: (newModel: GridSortModel) => void;
+
+  paginationModel: GridPaginationModel;
+  setPaginationModel: (newModel: GridPaginationModel) => void;
 }> = props => {
   const [filter, setFilter] = useControllableState(
     props.initialFilter ?? {},
@@ -83,6 +90,8 @@ export const CallsPage: FC<{
                 setColumnVisibilityModel={props.setColumnVisibilityModel}
                 sortModel={props.sortModel}
                 setSortModel={props.setSortModel}
+                paginationModel={props.paginationModel}
+                setPaginationModel={props.setPaginationModel}
               />
             ),
           },

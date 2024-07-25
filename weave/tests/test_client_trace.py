@@ -202,6 +202,17 @@ def test_trace_server_call_start_and_end(client):
     }
 
 
+def test_call_read_not_found(client):
+    call_id = generate_id()
+    res = client.server.call_read(
+        tsi.CallReadReq(
+            project_id=client._project_id(),
+            id=call_id,
+        )
+    )
+    assert res.call is None
+
+
 def test_graph_call_ordering(client):
     @weave.op()
     def my_op(a: int) -> int:
@@ -2255,7 +2266,7 @@ def test_call_has_client_version(client):
     def test():
         return 1
 
-    c = test.call()
+    _, c = test.call()
     assert "weave" in c.attributes
     assert "client_version" in c.attributes["weave"]
 
@@ -2265,7 +2276,7 @@ def test_user_cannot_modify_call_weave_dict(client):
     def test():
         return 1
 
-    call = test.call()
+    _, call = test.call()
 
     call.attributes["test"] = 123
 

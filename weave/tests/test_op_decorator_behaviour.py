@@ -71,18 +71,20 @@ def test_sync_func(client, func):
 
 
 def test_sync_func_call(client, func):
-    call = func.call(1)
+    res, call = func.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {"a": 1}
     assert call.output == 2
+    assert res == 2
 
     ref = weave.publish(func)
     func2 = ref.get()
 
-    call2 = func2.call(1)
+    res2, call2 = func2.call(1)
     assert isinstance(call2, Call)
     assert call2.inputs == {"a": 1}
     assert call2.output == 2
+    assert res2 == 2
 
 
 @pytest.mark.asyncio
@@ -97,18 +99,20 @@ async def test_async_func(client, afunc):
 
 @pytest.mark.asyncio
 async def test_async_func_call(client, afunc):
-    call = await afunc.call(1)
+    res, call = await afunc.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {"a": 1}
     assert call.output == 2
+    assert res == 2
 
     ref = weave.publish(afunc)
     afunc2 = ref.get()
 
-    call2 = await afunc2.call(1)
+    res2, call2 = await afunc2.call(1)
     assert isinstance(call2, Call)
     assert call2.inputs == {"a": 1}
     assert call2.output == 2
+    assert res2 == 2
 
 
 def test_sync_method(client, weave_obj, py_obj):
@@ -121,7 +125,7 @@ def test_sync_method(client, weave_obj, py_obj):
 
 
 def test_sync_method_call(client, weave_obj, py_obj):
-    call = weave_obj.method.call(1)
+    res, call = weave_obj.method.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {
         "self": ObjectRef(
@@ -134,6 +138,7 @@ def test_sync_method_call(client, weave_obj, py_obj):
         "a": 1,
     }
     assert call.output == 2
+    assert res == 2
 
     weave_obj_method_ref = weave.publish(weave_obj.method)
     with pytest.raises(MissingSelfInstanceError):
@@ -155,7 +160,7 @@ async def test_async_method(client, weave_obj, py_obj):
 
 @pytest.mark.asyncio
 async def test_async_method_call(client, weave_obj, py_obj):
-    call = await weave_obj.amethod.call(1)
+    res, call = await weave_obj.amethod.call(1)
     assert isinstance(call, Call)
     assert call.inputs == {
         "self": ObjectRef(
@@ -168,6 +173,7 @@ async def test_async_method_call(client, weave_obj, py_obj):
         "a": 1,
     }
     assert call.output == 2
+    assert res == 2
 
     weave_obj_amethod_ref = weave.publish(weave_obj.amethod)
     with pytest.raises(MissingSelfInstanceError):

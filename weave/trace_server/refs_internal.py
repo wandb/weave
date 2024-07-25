@@ -10,6 +10,7 @@ from typing import Union
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
+WEAVE_PRIVATE_SCHEME = "weave-private"
 
 DICT_KEY_EDGE_NAME = "key"
 LIST_INDEX_EDGE_NAME = "index"

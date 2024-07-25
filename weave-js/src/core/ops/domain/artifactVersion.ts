@@ -241,6 +241,22 @@ export const opArtifactVersionIsGenerated = makeArtifactVersionOp({
   resolver: ({artifactVersion}) => artifactVersion.isGenerated,
 });
 
+export const opArtifactVersionIsLinkedToGlobalRegistry = makeArtifactVersionOp({
+  name: 'artifactVersion-isLinkedToGlobalRegistry',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns if the artifact is linked to a collection in the global registry ${docType(
+    'artifactVersion'
+  )}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Returns if the artifact is linked to a collection in the global registry ${docType(
+    'artifactVersion'
+  )}`,
+  returnType: inputTypes => 'boolean',
+  resolver: ({artifactVersion}) => artifactVersion.isLinkedToGlobalRegistry,
+});
+
 const mediaTypeExtensions = BASIC_MEDIA_TYPES.map(mediaType => mediaType.type);
 const isMediaFilePath = (path: string) =>
   mediaTypeExtensions.some(extension => path.endsWith(`.${extension}.json`));

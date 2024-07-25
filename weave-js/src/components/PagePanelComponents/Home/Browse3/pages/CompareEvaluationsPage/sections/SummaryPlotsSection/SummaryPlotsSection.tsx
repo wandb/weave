@@ -1,6 +1,7 @@
 import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
+import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
   PLOT_HEIGHT,
@@ -9,9 +10,12 @@ import {
   STANDARD_PADDING,
 } from '../../ecpConstants';
 import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpTypes';
+import {EvaluationComparisonState} from '../../ecpState';
+import {
+  flattenedDimensionPath,
+  resolveSummaryMetricValueForEvaluateCall,
+} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
-import {buildCompositeComparisonSummaryMetrics} from '../ScorecardSection/summaryMetricUtil';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 
@@ -77,6 +81,7 @@ export const SummaryPlots: React.FC<{
     </VerticalBox>
   );
 };
+
 const normalizeValues = (values: Array<number | undefined>): number[] => {
   // find the max value
   // find the power of 2 that is greater than the max value
@@ -85,11 +90,12 @@ const normalizeValues = (values: Array<number | undefined>): number[] => {
   const maxPower = Math.ceil(Math.log2(maxVal));
   return values.map(val => (val ? val / 2 ** maxPower : 0));
 };
+
 const useNormalizedPlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): RadarPlotData => {
-  const {compositeMetrics} = useMemo(() => {
-    return buildCompositeComparisonSummaryMetrics(state);
+  const compositeMetrics = useMemo(() => {
+    return buildCompositeMetricsMap(state.data, 'summary');
   }, [state]);
   const callIds = useMemo(() => {
     return getOrderedCallIds(state);
@@ -100,15 +106,35 @@ const useNormalizedPlotDataFromMetrics = (
       .map(scoreGroup => Object.values(scoreGroup.metrics))
       .flat()
       .map(metric => {
-        const keys = Object.keys(metric.evalScores);
-        const values = keys.map(key => metric.evalScores[key]);
+        const values = callIds.map(callId => {
+          const metricDimension = Object.values(metric.scorerRefs).find(
+            scorerRefData => scorerRefData.evalCallIds.includes(callId)
+          )?.metric;
+          if (!metricDimension) {
+            return undefined;
+          }
+          const val = resolveSummaryMetricValueForEvaluateCall(
+            metricDimension,
+            state.data.evaluationCalls[callId]
+          );
+          if (typeof val === 'boolean') {
+            return val ? 1 : 0;
+          } else {
+            return val;
+          }
+        });
         const normalizedValues = normalizeValues(values);
+        const evalScores: {[evalCallId: string]: number | undefined} =
+          Object.fromEntries(
+            callIds.map((key, i) => [key, normalizedValues[i]])
+          );
 
+        const metricLabel = flattenedDimensionPath(
+          Object.values(metric.scorerRefs)[0].metric
+        );
         return {
-          ...metric,
-          evalScores: Object.fromEntries(
-            keys.map((key, i) => [key, normalizedValues[i]])
-          ),
+          metricLabel,
+          evalScores,
         };
       });
     return Object.fromEntries(
