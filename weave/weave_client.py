@@ -202,6 +202,7 @@ class Call:
             client.server,
             self.project_id,
             _CallsFilter(parent_ids=[self.id]),
+            [_SortBy(field="started_at", direction="asc")],
         )
 
     def delete(self) -> bool:
