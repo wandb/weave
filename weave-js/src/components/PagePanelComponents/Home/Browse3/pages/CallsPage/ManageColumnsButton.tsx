@@ -14,7 +14,7 @@ import {DraggableGrow, DraggableHandle} from '../../../../../DraggablePopups';
 import {TextField} from '../../../../../Form/TextField';
 import {Tailwind} from '../../../../../Tailwind';
 import {ColumnInfo} from '../../types';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 
 type ManageColumnsButtonProps = {
   columnInfo: ColumnInfo;

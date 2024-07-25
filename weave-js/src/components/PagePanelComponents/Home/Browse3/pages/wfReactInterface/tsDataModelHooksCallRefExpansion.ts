@@ -13,6 +13,7 @@ import {isRef} from '../common/util';
 import {refDataCache} from './cache';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
+import * as traceServerClientTypes from './traceServerClientTypes';
 import {CallSchema, Loadable} from './wfDataModelHooksInterface';
 
 export const EXPANDED_REF_REF_KEY = '__ref__';
@@ -23,7 +24,7 @@ export const useClientSideCallRefExpansion = (
 ) => {
   const getTsClient = useGetTraceServerClientContext();
   const [expandedCalls, setExpandedCalls] = useState<
-    traceServerClient.TraceCallSchema[]
+    traceServerClientTypes.TraceCallSchema[]
   >([]);
   const [isExpanding, setIsExpanding] = useState(false);
 
@@ -35,7 +36,7 @@ export const useClientSideCallRefExpansion = (
     }
 
     const doExpansionIteration = async (
-      traceCalls: traceServerClient.TraceCallSchema[]
+      traceCalls: traceServerClientTypes.TraceCallSchema[]
     ) => {
       const refsNeeded = new Set<string>();
       const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
