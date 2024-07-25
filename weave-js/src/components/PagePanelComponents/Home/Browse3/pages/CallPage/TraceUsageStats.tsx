@@ -43,10 +43,10 @@ export type CostData = {
   completion_tokens: number;
   total_tokens: number;
 
-  prompt_tokens_cost: number;
-  completion_tokens_cost: number;
-  prompt_token_cost: number;
-  completion_token_cost: number;
+  prompt_tokens_cost?: number;
+  completion_tokens_cost?: number;
+  prompt_token_cost?: number;
+  completion_token_cost?: number;
 
   effective_date?: string;
 
@@ -131,8 +131,8 @@ export const getCostFromCellParams = (params: {[key: string]: any}) => {
             completion_token_cost: 0,
           } as CostData;
         }
-        const costKeyTemp = costKey as keyof CostData;
-        costData[model][costKeyTemp] = params[key] as string | number;
+        // this is giving a type error: cant assign any to never
+        (costData[model] as any)[costKey] = params[key];
       }
     }
   }

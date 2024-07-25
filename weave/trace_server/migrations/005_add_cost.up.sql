@@ -26,14 +26,14 @@ CREATE TABLE llm_token_prices (
     effective_date DateTime64(3) DEFAULT now64(3),
 
     /*
-    `input_token_cost`: The cost of an input token in the specified LLM.
+    `prompt_token_cost`: The cost of an prompt token in the specified LLM.
     */
-    input_token_cost Float,
+    prompt_token_cost Float,
 
     /*
-    `output_token_cost`: The cost of an output token in the specified LLM.
+    `completion_token_cost`: The cost of an completion token in the specified LLM.
     */
-    output_token_cost Float
+    completion_token_cost Float
 
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (pricing_level, pricing_level_id, provider_id, llm_id, effective_date);

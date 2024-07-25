@@ -60,17 +60,9 @@ class ParamBuilder:
         param_name: typing.Optional[str] = None,
         param_type: typing.Optional[str] = None,
     ) -> str:
-        """Returns the placeholder for the target database type.
-
-        e.g. SQLite -> :limit
-        e.g. ClickHouse -> {limit:UInt64}
-        """
         param_name = param_name or self._prefix + str(len(self._params))
         self._params[param_name] = param_value
-        if self._database_type == "clickhouse":
-            ptype = param_type or python_value_to_ch_type(param_value)
-            return f"{{{param_name}:{ptype}}}"
-        return ":" + param_name
+        return param_name  # Return just the parameter name for manual replacem
 
     def get_params(self) -> typing.Dict[str, typing.Any]:
         return {**self._params}
@@ -89,6 +81,7 @@ ColumnType = typing.Literal[
     "string",
     "datetime",
     "json",  # Represented as string in ClickHouse
+    "float",
 ]
 
 
@@ -198,9 +191,21 @@ class PreparedSelect(BaseModel):
     fields: list[str]
 
 
+class Join:
+    join_type: str
+    table: Table
+    query: tsi.Query
+
+    def __init__(self, join_type: str, table: Table, query: tsi.Query):
+        self.join_type = join_type
+        self.table = table
+        self.query = query
+
+
 class Select:
     table: Table
     all_columns: list[str]
+    joins: list[Join]  # List of tuples (join_type, table, left_col, right_col)
 
     action: Action
 
@@ -210,11 +215,13 @@ class Select:
     _order_by: typing.Optional[typing.List[tsi._SortBy]]
     _limit: typing.Optional[int]
     _offset: typing.Optional[int]
+    _group_by: typing.Optional[list[str]]
 
     def __init__(self, table: Table, action: Action = "SELECT"):
         self.table = table
         self.action = action
         self.all_columns = [c.dbname() for c in table.cols]
+        self.joins = []
 
         self._project_id = None
         self._fields = []
@@ -222,6 +229,13 @@ class Select:
         self._order_by = None
         self._limit = None
         self._offset = None
+        self._group_by = None
+
+    def join(self, join_type: str, table: Table, query: tsi.Query) -> "Select":
+        self.joins.append(Join(join_type, table, query))
+        for col in table.cols:
+            self.all_columns.append(col.dbname())
+        return self
 
     def project_id(self, project_id: typing.Optional[str]) -> "Select":
         self._project_id = project_id
@@ -259,6 +273,10 @@ class Select:
         self._offset = offset
         return self
 
+    def group_by(self, fields: typing.Optional[list[str]]) -> "Select":
+        self._group_by = fields
+        return self
+
     def prepare(
         self,
         database_type: DatabaseType,
@@ -286,6 +304,14 @@ class Select:
             sql = "DELETE "
 
         sql += f"FROM {self.table.name}"
+
+        # Handle joins
+        for j in self.joins:
+            query_conds, fields_used = _process_query_to_conditions(
+                j.query, self.all_columns, self.table.json_cols, param_builder
+            )
+            joined = combine_conditions(query_conds, "AND")
+            sql += f"\n{j.join_type} JOIN {j.table.name} ON {joined}"
 
         conditions = []
         if self._project_id:
@@ -347,8 +373,26 @@ class Select:
         if self._offset is not None:
             param_offset = param_builder.add(self._offset, "offset", "UInt64")
             sql += f"\nOFFSET {param_offset}"
+        if self._group_by is not None:
+            internal_fields = [
+                _transform_external_field_to_internal_field(
+                    f,
+                    self.all_columns,
+                    self.table.json_cols,
+                    param_builder=param_builder,
+                )[0]
+                for f in self._group_by
+            ]
+            joined_fields = ", ".join(internal_fields)
+            sql += f"\nGROUP BY {joined_fields}"
 
         parameters = param_builder.get_params()
+        # Replace placeholders with actual values
+        for param_name, param_value in parameters.items():
+            if isinstance(param_value, str):
+                param_value = f"'{param_value}'"
+            sql = sql.replace(param_name, str(param_value))
+
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
 
 
@@ -487,6 +531,11 @@ def _transform_external_field_to_internal_field(
     param_builder = param_builder or ParamBuilder()
     raw_fields_used = set()
     json_path = None
+    table_prefix = None
+    old_field = field
+    if "." in field:
+        table_prefix, field = field.split(".", 1)
+
     for prefix in json_columns:
         if field == prefix:
             field = prefix + "_dump"
@@ -495,10 +544,19 @@ def _transform_external_field_to_internal_field(
             field = prefix + "_dump"
 
     # validate field
-    if field not in all_columns and field.lower() != "count(*)":
+    if (
+        field not in all_columns
+        and field.lower() != "count(*)"
+        and all(
+            substr not in old_field.lower()
+            # TODO Josiah: this is a hack to allow some select fields to pass through, but it's not a good solution
+            # Need to come up with a better way to handle this, eg selecting a field that is not in the table
+            for substr in ["as", "usage_raw"]
+        )
+    ):
         raise ValueError(f"Unknown field: {field}")
 
-    raw_fields_used.add(field)
+    raw_fields_used.add(old_field)
     if json_path is not None:
         json_path_param = param_builder.add(json_path, None, "String")
         if cast == "exists":
@@ -509,6 +567,9 @@ def _transform_external_field_to_internal_field(
             field = json_func + field + ", " + json_path_param + ")"
             if not is_sqlite:
                 field = clickhouse_cast(field, cast or "string")  # type: ignore
+
+    if table_prefix:
+        field = f"{table_prefix}.{field}"
 
     return field, param_builder, raw_fields_used
 

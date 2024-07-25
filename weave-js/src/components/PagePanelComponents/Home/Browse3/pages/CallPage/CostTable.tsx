@@ -86,14 +86,6 @@ export const CostTable = ({costs}: {costs: {[key: string]: CostData}}) => {
         completion_tokens: 0,
         total_tokens: 0,
         cost: 0,
-        prompt_tokens_cost: 0,
-        completion_tokens_cost: 0,
-        prompt_token_cost: 0,
-        completion_token_cost: 0,
-        effective_date: '',
-        provider_id: '',
-        pricing_level: '',
-        pricing_level_id: '',
       }
     );
 
