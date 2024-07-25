@@ -4,14 +4,14 @@
  * https://www.figma.com/file/01KWBdMZg5QM9SRS1pQq0z/Design-System----Robot-Styles?type=design&node-id=5956-31813&mode=design&t=Gm4WWGWwgjdfUUTe-0
  */
 
+import {TooltipContentProps} from '@radix-ui/react-tooltip';
 import classNames from 'classnames';
-import React, {ReactElement} from 'react';
-import {PopupProps} from 'semantic-ui-react';
+import React, {ReactElement, useState} from 'react';
 import {twMerge} from 'tailwind-merge';
 
 import {Icon, IconName} from '../Icon';
+import * as Tooltip from '../RadixTooltip';
 import {Tailwind} from '../Tailwind';
-import {Tooltip} from '../Tooltip';
 import {ButtonSize, ButtonVariant} from './types';
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -33,7 +33,10 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactElement | string;
   active?: boolean;
   tooltip?: string;
-  tooltipPosition?: PopupProps['position'];
+  tooltipPosition?: {
+    align: TooltipContentProps['align'];
+    side: TooltipContentProps['side'];
+  };
   twWrapperStyles?: React.CSSProperties;
 };
 
@@ -145,16 +148,22 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       </Tailwind>
     );
 
+    const [isTooltipOpen, setIsTooltipOpen] = useState(false);
     if (tooltip) {
-      // span is needed so tooltip works on disabled buttons
       return (
-        <Tooltip
-          content={tooltip}
-          trigger={<span>{button}</span>}
-          position={tooltipPosition}
-        />
+        <Tooltip.Provider>
+          <Tooltip.Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
+            <Tooltip.Trigger>{button}</Tooltip.Trigger>
+            <Tooltip.Content
+              align={tooltipPosition?.align}
+              side={tooltipPosition?.side}>
+              {tooltip}
+            </Tooltip.Content>
+          </Tooltip.Root>
+        </Tooltip.Provider>
       );
     }
+
     return button;
   }
 );

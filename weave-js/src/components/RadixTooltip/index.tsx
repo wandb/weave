@@ -57,7 +57,7 @@ export const Portal = RadixTooltip.Portal;
  */
 export const Content = React.forwardRef(
   ({className, children, ...props}: RadixTooltip.TooltipContentProps, ref) => (
-    <Tailwind>
+    <Tailwind style={{display: 'contents'}}>
       <RadixTooltip.Content
         className={twMerge(
           'night-aware',
