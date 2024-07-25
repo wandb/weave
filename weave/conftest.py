@@ -449,6 +449,16 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
 
 @pytest.fixture
 def network_proxy_client(client):
+    """
+    This fixture is used to test the `RemoteHTTPTraceServer` class. There is
+    almost no logic in this class, other than a little batching, so we typically
+    skip it for simplicity. However, we can use this fixture to test such logic.
+    It initializes a mini FastAPI app that proxies requests from the
+    `RemoteHTTPTraceServer` to the underlying `client.server` object.
+
+    We probably will want to flesh this out more in the future, but this is a
+    starting point.
+    """
     app = FastAPI()
 
     @app.post("/table/create")
