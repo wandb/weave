@@ -966,7 +966,7 @@ const CompareEvaluationsTableButton: FC<{
       onClick={onClick}
       icon="chart-scatterplot"
       tooltip={tooltipText}>
-      Compare Evaluations
+      Compare
     </Button>
   </Box>
 );
