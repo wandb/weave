@@ -214,13 +214,32 @@ gql_prop_op(
 )
 
 
-gql_prop_op(
-    "artifactVersion-tags",
-    wdt.ArtifactVersionType,
-    "tags",
-    types.List(wdt.TagType),
-    # is_many=True,
+# # FIXME: Pick the right format
+# gql_prop_op(
+#     "artifactVersion-tags",
+#     wdt.ArtifactVersionType,
+#     "tags",
+#     types.List(wdt.TagType),
+#     # is_many=True,
+# )
+
+@op(
+    name="artifactVersion-tags",
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+            tags {
+                id
+                name
+                tagCategoryName
+                attributes
+            }
+        """,
+    ),
 )
+def op_artifact_version_tags(
+    artifact: wdt.ArtifactVersion,
+) -> list[wdt.TagType]:
+    return artifact["tags"]
 
 
 
