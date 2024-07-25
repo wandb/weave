@@ -108,7 +108,7 @@ export class TraceServerClient extends DirectTraceServerClient {
 
   private async scheduleReadBatch() {
     await this.doReadBatch();
-    setTimeout(this.scheduleReadBatch, DEFAULT_BATCH_INTERVAL);
+    setTimeout(this.scheduleReadBatch.bind(this), DEFAULT_BATCH_INTERVAL);
   }
 
   private readBatchDirect(
