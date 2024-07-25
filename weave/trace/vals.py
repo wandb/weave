@@ -111,9 +111,7 @@ class Traceable:
     def _mark_dirty(self):
         self._is_dirty = True
         self.ref = None
-        print(f"Marking dirty {self=}")
         if self.parent not in (self, None):
-            # print(f"Marking root dirty {self.parent._class_name=}")
             self.parent._mark_dirty()
 
     def add_mutation(
@@ -243,32 +241,9 @@ class WeaveObject(Traceable):
             base_root.add_mutation(full_path, "setattr", __name, __value)
 
             self._mark_dirty()
-
-            # This wont work for basic
             if isinstance(__value, Traceable):
                 __value.parent = self
 
-            if hasattr(self, "parent") and isinstance(self.parent, Traceable):
-                self.parent._mark_dirty()
-
-            # Something is wrong here.  The root of B should be A, and A should b C, and C should be D.
-            # # But they all have root D
-            # if isinstance(self.root, Traceable):
-            #     print(f"I am {__value=} and my root is {self.root=}")
-            #     self.root._mark_dirty()
-
-            # if hasattr(__value, "root"):
-            #     print(f"I am {__value=} and my root is {self=}")
-            #     __value.root = self
-
-            # if hasattr(self, "root") and isinstance(self.root, Traceable):
-            # self.root._mark_dirty()
-            # if hasattr(self, "root")
-
-            # if isinstance(__value, Traceable):
-            #     __value.root = self
-
-            # return object.__setattr__(self._val, __name, __value)
             return setattr(self._val, __name, __value)
 
     def __dir__(self) -> list[str]:
@@ -329,7 +304,7 @@ class WeaveTable(Traceable):
                 )
             )
             for item in response.rows:
-                new_ref = self.ref.with_item(item.digest)
+                new_ref = self.ref.with_item(item.digest) if self.ref else None
                 yield make_trace_obj(
                     item.val,
                     new_ref,
@@ -382,10 +357,7 @@ class WeaveList(Traceable, list):
         if isinstance(i, slice):
             raise ValueError("Slices not yet supported")
         index = operator.index(i)
-        if self.ref:
-            new_ref = self.ref.with_index(index)
-        else:
-            new_ref = None
+        new_ref = self.ref.with_index(index) if self.ref else None
         index_val = super().__getitem__(index)
         return make_trace_obj(index_val, new_ref, self.server, self.root)
 
@@ -436,25 +408,18 @@ class WeaveDict(Traceable, dict):
         super().__init__(*args, **kwargs)
 
     def __getitem__(self, key: str) -> Any:
-        if self.ref:
-            new_ref = self.ref.with_key(key)
-        else:
-            new_ref = None
+        new_ref = self.ref.with_key(key) if self.ref else None
         v = super().__getitem__(key)
         return make_trace_obj(v, new_ref, self.server, self.root)
 
     def get(self, key: str, default: Any = None) -> Any:
-        if self.ref:
-            new_ref = self.ref.with_key(key)
-        else:
-            new_ref = None
+        new_ref = self.ref.with_key(key) if self.ref else None
         v = super().get(key, default)
         return make_trace_obj(v, new_ref, self.server, self.root)
 
     def __setitem__(self, key: str, value: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
             full_path = (key,)
-            # raise ValueError("Can only set items on object refs")
         else:
             full_path = self.ref.extra + (key,)
         super().__setitem__(key, value)
