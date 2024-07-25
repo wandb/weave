@@ -18,11 +18,16 @@ export const isPrimitive = (val: any) => {
 };
 
 export const isRef = (value: any): boolean => {
-  return (
-    typeof value === 'string' &&
-    (value.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      value.startsWith(WEAVE_REF_PREFIX))
-  );
+  if (typeof value !== 'string') {
+    return false;
+  }
+  if (
+    value.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+    value.startsWith(WEAVE_REF_PREFIX)
+  ) {
+    return true;
+  }
+  return false;
 };
 
 // Convert a list of objects into an object where the keys are integers

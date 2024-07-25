@@ -3,13 +3,13 @@ import json
 import logging
 import typing as t
 
-import requests
 import tenacity
 from pydantic import BaseModel, ValidationError
 
 from weave.environment import weave_trace_server_url
 from weave.legacy.wandb_interface import project_creator
 
+from . import requests
 from . import trace_server_interface as tsi
 from .async_batch_processor import AsyncBatchProcessor
 
@@ -361,6 +361,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.TableCreateRes:
         return self._generic_request(
             "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
+        )
+
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        return self._generic_request(
+            "/table/update", req, tsi.TableCreateReq, tsi.TableCreateRes
         )
 
     def table_query(
