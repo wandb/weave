@@ -1,0 +1,94 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '126'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.35.13
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 1.35.13
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.14
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA1SQPW/CMBRF9/wK680EEUj4yNihWxekLlQVMuaRGGw/y35IVIj/XtmkQBcP9+Zc
+        H+daCAF6D60A1UtW1ptyddTL+tTQu3Gfi+V6LS/1pvmwm8v8bdXBKBG0O6LiP2qsyHqDrMndaxVQ
+        MqbVajGdzJdVPZ3kwtIeTcI6z+Vs3JR8DjsqJ9W0GcietMIIrfgqhBDims/k6PZ4gVbknZxYjFF2
+        CO3jIyEgkEkJyBh1ZOkYRs9SkWN0WXsGQ3x77BnqfKBdutudjXnkB+107LcBZSSX2Mjk7/itEOI7
+        e5//qYAPZD1vmU7o0mA1u8/B80+9lEPHxNK8xHUx6EH8iYx2e9Cuw+CDzm9IksWt+AUAAP//AwDF
+        qUuswgEAAA==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8a16ef5e0e18a907-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 11 Jul 2024 07:03:40 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=4v2owgjYK91rK0QNFYjM1P0Vyfp7w0EG2CDLrP0A9p0-1720681420-1.0.1.1-zwfcAbvkh_YvH0RniM2DzDvLS4Lr6r2A6EF1EznYi7qpoQFOlYU1AwTeYxOPLNGJy2JND3zlyHIk25oKifGXtg;
+        path=/; expires=Thu, 11-Jul-24 07:33:40 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=M9cb4LCcsN47tyHZ0Ol3.u5kmishLoa5SzV47Zeato4-1720681420973-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '91'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '15000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '14999981'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_9f29e53ee979e28a78440f0174fb7738
+    status:
+      code: 200
+      message: OK
+version: 1

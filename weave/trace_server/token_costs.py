@@ -1,5 +1,5 @@
 from . import trace_server_interface as tsi
-from .orm import Column, PreparedSelect, Table, ParamBuilder
+from .orm import Column, ParamBuilder, PreparedSelect, Table
 
 LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="pricing_level", type="string"),
@@ -53,8 +53,7 @@ LLM_USAGE_COLUMNS = [
 
 
 # SELECT
-#     id,
-#     started_at,
+#     id, started_at,
 #     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{{}}') AS usage_raw,
 #     arrayJoin(
 #         arrayMap(
@@ -81,7 +80,7 @@ LLM_USAGE_COLUMNS = [
 # WHERE
 #     JSONLength(usage_raw) > 0
 # From a calls table alias, get the usage data for LLMs
-def get_llm_usage(table_alias: str, param_builder: ParamBuilder) -> PreparedSelect:
+def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSelect:
     all_calls_table = calls_merged_table(table_alias)
 
     # Select fields
@@ -121,21 +120,14 @@ def get_llm_usage(table_alias: str, param_builder: ParamBuilder) -> PreparedSele
         )
     )
 
-    prepared_query = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
+    prepared_query = select_query.prepare(
+        database_type="clickhouse", param_builder=param_builder
+    )
     return prepared_query
 
 
 # SELECT
-#     lu.id,
-#     lu.llm_id,
-#     lu.started_at,
-#     ltp.prompt_token_cost,
-#     ltp.completion_token_cost,
-#     ltp.effective_date,
-#     ltp.pricing_level,
-#     ltp.pricing_level_id,
-#     ltp.provider_id,
-#     lu.requests,
+#     lu.id, lu.llm_id, lu.started_at, ltp.prompt_token_cost, ltp.completion_token_cost, ltp.effective_date, ltp.pricing_level, ltp.pricing_level_id, ltp.provider_id, lu.requests,
 #     ROW_NUMBER() OVER (
 #         PARTITION BY lu.id, lu.llm_id
 #         ORDER BY
@@ -158,7 +150,7 @@ def get_llm_usage(table_alias: str, param_builder: ParamBuilder) -> PreparedSele
 #     ltp.effective_date <= lu.started_at
 # From an llm usage query, get the ranked prices for each llm_id in the usage data
 def get_ranked_prices(
-    project_id: str, llm_usage_table_alias: str, param_builder: ParamBuilder
+    param_builder: ParamBuilder, llm_usage_table_alias: str, project_id: str
 ) -> PreparedSelect:
     llm_usage_cols = [
         *LLM_USAGE_COLUMNS,
@@ -210,7 +202,9 @@ def get_ranked_prices(
                     "$expr": {
                         "$gte": [
                             {"$getField": f"{llm_usage_table_alias}.started_at"},
-                            {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.effective_date"},
+                            {
+                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.effective_date"
+                            },
                         ]
                     }
                 }
@@ -218,25 +212,22 @@ def get_ranked_prices(
         )
     )
 
-    prepared_query = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
+    prepared_query = select_query.prepare(
+        database_type="clickhouse", param_builder=param_builder
+    )
     return prepared_query
 
 
 # SELECT
-#     id,
-#     llm_id,
-#     prompt_token_cost,
-#     completion_token_cost,
-#     effective_date,
-#     pricing_level,
-#     pricing_level_id,
-#     provider_id
+#     id, llm_id, prompt_token_cost, completion_token_cost, effective_date, pricing_level, pricing_level_id, provider_id
 # FROM
 #     {table_alias}
 # WHERE
 #     rank = 1
 # From the ranked prices, get the top ranked price for each llm_id
-def get_top_ranked_prices(table_alias: str, param_builder: ParamBuilder) -> PreparedSelect:
+def get_top_ranked_prices(
+    param_builder: ParamBuilder, table_alias: str
+) -> PreparedSelect:
     columns = [
         Column(name="id", type="string"),
         *LLM_TOKEN_PRICES_COLUMNS,
@@ -252,35 +243,25 @@ def get_top_ranked_prices(table_alias: str, param_builder: ParamBuilder) -> Prep
         )
     )
 
-    prepared_query = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
+    prepared_query = select_query.prepare(
+        database_type="clickhouse", param_builder=param_builder
+    )
     return prepared_query
 
 
 # SELECT
-#     lu.id,
-#     lu.llm_id,
-#     lu.requests,
-#     lu.prompt_tokens,
-#     lu.completion_tokens,
-#     lu.total_tokens,
-#     lu.requests,
-#     trp.effective_date,
-#     trp.pricing_level,
-#     trp.pricing_level_id,
-#     trp.prompt_token_cost AS prompt_token_cost,
-#     trp.completion_token_cost AS completion_token_cost,
-#     trp.provider_id,
-#     prompt_tokens * prompt_token_cost AS prompt_tokens_cost,
-#     completion_tokens * completion_token_cost AS completion_tokens_cost
+#     lu.id, lu.llm_id, lu.requests, lu.prompt_tokens, lu.completion_tokens, lu.total_tokens, lu.requests, trp.effective_date, trp.pricing_level, trp.pricing_level_id, trp.prompt_token_cost AS prompt_token_cost, trp.completion_token_cost AS completion_token_cost, trp.provider_id, prompt_tokens * prompt_token_cost AS prompt_tokens_cost, completion_tokens * completion_token_cost AS completion_tokens_cost
 # FROM
 #     {usage_table_alias} AS lu
 # LEFT JOIN
 #     {price_table_alias} AS trp
 # ON
 #     lu.id = trp.id AND lu.llm_id = trp.llm_id
+
+
 # Join the call usage data with the top ranked prices to get the token costs
 def join_usage_with_costs(
-    usage_table_alias: str, price_table_alias: str, param_builder: ParamBuilder
+    param_builder: ParamBuilder, usage_table_alias: str, price_table_alias: str
 ) -> PreparedSelect:
     price_columns = [
         Column(name="id", type="string"),
@@ -333,5 +314,114 @@ def join_usage_with_costs(
         .join("LEFT", price_table, join_condition)
     )
 
-    prepared_select = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
+    prepared_select = select_query.prepare(
+        database_type="clickhouse", param_builder=param_builder
+    )
     return prepared_select
+
+
+# SELECT
+#       all_calls.project_id AS project_id, all_calls.id AS id, any(all_calls.op_name) AS op_name, all_calls.display_name, any(all_calls.trace_id) AS trace_id, any(all_calls.parent_id) AS parent_id, any(all_calls.started_at) AS started_at, any(all_calls.ended_at) AS ended_at, any(all_calls.exception) AS exception, array_concat_agg(all_calls.input_refs) AS input_refs, array_concat_agg(all_calls.output_refs) AS output_refs, any(all_calls.wb_user_id) AS wb_user_id, any(all_calls.wb_run_id) AS wb_run_id, any(all_calls.deleted_at) AS deleted_at, any(all_calls.attributes_dump) AS attributes_dump, any(all_calls.inputs_dump) AS inputs_dump, any(all_calls.output_dump) AS output_dump,
+#       -- Creates the cost object as a JSON string
+#       concat(
+#           -- Remove the last closing brace
+#           left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1),
+#           ',"costs":',
+#           concat('{', arrayStringConcat(groupUniqArray(
+#               concat('"', llm_id, '":{',
+#                   '"prompt_tokens":', toString(prompt_tokens), ',',
+#                   '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',',
+#                   '"completion_tokens_cost":', toString(completion_tokens_cost), ',',
+#                   '"completion_tokens":', toString(completion_tokens), ',',
+#                   '"prompt_token_cost":', toString(prompt_token_cost), ',',
+#                   '"completion_token_cost":', toString(completion_token_cost), ',',
+#                   '"total_tokens":', toString(total_tokens), ',',
+#                   '"requests":', toString(requests), ',',
+#                   '"effective_date":"', toString(effective_date), '",',
+#                   '"provider_id":"', toString(provider_id), '",',
+#                   '"pricing_level":"', toString(pricing_level), '",',
+#                   '"pricing_level_id":"', toString(pricing_level_id), '"}')
+#           ), ','), '}'),
+#       '}'
+#       ) AS summary_dump
+# FROM all_calls
+# JOIN usage_with_costs
+#     ON all_calls.id = usage_with_costs.id
+# GROUP BY (all_calls.id, all_calls.project_id, all_calls.display_name)
+
+
+# From a calls like table, select all fields specified and add the cost object to the summary_dump
+def final_call_select_with_cost(
+    param_builder: ParamBuilder,
+    call_table_alias: str,
+    price_table_alias: str,
+    select_fields: list[str],
+) -> PreparedSelect:
+    cost_snippet = """concat(
+        '{',
+        arrayStringConcat(groupUniqArray(
+            concat(
+                '"', llm_id, '":{',
+                '"prompt_tokens":', toString(prompt_tokens), ',',
+                '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',',
+                '"completion_tokens_cost":', toString(completion_tokens_cost), ',',
+                '"completion_tokens":', toString(completion_tokens), ',',
+                '"prompt_token_cost":', toString(prompt_token_cost), ',',
+                '"completion_token_cost":', toString(completion_token_cost), ',',
+                '"total_tokens":', toString(total_tokens), ',',
+                '"requests":', toString(requests), ',',
+                '"effective_date":"', toString(effective_date), '",',
+                '"provider_id":"', toString(provider_id), '",',
+                '"pricing_level":"', toString(pricing_level), '",',
+                '"pricing_level_id":"', toString(pricing_level_id), '"}'
+            )
+        ), ','),
+        '}'
+    )"""
+    summary_dump_snippet = f"""concat(
+        left(any({call_table_alias}.summary_dump), length(any({call_table_alias}.summary_dump)) - 1),
+        ',"costs":',
+        {cost_snippet},
+        '}}'
+    ) AS summary_dump"""
+
+    usage_with_costs_fields = [
+        *[col for col in LLM_USAGE_COLUMNS if col.name != "llm_id"],
+        *LLM_TOKEN_PRICES_COLUMNS,
+        Column(name="prompt_tokens_cost", type="float"),
+        Column(name="completion_tokens_cost", type="float"),
+    ]
+
+    usage_with_costs_table = Table(price_table_alias, usage_with_costs_fields)
+    all_calls_table = calls_merged_table(call_table_alias)
+
+    final_query = (
+        all_calls_table.select()
+        .fields([*select_fields, summary_dump_snippet])
+        .join(
+            "",
+            usage_with_costs_table,
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": f"{call_table_alias}.id"},
+                            {"$getField": f"{price_table_alias}.id"},
+                        ]
+                    }
+                }
+            ),
+        )
+        .group_by(
+            [
+                f"{call_table_alias}.id",
+                f"{call_table_alias}.project_id",
+                f"{call_table_alias}.display_name",
+            ]
+        )
+    )
+
+    final_prepared_query = final_query.prepare(
+        database_type="clickhouse", param_builder=param_builder
+    )
+    return final_prepared_query

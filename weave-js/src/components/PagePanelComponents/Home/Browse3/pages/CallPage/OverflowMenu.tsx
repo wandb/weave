@@ -141,7 +141,7 @@ export const ConfirmDeleteModal: FC<{
   const makeProjectGroups = (mixedCalls: CallSchema[]) => {
     const projectGroups: {[key: string]: string[]} = {};
     mixedCalls.forEach(call => {
-      const projectKey = `${call.project}/${call.callId}`;
+      const projectKey = `${call.entity}/${call.project}`;
       projectGroups[projectKey] = projectGroups[projectKey] || [];
       projectGroups[projectKey].push(call.callId);
     });
@@ -154,38 +154,44 @@ export const ConfirmDeleteModal: FC<{
       return;
     }
     setDeleteLoading(true);
+    userEvents.deleteClicked({
+      callIds: calls.map(
+        call => `${call.entity}/${call.project}/${call.callId}`
+      ),
+      numCalls: calls.length,
+      userId: userInfoLoaded?.id ?? '',
+      organizationName: orgName,
+      username: userInfoLoaded?.username ?? '',
+    });
+
     const projectGroups = makeProjectGroups(calls);
     const deletePromises: Array<Promise<void>> = [];
     Object.keys(projectGroups).forEach(projectKey => {
       const [entity, project] = projectKey.split('/');
       deletePromises.push(
-        callsDelete(entity, project, projectGroups[projectKey]).catch(() => {
-          const callNames = calls.map(callDisplayName);
-          setError(`Failed to delete call(s) ${callNames.join(', ')}`);
-        })
+        callsDelete(entity, project, projectGroups[projectKey])
       );
     });
-    Promise.all(deletePromises).then(() => {
-      userEvents.deleteClicked({
-        callIds: calls.map(
-          call => `${call.entity}/${call.project}/${call.callId}`
-        ),
-        numCalls: calls.length,
-        userId: userInfoLoaded?.id ?? '',
-        organizationName: orgName,
-        entityName: userInfoLoaded?.username ?? '',
+    Promise.all(deletePromises)
+      .then(() => {
+        setDeleteLoading(false);
+        setConfirmDelete(false);
+        onDeleteCallback?.();
+        closePeek();
+      })
+      .catch(() => {
+        setError(`Error deleting call(s)`);
+        setDeleteLoading(false);
       });
-      setDeleteLoading(false);
-      setConfirmDelete(false);
-      onDeleteCallback?.();
-      closePeek();
-    });
   };
 
   return (
     <Dialog
       open={confirmDelete}
-      onClose={() => setConfirmDelete(false)}
+      onClose={() => {
+        setConfirmDelete(false);
+        setError(null);
+      }}
       maxWidth="xs"
       fullWidth>
       <DialogTitle>Delete {calls.length > 1 ? 'calls' : 'call'}</DialogTitle>
@@ -199,9 +205,9 @@ export const ConfirmDeleteModal: FC<{
           </p>
         )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
-          <CallNameRow>
+          <CallNameRow key={call.callId}>
             <div>
-              <CallName key={call.callId}>{callDisplayName(call)}</CallName>
+              <CallName>{callDisplayName(call)}</CallName>
             </div>
             <CallIdDiv>
               <CopyableId id={call.callId} type="Call" />
@@ -224,7 +230,10 @@ export const ConfirmDeleteModal: FC<{
         <Button
           variant="ghost"
           disabled={deleteLoading}
-          onClick={() => setConfirmDelete(false)}>
+          onClick={() => {
+            setConfirmDelete(false);
+            setError(null);
+          }}>
           Cancel
         </Button>
       </DialogActions>

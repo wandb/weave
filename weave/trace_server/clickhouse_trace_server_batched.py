@@ -309,7 +309,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 limit=1,
             )
         )
-        return tsi.CallReadRes(call=next(res))
+        try:
+            _call = next(res)
+        except StopIteration:
+            _call = None
+        return tsi.CallReadRes(call=_call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
@@ -607,6 +611,89 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return tsi.TableCreateRes(digest=digest)
 
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        query = """
+            SELECT *
+            FROM (
+                    SELECT *,
+                        row_number() OVER (PARTITION BY project_id, digest) AS rn
+                    FROM tables
+                    WHERE project_id = {project_id:String} AND digest = {digest:String}
+                )
+            WHERE rn = 1
+            ORDER BY project_id, digest
+        """
+
+        row_digest_result_query = self.ch_client.query(
+            query,
+            parameters={
+                "project_id": req.project_id,
+                "digest": req.base_digest,
+            },
+        )
+
+        if len(row_digest_result_query.result_rows) == 0:
+            raise NotFoundError(f"Table {req.project_id}:{req.base_digest} not found")
+
+        final_row_digests: list[str] = row_digest_result_query.result_rows[0][2]
+        new_rows_needed_to_insert = []
+        known_digests = set(final_row_digests)
+
+        def add_new_row_needed_to_insert(row_data: typing.Any) -> str:
+            if not isinstance(row_data, dict):
+                raise ValueError("All rows must be dictionaries")
+            row_json = json.dumps(row_data)
+            row_digest = str_digest(row_json)
+            if row_digest not in known_digests:
+                new_rows_needed_to_insert.append(
+                    (
+                        req.project_id,
+                        row_digest,
+                        extract_refs_from_values(row_data),
+                        row_json,
+                    )
+                )
+                known_digests.add(row_digest)
+            return row_digest
+
+        for update in req.updates:
+            if isinstance(update, tsi.TableAppendSpec):
+                new_digest = add_new_row_needed_to_insert(update.append.row)
+                final_row_digests.append(new_digest)
+            elif isinstance(update, tsi.TablePopSpec):
+                if update.pop.index >= len(final_row_digests) or update.pop.index < 0:
+                    raise ValueError("Index out of range")
+                final_row_digests.pop(update.pop.index)
+            elif isinstance(update, tsi.TableInsertSpec):
+                if (
+                    update.insert.index > len(final_row_digests)
+                    or update.insert.index < 0
+                ):
+                    raise ValueError("Index out of range")
+                new_digest = add_new_row_needed_to_insert(update.insert.row)
+                final_row_digests.insert(update.insert.index, new_digest)
+            else:
+                raise ValueError("Unrecognized update", update)
+
+        if new_rows_needed_to_insert:
+            self._insert(
+                "table_rows",
+                data=new_rows_needed_to_insert,
+                column_names=["project_id", "digest", "refs", "val_dump"],
+            )
+
+        table_hasher = hashlib.sha256()
+        for row_digest in final_row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        self._insert(
+            "tables",
+            data=[(req.project_id, digest, final_row_digests)],
+            column_names=["project_id", "digest", "row_digests"],
+        )
+        return tsi.TableCreateRes(digest=digest)
+
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
         parameters = {}
@@ -725,30 +812,38 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            for ref_index, ref in enumerate(refs):
-                if ref.version == "latest":
-                    raise ValueError("Reading refs with `latest` is not supported")
+            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
+                defaultdict(list)
+            )
+            for ref in refs:
+                refs_by_project_id[ref.project_id].append(ref)
+            for project_id, project_refs in refs_by_project_id.items():
+                for ref_index, ref in enumerate(project_refs):
+                    if ref.version == "latest":
+                        raise ValueError("Reading refs with `latest` is not supported")
 
-                cache_key = make_ref_cache_key(ref)
+                    cache_key = make_ref_cache_key(ref)
 
-                if cache_key in root_val_cache:
-                    continue
+                    if cache_key in root_val_cache:
+                        continue
 
-                object_id_param_key = "object_id_" + str(ref_index)
-                version_param_key = "version_" + str(ref_index)
-                conds.append(
-                    f"object_id = {{{object_id_param_key}: String}} AND digest = {{{version_param_key}: String}}"
-                )
-                parameters[object_id_param_key] = ref.name
-                parameters[version_param_key] = ref.version
+                    object_id_param_key = "object_id_" + str(ref_index)
+                    version_param_key = "version_" + str(ref_index)
+                    conds.append(
+                        f"object_id = {{{object_id_param_key}: String}} AND digest = {{{version_param_key}: String}}"
+                    )
+                    parameters[object_id_param_key] = ref.name
+                    parameters[version_param_key] = ref.version
 
-            if len(conds) > 0:
-                conditions = [combine_conditions(conds, "OR")]
-                objs = self._select_objs_query(
-                    ref.project_id, conditions=conditions, parameters=parameters
-                )
-                for obj in objs:
-                    root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
+                if len(conds) > 0:
+                    conditions = [combine_conditions(conds, "OR")]
+                    objs = self._select_objs_query(
+                        project_id, conditions=conditions, parameters=parameters
+                    )
+                    for obj in objs:
+                        root_val_cache[make_obj_cache_key(obj)] = json.loads(
+                            obj.val_dump
+                        )
 
             return [root_val_cache[make_ref_cache_key(ref)] for ref in refs]
 

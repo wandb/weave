@@ -43,11 +43,7 @@ from weave.trace_server.orm import (
     quote_json_path_parts,
 )
 from weave.trace_server.token_costs import (
-    LLM_TOKEN_PRICES_COLUMNS,
-    LLM_USAGE_COLUMNS,
-    Column,
-    Table,
-    calls_merged_table,
+    final_call_select_with_cost,
     get_llm_usage,
     get_ranked_prices,
     get_top_ranked_prices,
@@ -438,34 +434,6 @@ class CallsQuery(BaseModel):
             outer_query.limit = self.limit
             outer_query.offset = self.offset
 
-        cost_snippet = """concat(
-            '{',
-            arrayStringConcat(groupUniqArray(
-                concat(
-                    '"', llm_id, '":{',
-                    '"prompt_tokens":', toString(prompt_tokens), ',',
-                    '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',',
-                    '"completion_tokens_cost":', toString(completion_tokens_cost), ',',
-                    '"completion_tokens":', toString(completion_tokens), ',',
-                    '"prompt_token_cost":', toString(prompt_token_cost), ',',
-                    '"completion_token_cost":', toString(completion_token_cost), ',',
-                    '"total_tokens":', toString(total_tokens), ',',
-                    '"requests":', toString(requests), ',',
-                    '"effective_date":"', toString(effective_date), '",',
-                    '"provider_id":"', toString(provider_id), '",',
-                    '"pricing_level":"', toString(pricing_level), '",',
-                    '"pricing_level_id":"', toString(pricing_level_id), '"}'
-                )
-            ), ','),
-            '}'
-        )"""
-        summary_dump_snippet = f"""concat(
-            left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1),
-            ',"costs":',
-            {cost_snippet},
-            '}}'
-        ) AS summary_dump"""
-
         # because we are selecting from a subquery, we need to prefix the fields, but we dont want to run all aggregations again
         # inparticular argMaxMerge throws an error when run twice on display_name
         # We also filter out summary_dump, because we add costs to summary dump in the select statement
@@ -478,43 +446,7 @@ class CallsQuery(BaseModel):
             if field.field != "summary_dump"
         ]
 
-        usage_with_costs_fields = [
-            *[col for col in LLM_USAGE_COLUMNS if col.name != "llm_id"],
-            *LLM_TOKEN_PRICES_COLUMNS,
-            Column(name="prompt_tokens_cost", type="float"),
-            Column(name="completion_tokens_cost", type="float"),
-        ]
-
-        usage_with_costs_table = Table("usage_with_costs", usage_with_costs_fields)
-        all_calls_table = calls_merged_table("all_calls")
-
-        final_query = (
-            all_calls_table.select()
-            .fields([*final_select_fields, summary_dump_snippet])
-            .join(
-                "",
-                usage_with_costs_table,
-                tsi.Query(
-                    **{
-                        "$expr": {
-                            "$eq": [
-                                {"$getField": "all_calls.id"},
-                                {"$getField": "usage_with_costs.id"},
-                            ]
-                        }
-                    }
-                ),
-            )
-            .group_by(
-                ["all_calls.id", "all_calls.project_id", "all_calls.display_name"]
-            )
-        )
-
-        final_prepared_query = final_query.prepare(database_type="clickhouse", param_builder=pb)
-
         raw_sql = f"""
-        -- This is the current call stream query
-
         -- We get the lightly filtered call ids
         -- Then we get the calls with the heavy filters
         -- From the 100 limited calls we get their usage data
@@ -530,33 +462,20 @@ class CallsQuery(BaseModel):
         all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
 
         -- From the all_calls we get the usage data for LLMs
-        -- Generate a list of LLM IDs and their respective token counts from the JSON structure
-        llm_usage AS (
-            {get_llm_usage("all_calls", param_builder=pb).sql}
-        ),
+        llm_usage AS ({get_llm_usage(pb, "all_calls").sql}),
 
-        -- based on the llm_ids in the usage data we get all the prices and rank them
-        -- Rank the rows in llm_token_prices based on the given conditions and effective_date
-        ranked_prices AS (
-            {get_ranked_prices(self.project_id, "llm_usage", param_builder=pb).sql}
-        ),
+        -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
+        ranked_prices AS ({get_ranked_prices(pb, "llm_usage", self.project_id).sql}),
 
-        -- Discard all but the top-ranked prices
-        -- Filter to get the top-ranked prices for each llm_id and call id
-        top_ranked_prices AS (
-            {get_top_ranked_prices("ranked_prices", param_builder=pb).sql}
-        ),
+        -- Discard all but the top-ranked prices for each llm_id and call id
+        top_ranked_prices AS ({get_top_ranked_prices(pb, "ranked_prices").sql}),
 
         -- Join with the top-ranked prices to get the token costs
-        usage_with_costs AS (
-           {join_usage_with_costs("llm_usage", "top_ranked_prices", param_builder=pb).sql}
-        )
+        usage_with_costs AS ({join_usage_with_costs(pb, "llm_usage", "top_ranked_prices").sql})
 
         -- Final Select, which just pulls all the data from all_calls, and adds a costs object
-        {final_prepared_query.sql}
+        {final_call_select_with_cost(pb, 'all_calls', 'usage_with_costs', final_select_fields).sql}
         """
-
-        print(raw_sql, "flush=True")
 
         return _safely_format_sql(raw_sql)
 

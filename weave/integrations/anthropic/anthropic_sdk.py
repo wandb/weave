@@ -1,5 +1,6 @@
 import importlib
 import typing
+from functools import wraps
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -64,10 +65,40 @@ def should_use_accumulator(inputs: typing.Dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Callable]:
+def create_wrapper_sync(
+    name: str,
+) -> typing.Callable[[typing.Callable], typing.Callable]:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         "We need to do this so we can check if `stream` is used"
         op = weave.op()(fn)
+        op.name = name  # type: ignore
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: anthropic_accumulator,
+            should_accumulate=should_use_accumulator,
+        )
+
+    return wrapper
+
+
+# Surprisingly, the async `client.chat.completions.create` does not pass
+# `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
+# it manually here...
+def create_wrapper_async(
+    name: str,
+) -> typing.Callable[[typing.Callable], typing.Callable]:
+    def wrapper(fn: typing.Callable) -> typing.Callable:
+        def _fn_wrapper(fn: typing.Callable) -> typing.Callable:
+            @wraps(fn)
+            async def _async_wrapper(
+                *args: typing.Any, **kwargs: typing.Any
+            ) -> typing.Any:
+                return await fn(*args, **kwargs)
+
+            return _async_wrapper
+
+        "We need to do this so we can check if `stream` is used"
+        op = weave.op()(_fn_wrapper(fn))
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
@@ -84,12 +115,12 @@ anthropic_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "Messages.create",
-            create_wrapper(name="anthropic.Messages.create"),
+            create_wrapper_sync(name="anthropic.Messages.create"),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "AsyncMessages.create",
-            create_wrapper(name="anthropic.AsyncMessages.create"),
+            create_wrapper_async(name="anthropic.AsyncMessages.create"),
         ),
     ]
 )
