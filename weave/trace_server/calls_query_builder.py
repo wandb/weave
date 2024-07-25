@@ -42,7 +42,9 @@ from weave.trace_server.orm import (
     python_value_to_ch_type,
     quote_json_path_parts,
 )
-from weave.trace_server.token_costs import cost_query
+from weave.trace_server.token_costs import (
+    cost_query
+)
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -441,14 +443,6 @@ class CallsQuery(BaseModel):
         ]
 
         raw_sql = f"""
-        -- We get the lightly filtered call ids
-        -- Then we get the calls with the heavy filters
-        -- From the 100 limited calls we get their usage data
-        -- From the llm ids in the usage data we get the prices and rank them
-        -- We get the top ranked prices and discard the rest
-        -- We join the top ranked prices with the usage data to get the token costs
-        -- Finally we pull all the data from the calls and add a costs object
-
         -- First we get lightly filtered calls, to optimize later for heavy filters
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)}),
 
