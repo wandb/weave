@@ -226,13 +226,14 @@ class Call:
 class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
+    sort_by: _SortBy
 
     def __init__(
         self,
         server: TraceServerInterface,
         project_id: str,
         filter: _CallsFilter,
-        sort_by: Optional[_SortBy] = None,
+        sort_by: _SortBy,
     ) -> None:
         self.server = server
         self.project_id = project_id
@@ -462,11 +463,15 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
+    def calls(
+        self, filter: Optional[_CallsFilter] = None, sort_by: Optional[_SortBy] = None
+    ) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
+        if sort_by is None:
+            sort_by = _SortBy(field="started_at", direction="desc")
 
-        return CallsIter(self.server, self._project_id(), filter)
+        return CallsIter(self.server, self._project_id(), filter, sort_by)
 
     @trace_sentry.global_trace_sentry.watch()
     def call(self, call_id: str) -> WeaveObject:
