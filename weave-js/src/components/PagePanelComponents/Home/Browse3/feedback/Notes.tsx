@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect, useMemo, useRef} from 'react';
 import {twMerge} from 'tailwind-merge';
 
 import {useDeepMemo} from '../../../../../hookUtils';
@@ -7,6 +7,7 @@ import {TooltipHint} from '../../../../DraggablePopups';
 import {TextField} from '../../../../Form/TextField';
 import {Tailwind} from '../../../../Tailwind';
 import {Timestamp} from '../../../../Timestamp';
+import {useUsers} from '../../../../UserLink';
 import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 
 type NotesProps = {
@@ -53,6 +54,17 @@ export const Notes = ({
     }
   }, [isPreview, deepNotes]);
 
+  const neededUsers = useMemo(() => {
+    return Array.from(new Set(notes.map(r => r.wb_user_id)));
+  }, [notes]);
+  const users = useUsers(neededUsers);
+  const userMap = useMemo(() => {
+    if (users === 'load' || users === 'loading' || users === 'error') {
+      return {};
+    }
+    return Object.fromEntries(users.map(u => [u.id, u]));
+  }, [users]);
+
   return (
     <Tailwind>
       <div
@@ -79,8 +91,8 @@ export const Notes = ({
             style={{maxHeight: 480}}
             className="mt-12 flex flex-col gap-16 overflow-auto">
             {notes.map(n => {
-              // # TODO: Fix me
-              const creator = n.creator ?? n.wb_user_id;
+              const creator =
+                n.creator ?? userMap[n.wb_user_id].username ?? n.wb_user_id;
               return (
                 <div key={n.id} className="flex items-start">
                   <div className="ml-12">

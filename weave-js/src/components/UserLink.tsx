@@ -6,6 +6,7 @@ import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Br
 import React, {useEffect, useRef, useState} from 'react';
 import styled from 'styled-components';
 
+import {useDeepMemo} from '../hookUtils';
 import {Button} from './Button';
 import {
   DraggableGrow,
@@ -17,9 +18,9 @@ import {
 import {LoadingDots} from './LoadingDots';
 import {A, Link} from './PagePanelComponents/Home/Browse3/pages/common/Links';
 
-const FIND_USER_QUERY = gql`
-  query FindUser($username: String!) {
-    users(usernames: [$username], first: 1) {
+const FIND_USERS_QUERY = gql`
+  query FindUser($userIds: [String!]) {
+    users(ids: $userIds) {
       edges {
         node {
           id
@@ -83,13 +84,14 @@ Label.displayName = 'S.Label';
 
 type UserInfo = {
   id: string;
-  name: string;
-  email: string;
-  username: string;
-  photoUrl: string;
+  // We might not have permission to read these fields
+  name?: string;
+  email?: string;
+  username?: string;
+  photoUrl?: string;
 };
 
-type UserResult = 'NA' | 'load' | 'loading' | 'error' | UserInfo;
+type UserResult = 'load' | 'loading' | 'error' | UserInfo[];
 
 const onClickDoNothing = (e: React.MouseEvent) => {
   e.preventDefault();
@@ -222,46 +224,50 @@ type UserLinkProps = {
   placement?: TooltipProps['placement'];
 };
 
+const fetchUsers = (userIds: string[]) => {
+  return apolloClient
+    .query({
+      query: FIND_USERS_QUERY as any,
+      variables: {
+        userIds,
+      },
+    })
+    .then(result => {
+      const {edges} = result.data.users;
+      return edges.map((e: any) => e.node) as UserInfo[];
+    });
+};
+
+export const useUsers = (userIds: string[]) => {
+  const memoedUserIds = useDeepMemo(userIds);
+
+  const [users, setUsers] = useState<UserResult>('load');
+  useEffect(() => {
+    setUsers('loading');
+    fetchUsers(memoedUserIds)
+      .then(userRes => {
+        setUsers(userRes);
+      })
+      .catch(err => {
+        setUsers('error');
+      });
+  }, [memoedUserIds]);
+
+  return users;
+};
+
 export const UserLink = ({userId, includeName, placement}: UserLinkProps) => {
-  const [user, setUser] = useState<UserResult>(userId ? 'load' : 'NA');
-  useEffect(
-    () => {
-      if (user !== 'load') {
-        return;
-      }
-      setUser('loading');
-      apolloClient
-        .query({
-          query: FIND_USER_QUERY as any,
-          variables: {
-            userId,
-          },
-        })
-        .then(result => {
-          const {edges} = result.data.users;
-          if (edges.length > 0) {
-            const u = edges[0].node;
-            setUser(u);
-          } else {
-            setUser('error');
-          }
-        })
-        .catch(err => {
-          setUser('error');
-        });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
-  if (user === 'NA') {
+  const users = useUsers(userId ? [userId] : []);
+  if (userId == null) {
     return <NotApplicable />;
   }
-  if (user === 'load' || user === 'loading') {
+  if (users === 'load' || users === 'loading') {
     return <LoadingDots />;
   }
-  if (user === 'error') {
+  if (users === 'error') {
     return <div>{userId}</div>;
   }
+  const user = users[0];
   return (
     <UserInner user={user} placement={placement} includeName={includeName} />
   );

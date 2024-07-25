@@ -2,9 +2,10 @@
  * Display a large version of the emoji and details about who reacted with it.
  */
 import _ from 'lodash';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {Tailwind} from '../../../../Tailwind';
+import {useUsers} from '../../../../UserLink';
 import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 
 type EmojiDetailsProps = {
@@ -44,14 +45,25 @@ export const EmojiDetails = ({
   const emojis = reactions.map(r => r.payload.emoji);
   const emoji = _.uniq(emojis).join('');
   const groupedByAlias = _.groupBy(reactions, r => r.payload.alias);
+  const neededUsers = useMemo(() => {
+    return Array.from(new Set(reactions.map(r => r.wb_user_id)));
+  }, [reactions]);
+  const users = useUsers(neededUsers);
+  const userMap = useMemo(() => {
+    if (users === 'load' || users === 'loading' || users === 'error') {
+      return {};
+    }
+    return Object.fromEntries(users.map(u => [u.id, u]));
+  }, [users]);
 
   return (
     <Tailwind>
       <div className="max-w-xs">
         <div className="text-center text-7xl">{emoji}</div>
         {Object.entries(groupedByAlias).map(([alias, aliasReactions]) => {
-          // # TODO: FIX ME!
-          const names = aliasReactions.map(r => r.creator ?? r.wb_user_id);
+          const names = aliasReactions.map(
+            r => r.creator ?? userMap[r.wb_user_id].username ?? r.wb_user_id
+          );
           moveToFront(names, currentViewerId);
           if (names.length > maxNames) {
             names.splice(maxNames);
