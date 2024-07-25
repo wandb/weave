@@ -214,6 +214,16 @@ gql_prop_op(
 )
 
 
+gql_prop_op(
+    "artifactVersion-tags",
+    wdt.ArtifactVersionType,
+    "tags",
+    types.List(wdt.TagType),
+    # is_many=True,
+)
+
+
+
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
 def refine_metadata(
     artifactVersion: wdt.ArtifactVersion,
@@ -240,14 +250,6 @@ gql_direct_edge_op(
     wdt.ArtifactVersionType,
     "aliases",
     wdt.ArtifactAliasType,
-    is_many=True,
-)
-
-gql_direct_edge_op(
-    "artifactVersion-tags",
-    wdt.ArtifactVersionType,
-    "tags",
-    wdt.TagType,
     is_many=True,
 )
 
