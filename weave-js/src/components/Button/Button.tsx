@@ -34,8 +34,8 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean;
   tooltip?: string;
   tooltipPosition?: {
-    align: TooltipContentProps['align'];
-    side: TooltipContentProps['side'];
+    align?: TooltipContentProps['align'];
+    side?: TooltipContentProps['side'];
   };
   twWrapperStyles?: React.CSSProperties;
 };
