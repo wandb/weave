@@ -39,11 +39,11 @@ class LLMUsageSchema(ExtraKeysAllowed):
 
 
 class SummaryInsertMap(ExtraKeysAllowed):
-    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
+    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]] = None
 
 
 class SummaryMap(SummaryInsertMap):
-    weave: WeaveSummarySchema
+    weave: typing.Optional[WeaveSummarySchema] = None
 
 
 class WeaveAttributeSchema(BaseModel):
@@ -56,7 +56,7 @@ class WeaveAttributeSchema(BaseModel):
 
 
 class AttributeMap(ExtraKeysAllowed):
-    weave: WeaveAttributeSchema
+    weave: typing.Optional[WeaveAttributeSchema] = None
 
 
 class CallSchema(BaseModel):
