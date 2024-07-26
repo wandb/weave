@@ -92,7 +92,7 @@ export const Notes = ({
             className="mt-12 flex flex-col gap-16 overflow-auto">
             {notes.map(n => {
               const creator =
-                n.creator ?? userMap[n.wb_user_id].username ?? n.wb_user_id;
+                n.creator ?? userMap[n.wb_user_id]?.username ?? n.wb_user_id;
               return (
                 <div key={n.id} className="flex items-start">
                   <div className="ml-12">

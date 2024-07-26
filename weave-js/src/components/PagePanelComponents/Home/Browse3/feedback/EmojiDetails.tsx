@@ -62,7 +62,7 @@ export const EmojiDetails = ({
         <div className="text-center text-7xl">{emoji}</div>
         {Object.entries(groupedByAlias).map(([alias, aliasReactions]) => {
           const names = aliasReactions.map(
-            r => r.creator ?? userMap[r.wb_user_id].username ?? r.wb_user_id
+            r => r.creator ?? userMap[r.wb_user_id]?.username ?? r.wb_user_id
           );
           moveToFront(names, currentViewerId);
           if (names.length > maxNames) {

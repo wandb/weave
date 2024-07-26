@@ -19,7 +19,7 @@ import {LoadingDots} from './LoadingDots';
 import {A, Link} from './PagePanelComponents/Home/Browse3/pages/common/Links';
 
 const FIND_USERS_QUERY = gql`
-  query FindUser($userIds: [String!]) {
+  query FindUser($userIds: [ID!]) {
     users(ids: $userIds) {
       edges {
         node {
