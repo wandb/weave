@@ -214,6 +214,14 @@ gql_prop_op(
 )
 
 
+# TODO: Fix circular import
+class ArtifactTagTypeDict(typing.TypedDict):
+    id: str
+    name: str
+    tagCategoryName: str
+    attributes: str
+
+
 @op(
     name="artifactVersion-tags",
     plugins=wb_gql_op_plugin(
@@ -229,7 +237,7 @@ gql_prop_op(
 )
 def op_artifact_version_tags(
     artifact: wdt.ArtifactVersion,
-) -> list[wdt.ArtifactTagTypeDict]:
+) -> list[ArtifactTagTypeDict]:
     return typing.cast(list[wdt.ArtifactTagTypeDict], artifact["tags"])
 
 

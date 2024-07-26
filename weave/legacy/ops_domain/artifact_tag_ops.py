@@ -1,5 +1,6 @@
+import typing
+
 from weave.api import op
-from weave.legacy.ops_domain.wb_domain_types import ArtifactTagTypeDict
 
 
 # Section 1/6: Tag Getters
@@ -9,6 +10,15 @@ from weave.legacy.ops_domain.wb_domain_types import ArtifactTagTypeDict
 # None
 
 # Section 3/6: Attribute Getters
+
+# TODO: Fix circular import
+class ArtifactTagTypeDict(typing.TypedDict):
+    id: str
+    name: str
+    tagCategoryName: str
+    attributes: str
+
+
 @op(
     name="artifactTag-name",
 )
