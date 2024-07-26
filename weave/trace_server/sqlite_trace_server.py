@@ -442,7 +442,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if not ended_at:
                 status = "running"
             else:  # call is finished, set latency and terminal status
-                latency = (ended_at - started_at).microseconds
+                started_at_dt = datetime.datetime.fromisoformat(started_at)
+                ended_at_dt = datetime.datetime.fromisoformat(ended_at)
+                latency = (ended_at_dt - started_at_dt).microseconds
                 status = "success" if exception is None else "error"
 
             weave_derived_fields = tsi.WeaveSummarySchema(

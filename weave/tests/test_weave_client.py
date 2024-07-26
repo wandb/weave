@@ -307,7 +307,6 @@ def test_calls_query(client):
                 "sys_version": sys.version,
             },
         },
-        started_at=call0.started_at,
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -326,7 +325,6 @@ def test_calls_query(client):
                 "sys_version": sys.version,
             },
         },
-        started_at=call1.started_at,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
