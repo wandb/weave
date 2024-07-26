@@ -235,11 +235,12 @@ gql_prop_op(
             }
         """,
     ),
+    output_type=lambda input_types: types.List(wdt.TagType),
 )
 def op_artifact_version_tags(
     artifact: wdt.ArtifactVersion,
 ) -> list[wdt.TagType]:
-    return artifact["tags"]
+    return [wdt.TagType.from_dict(obj) for obj in artifact["tags"]]
 
 
 
