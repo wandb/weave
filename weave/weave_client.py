@@ -323,6 +323,8 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
             if isinstance(v, dict):
                 result[k] = sum_dict_leaves([result.get(k, {}), v])
             else:
+                if not v or isinstance(v, str):
+                    continue
                 result[k] = result.get(k, 0) + v
     return result
 
@@ -591,11 +593,9 @@ class WeaveClient:
 
         summary = SummaryDict()
         if call._children:
-            # exclude weave key from summary
-            children_summaries = [child.summary or {} for child in call._children]
-            for summary in children_summaries:
-                summary.pop("weave", None)
-            summary = SummaryDict(**sum_dict_leaves(children_summaries))
+            summary = SummaryDict(
+                **sum_dict_leaves([child.summary or {} for child in call._children])
+            )
         elif (
             isinstance(original_output, dict)
             and "usage" in original_output
