@@ -5,7 +5,7 @@ import {
   OBJECT_ATTR_EDGE_NAME,
   WEAVE_PRIVATE_PREFIX,
 } from '../wfReactInterface/constants';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {privateRefToSimpleName} from '../wfReactInterface/tsDataModelHooks';
 import {
   EXPANDED_REF_REF_KEY,

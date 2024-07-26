@@ -6,7 +6,7 @@ import React, {useMemo} from 'react';
 
 import {Tailwind} from '../../../../Tailwind';
 import {useUsers} from '../../../../UserLink';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 
 type EmojiDetailsProps = {
   currentViewerId: string | null;
