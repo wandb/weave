@@ -428,6 +428,13 @@ class WeaveDict(Traceable, dict):
         v = super().get(key, default)
         return make_trace_obj(v, new_ref, self.server, self.root)
 
+    save_name = (
+        name
+        or getattr(obj, "name", None)
+        or getattr(obj, "_class_name", None)
+        or obj.__class__.__name__
+    )
+
     def __setitem__(self, key: str, value: Any) -> None:
         full_path: tuple[str, ...]
         if not isinstance(self.ref, ObjectRef):
