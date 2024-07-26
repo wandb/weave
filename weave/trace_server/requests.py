@@ -7,6 +7,7 @@ import threading
 from time import time
 from typing import Any, Dict, Optional, Union
 
+from gql.transport.requests import RequestsHTTPTransport
 from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
 from requests.adapters import HTTPAdapter
@@ -121,7 +122,7 @@ def pprint_response(response: Response) -> None:
         pprint_header(header)
 
     console.print(Text("Body:", style=STYLE_LABEL))
-    if response.headers.get("Content-Type") == "application/json":
+    if response.headers.get("Content-Type", "").startswith("application/json"):
         pprint_json(response.text)
     elif response.text:
         console.print(Text(response.text, style=STYLE_BODY))
@@ -152,6 +153,24 @@ if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
     adapter = LoggingHTTPAdapter()
     session.mount("http://", adapter)
     session.mount("https://", adapter)
+
+
+def get_session() -> Session:
+    session = Session()
+    if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
+        adapter = LoggingHTTPAdapter()
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+    return session
+
+
+class CustomRequestsHTTPTransport(RequestsHTTPTransport):
+    # See https://github.com/graphql-python/gql/blob/master/gql/transport/requests.py#L107
+    def connect(self) -> None:
+        if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
+            self.session = get_session()
+        else:
+            super().connect()
 
 
 def get(url: str, params: Optional[Dict[str, str]] = None, **kwargs: Any) -> Response:
