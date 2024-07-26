@@ -1,0 +1,9 @@
+weave
+numpy
+faiss-cpu
+openai
+together
+python-dotenv
+datasets
+ragas
+tonic-validate
