@@ -430,6 +430,32 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         cursor.execute(query)
 
+        def load_summary(
+            summary_dump: Optional[str],
+            started_at: datetime.datetime,
+            ended_at: Optional[datetime.datetime],
+            exception: Optional[str],
+            display_name: Optional[str],
+        ) -> Optional[tsi.WeaveSummarySchema]:
+            summary_json = json.loads(summary_dump) if summary_dump else {}
+            status, latency = None, None
+            if not ended_at:
+                status = "running"
+            else:  # call is finished, set latency and terminal status
+                latency = (
+                    datetime.datetime.fromisoformat(ended_at)
+                    - datetime.datetime.fromisoformat(started_at)
+                ).microseconds
+                status = "success" if exception is None else "error"
+
+            weave_derived_fields = tsi.WeaveSummarySchema(
+                display_name=display_name,
+                status=status,
+                latency=latency,
+            )
+
+            return tsi.SummaryMap(**summary_json, _weave=weave_derived_fields)
+
         query_result = cursor.fetchall()
         return tsi.CallsQueryRes(
             calls=[
@@ -446,7 +472,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     inputs=json.loads(row[9]),
                     output=None if row[11] is None else json.loads(row[11]),
                     output_refs=None if row[12] is None else json.loads(row[12]),
-                    summary=json.loads(row[13]) if row[13] else None,
+                    summary=load_summary(row[13], row[5], row[6], row[7], row[17]),
                     wb_user_id=row[14],
                     wb_run_id=row[15],
                     display_name=row[17] if row[17] != "" else None,
