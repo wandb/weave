@@ -83,16 +83,14 @@ import {
 } from '../CompareEvaluationsPage/ecpTypes';
 import {metricDefinitionId} from '../CompareEvaluationsPage/ecpUtil';
 import {getScoreKeyNameFromScorerRef} from '../CompareEvaluationsPage/ecpUtil';
-import {
-  TraceCallSchema,
-  TraceServerClient,
-} from '../wfReactInterface/traceServerClient';
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {
   convertISOToDate,
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
+import {TraceCallSchema} from './traceServerClientTypes';
 
 /**
  * Primary react hook for fetching evaluation comparison data. This could be

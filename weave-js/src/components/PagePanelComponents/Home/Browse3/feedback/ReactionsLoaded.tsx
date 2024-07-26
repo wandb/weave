@@ -13,7 +13,7 @@ import {twMerge} from 'tailwind-merge';
 import {Button} from '../../../../Button';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip as WeaveTooltip} from '../../../../Tooltip';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {EmojiButton} from './EmojiButton';
 import {Notes} from './Notes';
 import {WeaveEmojiPicker} from './WeaveEmojiPicker';
