@@ -1408,6 +1408,26 @@ def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
     return val if val != "" else None
 
 
+def _summary_dump_to_derived_summary_map(
+    summary_dump: typing.Optional[typing.Dict[str, typing.Any]],
+    ch_call: SelectableCHCallSchema,
+) -> tsi.SummaryMap:
+    if not summary_dump:
+        summary_dump = {}
+    summary = tsi.SummaryMap(**summary_dump)
+    summary._weave.display_name = ch_call.display_name
+    if ch_call.ended_at:
+        # completed call, set latency
+        summary._weave.latency = (ch_call.ended_at - ch_call.started_at).microseconds
+        if ch_call.exception is None:
+            summary._weave.status = "success"
+        else:
+            summary._weave.status = "error"
+    else:
+        summary._weave.status = "running"
+    return summary
+
+
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1420,7 +1440,9 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
+        summary=_summary_dump_to_derived_summary_map(
+            _nullable_any_dump_to_any(ch_call.summary_dump), ch_call
+        ),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
