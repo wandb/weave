@@ -335,11 +335,8 @@ class WeaveKeyDict(dict):
         raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
 
 
-class AttributesDict(dict):
-    """A dict representing the attributes of a call.
-
-    The `weave` key is reserved for internal use and cannot be set directly.
-    """
+class DictWithWeaveKeyDict(dict):
+    """A dict with a `weave` key that is a WeaveKeyDict."""
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
@@ -365,6 +362,14 @@ class AttributesDict(dict):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"
+
+
+class AttributesDict(DictWithWeaveKeyDict):
+    """A dict representing the attributes of a call."""
+
+
+class SummaryDict(DictWithWeaveKeyDict):
+    """A dict representing the summary of a call."""
 
 
 class WeaveClient:
@@ -574,25 +579,32 @@ class WeaveClient:
     def finish_call(
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
+        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         self._save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
         call.output = output
 
-        # Summary handling
-        summary = {}
+        summary = SummaryDict()
         if call._children:
-            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+            summary = SummaryDict(
+                **sum_dict_leaves([child.summary or {} for child in call._children])
+            )
         elif (
             isinstance(original_output, dict)
             and "usage" in original_output
             and "model" in original_output
         ):
-            summary["usage"] = {}
-            summary["usage"][original_output["model"]] = {
-                "requests": 1,
-                **original_output["usage"],
-            }
+            summary._set_weave_item("usage", {})
+            summary._set_weave_item(
+                "usage",
+                {
+                    original_output["model"]: {
+                        "requests": 1,
+                        **original_output["usage"],
+                    }
+                },
+            )
         elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
             # Handle the cases where we are emitting an object instead of a pre-serialized dict
             # In fact, this is going to become the more common case
@@ -601,8 +613,9 @@ class WeaveClient:
             if isinstance(usage, pydantic.BaseModel):
                 usage = usage.model_dump(exclude_unset=True)
             if isinstance(usage, dict) and isinstance(model, str):
-                summary["usage"] = {}
-                summary["usage"][model] = {"requests": 1, **usage}
+                summary._set_weave_item("usage", {model: {"requests": 1, **usage}})
+
+        summary._set_weave_item("latency", ended_at - call.started_at)
 
         # Exception Handling
         exception_str: Optional[str] = None
@@ -615,7 +628,7 @@ class WeaveClient:
                 end=EndedCallSchemaForInsert(
                     project_id=self._project_id(),
                     id=call.id,  # type: ignore
-                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    ended_at=ended_at,
                     output=to_json(output, self._project_id(), self.server),
                     summary=summary,
                     exception=exception_str,
