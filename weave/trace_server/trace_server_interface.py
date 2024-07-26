@@ -1,5 +1,6 @@
 import abc
 import datetime
+from enum import Enum
 import typing
 
 from pydantic import BaseModel, Field

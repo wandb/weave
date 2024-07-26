@@ -622,9 +622,9 @@ class WeaveClient:
                 summary._set_weave_item("usage", {model: {"requests": 1, **usage}})
 
         # TODO(gst): pick a good status constant
-        summary._set_weave_item("status", "success" if exception is None else "error")
-        summary._set_weave_item("display_name", call.display_name)
-        summary._set_weave_item("latency", (ended_at - call.started_at).microseconds)
+        # summary._set_weave_item("status", "success" if exception is None else "error")
+        # summary._set_weave_item("display_name", call.display_name)
+        # summary._set_weave_item("latency", (ended_at - call.started_at).microseconds)
 
         # Exception Handling
         exception_str: Optional[str] = None
