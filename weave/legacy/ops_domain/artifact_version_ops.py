@@ -238,7 +238,7 @@ class ArtifactTagTypeDict(typing.TypedDict):
 def op_artifact_version_tags(
     artifact: wdt.ArtifactVersion,
 ) -> list[ArtifactTagTypeDict]:
-    return typing.cast(list[wdt.ArtifactTagTypeDict], artifact["tags"])
+    return typing.cast(list[ArtifactTagTypeDict], artifact["tags"])
 
 
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
