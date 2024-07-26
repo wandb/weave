@@ -11,6 +11,49 @@ WB_USER_ID_DESCRIPTION = (
 )
 
 
+class ExtraKeysAllowed(BaseModel):
+    class Config:
+        extra = "allow"
+
+
+class WeaveSummarySchema(BaseModel):
+    # Computed properties w.r.t export project go here
+    # latency: ...
+    # Calculated costs go here
+    # costs: ...
+    pass
+
+
+class LLMUsageSchema(ExtraKeysAllowed):
+    prompt_tokens: typing.Optional[int] = None
+    input_tokens: typing.Optional[int] = None
+    completion_tokens: typing.Optional[int] = None
+    output_tokens: typing.Optional[int] = None
+    requests: typing.Optional[int] = None
+    total_tokens: typing.Optional[int] = None
+
+
+class SummaryInsertMap(ExtraKeysAllowed):
+    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
+
+
+class SummaryMap(SummaryInsertMap):
+    weave: WeaveSummarySchema
+
+
+class WeaveAttributeSchema(BaseModel):
+    client_version: typing.Optional[str] = None
+    source: typing.Optional[str] = None
+    os_name: typing.Optional[str] = None
+    os_version: typing.Optional[str] = None
+    os_release: typing.Optional[str] = None
+    sys_version: typing.Optional[str] = None
+
+
+class AttributeMap(ExtraKeysAllowed):
+    weave: WeaveAttributeSchema
+
+
 class CallSchema(BaseModel):
     id: str
     project_id: str
@@ -28,7 +71,7 @@ class CallSchema(BaseModel):
     ## Start time is required
     started_at: datetime.datetime
     ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    attributes: AttributeMap
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
@@ -43,7 +86,7 @@ class CallSchema(BaseModel):
     output: typing.Optional[typing.Any] = None
 
     ## Summary: a summary of the call
-    summary: typing.Optional[typing.Dict[str, typing.Any]] = None
+    summary: typing.Optional[SummaryMap] = None
 
     # WB Metadata
     wb_user_id: typing.Optional[str] = None
@@ -72,7 +115,7 @@ class StartedCallSchemaForInsert(BaseModel):
     ## Start time is required
     started_at: datetime.datetime
     ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    attributes: AttributeMap
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
@@ -96,7 +139,7 @@ class EndedCallSchemaForInsert(BaseModel):
     output: typing.Optional[typing.Any] = None
 
     ## Summary: a summary of the call
-    summary: typing.Dict[str, typing.Any]
+    summary: SummaryInsertMap
 
 
 class ObjSchema(BaseModel):
