@@ -19,18 +19,14 @@ import {LoadingDots} from './LoadingDots';
 import {A, Link} from './PagePanelComponents/Home/Browse3/pages/common/Links';
 
 const FIND_USERS_QUERY = gql`
-  query FindUser($userIds: [ID!]) {
-    users(ids: $userIds) {
-      edges {
-        node {
-          id
-          name
-          email
-          photoUrl
-          deletedAt
-          username
-        }
-      }
+  query FindUser($userId: ID!) {
+    user(id: $userId) {
+      id
+      name
+      email
+      photoUrl
+      deletedAt
+      username
     }
   }
 `;
@@ -224,18 +220,22 @@ type UserLinkProps = {
   placement?: TooltipProps['placement'];
 };
 
-const fetchUsers = (userIds: string[]) => {
+const fetchUser = (userId: string) => {
   return apolloClient
     .query({
       query: FIND_USERS_QUERY as any,
       variables: {
-        userIds,
+        userId,
       },
     })
     .then(result => {
-      const {edges} = result.data.users;
-      return edges.map((e: any) => e.node) as UserInfo[];
+      return result.data.user as UserInfo;
     });
+};
+
+const fetchUsers = (userIds: string[]) => {
+  // This is not great, gorilla does not allow multi-user-lookup by id :(
+  return Promise.all(userIds.map(fetchUser));
 };
 
 export const useUsers = (userIds: string[]) => {
