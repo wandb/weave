@@ -384,6 +384,46 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
             )
 
+    def calls_stream_export(self, req: tsi.CallsStreamExportReq) -> typing.Any:
+        """Returns a stream of calls that match the given query."""
+        cq = CallsQuery(project_id=req.project_id)
+
+        if req.column_selection:
+            columns = req.column_selection
+        else:
+            columns = all_call_select_columns
+
+        for col in columns:
+            cq.add_field(col)
+        if req.filter is not None:
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+        if req.query is not None:
+            cq.add_condition(req.query.expr_)
+
+        # Sort with empty list results in no sorting
+        if req.sort_by is not None:
+            for sort_by in req.sort_by:
+                cq.add_order(sort_by.field, sort_by.direction)
+        else:
+            cq.add_order("started_at", "asc")
+        if req.limit is not None:
+            cq.set_limit(req.limit)
+        if req.offset is not None:
+            cq.set_offset(req.offset)
+
+        pb = ParamBuilder()
+        raw_res = self._query_stream(
+            cq.as_sql(pb),
+            pb.get_params(),
+        )
+
+        for row in raw_res:
+            yield tsi.CallSchema.model_validate(
+                _ch_call_dict_to_call_schema_dict_selection(
+                    dict(zip(columns, row)), columns
+                )
+            )
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
@@ -1425,6 +1465,28 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
         display_name=_empty_str_to_none(ch_call.display_name),
+    )
+
+
+def _ch_call_dict_to_call_schema_dict_selection(
+    ch_call_dict: typing.Dict, columns: typing.List[str]
+) -> typing.Dict:
+    return dict(
+        project_id=ch_call_dict.get("project_id"),
+        id=ch_call_dict.get("id"),
+        trace_id=ch_call_dict.get("trace_id"),
+        parent_id=ch_call_dict.get("parent_id"),
+        op_name=ch_call_dict.get("op_name"),
+        started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
+        ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
+        attributes=_dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
+        inputs=_dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
+        output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump", "{}")),
+        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump", "{}")),
+        exception=ch_call_dict.get("exception"),
+        wb_run_id=ch_call_dict.get("wb_run_id"),
+        wb_user_id=ch_call_dict.get("wb_user_id"),
+        display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
     )
 
 

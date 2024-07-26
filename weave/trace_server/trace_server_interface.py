@@ -222,6 +222,11 @@ class CallUpdateRes(BaseModel):
     pass
 
 
+class CallsStreamExportReq(CallsQueryReq):
+    column_selection: typing.Optional[typing.List[str]] = None
+    dtype: typing.Optional[str] = None
+
+
 class OpCreateReq(BaseModel):
     op_obj: ObjSchemaForInsert
 
@@ -535,6 +540,12 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def calls_stream_export(
+        self, req: CallsStreamExportReq
+    ) -> typing.Iterator[typing.Any]:
         raise NotImplementedError()
 
     # Op API

@@ -45,6 +45,7 @@ from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
+    CallsStreamExportReq,
     EndedCallSchemaForInsert,
     ObjCreateReq,
     ObjQueryReq,
@@ -460,6 +461,32 @@ class WeaveClient:
             filter = _CallsFilter()
 
         return CallsIter(self.server, self._project_id(), filter)
+
+    def calls_export(
+        self, filter: Optional[_CallsFilter] = None, dtype: Optional[str] = None
+    ) -> CallsIter:
+        if filter is None:
+            filter = _CallsFilter()
+
+        stream = self.server.calls_stream_export(
+            CallsStreamExportReq(
+                project_id=self._project_id(),
+                filter=filter,
+                column_selection=[
+                    "id",
+                    "trace_id",
+                    "project_id",
+                    "op_name",
+                    "started_at",
+                    "ended_at",
+                    "inputs_dump",
+                    "output_dump",
+                    "summary_dump",
+                ],
+                dtype=dtype,
+            )
+        )
+        return stream
 
     @trace_sentry.global_trace_sentry.watch()
     def call(self, call_id: str) -> WeaveObject:

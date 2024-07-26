@@ -318,6 +318,17 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
         )
 
+    def calls_stream_export(
+        self, req: tsi.CallsStreamExportReq
+    ) -> t.Iterator[str | t.Dict[str, t.Any]]:
+        r = self._generic_request_executor("/calls/stream_export", req, stream=True)
+        for line in r.iter_lines():
+            if line:
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError:
+                    yield line.decode("utf-8")
+
     # Op API
 
     def op_create(

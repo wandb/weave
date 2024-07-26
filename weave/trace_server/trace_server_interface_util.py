@@ -33,6 +33,16 @@ def _order_dict(dictionary: typing.Dict) -> typing.Dict:
     }
 
 
+def _flatten_dict(d: dict, sep: str = ".", prefix: str = "") -> dict:
+    flat = {}
+    for key, val in d.items():
+        if isinstance(val, dict):
+            flat.update(_flatten_dict(val, sep, f"{prefix}{key}{sep}"))
+        else:
+            flat[f"{prefix}{key}"] = val
+    return flat
+
+
 def encode_bytes_as_b64(contents: typing.Dict[str, bytes]) -> typing.Dict[str, str]:
     res = {}
     for k, v in contents.items():
@@ -79,6 +89,30 @@ def extract_refs_from_values(
 
     _visit(vals)
     return refs
+
+
+def replace_refs(
+    vals: typing.Any,
+    ref_map: typing.Dict[str, str],
+) -> typing.Any:
+    out = {}
+
+    def _visit(val: typing.Any) -> typing.Any:
+        if isinstance(val, dict):
+            for v in val.values():
+                _visit(v)
+        elif isinstance(val, list):
+            for v in val:
+                _visit(v)
+        elif isinstance(val, str) and any(
+            val.startswith(scheme + "://") for scheme in valid_schemes
+        ):
+            out[val] = ref_map[val]
+        else:
+            out[val] = val
+
+    _visit(vals)
+    return out
 
 
 def assert_non_null_wb_user_id(obj: typing.Any) -> None:

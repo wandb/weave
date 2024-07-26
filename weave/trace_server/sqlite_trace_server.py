@@ -470,6 +470,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             count=len(calls),
         )
 
+    def calls_stream_export(
+        self, req: tsi.CallsStreamExportReq
+    ) -> Iterator[tsi.CallSchema]:
+        return self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id, filter=req.filter, query=req.query
+            )
+        )
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         # update row with a deleted_at field set to now
@@ -491,7 +500,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(", ".join("?" * len(req.call_ids)))
+            """.format(
+                ", ".join("?" * len(req.call_ids))
+            )
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -503,7 +514,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(", ".join("?" * len(all_ids)))
+            """.format(
+                ", ".join("?" * len(all_ids))
+            )
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()

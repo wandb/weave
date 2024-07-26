@@ -197,13 +197,3 @@ def sample_rows(data: list, max_rows: int) -> list:
     middle_split = data[middle_start : middle_start + split_size]
     end_split = data[-split_size:]
     return start_split + middle_split + end_split
-
-
-def _flatten_dict(d: dict, sep: str = ".", prefix: str = "") -> dict:
-    flat = {}
-    for key, val in d.items():
-        if isinstance(val, dict):
-            flat.update(_flatten_dict(val, sep, f"{prefix}{key}{sep}"))
-        else:
-            flat[f"{prefix}{key}"] = val
-    return flat
