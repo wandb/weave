@@ -45,15 +45,16 @@ export const EmojiDetails = ({
   const emojis = reactions.map(r => r.payload.emoji);
   const emoji = _.uniq(emojis).join('');
   const groupedByAlias = _.groupBy(reactions, r => r.payload.alias);
-  const neededUsers = useMemo(() => {
-    return Array.from(new Set(reactions.map(r => r.wb_user_id)));
-  }, [reactions]);
+  const neededUsers = useMemo(
+    () => _.uniq(reactions.map(r => r.wb_user_id)),
+    [reactions]
+  );
   const users = useUsers(neededUsers);
   const userMap = useMemo(() => {
     if (users === 'load' || users === 'loading' || users === 'error') {
       return {};
     }
-    return Object.fromEntries(users.map(u => [u.id, u]));
+    return _.keyBy(users, 'id');
   }, [users]);
 
   return (

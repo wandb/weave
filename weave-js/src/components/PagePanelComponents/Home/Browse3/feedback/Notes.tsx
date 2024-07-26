@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import React, {useEffect, useMemo, useRef} from 'react';
 import {twMerge} from 'tailwind-merge';
 
@@ -54,15 +55,16 @@ export const Notes = ({
     }
   }, [isPreview, deepNotes]);
 
-  const neededUsers = useMemo(() => {
-    return Array.from(new Set(notes.map(r => r.wb_user_id)));
-  }, [notes]);
+  const neededUsers = useMemo(
+    () => _.uniq(notes.map(n => n.wb_user_id)),
+    [notes]
+  );
   const users = useUsers(neededUsers);
   const userMap = useMemo(() => {
     if (users === 'load' || users === 'loading' || users === 'error') {
       return {};
     }
-    return Object.fromEntries(users.map(u => [u.id, u]));
+    return _.keyBy(users, 'id');
   }, [users]);
 
   return (

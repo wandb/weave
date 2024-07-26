@@ -18,7 +18,7 @@ import {
 import {LoadingDots} from './LoadingDots';
 import {A, Link} from './PagePanelComponents/Home/Browse3/pages/common/Links';
 
-const FIND_USERS_QUERY = gql`
+const FIND_USER_QUERY = gql`
   query FindUser($userId: ID!) {
     user(id: $userId) {
       id
@@ -223,7 +223,7 @@ type UserLinkProps = {
 const fetchUser = (userId: string) => {
   return apolloClient
     .query({
-      query: FIND_USERS_QUERY as any,
+      query: FIND_USER_QUERY as any,
       variables: {
         userId,
       },
@@ -265,7 +265,7 @@ export const UserLink = ({userId, includeName, placement}: UserLinkProps) => {
     return <LoadingDots />;
   }
   if (users === 'error') {
-    return <div>{userId}</div>;
+    return <NotApplicable />;
   }
   const user = users[0];
   return (
