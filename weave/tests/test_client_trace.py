@@ -88,6 +88,7 @@ def test_simple_op(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=fetched_call.started_at,
     )
 
 

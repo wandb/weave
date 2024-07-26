@@ -591,9 +591,11 @@ class WeaveClient:
 
         summary = SummaryDict()
         if call._children:
-            summary = SummaryDict(
-                **sum_dict_leaves([child.summary or {} for child in call._children])
-            )
+            # exclude weave key from summary
+            children_summaries = [child.summary or {} for child in call._children]
+            for summary in children_summaries:
+                summary.pop("weave", None)
+            summary = SummaryDict(**sum_dict_leaves(children_summaries))
         elif (
             isinstance(original_output, dict)
             and "usage" in original_output
