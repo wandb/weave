@@ -22,14 +22,18 @@ class ExtraKeysAllowed(BaseModel):
     class Config:
         extra = "allow"
 
-    def dict(self, *args, **kwargs) -> typing.Dict[str, typing.Any]:
+    def dict(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> typing.Dict[str, typing.Any]:
         if "exclude_none" in kwargs:
             kwargs.pop("exclude_none")
         if "by_alias" in kwargs:
             kwargs.pop("by_alias")
         return super().dict(*args, exclude_none=True, by_alias=True, **kwargs)
 
-    def model_dump(self, *args, **kwargs) -> typing.Dict[str, typing.Any]:
+    def model_dump(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> typing.Dict[str, typing.Any]:
         if "exclude_none" in kwargs:
             kwargs.pop("exclude_none")
         if "by_alias" in kwargs:
