@@ -21,7 +21,7 @@ class ExtraKeysAllowed(BaseModel):
         extra = "allow"
 
 
-class WeaveSummarySchema(BaseModel):
+class WeaveSummarySchema(ExtraKeysAllowed):
     # Computed properties w.r.t export project go here
     # latency: ...
     # Calculated costs go here
@@ -43,10 +43,10 @@ class SummaryInsertMap(ExtraKeysAllowed):
 
 
 class SummaryMap(SummaryInsertMap):
-    _weave: typing.Optional[WeaveSummarySchema] = None
+    weave: typing.Optional[WeaveSummarySchema] = None
 
 
-class WeaveAttributeSchema(BaseModel):
+class WeaveAttributeSchema(ExtraKeysAllowed):
     client_version: typing.Optional[str] = None
     source: typing.Optional[str] = None
     os_name: typing.Optional[str] = None
@@ -56,7 +56,7 @@ class WeaveAttributeSchema(BaseModel):
 
 
 class AttributeMap(ExtraKeysAllowed):
-    _weave: typing.Optional[WeaveAttributeSchema] = None
+    weave: typing.Optional[WeaveAttributeSchema] = None
 
 
 class CallSchema(BaseModel):
