@@ -82,7 +82,7 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
-const MAX_SELECT = 10;
+const MAX_SELECT = 100;
 
 export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
   'attributes.weave.client_version': false,
