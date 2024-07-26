@@ -7,7 +7,6 @@ import * as CGReact from '../../../react';
 import * as Panel2 from '../panel';
 import {Panel2Loader} from '../PanelComp';
 import {inputType} from './common';
-import {typedDict} from "@wandb/weave/core";
 
 const Wrapper = styled.div`
   width: 100%;
@@ -35,13 +34,7 @@ const PanelArtifactVersionTags: React.FC<
   PanelArtifactVersionTagsProps
 > = props => {
   const nodeValueQuery = CGReact.useNodeValue(
-    Op.constNode(typedDict({
-    id: 'string',
-    name: 'string',
-    tagCategoryName: 'string',
-    attributes: 'string',
-  }), props.input),
-    // Op.opArtifactAliasAlias({artifactAlias: props.input as any})
+    Op.opArtifactTagName({artifactTag: props.input as any}),
   );
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
@@ -51,13 +44,13 @@ const PanelArtifactVersionTags: React.FC<
   }
   return (
     <Wrapper>
-      {/*TODO: Fix type*/}
-      {nodeValueQuery.result.map((artifactVersionTag: any) => {
+      {nodeValueQuery.result.map((artifactVersionTag: string) => {
+        console.log(artifactVersionTag);
         return (
           <Tag
-            key={artifactVersionTag.name}
+            key={artifactVersionTag}
             tag={{
-              name: artifactVersionTag.name,
+              name: artifactVersionTag,
               colorIndex: TagType.TAG,
             }}
             noun="tag"

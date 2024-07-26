@@ -1,5 +1,6 @@
 import './artifact';
 import './artifactAlias';
+import './artifactTag';
 import './artifactMembership';
 import './artifactType';
 import './artifactVersion';
@@ -23,6 +24,7 @@ import './user';
 
 export * from './artifact';
 export * from './artifactAlias';
+export * from './artifactTag';
 export * from './artifactMembership';
 export * from './artifactType';
 export * from './artifactVersion';
