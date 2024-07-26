@@ -184,7 +184,6 @@ def local_client() -> typing.Iterator[_weave_client.WeaveClient]:
         inited_client.reset()
 
 
-
 def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.ObjectRef:
     """Save and version a python object.
 
