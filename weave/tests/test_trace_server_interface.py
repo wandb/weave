@@ -63,6 +63,163 @@ def test_call_start_req():
     )
 
 
+def test_call_end_req():
+    general_schema_test(
+        tsi.CallEndReq,
+        {
+            "end": {
+                "project_id": "project_id",
+                "id": "call_id",
+                "ended_at": datetime.datetime.now(),
+                "summary": {},
+            }
+        },
+        [
+            PathTest(
+                path=["end", "summary"],
+                valid_values=[
+                    {},
+                    {"something": "random"},
+                    {"usage": None},
+                    {"usage": {}},
+                    {
+                        "usage": {
+                            "model_id": {
+                                "prompt_tokens": 1,
+                                "input_tokens": 1,
+                                "completion_tokens": 1,
+                                "output_tokens": 1,
+                                "requests": 1,
+                                "total_tokens": 1,
+                            }
+                        }
+                    },
+                ],
+                invalid_values=[
+                    None,
+                    1,
+                    "string",
+                    # Invalid type for the usage
+                    {"usage": 1},
+                    {
+                        "usage": {
+                            1: {
+                                "prompt_tokens": 1,
+                                "input_tokens": 1,
+                                "completion_tokens": 1,
+                                "output_tokens": 1,
+                                "requests": 1,
+                                "total_tokens": 1,
+                            }
+                        }
+                    },
+                    {
+                        "usage": {
+                            1: {
+                                "prompt_tokens": "a",
+                            }
+                        }
+                    },
+                ],
+            )
+        ],
+    )
+
+
+def test_call_schema():
+    general_schema_test(
+        tsi.CallSchema,
+        {
+            "id": "call_id",
+            "project_id": "project_id",
+            "op_name": "op_name",
+            "trace_id": "trace_id",
+            "started_at": datetime.datetime.now(),
+            "attributes": {},
+            "inputs": {},
+        },
+        [
+            PathTest(
+                path=["attributes"],
+                valid_values=[
+                    {},
+                    {"something": "random"},
+                    {"weave": None},
+                    {"weave": {}},
+                    {"weave": {"random_overlapping_key": "random"}},
+                    {
+                        "weave": {
+                            "client_version": "string_val",
+                            "source": "string_val",
+                            "os_name": "string_val",
+                            "os_version": "string_val",
+                            "os_release": "string_val",
+                            "sys_version": "string_val",
+                        }
+                    },
+                ],
+                invalid_values=[
+                    None,
+                    1,
+                    "string",
+                    # Invalid type for the Weave Key
+                    {
+                        "weave": {
+                            "client_version": 1,
+                        }
+                    },
+                ],
+            ),
+            PathTest(
+                path=["summary"],
+                valid_values=[
+                    {},
+                    {"something": "random"},
+                    {"usage": None},
+                    {"usage": {}},
+                    {
+                        "usage": {
+                            "model_id": {
+                                "prompt_tokens": 1,
+                                "input_tokens": 1,
+                                "completion_tokens": 1,
+                                "output_tokens": 1,
+                                "requests": 1,
+                                "total_tokens": 1,
+                            }
+                        }
+                    },
+                ],
+                invalid_values=[
+                    1,
+                    "string",
+                    # Invalid type for the usage
+                    {"usage": 1},
+                    {
+                        "usage": {
+                            1: {
+                                "prompt_tokens": 1,
+                                "input_tokens": 1,
+                                "completion_tokens": 1,
+                                "output_tokens": 1,
+                                "requests": 1,
+                                "total_tokens": 1,
+                            }
+                        }
+                    },
+                    {
+                        "usage": {
+                            1: {
+                                "prompt_tokens": "a",
+                            }
+                        }
+                    },
+                ],
+            ),
+        ],
+    )
+
+
 # Helpers Below
 
 
