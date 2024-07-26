@@ -1415,16 +1415,16 @@ def _summary_dump_to_derived_summary_map(
     if not summary_dump:
         summary_dump = {}
     summary = tsi.SummaryMap(**summary_dump)
-    summary._weave.display_name = ch_call.display_name
+    summary.weave.display_name = ch_call.display_name
     if ch_call.ended_at:
         # completed call, set latency
-        summary._weave.latency = (ch_call.ended_at - ch_call.started_at).microseconds
+        summary.weave.latency = (ch_call.ended_at - ch_call.started_at).microseconds
         if ch_call.exception is None:
-            summary._weave.status = "success"
+            summary.weave.status = "success"
         else:
-            summary._weave.status = "error"
+            summary.weave.status = "error"
     else:
-        summary._weave.status = "running"
+        summary.weave.status = "running"
     return summary
 
 

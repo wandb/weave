@@ -47,7 +47,9 @@ class SummaryInsertMap(ExtraKeysAllowed):
 
 
 class SummaryMap(SummaryInsertMap):
-    _weave: typing.Optional[WeaveSummarySchema] = None
+    weave: typing.Optional[WeaveSummarySchema] = Field(
+        alias="_weave", description="internal weave summary for derived fields"
+    )
 
 
 class WeaveAttributeSchema(BaseModel):
