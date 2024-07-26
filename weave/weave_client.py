@@ -158,6 +158,7 @@ class Call:
     project_id: str
     parent_id: Optional[str]
     inputs: dict
+    started_at: datetime.datetime
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
@@ -301,6 +302,7 @@ def make_client_call(
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
         id=server_call.id,
+        started_at=server_call.started_at,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
         summary=server_call.summary,
@@ -514,6 +516,7 @@ class WeaveClient:
         else:
             op_str = op
 
+        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         inputs_redacted = redact_sensitive_keys(inputs)
 
         self._save_nested_objects(inputs_redacted)
@@ -550,6 +553,7 @@ class WeaveClient:
             inputs=inputs_with_refs,
             display_name=display_name,
             attributes=attributes,
+            started_at=started_at,
         )
         if parent is not None:
             parent._children.append(call)
@@ -562,7 +566,7 @@ class WeaveClient:
             op_name=op_str,
             display_name=display_name,
             trace_id=trace_id,
-            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            started_at=started_at,
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes=attributes,
@@ -615,6 +619,9 @@ class WeaveClient:
             if isinstance(usage, dict) and isinstance(model, str):
                 summary._set_weave_item("usage", {model: {"requests": 1, **usage}})
 
+        # TODO(gst): pick a good status constant
+        summary._set_weave_item("status", "success" if exception is None else "error")
+        summary._set_weave_item("display_name", call.display_name)
         summary._set_weave_item("latency", ended_at - call.started_at)
 
         # Exception Handling
