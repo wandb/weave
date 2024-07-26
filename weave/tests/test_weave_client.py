@@ -3,14 +3,11 @@ import dataclasses
 import json
 import platform
 import re
-import signal
 import sys
-from typing import Callable
 
 import pydantic
 import pytest
 import requests
-from pydantic import BaseModel
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
@@ -24,7 +21,6 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
-    OpRef,
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
@@ -1119,3 +1115,53 @@ def test_weave_server(client):
     url = weave.serve(ref, thread=True)
     response = requests.post(url + "/predict", json={"input": "x"})
     assert response.json() == {"result": "input is: x"}
+
+
+def row_gen(num_rows: int, approx_row_bytes: int = 1024):
+    for i in range(num_rows):
+        yield {"a": i, "b": "x" * approx_row_bytes}
+
+
+def test_table_partitioning(network_proxy_client):
+    """
+    This test is specifically testing the correctness
+    of the table partitioning logic in the remote client.
+    In particular, the ability to partition large dataset
+    creation into multiple updates
+    """
+    client, remote_client, records = network_proxy_client
+    NUM_ROWS = 16
+    rows = list(row_gen(NUM_ROWS, 1024))
+    exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
+
+    remote_client.remote_request_bytes_limit = (
+        100 * 1024
+    )  # very large buffer to ensure a single request
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+    assert res.digest == exp_digest
+    assert len(records) == 1
+
+    remote_client.remote_request_bytes_limit = (
+        4 * 1024
+    )  # Small enough to get multiple updates
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+    assert res.digest == exp_digest
+    assert len(records) == (
+        1  # The first create call,
+        + 1  # the second  create
+        + NUM_ROWS / 2  # updates - 2 per batch
+    )
