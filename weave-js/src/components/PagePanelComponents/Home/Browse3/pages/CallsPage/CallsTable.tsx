@@ -62,7 +62,7 @@ import {
   useURLSearchParamsDict,
 } from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
