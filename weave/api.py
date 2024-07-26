@@ -201,11 +201,12 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     """
     client = client_context.weave_client.require_weave_client()
 
+    # Save name precedence:
     save_name = (
-        name
-        or getattr(obj, "name", None)
-        or getattr(obj, "_class_name", None)
-        or obj.__class__.__name__
+        name  # Explicit publish name
+        or getattr(obj, "name", None)  # Name already defined on the object
+        or getattr(obj, "_class_name", None)  # Class name of the object if it's a WeaveObject
+        or obj.__class__.__name__  # Class name of the object if it's a regular python object
     )
 
     ref = client._save_object(obj, save_name, "latest")

@@ -78,7 +78,7 @@ def make_mutation(
 ) -> Mutation:
     if operation == "setitem_dict":
         if len(args) != 2:
-            raise ValueError("setitem mutation requires 2 args")
+            raise ValueError("setitem_dict mutation requires 2 args")
         args = typing.cast(tuple[str, Any], args)
         return MutationSetitemObject(path, operation, args)
     elif operation == "setitem_list":
@@ -428,13 +428,6 @@ class WeaveDict(Traceable, dict):
         v = super().get(key, default)
         return make_trace_obj(v, new_ref, self.server, self.root)
 
-    save_name = (
-        name
-        or getattr(obj, "name", None)
-        or getattr(obj, "_class_name", None)
-        or obj.__class__.__name__
-    )
-
     def __setitem__(self, key: str, value: Any) -> None:
         full_path: tuple[str, ...]
         if not isinstance(self.ref, ObjectRef):
@@ -452,14 +445,14 @@ class WeaveDict(Traceable, dict):
 
         super().__setitem__(key, value)
 
-    def keys(self) -> dict_keys[Any]:  # type: ignore
-        return super().keys()
+    def keys(self) -> Generator[Any, Any, Any]:  # type: ignore
+        yield from super().keys()
 
-    def values(self) -> Generator[Any]:  # type: ignore
+    def values(self) -> Generator[Any, Any, Any]:  # type: ignore
         for k in self.keys():
             yield self[k]
 
-    def items(self) -> Generator[tuple[Any, Any]]:  # type: ignore
+    def items(self) -> Generator[tuple[Any, Any], Any, Any]:  # type: ignore
         for k in self.keys():
             yield k, self[k]
 
