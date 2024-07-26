@@ -214,6 +214,13 @@ gql_prop_op(
 )
 
 
+class ArtifactTagTypeDict(typing.TypedDict):
+    id: str
+    name: str
+    tagCategoryName: str
+    attributes: str
+
+
 # # FIXME: Pick the right format
 # gql_prop_op(
 #     "artifactVersion-tags",
@@ -239,9 +246,8 @@ gql_prop_op(
 )
 def op_artifact_version_tags(
     artifact: wdt.ArtifactVersion,
-) -> list[wdt.TagType]:
-    return [wdt.TagType.from_keys(obj) for obj in artifact["tags"]]
-
+) -> list[ArtifactTagTypeDict]:
+    return typing.cast(list[ArtifactTagTypeDict], artifact["tags"])
 
 
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
