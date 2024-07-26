@@ -2340,7 +2340,7 @@ def test_calls_iter_different_value_same_page_cached(client):
     end_time1 = time.time()
     elapsed_time1 = end_time1 - start_time1
 
-    # default page size is 10, so these lookups should be cached too
+    # default page size is 1000, so these lookups should be cached too
     start_time2 = time.time()
     c2 = calls[1]
     end_time2 = time.time()
