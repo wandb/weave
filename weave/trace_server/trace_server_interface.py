@@ -12,6 +12,11 @@ WB_USER_ID_DESCRIPTION = (
 
 
 class ExtraKeysAllowed(BaseModel):
+    """By inheriting from this class, you allow extra keys in the model.
+    This is useful for when we want to specify a known set of keys, but
+    also allow additional keys.
+    """
+
     class Config:
         extra = "allow"
 
