@@ -109,6 +109,7 @@ class Traceable:
     _is_dirty: bool = False
 
     def _mark_dirty(self) -> None:
+        """Recursively mark this object and its ancestors as dirty and removes their refs."""
         self._is_dirty = True
         self.ref = None
         if self.parent is not self and self.parent is not None:
@@ -370,6 +371,10 @@ class WeaveList(Traceable, list):
         base_root = object.__getattribute__(self, "root")
         base_root.add_mutation(self.ref, "setitem_list", index, value)
 
+        # Although this only marks the parent as dirty but not any siblings in
+        # the list, they will still get new refs because the container itself
+        # is dirtied so the container will get a new ref (and the elements will
+        # be extras of that new ref)
         self._mark_dirty()
         if isinstance(value, Traceable):
             value.parent = self
@@ -439,6 +444,10 @@ class WeaveDict(Traceable, dict):
         base_root = object.__getattribute__(self, "root")
         base_root.add_mutation(full_path, "setitem_dict", key, value)
 
+        # Although this only marks the parent as dirty but not any siblings in
+        # the dict, they will still get new refs because the container itself
+        # is dirtied so the container will get a new ref (and the elements will
+        # be extras of that new ref)
         self._mark_dirty()
         if isinstance(value, Traceable):
             value.parent = self

@@ -169,19 +169,20 @@ def test_object_mutation_saving_nested_lists_and_dicts(client):
     assert g2.b.e == {"a": 5, "b": 6}
     assert g2.b.f == {"c": {"d": "e"}}
 
-    g2.b.c.append(7)  # Mutate a list
+    g2.b.c.append(7)  # Add an item to a list
+    g2.b.c.pop(0)  # Delete an item from a list
     g2.b.d = [["p", "q"], ["r", "s"]]  # Replace an entire list
-    g2.b.e = {"c": 9}  # Mutate a dict
+    g2.b.e["c"] = 9  # Add an item to a dict
+    g2.b.e.pop("a")  # Delete an item from a dict
     g2.b.f = {"d": {"e": "f"}}  # Replace an entire dict
     ref2 = weave.publish(g2)
 
     g3 = ref2.get()
     assert g3.a.b == 1
     assert g3.b.a.b == 2
-    # assert g3.b.c == [7, 8]
-    assert g3.b.c == [3, 4, 7]
+    assert g3.b.c == [4, 7]
     assert g3.b.d == [["p", "q"], ["r", "s"]]
-    assert g3.b.e == {"c": 9}
+    assert g3.b.e == {"b": 6, "c": 9}
     assert g3.b.f == {"d": {"e": "f"}}
 
 
