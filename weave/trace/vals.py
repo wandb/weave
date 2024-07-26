@@ -74,7 +74,7 @@ MutationOperation = Literal["setitem_dict", "setitem_list", "setattr", "append"]
 
 
 def make_mutation(
-    path: tuple[str, ...], operation: MutationOperation, args: tuple[Any, ...]
+    path: tuple[Any, ...], operation: MutationOperation, args: tuple[Any, ...]
 ) -> Mutation:
     if operation == "setitem_dict":
         if len(args) != 2:
@@ -108,10 +108,10 @@ class Traceable:
     server: TraceServerInterface
     _is_dirty: bool = False
 
-    def _mark_dirty(self):
+    def _mark_dirty(self) -> None:
         self._is_dirty = True
         self.ref = None
-        if self.parent not in (self, None):
+        if self.parent is not self and self.parent is not None:
             self.parent._mark_dirty()
 
     def add_mutation(
@@ -231,9 +231,10 @@ class WeaveObject(Traceable):
         ]:
             return object.__setattr__(self, __name, __value)
         else:
+            full_path: tuple[str, ...]
             if not isinstance(self.ref, ObjectRef):
-                # We used to raise ValueError here to only set attributes on object refs
-                # but I don't understand why that's necessary.
+                # We used to raise ValueError here to only set attributes on
+                # object refs but I don't understand why that's necessary.
                 full_path = (__name,)
             else:
                 full_path = self.ref.extra + (__name,)
@@ -428,21 +429,30 @@ class WeaveDict(Traceable, dict):
         return make_trace_obj(v, new_ref, self.server, self.root)
 
     def __setitem__(self, key: str, value: Any) -> None:
+        full_path: tuple[str, ...]
         if not isinstance(self.ref, ObjectRef):
+            # We used to raise ValueError here to only set attributes on
+            # object refs but I don't understand why that's necessary.
             full_path = (key,)
         else:
             full_path = self.ref.extra + (key,)
-        super().__setitem__(key, value)
-        self.root.add_mutation(full_path, "setitem_dict", key, value)
+        base_root = object.__getattribute__(self, "root")
+        base_root.add_mutation(full_path, "setitem_dict", key, value)
 
-    def keys(self):  # type: ignore
+        self._mark_dirty()
+        if isinstance(value, Traceable):
+            value.parent = self
+
+        super().__setitem__(key, value)
+
+    def keys(self) -> dict_keys[Any]:  # type: ignore
         return super().keys()
 
-    def values(self):  # type: ignore
+    def values(self) -> Generator[Any]:  # type: ignore
         for k in self.keys():
             yield self[k]
 
-    def items(self):  # type: ignore
+    def items(self) -> Generator[tuple[Any, Any]]:  # type: ignore
         for k in self.keys():
             yield k, self[k]
 
