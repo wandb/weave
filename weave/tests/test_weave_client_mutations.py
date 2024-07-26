@@ -134,7 +134,7 @@ def test_dict_mutation_saving_nested(client):
     }
 
 
-def test_mutation_saving_nested(client):
+def test_object_mutation_saving_nested_lists_and_dicts(client):
     class A(weave.Object):
         b: int
 
@@ -169,16 +169,81 @@ def test_mutation_saving_nested(client):
     assert g2.b.e == {"a": 5, "b": 6}
     assert g2.b.f == {"c": {"d": "e"}}
 
-    g2.b.c = [7, 8]
-    g2.b.d = [["p", "q"], ["r", "s"]]
-    g2.b.e = {"c": 9}
-    g2.b.f = {"d": {"e": "f"}}
+    g2.b.c.append(7)  # Mutate a list
+    g2.b.d = [["p", "q"], ["r", "s"]]  # Replace an entire list
+    g2.b.e = {"c": 9}  # Mutate a dict
+    g2.b.f = {"d": {"e": "f"}}  # Replace an entire dict
     ref2 = weave.publish(g2)
 
     g3 = ref2.get()
     assert g3.a.b == 1
     assert g3.b.a.b == 2
-    assert g3.b.c == [7, 8]
+    # assert g3.b.c == [7, 8]
+    assert g3.b.c == [3, 4, 7]
     assert g3.b.d == [["p", "q"], ["r", "s"]]
     assert g3.b.e == {"c": 9}
     assert g3.b.f == {"d": {"e": "f"}}
+
+
+def test_list_mutation_saving_nested_objects(client):
+    class A(weave.Object):
+        b: int
+
+    lst = [A(b=1), A(b=2)]
+    ref = weave.publish(lst)
+
+    lst2 = ref.get()
+    lst2.append(A(b=3))
+    ref2 = weave.publish(lst2)
+
+    lst3 = ref2.get()
+    assert len(lst3) == 3
+    assert lst3[0].b == 1
+    assert lst3[1].b == 2
+    assert lst3[2].b == 3
+
+
+def test_list_mutation_saving_nested_dicts(client):
+    lst = [{"a": {"b": 1}}, {"a": {"b": 2}}]
+    ref = weave.publish(lst)
+
+    lst2 = ref.get()
+    lst2.append({"a": {"b": 3}})
+    ref2 = weave.publish(lst2)
+
+    lst3 = ref2.get()
+    assert len(lst3) == 3
+    assert lst3[0]["a"]["b"] == 1
+    assert lst3[1]["a"]["b"] == 2
+    assert lst3[2]["a"]["b"] == 3
+
+
+def test_dict_mutation_saving_nested_objects(client):
+    class A(weave.Object):
+        b: int
+
+    d = {"a": A(b=1), "b": A(b=2)}
+    ref = weave.publish(d)
+
+    d2 = ref.get()
+    d2["c"] = A(b=3)
+    ref2 = weave.publish(d2)
+
+    d3 = ref2.get()
+    assert d3["a"].b == 1
+    assert d3["b"].b == 2
+    assert d3["c"].b == 3
+
+
+def test_dict_mutation_saving_nested_lists(client):
+    d = {"a": [1, 2], "b": [3, 4]}
+    ref = weave.publish(d)
+
+    d2 = ref.get()
+    d2["c"] = [5, 6]
+    ref2 = weave.publish(d2)
+
+    d3 = ref2.get()
+    assert d3["a"] == [1, 2]
+    assert d3["b"] == [3, 4]
+    assert d3["c"] == [5, 6]

@@ -368,11 +368,21 @@ class WeaveList(Traceable, list):
             raise IndexError("list assignment index out of range")
         base_root = object.__getattribute__(self, "root")
         base_root.add_mutation(self.ref, "setitem_list", index, value)
+
+        self._mark_dirty()
+        if isinstance(value, Traceable):
+            value.parent = self
+
         super().__setitem__(index, value)
 
     def append(self, item: Any) -> None:
         base_root = object.__getattribute__(self, "root")
         base_root.add_mutation(self.ref, "append", item)
+
+        self._mark_dirty()
+        if isinstance(item, Traceable):
+            item.parent = self
+
         super().append(item)
 
     def __iter__(self) -> Iterator[Any]:
@@ -527,7 +537,7 @@ def make_trace_obj(
         if isinstance(val, ObjectRecord):
             return WeaveObject(val, new_ref, server, root, parent)
         elif isinstance(val, list):
-            return WeaveList(val, ref=new_ref, server=server, root=root)
+            return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
             return WeaveDict(val, ref=new_ref, server=server, root=root)
     if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
@@ -565,7 +575,8 @@ def make_trace_obj(
 
         pass
     else:
-        setattr(box_val, "ref", new_ref)
+        if hasattr(box_val, "ref"):
+            setattr(box_val, "ref", new_ref)
     return box_val
 
 

@@ -10,23 +10,29 @@ from typing import Any, TypeVar
 
 import numpy as np
 
+from weave.ref_base import Ref
+
 T = TypeVar("T")
 
 
-# Are these missing "ref"?
 class BoxedInt(int):
     _id: int | None = None
+    ref: Ref | None = None
 
 
 class BoxedFloat(float):
     _id: int | None = None
+    ref: Ref | None = None
 
 
 class BoxedStr(str):
     _id: int | None = None
+    ref: Ref | None = None
 
 
 class BoxedDatetime(datetime.datetime):
+    ref: Ref | None = None
+
     def __eq__(self, other: Any) -> bool:
         return (
             isinstance(other, datetime.datetime)
@@ -35,6 +41,8 @@ class BoxedDatetime(datetime.datetime):
 
 
 class BoxedTimedelta(datetime.timedelta):
+    ref: Ref | None = None
+
     def __eq__(self, other: Any) -> bool:
         return (
             isinstance(other, datetime.timedelta)
@@ -44,6 +52,8 @@ class BoxedTimedelta(datetime.timedelta):
 
 # See https://numpy.org/doc/stable/user/basics.subclassing.html
 class BoxedNDArray(np.ndarray):
+    ref: Ref | None = None
+
     def __new__(cls, input_array: Any) -> BoxedNDArray:
         obj = np.asarray(input_array).view(cls)
         return obj
