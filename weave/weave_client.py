@@ -18,7 +18,8 @@ from typing import (
 import pydantic
 from requests import HTTPError
 
-from weave import call_context, client_context, trace_sentry, urls, version
+from weave import call_context, trace_sentry, urls, version
+from weave.client_context import weave_client as weave_client_context
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
@@ -38,6 +39,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
@@ -69,10 +71,6 @@ if typing.TYPE_CHECKING:
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
-
-
-def generate_id() -> str:
-    return str(uuid.uuid4())
 
 
 class ValueFilter(TypedDict, total=False):
@@ -125,9 +123,9 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
-    ref = _get_direct_ref(obj)
-    if ref:
+    if ref := _get_direct_ref(obj):
         return ref
+
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
@@ -138,10 +136,18 @@ def map_to_refs(obj: Any) -> Any:
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
         return obj.ref
+    elif isinstance(obj, WeaveTable):
+        return obj.ref
     elif isinstance(obj, list):
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
+
+    # This path should only be reached if the object is both:
+    # 1. A `WeaveObject`; and
+    # 2. Has been dirtied (edited in any way), causing obj.ref=None
+    elif isinstance(obj, WeaveObject):
+        return map_to_refs(obj._val)
 
     return obj
 
@@ -194,7 +200,7 @@ class Call:
 
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
         return CallsIter(
@@ -204,7 +210,7 @@ class Call:
         )
 
     def delete(self) -> bool:
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
@@ -214,7 +220,7 @@ class Call:
             )
         if name == self.display_name:
             return
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         client._set_call_display_name(call=self, display_name=name)
         self.display_name = name
 
@@ -225,14 +231,20 @@ class Call:
 class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
+    include_costs: bool
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: _CallsFilter,
+        include_costs: bool = False,
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
-        self._page_size = 10
+        self._page_size = 1000
+        self.include_costs = include_costs
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
@@ -245,6 +257,7 @@ class CallsIter:
                 filter=self.filter,
                 offset=index * self._page_size,
                 limit=self._page_size,
+                include_costs=self.include_costs,
             )
         )
         return response.calls
@@ -303,7 +316,7 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        summary=server_call.summary,
+        summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,
     )
@@ -455,18 +468,25 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
+    def calls(
+        self,
+        filter: Optional[_CallsFilter] = None,
+        include_costs: Optional[bool] = False,
+    ) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
 
-        return CallsIter(self.server, self._project_id(), filter)
+        return CallsIter(
+            self.server, self._project_id(), filter, include_costs or False
+        )
 
     @trace_sentry.global_trace_sentry.watch()
-    def call(self, call_id: str) -> WeaveObject:
+    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
                 filter=_CallsFilter(call_ids=[call_id]),
+                include_costs=include_costs,
             )
         )
         if not response.calls:
@@ -737,6 +757,11 @@ class WeaveClient:
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
+        # The WeaveTable case is special because object saving happens inside
+        # _save_object_nested and it has a special table_ref -- skip it here.
+        if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
+            val.ref = None
+
         is_opdef = isinstance(val, Op)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
@@ -787,6 +812,10 @@ class WeaveClient:
         elif isinstance(obj, Table):
             table_ref = self._save_table(obj)
             obj.ref = table_ref
+        elif isinstance(obj, WeaveTable):
+            table_ref = self._save_table(obj)
+            obj.ref = table_ref
+            obj.table_ref = table_ref
         elif isinstance_namedtuple(obj):
             for v in obj._asdict().values():
                 self._save_nested_objects(v)
@@ -798,6 +827,9 @@ class WeaveClient:
                 self._save_nested_objects(v)
         elif isinstance(obj, Op):
             self._save_op(obj)
+        # TODO: Kinda hacky way to dispatching Dataset with rows: Table
+        elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
+            self._save_nested_objects(obj.rows)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:

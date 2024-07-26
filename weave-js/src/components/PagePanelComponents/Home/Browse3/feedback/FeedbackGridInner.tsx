@@ -7,13 +7,18 @@ import {CellValueString} from '../../Browse2/CellValueString';
 import {CopyableId} from '../pages/common/Id';
 import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
+import {FeedbackGridActions} from './FeedbackGridActions';
 import {FeedbackTypeChip} from './FeedbackTypeChip';
 
 type FeedbackGridInnerProps = {
   feedback: Feedback[];
+  currentViewerId: string | null;
 };
 
-export const FeedbackGridInner = ({feedback}: FeedbackGridInnerProps) => {
+export const FeedbackGridInner = ({
+  feedback,
+  currentViewerId,
+}: FeedbackGridInnerProps) => {
   const columns: GridColDef[] = [
     {
       field: 'feedback_type',
@@ -68,7 +73,27 @@ export const FeedbackGridInner = ({feedback}: FeedbackGridInnerProps) => {
         ) {
           return params.row.creator;
         }
-        return <UserLink username={params.row.wb_user_id} includeName />;
+        return <UserLink userId={params.row.wb_user_id} includeName />;
+      },
+    },
+    {
+      field: 'actions',
+      headerName: '',
+      width: 50,
+      filterable: false,
+      sortable: false,
+      resizable: false,
+      disableColumnMenu: true,
+      renderCell: params => {
+        const projectId = params.row.project_id;
+        const feedbackId = params.row.id;
+        const creatorId = params.row.wb_user_id;
+        if (!currentViewerId || creatorId !== currentViewerId) {
+          return null;
+        }
+        return (
+          <FeedbackGridActions projectId={projectId} feedbackId={feedbackId} />
+        );
       },
     },
   ];

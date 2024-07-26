@@ -23,6 +23,8 @@ from weave.flow.scorer import (
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.op import Op
+from weave.trace.vals import WeaveObject
+from weave.weave_client import get_ref
 
 console = Console()
 
@@ -44,6 +46,10 @@ def async_call(
     if is_async:
         return func(*args, **kwargs)  # type: ignore
     return asyncio.to_thread(func, *args, **kwargs)
+
+
+class EvaluationResults(weave.Object):
+    rows: weave.Table
 
 
 class Evaluation(Object):
@@ -247,8 +253,9 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: list) -> dict:
-        cols = transpose(eval_table)
+    async def summarize(self, eval_table: EvaluationResults) -> dict:
+        eval_table_rows = list(eval_table.rows)
+        cols = transpose(eval_table_rows)
         summary = {}
 
         for name, vals in cols.items():
@@ -269,7 +276,7 @@ class Evaluation(Object):
 
     @weave.op()
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
-        if not isinstance(model, Model) and not isinstance(model, Op):
+        if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
 
@@ -310,7 +317,18 @@ class Evaluation(Object):
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
 
-        summary = await self.summarize(eval_rows)
+        # The need for this pattern is quite unfortunate and highlights a gap in our
+        # data model. As a user, I just want to pass a list of data `eval_rows` to
+        # summarize. Under the hood, Weave should choose the appropriate storage
+        # format (in this case `Table`) and serialize it that way. Right now, it is
+        # just a huge list of dicts. The fact that "as a user" I need to construct
+        # `weave.Table` at all is a leaky abstraction. Moreover, the need to
+        # construct `EvaluationResults` just so that tracing and the UI works is
+        # also bad. In the near-term, this will at least solve the problem of
+        # breaking summarization with big datasets, but this is not the correct
+        # long-term solution.
+        eval_results = EvaluationResults(rows=weave.Table(eval_rows))
+        summary = await self.summarize(eval_results)
 
         print("Evaluation summary", summary)
 
@@ -327,3 +345,19 @@ def evaluate(
         dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
     )
     return asyncio.run(eval.evaluate(model))
+
+
+def is_valid_model(model: Any) -> bool:
+    return (
+        # Model instances are supported
+        isinstance(model, Model)
+        # Ops are supported
+        or isinstance(model, Op)
+        # Saved Models (Objects with predict) are supported
+        or (
+            get_ref(model) is not None
+            and isinstance(model, WeaveObject)
+            and hasattr(model, "predict")
+            and isinstance(model.predict, Op)
+        )
+    )

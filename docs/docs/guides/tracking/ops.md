@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
-
 # Ops
 
 A Weave op is a versioned function that automatically logs all calls.
@@ -20,7 +15,7 @@ weave.init('intro-example')
 track_me(15)
 ```
 
-Calling an op will created a new op version if the code has changed from the last call, and log the inputs and outputs of the function.
+Calling an op will create a new op version if the code has changed from the last call, and log the inputs and outputs of the function.
 
 :::note
 Functions decorated with `@weave.op()` will behave normally (without code versioning and tracking), if you don't call `weave.init('your-project-name')` before calling them.

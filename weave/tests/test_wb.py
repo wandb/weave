@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import wandb
 
-from weave import api as weave
+from weave import query_api as weave
 from weave import stitch
 from weave import weave_types as types
 from weave.legacy import artifact_fs, artifact_wandb, compile, graph, ops, uris

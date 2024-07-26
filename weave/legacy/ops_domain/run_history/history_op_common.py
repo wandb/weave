@@ -11,7 +11,7 @@ from weave import (
     util,
 )
 from weave import weave_types as types
-from weave.api import use
+from weave.query_api import use
 from weave.legacy import (
     _dict_utils,
     artifact_base,

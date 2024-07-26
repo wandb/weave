@@ -1,11 +1,8 @@
----
-sidebar_position: 4
-hide_table_of_contents: true
----
-
 # Evaluation
 
 Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
+
+![Evals hero](../../../static/img/evals-hero.png)
 
 ```python
 import weave

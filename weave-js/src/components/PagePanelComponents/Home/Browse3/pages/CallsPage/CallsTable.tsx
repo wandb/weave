@@ -47,7 +47,7 @@ import {
 } from '../../context';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
-import {SELECTED_FOR_DELETION, StyledDataGrid} from '../../StyledDataGrid';
+import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
@@ -56,6 +56,7 @@ import {
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
+import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
 import {
   truncateID,
   useControllableState,
@@ -65,11 +66,13 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallSchema,
+  OpVersionKey,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {useCallsTableColumns} from './callsTableColumns';
-import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
 import {useOpVersionOptions} from './callsTableFilter';
@@ -81,7 +84,7 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
-const MAX_BULK_DELETE = 10;
+const MAX_SELECT = 100;
 
 export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
   'attributes.weave.client_version': false,
@@ -90,6 +93,12 @@ export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
   'attributes.weave.os_version': false,
   'attributes.weave.os_release': false,
   'attributes.weave.sys_version': false,
+};
+
+export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
+
+export const DEFAULT_PIN_CALLS: GridPinnedColumns = {
+  left: ['CustomCheckbox', 'op_name', 'feedback'],
 };
 
 export const DEFAULT_SORT_CALLS: GridSortModel = [
@@ -114,6 +123,9 @@ export const CallsTable: FC<{
   columnVisibilityModel?: GridColumnVisibilityModel;
   setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
 
+  pinModel?: GridPinnedColumns;
+  setPinModel?: (newModel: GridPinnedColumns) => void;
+
   sortModel?: GridSortModel;
   setSortModel?: (newModel: GridSortModel) => void;
 
@@ -128,6 +140,8 @@ export const CallsTable: FC<{
   hideControls,
   columnVisibilityModel,
   setColumnVisibilityModel,
+  pinModel,
+  setPinModel,
   sortModel,
   setSortModel,
   paginationModel,
@@ -330,10 +344,7 @@ export const CallsTable: FC<{
   );
 
   // DataGrid Model Management
-  const [pinnedColumnsModel, setPinnedColumnsModel] =
-    useState<GridPinnedColumns>({
-      left: ['CustomCheckbox', 'op_name', 'feedback'],
-    });
+  const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
 
   // END OF CPR FACTORED CODE
 
@@ -380,18 +391,17 @@ export const CallsTable: FC<{
     project
   );
 
-  const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
-
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const muiColumns = useMemo(() => {
-    return [
+    const cols = [
       {
         minWidth: 30,
         width: 38,
         field: 'CustomCheckbox',
         sortable: false,
         disableColumnMenu: true,
+        resizable: false,
         renderHeader: (params: any) => {
           return (
             <Checkbox
@@ -403,33 +413,18 @@ export const CallsTable: FC<{
                   : 'indeterminate'
               }
               onCheckedChange={() => {
-                // if bulk delete move, or not eval table, select all calls
-                if (bulkDeleteMode || !isEvaluateTable) {
-                  if (
-                    selectedCalls.length ===
-                    Math.min(tableData.length, MAX_BULK_DELETE)
-                  ) {
-                    setSelectedCalls([]);
-                  } else {
-                    setSelectedCalls(
-                      tableData.map(row => row.id).slice(0, MAX_BULK_DELETE)
-                    );
-                  }
+                const maxForTable = isEvaluateTable
+                  ? MAX_EVAL_COMPARISONS
+                  : MAX_SELECT;
+                if (
+                  selectedCalls.length ===
+                  Math.min(tableData.length, maxForTable)
+                ) {
+                  setSelectedCalls([]);
                 } else {
-                  // exclude non-successful calls from selection
-                  const filtered = tableData.filter(
-                    row => row.exception == null && row.ended_at != null
+                  setSelectedCalls(
+                    tableData.map(row => row.id).slice(0, maxForTable)
                   );
-                  if (
-                    selectedCalls.length ===
-                    Math.min(filtered.length, MAX_EVAL_COMPARISONS)
-                  ) {
-                    setSelectedCalls([]);
-                  } else {
-                    setSelectedCalls(
-                      filtered.map(row => row.id).slice(0, MAX_EVAL_COMPARISONS)
-                    );
-                  }
                 }
               }}
             />
@@ -438,30 +433,18 @@ export const CallsTable: FC<{
         renderCell: (params: any) => {
           const rowId = params.id as string;
           const isSelected = selectedCalls.includes(rowId);
-          const disabledDueToMax =
-            selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected;
-          const disabledDueToNonSuccess =
-            params.row.exception != null || params.row.ended_at == null;
+          const disabled =
+            !isSelected &&
+            (isEvaluateTable
+              ? selectedCalls.length >= MAX_EVAL_COMPARISONS
+              : selectedCalls.length >= MAX_SELECT);
           let tooltipText = '';
-          if (bulkDeleteMode || !isEvaluateTable) {
-            if (selectedCalls.length >= MAX_BULK_DELETE) {
-              tooltipText = `Deletion limited to ${MAX_BULK_DELETE} items`;
-            } else {
-              tooltipText = '';
-            }
-          } else {
-            if (disabledDueToNonSuccess) {
-              tooltipText = 'Cannot compare non-successful evaluations';
-            } else if (disabledDueToMax) {
+          if (isEvaluateTable) {
+            if (selectedCalls.length >= MAX_EVAL_COMPARISONS && !isSelected) {
               tooltipText = `Comparison limited to ${MAX_EVAL_COMPARISONS} evaluations`;
             }
-          }
-
-          let disabled = false;
-          if ((bulkDeleteMode || !isEvaluateTable) && !isSelected) {
-            disabled = selectedCalls.length >= MAX_BULK_DELETE;
-          } else if (isEvaluateTable) {
-            disabled = disabledDueToNonSuccess || disabledDueToMax;
+          } else if (selectedCalls.length >= MAX_SELECT && !isSelected) {
+            tooltipText = `Selection limited to ${MAX_SELECT} items`;
           }
 
           return (
@@ -490,7 +473,8 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-  }, [columns.cols, selectedCalls, tableData, bulkDeleteMode, isEvaluateTable]);
+    return cols;
+  }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
 
   // Register Compare Evaluations Button
   const history = useHistory();
@@ -507,10 +491,7 @@ export const CallsTable: FC<{
               router.compareEvaluationsUri(entity, project, selectedCalls)
             );
           }}
-          disabled={selectedCalls.length === 0 || bulkDeleteMode}
-          tooltipText={
-            bulkDeleteMode ? 'Cannot compare while bulk deleting' : undefined
-          }
+          disabled={selectedCalls.length === 0}
         />
       ),
       order: 1,
@@ -529,7 +510,6 @@ export const CallsTable: FC<{
     entity,
     project,
     history,
-    bulkDeleteMode,
   ]);
 
   // Register Delete Button
@@ -541,29 +521,15 @@ export const CallsTable: FC<{
     addExtra('deleteSelectedCalls', {
       node: (
         <BulkDeleteButton
-          onConfirm={() => setDeleteConfirmModalOpen(true)}
+          onClick={() => setDeleteConfirmModalOpen(true)}
           disabled={selectedCalls.length === 0}
-          bulkDeleteModeToggle={mode => {
-            setBulkDeleteMode(mode);
-            if (!mode) {
-              setSelectedCalls([]);
-            }
-          }}
-          selectedCalls={selectedCalls}
         />
       ),
       order: 3,
     });
 
     return () => removeExtra('deleteSelectedCalls');
-  }, [
-    addExtra,
-    removeExtra,
-    selectedCalls,
-    isEvaluateTable,
-    bulkDeleteMode,
-    isReadonly,
-  ]);
+  }, [addExtra, removeExtra, selectedCalls, isEvaluateTable, isReadonly]);
 
   useEffect(() => {
     if (isReadonly) {
@@ -602,6 +568,16 @@ export const CallsTable: FC<{
         setColumnVisibilityModel(newModel);
       }
     : undefined;
+
+  const onPinnedColumnsChange = useCallback(
+    (newModel: GridPinnedColumns) => {
+      if (!setPinModel || callsLoading) {
+        return;
+      }
+      setPinModel(newModel);
+    },
+    [callsLoading, setPinModel]
+  );
 
   const onSortModelChange = useCallback(
     (newModel: GridSortModel) => {
@@ -785,11 +761,6 @@ export const CallsTable: FC<{
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
-        getRowClassName={params =>
-          bulkDeleteMode && selectedCalls.includes(params.row.id)
-            ? SELECTED_FOR_DELETION
-            : ''
-        }
         onColumnWidthChange={newCol => {
           setUserDefinedColumnWidths(curr => {
             return {
@@ -798,8 +769,8 @@ export const CallsTable: FC<{
             };
           });
         }}
-        pinnedColumns={pinnedColumnsModel}
-        onPinnedColumnsChange={newModel => setPinnedColumnsModel(newModel)}
+        pinnedColumns={pinModelResolved}
+        onPinnedColumnsChange={onPinnedColumnsChange}
         sx={{
           borderRadius: 0,
         }}
@@ -938,7 +909,7 @@ const ExportRunsTableButton = ({
       alignItems: 'center',
     }}>
     <Button
-      className={rightmostButton ? 'mr-16' : 'mr-4'}
+      className={rightmostButton ? 'mr-16' : 'ml-4'}
       size="medium"
       variant="ghost"
       icon="export-share-upload"
@@ -964,23 +935,20 @@ const CompareEvaluationsTableButton: FC<{
     <Button
       className="mx-4"
       size="medium"
-      variant="ghost"
+      variant="primary"
       disabled={disabled}
       onClick={onClick}
       icon="chart-scatterplot"
       tooltip={tooltipText}>
-      Compare Evaluations
+      Compare
     </Button>
   </Box>
 );
 
 const BulkDeleteButton: FC<{
   disabled?: boolean;
-  selectedCalls: string[];
-  onConfirm: () => void;
-  bulkDeleteModeToggle: (mode: boolean) => void;
-}> = ({disabled, selectedCalls, onConfirm, bulkDeleteModeToggle}) => {
-  const [deleteClicked, setDeleteClicked] = useState(false);
+  onClick: () => void;
+}> = ({disabled, onClick}) => {
   return (
     <Box
       sx={{
@@ -988,51 +956,21 @@ const BulkDeleteButton: FC<{
         display: 'flex',
         alignItems: 'center',
       }}>
-      {deleteClicked ? (
-        <>
-          <Button
-            className="mx-4"
-            variant="ghost"
-            size="medium"
-            disabled={disabled}
-            onClick={onConfirm}
-            tooltip="Select rows with the checkbox to delete"
-            icon="delete">
-            Confirm
-          </Button>
-          <Button
-            className="ml-4 mr-16"
-            variant="ghost"
-            size="medium"
-            onClick={() => {
-              setDeleteClicked(false);
-              bulkDeleteModeToggle(false);
-            }}>
-            Exit delete mode
-          </Button>
-        </>
-      ) : selectedCalls.length > 0 ? (
-        <Button
-          className="ml-4 mr-16"
-          variant="ghost"
-          size="medium"
-          onClick={onConfirm}
-          tooltip="Select rows with the checkbox to delete"
-          icon="delete"
-        />
-      ) : (
-        <Button
-          className="ml-4 mr-16"
-          variant="ghost"
-          size="medium"
-          onClick={() => {
-            setDeleteClicked(true);
-            bulkDeleteModeToggle(true);
-          }}
-          tooltip="Select rows with the checkbox to delete"
-          icon="delete"
-        />
-      )}
+      <Button
+        className="ml-4 mr-16"
+        variant="ghost"
+        size="medium"
+        disabled={disabled}
+        onClick={onClick}
+        tooltip="Select rows with the checkbox to delete"
+        icon="delete"
+      />
     </Box>
   );
 };
+
+function prepareFlattenedCallDataForTable(
+  callsResult: CallSchema[]
+): Array<TraceCallSchema & {[key: string]: string}> {
+  return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
+}

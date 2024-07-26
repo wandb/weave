@@ -24,6 +24,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
+from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -1165,3 +1166,96 @@ def test_table_partitioning(network_proxy_client):
         + 1  # the second  create
         + NUM_ROWS / 2  # updates - 2 per batch
     )
+
+
+def test_summary_tokens_cost(client):
+    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
+    if is_sqlite:
+        # SQLite does not support costs
+        return
+
+    @weave.op()
+    def model_a(text):
+        result = "a: " + text
+        return {
+            "result": result,
+            "model": "model_a",
+            "usage": {
+                "prompt_tokens": len(text),
+                "completion_tokens": len(result),
+            },
+        }
+
+    @weave.op()
+    def model_b(text):
+        result = "bbbb: " + text
+        return {
+            "result": result,
+            "model": "model_b",
+            "usage": {
+                "prompt_tokens": len(text),
+                "completion_tokens": len(result),
+            },
+        }
+
+    @weave.op()
+    def models(text):
+        return (
+            model_a(text)["result"]
+            + " "
+            + model_a(text)["result"]
+            + " "
+            + model_b(text)["result"]
+        )
+
+    res = models("hello")
+    assert res == "a: hello a: hello bbbb: hello"
+
+    call = list(models.calls())[0]
+
+    assert call.summary["usage"] == {
+        "model_a": {"requests": 2, "prompt_tokens": 10, "completion_tokens": 16},
+        "model_b": {"requests": 1, "prompt_tokens": 5, "completion_tokens": 11},
+    }
+
+    callsWithCost = list(client.calls(include_costs=True))
+    callsNoCost = list(client.calls(include_costs=False))
+
+    assert len(callsWithCost) == len(callsNoCost)
+    assert len(callsWithCost) == 4
+
+    noCostCallSummary = callsNoCost[0].summary
+    withCostCallSummary = callsWithCost[0].summary
+
+    assert withCostCallSummary.get("weave", "bah") != "bah"
+    assert len(withCostCallSummary["weave"]["costs"]) > 0
+
+    # for no cost call, there should be no cost information
+    # currently that means no weave object in the summary
+    assert noCostCallSummary.get("weave", "bah") == "bah"
+
+
+@pytest.mark.skip_clickhouse_client
+def test_summary_tokens_cost_sqlite(client):
+    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
+    if not is_sqlite:
+        # only run this test for sqlite
+        return
+
+    # ensure that include_costs is a no-op for sqlite
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
+    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
+    call1 = client.create_call("y", {"a": 6, "b": 11})
+
+    callsWithCost = list(client.calls(include_costs=True))
+    callsNoCost = list(client.calls(include_costs=False))
+
+    assert len(callsWithCost) == len(callsNoCost)
+    assert len(callsWithCost) == 4
+
+    noCostCallSummary = callsNoCost[0].summary
+    withCostCallSummary = callsWithCost[0].summary
+
+    assert noCostCallSummary is None
+    assert withCostCallSummary is None

@@ -4,13 +4,14 @@
  * https://www.figma.com/file/01KWBdMZg5QM9SRS1pQq0z/Design-System----Robot-Styles?type=design&node-id=5956-31813&mode=design&t=Gm4WWGWwgjdfUUTe-0
  */
 
+import {TooltipContentProps} from '@radix-ui/react-tooltip';
 import classNames from 'classnames';
-import React, {ReactElement} from 'react';
+import React, {ReactElement, useState} from 'react';
 import {twMerge} from 'tailwind-merge';
 
 import {Icon, IconName} from '../Icon';
+import * as Tooltip from '../RadixTooltip';
 import {Tailwind} from '../Tailwind';
-import {Tooltip} from '../Tooltip';
 import {ButtonSize, ButtonVariant} from './types';
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -32,6 +33,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactElement | string;
   active?: boolean;
   tooltip?: string;
+  tooltipProps?: TooltipContentProps;
   twWrapperStyles?: React.CSSProperties;
 };
 
@@ -47,6 +49,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       children,
       className = '',
       tooltip,
+      tooltipProps,
       twWrapperStyles = {},
       ...htmlAttributes
     },
@@ -82,70 +85,82 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     const button = (
-      <Tailwind style={wrapperStyles}>
-        <button
-          ref={ref}
-          type="button"
-          className={twMerge(
-            classNames(
-              'night-aware',
-              "inline-flex items-center justify-center whitespace-nowrap rounded border-none font-['Source_Sans_Pro'] font-semibold",
-              'disabled:pointer-events-none disabled:opacity-35',
-              'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
-              {
-                // small
-                'gap-6 px-6 py-3 text-sm leading-[18px]': isSmall,
-                '[&_svg]:h-16 [&_svg]:w-16': isSmall,
-                'h-24 w-24 p-0': isSmall && isIconOnly,
+      <button
+        ref={ref}
+        type="button"
+        className={twMerge(
+          classNames(
+            'night-aware',
+            "inline-flex items-center justify-center whitespace-nowrap rounded border-none font-['Source_Sans_Pro'] font-semibold",
+            'disabled:pointer-events-none disabled:opacity-35',
+            'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
+            {
+              // small
+              'gap-6 px-6 py-3 text-sm leading-[18px]': isSmall,
+              '[&_svg]:h-16 [&_svg]:w-16': isSmall,
+              'h-24 w-24 p-0': isSmall && isIconOnly,
 
-                // medium
-                'gap-10 px-10 py-4 text-base': isMedium,
-                '[&_svg]:h-18 [&_svg]:w-18': isMedium,
-                'h-32 w-32 p-0': isMedium && isIconOnly,
+              // medium
+              'gap-10 px-10 py-4 text-base': isMedium,
+              '[&_svg]:h-18 [&_svg]:w-18': isMedium,
+              'h-32 w-32 p-0': isMedium && isIconOnly,
 
-                // large
-                'gap-8 px-12 py-8 text-base': isLarge,
-                'h-40 w-40 p-0': isLarge && isIconOnly,
+              // large
+              'gap-8 px-12 py-8 text-base': isLarge,
+              'h-40 w-40 p-0': isLarge && isIconOnly,
 
-                // primary
-                'bg-teal-500 text-white hover:bg-teal-450': isPrimary,
-                'bg-teal-450': isPrimary && active,
+              // primary
+              'bg-teal-500 text-white hover:bg-teal-450': isPrimary,
+              'bg-teal-450': isPrimary && active,
 
-                // secondary & ghost
-                'bg-oblivion/[0.05] dark:bg-moonbeam/[0.05]': isSecondary,
-                'text-moon-800 dark:text-moon-200': isSecondary || isGhost,
-                'hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400':
-                  isSecondary || isGhost,
-                'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400':
-                  (isSecondary || isGhost) && active,
+              // secondary & ghost
+              'bg-oblivion/[0.05] dark:bg-moonbeam/[0.05]': isSecondary,
+              'text-moon-800 dark:text-moon-200': isSecondary || isGhost,
+              'hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400':
+                isSecondary || isGhost,
+              'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400':
+                (isSecondary || isGhost) && active,
 
-                // quiet
-                'text-moon-500': isQuiet,
-                'bg-oblivion/[0.05] text-moon-800 dark:bg-moonbeam/[0.05] dark:text-moon-200':
-                  isQuiet && active,
-                'hover:text-moon-800 dark:hover:text-moon-200': isQuiet,
-                'hover:bg-oblivion/[0.05] dark:hover:bg-moonbeam/[0.05]':
-                  isQuiet,
+              // quiet
+              'text-moon-500': isQuiet,
+              'bg-oblivion/[0.05] text-moon-800 dark:bg-moonbeam/[0.05] dark:text-moon-200':
+                isQuiet && active,
+              'hover:text-moon-800 dark:hover:text-moon-200': isQuiet,
+              'hover:bg-oblivion/[0.05] dark:hover:bg-moonbeam/[0.05]': isQuiet,
 
-                // destructive
-                'bg-red-500 text-white hover:bg-red-450': isDestructive,
-                'bg-red-450': isDestructive && active,
-              },
-              className
-            )
-          )}
-          {...htmlAttributes}>
-          {startIcon ? <Icon name={startIcon} /> : null}
-          {children}
-          {endIcon ? <Icon name={endIcon} /> : null}
-        </button>
-      </Tailwind>
+              // destructive
+              'bg-red-500 text-white hover:bg-red-450': isDestructive,
+              'bg-red-450': isDestructive && active,
+            },
+            className
+          )
+        )}
+        {...htmlAttributes}>
+        {startIcon ? <Icon name={startIcon} /> : null}
+        {children}
+        {endIcon ? <Icon name={endIcon} /> : null}
+      </button>
     );
 
+    const [isTooltipOpen, setIsTooltipOpen] = useState(false);
     if (tooltip) {
-      // span is needed so tooltip works on disabled buttons
-      return <Tooltip content={tooltip} trigger={<span>{button}</span>} />;
+      return (
+        <Tailwind style={wrapperStyles}>
+          <Tooltip.Provider>
+            <Tooltip.Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
+              <Tooltip.Trigger asChild>
+                {/* span is needed so tooltip works on disabled buttons */}
+                <span>{button}</span>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content {...tooltipProps}>{tooltip}</Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          </Tooltip.Provider>
+        </Tailwind>
+      );
     }
-    return button;
+
+    return <Tailwind style={wrapperStyles}>{button}</Tailwind>;
   }
 );

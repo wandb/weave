@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
-
 # Google Gemini
 
 Google offers two ways of calling Gemini via API:
