@@ -812,9 +812,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
-                defaultdict(list)
-            )
+            refs_by_project_id: dict[
+                str, list[refs_internal.InternalObjectRef]
+            ] = defaultdict(list)
             for ref in refs:
                 refs_by_project_id[ref.project_id].append(ref)
             for project_id, project_refs in refs_by_project_id.items():
@@ -1415,6 +1415,7 @@ def _summary_dump_to_derived_summary_map(
     if not summary_dump:
         summary_dump = {}
     summary = tsi.SummaryMap(**summary_dump)
+    summary.weave = tsi.WeaveSummarySchema()
     summary.weave.display_name = ch_call.display_name
     if ch_call.ended_at:
         # completed call, set latency
