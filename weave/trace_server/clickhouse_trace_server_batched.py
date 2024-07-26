@@ -1414,7 +1414,6 @@ def _summary_dump_to_derived_summary_map(
 ) -> tsi.SummaryMap:
     if not summary_dump:
         summary_dump = {}
-    summary = tsi.SummaryMap(**summary_dump)
     status, latency = None, None
     if not ch_call.ended_at:
         status = "running"
@@ -1422,13 +1421,13 @@ def _summary_dump_to_derived_summary_map(
         latency = (ch_call.ended_at - ch_call.started_at).microseconds
         status = "success" if ch_call.exception is None else "error"
 
-    summary.weave = tsi.WeaveSummarySchema(
+    weave_derived_fields = tsi.WeaveSummarySchema(
         display_name=ch_call.display_name,
         status=status,
         latency=latency,
     )
 
-    return summary
+    return tsi.SummaryMap(**summary_dump, _weave=weave_derived_fields)
 
 
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:

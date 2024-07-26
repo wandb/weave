@@ -436,16 +436,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ended_at: Optional[datetime.datetime],
             exception: Optional[str],
             display_name: Optional[str],
-        ) -> Optional[tsi.WeaveSummarySchema]:
+        ) -> Optional[tsi.SummaryMap]:
             summary_json = json.loads(summary_dump) if summary_dump else {}
             status, latency = None, None
             if not ended_at:
                 status = "running"
             else:  # call is finished, set latency and terminal status
-                latency = (
-                    datetime.datetime.fromisoformat(ended_at)
-                    - datetime.datetime.fromisoformat(started_at)
-                ).microseconds
+                latency = (ended_at - started_at).microseconds
                 status = "success" if exception is None else "error"
 
             weave_derived_fields = tsi.WeaveSummarySchema(
