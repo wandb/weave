@@ -1,5 +1,6 @@
 from weave.api import op
-from weave.legacy.ops_domain.artifact_version_ops import ArtifactTagTypeDict
+from weave.legacy.ops_domain.wb_domain_types import ArtifactTagTypeDict
+
 
 # Section 1/6: Tag Getters
 # None

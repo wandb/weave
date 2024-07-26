@@ -190,6 +190,13 @@ ArtifactAliasType = ArtifactAlias.WeaveType()  # type: ignore
 ArtifactAliasType = typing.cast(PartialObjectTypeGeneratorType, ArtifactAliasType)
 
 
+class ArtifactTagTypeDict(typing.TypedDict):
+    id: str
+    name: str
+    tagCategoryName: str
+    attributes: str
+
+
 @gql_type("tag")
 class Tag(GQLBase):
     REQUIRED_FRAGMENT = """
