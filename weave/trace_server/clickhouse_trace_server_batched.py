@@ -812,9 +812,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[
-                str, list[refs_internal.InternalObjectRef]
-            ] = defaultdict(list)
+            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
+                defaultdict(list)
+            )
             for ref in refs:
                 refs_by_project_id[ref.project_id].append(ref)
             for project_id, project_refs in refs_by_project_id.items():
@@ -1408,22 +1408,6 @@ def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
     return val if val != "" else None
 
 
-def _make_call_summary_derived_fields(
-    ch_call: SelectableCHCallSchema,
-) -> tsi.SummaryDict:
-    # set summary._weave.status, summary._weave.latency, summary._weave.display_name
-    if ch_call.summary is None:
-        summary = tsi.SummaryDict()
-    else:
-        summary = tsi.SummaryDict(**ch_call.summary)
-    summary._weave.status = (
-        tsi.CallStatus.SUCCESS if ch_call.exception is None else tsi.CallStatus.ERROR
-    )
-    summary._weave.latency = (ch_call.ended_at - ch_call.started_at).microseconds
-    summary._weave.display_name = ch_call.display_name
-    return summary
-
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1436,7 +1420,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=_make_call_summary_derived_fields(ch_call),
+        summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
@@ -1493,7 +1477,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         parent_id=start_call.parent_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
-        attributes_dump=_dict_value_to_dump(start_call.attributes),
+        attributes_dump=_dict_value_to_dump(start_call.attributes.model_dump()),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
@@ -1512,7 +1496,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
-        summary_dump=_dict_value_to_dump(end_call.summary),
+        summary_dump=_dict_value_to_dump(end_call.summary.model_dump()),
         output_dump=_any_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(end_call.output),
     )

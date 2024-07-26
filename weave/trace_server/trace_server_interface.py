@@ -1,6 +1,5 @@
 import abc
 import datetime
-from enum import Enum
 import typing
 
 from pydantic import BaseModel, Field
@@ -10,6 +9,54 @@ from .interface.query import Query
 WB_USER_ID_DESCRIPTION = (
     "Do not set directly. Server will automatically populate this field."
 )
+
+
+class ExtraKeysAllowed(BaseModel):
+    """By inheriting from this class, you allow extra keys in the model.
+    This is useful for when we want to specify a known set of keys, but
+    also allow additional keys.
+    """
+
+    class Config:
+        extra = "allow"
+
+
+class WeaveSummarySchema(BaseModel):
+    # Computed properties w.r.t export project go here
+    # latency: ...
+    # Calculated costs go here
+    # costs: ...
+    pass
+
+
+class LLMUsageSchema(ExtraKeysAllowed):
+    prompt_tokens: typing.Optional[int] = None
+    input_tokens: typing.Optional[int] = None
+    completion_tokens: typing.Optional[int] = None
+    output_tokens: typing.Optional[int] = None
+    requests: typing.Optional[int] = None
+    total_tokens: typing.Optional[int] = None
+
+
+class SummaryInsertMap(ExtraKeysAllowed):
+    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]] = None
+
+
+class SummaryMap(SummaryInsertMap):
+    _weave: typing.Optional[WeaveSummarySchema] = None
+
+
+class WeaveAttributeSchema(BaseModel):
+    client_version: typing.Optional[str] = None
+    source: typing.Optional[str] = None
+    os_name: typing.Optional[str] = None
+    os_version: typing.Optional[str] = None
+    os_release: typing.Optional[str] = None
+    sys_version: typing.Optional[str] = None
+
+
+class AttributeMap(ExtraKeysAllowed):
+    _weave: typing.Optional[WeaveAttributeSchema] = None
 
 
 class CallSchema(BaseModel):
@@ -29,7 +76,7 @@ class CallSchema(BaseModel):
     ## Start time is required
     started_at: datetime.datetime
     ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    attributes: AttributeMap
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
@@ -44,7 +91,7 @@ class CallSchema(BaseModel):
     output: typing.Optional[typing.Any] = None
 
     ## Summary: a summary of the call
-    summary: typing.Optional[typing.Dict[str, typing.Any]] = None
+    summary: typing.Optional[SummaryMap] = None
 
     # WB Metadata
     wb_user_id: typing.Optional[str] = None
@@ -73,7 +120,7 @@ class StartedCallSchemaForInsert(BaseModel):
     ## Start time is required
     started_at: datetime.datetime
     ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    attributes: AttributeMap
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
@@ -97,7 +144,7 @@ class EndedCallSchemaForInsert(BaseModel):
     output: typing.Optional[typing.Any] = None
 
     ## Summary: a summary of the call
-    summary: typing.Dict[str, typing.Any]
+    summary: SummaryInsertMap
 
 
 class ObjSchema(BaseModel):
