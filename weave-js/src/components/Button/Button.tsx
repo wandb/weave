@@ -33,10 +33,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactElement | string;
   active?: boolean;
   tooltip?: string;
-  tooltipPosition?: {
-    align?: TooltipContentProps['align'];
-    side?: TooltipContentProps['side'];
-  };
+  tooltipProps?: TooltipContentProps;
   twWrapperStyles?: React.CSSProperties;
 };
 
@@ -52,7 +49,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       children,
       className = '',
       tooltip,
-      tooltipPosition,
+      tooltipProps,
       twWrapperStyles = {},
       ...htmlAttributes
     },
@@ -155,11 +152,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 {button}
               </Tooltip.Trigger>
               <Tooltip.Portal>
-                <Tooltip.Content
-                  align={tooltipPosition?.align}
-                  side={tooltipPosition?.side}>
-                  {tooltip}
-                </Tooltip.Content>
+                <Tooltip.Content {...tooltipProps}>{tooltip}</Tooltip.Content>
               </Tooltip.Portal>
             </Tooltip.Root>
           </Tooltip.Provider>
