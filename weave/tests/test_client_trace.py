@@ -79,7 +79,7 @@ def test_simple_op(client):
         output=6,
         summary={},
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -1266,7 +1266,7 @@ def test_attributes_on_ops(client):
     assert len(res.calls) == 1
     assert res.calls[0].attributes == {
         "custom": "attribute",
-        "weave": {
+        "_weave": {
             "client_version": weave.version.VERSION,
             "source": "python-sdk",
             "os_name": platform.system(),
@@ -2267,8 +2267,8 @@ def test_call_has_client_version(client):
         return 1
 
     _, c = test.call()
-    assert "weave" in c.attributes
-    assert "client_version" in c.attributes["weave"]
+    assert "_weave" in c.attributes
+    assert "client_version" in c.attributes["_weave"]
 
 
 def test_user_cannot_modify_call_weave_dict(client):
@@ -2281,12 +2281,12 @@ def test_user_cannot_modify_call_weave_dict(client):
     call.attributes["test"] = 123
 
     with pytest.raises(KeyError):
-        call.attributes["weave"] = {"anything": "blah"}
+        call.attributes["_weave"] = {"anything": "blah"}
 
     with pytest.raises(KeyError):
-        call.attributes["weave"]["anything"] = "blah"
+        call.attributes["_weave"]["anything"] = "blah"
 
-    # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
+    # you can set call.attributes["_weave"]["anything"]["something_else"] = "blah"
     # but at that point you're on your own :)
 
 

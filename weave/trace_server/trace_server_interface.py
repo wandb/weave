@@ -12,13 +12,29 @@ WB_USER_ID_DESCRIPTION = (
 
 
 class ExtraKeysAllowed(BaseModel):
-    """By inheriting from this class, you allow extra keys in the model.
-    This is useful for when we want to specify a known set of keys, but
-    also allow additional keys.
+    """Base class for Attribute and Summary so that:
+
+    1. We can define a known set of keys, but allow anything else
+    2. We don't include None defaults in the dict representation of the model
+    3. We always dump with aliases
     """
 
     class Config:
         extra = "allow"
+
+    def dict(self, *args, **kwargs) -> typing.Dict[str, typing.Any]:
+        if "exclude_none" in kwargs:
+            kwargs.pop("exclude_none")
+        if "by_alias" in kwargs:
+            kwargs.pop("by_alias")
+        return super().dict(*args, exclude_none=True, by_alias=True, **kwargs)
+
+    def model_dump(self, *args, **kwargs) -> typing.Dict[str, typing.Any]:
+        if "exclude_none" in kwargs:
+            kwargs.pop("exclude_none")
+        if "by_alias" in kwargs:
+            kwargs.pop("by_alias")
+        return super().model_dump(*args, exclude_none=True, by_alias=True, **kwargs)
 
 
 class WeaveSummarySchema(ExtraKeysAllowed):

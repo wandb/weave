@@ -303,9 +303,9 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        summary=server_call.summary,
+        summary=server_call.summary.model_dump() if server_call.summary else None,
         display_name=server_call.display_name,
-        attributes=server_call.attributes,
+        attributes=server_call.attributes.model_dump(),
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -338,12 +338,12 @@ class WeaveKeyDict(dict):
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
 
-    The `weave` key is reserved for internal use and cannot be set directly.
+    The `_weave` key is reserved for internal use and cannot be set directly.
     """
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
-        dict.__setitem__(self, "weave", WeaveKeyDict())
+        dict.__setitem__(self, "_weave", WeaveKeyDict())
 
         if kwargs:
             for key, value in kwargs.items():
@@ -355,13 +355,13 @@ class AttributesDict(dict):
                     self[key] = value
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        if key == "weave":
-            raise KeyError("Cannot set 'weave' directly -- for internal use only!")
+        if key == "_weave":
+            raise KeyError("Cannot set '_weave' directly -- for internal use only!")
         super().__setitem__(key, value)
 
     def _set_weave_item(self, subkey: Any, value: Any) -> None:
-        """Internal method to set items in the 'weave' subdictionary."""
-        dict.__setitem__(self["weave"], subkey, value)
+        """Internal method to set items in the '_weave' subdictionary."""
+        dict.__setitem__(self["_weave"], subkey, value)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"

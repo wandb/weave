@@ -84,6 +84,13 @@ const MAX_EVAL_COMPARISONS = 5;
 const MAX_BULK_DELETE = 10;
 
 export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
+  'attributes._weave.client_version': false,
+  'attributes._weave.source': false,
+  'attributes._weave.os_name': false,
+  'attributes._weave.os_version': false,
+  'attributes._weave.os_release': false,
+  'attributes._weave.sys_version': false,
+  // Non underscore is legacy
   'attributes.weave.client_version': false,
   'attributes.weave.source': false,
   'attributes.weave.os_name': false,
