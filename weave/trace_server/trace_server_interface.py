@@ -43,7 +43,7 @@ class SummaryInsertMap(ExtraKeysAllowed):
 
 
 class SummaryMap(SummaryInsertMap):
-    weave: typing.Optional[WeaveSummarySchema] = None
+    _weave: typing.Optional[WeaveSummarySchema] = None
 
 
 class WeaveAttributeSchema(BaseModel):
@@ -56,7 +56,7 @@ class WeaveAttributeSchema(BaseModel):
 
 
 class AttributeMap(ExtraKeysAllowed):
-    weave: typing.Optional[WeaveAttributeSchema] = None
+    _weave: typing.Optional[WeaveAttributeSchema] = None
 
 
 class CallSchema(BaseModel):

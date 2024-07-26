@@ -29,7 +29,7 @@ type SummaryInsertMap = {
 } & ExtraKeysAllowed;
 
 type SummaryMap = {
-  weave?: WeaveSummarySchema;
+  _weave?: WeaveSummarySchema;
 } & SummaryInsertMap;
 
 type WeaveAttributeSchema = {
@@ -42,7 +42,7 @@ type WeaveAttributeSchema = {
 } & ExtraKeysAllowed;
 
 type AttributeMap = {
-  weave?: WeaveAttributeSchema;
+  _weave?: WeaveAttributeSchema;
 } & ExtraKeysAllowed;
 
 export type KeyedDictType = {
