@@ -151,12 +151,16 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <Tailwind style={wrapperStyles}>
           <Tooltip.Provider>
             <Tooltip.Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
-              <Tooltip.Trigger asChild>{button}</Tooltip.Trigger>
-              <Tooltip.Content
-                align={tooltipPosition?.align}
-                side={tooltipPosition?.side}>
-                {tooltip}
-              </Tooltip.Content>
+              <Tooltip.Trigger className="cursor-pointer" asChild>
+                {button}
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content
+                  align={tooltipPosition?.align}
+                  side={tooltipPosition?.side}>
+                  {tooltip}
+                </Tooltip.Content>
+              </Tooltip.Portal>
             </Tooltip.Root>
           </Tooltip.Provider>
         </Tailwind>
