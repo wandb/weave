@@ -31,6 +31,7 @@ panels = [
     LPanel("run-overview", "PanelRunOverview"),
     LPanel("none", "PanelNone"),
     LPanel("artifactVersionAliases", "PanelArtifactVersionAliases"),
+    LPanel("artifactVersionTags", "PanelArtifactVersionTags"),
     LPanel("netron", "PanelNetron"),
     LPanel("object", "PanelObject"),
     LPanel("audio-file", "PanelAudioFile"),
