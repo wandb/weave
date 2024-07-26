@@ -1,6 +1,6 @@
 # Arxiv PDF Summarization Bot using Chain of Density
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/examples/cookbooks/summarization/chain-of-density-arxiv.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/add-summarization-example/examples/cookbooks/summarization/chain_of_density_arxiv.ipynb)
 ![Eval Comparison](./media/eval_comparison.gif)
 
 This cookbook walks through the implementation of an AI-powered summarization bot that extracts concise, information-dense summaries from Arxiv papers using the Chain of Density technique. We'll use Anthropic's Claude API, the Arxiv API, PyPDF2 for PDF processing, and Weave for experiment tracking and evaluation.
