@@ -59,6 +59,7 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     _CallsFilter,
     _ObjectVersionFilter,
+    _SortBy,
 )
 
 if typing.TYPE_CHECKING:
@@ -201,6 +202,7 @@ class Call:
             client.server,
             self.project_id,
             _CallsFilter(parent_ids=[self.id]),
+            [_SortBy(field="started_at", direction="asc")],
         )
 
     def delete(self) -> bool:
@@ -225,13 +227,19 @@ class Call:
 class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
+    sort_by: list[_SortBy]
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: _CallsFilter,
+        sort_by: list[_SortBy],
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
+        self.sort_by = sort_by
         self._page_size = 10
 
     # seems like this caching should be on the server, but it's here for now...
@@ -243,6 +251,7 @@ class CallsIter:
             CallsQueryReq(
                 project_id=self.project_id,
                 filter=self.filter,
+                sort_by=self.sort_by,
                 offset=index * self._page_size,
                 limit=self._page_size,
             )
@@ -455,11 +464,17 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
+    def calls(
+        self,
+        filter: Optional[_CallsFilter] = None,
+        sort_by: Optional[list[_SortBy]] = None,
+    ) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
+        if sort_by is None:
+            sort_by = [_SortBy(field="started_at", direction="asc")]
 
-        return CallsIter(self.server, self._project_id(), filter)
+        return CallsIter(self.server, self._project_id(), filter, sort_by)
 
     @trace_sentry.global_trace_sentry.watch()
     def call(self, call_id: str) -> WeaveObject:
