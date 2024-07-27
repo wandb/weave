@@ -5,15 +5,7 @@ import sys
 import typing
 import uuid
 from functools import lru_cache
-from typing import (
-    Any,
-    Dict,
-    Iterator,
-    Optional,
-    Sequence,
-    TypedDict,
-    Union,
-)
+from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, TypedDict, Union
 
 import pydantic
 from requests import HTTPError
@@ -161,9 +153,9 @@ class Call:
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
-    summary: Optional[dict] = None
+    summary: Optional[Mapping] = None
     display_name: Optional[str] = None
-    attributes: Optional[dict] = None
+    attributes: Optional[Mapping] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
@@ -305,14 +297,14 @@ def make_client_call(
         output=output,
         summary=server_call.summary,
         display_name=server_call.display_name,
-        attributes=server_call.attribute,
+        attributes=server_call.attributes,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
     return WeaveObject(call, CallRef(entity, project, call.id), server, None)
 
 
-def sum_dict_leaves(dicts: list[dict]) -> dict:
+def sum_dict_leaves(dicts: list[Mapping]) -> dict:
     # dicts is a list of dictionaries, that may or may not
     # have nested dictionaries. Sum all the leaves that match
     result: dict = {}

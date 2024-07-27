@@ -13,7 +13,7 @@ WB_USER_ID_DESCRIPTION = (
 
 
 class WeaveSummarySchema(TypedDict, total=False):
-    __pydantic_config__ = ConfigDict(extra="allow")
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
     # Computed properties w.r.t export project go here
     # latency: ...
@@ -24,7 +24,7 @@ class WeaveSummarySchema(TypedDict, total=False):
 
 # `total=False` means keys are non-required
 class LLMUsageSchema(TypedDict, total=False):
-    __pydantic_config__ = ConfigDict(extra="allow")
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
     prompt_tokens: typing.Optional[int]
     input_tokens: typing.Optional[int]
@@ -35,19 +35,17 @@ class LLMUsageSchema(TypedDict, total=False):
 
 
 class SummaryInsertMap(TypedDict, total=False):
-    __pydantic_config__ = ConfigDict(extra="allow")
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
     usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
 
 
 class SummaryMap(SummaryInsertMap, total=False):
-    __pydantic_config__ = ConfigDict(extra="allow")
-
     _weave: typing.Optional[WeaveSummarySchema]
 
 
 class WeaveAttributeSchema(TypedDict, total=False):
-    __pydantic_config__ = ConfigDict(extra="allow")
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
     client_version: typing.Optional[str]
     source: typing.Optional[str]
@@ -58,7 +56,7 @@ class WeaveAttributeSchema(TypedDict, total=False):
 
 
 class AttributeMap(TypedDict, total=False):
-    __pydantic_config__ = ConfigDict(extra="allow")
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
     _weave: typing.Optional[WeaveAttributeSchema]
 

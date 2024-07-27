@@ -1343,7 +1343,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
 
 def _dict_value_to_dump(
-    value: dict,
+    value: typing.Mapping,
 ) -> str:
     if not isinstance(value, dict):
         raise ValueError(f"Value is not a dict: {value}")
