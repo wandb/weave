@@ -3,6 +3,8 @@ import datetime
 import typing
 
 from pydantic import BaseModel, Field
+from typing_extensions import TypedDict
+
 
 from .interface.query import Query
 
@@ -11,37 +13,7 @@ WB_USER_ID_DESCRIPTION = (
 )
 
 
-class ExtraKeysAllowed(BaseModel):
-    """Base class for Attribute and Summary so that:
-
-    1. We can define a known set of keys, but allow anything else
-    2. We don't include None defaults in the dict representation of the model
-    3. We always dump with aliases
-    """
-
-    class Config:
-        extra = "allow"
-
-    def dict(
-        self, *args: typing.Any, **kwargs: typing.Any
-    ) -> typing.Dict[str, typing.Any]:
-        if "exclude_none" in kwargs:
-            kwargs.pop("exclude_none")
-        if "by_alias" in kwargs:
-            kwargs.pop("by_alias")
-        return super().dict(*args, exclude_none=True, by_alias=True, **kwargs)
-
-    def model_dump(
-        self, *args: typing.Any, **kwargs: typing.Any
-    ) -> typing.Dict[str, typing.Any]:
-        if "exclude_none" in kwargs:
-            kwargs.pop("exclude_none")
-        if "by_alias" in kwargs:
-            kwargs.pop("by_alias")
-        return super().model_dump(*args, exclude_none=True, by_alias=True, **kwargs)
-
-
-class WeaveSummarySchema(ExtraKeysAllowed):
+class WeaveSummarySchema(TypedDict, total=False):
     # Computed properties w.r.t export project go here
     # latency: ...
     # Calculated costs go here
@@ -49,34 +21,35 @@ class WeaveSummarySchema(ExtraKeysAllowed):
     pass
 
 
-class LLMUsageSchema(ExtraKeysAllowed):
-    prompt_tokens: typing.Optional[int] = None
-    input_tokens: typing.Optional[int] = None
-    completion_tokens: typing.Optional[int] = None
-    output_tokens: typing.Optional[int] = None
-    requests: typing.Optional[int] = None
-    total_tokens: typing.Optional[int] = None
+# `total=False` means keys are non-required
+class LLMUsageSchema(TypedDict, total=False):
+    prompt_tokens: typing.Optional[int]
+    input_tokens: typing.Optional[int]
+    completion_tokens: typing.Optional[int]
+    output_tokens: typing.Optional[int]
+    requests: typing.Optional[int]
+    total_tokens: typing.Optional[int]
 
 
-class SummaryInsertMap(ExtraKeysAllowed):
-    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]] = None
+class SummaryInsertMap(TypedDict, total=False):
+    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
 
 
-class SummaryMap(SummaryInsertMap):
-    weave: typing.Optional[WeaveSummarySchema] = None
+class SummaryMap(SummaryInsertMap, total=False):
+    _weave: typing.Optional[WeaveSummarySchema]
 
 
-class WeaveAttributeSchema(ExtraKeysAllowed):
-    client_version: typing.Optional[str] = None
-    source: typing.Optional[str] = None
-    os_name: typing.Optional[str] = None
-    os_version: typing.Optional[str] = None
-    os_release: typing.Optional[str] = None
-    sys_version: typing.Optional[str] = None
+class WeaveAttributeSchema(TypedDict, total=False):
+    client_version: typing.Optional[str]
+    source: typing.Optional[str]
+    os_name: typing.Optional[str]
+    os_version: typing.Optional[str]
+    os_release: typing.Optional[str]
+    sys_version: typing.Optional[str]
 
 
-class AttributeMap(ExtraKeysAllowed):
-    weave: typing.Optional[WeaveAttributeSchema] = None
+class AttributeMap(TypedDict, total=False):
+    _weave: typing.Optional[WeaveAttributeSchema]
 
 
 class CallSchema(BaseModel):

@@ -33,11 +33,11 @@ def test_call_start_req():
                 valid_values=[
                     {},
                     {"something": "random"},
-                    {"weave": None},
-                    {"weave": {}},
-                    {"weave": {"random_overlapping_key": "random"}},
+                    {"_weave": None},
+                    {"_weave": {}},
+                    {"_weave": {"random_overlapping_key": "random"}},
                     {
-                        "weave": {
+                        "_weave": {
                             "client_version": "string_val",
                             "source": "string_val",
                             "os_name": "string_val",
@@ -53,7 +53,7 @@ def test_call_start_req():
                     "string",
                     # Invalid type for the Weave Key
                     {
-                        "weave": {
+                        "_weave": {
                             "client_version": 1,
                         }
                     },
@@ -144,11 +144,11 @@ def test_call_schema():
                 valid_values=[
                     {},
                     {"something": "random"},
-                    {"weave": None},
-                    {"weave": {}},
-                    {"weave": {"random_overlapping_key": "random"}},
+                    {"_weave": None},
+                    {"_weave": {}},
+                    {"_weave": {"random_overlapping_key": "random"}},
                     {
-                        "weave": {
+                        "_weave": {
                             "client_version": "string_val",
                             "source": "string_val",
                             "os_name": "string_val",
@@ -164,7 +164,7 @@ def test_call_schema():
                     "string",
                     # Invalid type for the Weave Key
                     {
-                        "weave": {
+                        "_weave": {
                             "client_version": 1,
                         }
                     },
