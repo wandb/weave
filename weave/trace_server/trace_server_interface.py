@@ -2,7 +2,7 @@ import abc
 import datetime
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import TypedDict
 
 from .interface.query import Query
