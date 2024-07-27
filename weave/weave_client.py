@@ -303,9 +303,9 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        summary=server_call.summary.model_dump() if server_call.summary else None,
+        summary=server_call.summary,
         display_name=server_call.display_name,
-        attributes=server_call.attributes.model_dump(),
+        attributes=server_call.attribute,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
