@@ -2,7 +2,7 @@ import abc
 import datetime
 import typing
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
 from typing_extensions import TypedDict
 
 from .interface.query import Query
@@ -12,6 +12,8 @@ WB_USER_ID_DESCRIPTION = (
 )
 
 
+# `total=False` means keys are non-required
+# ConfigDict(extra="allow") allows for extra keys in the dictionary
 class WeaveSummarySchema(TypedDict, total=False):
     __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
@@ -22,7 +24,6 @@ class WeaveSummarySchema(TypedDict, total=False):
     pass
 
 
-# `total=False` means keys are non-required
 class LLMUsageSchema(TypedDict, total=False):
     __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
@@ -37,11 +38,13 @@ class LLMUsageSchema(TypedDict, total=False):
 class SummaryInsertMap(TypedDict, total=False):
     __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
-    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
+    usage: typing.Optional[typing.Dict[str, SerializeAsAny[LLMUsageSchema]]]
 
 
 class SummaryMap(SummaryInsertMap, total=False):
-    _weave: typing.Optional[WeaveSummarySchema]
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
+
+    _weave: typing.Optional[SerializeAsAny[WeaveSummarySchema]]
 
 
 class WeaveAttributeSchema(TypedDict, total=False):
@@ -78,7 +81,7 @@ class CallSchema(BaseModel):
     ## Start time is required
     started_at: datetime.datetime
     ## Attributes: properties of the call
-    attributes: AttributeMap
+    attributes: SerializeAsAny[AttributeMap]
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
@@ -93,7 +96,7 @@ class CallSchema(BaseModel):
     output: typing.Optional[typing.Any] = None
 
     ## Summary: a summary of the call
-    summary: typing.Optional[SummaryMap] = None
+    summary: typing.Optional[SerializeAsAny[SummaryMap]] = None
 
     # WB Metadata
     wb_user_id: typing.Optional[str] = None
@@ -122,7 +125,7 @@ class StartedCallSchemaForInsert(BaseModel):
     ## Start time is required
     started_at: datetime.datetime
     ## Attributes: properties of the call
-    attributes: AttributeMap
+    attributes: SerializeAsAny[AttributeMap]
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
