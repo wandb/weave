@@ -23,6 +23,7 @@ from weave.flow.scorer import (
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.op import Op
+from weave.weave_client import get_ref
 
 console = Console()
 
@@ -269,7 +270,11 @@ class Evaluation(Object):
 
     @weave.op()
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
-        if not isinstance(model, Model) and not isinstance(model, Op):
+        if (
+            not isinstance(model, Model)
+            and not isinstance(model, Op)
+            and not get_ref(model)
+        ):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
 
