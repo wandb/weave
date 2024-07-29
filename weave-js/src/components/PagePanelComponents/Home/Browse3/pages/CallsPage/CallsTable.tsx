@@ -24,9 +24,9 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
-import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import React, {
   FC,
   useCallback,
@@ -462,36 +462,6 @@ export const CallsTable: FC<{
       },
       ...columns.cols,
     ];
-    if (isEvaluateTable) {
-      cols.push({
-        field: 'evaluatable_icon',
-        minWidth: 32,
-        width: 32,
-        sortable: false,
-        disableReorder: true,
-        resizable: false,
-        disableColumnMenu: true,
-        renderHeader: () => {
-          return '';
-        },
-        renderCell: (params: any) => {
-          const isEval =
-            isEvaluateTable &&
-            params.row.exception == null &&
-            params.row.ended_at != null;
-          return isEval ? (
-            <Tooltip title="Comparable evaluation" placement="right" arrow>
-              {/* Adjust left to remove default padding */}
-              <span style={{marginLeft: -10}}>
-                <IconOnlyPill icon="chart-scatterplot" color="teal" />
-              </span>
-            </Tooltip>
-          ) : (
-            ''
-          );
-        },
-      });
-    }
     return cols;
   }, [columns.cols, selectedCalls, tableData, isEvaluateTable]);
 
@@ -502,32 +472,38 @@ export const CallsTable: FC<{
     if (!isEvaluateTable) {
       return;
     }
-    const selectedTableData = tableData.filter(row =>
+    const validCalls: string[] = [];
+    let errorMsgs: string[] = [];
+    for (const call of tableData.filter(row =>
       selectedCalls.includes(row.id)
-    );
-    let disabledMessage: string | undefined;
-    if (
-      selectedTableData.some(
-        row => row.exception != null || row.ended_at == null
-      )
-    ) {
-      disabledMessage =
-        'Cannot compare evaluations with errors or incomplete traces';
-    } else if (selectedCalls.length > MAX_EVAL_COMPARISONS) {
-      disabledMessage = `Comparison limited to ${MAX_EVAL_COMPARISONS} valid evaluations`;
-    } else if (selectedCalls.length === 0) {
-      disabledMessage = 'No evaluations selected';
+    )) {
+      if (call.exception != null) {
+        errorMsgs.push(`${call.display_name ?? call.id.slice(0, 4)} (failed)`);
+      } else if (call.ended_at == null) {
+        errorMsgs.push(
+          `${call.display_name ?? call.id.slice(0, 4)} (not completed)`
+        );
+      } else {
+        validCalls.push(call.id);
+      }
     }
+    const errorMsg =
+      errorMsgs.length > 0
+        ? `Unable to compare evaluations: ${errorMsgs.join(', ')}`
+        : undefined;
     addExtra('compareEvaluations', {
       node: (
         <CompareEvaluationsTableButton
           onClick={() => {
+            if (errorMsg) {
+              toast(errorMsg, {type: 'error'});
+            }
             history.push(
-              router.compareEvaluationsUri(entity, project, selectedCalls)
+              router.compareEvaluationsUri(entity, project, validCalls)
             );
           }}
-          disabled={disabledMessage !== undefined}
-          tooltipText={disabledMessage}
+          disabled={validCalls.length === 0}
+          tooltipText={validCalls.length === 0 ? errorMsg : undefined}
         />
       ),
       order: 1,
@@ -935,7 +911,7 @@ const ExportRunsTableButton = ({
       alignItems: 'center',
     }}>
     <Button
-      className={rightmostButton ? 'mr-16' : 'mr-4'}
+      className={rightmostButton ? 'mr-16' : 'ml-4'}
       size="medium"
       variant="ghost"
       icon="export-share-upload"
