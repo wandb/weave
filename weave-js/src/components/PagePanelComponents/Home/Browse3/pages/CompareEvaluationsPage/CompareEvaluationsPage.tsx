@@ -4,7 +4,7 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
-import React, {FC, useCallback, useContext} from 'react';
+import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {Button} from '../../../../../Button';
@@ -27,6 +27,13 @@ import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCom
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
+import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
+import {
+  MOON_500,
+  TEAL_300,
+  TEAL_550,
+} from '@wandb/weave/common/css/color.styles';
+import {hexToRGB} from '@wandb/weave/common/css/utils';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -165,6 +172,7 @@ const CompareEvaluationsPageInner: React.FC = props => {
           alignItems: 'flex-start',
           gridGap: STANDARD_PADDING * 2,
         }}>
+        <InvalidEvaluationBanner state={state} />
         <ComparisonDefinitionSection state={state} />
         <SummaryPlots state={state} />
         <ScorecardSection state={state} />
@@ -235,5 +243,50 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
         <ExampleCompareSection state={state} />
       </Box>
     </VerticalBox>
+  );
+};
+
+const InvalidEvaluationBanner: React.FC<{state: EvaluationComparisonState}> = ({
+  state,
+}) => {
+  const [dismissed, setDismissed] = useState(false);
+  const invalidEvals = useMemo(() => {
+    return Object.values(state.data.evaluationCalls)
+      .filter(evalCall => {
+        return Object.keys(evalCall.summaryMetrics).length === 0;
+      })
+      .map(call =>
+        call.name !== EVALUATION_NAME_DEFAULT
+          ? call.name
+          : call.callId.slice(-4)
+      );
+  }, [state.data.evaluationCalls]);
+  if (invalidEvals.length === 0 || dismissed) {
+    return null;
+  }
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        paddingLeft: STANDARD_PADDING,
+        paddingRight: STANDARD_PADDING,
+      }}>
+      <Alert
+        severity="info"
+        style={{backgroundColor: hexToRGB(TEAL_300, 0.3), color: '#038194'}}
+        action={
+          <Button
+            className="text-override hover:bg-override"
+            variant="ghost"
+            onClick={() => setDismissed(true)}>
+            Dismiss
+          </Button>
+        }>
+        <span style={{fontWeight: '600'}}>
+          No summary information found for evaluation
+          {invalidEvals.length > 1 ? 's' : ''}: {invalidEvals.join(', ')}
+        </span>
+      </Alert>
+    </Box>
   );
 };

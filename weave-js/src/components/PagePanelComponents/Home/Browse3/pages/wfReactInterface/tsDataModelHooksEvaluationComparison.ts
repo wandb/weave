@@ -81,7 +81,10 @@ import {
   EvaluationComparisonData,
   MetricDefinition,
 } from '../CompareEvaluationsPage/ecpTypes';
-import {metricDefinitionId} from '../CompareEvaluationsPage/ecpUtil';
+import {
+  EVALUATION_NAME_DEFAULT,
+  metricDefinitionId,
+} from '../CompareEvaluationsPage/ecpUtil';
 import {getScoreKeyNameFromScorerRef} from '../CompareEvaluationsPage/ecpUtil';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
@@ -183,7 +186,7 @@ const fetchEvaluationComparisonData = async (
       call.id,
       {
         callId: call.id,
-        name: call.display_name ?? 'Evaluation',
+        name: call.display_name ?? EVALUATION_NAME_DEFAULT,
         color: pickColor(ndx),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
