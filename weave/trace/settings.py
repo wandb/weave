@@ -66,4 +66,7 @@ def parse_and_apply_settings(
         user_settings = UserSettings()
     if isinstance(settings, dict):
         user_settings = UserSettings.model_validate(settings)
+    if isinstance(settings, UserSettings):
+        user_settings = settings
+
     user_settings.apply()
