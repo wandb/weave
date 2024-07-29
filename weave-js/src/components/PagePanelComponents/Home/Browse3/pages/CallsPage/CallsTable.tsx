@@ -24,7 +24,6 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import React, {
