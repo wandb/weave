@@ -9,13 +9,20 @@ export const useProjectSidebar = (
   viewingRestricted: boolean,
   hasModelsData: boolean,
   hasWeaveData: boolean,
-  isLargeWorkspaceModeEnabled: boolean
+  isLargeWorkspaceModeEnabled: boolean,
+  hasTraceBackend: boolean = true
 ): FancyPageSidebarItem[] => {
-  const isNoData = !hasModelsData && !hasWeaveData;
-  const isModelsOnly = hasModelsData && !hasWeaveData;
-  const isWeaveOnly = !hasModelsData && hasWeaveData;
-  const isBothData = hasModelsData && hasWeaveData;
-  const isShowAll = isNoData || isBothData;
+  // Should show models sidebar items if we have models data or if we don't have a trace backend
+  const showModelsSidebarItems = hasModelsData || !hasTraceBackend;
+  // Should show weave sidebar items if we have weave data and we have a trace backend
+  const showWeaveSidebarItems = hasWeaveData && hasTraceBackend;
+
+  const isModelsOnly = showModelsSidebarItems && !showWeaveSidebarItems;
+  const isWeaveOnly = !showModelsSidebarItems && showWeaveSidebarItems;
+
+  const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
+  const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
+  const isShowAll = isNoSidebarItems || isBothSidebarItems;
   return useMemo(() => {
     const allItems = isLoading
       ? []
@@ -109,7 +116,7 @@ export const useProjectSidebar = (
           //   type: 'button' as const,
           //   name: 'Weave',
           //   slug: 'weave',
-          //   isShown: !hasWeaveData,
+          //   isShown: !showWeaveSidebarItems,
           //   iconName: IconNames.CodeAlt,
           //   isDisabled: viewingRestricted,
           // },
@@ -127,7 +134,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Evaluations',
             slug: 'weave/evaluations',
-            isShown: hasWeaveData || isShowAll,
+            isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.TypeBoolean,
             // path: baseRouter.callsUIUrl(entity, project, evaluationsFilter),
           },
@@ -135,14 +142,14 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Models',
             slug: 'weave/models',
-            isShown: hasWeaveData || isShowAll,
+            isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.Model,
           },
           {
             type: 'button' as const,
             name: 'Datasets',
             slug: 'weave/datasets',
-            isShown: hasWeaveData || isShowAll,
+            isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.Table,
           },
           {
@@ -154,7 +161,7 @@ export const useProjectSidebar = (
             type: 'button' as const,
             name: 'Traces',
             slug: 'weave/traces',
-            isShown: hasWeaveData || isShowAll,
+            isShown: showWeaveSidebarItems || isShowAll,
             iconName: IconNames.LayoutTabs,
             // path: baseRouter.callsUIUrl(entity, project, {
             //   traceRootsOnly: true,
@@ -213,7 +220,7 @@ export const useProjectSidebar = (
     isLargeWorkspaceModeEnabled,
     isModelsOnly,
     isWeaveOnly,
-    hasWeaveData,
+    showWeaveSidebarItems,
     isShowAll,
     viewingRestricted,
   ]);

@@ -33,9 +33,8 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     fields = project_name.split("/")
     if len(fields) == 1:
         api = wandb_api.get_wandb_api_sync()
-        try:
-            entity_name = api.default_entity_name()
-        except AttributeError:
+        entity_name = api.default_entity_name()
+        if entity_name is None:
             raise errors.WeaveWandbAuthenticationException(
                 'weave init requires wandb. Run "wandb login"'
             )

@@ -5,7 +5,7 @@ import _ from 'lodash';
 import React from 'react';
 
 import {Tailwind} from '../../../../Tailwind';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 
 type EmojiDetailsProps = {
   viewer: string | null; // Username
