@@ -7,7 +7,7 @@ import {TooltipHint} from '../../../../DraggablePopups';
 import {TextField} from '../../../../Form/TextField';
 import {Tailwind} from '../../../../Tailwind';
 import {Timestamp} from '../../../../Timestamp';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 
 type NotesProps = {
   notes: Feedback[];

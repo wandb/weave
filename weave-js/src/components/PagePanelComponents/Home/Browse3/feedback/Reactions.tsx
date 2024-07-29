@@ -2,8 +2,8 @@ import React, {useEffect, useState} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {parseRef} from '../../../../../react';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {ReactionsLoaded} from './ReactionsLoaded';
 
 type ReactionsProps = {

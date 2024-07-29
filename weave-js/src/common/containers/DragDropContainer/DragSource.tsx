@@ -69,7 +69,7 @@ const DragSourceComp: FC<DragSourceProps> = ({
         }
 
         // Automatically scroll the window if you're dragging near the top or bottom of the page
-        const clientYForAutoScroll = e.clientY ?? clientXY?.[1];
+        const clientYForAutoScroll = clientXY ? clientXY[1] : e.clientY;
         if (clientYForAutoScroll != null) {
           autoScrollWhenDragging(clientYForAutoScroll);
         }
