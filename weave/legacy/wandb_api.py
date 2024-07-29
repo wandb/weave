@@ -243,7 +243,7 @@ class WandbApiAsync:
                     name
                 }
             }
-        }        
+        }
         """
     )
 
@@ -408,7 +408,7 @@ class WandbApi:
                     name
                 }
             }
-        }        
+        }
         """
     )
 
@@ -417,7 +417,10 @@ class WandbApi:
             result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:
             return None
-        return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
+        try:
+            return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
+        except AttributeError:
+            return None
 
     def username(self) -> typing.Optional[str]:
         try:

@@ -8,7 +8,7 @@ import React from 'react';
 import styled from 'styled-components';
 
 import {Button} from '../../../../Button';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {EmojiDetails} from './EmojiDetails';
 
 type EmojiButtonProps = {
