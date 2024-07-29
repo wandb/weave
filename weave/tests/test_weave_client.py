@@ -290,6 +290,24 @@ def test_calls_query(client):
     call2 = client.create_call("y", {"a": 5, "b": 10})
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
+    assert result[0].summary == {
+        "usage": None,
+        "_weave": {
+            "status": "running",
+            "display_name": None,
+            "latency": None,
+        },
+    }
+    assert result[0].attributes == {
+        "_weave": {
+            "client_version": weave.version.VERSION,
+            "source": "python-sdk",
+            "os_name": platform.system(),
+            "os_version": platform.version(),
+            "os_release": platform.release(),
+            "sys_version": sys.version,
+        },
+    }
     assert result[0] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
@@ -298,7 +316,7 @@ def test_calls_query(client):
         inputs={"a": 5, "b": 10},
         id=call0.id,
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -306,6 +324,16 @@ def test_calls_query(client):
                 "os_release": platform.release(),
                 "sys_version": sys.version,
             },
+        },
+        summary={
+            "usage": None,
+            "_weave": tsi.WeaveSummarySchema(
+                **{
+                    "status": "running",
+                    "display_name": None,
+                    "latency": None,
+                }
+            ),
         },
     )
     assert result[1] == weave_client.Call(
@@ -316,7 +344,7 @@ def test_calls_query(client):
         inputs={"a": 6, "b": 11},
         id=call1.id,
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -324,6 +352,16 @@ def test_calls_query(client):
                 "os_release": platform.release(),
                 "sys_version": sys.version,
             },
+        },
+        summary={
+            "usage": None,
+            "_weave": tsi.WeaveSummarySchema(
+                **{
+                    "status": "running",
+                    "display_name": None,
+                    "latency": None,
+                }
+            ),
         },
     )
     client.finish_call(call2, None)

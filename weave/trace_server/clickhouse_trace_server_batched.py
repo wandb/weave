@@ -1426,7 +1426,6 @@ def _summary_dump_to_derived_summary_map(
         status=status,
         latency=latency,
     )
-
     return tsi.SummaryMap(**summary_dump, _weave=weave_derived_fields)
 
 

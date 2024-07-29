@@ -3,6 +3,7 @@ import datetime
 import typing
 
 from pydantic import BaseModel, Field
+from typing_extensions import TypedDict
 
 from .interface.query import Query
 
@@ -21,16 +22,10 @@ class ExtraKeysAllowed(BaseModel):
         extra = "allow"
 
 
-class WeaveSummarySchema(BaseModel):
-    status: typing.Optional[typing.Literal["success", "error", "running"]] = Field(
-        None, description="success or error", examples=["success", "error", "running"]
-    )
-    display_name: typing.Optional[str] = Field(
-        None, description="display name", examples=["display name"]
-    )
-    latency: typing.Optional[int] = Field(
-        None, description="latency in microseconds", examples=[1000]
-    )
+class WeaveSummarySchema(TypedDict):
+    status: typing.Optional[typing.Literal["success", "error", "running"]]
+    display_name: typing.Optional[str]
+    latency: typing.Optional[int]
 
 
 class LLMUsageSchema(ExtraKeysAllowed):
@@ -42,27 +37,25 @@ class LLMUsageSchema(ExtraKeysAllowed):
     total_tokens: typing.Optional[int] = None
 
 
-class SummaryInsertMap(ExtraKeysAllowed):
-    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]] = None
+class SummaryInsertMap(TypedDict):
+    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
 
 
 class SummaryMap(SummaryInsertMap):
-    weave: typing.Optional[WeaveSummarySchema] = Field(
-        alias="_weave", description="internal weave summary for derived fields"
-    )
+    _weave: typing.Optional[WeaveSummarySchema]
 
 
-class WeaveAttributeSchema(BaseModel):
-    client_version: typing.Optional[str] = None
-    source: typing.Optional[str] = None
-    os_name: typing.Optional[str] = None
-    os_version: typing.Optional[str] = None
-    os_release: typing.Optional[str] = None
-    sys_version: typing.Optional[str] = None
+class WeaveAttributeSchema(TypedDict):
+    client_version: typing.Optional[str]
+    source: typing.Optional[str]
+    os_name: typing.Optional[str]
+    os_version: typing.Optional[str]
+    os_release: typing.Optional[str]
+    sys_version: typing.Optional[str]
 
 
-class AttributeMap(ExtraKeysAllowed):
-    _weave: typing.Optional[WeaveAttributeSchema] = None
+class AttributeMap(TypedDict):
+    _weave: typing.Optional[WeaveAttributeSchema]
 
 
 class CallSchema(BaseModel):

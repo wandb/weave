@@ -325,6 +325,9 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
     return result
 
 
+WEAVE_KEY = "_weave"
+
+
 class WeaveKeyDict(dict):
     """A dict representing the 'weave' subdictionary of a call's attributes.
 
@@ -332,22 +335,24 @@ class WeaveKeyDict(dict):
     """
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
+        raise KeyError(
+            f"Cannot modify `{WEAVE_KEY}` dict directly -- for internal use only!"
+        )
 
 
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
 
-    The `weave` key is reserved for internal use and cannot be set directly.
+    The `_weave` key is reserved for internal use and cannot be set directly.
     """
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
-        dict.__setitem__(self, "weave", WeaveKeyDict())
+        dict.__setitem__(self, WEAVE_KEY, WeaveKeyDict())
 
         if kwargs:
             for key, value in kwargs.items():
-                if key == "weave":
+                if key == WEAVE_KEY:
                     if isinstance(value, dict):
                         for subkey, subvalue in value.items():
                             self._set_weave_item(subkey, subvalue)
@@ -355,13 +360,15 @@ class AttributesDict(dict):
                     self[key] = value
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        if key == "weave":
-            raise KeyError("Cannot set 'weave' directly -- for internal use only!")
+        if key == WEAVE_KEY:
+            raise KeyError(
+                f"Cannot set `{WEAVE_KEY}` directly -- for internal use only!"
+            )
         super().__setitem__(key, value)
 
     def _set_weave_item(self, subkey: Any, value: Any) -> None:
-        """Internal method to set items in the 'weave' subdictionary."""
-        dict.__setitem__(self["weave"], subkey, value)
+        """Internal method to set items in the '_weave' subdictionary."""
+        dict.__setitem__(self[WEAVE_KEY], subkey, value)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"
@@ -580,7 +587,7 @@ class WeaveClient:
         call.output = output
 
         # Summary handling
-        summary = {}
+        summary = {"usage": {}}
         if call._children:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
@@ -588,7 +595,6 @@ class WeaveClient:
             and "usage" in original_output
             and "model" in original_output
         ):
-            summary["usage"] = {}
             summary["usage"][original_output["model"]] = {
                 "requests": 1,
                 **original_output["usage"],
@@ -601,7 +607,6 @@ class WeaveClient:
             if isinstance(usage, pydantic.BaseModel):
                 usage = usage.model_dump(exclude_unset=True)
             if isinstance(usage, dict) and isinstance(model, str):
-                summary["usage"] = {}
                 summary["usage"][model] = {"requests": 1, **usage}
 
         # Exception Handling

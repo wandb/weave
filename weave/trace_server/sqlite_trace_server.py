@@ -188,7 +188,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.op_name,
                     req.start.display_name,
                     req.start.started_at.isoformat(),
-                    json.dumps(req.start.attributes.model_dump()),
+                    json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
                     json.dumps(
                         extract_refs_from_values(list(req.start.inputs.values()))
@@ -227,7 +227,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     json.dumps(
                         extract_refs_from_values(list(parsable_output.values()))
                     ),
-                    json.dumps(req.end.summary.model_dump()),
+                    json.dumps(req.end.summary),
                     req.end.id,
                 ),
             )
@@ -432,12 +432,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         def load_summary(
             summary_dump: Optional[str],
-            started_at: datetime.datetime,
-            ended_at: Optional[datetime.datetime],
+            started_at: str,
+            ended_at: Optional[str],
             exception: Optional[str],
             display_name: Optional[str],
         ) -> Optional[tsi.SummaryMap]:
-            summary_json = json.loads(summary_dump) if summary_dump else {}
+            summary_json = json.loads(summary_dump) if summary_dump else {"usage": None}
             status, latency = None, None
             if not ended_at:
                 status = "running"
@@ -452,7 +452,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 status=status,
                 latency=latency,
             )
-
             return tsi.SummaryMap(**summary_json, _weave=weave_derived_fields)
 
         query_result = cursor.fetchall()
