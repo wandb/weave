@@ -473,7 +473,7 @@ export const CallsTable: FC<{
       return;
     }
     const validCalls: string[] = [];
-    let errorMsgs: string[] = [];
+    const errorMsgs: string[] = [];
     for (const call of tableData.filter(row =>
       selectedCalls.includes(row.id)
     )) {
