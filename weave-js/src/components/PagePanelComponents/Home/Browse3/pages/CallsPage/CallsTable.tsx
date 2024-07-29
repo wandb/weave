@@ -496,7 +496,7 @@ export const CallsTable: FC<{
         <CompareEvaluationsTableButton
           onClick={() => {
             if (errorMsg) {
-              toast(errorMsg, {type: 'error'});
+              toast(errorMsg);
             }
             history.push(
               router.compareEvaluationsUri(entity, project, validCalls)
