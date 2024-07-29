@@ -1,65 +1,71 @@
 import io
+import os
 import sys
-import time
+import timeit
 
 import weave
+from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 
 
-def test_disabled(client):
-    settings = UserSettings(disabled=True)
-    parse_and_apply_settings(settings)
-
-    @weave.op
-    def test():
-        return 1
-
-    disabled_start = time.time()
-    test()
-    disabled_end = time.time()
-    disabled_delta = disabled_end - disabled_start
-
-    settings2 = UserSettings(disabled=False)
-    parse_and_apply_settings(settings2)
-
-    enabled_start = time.time()
-    test()
-    enabled_end = time.time()
-    enabled_delta = enabled_end - enabled_start
-
-    # Regular py func should be a lot faster than traced func
-    assert disabled_delta * 10 < enabled_delta
+@weave.op
+def func():
+    return 1
 
 
-def test_print_call_link_disabled(client):
+def test_disabled_setting(client):
+    parse_and_apply_settings(UserSettings(disabled=True))
+    disabled_time = timeit.timeit(func, number=10)
+
+    parse_and_apply_settings(UserSettings(disabled=False))
+    enabled_time = timeit.timeit(func, number=10)
+
+    assert (
+        disabled_time * 10 < enabled_time
+    ), "Disabled weave should be faster than enabled weave"
+
+
+def test_disabled_env(client):
+    os.environ["WEAVE_DISABLED"] = "true"
+    disabled_time = timeit.timeit(func, number=10)
+
+    os.environ["WEAVE_DISABLED"] = "false"
+    enabled_time = timeit.timeit(func, number=10)
+
+    assert (
+        disabled_time * 10 < enabled_time
+    ), "Disabled weave should be faster than enabled weave"
+
+
+def test_print_call_link_setting(client):
     captured_stdout = io.StringIO()
     sys.stdout = captured_stdout
 
-    settings = UserSettings(print_call_link=False)
-    parse_and_apply_settings(settings)
-
-    @weave.op
-    def test():
-        return 1
-
-    test()
+    parse_and_apply_settings(UserSettings(print_call_link=False))
+    func()
 
     output = captured_stdout.getvalue()
-    assert output == ""
+    assert TRACE_CALL_EMOJI not in output
+
+    parse_and_apply_settings(UserSettings(print_call_link=True))
+    func()
+
+    output = captured_stdout.getvalue()
+    assert TRACE_CALL_EMOJI in output
 
 
-def test_print_call_link_enabled(client):
+def test_print_call_link_env(client):
     captured_stdout = io.StringIO()
     sys.stdout = captured_stdout
 
-    settings = UserSettings(print_call_link=True)
-    parse_and_apply_settings(settings)
-
-    @weave.op
-    def test():
-        return 1
-
-    test()
+    os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
+    func()
 
     output = captured_stdout.getvalue()
-    assert output != ""
+    assert TRACE_CALL_EMOJI not in output
+
+    os.environ["WEAVE_PRINT_CALL_LINK"] = "true"
+    func()
+
+    output = captured_stdout.getvalue()
+    assert TRACE_CALL_EMOJI in output

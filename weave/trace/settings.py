@@ -43,20 +43,20 @@ class UserSettings(BaseModel):
         print_call_link.set(self.print_call_link)
 
 
+def str2bool_truthy(v: str) -> bool:
+    return v.lower() in ("yes", "true", "1", "on")
+
+
 def should_disable_weave() -> bool:
-    if os.getenv("WEAVE_DISABLED") == "true":
-        return True
-    if disabled.get():
-        return True
-    return False
+    if env := os.getenv("WEAVE_DISABLED"):
+        return str2bool_truthy(env)
+    return disabled.get()
 
 
 def should_print_call_link() -> bool:
-    if os.getenv("WEAVE_PRINT_CALL_LINK") == "true":
-        return True
-    if print_call_link.get():
-        return True
-    return False
+    if env := os.getenv("WEAVE_PRINT_CALL_LINK"):
+        return str2bool_truthy(env)
+    return print_call_link.get()
 
 
 def parse_and_apply_settings(
