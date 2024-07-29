@@ -9,6 +9,8 @@ import dataclasses
 from typing import Any
 import threading
 
+from weave.trace.settings import UserSettings, parse_and_apply_settings
+
 from . import urls
 
 from weave.legacy import graph as _graph
@@ -137,7 +139,7 @@ def from_pandas(df):
 #### Newer API below
 
 
-def init(project_name: str) -> _weave_client.WeaveClient:
+def init(project_name: str, *, settings: Optional[Union[UserSettings, dict[str, Any]]] = None) -> _weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
     Logging is initialized globally, so you do not need to keep a reference
@@ -156,6 +158,9 @@ def init(project_name: str) -> _weave_client.WeaveClient:
     # trace-server backend.
     # return _weave_init.init_wandb(project_name).client
     # return _weave_init.init_trace_remote(project_name).client
+
+    # This doesn't need to be here.  It could just be top-level
+    parse_and_apply_settings(settings)
     return _weave_init.init_weave(project_name).client
 
 
