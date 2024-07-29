@@ -12,18 +12,18 @@ class UserSettings(BaseModel):
     """User configuration for Weave.
 
     All configs can be overrided with environment variables.  The precedence is
-    environment variables > `weave.trace.settings` > default"""
+    environment variables > `weave.trace.settings.UserSettings`"""
 
     disabled: bool = False
-    """Whether to disable the Weave tracing completely.
+    """Toggles Weave tracing.
     
-    This setting will make all weave code into no-ops.
-
+    If True, all weave ops will behave like regular functions.
     Can be overrided with the environment variable `WEAVE_DISABLED`"""
 
     print_call_link: bool = True
-    """Whether to print call links when calling an op.
+    """Toggles link printing to the terminal.
 
+    If True, prints a link to the Weave UI when calling a weave op.
     Can be overrided with the environment variable `WEAVE_PRINT_CALL_LINK`"""
 
     model_config = ConfigDict(extra="forbid")
