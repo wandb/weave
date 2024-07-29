@@ -181,8 +181,6 @@ def attribute_access_result(
         val_attr_val,
         new_ref,
         server,
-        # None,  # TODO: not passing root, needed for mutate which is not implemented yet
-        # self.root,
         root,
         self,
     )
@@ -371,10 +369,9 @@ class WeaveList(Traceable, list):
         base_root = object.__getattribute__(self, "root")
         base_root.add_mutation(self.ref, "setitem_list", index, value)
 
-        # Although this only marks the parent as dirty but not any siblings in
-        # the list, they will still get new refs because the container itself
-        # is dirtied so the container will get a new ref (and the elements will
-        # be extras of that new ref)
+        # Though this ostensibly only marks the parent (list) as dirty, siblings
+        # will also get new refs because their old refs are relative to the parent
+        # (the element refs will be extras of the new parent ref)
         self._mark_dirty()
         if isinstance(value, Traceable):
             value.parent = self
@@ -444,10 +441,9 @@ class WeaveDict(Traceable, dict):
         base_root = object.__getattribute__(self, "root")
         base_root.add_mutation(full_path, "setitem_dict", key, value)
 
-        # Although this only marks the parent as dirty but not any siblings in
-        # the dict, they will still get new refs because the container itself
-        # is dirtied so the container will get a new ref (and the elements will
-        # be extras of that new ref)
+        # Though this ostensibly only marks the parent (dict) as dirty, siblings
+        # will also get new refs because their old refs are relative to the parent
+        # (the element refs will be extras of the new parent ref)
         self._mark_dirty()
         if isinstance(value, Traceable):
             value.parent = self
