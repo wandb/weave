@@ -327,8 +327,9 @@ const fetchEvaluationComparisonData = async (
     // Total Tokens
     // TODO: This "mean" is incorrect - really should average across all model
     // calls since this includes LLM scorers
-    const totalTokens = output.summary
-      ? sum(Object.values(output.summary.usage ?? {}).map(v => v.total_tokens))
+    const summary = evaluationCallCache[evalCall.callId].summary;
+    const totalTokens = summary
+      ? sum(Object.values(summary.usage ?? {}).map(v => v.total_tokens))
       : null;
     if (totalTokens != null) {
       const metricId = metricDefinitionId(totalTokensMetricDimension);

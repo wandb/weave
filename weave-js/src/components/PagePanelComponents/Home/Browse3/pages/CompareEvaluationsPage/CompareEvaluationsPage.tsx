@@ -4,6 +4,8 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
+import {TEAL_300} from '@wandb/weave/common/css/color.styles';
+import {hexToRGB} from '@wandb/weave/common/css/utils';
 import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -21,19 +23,13 @@ import {
 import {STANDARD_PADDING} from './ecpConstants';
 import {EvaluationComparisonState} from './ecpState';
 import {ComparisonDimensionsType} from './ecpState';
+import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
-import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
-import {
-  MOON_500,
-  TEAL_300,
-  TEAL_550,
-} from '@wandb/weave/common/css/color.styles';
-import {hexToRGB} from '@wandb/weave/common/css/utils';
 
 type CompareEvaluationsPageProps = {
   entity: string;
