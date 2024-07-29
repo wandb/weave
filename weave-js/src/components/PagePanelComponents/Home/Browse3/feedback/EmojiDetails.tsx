@@ -71,14 +71,14 @@ export const EmojiDetails = ({
             r => r.creator ?? userMap[r.wb_user_id]?.username ?? r.wb_user_id
           );
           const currentViewerName = currentViewerId
-            ? userMap[currentViewerId]?.username ?? null
+            ? userMap[currentViewerId]?.username ?? currentViewerId
             : null;
           moveToFront(names, currentViewerName);
           if (names.length > maxNames) {
             names.splice(maxNames);
             names.push('others');
           }
-          if (names[0] === currentViewerId) {
+          if (names[0] === currentViewerName) {
             names[0] = 'You (click to remove)';
           }
           const joined = englishJoiner(names);
