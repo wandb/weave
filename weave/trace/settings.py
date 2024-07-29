@@ -63,7 +63,7 @@ def parse_and_apply_settings(
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
 ) -> None:
     if settings is None:
-        settings = UserSettings()
-    elif isinstance(settings, dict):
-        settings = UserSettings.model_validate(settings)
-    settings.apply()
+        user_settings = UserSettings()
+    if isinstance(settings, dict):
+        user_settings = UserSettings.model_validate(settings)
+    user_settings.apply()
