@@ -10,6 +10,8 @@ Retrieval Augmented Generation (RAG) is a common way of building Generative AI a
 In this example, we'll show an example that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
 We'll also show how to evaluate it using an LLM judge.
 
+![Evals hero](../static/img/evals-hero.png)
+
 ## 1. Build a knowledge base
 
 First, we compute the embeddings for our articles. You would typically do this once with your articles and put the embeddings & metadata in a database, but here we're doing it every time we run our script for simplicity.
