@@ -332,7 +332,7 @@ export const CallsTable: FC<{
   // DataGrid Model Management
   const [pinnedColumnsModel, setPinnedColumnsModel] =
     useState<GridPinnedColumns>({
-      left: ['CustomCheckbox', 'op_name', 'evaluatable_icon', 'feedback'],
+      left: ['CustomCheckbox', 'op_name', 'feedback'],
     });
 
   // END OF CPR FACTORED CODE
