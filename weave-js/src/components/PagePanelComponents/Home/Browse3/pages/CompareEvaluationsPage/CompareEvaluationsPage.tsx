@@ -276,13 +276,14 @@ const InvalidEvaluationBanner: React.FC<{state: EvaluationComparisonState}> = ({
         style={{backgroundColor: hexToRGB(TEAL_300, 0.3), color: '#038194'}}
         action={
           <Button
+            // override the default tailwind classes for text and background hover
             className="text-override hover:bg-override"
             variant="ghost"
             onClick={() => setDismissed(true)}>
             Dismiss
           </Button>
         }>
-        <span style={{fontWeight: '600'}}>
+        <span style={{fontWeight: 'bold'}}>
           No summary information found for evaluation
           {invalidEvals.length > 1 ? 's' : ''}: {invalidEvals.join(', ')}
         </span>
