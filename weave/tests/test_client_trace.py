@@ -110,7 +110,7 @@ def test_trace_server_call_start_and_end(client):
         parent_id="test_parent_id",
         started_at=datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
-        attributes={"a": 5},
+        attributes={"a": 5, "_weave": None},
         inputs={"b": 5},
     )
     client.server.call_start(tsi.CallStartReq(start=start))
@@ -152,10 +152,13 @@ def test_trace_server_call_start_and_end(client):
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": None,
         "exception": None,
-        "attributes": {"a": 5},
+        "attributes": {"a": 5, "_weave": None},
         "inputs": {"b": 5},
         "output": None,
-        "summary": None,
+        "summary": {
+            "_weave": {"display_name": None, "latency": None, "status": "running"},
+            "usage": None,
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,

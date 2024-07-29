@@ -812,9 +812,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
-                defaultdict(list)
-            )
+            refs_by_project_id: dict[
+                str, list[refs_internal.InternalObjectRef]
+            ] = defaultdict(list)
             for ref in refs:
                 refs_by_project_id[ref.project_id].append(ref)
             for project_id, project_refs in refs_by_project_id.items():
@@ -1409,7 +1409,7 @@ def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
 
 
 def _summary_dump_to_derived_summary_map(
-    summary_dump: typing.Optional[typing.Dict[str, typing.Any]],
+    summary_dump: typing.Optional[tsi.AttributeMap],
     ch_call: SelectableCHCallSchema,
 ) -> tsi.SummaryMap:
     if not summary_dump:
@@ -1426,7 +1426,7 @@ def _summary_dump_to_derived_summary_map(
         status=status,
         latency=latency,
     )
-    return tsi.SummaryMap(**summary_dump, _weave=weave_derived_fields)
+    return tsi.SummaryMap({**summary_dump, "_weave": weave_derived_fields})
 
 
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
@@ -1500,7 +1500,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         parent_id=start_call.parent_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
-        attributes_dump=_dict_value_to_dump(start_call.attributes.model_dump()),
+        attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
