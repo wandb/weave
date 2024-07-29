@@ -7,6 +7,7 @@ import _ from 'lodash';
 import React from 'react';
 import styled from 'styled-components';
 
+import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {EmojiDetails} from './EmojiDetails';
@@ -41,7 +42,16 @@ export const EmojiButton = ({
   const emojis = reactions.map(r => r.payload.emoji);
   const emoji = _.uniq(emojis).join('');
   const count = reactions.length;
-  const includesUser = reactions.some(r => r.wb_user_id === currentViewerId);
+
+  // TODO (Tim): After https://github.com/wandb/core/pull/22947 is deployed,
+  // Remove `includesUserLegacy`
+  const {loading: userInfoLoading, userInfo} = useViewerInfo();
+  const includesUserLegacy = reactions.some(
+    r => !userInfoLoading && r.wb_user_id === userInfo?.username
+  );
+
+  const includesUser =
+    reactions.some(r => r.wb_user_id === currentViewerId) || includesUserLegacy;
 
   const title = (
     <EmojiDetails currentViewerId={currentViewerId} reactions={reactions} />

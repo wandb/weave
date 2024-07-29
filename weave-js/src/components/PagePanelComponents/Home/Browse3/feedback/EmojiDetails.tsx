@@ -45,10 +45,13 @@ export const EmojiDetails = ({
   const emojis = reactions.map(r => r.payload.emoji);
   const emoji = _.uniq(emojis).join('');
   const groupedByAlias = _.groupBy(reactions, r => r.payload.alias);
-  const neededUsers = useMemo(
-    () => _.uniq(reactions.map(r => r.wb_user_id)),
-    [reactions]
-  );
+  const neededUsers = useMemo(() => {
+    const reactionIds = reactions.map(r => r.wb_user_id);
+    if (currentViewerId) {
+      reactionIds.push(currentViewerId);
+    }
+    return _.uniq(reactionIds);
+  }, [currentViewerId, reactions]);
   const users = useUsers(neededUsers);
   const userMap = useMemo(() => {
     if (users === 'load' || users === 'loading' || users === 'error') {
@@ -62,10 +65,15 @@ export const EmojiDetails = ({
       <div className="max-w-xs">
         <div className="text-center text-7xl">{emoji}</div>
         {Object.entries(groupedByAlias).map(([alias, aliasReactions]) => {
+          // TODO (Tim): After https://github.com/wandb/core/pull/22947 is deployed,
+          // change the fallback from `r.wb_user_id` to `null`-like (this means no access)
           const names = aliasReactions.map(
             r => r.creator ?? userMap[r.wb_user_id]?.username ?? r.wb_user_id
           );
-          moveToFront(names, currentViewerId);
+          const currentViewerName = currentViewerId
+            ? userMap[currentViewerId]?.username ?? null
+            : null;
+          moveToFront(names, currentViewerName);
           if (names.length > maxNames) {
             names.splice(maxNames);
             names.push('others');

@@ -10,6 +10,7 @@ import React, {useRef, useState} from 'react';
 import styled from 'styled-components';
 import {twMerge} from 'tailwind-merge';
 
+import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip as WeaveTooltip} from '../../../../Tooltip';
@@ -87,14 +88,29 @@ export const ReactionsLoaded = ({
   const idNotes = isOpenNotes ? 'simple-popper' : undefined;
 
   // TODO: Would need to revisit this if we want to support skin tones
+  const {loading: userInfoLoading, userInfo} = useViewerInfo();
   const onToggleEmoji = (emoji: string) => {
     if (!currentViewerId) {
       return;
     }
+
+    // TODO (Tim): After https://github.com/wandb/core/pull/22947 is deployed,
+    // Remove `existingLegacy`
+    const legacyUsername = !userInfoLoading ? userInfo?.username : null;
+    const userReactionsLegacy = legacyUsername
+      ? groupedByUser[legacyUsername]
+      : [];
+    const existingLegacy = _.find(
+      userReactionsLegacy,
+      r => r.payload.emoji === emoji
+    );
+
     const userReactions = groupedByUser[currentViewerId];
     const existing = _.find(userReactions, r => r.payload.emoji === emoji);
     if (existing) {
       onRemoveFeedback(existing.id);
+    } else if (existingLegacy) {
+      onRemoveFeedback(existingLegacy.id);
     } else {
       onAddEmoji(emoji);
     }
