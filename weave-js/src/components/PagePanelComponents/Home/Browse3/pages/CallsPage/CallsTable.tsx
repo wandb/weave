@@ -92,6 +92,12 @@ export const DEFAULT_COLUMN_VISIBILITY_CALLS = {
   'attributes.weave.sys_version': false,
 };
 
+export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
+
+export const DEFAULT_PIN_CALLS: GridPinnedColumns = {
+  left: ['CustomCheckbox', 'op_name', 'feedback'],
+};
+
 export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
@@ -114,6 +120,9 @@ export const CallsTable: FC<{
   columnVisibilityModel?: GridColumnVisibilityModel;
   setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
 
+  pinModel?: GridPinnedColumns;
+  setPinModel?: (newModel: GridPinnedColumns) => void;
+
   sortModel?: GridSortModel;
   setSortModel?: (newModel: GridSortModel) => void;
 
@@ -128,6 +137,8 @@ export const CallsTable: FC<{
   hideControls,
   columnVisibilityModel,
   setColumnVisibilityModel,
+  pinModel,
+  setPinModel,
   sortModel,
   setSortModel,
   paginationModel,
@@ -330,10 +341,7 @@ export const CallsTable: FC<{
   );
 
   // DataGrid Model Management
-  const [pinnedColumnsModel, setPinnedColumnsModel] =
-    useState<GridPinnedColumns>({
-      left: ['CustomCheckbox', 'op_name', 'feedback'],
-    });
+  const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
 
   // END OF CPR FACTORED CODE
 
@@ -558,6 +566,16 @@ export const CallsTable: FC<{
       }
     : undefined;
 
+  const onPinnedColumnsChange = useCallback(
+    (newModel: GridPinnedColumns) => {
+      if (!setPinModel || callsLoading) {
+        return;
+      }
+      setPinModel(newModel);
+    },
+    [callsLoading, setPinModel]
+  );
+
   const onSortModelChange = useCallback(
     (newModel: GridSortModel) => {
       if (!setSortModel || callsLoading) {
@@ -748,8 +766,8 @@ export const CallsTable: FC<{
             };
           });
         }}
-        pinnedColumns={pinnedColumnsModel}
-        onPinnedColumnsChange={newModel => setPinnedColumnsModel(newModel)}
+        pinnedColumns={pinModelResolved}
+        onPinnedColumnsChange={onPinnedColumnsChange}
         sx={{
           borderRadius: 0,
         }}
