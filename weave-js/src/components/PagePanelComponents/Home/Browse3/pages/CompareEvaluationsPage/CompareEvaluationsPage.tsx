@@ -73,7 +73,7 @@ export const CompareEvaluationsPage: React.FC<
 
   return (
     <SimplePageLayout
-      title={'Compare Evaluations'}
+      title="Compare Evaluations"
       hideTabsIfSingle
       tabs={[
         {

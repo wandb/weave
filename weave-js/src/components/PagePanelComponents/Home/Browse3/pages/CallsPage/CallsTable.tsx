@@ -472,38 +472,15 @@ export const CallsTable: FC<{
     if (!isEvaluateTable) {
       return;
     }
-    const validCalls: string[] = [];
-    const errorMsgs: string[] = [];
-    for (const call of tableData.filter(row =>
-      selectedCalls.includes(row.id)
-    )) {
-      if (call.exception != null) {
-        errorMsgs.push(`${call.display_name ?? call.id.slice(0, 4)} (failed)`);
-      } else if (call.ended_at == null) {
-        errorMsgs.push(
-          `${call.display_name ?? call.id.slice(0, 4)} (not completed)`
-        );
-      } else {
-        validCalls.push(call.id);
-      }
-    }
-    const errorMsg =
-      errorMsgs.length > 0
-        ? `Unable to compare evaluations: ${errorMsgs.join(', ')}`
-        : undefined;
     addExtra('compareEvaluations', {
       node: (
         <CompareEvaluationsTableButton
           onClick={() => {
-            if (errorMsg) {
-              toast(errorMsg);
-            }
             history.push(
-              router.compareEvaluationsUri(entity, project, validCalls)
+              router.compareEvaluationsUri(entity, project, selectedCalls)
             );
           }}
-          disabled={validCalls.length === 0}
-          tooltipText={validCalls.length === 0 ? errorMsg : undefined}
+          disabled={selectedCalls.length === 0}
         />
       ),
       order: 1,

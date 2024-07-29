@@ -183,8 +183,7 @@ const fetchEvaluationComparisonData = async (
       call.id,
       {
         callId: call.id,
-        // TODO: Get user-defined name for the evaluation
-        name: 'Evaluation',
+        name: call.display_name ?? 'Evaluation',
         color: pickColor(ndx),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
@@ -230,7 +229,11 @@ const fetchEvaluationComparisonData = async (
     // Add the user-defined scores
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-      const score = evaluationCallCache[evalCall.callId].output[scorerKey];
+      const output = evaluationCallCache[evalCall.callId].output;
+      if (output == null) {
+        return;
+      }
+      const score = output[scorerKey];
       const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
         if (isBinarySummaryScore(scoreVal)) {
           const metricDimension: MetricDefinition = {
@@ -304,8 +307,8 @@ const fetchEvaluationComparisonData = async (
 
     // Add the derived metrics
     // Model latency
-    const model_latency =
-      evaluationCallCache[evalCall.callId].output.model_latency;
+    const output = evaluationCallCache[evalCall.callId].output;
+    const model_latency = output ? output.model_latency : null;
     if (model_latency != null) {
       const metricId = metricDefinitionId(modelLatencyMetricDimension);
       result.summaryMetrics[metricId] = {
@@ -323,11 +326,10 @@ const fetchEvaluationComparisonData = async (
     // Total Tokens
     // TODO: This "mean" is incorrect - really should average across all model
     // calls since this includes LLM scorers
-    const totalTokens = sum(
-      Object.values(
-        evaluationCallCache[evalCall.callId].summary.usage ?? {}
-      ).map(v => v.total_tokens)
-    );
+    const summary = evaluationCallCache[evalCall.callId].summary;
+    const totalTokens = summary
+      ? sum(Object.values(summary.usage ?? {}).map(v => v.total_tokens))
+      : null;
     if (totalTokens != null) {
       const metricId = metricDefinitionId(totalTokensMetricDimension);
       result.summaryMetrics[metricId] = {
