@@ -285,7 +285,7 @@ def test_call_create(client):
 
 
 def test_calls_query(client):
-    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0 = client.create_call("x", {"a": 5, "b": 10}, attributes={"foobar": 1})
     call1 = client.create_call("x", {"a": 6, "b": 11})
     call2 = client.create_call("y", {"a": 5, "b": 10})
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
@@ -306,6 +306,7 @@ def test_calls_query(client):
                 "os_release": platform.release(),
                 "sys_version": sys.version,
             },
+            "foobar": 1,
         },
         summary={
             "usage": None,

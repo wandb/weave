@@ -2,7 +2,7 @@ import abc
 import datetime
 import typing
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
 from .interface.query import Query
@@ -22,7 +22,15 @@ class ExtraKeysAllowed(BaseModel):
         extra = "allow"
 
 
-class WeaveSummarySchema(TypedDict):
+class ExtraKeysTypedDict(TypedDict):
+    pass
+
+
+# https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
+ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")
+
+
+class WeaveSummarySchema(ExtraKeysTypedDict):
     status: typing.Optional[typing.Literal["success", "error", "running"]]
     display_name: typing.Optional[str]
     latency: typing.Optional[int]
@@ -37,9 +45,7 @@ class LLMUsageSchema(ExtraKeysAllowed):
     total_tokens: typing.Optional[int] = None
 
 
-class SummaryInsertMap(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
+class SummaryInsertMap(ExtraKeysTypedDict):
     usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
 
 
@@ -56,9 +62,7 @@ class WeaveAttributeSchema(TypedDict):
     sys_version: typing.Optional[str]
 
 
-class AttributeMap(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
+class AttributeMap(ExtraKeysTypedDict):
     _weave: typing.Optional[WeaveAttributeSchema]
 
 
@@ -102,6 +106,10 @@ class CallSchema(BaseModel):
 
     deleted_at: typing.Optional[datetime.datetime] = None
 
+    @field_serializer("attributes")
+    def serialize_attributes(self, v):
+        return dict(v)
+
 
 # Essentially a partial of StartedCallSchema. Mods:
 # - id is not required (will be generated)
@@ -131,6 +139,10 @@ class StartedCallSchemaForInsert(BaseModel):
     # WB Metadata
     wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: typing.Optional[str] = None
+
+    @field_serializer("attributes")
+    def serialize_attributes(self, v):
+        return dict(v)
 
 
 class EndedCallSchemaForInsert(BaseModel):
