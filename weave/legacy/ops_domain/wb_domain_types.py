@@ -190,19 +190,6 @@ ArtifactAliasType = ArtifactAlias.WeaveType()  # type: ignore
 ArtifactAliasType = typing.cast(PartialObjectTypeGeneratorType, ArtifactAliasType)
 
 
-@gql_type("tag")
-class Tag(GQLBase):
-    REQUIRED_FRAGMENT = """
-        id
-        name
-        tagCategoryName
-        attributes
-    """
-
-
-TagType = Tag.WeaveType()  # type: ignore
-TagType = typing.cast(PartialObjectTypeGeneratorType, TagType)
-
 @gql_type("report")
 class Report(GQLBase):
     REQUIRED_FRAGMENT = """
