@@ -19,7 +19,7 @@ from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, WeaveObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-from weave.weave_client import Call
+from weave.weave_client import WEAVE_KEY, Call
 
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
@@ -2303,10 +2303,10 @@ def test_user_cannot_modify_call_weave_dict(client):
     call.attributes["test"] = 123
 
     with pytest.raises(KeyError):
-        call.attributes["weave"] = {"anything": "blah"}
+        call.attributes[WEAVE_KEY] = {"anything": "blah"}
 
     with pytest.raises(KeyError):
-        call.attributes["weave"]["anything"] = "blah"
+        call.attributes[WEAVE_KEY]["anything"] = "blah"
 
     # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
     # but at that point you're on your own :)
