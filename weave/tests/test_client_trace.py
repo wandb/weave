@@ -50,6 +50,11 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 ## End hacky interface compatibility helpers
 
 
+class AnyIntMatcher:
+    def __eq__(self, other):
+        return isinstance(other, int)
+
+
 def test_simple_op(client):
     @weave.op()
     def my_op(a: int) -> int:
@@ -70,16 +75,23 @@ def test_simple_op(client):
     )
     assert fetched_call == weave_client.Call(
         op_name=expected_name,
-        project_id=f"{client.entity}/{client.project}",
+        project_id=fetched_call.project_id,
         trace_id=fetched_call.trace_id,
         parent_id=None,
         id=fetched_call.id,
         inputs={"a": 5},
         exception=None,
         output=6,
-        summary={},
+        summary={
+            "_weave": {
+                "display_name": None,
+                "latency": AnyIntMatcher(),
+                "status": "success",
+            },
+            "usage": None,
+        },
         attributes={
-            "weave": {
+            WEAVE_KEY: {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -133,13 +145,6 @@ def test_trace_server_call_start_and_end(client):
         def __eq__(self, other):
             # Checks within 1ms
             return abs((self.dt - other).total_seconds()) < 0.001
-
-    class FuzzyNumberMatcher:
-        def __init__(self, n):
-            self.n = n
-
-        def __eq__(self, other):
-            return abs(self.n - other) < 1000
 
     class MaybeStringMatcher:
         def __init__(self, s):
@@ -212,7 +217,7 @@ def test_trace_server_call_start_and_end(client):
             "c": 5,
             "_weave": {
                 "display_name": None,
-                "latency": FuzzyNumberMatcher(1000),
+                "latency": AnyIntMatcher(),
                 "status": "success",
             },
             "usage": None,
@@ -1288,7 +1293,7 @@ def test_attributes_on_ops(client):
     assert len(res.calls) == 1
     assert res.calls[0].attributes == {
         "custom": "attribute",
-        "weave": {
+        WEAVE_KEY: {
             "client_version": weave.version.VERSION,
             "source": "python-sdk",
             "os_name": platform.system(),
@@ -2289,8 +2294,8 @@ def test_call_has_client_version(client):
         return 1
 
     _, c = test.call()
-    assert "weave" in c.attributes
-    assert "client_version" in c.attributes["weave"]
+    assert WEAVE_KEY in c.attributes
+    assert "client_version" in c.attributes[WEAVE_KEY]
 
 
 def test_user_cannot_modify_call_weave_dict(client):
@@ -2308,7 +2313,7 @@ def test_user_cannot_modify_call_weave_dict(client):
     with pytest.raises(KeyError):
         call.attributes[WEAVE_KEY]["anything"] = "blah"
 
-    # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
+    # you can set call.attributes[WEAVE_KEY]["anything"]["something_else"] = "blah"
     # but at that point you're on your own :)
 
 

@@ -587,7 +587,7 @@ class WeaveClient:
         call.output = output
 
         # Summary handling
-        summary = {"usage": {}}
+        summary = {}
         if call._children:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
@@ -595,6 +595,7 @@ class WeaveClient:
             and "usage" in original_output
             and "model" in original_output
         ):
+            summary["usage"] = {}
             summary["usage"][original_output["model"]] = {
                 "requests": 1,
                 **original_output["usage"],
@@ -607,7 +608,11 @@ class WeaveClient:
             if isinstance(usage, pydantic.BaseModel):
                 usage = usage.model_dump(exclude_unset=True)
             if isinstance(usage, dict) and isinstance(model, str):
+                summary["usage"] = {}
                 summary["usage"][model] = {"requests": 1, **usage}
+
+        if "usage" not in summary:
+            summary["usage"] = None
 
         # Exception Handling
         exception_str: Optional[str] = None

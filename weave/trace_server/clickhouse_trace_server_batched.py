@@ -1410,19 +1410,22 @@ def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
 
 def _summary_dump_to_derived_summary_map(
     summary_dump: typing.Optional[tsi.AttributeMap],
-    ch_call: SelectableCHCallSchema,
+    started_at: datetime.datetime,
+    ended_at: typing.Optional[datetime.datetime],
+    exception: typing.Optional[str],
+    display_name: typing.Optional[str],
 ) -> tsi.SummaryMap:
     if not summary_dump:
         summary_dump = {}
     status, latency = None, None
-    if not ch_call.ended_at:
+    if not ended_at:
         status = "running"
     else:  # call is finished, set latency and terminal status
-        latency = (ch_call.ended_at - ch_call.started_at).microseconds
-        status = "success" if ch_call.exception is None else "error"
+        latency = (ended_at - started_at).microseconds
+        status = "success" if exception is None else "error"
 
     weave_derived_fields = tsi.WeaveSummarySchema(
-        display_name=ch_call.display_name,
+        display_name=display_name,
         status=status,
         latency=latency,
     )
@@ -1443,7 +1446,11 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=_summary_dump_to_derived_summary_map(
-            _nullable_any_dump_to_any(ch_call.summary_dump), ch_call
+            _nullable_any_dump_to_any(ch_call.summary_dump),
+            ch_call.ended_at,
+            ch_call.started_at,
+            ch_call.exception,
+            ch_call.display_name,
         ),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
@@ -1465,7 +1472,13 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
+        summary=_summary_dump_to_derived_summary_map(
+            _nullable_any_dump_to_any(ch_call_dict.get("summary_dump")),
+            ch_call_dict.get("ended_at"),
+            ch_call_dict.get("started_at"),
+            ch_call_dict.get("exception"),
+            ch_call_dict.get("display_name"),
+        ),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
