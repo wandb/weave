@@ -4,8 +4,8 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
-import {TEAL_300} from '@wandb/weave/common/css/color.styles';
-import {hexToRGB} from '@wandb/weave/common/css/utils';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -23,6 +23,7 @@ import {
 import {STANDARD_PADDING} from './ecpConstants';
 import {EvaluationComparisonState} from './ecpState';
 import {ComparisonDimensionsType} from './ecpState';
+import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
@@ -168,7 +169,9 @@ const CompareEvaluationsPageInner: React.FC = props => {
           alignItems: 'flex-start',
           gridGap: STANDARD_PADDING * 2,
         }}>
-        <InvalidEvaluationBanner state={state} />
+        <InvalidEvaluationBanner
+          evaluationCalls={Object.values(state.data.evaluationCalls)}
+        />
         <ComparisonDefinitionSection state={state} />
         <SummaryPlots state={state} />
         <ScorecardSection state={state} />
@@ -242,21 +245,26 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
   );
 };
 
-const InvalidEvaluationBanner: React.FC<{state: EvaluationComparisonState}> = ({
-  state,
-}) => {
+/*
+ * Returns true if the evaluation call has summary metrics.
+ */
+const isValidEval = (evalCall: EvaluationCall) => {
+  return Object.keys(evalCall.summaryMetrics).length > 0;
+};
+
+const InvalidEvaluationBanner: React.FC<{
+  evaluationCalls: EvaluationCall[];
+}> = ({evaluationCalls}) => {
   const [dismissed, setDismissed] = useState(false);
   const invalidEvals = useMemo(() => {
-    return Object.values(state.data.evaluationCalls)
-      .filter(evalCall => {
-        return Object.keys(evalCall.summaryMetrics).length === 0;
-      })
+    return Object.values(evaluationCalls)
+      .filter(call => !isValidEval(call))
       .map(call =>
         call.name !== EVALUATION_NAME_DEFAULT
           ? call.name
           : call.callId.slice(-4)
       );
-  }, [state.data.evaluationCalls]);
+  }, [evaluationCalls]);
   if (invalidEvals.length === 0 || dismissed) {
     return null;
   }
@@ -267,23 +275,29 @@ const InvalidEvaluationBanner: React.FC<{state: EvaluationComparisonState}> = ({
         paddingLeft: STANDARD_PADDING,
         paddingRight: STANDARD_PADDING,
       }}>
-      <Alert
-        severity="info"
-        style={{backgroundColor: hexToRGB(TEAL_300, 0.3), color: '#038194'}}
-        action={
-          <Button
-            // override the default tailwind classes for text and background hover
-            className="text-override hover:bg-override"
-            variant="ghost"
-            onClick={() => setDismissed(true)}>
-            Dismiss
-          </Button>
-        }>
-        <span style={{fontWeight: 'bold'}}>
-          No summary information found for evaluation
-          {invalidEvals.length > 1 ? 's' : ''}: {invalidEvals.join(', ')}
-        </span>
-      </Alert>
+      <Tailwind>
+        <Alert
+          severity="info"
+          classes={{
+            root: 'bg-teal-300/[0.30] text-teal-600',
+            action: 'text-teal-600',
+          }}
+          action={
+            <Button
+              // override the default tailwind classes for text and background hover
+              className="text-override hover:bg-override"
+              variant="ghost"
+              onClick={() => setDismissed(true)}>
+              Dismiss
+            </Button>
+          }>
+          <span style={{fontWeight: 'bold'}}>
+            No summary information found for{' '}
+            {maybePluralizeWord(invalidEvals.length, 'evaluation')}:{' '}
+            {invalidEvals.join(', ')}.
+          </span>
+        </Alert>
+      </Tailwind>
     </Box>
   );
 };
