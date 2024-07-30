@@ -36,13 +36,13 @@ class WeaveSummarySchema(ExtraKeysTypedDict):
     latency: typing.Optional[int]
 
 
-class LLMUsageSchema(ExtraKeysAllowed):
-    prompt_tokens: typing.Optional[int] = None
-    input_tokens: typing.Optional[int] = None
-    completion_tokens: typing.Optional[int] = None
-    output_tokens: typing.Optional[int] = None
-    requests: typing.Optional[int] = None
-    total_tokens: typing.Optional[int] = None
+class LLMUsageSchema(TypedDict):
+    prompt_tokens: typing.Optional[int]
+    input_tokens: typing.Optional[int]
+    completion_tokens: typing.Optional[int]
+    output_tokens: typing.Optional[int]
+    requests: typing.Optional[int]
+    total_tokens: typing.Optional[int]
 
 
 class SummaryInsertMap(ExtraKeysTypedDict):
@@ -110,6 +110,10 @@ class CallSchema(BaseModel):
     def serialize_attributes(self, v):
         return dict(v)
 
+    @field_serializer("summary")
+    def serialize_summary(self, v):
+        return dict(v) if v else None
+
 
 # Essentially a partial of StartedCallSchema. Mods:
 # - id is not required (will be generated)
@@ -160,6 +164,10 @@ class EndedCallSchemaForInsert(BaseModel):
 
     # Summary: a summary of the call
     summary: SummaryInsertMap
+
+    @field_serializer("summary")
+    def serialize_summary(self, v):
+        return dict(v)
 
 
 class ObjSchema(BaseModel):
