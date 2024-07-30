@@ -390,6 +390,7 @@ export const CallsTable: FC<{
         field: 'CustomCheckbox',
         sortable: false,
         disableColumnMenu: true,
+        resizable: false,
         renderHeader: (params: any) => {
           return (
             <Checkbox
