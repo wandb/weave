@@ -2,13 +2,14 @@
  * Display a large version of the emoji and details about who reacted with it.
  */
 import _ from 'lodash';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {Tailwind} from '../../../../Tailwind';
+import {useUsers} from '../../../../UserLink';
 import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 
 type EmojiDetailsProps = {
-  viewer: string | null; // Username
+  currentViewerId: string | null;
   reactions: Feedback[];
   maxNames?: number;
 };
@@ -37,26 +38,47 @@ const englishJoiner = (list: string[]): string => {
 };
 
 export const EmojiDetails = ({
-  viewer,
+  currentViewerId,
   reactions,
   maxNames = 20,
 }: EmojiDetailsProps) => {
   const emojis = reactions.map(r => r.payload.emoji);
   const emoji = _.uniq(emojis).join('');
   const groupedByAlias = _.groupBy(reactions, r => r.payload.alias);
+  const neededUsers = useMemo(() => {
+    const reactionIds = reactions.map(r => r.wb_user_id);
+    if (currentViewerId) {
+      reactionIds.push(currentViewerId);
+    }
+    return _.uniq(reactionIds);
+  }, [currentViewerId, reactions]);
+  const users = useUsers(neededUsers);
+  const userMap = useMemo(() => {
+    if (users === 'load' || users === 'loading' || users === 'error') {
+      return {};
+    }
+    return _.keyBy(users, 'id');
+  }, [users]);
 
   return (
     <Tailwind>
       <div className="max-w-xs">
         <div className="text-center text-7xl">{emoji}</div>
         {Object.entries(groupedByAlias).map(([alias, aliasReactions]) => {
-          const names = aliasReactions.map(r => r.creator ?? r.wb_user_id);
-          moveToFront(names, viewer);
+          // TODO (Tim): After https://github.com/wandb/core/pull/22947 is deployed,
+          // change the fallback from `r.wb_user_id` to `null`-like (this means no access)
+          const names = aliasReactions.map(
+            r => r.creator ?? userMap[r.wb_user_id]?.username ?? r.wb_user_id
+          );
+          const currentViewerName = currentViewerId
+            ? userMap[currentViewerId]?.username ?? currentViewerId
+            : null;
+          moveToFront(names, currentViewerName);
           if (names.length > maxNames) {
             names.splice(maxNames);
             names.push('others');
           }
-          if (names[0] === viewer) {
+          if (names[0] === currentViewerName) {
             names[0] = 'You (click to remove)';
           }
           const joined = englishJoiner(names);

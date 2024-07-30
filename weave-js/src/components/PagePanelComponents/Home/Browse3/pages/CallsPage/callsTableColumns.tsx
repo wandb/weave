@@ -446,7 +446,7 @@ function buildCallsTableColumns(
       if (userId == null) {
         return null;
       }
-      return <UserLink username={userId} />;
+      return <UserLink userId={userId} />;
     },
   });
 
