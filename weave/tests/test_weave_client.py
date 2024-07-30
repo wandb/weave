@@ -290,24 +290,6 @@ def test_calls_query(client):
     call2 = client.create_call("y", {"a": 5, "b": 10})
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
-    assert result[0].summary == {
-        "usage": None,
-        "_weave": {
-            "status": "running",
-            "display_name": None,
-            "latency": None,
-        },
-    }
-    assert result[0].attributes == {
-        "_weave": {
-            "client_version": weave.version.VERSION,
-            "source": "python-sdk",
-            "os_name": platform.system(),
-            "os_version": platform.version(),
-            "os_release": platform.release(),
-            "sys_version": sys.version,
-        },
-    }
     assert result[0] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
