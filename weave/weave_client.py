@@ -39,6 +39,7 @@ from weave.trace.refs import (
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (
+    AttributeMap,
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
@@ -54,6 +55,7 @@ from weave.trace_server.trace_server_interface import (
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
+    SummaryMap,
     TableCreateReq,
     TableSchemaForInsert,
     TraceServerInterface,
@@ -161,9 +163,9 @@ class Call:
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
-    summary: Optional[dict] = None
+    summary: Optional[SummaryMap] = None
     display_name: Optional[str] = None
-    attributes: Optional[dict] = None
+    attributes: Optional[AttributeMap] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
@@ -320,7 +322,7 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
         for k, v in d.items():
             if isinstance(v, dict):
                 result[k] = sum_dict_leaves([result.get(k, {}), v])
-            else:
+            elif v is not None:
                 result[k] = result.get(k, 0) + v
     return result
 

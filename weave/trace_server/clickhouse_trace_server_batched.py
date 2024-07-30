@@ -1415,8 +1415,6 @@ def _summary_dump_to_derived_summary_map(
     exception: typing.Optional[str],
     display_name: typing.Optional[str],
 ) -> tsi.SummaryMap:
-    if not summary_dump:
-        summary_dump = {}
     status, latency = None, None
     if not ended_at:
         status = "running"
@@ -1429,8 +1427,10 @@ def _summary_dump_to_derived_summary_map(
         status=status,
         latency=latency,
     )
-    summary_dump["_weave"] = weave_derived_fields
-    return tsi.SummaryMap(**summary_dump)
+    summary = summary_dump or {}
+    summary["_weave"] = weave_derived_fields
+    usage = summary.pop("usage", None)
+    return tsi.SummaryMap(usage=usage, **summary)
 
 
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
@@ -1447,8 +1447,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=_summary_dump_to_derived_summary_map(
             _nullable_any_dump_to_any(ch_call.summary_dump),
-            ch_call.ended_at,
             ch_call.started_at,
+            ch_call.ended_at,
             ch_call.exception,
             ch_call.display_name,
         ),
@@ -1474,8 +1474,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_summary_dump_to_derived_summary_map(
             _nullable_any_dump_to_any(ch_call_dict.get("summary_dump")),
-            ch_call_dict.get("ended_at"),
             ch_call_dict.get("started_at"),
+            ch_call_dict.get("ended_at"),
             ch_call_dict.get("exception"),
             ch_call_dict.get("display_name"),
         ),
@@ -1514,7 +1514,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         parent_id=start_call.parent_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
-        attributes_dump=_dict_value_to_dump(start_call.attributes),
+        attributes_dump=_dict_value_to_dump(dict(start_call.attributes)),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
@@ -1533,7 +1533,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
-        summary_dump=_dict_value_to_dump(end_call.summary),
+        summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(end_call.output),
     )
