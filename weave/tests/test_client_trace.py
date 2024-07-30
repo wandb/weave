@@ -88,7 +88,6 @@ def test_simple_op(client):
                 "latency": AnyIntMatcher(),
                 "status": "success",
             },
-            "usage": None,
         },
         attributes={
             WEAVE_KEY: {
@@ -169,7 +168,6 @@ def test_trace_server_call_start_and_end(client):
         "output": None,
         "summary": {
             "_weave": {"display_name": None, "latency": None, "status": "running"},
-            "usage": None,
         },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
@@ -184,7 +182,6 @@ def test_trace_server_call_start_and_end(client):
         summary={
             "c": 5,
             "_weave": None,
-            "usage": None,
         },
         output={"d": 5},
     )
@@ -220,7 +217,6 @@ def test_trace_server_call_start_and_end(client):
                 "latency": AnyIntMatcher(),
                 "status": "success",
             },
-            "usage": None,
         },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
