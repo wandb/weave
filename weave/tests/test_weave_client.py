@@ -271,7 +271,7 @@ def test_call_create(client):
         summary={},
         _children=[],
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),

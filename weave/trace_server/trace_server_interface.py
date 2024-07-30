@@ -36,7 +36,7 @@ class WeaveSummarySchema(ExtraKeysTypedDict):
     latency: typing.Optional[int]
 
 
-class LLMUsageSchema(TypedDict):
+class LLMUsageSchema(TypedDict, total=False):
     prompt_tokens: typing.Optional[int]
     input_tokens: typing.Optional[int]
     completion_tokens: typing.Optional[int]
