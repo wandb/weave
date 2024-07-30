@@ -171,6 +171,8 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
+    # calculated at read time
+    latency: typing.Optional[int] = None
 
 
 all_call_insert_columns = list(
@@ -812,9 +814,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
-                defaultdict(list)
-            )
+            refs_by_project_id: dict[
+                str, list[refs_internal.InternalObjectRef]
+            ] = defaultdict(list)
             for ref in refs:
                 refs_by_project_id[ref.project_id].append(ref)
             for project_id, project_refs in refs_by_project_id.items():
@@ -1410,17 +1412,17 @@ def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
 
 def _summary_dump_to_derived_summary_map(
     summary_dump: typing.Optional[tsi.AttributeMap],
-    started_at: datetime.datetime,
+    latency: typing.Optional[int],
     ended_at: typing.Optional[datetime.datetime],
     exception: typing.Optional[str],
     display_name: typing.Optional[str],
 ) -> tsi.SummaryMap:
-    status, latency = None, None
     if not ended_at:
         status = "running"
-    else:  # call is finished, set latency and terminal status
-        latency = (ended_at - started_at).microseconds
-        status = "success" if exception is None else "error"
+    elif exception is not None:
+        status = "error"
+    else:
+        status = "success"
 
     weave_derived_fields = tsi.WeaveSummarySchema(
         display_name=display_name,
@@ -1447,7 +1449,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=_summary_dump_to_derived_summary_map(
             _nullable_any_dump_to_any(ch_call.summary_dump),
-            ch_call.started_at,
+            ch_call.latency,
             ch_call.ended_at,
             ch_call.exception,
             ch_call.display_name,
@@ -1474,7 +1476,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_summary_dump_to_derived_summary_map(
             _nullable_any_dump_to_any(ch_call_dict.get("summary_dump")),
-            ch_call_dict.get("started_at"),
+            ch_call_dict.get("latency"),
             ch_call_dict.get("ended_at"),
             ch_call_dict.get("exception"),
             ch_call_dict.get("display_name"),
