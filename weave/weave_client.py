@@ -127,8 +127,6 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 def map_to_refs(obj: Any) -> Any:
     if ref := _get_direct_ref(obj):
         return ref
-    if isinstance(obj, ObjectRef):
-        obj = obj.get()
 
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
