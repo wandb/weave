@@ -613,9 +613,6 @@ class WeaveClient:
                 summary["usage"] = {}
                 summary["usage"][model] = {"requests": 1, **usage}
 
-        if "usage" not in summary:
-            summary["usage"] = None
-
         # Exception Handling
         exception_str: Optional[str] = None
         if exception:

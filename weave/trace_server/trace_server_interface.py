@@ -12,16 +12,6 @@ WB_USER_ID_DESCRIPTION = (
 )
 
 
-class ExtraKeysAllowed(BaseModel):
-    """By inheriting from this class, you allow extra keys in the model.
-    This is useful for when we want to specify a known set of keys, but
-    also allow additional keys.
-    """
-
-    class Config:
-        extra = "allow"
-
-
 class ExtraKeysTypedDict(TypedDict):
     pass
 
@@ -45,7 +35,7 @@ class LLMUsageSchema(TypedDict, total=False):
     total_tokens: typing.Optional[int]
 
 
-class SummaryInsertMap(ExtraKeysTypedDict):
+class SummaryInsertMap(ExtraKeysTypedDict, total=False):
     usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
 
 

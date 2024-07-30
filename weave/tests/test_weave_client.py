@@ -309,7 +309,6 @@ def test_calls_query(client):
             "foobar": 1,
         },
         summary={
-            "usage": None,
             "_weave": tsi.WeaveSummarySchema(
                 **{
                     "status": "running",
@@ -337,7 +336,6 @@ def test_calls_query(client):
             },
         },
         summary={
-            "usage": None,
             "_weave": tsi.WeaveSummarySchema(
                 **{
                     "status": "running",
