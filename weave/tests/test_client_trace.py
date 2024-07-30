@@ -134,6 +134,13 @@ def test_trace_server_call_start_and_end(client):
             # Checks within 1ms
             return abs((self.dt - other).total_seconds()) < 0.001
 
+    class FuzzyNumberMatcher:
+        def __init__(self, n):
+            self.n = n
+
+        def __eq__(self, other):
+            return abs(self.n - other) < 1000
+
     class MaybeStringMatcher:
         def __init__(self, s):
             self.s = s
@@ -169,7 +176,11 @@ def test_trace_server_call_start_and_end(client):
         project_id=client._project_id(),
         id=call_id,
         ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-        summary={"c": 5},
+        summary={
+            "c": 5,
+            "_weave": None,
+            "usage": None,
+        },
         output={"d": 5},
     )
     client.server.call_end(tsi.CallEndReq(end=end))
@@ -194,10 +205,18 @@ def test_trace_server_call_start_and_end(client):
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": FuzzyDateTimeMatcher(end.ended_at),
         "exception": None,
-        "attributes": {"a": 5},
+        "attributes": {"a": 5, "_weave": None},
         "inputs": {"b": 5},
         "output": {"d": 5},
-        "summary": {"c": 5},
+        "summary": {
+            "c": 5,
+            "_weave": {
+                "display_name": None,
+                "latency": FuzzyNumberMatcher(1000),
+                "status": "success",
+            },
+            "usage": None,
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,

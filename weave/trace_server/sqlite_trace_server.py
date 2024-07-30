@@ -188,7 +188,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.op_name,
                     req.start.display_name,
                     req.start.started_at.isoformat(),
-                    json.dumps(req.start.attributes),
+                    json.dumps(req.start.attributes.model_dump()),
                     json.dumps(req.start.inputs),
                     json.dumps(
                         extract_refs_from_values(list(req.start.inputs.values()))
@@ -227,7 +227,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     json.dumps(
                         extract_refs_from_values(list(parsable_output.values()))
                     ),
-                    json.dumps(req.end.summary),
+                    json.dumps(req.end.summary.model_dump()),
                     req.end.id,
                 ),
             )
@@ -452,7 +452,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 status=status,
                 latency=latency,
             )
-            return tsi.SummaryMap({**summary_json, "_weave": weave_derived_fields})
+            summary_json["_weave"] = weave_derived_fields
+            return tsi.SummaryMap(**summary_json)
 
         query_result = cursor.fetchall()
         return tsi.CallsQueryRes(

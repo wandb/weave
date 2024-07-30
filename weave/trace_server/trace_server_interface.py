@@ -2,7 +2,7 @@ import abc
 import datetime
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import TypedDict
 
 from .interface.query import Query
@@ -37,7 +37,9 @@ class LLMUsageSchema(ExtraKeysAllowed):
     total_tokens: typing.Optional[int] = None
 
 
-class SummaryInsertMap(TypedDict):
+class SummaryInsertMap(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
 
 
@@ -54,7 +56,9 @@ class WeaveAttributeSchema(TypedDict):
     sys_version: typing.Optional[str]
 
 
-class AttributeMap(TypedDict):
+class AttributeMap(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     _weave: typing.Optional[WeaveAttributeSchema]
 
 
