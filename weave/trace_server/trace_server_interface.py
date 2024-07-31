@@ -97,13 +97,9 @@ class CallSchema(BaseModel):
     deleted_at: typing.Optional[datetime.datetime] = None
     latency: typing.Optional[int] = None
 
-    @field_serializer("attributes")
-    def serialize_attributes(self, v):
+    @field_serializer("attributes", "summary", when_used="unless-none")
+    def serialize_typed_dicts(self, v):
         return dict(v)
-
-    @field_serializer("summary")
-    def serialize_summary(self, v):
-        return dict(v) if v else None
 
 
 # Essentially a partial of StartedCallSchema. Mods:
@@ -136,7 +132,7 @@ class StartedCallSchemaForInsert(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     @field_serializer("attributes")
-    def serialize_attributes(self, v):
+    def serialize_typed_dicts(self, v):
         return dict(v)
 
 
@@ -157,7 +153,7 @@ class EndedCallSchemaForInsert(BaseModel):
     summary: SummaryInsertMap
 
     @field_serializer("summary")
-    def serialize_summary(self, v):
+    def serialize_typed_dicts(self, v):
         return dict(v)
 
 
