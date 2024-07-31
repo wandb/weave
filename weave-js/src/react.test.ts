@@ -1,4 +1,6 @@
-import {parseRef} from './react';
+import _ from 'lodash';
+
+import {parseRef, refUri, WeaveObjectRef} from './react';
 
 describe('parseRef', () => {
   describe('parsing weave ref', () => {
@@ -61,11 +63,14 @@ describe('parseRef', () => {
       });
     });
     it('parses a ref with slashes in name', () => {
+      const name = 'a/b/c';
       const parsed = parseRef(
-        'weave:///entity/project/object/a/b/c:artifactversion'
+        `weave:///entity/project/object/${encodeURIComponent(
+          name
+        )}:artifactversion`
       );
       expect(parsed).toEqual({
-        artifactName: 'a/b/c',
+        artifactName: name,
         artifactRefExtra: '',
         artifactVersion: 'artifactversion',
         entityName: 'entity',
@@ -75,12 +80,15 @@ describe('parseRef', () => {
       });
     });
     it('parses a ref with slashes in name and with extra', () => {
+      const name = 'a/b/c';
       const parsed = parseRef(
-        'weave:///entity/project/object/a/b/c:artifactversion/attr/rows/id/rowversion'
+        `weave:///entity/project/object/${encodeURIComponent(
+          name
+        )}:artifactversion/attr/rows/id/rowversion`
       );
       expect(parsed).toEqual({
         scheme: 'weave',
-        artifactName: 'a/b/c',
+        artifactName: name,
         artifactRefExtra: 'attr/rows/id/rowversion',
         artifactVersion: 'artifactversion',
         entityName: 'entity',
@@ -157,5 +165,37 @@ describe('parseRef', () => {
       scheme: 'weave',
       weaveKind: 'op',
     });
+  });
+  it('handles any character', () => {
+    const chars = [];
+
+    for (let i = 0; i < 256; i++) {
+      chars.push(String.fromCharCode(i));
+    }
+
+    const ref: WeaveObjectRef = {
+      scheme: 'weave',
+      entityName: _.shuffle(chars).join(''),
+      projectName: _.shuffle(chars).join(''),
+      weaveKind: 'object',
+      artifactName: _.shuffle(chars).join(''),
+      artifactVersion: _.shuffle(chars).join(''),
+      artifactRefExtra: 'string_with_every_character',
+    };
+
+    const checkUrl = [
+      'weave://',
+      encodeURIComponent(ref.entityName),
+      encodeURIComponent(ref.projectName),
+      ref.weaveKind,
+      encodeURIComponent(ref.artifactName) +
+        ':' +
+        encodeURIComponent(ref.artifactVersion),
+      ref.artifactRefExtra,
+    ].join('/');
+    const genUrl = refUri(ref);
+    expect(genUrl).toEqual(checkUrl);
+    const parsed = parseRef(genUrl);
+    expect(parsed).toEqual(ref);
   });
 });
