@@ -45,20 +45,12 @@ def _filesystem_runfiles_from_run_path(run_path: RunPath, file_path: str):
     runfiles = WandbRunFiles(name=uri.name, uri=uri)
     return runfiles.path_info(file_path)
 
-def key_is_wandb_private(key: str) -> bool:
-    # For a very long time, this was just `key == "_wandb"`, however
-    # it seems that we are now returning fields like `_wandb.runtime`.
-    # This seems like a bug in gorilla, since it is not happening in
-    # local-integration-tests, which makes me think RunsV2 is doing
-    # something different. Anyway, this is a quick fix to make the
-    # tests pass.
-    return key == "_wandb" or key.startswith("_wandb.")
 
 def process_run_dict_obj(run_dict, run_path: typing.Optional[RunPath] = None):
     return {
         k: _process_run_dict_item(v, run_path)
         for k, v in run_dict.items()
-        if not key_is_wandb_private(k)
+        if k != "_wandb"
     }
 
 
@@ -211,7 +203,7 @@ def process_run_dict_type(run_dict):
         {
             k: _process_run_dict_item_type(v)
             for k, v in run_dict.items()
-            if not key_is_wandb_private(k)
+            if k != "_wandb"
         }
     )
 

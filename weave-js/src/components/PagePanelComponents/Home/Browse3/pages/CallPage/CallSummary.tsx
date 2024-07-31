@@ -46,7 +46,7 @@ export const CallSummary: React.FC<{
             ),
           User: (
             <UserLink
-              username={call.userId}
+              userId={call.userId}
               placement="bottom-start"
               includeName
             />

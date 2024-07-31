@@ -163,7 +163,7 @@ if not import_failed:
 
                 # First, there needs to be something on the stack.
                 if wv_current_run is not None:
-                    attrs: Dict[str, Any] = wv_current_run.attributes or {}
+                    attrs = wv_current_run.attributes or {}
                     # Now, the major condition:
                     if (
                         # 1. Both runs must be of type `RunnableSequence`
