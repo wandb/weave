@@ -45,7 +45,10 @@ from weave.trace_server.calls_query_builder import (
     HardCodedFilter,
     combine_conditions,
 )
-from weave.trace_server.trace_server_common import make_derived_summary_map
+from weave.trace_server.trace_server_common import (
+    make_call_status_from_exception_and_ended_at,
+    op_name_simple_from_ref_str,
+)
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
@@ -1409,6 +1412,29 @@ def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
     return val if val != "" else None
 
 
+def _make_derived_summary_map(
+    summary_dump: typing.Optional[dict],
+    started_at: typing.Optional[datetime.datetime],
+    ended_at: typing.Optional[datetime.datetime],
+    exception: typing.Optional[str],
+    display_name: typing.Optional[str],
+    op_name: typing.Optional[str],
+) -> tsi.SummaryMap:
+    status = make_call_status_from_exception_and_ended_at(exception, ended_at)
+    latency = (
+        None if not ended_at or not started_at else (ended_at - started_at).microseconds
+    )
+    display_name = display_name or op_name_simple_from_ref_str(op_name)
+    weave_derived_fields = tsi.WeaveSummarySchema(
+        nice_trace_name=display_name,
+        status=status,
+        latency=latency,
+    )
+    summary = summary_dump or {}
+    summary["_weave"] = weave_derived_fields
+    return typing.cast(tsi.SummaryMap, summary)
+
+
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1421,7 +1447,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=make_derived_summary_map(
+        summary=_make_derived_summary_map(
             _nullable_any_dump_to_any(ch_call.summary_dump),
             _ensure_datetimes_have_tz(ch_call.started_at),
             _ensure_datetimes_have_tz(ch_call.ended_at),
@@ -1449,7 +1475,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=make_derived_summary_map(
+        summary=_make_derived_summary_map(
             _nullable_any_dump_to_any(ch_call_dict.get("summary_dump")),
             _ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
             _ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),

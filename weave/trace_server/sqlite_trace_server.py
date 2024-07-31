@@ -29,7 +29,10 @@ from weave.trace_server.refs_internal import (
     InternalTableRef,
     parse_internal_uri,
 )
-from weave.trace_server.trace_server_common import make_derived_summary_map
+from weave.trace_server.trace_server_common import (
+    make_call_status_from_exception_and_ended_at,
+    op_name_simple_from_ref_str,
+)
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     generate_id,
@@ -446,7 +449,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     inputs=json.loads(row[9]),
                     output=None if row[11] is None else json.loads(row[11]),
                     output_refs=None if row[12] is None else json.loads(row[12]),
-                    summary=make_derived_summary_map(
+                    summary=_make_derived_summary_map(
                         row[13],
                         row[5],
                         row[6],
@@ -1077,3 +1080,31 @@ def _transform_external_calls_field_to_internal_calls_field(
         )
 
     return field
+
+
+def _make_derived_summary_map(
+    summary_dump: Optional[dict],
+    started_at: str,
+    ended_at: Optional[str],
+    exception: Optional[str],
+    display_name: Optional[str],
+    op_name: Optional[str],
+) -> tsi.SummaryMap:
+    status = make_call_status_from_exception_and_ended_at(exception, ended_at)
+    latency = (
+        None
+        if not ended_at
+        else (
+            datetime.datetime.fromisoformat(ended_at)
+            - datetime.datetime.fromisoformat(started_at)
+        ).microseconds
+    )
+    display_name = display_name or op_name_simple_from_ref_str(op_name)
+    weave_derived_fields = tsi.WeaveSummarySchema(
+        nice_trace_name=display_name,
+        status=status,
+        latency=latency,
+    )
+    summary = summary_dump or {}
+    summary["_weave"] = weave_derived_fields
+    return cast(tsi.SummaryMap, summary)
