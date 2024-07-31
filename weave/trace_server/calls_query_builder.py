@@ -42,6 +42,7 @@ from weave.trace_server.orm import (
     python_value_to_ch_type,
     quote_json_path_parts,
 )
+from weave.trace_server.token_costs import cost_query
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -216,6 +217,7 @@ class CallsQuery(BaseModel):
     order_fields: list[OrderField] = Field(default_factory=list)
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
+    add_costs: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
         self.select_fields.append(get_field_by_name(field))
@@ -428,9 +430,23 @@ class CallsQuery(BaseModel):
             outer_query.offset = self.offset
 
         raw_sql = f"""
+        -- First we get lightly filtered calls, to optimize later for heavy filters
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
-        {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
         """
+
+        if self.add_costs:
+            raw_sql += f""",
+            -- Then we get all the calls we want, with all the data we need, with heavy filtering
+            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
+
+            -- Add Cost to the summary dump, of each call
+            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields])}
+            """
+
+        else:
+            raw_sql += f"""
+            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
+            """
 
         return _safely_format_sql(raw_sql)
 
