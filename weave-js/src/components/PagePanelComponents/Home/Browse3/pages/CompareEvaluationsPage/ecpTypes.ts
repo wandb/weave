@@ -5,7 +5,7 @@
  * The `EvaluationComparisonData` fully defines a normalized data structure for the
  * Comparing Evaluations.
  */
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 
 export type EvaluationComparisonData = {
   // Entity and Project are constant across all calls

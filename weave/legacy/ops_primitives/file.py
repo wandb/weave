@@ -1,6 +1,7 @@
 import json
 import typing
 
+from weave import environment as weave_env
 from weave import errors
 from weave import weave_types as types
 from weave.api import op
@@ -57,6 +58,7 @@ def _file_dict_from_manifest(
         res = wandb_file_manager._local_path_and_download_url(
             art.uri_obj.with_path(file.path),
             manifest,
+            base_url=weave_env.wandb_frontend_base_url(),
         )
         if res:
             base_dict["url"] = res[1]

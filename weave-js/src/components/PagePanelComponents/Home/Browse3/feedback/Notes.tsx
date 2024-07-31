@@ -1,4 +1,5 @@
-import React, {useEffect, useRef} from 'react';
+import _ from 'lodash';
+import React, {useEffect, useMemo, useRef} from 'react';
 import {twMerge} from 'tailwind-merge';
 
 import {useDeepMemo} from '../../../../../hookUtils';
@@ -7,11 +8,12 @@ import {TooltipHint} from '../../../../DraggablePopups';
 import {TextField} from '../../../../Form/TextField';
 import {Tailwind} from '../../../../Tailwind';
 import {Timestamp} from '../../../../Timestamp';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
+import {useUsers} from '../../../../UserLink';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 
 type NotesProps = {
   notes: Feedback[];
-  viewer?: string | null;
+  currentViewerId?: string | null;
   readonly: boolean;
   note?: string;
   setNote?: (value: string) => void;
@@ -22,7 +24,7 @@ type NotesProps = {
 
 export const Notes = ({
   notes,
-  viewer,
+  currentViewerId,
   readonly,
   note,
   setNote,
@@ -53,6 +55,18 @@ export const Notes = ({
     }
   }, [isPreview, deepNotes]);
 
+  const neededUsers = useMemo(
+    () => _.uniq(notes.map(n => n.wb_user_id)),
+    [notes]
+  );
+  const users = useUsers(neededUsers);
+  const userMap = useMemo(() => {
+    if (users === 'load' || users === 'loading' || users === 'error') {
+      return {};
+    }
+    return _.keyBy(users, 'id');
+  }, [users]);
+
   return (
     <Tailwind>
       <div
@@ -79,7 +93,10 @@ export const Notes = ({
             style={{maxHeight: 480}}
             className="mt-12 flex flex-col gap-16 overflow-auto">
             {notes.map(n => {
-              const creator = n.creator ?? n.wb_user_id;
+              const creator =
+                // TODO (Tim): After https://github.com/wandb/core/pull/22947 is deployed,
+                // change the fallback from `n.wb_user_id` to `null`-like (this means no access)
+                n.creator ?? userMap[n.wb_user_id]?.username ?? n.wb_user_id;
               return (
                 <div key={n.id} className="flex items-start">
                   <div className="ml-12">

@@ -2,8 +2,8 @@ import React, {useEffect, useState} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {parseRef} from '../../../../../react';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {ReactionsLoaded} from './ReactionsLoaded';
 
 type ReactionsProps = {
@@ -142,11 +142,11 @@ export const Reactions = ({
 
   // Always readonly if anonymous.
   // TODO: Consider W&B admin privileges.
-  const viewer = userInfo ? userInfo.username : null;
+  const viewer = userInfo ? userInfo.id : null;
   const isReadonly = !viewer || !userInfo?.teams.includes(entity) || readonly;
   return (
     <ReactionsLoaded
-      viewer={viewer}
+      currentViewerId={viewer}
       reactions={feedback}
       onAddEmoji={onAddEmoji}
       onAddNote={onAddNote}

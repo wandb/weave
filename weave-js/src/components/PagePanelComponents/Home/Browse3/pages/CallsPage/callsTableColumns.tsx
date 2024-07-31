@@ -32,7 +32,7 @@ import {
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {isRef} from '../common/util';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
   traceCallLatencyS,
@@ -440,13 +440,12 @@ function buildCallsTableColumns(
     align: 'center',
     sortable: false,
     resizable: false,
-    disableColumnMenu: true,
     renderCell: cellParams => {
       const userId = cellParams.row.wb_user_id;
       if (userId == null) {
         return null;
       }
-      return <UserLink username={userId} />;
+      return <UserLink userId={userId} />;
     },
   });
 

@@ -232,7 +232,7 @@ class CallsIter:
         self.server = server
         self.project_id = project_id
         self.filter = filter
-        self._page_size = 10
+        self._page_size = 1000
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
@@ -928,7 +928,10 @@ def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     return op
 
 
-REDACT_KEYS = ("api_key",)
+REDACT_KEYS = (
+    "api_key",
+    "Authorization",
+)
 REDACTED_VALUE = "REDACTED"
 
 

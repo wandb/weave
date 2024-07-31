@@ -9,8 +9,11 @@ import typing
 
 import numpy as np
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from flask.testing import FlaskClient
 
+import weave
 from weave import weave_init
 from weave.legacy import client as client_legacy
 from weave.legacy import context_state, io_service, serialize
@@ -355,7 +358,7 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
     def ext_to_int_project_id(self, project_id: str) -> str:
         return self._project_map.ext_to_int(project_id, simple_hash(project_id))
 
-    def int_to_ext_project_id(self, project_id: str) -> str:
+    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
         return self._project_map.int_to_ext(project_id, simple_hash(project_id))
 
     def ext_to_int_run_id(self, run_id: str) -> str:
@@ -442,3 +445,56 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         yield inited_client.client
     finally:
         inited_client.reset()
+
+
+@pytest.fixture
+def network_proxy_client(client):
+    """
+    This fixture is used to test the `RemoteHTTPTraceServer` class. There is
+    almost no logic in this class, other than a little batching, so we typically
+    skip it for simplicity. However, we can use this fixture to test such logic.
+    It initializes a mini FastAPI app that proxies requests from the
+    `RemoteHTTPTraceServer` to the underlying `client.server` object.
+
+    We probably will want to flesh this out more in the future, but this is a
+    starting point.
+    """
+    app = FastAPI()
+
+    records = []
+
+    @app.post("/table/create")
+    def table_create(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        records.append(
+            (
+                "table_create",
+                req,
+            )
+        )
+        return client.server.table_create(req)
+
+    @app.post("/table/update")
+    def table_update(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        records.append(
+            (
+                "table_update",
+                req,
+            )
+        )
+        return client.server.table_update(req)
+
+    with TestClient(app) as c:
+
+        def post(url, data=None, json=None, **kwargs):
+            kwargs.pop("stream", None)
+            return c.post(url, data=data, json=json, **kwargs)
+
+        orig_post = weave.trace_server.requests.post
+        weave.trace_server.requests.post = post
+
+        remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
+            trace_server_url=""
+        )
+        yield (client, remote_client, records)
+
+        weave.trace_server.requests.post = orig_post

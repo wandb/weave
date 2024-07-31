@@ -5,7 +5,7 @@ import {Timestamp} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {CellValueString} from '../../Browse2/CellValueString';
 import {CopyableId} from '../pages/common/Id';
-import {Feedback} from '../pages/wfReactInterface/traceServerClient';
+import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {FeedbackTypeChip} from './FeedbackTypeChip';
 
@@ -68,7 +68,7 @@ export const FeedbackGridInner = ({feedback}: FeedbackGridInnerProps) => {
         ) {
           return params.row.creator;
         }
-        return <UserLink username={params.row.wb_user_id} includeName />;
+        return <UserLink userId={params.row.wb_user_id} includeName />;
       },
     },
   ];

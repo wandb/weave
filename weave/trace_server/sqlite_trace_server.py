@@ -647,6 +647,76 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableCreateRes(digest=digest)
 
+    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        # conds = ["project_id = {project_id: String}"]
+
+        cursor.execute(
+            """
+            SELECT
+                tables.row_digests
+            FROM
+                tables
+            WHERE
+                tables.project_id = ? AND
+                tables.digest = ?
+            """,
+            (req.project_id, req.base_digest),
+        )
+        query_result = cursor.fetchall()
+        final_row_digests: list[str] = json.loads(query_result[0][0])
+        new_rows_needed_to_insert = []
+        known_digests = set(final_row_digests)
+
+        def add_new_row_needed_to_insert(row_data: Any) -> str:
+            if not isinstance(row_data, dict):
+                raise ValueError("All rows must be dictionaries")
+            row_json = json.dumps(row_data)
+            row_digest = str_digest(row_json)
+            if row_digest not in known_digests:
+                new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
+                known_digests.add(row_digest)
+            return row_digest
+
+        for update in req.updates:
+            if isinstance(update, tsi.TableAppendSpec):
+                new_digest = add_new_row_needed_to_insert(update.append.row)
+                final_row_digests.append(new_digest)
+            elif isinstance(update, tsi.TablePopSpec):
+                if update.pop.index >= len(final_row_digests) or update.pop.index < 0:
+                    raise ValueError("Index out of range")
+                final_row_digests.pop(update.pop.index)
+            elif isinstance(update, tsi.TableInsertSpec):
+                if (
+                    update.insert.index > len(final_row_digests)
+                    or update.insert.index < 0
+                ):
+                    raise ValueError("Index out of range")
+                new_digest = add_new_row_needed_to_insert(update.insert.row)
+                final_row_digests.insert(update.insert.index, new_digest)
+            else:
+                raise ValueError("Unrecognized update", update)
+
+        # Perform the actual DB inserts
+        with self.lock:
+            cursor.executemany(
+                "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
+                new_rows_needed_to_insert,
+            )
+
+            table_hasher = hashlib.sha256()
+            for row_digest in final_row_digests:
+                table_hasher.update(row_digest.encode())
+            digest = table_hasher.hexdigest()
+
+            cursor.execute(
+                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
+                (req.project_id, digest, json.dumps(final_row_digests)),
+            )
+            conn.commit()
+
+        return tsi.TableUpdateRes(digest=digest)
+
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
         if req.filter:
