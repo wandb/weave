@@ -14,7 +14,11 @@ from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from weave.legacy import artifact_fs, context_state
-from weave.trace.ipython import get_class_source, is_running_interactively
+from weave.trace.ipython import (
+    ClassNotFoundError,
+    get_class_source,
+    is_running_interactively,
+)
 from weave.trace.refs import ObjectRef
 
 from .. import environment, errors, storage
@@ -194,7 +198,12 @@ class GetCodeDepsResult(typing.TypedDict):
 def get_source_notebook_safe(fn: typing.Callable) -> str:
     # In ipython, we can't use inspect.getsource on classes defined in the notebook
     if is_running_interactively() and inspect.isclass(fn):
-        src = get_class_source(fn)
+        try:
+            src = get_class_source(fn)
+        except ClassNotFoundError:
+            # Not all times are we using notebook code - for example if a class
+            # is defined int he Weave package itself.
+            src = inspect.getsource(fn)
     else:
         src = inspect.getsource(fn)
     return textwrap.dedent(src)

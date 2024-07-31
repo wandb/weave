@@ -268,8 +268,8 @@ class Evaluation(Object):
 
     @weave.op()
     async def summarize(self, eval_table: EvaluationResults) -> dict:
-        eval_table = list(eval_table.rows)
-        cols = transpose(eval_table)
+        eval_table_rows = list(eval_table.rows)
+        cols = transpose(eval_table_rows)
         summary = {}
 
         for name, vals in cols.items():
