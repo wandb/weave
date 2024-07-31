@@ -34,7 +34,7 @@ def make_derived_summary_map(
     )
     display_name = display_name or _op_name_simple_from_ref_str(op_name)
     weave_derived_fields = tsi.WeaveSummarySchema(
-        display_name=display_name,
+        nice_trace_name=display_name,
         status=status,
         latency=latency,
     )

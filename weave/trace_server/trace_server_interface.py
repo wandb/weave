@@ -17,12 +17,12 @@ class ExtraKeysTypedDict(TypedDict):
 
 
 # https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
-ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")
+ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
 
 class WeaveSummarySchema(ExtraKeysTypedDict):
     status: typing.Optional[typing.Literal["success", "error", "running"]]
-    display_name: typing.Optional[str]
+    nice_trace_name: typing.Optional[str]
     latency: typing.Optional[int]
 
 
@@ -98,7 +98,9 @@ class CallSchema(BaseModel):
     latency: typing.Optional[int] = None
 
     @field_serializer("attributes", "summary", when_used="unless-none")
-    def serialize_typed_dicts(self, v):
+    def serialize_typed_dicts(
+        self, v: typing.Dict[str, typing.Any]
+    ) -> typing.Dict[str, typing.Any]:
         return dict(v)
 
 
@@ -132,7 +134,9 @@ class StartedCallSchemaForInsert(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     @field_serializer("attributes")
-    def serialize_typed_dicts(self, v):
+    def serialize_typed_dicts(
+        self, v: typing.Dict[str, typing.Any]
+    ) -> typing.Dict[str, typing.Any]:
         return dict(v)
 
 
@@ -153,7 +157,9 @@ class EndedCallSchemaForInsert(BaseModel):
     summary: SummaryInsertMap
 
     @field_serializer("summary")
-    def serialize_typed_dicts(self, v):
+    def serialize_typed_dicts(
+        self, v: typing.Dict[str, typing.Any]
+    ) -> typing.Dict[str, typing.Any]:
         return dict(v)
 
 
