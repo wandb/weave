@@ -33,7 +33,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         self.trace_server_url = "http://example.com"
         self.server = RemoteHTTPTraceServer(self.trace_server_url)
 
-    @patch("requests.post")
+    @patch("weave.trace_server.requests.post")
     def test_ok(self, mock_post):
         call_id = generate_id()
         mock_post.return_value = requests.Response()
@@ -45,7 +45,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         self.server.call_start(tsi.CallStartReq(start=start))
         mock_post.assert_called_once()
 
-    @patch("requests.post")
+    @patch("weave.trace_server.requests.post")
     def test_400_500_no_retry(self, mock_post):
         call_id = generate_id()
         resp1 = requests.Response()
@@ -73,7 +73,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
 
-    @patch("requests.post")
+    @patch("weave.trace_server.requests.post")
     def test_502_503_504_429_retry(self, mock_post):
         call_id = generate_id()
 
@@ -99,7 +99,7 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
         start = generate_start(call_id)
         self.server.call_start(tsi.CallStartReq(start=start))
 
-    @patch("requests.post")
+    @patch("weave.trace_server.requests.post")
     def test_other_error_retry(self, mock_post):
         call_id = generate_id()
 

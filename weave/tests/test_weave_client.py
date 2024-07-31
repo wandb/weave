@@ -1,13 +1,13 @@
 import asyncio
 import dataclasses
 import json
+import platform
 import re
-import signal
+import sys
 
 import pydantic
 import pytest
 import requests
-from pydantic import BaseModel
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
@@ -65,6 +65,65 @@ def test_table_create(client):
     assert result.rows[0].val["val"] == 1
     assert result.rows[1].val["val"] == 2
     assert result.rows[2].val["val"] == 3
+
+
+def test_table_update(client):
+    data = [
+        {"val": 1},
+        {"val": 2},
+        {"val": 3},
+    ]
+    table_create_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=data,
+            )
+        )
+    )
+    table_query_res = client.server.table_query(
+        TableQueryReq(project_id=client._project_id(), digest=table_create_res.digest)
+    )
+    assert len(table_query_res.rows) == len(data)
+    for i, row in enumerate(table_query_res.rows):
+        assert row.val["val"] == data[i]["val"]
+
+    table_create_res = client.server.table_update(
+        tsi.TableUpdateReq.model_validate(
+            dict(
+                project_id=client._project_id(),
+                base_digest=table_create_res.digest,
+                updates=[
+                    {"insert": {"index": 1, "row": {"val": 4}}},
+                    {"pop": {"index": 0}},
+                    {"append": {"row": {"val": 5}}},
+                ],
+            )
+        )
+    )
+    final_data = [*data]
+    final_data.insert(1, {"val": 4})
+    final_data.pop(0)
+    final_data.append({"val": 5})
+
+    table_query_2_res = client.server.table_query(
+        TableQueryReq(project_id=client._project_id(), digest=table_create_res.digest)
+    )
+
+    assert len(table_query_2_res.rows) == len(final_data)
+    for i, row in enumerate(table_query_2_res.rows):
+        assert row.val["val"] == final_data[i]["val"]
+
+    # Verify digests are equal to if we added directly
+    check_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=final_data,
+            )
+        )
+    )
+    assert check_res.digest == table_create_res.digest
 
 
 @pytest.mark.skip()
@@ -211,7 +270,16 @@ def test_call_create(client):
         exception=None,
         summary={},
         _children=[],
-        attributes={},
+        attributes={
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+                "sys_version": sys.version,
+            },
+        },
     )
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
@@ -229,7 +297,16 @@ def test_calls_query(client):
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call0.id,
-        attributes={},
+        attributes={
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+                "sys_version": sys.version,
+            },
+        },
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -238,7 +315,16 @@ def test_calls_query(client):
         parent_id=call0.id,
         inputs={"a": 6, "b": 11},
         id=call1.id,
-        attributes={},
+        attributes={
+            "weave": {
+                "client_version": weave.version.VERSION,
+                "source": "python-sdk",
+                "os_name": platform.system(),
+                "os_version": platform.version(),
+                "os_release": platform.release(),
+                "sys_version": sys.version,
+            },
+        },
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
@@ -478,6 +564,68 @@ def test_saveload_op(client):
     assert obj2["a"].name == "op-add2"
     assert isinstance(obj2["b"], op_def.OpDef)
     assert obj2["b"].name == "op-add3"
+
+
+def test_object_mismatch_project_ref(client):
+    client.project = "test-project"
+
+    class MyModel(weave.Model):
+        prompt: str
+
+        @weave.op()
+        def predict(self, input):
+            return self.prompt.format(input=input)
+
+    obj = MyModel(prompt="input is: {input}")
+
+    client.project = "test-project2"
+    obj.predict("x")
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+    assert calls[0].project_id == "shawn/test-project2"
+    assert "weave:///shawn/test-project2/op" in str(calls[0].op_name)
+
+
+def test_object_mismatch_project_ref_nested(client):
+    client.project = "test-project"
+
+    @weave.op()
+    def hello_world():
+        return "Hello world"
+
+    hello_world()
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+    assert calls[0].project_id == "shawn/test-project"
+    assert "weave:///shawn/test-project/op" in str(calls[0].op_name)
+
+    ### Now change project in client, simulating new init
+    client.project = "test-project2"
+    nested = {"a": hello_world}
+
+    client.save(nested, "my-object")
+
+    nested["a"]()
+
+    calls = list(client.calls())
+    assert len(calls) == 1
+    assert calls[0].project_id == "shawn/test-project2"
+    assert "weave:///shawn/test-project2/op" in str(calls[0].op_name)
+
+    # also assert the op and objects are correct in db
+    res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
+    assert len(res.objs) == 2
+
+    op = [x for x in res.objs if x.kind == "op"][0]
+    assert op.object_id == "hello_world"
+    assert op.project_id == "shawn/test-project2"
+    assert op.kind == "op"
+
+    obj = [x for x in res.objs if x.kind == "object"][0]
+    assert obj.object_id == "my-object"
+    assert obj.project_id == "shawn/test-project2"
 
 
 def test_saveload_customtype(client, strict_op_saving):
@@ -768,6 +916,24 @@ def test_refs_read_batch_dataset_rows(client):
     assert res.vals[1] == 6
 
 
+def test_refs_read_batch_multi_project(client):
+    client.project = "test111"
+    ref = client._save_object([1, 2, 3], "my-list")
+
+    client.project = "test222"
+    ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
+
+    client.project = "test333"
+    ref3 = client._save_object({"ab": [3, 4, 5]}, "my-obj-2")
+
+    refs = [ref.uri(), ref2.uri(), ref3.uri()]
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=refs))
+    assert len(res.vals) == 3
+    assert res.vals[0] == [1, 2, 3]
+    assert res.vals[1] == {"a": [3, 4, 5]}
+    assert res.vals[2] == {"ab": [3, 4, 5]}
+
+
 def test_large_files(client):
     class CoolCustomThing:
         a: str
@@ -949,3 +1115,53 @@ def test_weave_server(client):
     url = weave.serve(ref, thread=True)
     response = requests.post(url + "/predict", json={"input": "x"})
     assert response.json() == {"result": "input is: x"}
+
+
+def row_gen(num_rows: int, approx_row_bytes: int = 1024):
+    for i in range(num_rows):
+        yield {"a": i, "b": "x" * approx_row_bytes}
+
+
+def test_table_partitioning(network_proxy_client):
+    """
+    This test is specifically testing the correctness
+    of the table partitioning logic in the remote client.
+    In particular, the ability to partition large dataset
+    creation into multiple updates
+    """
+    client, remote_client, records = network_proxy_client
+    NUM_ROWS = 16
+    rows = list(row_gen(NUM_ROWS, 1024))
+    exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
+
+    remote_client.remote_request_bytes_limit = (
+        100 * 1024
+    )  # very large buffer to ensure a single request
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+    assert res.digest == exp_digest
+    assert len(records) == 1
+
+    remote_client.remote_request_bytes_limit = (
+        4 * 1024
+    )  # Small enough to get multiple updates
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+    assert res.digest == exp_digest
+    assert len(records) == (
+        1  # The first create call,
+        + 1  # the second  create
+        + NUM_ROWS / 2  # updates - 2 per batch
+    )

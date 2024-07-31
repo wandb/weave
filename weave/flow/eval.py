@@ -23,8 +23,16 @@ from weave.flow.scorer import (
 from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.op import Op
+from weave.trace.vals import WeaveObject
+from weave.weave_client import get_ref
 
 console = Console()
+
+
+INVALID_MODEL_ERROR = (
+    "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
+    + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
+)
 
 
 def async_call(
@@ -263,6 +271,8 @@ class Evaluation(Object):
 
     @weave.op()
     async def evaluate(self, model: Union[Callable, Model]) -> dict:
+        if not is_valid_model(model):
+            raise ValueError(INVALID_MODEL_ERROR)
         eval_rows = []
 
         start_time = time.time()
@@ -319,3 +329,19 @@ def evaluate(
         dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
     )
     return asyncio.run(eval.evaluate(model))
+
+
+def is_valid_model(model: Any) -> bool:
+    return (
+        # Model instances are supported
+        isinstance(model, Model)
+        # Ops are supported
+        or isinstance(model, Op)
+        # Saved Models (Objects with predict) are supported
+        or (
+            get_ref(model) is not None
+            and isinstance(model, WeaveObject)
+            and hasattr(model, "predict")
+            and isinstance(model.predict, Op)
+        )
+    )

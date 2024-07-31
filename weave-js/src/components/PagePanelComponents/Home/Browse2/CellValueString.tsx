@@ -39,8 +39,6 @@ type CellValueStringProps = {
 };
 
 const Collapsed = styled.div`
-  min-height: 38px;
-  line-height: 38px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

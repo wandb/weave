@@ -32,7 +32,8 @@ const overlayClassName = classNames(
   'night-aware',
   'bg-oblivion/[0.24] dark:bg-oblivion/[0.48]',
   'fixed bottom-0 left-0 right-0 top-0',
-  'grid place-items-center overflow-y-auto'
+  'grid place-items-center overflow-y-auto',
+  'z-[1001]'
 );
 export const Overlay = React.forwardRef(
   ({className, children, ...props}: RadixDialog.DialogOverlayProps, ref) => (
@@ -51,11 +52,12 @@ export const Overlay = React.forwardRef(
  */
 const contentClassName = classNames(
   'night-aware',
-  'absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]', // centers modal on screen
+  'fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]', // centers modal on screen
   'rounded border py-24 px-32',
   'shadow-lg shadow-oblivion/[0.16] dark:shadow-oblivion/[0.48]',
   'border-moon-250 bg-white text-moon-850',
-  'dark:border-moon-750 dark:bg-moon-900 dark:text-moon-150'
+  'dark:border-moon-750 dark:bg-moon-900 dark:text-moon-150',
+  'z-[1001]'
 );
 export const Content = React.forwardRef<
   HTMLDivElement,

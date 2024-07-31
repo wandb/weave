@@ -32,7 +32,7 @@ import {
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {isRef} from '../common/util';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
   traceCallLatencyS,
@@ -54,6 +54,8 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {allOperators} from './callsTableQuery';
+
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -181,7 +183,7 @@ function buildCallsTableColumns(
 } {
   // Filters summary.usage. because we add a derived column for tokens and cost
   const filteredDynamicColumnNames = allDynamicColumnNames.filter(
-    c => !c.startsWith('summary.usage.')
+    c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
   );
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
@@ -444,7 +446,7 @@ function buildCallsTableColumns(
       if (userId == null) {
         return null;
       }
-      return <UserLink username={userId} />;
+      return <UserLink userId={userId} />;
     },
   });
 
