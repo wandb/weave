@@ -1,4 +1,5 @@
 import typing
+from urllib.parse import quote, unquote
 
 from pydantic import BaseModel
 
@@ -35,14 +36,17 @@ def universal_ext_to_int_ref_converter(
         parts = rest.split("/", 2)
         if len(parts) != 3:
             raise ValueError(f"Invalid URI: {ref_str}")
-        entity, project, tail = parts
+        entity_quoted, project_quoted, tail = parts
+        entity = unquote(entity_quoted)
+        project = unquote(project_quoted)
+
         project_key = f"{entity}/{project}"
         if project_key not in ext_to_int_project_cache:
             ext_to_int_project_cache[project_key] = convert_ext_to_int_project_id(
                 project_key
             )
         internal_project_id = ext_to_int_project_cache[project_key]
-        return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
+        return f"{ri.WEAVE_INTERNAL_SCHEME}:///{quote(internal_project_id)}/{tail}"
 
     def mapper(obj: B) -> B:
         if isinstance(obj, str) and obj.startswith(weave_prefix):
@@ -85,7 +89,8 @@ def universal_int_to_ext_ref_converter(
         parts = rest.split("/", 1)
         if len(parts) != 2:
             raise ValueError(f"Invalid URI: {ref_str}")
-        project_id, tail = parts
+        project_id_quoted, tail = parts
+        project_id = unquote(project_id_quoted)
         if project_id not in int_to_ext_project_cache:
             int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
                 project_id
@@ -93,7 +98,7 @@ def universal_int_to_ext_ref_converter(
         external_project_id = int_to_ext_project_cache[project_id]
         if not external_project_id:
             return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
-        return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
+        return f"{ri.WEAVE_SCHEME}:///{quote(external_project_id)}/{tail}"
 
     def mapper(obj: D) -> D:
         if isinstance(obj, str) and obj.startswith(weave_internal_prefix):

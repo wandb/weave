@@ -678,11 +678,17 @@ export const refUri = (ref: ObjectRef): string => {
     }
     return uri;
   } else if (isWeaveObjectRef(ref)) {
-    let name = `${ref.artifactName}:${ref.artifactVersion}`;
+    let name = `${encodeURIComponent(ref.artifactName)}:${encodeURIComponent(
+      ref.artifactVersion
+    )}`;
     if (ref.artifactName === '' && ref.weaveKind === 'table') {
       name = ref.artifactVersion;
     }
-    let uri = `weave:///${ref.entityName}/${ref.projectName}/${ref.weaveKind}/${name}`;
+    let uri = `weave:///${encodeURIComponent(
+      ref.entityName
+    )}/${encodeURIComponent(ref.projectName)}/${encodeURIComponent(
+      ref.weaveKind
+    )}/${name}`;
     if (ref.artifactRefExtra != null && ref.artifactRefExtra !== '') {
       if (ref.artifactRefExtra.startsWith('/')) {
         // UGG Why does this happen???

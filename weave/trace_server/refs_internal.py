@@ -7,6 +7,7 @@
 
 import dataclasses
 from typing import Union
+from urllib.parse import quote, unquote
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -24,7 +25,7 @@ class InternalTableRef:
     digest: str
 
     def uri(self) -> str:
-        return f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/table/{self.digest}"
+        return f"{WEAVE_INTERNAL_SCHEME}:///{quote(self.project_id)}/table/{quote(self.digest)}"
 
 
 @dataclasses.dataclass
@@ -35,18 +36,18 @@ class InternalObjectRef:
     extra: list[str] = dataclasses.field(default_factory=list)
 
     def uri(self) -> str:
-        u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/object/{self.name}:{self.version}"
+        u = f"{WEAVE_INTERNAL_SCHEME}:///{quote(self.project_id)}/object/{quote(self.name)}:{quote(self.version)}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join([quote(e) for e in self.extra])
         return u
 
 
 @dataclasses.dataclass
 class InternalOpRef(InternalObjectRef):
     def uri(self) -> str:
-        u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/op/{self.name}:{self.version}"
+        u = f"{WEAVE_INTERNAL_SCHEME}:///{quote(self.project_id)}/op/{quote(self.name)}:{quote(self.version)}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join([quote(e) for e in self.extra])
         return u
 
 
@@ -57,9 +58,9 @@ class InternalCallRef:
     extra: list[str] = dataclasses.field(default_factory=list)
 
     def uri(self) -> str:
-        u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/call/{self.id}"
+        u = f"{WEAVE_INTERNAL_SCHEME}:///{quote(self.project_id)}/call/{quote(self.id)}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join([quote(e) for e in self.extra])
         return u
 
 
@@ -69,22 +70,35 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
         parts = path.split("/")
         if len(parts) < 2:
             raise ValueError(f"Invalid URI: {uri}")
-        project_id, kind = parts[:2]
+        project_id_quoted, kind_quoted = parts[:2]
+
+        project_id = unquote(project_id_quoted)
+        kind = unquote(kind_quoted)
+
         remaining = parts[2:]
     elif uri.startswith(f"{WEAVE_SCHEME}:///"):
         path = uri[len(f"{WEAVE_SCHEME}:///") :]
         parts = path.split("/")
         if len(parts) < 3:
             raise ValueError(f"Invalid URI: {uri}")
-        entity, project, kind = parts[:3]
+        entity_quoted, project_quoted, kind_quoted = parts[:3]
+
+        entity = unquote(entity_quoted)
+        project = unquote(project_quoted)
+        kind = unquote(kind_quoted)
+
         project_id = f"{entity}/{project}"
         remaining = parts[3:]
     else:
         raise ValueError(f"Invalid URI: {uri}")
     if kind == "table":
-        return InternalTableRef(project_id=project_id, digest=remaining[0])
+        return InternalTableRef(project_id=project_id, digest=unquote(remaining[0]))
     elif kind == "object":
-        name, version = remaining[0].split(":")
+        name_quoted, version_quoted = remaining[0].split(":")
+
+        name = unquote(name_quoted)
+        version = unquote(version_quoted)
+
         return InternalObjectRef(
             project_id=project_id,
             name=name,
@@ -92,7 +106,11 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
             extra=remaining[1:],
         )
     elif kind == "op":
-        name, version = remaining[0].split(":")
+        name_quoted, version_quoted = remaining[0].split(":")
+
+        name = unquote(name_quoted)
+        version = unquote(version_quoted)
+
         return InternalOpRef(
             project_id=project_id,
             name=name,

@@ -1,5 +1,6 @@
 import dataclasses
 from typing import Any, Union
+from urllib.parse import quote, unquote
 
 from ..trace_server import refs_internal
 
@@ -22,7 +23,7 @@ class TableRef(Ref):
     digest: str
 
     def uri(self) -> str:
-        return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
+        return f"weave:///{quote(self.entity)}/{quote(self.project)}/table/{quote(self.digest)}"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,9 +55,9 @@ class ObjectRef(RefWithExtra):
     extra: tuple[str, ...] = ()
 
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
+        u = f"weave:///{quote(self.entity)}/{quote(self.project)}/object/{quote(self.name)}:{quote(self.digest)}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join([quote(e) for e in self.extra])
         return u
 
     def get(self) -> Any:
@@ -104,9 +105,9 @@ class ObjectRef(RefWithExtra):
 @dataclasses.dataclass(frozen=True)
 class OpRef(ObjectRef):
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
+        u = f"weave:///{quote(self.entity)}/{quote(self.project)}/op/{quote(self.name)}:{quote(self.digest)}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join([quote(e) for e in self.extra])
         return u
 
 
@@ -118,9 +119,9 @@ class CallRef(RefWithExtra):
     extra: tuple[str, ...] = ()
 
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
+        u = f"weave:///{quote(self.entity)}/{quote(self.project)}/call/{quote(self.id)}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join([quote(e) for e in self.extra])
         return u
 
 
@@ -134,16 +135,27 @@ def parse_uri(uri: str) -> AnyRef:
     parts = path.split("/")
     if len(parts) < 3:
         raise ValueError(f"Invalid URI: {uri}")
-    entity, project, kind = parts[:3]
+    entity_quoted, project_quoted, kind_quoted = parts[:3]
+
+    entity = unquote(entity_quoted)
+    project = unquote(project_quoted)
+    kind = unquote(kind_quoted)
+
     remaining = tuple(parts[3:])
     if kind == "table":
-        return TableRef(entity=entity, project=project, digest=remaining[0])
+        return TableRef(entity=entity, project=project, digest=unquote(remaining[0]))
     elif kind == "call":
         return CallRef(
-            entity=entity, project=project, id=remaining[0], extra=remaining[1:]
+            entity=entity,
+            project=project,
+            id=unquote(remaining[0]),
+            extra=[unquote(r) for r in remaining[1:]],
         )
     elif kind == "object":
-        name, version = remaining[0].split(":")
+        name_quoted, version_quoted = remaining[0].split(":")
+        name = unquote(name_quoted)
+        version = unquote(version_quoted)
+
         return ObjectRef(
             entity=entity,
             project=project,
@@ -152,7 +164,10 @@ def parse_uri(uri: str) -> AnyRef:
             extra=remaining[1:],
         )
     elif kind == "op":
-        name, version = remaining[0].split(":")
+        name_quoted, version_quoted = remaining[0].split(":")
+        name = unquote(name_quoted)
+        version = unquote(version_quoted)
+
         return OpRef(
             entity=entity,
             project=project,
