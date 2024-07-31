@@ -452,6 +452,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         row[6],
                         row[7],
                         row[17],
+                        row[4],
                     ),
                     wb_user_id=row[14],
                     wb_run_id=row[15],

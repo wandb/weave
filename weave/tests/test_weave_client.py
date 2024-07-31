@@ -312,7 +312,7 @@ def test_calls_query(client):
             "_weave": tsi.WeaveSummarySchema(
                 **{
                     "status": "running",
-                    "display_name": None,
+                    "display_name": "x",
                     "latency": None,
                 }
             ),
@@ -339,7 +339,7 @@ def test_calls_query(client):
             "_weave": tsi.WeaveSummarySchema(
                 **{
                     "status": "running",
-                    "display_name": None,
+                    "display_name": "x",
                     "latency": None,
                 }
             ),
