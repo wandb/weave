@@ -1123,7 +1123,8 @@ export const toGqlField = (
   } else if (forwardOp.op.name === 'artifactVersion-tags') {
     return [
       gqlObjectField(forwardGraph, forwardOp, 'tags', undefined, {
-        extraFields: gqlBasicField('name')
+        extraFields: gqlBasicField('id')
+          .concat(gqlBasicField('name'))
           .concat(gqlBasicField('tagCategoryName'))
           .concat(gqlBasicField('attributes')),
       }),

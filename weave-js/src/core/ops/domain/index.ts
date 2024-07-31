@@ -24,8 +24,8 @@ import './user';
 
 export * from './artifact';
 export * from './artifactAlias';
-export * from './artifactTag';
 export * from './artifactMembership';
+export * from './artifactTag';
 export * from './artifactType';
 export * from './artifactVersion';
 export * from './asset';

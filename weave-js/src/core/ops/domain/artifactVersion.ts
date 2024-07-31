@@ -549,15 +549,7 @@ export const opArtifactVersionTags = makeArtifactVersionOp({
     artifactVersion: artifactVersionArgDescription,
   },
   returnValueDescription: `The tags for a ${docType('artifactVersion')}`,
-  returnType: inputTypes =>
-    list(
-      typedDict({
-        id: 'string',
-        name: 'string',
-        tagCategoryName: 'string',
-        attributes: 'string',
-      })
-    ),
+  returnType: inputTypes => list('artifactTag'),
   resolver: ({artifactVersion}) => artifactVersion.tags ?? [],
 });
 

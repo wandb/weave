@@ -2,6 +2,8 @@ import typing
 
 from weave.api import op
 
+from weave.legacy.ops_domain import wb_domain_types as wdt
+
 
 # Section 1/6: Tag Getters
 # None
@@ -11,19 +13,11 @@ from weave.api import op
 
 # Section 3/6: Attribute Getters
 
-# TODO: Fix circular import
-class ArtifactTagTypeDict(typing.TypedDict):
-    id: str
-    name: str
-    tagCategoryName: str
-    attributes: str
-
-
 @op(
     name="artifactTag-name",
 )
-def op_artifact_tag_name(tag: ArtifactTagTypeDict) -> str:
-    return tag["name"]
+def op_artifact_tag_name(tag: wdt.ArtifactTag) -> str:
+    return tag.name
 
 # Section 4/6: Direct Relationship Ops
 # None

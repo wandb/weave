@@ -1,13 +1,7 @@
 import * as OpKinds from '../opKinds';
-import {typedDict} from "@wandb/weave/core";
 
 const artifactTagArgTypes = {
-  artifactTag: typedDict({
-    id: 'string',
-    name: 'string',
-    tagCategoryName: 'string',
-    attributes: 'string',
-  })
+  artifactTag: 'artifactTag' as const,
 };
 
 export const opArtifactTagName = OpKinds.makeStandardOp({
