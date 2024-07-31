@@ -53,16 +53,16 @@ class EvaluationResults(weave.Object):
 
 
 def make_evaluation_results(eval_rows: list[dict]) -> EvaluationResults:
-    # The need for this pattern is quite unfortunate and highlights
-    # a gap in our data model. As a user, i just want to pass a list
-    # of data `eval_rows` to summarize. Under the hood, Weave should
-    # choose the appropriate storage format (in this case `Table`) and
-    # serialize it that way. Right now, it is just a huge list of dicts.
-    # The fact that "as a user" I need to construct `weave.Table` at all
-    # is a leaky abstraction. Moreover, the need to construct `EvaluationResults`
-    # just so that tracing and the UI works is also bad. In the near-term,
-    # this will at least solve the problem of breaking summarization with
-    # big datasets, but this is not the correct long-term play.
+    # The need for this pattern is quite unfortunate and highlights a gap in our
+    # data model. As a user, i just want to pass a list of data `eval_rows` to
+    # summarize. Under the hood, Weave should choose the appropriate storage
+    # format (in this case `Table`) and serialize it that way. Right now, it is
+    # just a huge list of dicts. The fact that "as a user" I need to construct
+    # `weave.Table` at all is a leaky abstraction. Moreover, the need to
+    # construct `EvaluationResults` just so that tracing and the UI works is
+    # also bad. In the near-term, this will at least solve the problem of
+    # breaking summarization with big datasets, but this is not the correct
+    # long-term play.
     return EvaluationResults(rows=weave.Table(eval_rows))
 
 
@@ -279,7 +279,6 @@ class Evaluation(Object):
                     scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
                     scorer_stats = transpose(vals)
                     score_table = scorer_stats[scorer_name]
-
                     scored = summarize_fn(score_table)
                     summary[scorer_name] = scored
             else:
