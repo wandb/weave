@@ -40,17 +40,10 @@ from weave.trace_server.trace_server_interface import (
 
 
 @dataclasses.dataclass
-class MutationSetitemObject:
+class MutationSetitem:
     path: tuple[str, ...]
-    operation: Literal["setitem_dict"]
+    operation: Literal["setitem"]
     args: tuple[str, Any]
-
-
-@dataclasses.dataclass
-class MutationSetitemList:
-    path: tuple[int, ...]
-    operation: Literal["setitem_list"]
-    args: tuple[int, Any]
 
 
 @dataclasses.dataclass
@@ -67,25 +60,18 @@ class MutationAppend:
     args: tuple[Any]
 
 
-Mutation = Union[
-    MutationSetattr, MutationSetitemObject, MutationSetitemList, MutationAppend
-]
-MutationOperation = Literal["setitem_dict", "setitem_list", "setattr", "append"]
+Mutation = Union[MutationSetattr, MutationSetitem, MutationAppend]
+MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["append"]]
 
 
 def make_mutation(
-    path: tuple[Any, ...], operation: MutationOperation, args: tuple[Any, ...]
+    path: tuple[str, ...], operation: MutationOperation, args: tuple[Any, ...]
 ) -> Mutation:
-    if operation == "setitem_dict":
-        if len(args) != 2:
-            raise ValueError("setitem_dict mutation requires 2 args")
+    if operation == "setitem":
+        if len(args) != 2 or not isinstance(args[0], str):
+            raise ValueError("setitem mutation requires 2 args")
         args = typing.cast(tuple[str, Any], args)
-        return MutationSetitemObject(path, operation, args)
-    elif operation == "setitem_list":
-        if len(args) != 2 or not isinstance(args[0], int):
-            raise ValueError("setitem_list mutation requires 2 args")
-        args = typing.cast(tuple[int, Any], args)
-        return MutationSetitemList(path, operation, args)
+        return MutationSetitem(path, operation, args)
     elif operation == "setattr":
         if len(args) != 2 or not isinstance(args[0], str):
             raise ValueError("setattr mutation requires 2 args")
