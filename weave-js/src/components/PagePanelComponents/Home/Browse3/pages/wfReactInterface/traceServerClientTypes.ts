@@ -203,3 +203,16 @@ export type TraceFileContentReadReq = {
 export type TraceFileContentReadRes = {
   content: string;
 };
+
+export enum ContentTypeText {
+  csv = 'text/csv',
+  tsv = 'text/tab-separated-values',
+}
+
+export enum ContentTypeJson {
+  any = '*/*',
+  jsonl = 'application/jsonl',
+  json = 'application/json',
+}
+
+export type ContentType = ContentTypeText | ContentTypeJson;

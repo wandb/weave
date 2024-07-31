@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
-  GridApiPro,
   GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
@@ -24,7 +23,6 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import React, {
   FC,
@@ -78,6 +76,7 @@ import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import { ExportRunsTableButton, BulkDeleteButton, CompareEvaluationsTableButton } from './CallsTableButtons';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
@@ -152,18 +151,6 @@ export const CallsTable: FC<{
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
-
-  // Register Export Button
-  useEffect(() => {
-    addExtra('exportRunsTableButton', {
-      node: (
-        <ExportRunsTableButton tableRef={apiRef} rightmostButton={isReadonly} />
-      ),
-      order: 2,
-    });
-
-    return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, isReadonly, addExtra, removeExtra]);
 
   // Table State consists of:
   // 1. Filter (Structured Filter)
@@ -399,6 +386,7 @@ export const CallsTable: FC<{
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
+        disableExport: true,
         renderHeader: (params: any) => {
           return (
             <Checkbox
@@ -508,6 +496,42 @@ export const CallsTable: FC<{
     project,
     history,
   ]);
+
+  // Register Export Button
+  useEffect(() => {
+    addExtra('exportRunsTableButton', {
+      node: (
+        <ExportRunsTableButton
+          pageName={isEvaluateTable ? 'evaluations' : 'calls'}
+          tableRef={apiRef}
+          selectedCalls={selectedCalls}
+          callQueryParams={{
+            entity,
+            project,
+            filter: effectiveFilter,
+            gridFilter: filterModel,
+            gridSort: sortModel,
+          }}
+          rightmostButton={isReadonly}
+        />
+      ),
+      order: 2,
+    });
+
+    return () => removeExtra('exportRunsTableButton');
+  }, [
+    apiRef,
+    isReadonly,
+    isEvaluateTable,
+    addExtra,
+    removeExtra,
+    selectedCalls,
+    entity,
+    project,
+    effectiveFilter,
+    filterModel,
+    sortModel,
+  ])
 
   // Register Delete Button
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
@@ -890,78 +914,4 @@ const getPeekId = (peekPath: string | null): string | null => {
   const url = new URL(peekPath, baseUrl);
   const {pathname} = url;
   return pathname.split('/').pop() ?? null;
-};
-
-const ExportRunsTableButton = ({
-  tableRef,
-  rightmostButton = false,
-}: {
-  tableRef: React.MutableRefObject<GridApiPro>;
-  rightmostButton?: boolean;
-}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className={rightmostButton ? 'mr-16' : 'ml-4'}
-      size="medium"
-      variant="ghost"
-      icon="export-share-upload"
-      tooltip="Export to CSV"
-      onClick={() =>
-        tableRef.current?.exportDataAsCsv({includeColumnGroupsHeaders: false})
-      }
-    />
-  </Box>
-);
-
-const CompareEvaluationsTableButton: FC<{
-  onClick: () => void;
-  disabled?: boolean;
-  tooltipText?: string;
-}> = ({onClick, disabled, tooltipText}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className="mx-4"
-      size="medium"
-      variant="primary"
-      disabled={disabled}
-      onClick={onClick}
-      icon="chart-scatterplot"
-      tooltip={tooltipText}>
-      Compare
-    </Button>
-  </Box>
-);
-
-const BulkDeleteButton: FC<{
-  disabled?: boolean;
-  onClick: () => void;
-}> = ({disabled, onClick}) => {
-  return (
-    <Box
-      sx={{
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-      }}>
-      <Button
-        className="ml-4 mr-16"
-        variant="ghost"
-        size="medium"
-        disabled={disabled}
-        onClick={onClick}
-        tooltip="Select rows with the checkbox to delete"
-        icon="delete"
-      />
-    </Box>
-  );
 };

@@ -511,6 +511,99 @@ const useCallUpdateFunc = () => {
   return callUpdate;
 };
 
+
+const useCallsExport = (
+  entity: string,
+  project: string,
+  filter: CallFilter,
+  contentType: traceServerTypes.ContentType,
+  limit?: number,
+  offset?: number,
+  sortBy?: traceServerTypes.SortBy[],
+  query?: Query,
+  expandedRefColumns?: Set<string>,
+  opts?: {skip?: boolean}
+): Loadable<string | BinaryData | Map<string, any>> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const [callRes, setCallRes] =
+    useState<string | BinaryData | Map<string, any> | null>(null);
+  const deepFilter = useDeepMemo(filter);
+
+  const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      return;
+    }
+    setCallRes(null);
+    loadingRef.current = true;
+    const req: traceServerTypes.TraceCallsQueryReq = {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        op_names: deepFilter.opVersionRefs,
+        input_refs: deepFilter.inputObjectVersionRefs,
+        output_refs: deepFilter.outputObjectVersionRefs,
+        parent_ids: deepFilter.parentIds,
+        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter.callIds,
+        trace_roots_only: deepFilter.traceRootsOnly,
+        wb_run_ids: deepFilter.runIds,
+        wb_user_ids: deepFilter.userIds,
+      },
+      limit,
+      offset,
+      sort_by: sortBy,
+      query,
+    };
+    const onSuccess = (res: string | BinaryData | Map<string, any>) => {
+      loadingRef.current = false;
+      setCallRes(res);
+    };
+    const onError = (e: any) => {
+      loadingRef.current = false;
+      console.error(e);
+      setCallRes(null);
+    };
+    getTsClient().callsStreamQueryExport(req, contentType).then(onSuccess).catch(onError);
+  }, [
+    entity,
+    project,
+    deepFilter,
+    limit,
+    opts?.skip,
+    getTsClient,
+    offset,
+    sortBy,
+    query,
+  ]);
+
+  useEffect(() => {
+    if (opts?.skip) {
+      return;
+    }
+    doFetch();
+  }, [opts?.skip, doFetch]);
+
+  return useMemo(() => {
+    if (opts?.skip) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+    if (callRes == null || loadingRef.current) {
+      return {
+        loading: true,
+        result: null,
+      };
+    } else {
+      return {
+        loading: false,
+        result: callRes,
+      };
+    }
+  }, [callRes, entity, project, opts?.skip]);
+};
+
 const useFeedback = (
   key: FeedbackKey | null
 ): LoadableWithError<traceServerTypes.Feedback[]> => {
@@ -1389,6 +1482,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCallsStats,
   useCallsDeleteFunc,
   useCallUpdateFunc,
+  useCallsExport,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

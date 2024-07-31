@@ -16,6 +16,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
+import { ContentType } from '../wfReactInterface/traceServerClientTypes';
 
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
@@ -44,45 +45,12 @@ export const useCallsForQuery = (
   const offset = gridPage.page * gridPage.pageSize;
   const limit = gridPage.pageSize;
 
-  const sortBy = useDeepMemo(
-    useMemo(() => {
-      return gridSort.map(sort => {
-        return {
-          field: sort.field,
-          direction: sort.sort ?? 'asc',
-        };
-      });
-    }, [gridSort])
-  );
-
-  const filterByRaw = useMemo(() => {
-    const setItems = gridFilter.items.filter(item => item.value !== undefined);
-
-    const convertedItems = setItems
-      .map(operationConverter)
-      .filter(item => item !== null) as Array<Query['$expr']>;
-
-    if (convertedItems.length === 0) {
-      return undefined;
-    }
-
-    if (convertedItems.length === 1) {
-      return convertedItems[0];
-    }
-
-    const operation = gridFilter.logicOperator === 'or' ? '$or' : '$and'; // and is default
-
-    return {
-      [operation]: convertedItems,
-    };
-  }, [gridFilter]);
-
-  const filterBy: Query | undefined = useMemo(() => {
-    if (filterByRaw === undefined) {
-      return undefined;
-    }
-    return {$expr: filterByRaw} as Query;
-  }, [filterByRaw]);
+  const sortBy = useDeepMemo(useMemo(() => getSortBy(gridSort), [gridSort]));
+  const filterByRaw = useMemo(() => getFilterByRaw(gridFilter), [gridFilter]);
+  const filterBy: Query | undefined = useMemo(
+    () => getFilterBy(filterByRaw),
+    [filterByRaw]
+  )
 
   const calls = useCalls(
     entity,
@@ -121,6 +89,97 @@ export const useCallsForQuery = (
       total,
     };
   }, [callResults, calls.loading, total]);
+};
+
+export const useCallsExportStream = (
+  entity: string,
+  project: string,
+  contentType: ContentType,
+  filter: WFHighLevelCallFilter,
+  gridFilter: GridFilterModel,
+  gridSort: GridSortModel | null,
+  limit: number,
+  skip: boolean
+) => {
+  const {useCallsExport} = useWFHooks();
+
+  const sortBy = useDeepMemo(
+    useMemo(() => (gridSort ? getSortBy(gridSort) : []), [gridSort])
+  );
+  const lowLevelFilter: CallFilter = useMemo(() => {
+    return convertHighLevelFilterToLowLevelFilter(filter);
+  }, [filter]);
+  const filterByRaw = useMemo(() => getFilterByRaw(gridFilter), [gridFilter]);
+  const filterBy: Query | undefined = useMemo(
+    () => getFilterBy(filterByRaw),
+    [filterByRaw]
+  );
+
+  const {result, loading} = useCallsExport(
+    entity,
+    project,
+    lowLevelFilter,
+    contentType,
+    limit,
+    0,
+    sortBy,
+    filterBy,
+    undefined,
+    {skip}
+  );
+
+  const dataResult = useMemo(() => {
+    return result ?? null;
+  }, [result]);
+
+  return useMemo(() => {
+    return {
+      loading,
+      result: loading ? null : dataResult,
+    };
+  }, [dataResult, loading]);
+};
+
+const getFilterByRaw = (
+  gridFilter: GridFilterModel
+): Query['$expr'] | undefined => {
+  const setItems = gridFilter.items.filter(item => item.value !== undefined);
+
+  const convertedItems = setItems
+    .map(operationConverter)
+    .filter(item => item !== null) as Array<Query['$expr']>;
+
+  if (convertedItems.length === 0) {
+    return undefined;
+  }
+
+  if (convertedItems.length === 1) {
+    return convertedItems[0];
+  }
+
+  const operation = gridFilter.logicOperator === 'or' ? '$or' : '$and'; // and is default
+
+  return {
+    [operation]: convertedItems,
+  } as Query['$expr'];
+};
+
+const getSortBy = (gridSort: GridSortModel) => {
+  return gridSort.map(sort => {
+    return {
+      field: sort.field,
+      direction: sort.sort ?? 'asc',
+    };
+  });
+};
+
+const getFilterBy = (
+  filterByRaw: Query['$expr'] | undefined
+): Query | undefined => {
+  if (filterByRaw === undefined) {
+    return undefined;
+  }
+  return {$expr: filterByRaw} as Query;
 };
 
 const convertHighLevelFilterToLowLevelFilter = (
