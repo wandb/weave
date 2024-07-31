@@ -515,8 +515,8 @@ const useCallUpdateFunc = () => {
 const useCallsExport = (
   entity: string,
   project: string,
-  filter: CallFilter,
   contentType: traceServerTypes.ContentType,
+  filter: CallFilter,
   limit?: number,
   offset?: number,
   sortBy?: traceServerTypes.SortBy[],

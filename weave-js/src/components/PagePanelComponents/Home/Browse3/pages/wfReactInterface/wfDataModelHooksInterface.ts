@@ -191,8 +191,8 @@ export type WFDataModelHooksInterface = {
   useCallsExport: (
     entity: string,
     project: string,
-    filter: CallFilter,
     contentType: ContentType,
+    filter: CallFilter,
     limit?: number,
     offset?: number,
     sortBy?: traceServerClientTypes.SortBy[],

@@ -33,10 +33,11 @@ export const ExportRunsTableButton = ({
   }) => {
     const [clickedOption, setClickedOption] = useState<ContentType | null>(null);
     const fileName = `${pageName}-export`;
+
     const {loading, result} = useCallsExportStream(
       callQueryParams.entity,
       callQueryParams.project,
-      ContentTypeJson.jsonl,
+      clickedOption ?? ContentTypeJson.jsonl,
       callQueryParams.filter,
       callQueryParams.gridFilter,
       callQueryParams.gridSort ?? null,

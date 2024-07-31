@@ -276,6 +276,7 @@ export class DirectTraceServerClient {
       Authorization: 'Basic ' + btoa(':'),
     };
     if (contentType) {
+      console.log("CONTENT TYPE", contentType, contentType == ContentTypeText.csv)
       if (contentType == ContentTypeText.csv) {
         headers['Accept'] = 'text/csv';
       } else if (contentType == ContentTypeText.tsv) {
@@ -286,6 +287,7 @@ export class DirectTraceServerClient {
         headers['Accept'] = 'application/json';
       }
     }
+    console.log("HEADERS", headers)
     const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
     if (useAdminPrivileges) {
       headers['use-admin-privileges'] = 'true';

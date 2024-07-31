@@ -118,8 +118,8 @@ export const useCallsExportStream = (
   const {result, loading} = useCallsExport(
     entity,
     project,
-    lowLevelFilter,
     contentType,
+    lowLevelFilter,
     limit,
     0,
     sortBy,
