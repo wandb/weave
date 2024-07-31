@@ -95,7 +95,6 @@ class CallSchema(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
-    latency: typing.Optional[int] = None
 
     @field_serializer("attributes", "summary", when_used="unless-none")
     def serialize_typed_dicts(
