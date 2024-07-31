@@ -55,7 +55,7 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {allOperators} from './callsTableQuery';
 
-const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.costs'];
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary._weave'];
 
 export const useCallsTableColumns = (
   entity: string,

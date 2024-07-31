@@ -159,6 +159,11 @@ class SelectableCHCallSchema(BaseModel):
     ended_at: typing.Optional[datetime.datetime] = None
     exception: typing.Optional[str] = None
 
+    attributes_dump: str
+    inputs_dump: str
+    output_dump: typing.Optional[str] = None
+    summary_dump: typing.Optional[str] = None
+
     input_refs: typing.List[str]
     output_refs: typing.List[str]
 
@@ -166,11 +171,6 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
-
-    attributes_dump: str
-    inputs_dump: str
-    output_dump: typing.Optional[str] = None
-    summary_dump: typing.Optional[str] = None
 
 
 all_call_insert_columns = list(
@@ -348,13 +348,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(project_id=req.project_id)
+        cq.add_costs = False
 
         # TODO (Perf): By allowing a sub-selection of columns
         # we will gain increased performance by not having to
         # fetch all columns from the database. Currently all use
         # cases call for every column to be fetched, so we have not
         # implemented this yet.
-        columns = all_call_select_columns
+        # We put summary_dump last so that when we compute the costs and summary its in the right place
+        columns = [
+            *[col for col in all_call_select_columns if col != "summary_dump"],
+            "summary_dump",
+        ]
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -1343,7 +1348,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
 
 def _dict_value_to_dump(
-    value: dict,
+    value: typing.Mapping,
 ) -> str:
     if not isinstance(value, dict):
         raise ValueError(f"Value is not a dict: {value}")

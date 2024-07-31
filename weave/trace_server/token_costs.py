@@ -9,6 +9,8 @@ LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="effective_date", type="datetime"),
     Column(name="prompt_token_cost", type="float"),
     Column(name="completion_token_cost", type="float"),
+    Column(name="prompt_token_cost_unit", type="string"),
+    Column(name="completion_token_cost_unit", type="string"),
 ]
 LLM_TOKEN_PRICES_TABLE_NAME = "llm_token_prices"
 LLM_TOKEN_PRICES_TABLE = Table(
@@ -32,9 +34,8 @@ CALLS_MERGED_COLUMNS = [
     Column(name="wb_run_id", type="string"),
     Column(name="deleted_at", type="datetime"),
     Column(name="display_name", type="string"),
-    # These are Array(String) in the original table
-    Column(name="input_refs", type="json"),
-    Column(name="output_refs", type="json"),
+    Column(name="input_refs", type="string"),
+    Column(name="output_refs", type="string"),
 ]
 
 
@@ -81,7 +82,19 @@ LLM_USAGE_COLUMNS = [
 #     JSONLength(usage_raw) > 0
 # From a calls table alias, get the usage data for LLMs
 def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSelect:
-    all_calls_table = calls_merged_table(table_alias)
+    cols = [
+        *CALLS_MERGED_COLUMNS,
+        # Derived cols that we will select
+        Column(name="usage_raw", type="string"),
+        Column(name="kv", type="string"),
+        Column(name="llm_id", type="string"),
+        Column(name="requests", type="float"),
+        Column(name="prompt_tokens", type="float"),
+        Column(name="completion_tokens", type="float"),
+        Column(name="total_tokens", type="float"),
+    ]
+
+    all_calls_table = Table(table_alias, cols)
 
     # Select fields
     usage_raw = "ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw"
@@ -157,10 +170,16 @@ def get_ranked_prices(
         Column(name="started_at", type="datetime"),
     ]
 
-    llm_usage_table = Table(name=llm_usage_table_alias, cols=llm_usage_cols)
+    derived_llm_usage_cols = [
+        Column(name="rank", type="string"),
+    ]
+
+    llm_usage_table = Table(
+        name=llm_usage_table_alias, cols=[*llm_usage_cols, *derived_llm_usage_cols]
+    )
 
     # Select fields
-    lu_fields = [f"{llm_usage_table_alias}.{col.name}" for col in llm_usage_table.cols]
+    lu_fields = [f"{llm_usage_table_alias}.{col.name}" for col in llm_usage_cols]
     ltp_fields = [
         f"{LLM_TOKEN_PRICES_TABLE.name}.{col.name}" for col in LLM_TOKEN_PRICES_COLUMNS
     ]
@@ -231,13 +250,16 @@ def get_top_ranked_prices(
     columns = [
         Column(name="id", type="string"),
         *LLM_TOKEN_PRICES_COLUMNS,
+    ]
+
+    derived_columns = [
         Column(name="rank", type="string"),
     ]
 
-    table = Table(name=table_alias, cols=columns)
+    table = Table(name=table_alias, cols=[*columns, *derived_columns])
     select_query = (
         table.select()
-        .fields([col.name for col in table.cols])
+        .fields([col.name for col in columns])
         .where(
             tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
         )
@@ -268,8 +290,15 @@ def join_usage_with_costs(
         *LLM_TOKEN_PRICES_COLUMNS,
     ]
 
+    derived_price_columns = [
+        Column(name="prompt_tokens_cost", type="float"),
+        Column(name="completion_tokens_cost", type="float"),
+    ]
+
     usage_table = Table(name=usage_table_alias, cols=LLM_USAGE_COLUMNS)
-    price_table = Table(name=price_table_alias, cols=price_columns)
+    price_table = Table(
+        name=price_table_alias, cols=[*price_columns, *derived_price_columns]
+    )
 
     join_condition = tsi.Query(
         **{
@@ -296,9 +325,7 @@ def join_usage_with_costs(
         f"{usage_table_alias}.{col.name}" for col in usage_table.cols
     ]
     price_select_columns = [
-        f"{price_table_alias}.{col.name}"
-        for col in price_table.cols
-        if col.name != "id"
+        f"{price_table_alias}.{col.name}" for col in price_columns if col.name != "id"
     ]
 
     select_query = (
@@ -357,33 +384,41 @@ def final_call_select_with_cost(
     price_table_alias: str,
     select_fields: list[str],
 ) -> PreparedSelect:
-    cost_snippet = """concat(
-        '{',
-        arrayStringConcat(groupUniqArray(
-            concat(
-                '"', llm_id, '":{',
-                '"prompt_tokens":', toString(prompt_tokens), ',',
-                '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',',
-                '"completion_tokens_cost":', toString(completion_tokens_cost), ',',
-                '"completion_tokens":', toString(completion_tokens), ',',
-                '"prompt_token_cost":', toString(prompt_token_cost), ',',
-                '"completion_token_cost":', toString(completion_token_cost), ',',
-                '"total_tokens":', toString(total_tokens), ',',
-                '"requests":', toString(requests), ',',
-                '"effective_date":"', toString(effective_date), '",',
-                '"provider_id":"', toString(provider_id), '",',
-                '"pricing_level":"', toString(pricing_level), '",',
-                '"pricing_level_id":"', toString(pricing_level_id), '"}'
-            )
-        ), ','),
-        '}'
-    )"""
-    summary_dump_snippet = f"""concat(
+    cost_snippet = """
+    ',"_weave":{',
+        '"costs":',
+        concat(
+            '{',
+            arrayStringConcat(
+                groupUniqArray(
+                    concat(
+                        '"', toString(llm_id), '":{',
+                        '"prompt_tokens":', toString(prompt_tokens), ',',
+                        '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',',
+                        '"completion_tokens_cost":', toString(completion_tokens_cost), ',',
+                        '"completion_tokens":', toString(completion_tokens), ',',
+                        '"prompt_token_cost":', toString(prompt_token_cost), ',',
+                        '"completion_token_cost":', toString(completion_token_cost), ',',
+                        '"total_tokens":', toString(total_tokens), ',',
+                        '"requests":', toString(requests), ',',
+                        '"effective_date":"', toString(effective_date), '",',
+                        '"provider_id":"', toString(provider_id), '",',
+                        '"pricing_level":"', toString(pricing_level), '",',
+                        '"pricing_level_id":"', toString(pricing_level_id), '"}'
+                    )
+                ), ','
+            ),
+            '} }'
+        )
+    """
+
+    summary_dump_snippet = f"""
+    concat(
         left(any({call_table_alias}.summary_dump), length(any({call_table_alias}.summary_dump)) - 1),
-        ',"costs":',
         {cost_snippet},
         '}}'
-    ) AS summary_dump"""
+    ) AS summary_dump
+    """
 
     usage_with_costs_fields = [
         *[col for col in LLM_USAGE_COLUMNS if col.name != "llm_id"],
@@ -412,13 +447,7 @@ def final_call_select_with_cost(
                 }
             ),
         )
-        .group_by(
-            [
-                f"{call_table_alias}.id",
-                f"{call_table_alias}.project_id",
-                f"{call_table_alias}.display_name",
-            ]
-        )
+        .group_by(select_fields)
     )
 
     final_prepared_query = final_query.prepare(
@@ -433,6 +462,14 @@ def cost_query(
     project_id: str,
     select_fields: list[str],
 ) -> str:
+    # because we are selecting from a subquery, we need to prefix the fields
+    # We also filter out summary_dump, because we add costs to summary dump in the select statement
+    final_select_fields = [
+        call_table_alias + "." + field
+        for field in select_fields
+        if field != "summary_dump"
+    ]
+
     raw_sql = f"""
         -- From a calls query we get the llm ids in the usage data
         -- Then the prices and rank them
@@ -453,6 +490,6 @@ def cost_query(
         usage_with_costs AS ({join_usage_with_costs(pb, "llm_usage", "top_ranked_prices").sql})
 
         -- Final Select, which just pulls all the data from all_calls, and adds a costs object
-        {final_call_select_with_cost(pb, 'all_calls', 'usage_with_costs', select_fields).sql}
+        {final_call_select_with_cost(pb, 'all_calls', 'usage_with_costs', final_select_fields).sql}
     """
     return raw_sql

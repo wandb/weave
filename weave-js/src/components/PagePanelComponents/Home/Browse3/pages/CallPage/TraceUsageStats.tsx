@@ -7,6 +7,7 @@ import React, {ReactNode} from 'react';
 import {MOON_600} from '../../../../../../common/css/color.styles';
 import {IconName} from '../../../../../Icon';
 import {Tooltip} from '../../../../../Tooltip';
+import {LLMCostSchema} from '../wfReactInterface/traceServerClientTypes';
 
 export const FORMAT_NUMBER_NO_DECIMALS = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
@@ -37,29 +38,12 @@ export const formatTokenCost = (cost: number): string => {
   return `$${cost.toFixed(2)}`;
 };
 
-export type CostData = {
-  requests: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
+type CostDataKey = keyof LLMCostSchema;
+const isCostDataKey = (key: any): key is CostDataKey => {
+  if (typeof key !== 'string') {
+    return false;
+  }
 
-  prompt_tokens_cost?: number;
-  completion_tokens_cost?: number;
-  prompt_token_cost?: number;
-  completion_token_cost?: number;
-
-  effective_date?: string;
-
-  provider_id?: string;
-  pricing_level?: string;
-  pricing_level_id?: string;
-
-  input_tokens?: number;
-  output_tokens?: number;
-};
-
-type CostDataKey = keyof CostData;
-const isCostDataKey = (key: string): key is CostDataKey => {
   const costDataKeys: CostDataKey[] = [
     'requests',
     'prompt_tokens',
@@ -79,7 +63,7 @@ export const TraceUsageStats = ({
   costData,
   latency_s,
 }: {
-  costData: {[key: string]: CostData};
+  costData: {[key: string]: LLMCostSchema};
   latency_s: number;
 }) => {
   const {cost, tokens, costToolTip, tokenToolTip} =
@@ -112,10 +96,10 @@ export const TraceUsageStats = ({
 };
 
 export const getCostFromCellParams = (params: {[key: string]: any}) => {
-  const costData: {[key: string]: CostData} = {};
+  const costData: {[key: string]: LLMCostSchema} = {};
   for (const key in params) {
-    if (key.startsWith('summary.costs')) {
-      const costKeys = key.replace('summary.costs.', '').split('.');
+    if (key.startsWith('summary._weave.costs')) {
+      const costKeys = key.replace('summary._weave.costs.', '').split('.');
       const costKey = costKeys.pop() || '';
       if (isCostDataKey(costKey)) {
         const model = costKeys.join('.');
@@ -129,7 +113,7 @@ export const getCostFromCellParams = (params: {[key: string]: any}) => {
             completion_tokens_cost: 0,
             prompt_token_cost: 0,
             completion_token_cost: 0,
-          } as CostData;
+          } as LLMCostSchema;
         }
         // this is giving a type error: cant assign any to never
         (costData[model] as any)[costKey] = params[key];
@@ -141,16 +125,16 @@ export const getCostFromCellParams = (params: {[key: string]: any}) => {
 
 // This needs to updated eventually, to either include more possible keys or to be more dynamic
 // accounts for openai and anthropic usage objects (prompt_tokens, input_tokens)
-export const getInputTokens = (cost: CostData) => {
+export const getInputTokens = (cost: LLMCostSchema) => {
   return cost.input_tokens ?? cost.prompt_tokens ?? 0;
 };
 
-export const getOutputTokens = (cost: CostData) => {
+export const getOutputTokens = (cost: LLMCostSchema) => {
   return cost.output_tokens ?? cost.completion_tokens ?? 0;
 };
 
 export const getTokensAndCostFromCostData = (cost: {
-  [key: string]: CostData;
+  [key: string]: LLMCostSchema;
 }) => {
   const metrics: {
     inputs: {

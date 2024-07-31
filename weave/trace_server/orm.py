@@ -552,11 +552,10 @@ def _transform_external_field_to_internal_field(
     if (
         field not in all_columns
         and field.lower() != "count(*)"
-        and all(
-            substr not in unprefixed_field.lower()
-            # TODO Josiah: this is a hack to allow some select fields to pass through, but it's not a good solution
-            # Need to come up with a better way to handle this, eg selecting a field that is not in the table
-            for substr in ["as", "usage_raw"]
+        and not any(
+            # Checks that a column is in the field, allows derrived fields from the columns to be used
+            substr in unprefixed_field.lower()
+            for substr in all_columns
         )
     ):
         raise ValueError(f"Unknown field: {field}")

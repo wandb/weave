@@ -3,11 +3,8 @@ import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
 import React from 'react';
 
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {
-  CostData,
-  FORMAT_NUMBER_NO_DECIMALS,
-  formatTokenCost,
-} from './TraceUsageStats';
+import {LLMCostSchema} from '../wfReactInterface/traceServerClientTypes';
+import {FORMAT_NUMBER_NO_DECIMALS, formatTokenCost} from './TraceUsageStats';
 
 const renderNumberCell = (params: GridRenderCellParams) => (
   <Box sx={{textAlign: 'right', width: '100%'}}>
@@ -53,10 +50,10 @@ const columns: GridColDef[] = [
   },
 ];
 
-export const CostTable = ({costs}: {costs: {[key: string]: CostData}}) => {
+export const CostTable = ({costs}: {costs: {[key: string]: LLMCostSchema}}) => {
   const costData: any[] = Object.entries(costs ?? {}).map(([k, v]) => {
-    const promptTokens = v.input_tokens ?? v.prompt_tokens;
-    const completionTokens = v.output_tokens ?? v.completion_tokens;
+    const promptTokens = v.input_tokens ?? v.prompt_tokens ?? 0;
+    const completionTokens = v.output_tokens ?? v.completion_tokens ?? 0;
     return {
       id: k,
       ...v,
