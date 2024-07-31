@@ -48,6 +48,22 @@ def async_call(
     return asyncio.to_thread(func, *args, **kwargs)
 
 
+class TableObject(weave.Object):
+    rows: weave.Table
+
+
+def make_traceable_table(rows: list[dict]) -> TableObject:
+    # This illustrates a huge problem with our API right now. Namely:
+    # we don't have a way to use weave.Table in a way that does object
+    # tracing. Ideally, WeaveList would be able to be backed by a Table
+    # when it is large enough. Table is just an implementation detail.
+    raw_table = weave.Table(rows)
+    table_obj = TableObject(rows=raw_table)
+    weave.publish(table_obj)
+    traceable_table = table_obj.rows
+    return traceable_table
+
+
 class Evaluation(Object):
     """
     Sets up an evaluation which includes a set of scorers and a dataset.
@@ -249,8 +265,8 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: Dataset) -> dict:
-        eval_table = list(eval_table.rows)
+    async def summarize(self, eval_table: weave.Table) -> dict:
+        eval_table = list(eval_table)
         cols = transpose(eval_table)
         summary = {}
 
@@ -261,12 +277,6 @@ class Evaluation(Object):
                     scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
                     scorer_stats = transpose(vals)
                     score_table = scorer_stats[scorer_name]
-
-                    # DO NOT CHECK IN
-                    # This is a big problem with our API right now
-                    ds = Dataset(rows=score_table)
-                    weave.publish(ds)
-                    score_table = ds.rows
 
                     scored = summarize_fn(score_table)
                     summary[scorer_name] = scored
@@ -320,14 +330,8 @@ class Evaluation(Object):
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
 
-        name = "Evaluation-results"
-        if self.name is not None:
-            name = self.name + "-results"
-
-        # DO NOT CHECK IN
-        # This is a big problem with our API right now
-        output_ds = Dataset(name=name, rows=eval_rows)
-        summary = await self.summarize(output_ds)
+        eval_rows_table = make_traceable_table(eval_rows)
+        summary = await self.summarize(eval_rows_table)
 
         print("Evaluation summary", summary)
 
