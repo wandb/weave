@@ -31,13 +31,13 @@ This approach allows for more flexible runtime configuration while still respect
 
 import datetime
 import json
-import re
 from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
 from weave import call_context, client_context
 from weave.trace.patcher import Patcher
+from weave.trace.util import sanitize_call_name
 from weave.weave_client import Call
 
 import_failed = False
@@ -56,12 +56,6 @@ from typing import Any, Dict, Generator, List, Optional
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
 if not import_failed:
-
-    def make_valid_run_name(name: str) -> str:
-        name = name.replace("<", "_").replace(">", "")
-
-        valid_run_name = re.sub(r"[^a-zA-Z0-9 .-_]", "_", name)
-        return valid_run_name
 
     def _run_to_dict(run: Run, as_input: bool = False) -> dict:
         run_dict = run.json(
@@ -107,7 +101,7 @@ if not import_failed:
         def _persist_run_single(self, run: Run) -> None:
             """Persist a run."""
             run_dict = _run_to_dict(run, as_input=True)
-            run_name = make_valid_run_name(run.name)
+            run_name = sanitize_call_name(run.name)
 
             """Now we must determine the parent_run to associate this call with.
             In most cases, it is very straight forward - we just look up the

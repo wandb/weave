@@ -95,3 +95,32 @@ class ContextAwareThread(_Thread):
 # rename for cleaner export
 ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread
+
+
+def sanitize_call_name(call_name: str) -> str:
+    """Sanitizes calls following the standard set in our Langchain integration.
+
+    - Alphanumeric + period, underscore, hyphen, space, backslash.
+    - All other chars are converted to underscores."""
+    import re
+
+    return re.sub(r"[^a-zA-Z0-9 .\\-_]", "_", call_name)
+
+
+def sanitize_call_name1(call_name: str) -> str:
+    """Sanitizes calls by URL encoding the string.
+
+    This does not seem to work and will crash the UI."""
+    from urllib.parse import quote
+
+    return quote(call_name)
+
+
+def sanitize_call_name2(call_name: str) -> str:
+    """Sanitizes calls following the W&B Artifacts standard.
+
+    - Alphanumeric + period, underscore, and hyphen.
+    - All other chars are converted to underscores."""
+    import re
+
+    return re.sub(r"[a-zA-Z0-9._-]", "", call_name)
