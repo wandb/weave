@@ -159,7 +159,6 @@ class Call:
     parent_id: Optional[str]
     inputs: dict
     attributes: dict
-    started_at: datetime.datetime
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
@@ -306,7 +305,6 @@ def make_client_call(
         summary=dict(server_call.summary) if server_call.summary else None,
         display_name=server_call.display_name,
         attributes=dict(server_call.attributes),
-        started_at=server_call.started_at,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -506,7 +504,6 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
-        now = datetime.datetime.now(tz=datetime.timezone.utc)
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -554,7 +551,6 @@ class WeaveClient:
             inputs=inputs_with_refs,
             display_name=display_name,
             attributes=attributes,
-            started_at=now,
         )
         if parent is not None:
             parent._children.append(call)
@@ -567,7 +563,7 @@ class WeaveClient:
             op_name=op_str,
             display_name=display_name,
             trace_id=trace_id,
-            started_at=now,
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes=attributes,
@@ -584,7 +580,6 @@ class WeaveClient:
     def finish_call(
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
-        now = datetime.datetime.now(tz=datetime.timezone.utc)
         self._save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
@@ -628,19 +623,13 @@ class WeaveClient:
                 end=EndedCallSchemaForInsert(
                     project_id=self._project_id(),
                     id=call.id,  # type: ignore
-                    ended_at=now,
+                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
                     output=to_json(output, self._project_id(), self.server),
                     summary=summary,
                     exception=exception_str,
                 )
             )
         )
-
-        summary["_weave"] = {
-            "latency": (now - call.started_at).microseconds,
-            "status": "success" if exception is None else "error",
-            "display_name": call.display_name,
-        }
 
         # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only

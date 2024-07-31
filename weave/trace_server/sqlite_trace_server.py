@@ -29,6 +29,7 @@ from weave.trace_server.refs_internal import (
     InternalTableRef,
     parse_internal_uri,
 )
+from weave.trace_server.trace_server_common import make_derived_summary_map
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     generate_id,
@@ -429,32 +430,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         print("QUERY", query)
 
         cursor.execute(query)
-
-        def load_summary(
-            summary_dump: Optional[str],
-            started_at: str,
-            ended_at: Optional[str],
-            exception: Optional[str],
-            display_name: Optional[str],
-        ) -> Optional[tsi.SummaryMap]:
-            summary_json = json.loads(summary_dump) if summary_dump else {}
-            status, latency = None, None
-            if not ended_at:
-                status = "running"
-            else:  # call is finished, set latency and terminal status
-                started_at_dt = datetime.datetime.fromisoformat(started_at)
-                ended_at_dt = datetime.datetime.fromisoformat(ended_at)
-                latency = (ended_at_dt - started_at_dt).microseconds
-                status = "success" if exception is None else "error"
-
-            weave_derived_fields = tsi.WeaveSummarySchema(
-                display_name=display_name,
-                status=status,
-                latency=latency,
-            )
-            summary_json["_weave"] = weave_derived_fields
-            return tsi.SummaryMap(**summary_json)
-
         query_result = cursor.fetchall()
         return tsi.CallsQueryRes(
             calls=[
@@ -471,7 +446,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     inputs=json.loads(row[9]),
                     output=None if row[11] is None else json.loads(row[11]),
                     output_refs=None if row[12] is None else json.loads(row[12]),
-                    summary=load_summary(row[13], row[5], row[6], row[7], row[17]),
+                    summary=make_derived_summary_map(
+                        row[13],
+                        row[5],
+                        row[6],
+                        row[7],
+                        row[17],
+                    ),
                     wb_user_id=row[14],
                     wb_run_id=row[15],
                     display_name=row[17] if row[17] != "" else None,
