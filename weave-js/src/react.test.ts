@@ -10,7 +10,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact-name',
-        artifactRefExtra: '',
+        artifactRefExtra: [],
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project',
@@ -26,7 +26,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact-name',
-        artifactRefExtra: '',
+        artifactRefExtra: [],
         artifactVersion: 'artifactversion',
         entityName: 'Entity',
         projectName: 'project',
@@ -40,7 +40,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact-name',
-        artifactRefExtra: '',
+        artifactRefExtra: [],
         artifactVersion: 'artifactversion',
         entityName: 'Entity Name',
         projectName: 'project',
@@ -54,7 +54,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact-name',
-        artifactRefExtra: 'attr/rows/id/rowversion',
+        artifactRefExtra: 'attr/rows/id/rowversion'.split('/'),
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project',
@@ -71,7 +71,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: name,
-        artifactRefExtra: '',
+        artifactRefExtra: [],
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project',
@@ -89,7 +89,7 @@ describe('parseRef', () => {
       expect(parsed).toEqual({
         scheme: 'weave',
         artifactName: name,
-        artifactRefExtra: 'attr/rows/id/rowversion',
+        artifactRefExtra: 'attr/rows/id/rowversion'.split('/'),
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project',
@@ -102,7 +102,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact name with spaces',
-        artifactRefExtra: '',
+        artifactRefExtra: [],
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project with spaces',
@@ -116,7 +116,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact name with spaces',
-        artifactRefExtra: '',
+        artifactRefExtra: [],
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project with spaces',
@@ -132,7 +132,7 @@ describe('parseRef', () => {
     expect(parsed).toEqual({
       scheme: 'weave',
       artifactName: '',
-      artifactRefExtra: '',
+      artifactRefExtra: [],
       artifactVersion:
         'b8dfcb84974c481fd98fd9878e56be02ebef3e2da44becb59d1863cd643b83fe',
       entityName: 'entity',
@@ -147,7 +147,7 @@ describe('parseRef', () => {
     expect(parsed).toEqual({
       scheme: 'weave',
       artifactName: '178a32ca-1c00-486d-bd55-6207a7a25ff7',
-      artifactRefExtra: '',
+      artifactRefExtra: [],
       artifactVersion: '',
       entityName: 'entity',
       projectName: 'project',
@@ -158,7 +158,7 @@ describe('parseRef', () => {
     const parsed = parseRef('weave:///entity/project/op/op-name:*');
     expect(parsed).toEqual({
       artifactName: 'op-name',
-      artifactRefExtra: '',
+      artifactRefExtra: [],
       artifactVersion: '*',
       entityName: 'entity',
       projectName: 'project',
@@ -180,7 +180,7 @@ describe('parseRef', () => {
       weaveKind: 'object',
       artifactName: _.shuffle(chars).join(''),
       artifactVersion: _.shuffle(chars).join(''),
-      artifactRefExtra: 'string_with_every_character',
+      artifactRefExtra: [_.shuffle(chars).join(''), _.shuffle(chars).join('')],
     };
 
     const checkUrl = [
@@ -191,7 +191,7 @@ describe('parseRef', () => {
       encodeURIComponent(ref.artifactName) +
         ':' +
         encodeURIComponent(ref.artifactVersion),
-      ref.artifactRefExtra,
+      ref.artifactRefExtra?.map(encodeURIComponent).join('/'),
     ].join('/');
     const genUrl = refUri(ref);
     expect(genUrl).toEqual(checkUrl);

@@ -40,7 +40,7 @@ export const ObjectVersionPage: React.FC<{
   objectName: string;
   version: string;
   filePath: string;
-  refExtra?: string;
+  refExtra?: string[];
 }> = props => {
   const {useObjectVersion} = useWFHooks();
 

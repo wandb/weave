@@ -101,7 +101,7 @@ export const SmallRef: FC<{
       objectId: objRef.artifactName,
       versionHash: objRef.artifactVersion,
       path: objRef.artifactPath,
-      refExtra: objRef.artifactRefExtra,
+      refExtra: objRef.artifactRefExtra?.split('/'),
     };
   } else if (isWeaveObjRef) {
     if (objRef.weaveKind === 'op') {

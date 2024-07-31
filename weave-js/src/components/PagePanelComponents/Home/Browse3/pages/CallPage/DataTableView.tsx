@@ -74,11 +74,9 @@ export const WeaveCHTable: FC<{
     val => {
       const ref = parseRef(sourceRef!);
       if (isWeaveObjectRef(ref)) {
-        let extra = ref.artifactRefExtra ?? '';
-        if (extra !== '') {
-          extra += '/';
-        }
-        extra += TABLE_ID_EDGE_NAME + '/' + val.digest;
+        const extra = ref.artifactRefExtra ?? [];
+        extra.push(TABLE_ID_EDGE_NAME);
+        extra.push(val.digest);
 
         const target = router.objectVersionUIUrl(
           ref.entityName,

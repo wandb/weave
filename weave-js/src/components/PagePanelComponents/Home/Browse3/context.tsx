@@ -124,7 +124,7 @@ export const browse2Context = {
     objectName: string,
     objectVersionHash: string,
     filePath?: string,
-    refExtra?: string
+    refExtra?: string[]
   ) => {
     throw new Error('Not implemented');
   },
@@ -235,13 +235,14 @@ export const browse3ContextGen = (
       }
 
       if (isWandbArtifactRef(objRef)) {
+        // TODO: Remove all code paths with `isWandbArtifactRef`, this is old now.
         return browse3Context.objectVersionUIUrl(
           objRef.entityName,
           objRef.projectName,
           objRef.artifactName,
           objRef.artifactVersion,
-          objRef.artifactPath,
-          objRef.artifactRefExtra
+          objRef.artifactPath
+          // objRef.artifactRefExtra
         );
       } else if (isWeaveObjectRef(objRef)) {
         return browse3Context.objectVersionUIUrl(
@@ -280,10 +281,14 @@ export const browse3ContextGen = (
       objectName: string,
       objectVersionHash: string,
       filePath?: string,
-      refExtra?: string
+      refExtra?: string[]
     ) => {
       const path = filePath ? `path=${encodeURIComponent(filePath)}` : '';
-      const extra = refExtra ? `extra=${encodeURIComponent(refExtra)}` : '';
+      const extra = refExtra
+        ? `extra=${encodeURIComponent(
+            refExtra.map(encodeURIComponent).join('/')
+          )}`
+        : '';
 
       return `${projectRoot(
         entityName,
@@ -446,7 +451,7 @@ type RouteType = {
     objectName: string,
     objectVersionHash: string,
     filePath?: string,
-    refExtra?: string
+    refExtra?: string[]
   ) => string;
   opVersionsUIUrl: (
     entityName: string,

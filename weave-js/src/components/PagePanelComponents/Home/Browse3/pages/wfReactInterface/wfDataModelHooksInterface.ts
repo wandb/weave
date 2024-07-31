@@ -89,7 +89,7 @@ type CommonObjectVersionKey = {
   objectId: string;
   versionHash: string;
   path: string;
-  refExtra?: string;
+  refExtra?: string[];
 };
 
 type WandbArtifactObjectVersionKey = {

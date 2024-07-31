@@ -27,7 +27,7 @@ export const TabUseDataset = ({
 }: TabUseDatasetProps) => {
   const ref = parseRef(uri);
   const isParentObject = !ref.artifactRefExtra;
-  const isRow = ref.artifactRefExtra?.startsWith(ROW_PATH_PREFIX) ?? false;
+  const isRow = ref.artifactRefExtra?.[0] === ROW_PATH_PREFIX ?? false;
   const label = isParentObject ? 'dataset version' : isRow ? 'row' : 'object';
   let pythonName = isValidVarName(name) ? name : 'dataset';
   if (isRow) {

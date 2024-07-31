@@ -59,6 +59,7 @@ export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
 export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
   const refDict = refStringToRefDict(refUri);
   if (refDict.scheme === WANDB_ARTIFACT_REF_SCHEME) {
+    // Deprecated Path
     return {
       scheme: refDict.scheme,
       entity: refDict.entity,
@@ -66,9 +67,9 @@ export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
       objectId: refDict.artifactName,
       versionHash: refDict.versionCommitHash,
       path: refDict.filePathParts.join('/'),
-      refExtra: refDict.refExtraTuples
-        .map(t => `${t.edgeType}/${t.edgeName}`)
-        .join('/'),
+      // refExtra: refDict.refExtraTuples
+      //   .map(t => `${t.edgeType}/${t.edgeName}`)
+      //   .join('/'),
     };
   } else if (refDict.scheme === WEAVE_REF_SCHEME) {
     if (refDict.weaveKind == null) {
@@ -82,9 +83,9 @@ export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
       objectId: refDict.artifactName,
       versionHash: refDict.versionCommitHash,
       path: refDict.filePathParts.join('/'),
-      refExtra: refDict.refExtraTuples
-        .map(t => `${t.edgeType}/${t.edgeName}`)
-        .join('/'),
+      refExtra: refDict.refExtraTuples.reduce<string[]>((acc, t) => {
+        return acc.concat([t.edgeType, t.edgeName]);
+      }, []),
     };
   } else {
     throw new Error(
@@ -104,9 +105,9 @@ export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
     )}/${encodeURIComponent(key.project)}/object/${encodeURIComponent(
       key.objectId
     )}:${encodeURIComponent(key.versionHash)}`;
-    if (key.refExtra != null && key.refExtra !== '') {
+    if (key.refExtra != null && key.refExtra.length !== 0) {
       // already encoded
-      res += `/${key.refExtra}`;
+      res += `/${key.refExtra.map(encodeURIComponent).join('/')}`;
     }
     return res;
   }
@@ -195,7 +196,7 @@ const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
   }
   const refExtraTuples: WFNaiveRefDict['refExtraTuples'] = [];
   if (artifactRefExtra) {
-    const refExtraParts = artifactRefExtra.split('/');
+    const refExtraParts = artifactRefExtra;
     if (refExtraParts.length % 2 !== 0) {
       throw new Error('Invalid uri: ' + uri + '. got: ' + refExtraParts);
     }

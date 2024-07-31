@@ -481,7 +481,7 @@ export interface WeaveObjectRef {
   weaveKind: WeaveKind;
   artifactName: string;
   artifactVersion: string;
-  artifactRefExtra?: string;
+  artifactRefExtra?: string[];
 }
 
 export type ArtifactRef = LocalArtifactRef | WandbArtifactRef;
@@ -610,7 +610,7 @@ export const parseRef = (ref: string): ObjectRef => {
         weaveKind: 'table' as WeaveKind,
         artifactName: '',
         artifactVersion: decodeURIComponent(digest),
-        artifactRefExtra: '',
+        artifactRefExtra: [],
       };
     }
     const callMatch = trimmed.match(RE_WEAVE_CALL_REF_PATHNAME);
@@ -623,7 +623,7 @@ export const parseRef = (ref: string): ObjectRef => {
         weaveKind: 'call' as WeaveKind,
         artifactName: decodeURIComponent(callId),
         artifactVersion: '',
-        artifactRefExtra: '',
+        artifactRefExtra: [],
       };
     }
     const match = trimmed.match(RE_WEAVE_OBJECT_REF_PATHNAME);
@@ -638,6 +638,10 @@ export const parseRef = (ref: string): ObjectRef => {
       artifactVersion,
       artifactRefExtra,
     ] = match.slice(1);
+    const artifactRefExtraParts = (artifactRefExtra ?? '')
+      .split('/')
+      .filter(Boolean)
+      .map(decodeURIComponent);
     return {
       scheme: 'weave',
       entityName: decodeURIComponent(entityName),
@@ -645,7 +649,7 @@ export const parseRef = (ref: string): ObjectRef => {
       weaveKind: weaveKind as WeaveKind,
       artifactName: decodeURIComponent(artifactName),
       artifactVersion: decodeURIComponent(artifactVersion),
-      artifactRefExtra: artifactRefExtra ?? '',
+      artifactRefExtra: artifactRefExtraParts,
     };
   }
   throw new Error(`Unknown protocol: ${url.protocol}`);
@@ -655,15 +659,21 @@ export const objectRefWithExtra = (
   objRef: ObjectRef,
   extra: string
 ): ObjectRef => {
-  let newExtra = '';
-  if (objRef.artifactRefExtra != null && objRef.artifactRefExtra !== '') {
-    newExtra = objRef.artifactRefExtra + '/';
+  if (!isWeaveObjectRef(objRef)) {
+    // Not longer supported
+    return {
+      ...objRef,
+    };
   }
-  newExtra += extra;
+  let newExtra: string[] = [];
+  if (objRef.artifactRefExtra != null) {
+    newExtra = [...objRef.artifactRefExtra];
+  }
+  newExtra.push(extra);
   return {
     ...objRef,
     artifactRefExtra: newExtra,
-  };
+  } as WeaveObjectRef;
 };
 
 export const refUri = (ref: ObjectRef): string => {
@@ -688,13 +698,8 @@ export const refUri = (ref: ObjectRef): string => {
     )}/${encodeURIComponent(ref.projectName)}/${encodeURIComponent(
       ref.weaveKind
     )}/${name}`;
-    if (ref.artifactRefExtra != null && ref.artifactRefExtra !== '') {
-      if (ref.artifactRefExtra.startsWith('/')) {
-        // UGG Why does this happen???
-        uri = `${uri}${ref.artifactRefExtra}`;
-      } else {
-        uri = `${uri}/${ref.artifactRefExtra}`;
-      }
+    if (ref.artifactRefExtra != null && ref.artifactRefExtra.length > 0) {
+      uri = `${uri}/${ref.artifactRefExtra.map(encodeURIComponent).join('/')}`;
     }
     if (uri.endsWith('/')) {
       uri = uri.slice(0, -1);

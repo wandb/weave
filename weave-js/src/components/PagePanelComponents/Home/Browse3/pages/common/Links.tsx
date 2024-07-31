@@ -142,7 +142,7 @@ export const ObjectVersionLink: React.FC<{
   version: string;
   versionIndex: number;
   filePath?: string;
-  refExtra?: string;
+  refExtra?: string[];
   fullWidth?: boolean;
   icon?: React.ReactNode;
   color?: string;
