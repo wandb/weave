@@ -17,7 +17,7 @@ This LangChain integration patching differs from other integrations in how traci
 
 3. Respecting User Settings:
    The patcher respects any existing WEAVE_TRACE_LANGCHAIN environment variable set by the user:
-   - If not set, it's set to "true" and global patchin is enabled.
+   - If not set, it's set to "true" and global patching is enabled.
    - If already set, its value is preserved
 
 4. Context Manager:
@@ -60,7 +60,7 @@ if not import_failed:
     def make_valid_run_name(name: str) -> str:
         name = name.replace("<", "_").replace(">", "")
 
-        valid_run_name = re.sub(r"[^a-zA-Z0-9 .-_]", "_", name)
+        valid_run_name = re.sub(r"[^a-zA-Z0-9 .\\-_]", "_", name)
         return valid_run_name
 
     def _run_to_dict(run: Run, as_input: bool = False) -> dict:
