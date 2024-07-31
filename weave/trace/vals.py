@@ -104,6 +104,9 @@ class Traceable:
     def add_mutation(
         self, path: tuple[str, ...], operation: MutationOperation, *args: Any
     ) -> None:
+        """Adds a mutation to the object.
+
+        TODO: This function is currently unused"""
         if self.mutations is None:
             self.mutations = []
         self.mutations.append(make_mutation(path, operation, args))
@@ -224,7 +227,6 @@ class WeaveObject(Traceable):
             else:
                 full_path = self.ref.extra + (__name,)
             base_root = object.__getattribute__(self, "root")
-            base_root.add_mutation(full_path, "setattr", __name, __value)
 
             self._mark_dirty()
             if isinstance(__value, Traceable):
@@ -322,7 +324,6 @@ class WeaveTable(Traceable):
     def append(self, val: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
             raise ValueError("Can only append to object refs")
-        self.root.add_mutation(self.ref.extra, "append", val)
 
 
 class WeaveList(Traceable, list):
@@ -353,7 +354,6 @@ class WeaveList(Traceable, list):
         if (index := operator.index(i)) >= len(self):
             raise IndexError("list assignment index out of range")
         base_root = object.__getattribute__(self, "root")
-        base_root.add_mutation(self.ref, "setitem_list", index, value)
 
         # Though this ostensibly only marks the parent (list) as dirty, siblings
         # will also get new refs because their old refs are relative to the parent
@@ -366,7 +366,6 @@ class WeaveList(Traceable, list):
 
     def append(self, item: Any) -> None:
         base_root = object.__getattribute__(self, "root")
-        base_root.add_mutation(self.ref, "append", item)
 
         self._mark_dirty()
         if isinstance(item, Traceable):
@@ -425,7 +424,6 @@ class WeaveDict(Traceable, dict):
         else:
             full_path = self.ref.extra + (key,)
         base_root = object.__getattribute__(self, "root")
-        base_root.add_mutation(full_path, "setitem_dict", key, value)
 
         # Though this ostensibly only marks the parent (dict) as dirty, siblings
         # will also get new refs because their old refs are relative to the parent

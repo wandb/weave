@@ -21,8 +21,6 @@ def test_object_mutation_saving(client):
     thing2.a = "newer"
     thing2.b = 2
 
-    assert len(thing2.mutations) == 3
-
     ref2 = weave.publish(thing2)
     thing3 = ref2.get()
     assert thing3.a == "newer"
