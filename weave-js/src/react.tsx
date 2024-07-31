@@ -64,7 +64,6 @@ import {
   getChainRootVar,
   isConstructor,
 } from './core/mutate';
-import {trimStartChar} from './core/util/string';
 import {UseNodeValueServerExecutionError} from './errors';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
