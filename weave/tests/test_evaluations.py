@@ -4,6 +4,7 @@ import pytest
 
 import weave
 from weave import Evaluation, Model
+from weave.tests.test_client_trace import AnyIntMatcher
 
 from ..trace_server import trace_server_interface as tsi
 
@@ -266,11 +267,6 @@ class MyDictScorerWithCustomDictSummary(weave.Scorer):
             "nested": {"bool_avg": bool_avg},
             "reason": "This is a custom test reason",
         }
-
-
-class AnyIntMatcher(int):
-    def __eq__(self, other):
-        return isinstance(other, int)
 
 
 @pytest.mark.asynciotest_evaluation_data_topology

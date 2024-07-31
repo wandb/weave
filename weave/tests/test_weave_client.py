@@ -13,6 +13,7 @@ import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation, weave_client
 from weave.legacy import op_def
+from weave.tests.test_client_trace import AnyIntMatcher
 from weave.trace import refs
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
@@ -268,7 +269,15 @@ def test_call_create(client):
         id=call.id,
         output="hello",
         exception=None,
-        summary={},
+        summary={
+            "_weave": tsi.WeaveSummarySchema(
+                **{
+                    "status": "success",
+                    "nice_trace_name": "x",
+                    "latency": AnyIntMatcher(),
+                }
+            ),
+        },
         _children=[],
         attributes={
             "_weave": {

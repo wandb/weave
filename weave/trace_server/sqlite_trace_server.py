@@ -450,7 +450,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     output=None if row[11] is None else json.loads(row[11]),
                     output_refs=None if row[12] is None else json.loads(row[12]),
                     summary=_make_derived_summary_map(
-                        row[13],
+                        None if row[13] is None else json.loads(row[13]),
                         row[5],
                         row[6],
                         row[7],
@@ -1090,15 +1090,12 @@ def _make_derived_summary_map(
     display_name: Optional[str],
     op_name: Optional[str],
 ) -> tsi.SummaryMap:
-    status = make_call_status_from_exception_and_ended_at(exception, ended_at)
-    latency = (
-        None
-        if not ended_at
-        else (
-            datetime.datetime.fromisoformat(ended_at)
-            - datetime.datetime.fromisoformat(started_at)
-        ).microseconds
+    ended_at_dt = (
+        None if ended_at is None else datetime.datetime.fromisoformat(ended_at)
     )
+    started_at_dt = datetime.datetime.fromisoformat(started_at)
+    status = make_call_status_from_exception_and_ended_at(exception, ended_at_dt)
+    latency = None if not ended_at_dt else (ended_at_dt - started_at_dt).microseconds
     display_name = display_name or op_name_simple_from_ref_str(op_name)
     weave_derived_fields = tsi.WeaveSummarySchema(
         nice_trace_name=display_name,
