@@ -217,7 +217,16 @@ def link(
 
 @op(
     name="artifact-rawTags",
-    output_type=types.List(wdt.ArtifactTagType),
+    output_type=types.List(
+        types.TypedDict(
+            {
+                "id": types.String(),
+                "name": types.String(),
+                "tagCategoryName": types.String(),
+                "attributes": types.String(),
+            }
+        )
+    ),
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: """
         tags {

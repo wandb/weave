@@ -1,7 +1,7 @@
 import moment from 'moment';
 
 import * as Urls from '../../_external/util/urls';
-import {list, maybe} from '../../model/helpers';
+import {list, maybe, typedDict} from '../../model/helpers';
 import {docType} from '../../util/docs';
 import {sanitizeGQLAlias} from '../../util/string';
 import {makeStandardOp} from '../opKinds';
@@ -161,6 +161,14 @@ export const opArtifactRawTags = makeArtifactOp({
   hidden: true,
   name: 'artifact-rawTags',
   argTypes: artifactArgTypes,
-  returnType: inputTypes => list('artifactTag'),
+  returnType: inputTypes =>
+    list(
+      typedDict({
+        id: 'string',
+        name: 'string',
+        tagCategoryName: 'string',
+        attributes: 'string',
+      })
+    ),
   resolver: ({artifact}) => connectionToNodes(artifact.tags),
 });
