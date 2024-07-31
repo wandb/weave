@@ -48,20 +48,22 @@ def async_call(
     return asyncio.to_thread(func, *args, **kwargs)
 
 
-class TableObject(weave.Object):
+class EvaluationResults(weave.Object):
     rows: weave.Table
 
 
-def make_traceable_table(rows: list[dict]) -> TableObject:
-    # This illustrates a huge problem with our API right now. Namely:
-    # we don't have a way to use weave.Table in a way that does object
-    # tracing. Ideally, WeaveList would be able to be backed by a Table
-    # when it is large enough. Table is just an implementation detail.
-    raw_table = weave.Table(rows)
-    table_obj = TableObject(rows=raw_table)
-    weave.publish(table_obj)
-    traceable_table = table_obj.rows
-    return traceable_table
+def make_evaluation_results(eval_rows: list[dict]) -> EvaluationResults:
+    # The need for this pattern is quite unfortunate and highlights
+    # a gap in our data model. As a user, i just want to pass a list
+    # of data `eval_rows` to summarize. Under the hood, Weave should
+    # choose the appropriate storage format (in this case `Table`) and
+    # serialize it that way. Right now, it is just a huge list of dicts.
+    # The fact that "as a user" I need to construct `weave.Table` at all
+    # is a leaky abstraction. Moreover, the need to construct `EvaluationResults`
+    # just so that tracing and the UI works is also bad. In the near-term,
+    # this will at least solve the problem of breaking summarization with
+    # big datasets, but this is not the correct long-term play.
+    return EvaluationResults(rows=weave.Table(eval_rows))
 
 
 class Evaluation(Object):
@@ -265,8 +267,8 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: weave.Table) -> dict:
-        eval_table = list(eval_table)
+    async def summarize(self, eval_table: EvaluationResults) -> dict:
+        eval_table = list(eval_table.rows)
         cols = transpose(eval_table)
         summary = {}
 
@@ -330,8 +332,7 @@ class Evaluation(Object):
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
 
-        eval_rows_table = make_traceable_table(eval_rows)
-        summary = await self.summarize(eval_rows_table)
+        summary = await self.summarize(make_evaluation_results(eval_rows))
 
         print("Evaluation summary", summary)
 
