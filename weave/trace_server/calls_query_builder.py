@@ -448,7 +448,6 @@ class CallsQuery(BaseModel):
             {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
             """
 
-        print(raw_sql, flush=True)
         return _safely_format_sql(raw_sql)
 
     def _as_sql_base_format(
