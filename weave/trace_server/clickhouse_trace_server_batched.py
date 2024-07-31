@@ -171,8 +171,6 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
-    # calculated at read time
-    latency: typing.Optional[int] = None
 
 
 all_call_insert_columns = list(
@@ -814,9 +812,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
-                defaultdict(list)
-            )
+            refs_by_project_id: dict[
+                str, list[refs_internal.InternalObjectRef]
+            ] = defaultdict(list)
             for ref in refs:
                 refs_by_project_id[ref.project_id].append(ref)
             for project_id, project_refs in refs_by_project_id.items():
@@ -1410,31 +1408,6 @@ def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
     return val if val != "" else None
 
 
-def _summary_dump_to_derived_summary_map(
-    summary_dump: typing.Optional[tsi.AttributeMap],
-    latency: typing.Optional[int],
-    ended_at: typing.Optional[datetime.datetime],
-    exception: typing.Optional[str],
-    display_name: typing.Optional[str],
-) -> tsi.SummaryMap:
-    if not ended_at:
-        status = "running"
-    elif exception is not None:
-        status = "error"
-    else:
-        status = "success"
-
-    weave_derived_fields = tsi.WeaveSummarySchema(
-        display_name=display_name,
-        status=status,
-        latency=latency,
-    )
-    summary = summary_dump or {}
-    summary["_weave"] = weave_derived_fields
-    usage = summary.pop("usage", None)
-    return tsi.SummaryMap(usage=usage, **summary)
-
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1447,13 +1420,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=_summary_dump_to_derived_summary_map(
-            _nullable_any_dump_to_any(ch_call.summary_dump),
-            ch_call.latency,
-            ch_call.ended_at,
-            ch_call.exception,
-            ch_call.display_name,
-        ),
+        summary=_nullable_any_dump_to_any(ch_call.summary_dump),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
@@ -1474,13 +1441,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=_summary_dump_to_derived_summary_map(
-            _nullable_any_dump_to_any(ch_call_dict.get("summary_dump")),
-            ch_call_dict.get("latency"),
-            ch_call_dict.get("ended_at"),
-            ch_call_dict.get("exception"),
-            ch_call_dict.get("display_name"),
-        ),
+        summary=_nullable_any_dump_to_any(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),

@@ -129,11 +129,6 @@ class ContainsOperation(BaseModel):
     contains_: "ContainsSpec" = Field(alias="$contains")
 
 
-# https://www.mongodb.com/docs/manual/reference/operator/aggregation/subtract/
-class SubtractOperation(BaseModel):
-    subtract_: typing.Tuple["Operand", "Operand"] = Field(alias="$subtract")
-
-
 class ContainsSpec(BaseModel):
     input: "Operand"
     substr: "Operand"

@@ -148,22 +148,6 @@ class OrderField(BaseModel):
         return res
 
 
-class ConstructedSelectField(CallsMergedField):
-    field: str
-    expression: str
-
-    def as_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        cast: typing.Optional[tsi_query.CastTo] = None,
-    ) -> str:
-        return self.expression
-
-    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        return self.expression
-
-
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: typing.Optional[list[CallsMergedField]] = None
@@ -538,11 +522,6 @@ ALLOWED_CALL_FIELDS = {
     "wb_run_id": CallsMergedAggField(field="wb_run_id", agg_fn="any"),
     "deleted_at": CallsMergedAggField(field="deleted_at", agg_fn="any"),
     "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
-    # constructed fields
-    "latency": ConstructedSelectField(
-        field="latency",
-        expression="dateDiff('millisecond', any(calls_merged.started_at), any(calls_merged.ended_at)) AS latency",
-    ),
 }
 
 

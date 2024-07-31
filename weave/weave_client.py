@@ -39,7 +39,6 @@ from weave.trace.refs import (
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (
-    AttributeMap,
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
@@ -55,7 +54,6 @@ from weave.trace_server.trace_server_interface import (
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
-    SummaryMap,
     TableCreateReq,
     TableSchemaForInsert,
     TraceServerInterface,
@@ -160,15 +158,15 @@ class Call:
     project_id: str
     parent_id: Optional[str]
     inputs: dict
+    attributes: dict
+    started_at: datetime.datetime
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
-    summary: Optional[SummaryMap] = None
+    summary: Optional[dict] = None
     display_name: Optional[str] = None
-    attributes: Optional[AttributeMap] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
-
     _feedback: Optional[RefFeedbackQuery] = None
 
     @property
@@ -305,9 +303,10 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        summary=server_call.summary,
+        summary=dict(server_call.summary) if server_call.summary else None,
         display_name=server_call.display_name,
-        attributes=server_call.attributes,
+        attributes=dict(server_call.attributes),
+        started_at=server_call.started_at,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -507,6 +506,7 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -554,6 +554,7 @@ class WeaveClient:
             inputs=inputs_with_refs,
             display_name=display_name,
             attributes=attributes,
+            started_at=now,
         )
         if parent is not None:
             parent._children.append(call)
@@ -566,7 +567,7 @@ class WeaveClient:
             op_name=op_str,
             display_name=display_name,
             trace_id=trace_id,
-            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            started_at=now,
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes=attributes,
@@ -583,6 +584,7 @@ class WeaveClient:
     def finish_call(
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
         self._save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
@@ -591,7 +593,9 @@ class WeaveClient:
         # Summary handling
         summary = {}
         if call._children:
-            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+            summary = sum_dict_leaves(
+                [child.summary for child in call._children if child.summary]
+            )
         elif (
             isinstance(original_output, dict)
             and "usage" in original_output
@@ -624,13 +628,19 @@ class WeaveClient:
                 end=EndedCallSchemaForInsert(
                     project_id=self._project_id(),
                     id=call.id,  # type: ignore
-                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    ended_at=now,
                     output=to_json(output, self._project_id(), self.server),
                     summary=summary,
                     exception=exception_str,
                 )
             )
         )
+
+        summary["_weave"] = {
+            "latency": (now - call.started_at).microseconds,
+            "status": "success" if exception is None else "error",
+            "display_name": call.display_name,
+        }
 
         # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only
