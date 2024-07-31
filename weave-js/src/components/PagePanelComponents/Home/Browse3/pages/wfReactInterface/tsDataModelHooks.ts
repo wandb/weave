@@ -1331,7 +1331,7 @@ const isValidTraceCall = (callRes: traceServerTypes.TraceCallSchema) => {
 export const privateRefToSimpleName = (ref: string) => {
   const trimmed = ref.replace(`${WEAVE_PRIVATE_PREFIX}//`, '');
   try {
-    return trimmed.split('/')[1].split(':')[0];
+    return decodeURIComponent(trimmed.split('/')[1].split(':')[0]);
   } catch (e) {
     return trimmed;
   }

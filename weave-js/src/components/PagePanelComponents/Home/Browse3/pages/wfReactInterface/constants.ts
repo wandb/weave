@@ -1,7 +1,6 @@
 export const PROJECT_CALL_STREAM_NAME = 'stream';
 export const WANDB_ARTIFACT_REF_SCHEME = 'wandb-artifact';
 export const WANDB_ARTIFACT_REF_PREFIX = `${WANDB_ARTIFACT_REF_SCHEME}:///`;
-// # TODO: Come back to these
 export const WEAVE_REF_SCHEME = 'weave';
 export const WEAVE_REF_PREFIX = `${WEAVE_REF_SCHEME}:///`;
 export const WEAVE_PRIVATE_SCHEME = 'weave-private';

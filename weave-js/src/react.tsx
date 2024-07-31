@@ -568,8 +568,8 @@ export const parseRef = (ref: string): ObjectRef => {
 
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
-  const decodedUri = decodeURIComponent(url.pathname);
-  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
+  const trimmed = url.pathname.replace(/^\/+/, '');
+  const splitUri = trimmed.split('/', splitLimit);
 
   if (splitUri.length !== splitLimit) {
     throw new Error(`Invalid Artifact URI: ${url}`);
@@ -600,17 +600,16 @@ export const parseRef = (ref: string): ObjectRef => {
   }
 
   if (isWeaveRef) {
-    const trimmed = trimStartChar(decodedUri, '/');
     const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
     if (tableMatch !== null) {
       const [entity, project, digest] = tableMatch.slice(1);
       return {
         scheme: 'weave',
-        entityName: entity,
-        projectName: project,
+        entityName: decodeURIComponent(entity),
+        projectName: decodeURIComponent(project),
         weaveKind: 'table' as WeaveKind,
         artifactName: '',
-        artifactVersion: digest,
+        artifactVersion: decodeURIComponent(digest),
         artifactRefExtra: '',
       };
     }
@@ -619,10 +618,10 @@ export const parseRef = (ref: string): ObjectRef => {
       const [entity, project, callId] = callMatch.slice(1);
       return {
         scheme: 'weave',
-        entityName: entity,
-        projectName: project,
+        entityName: decodeURIComponent(entity),
+        projectName: decodeURIComponent(project),
         weaveKind: 'call' as WeaveKind,
-        artifactName: callId,
+        artifactName: decodeURIComponent(callId),
         artifactVersion: '',
         artifactRefExtra: '',
       };
@@ -641,11 +640,11 @@ export const parseRef = (ref: string): ObjectRef => {
     ] = match.slice(1);
     return {
       scheme: 'weave',
-      entityName,
-      projectName,
+      entityName: decodeURIComponent(entityName),
+      projectName: decodeURIComponent(projectName),
       weaveKind: weaveKind as WeaveKind,
-      artifactName,
-      artifactVersion,
+      artifactName: decodeURIComponent(artifactName),
+      artifactVersion: decodeURIComponent(artifactVersion),
       artifactRefExtra: artifactRefExtra ?? '',
     };
   }

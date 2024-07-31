@@ -48,7 +48,11 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
 };
 
 export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
-  return `${WEAVE_REF_PREFIX}${key.entity}/${key.project}/op/${key.opId}:${key.versionHash}`;
+  return `${WEAVE_REF_PREFIX}${encodeURIComponent(
+    key.entity
+  )}/${encodeURIComponent(key.project)}/op/${encodeURIComponent(
+    key.opId
+  )}:${encodeURIComponent(key.versionHash)}`;
   // return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
 };
 
@@ -95,8 +99,13 @@ export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
       key.objectId
     }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
   } else if (key.scheme === WEAVE_REF_SCHEME) {
-    let res = `${WEAVE_REF_PREFIX}${key.entity}/${key.project}/object/${key.objectId}:${key.versionHash}`;
+    let res = `${WEAVE_REF_PREFIX}${encodeURIComponent(
+      key.entity
+    )}/${encodeURIComponent(key.project)}/object/${encodeURIComponent(
+      key.objectId
+    )}:${encodeURIComponent(key.versionHash)}`;
     if (key.refExtra != null && key.refExtra !== '') {
+      // already encoded
       res += `/${key.refExtra}`;
     }
     return res;
