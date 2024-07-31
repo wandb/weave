@@ -14,9 +14,9 @@ import {useMemo} from 'react';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
+import {ContentType} from '../wfReactInterface/traceServerClientTypes';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import { ContentType } from '../wfReactInterface/traceServerClientTypes';
 
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
@@ -50,7 +50,7 @@ export const useCallsForQuery = (
   const filterBy: Query | undefined = useMemo(
     () => getFilterBy(filterByRaw),
     [filterByRaw]
-  )
+  );
 
   const calls = useCalls(
     entity,

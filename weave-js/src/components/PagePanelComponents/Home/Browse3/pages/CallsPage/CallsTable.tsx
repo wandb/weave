@@ -66,6 +66,11 @@ import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
+import {
+  BulkDeleteButton,
+  CompareEvaluationsTableButton,
+  ExportRunsTableButton,
+} from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
 import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
 import {WFHighLevelCallFilter} from './callsTableFilter';
@@ -76,7 +81,6 @@ import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {ManageColumnsButton} from './ManageColumnsButton';
-import { ExportRunsTableButton, BulkDeleteButton, CompareEvaluationsTableButton } from './CallsTableButtons';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
@@ -531,7 +535,7 @@ export const CallsTable: FC<{
     effectiveFilter,
     filterModel,
     sortModel,
-  ])
+  ]);
 
   // Register Delete Button
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);

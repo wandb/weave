@@ -16,6 +16,9 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 
 import {
+  ContentType,
+  ContentTypeJson,
+  ContentTypeText,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
@@ -41,9 +44,6 @@ import {
   TraceRefsReadBatchRes,
   TraceTableQueryReq,
   TraceTableQueryRes,
-  ContentType,
-  ContentTypeText,
-  ContentTypeJson
 } from './traceServerClientTypes';
 
 export class DirectTraceServerClient {
@@ -248,7 +248,7 @@ export class DirectTraceServerClient {
     req: QT,
     returnText?: boolean,
     contentType?: ContentType
-   ): Promise<ST> => {
+  ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
     const reqBody = JSON.stringify(req);
     let needsFetch = false;
@@ -276,18 +276,19 @@ export class DirectTraceServerClient {
       Authorization: 'Basic ' + btoa(':'),
     };
     if (contentType) {
-      console.log("CONTENT TYPE", contentType, contentType == ContentTypeText.csv)
-      if (contentType == ContentTypeText.csv) {
+      if (contentType === ContentTypeText.csv) {
         headers['Accept'] = 'text/csv';
-      } else if (contentType == ContentTypeText.tsv) {
+      } else if (contentType === ContentTypeText.tsv) {
         headers['Accept'] = 'text/tab-separated-values';
-      } else if ([ContentTypeJson.any, ContentTypeJson.jsonl].includes(contentType)) {
+      } else if (
+        [ContentTypeJson.any, ContentTypeJson.jsonl].includes(contentType)
+      ) {
         headers['Accept'] = 'application/jsonl';
-      } else if (contentType == ContentTypeJson.json) {
+      } else if (contentType === ContentTypeJson.json) {
         headers['Accept'] = 'application/json';
       }
     }
-    console.log("HEADERS", headers)
+    console.log('HEADERS', headers);
     const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
     if (useAdminPrivileges) {
       headers['use-admin-privileges'] = 'true';

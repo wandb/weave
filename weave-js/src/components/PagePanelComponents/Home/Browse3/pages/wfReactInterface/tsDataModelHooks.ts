@@ -511,7 +511,6 @@ const useCallUpdateFunc = () => {
   return callUpdate;
 };
 
-
 const useCallsExport = (
   entity: string,
   project: string,
@@ -526,8 +525,9 @@ const useCallsExport = (
 ): Loadable<string | BinaryData | Map<string, any>> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const [callRes, setCallRes] =
-    useState<string | BinaryData | Map<string, any> | null>(null);
+  const [callRes, setCallRes] = useState<
+    string | BinaryData | Map<string, any> | null
+  >(null);
   const deepFilter = useDeepMemo(filter);
 
   const doFetch = useCallback(() => {
@@ -563,7 +563,10 @@ const useCallsExport = (
       console.error(e);
       setCallRes(null);
     };
-    getTsClient().callsStreamQueryExport(req, contentType).then(onSuccess).catch(onError);
+    getTsClient()
+      .callsStreamQueryExport(req, contentType)
+      .then(onSuccess)
+      .catch(onError);
   }, [
     entity,
     project,
@@ -574,6 +577,7 @@ const useCallsExport = (
     offset,
     sortBy,
     query,
+    contentType,
   ]);
 
   useEffect(() => {
@@ -601,7 +605,7 @@ const useCallsExport = (
         result: callRes,
       };
     }
-  }, [callRes, entity, project, opts?.skip]);
+  }, [callRes, opts?.skip]);
 };
 
 const useFeedback = (
