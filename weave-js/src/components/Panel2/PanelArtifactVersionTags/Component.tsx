@@ -34,7 +34,7 @@ const PanelArtifactVersionTags: React.FC<
   PanelArtifactVersionTagsProps
 > = props => {
   const nodeValueQuery = CGReact.useNodeValue(
-    Op.opArtifactTagName({artifactTag: props.input as any}),
+    Op.opArtifactTagName({artifactTag: props.input as any})
   );
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
@@ -45,7 +45,6 @@ const PanelArtifactVersionTags: React.FC<
   return (
     <Wrapper>
       {nodeValueQuery.result.map((artifactVersionTag: string) => {
-        console.log(artifactVersionTag);
         return (
           <Tag
             key={artifactVersionTag}
