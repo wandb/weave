@@ -231,7 +231,7 @@ class CallsIter:
         self.server = server
         self.project_id = project_id
         self.filter = filter
-        self._page_size = 10
+        self._page_size = 1000
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache

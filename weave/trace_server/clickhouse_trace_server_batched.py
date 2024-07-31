@@ -45,6 +45,7 @@ from weave.trace_server.calls_query_builder import (
     HardCodedFilter,
     combine_conditions,
 )
+from weave.trace_server.trace_server_common import make_derived_summary_map
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
@@ -1420,12 +1421,13 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=summary_dump_to_derived_summary_map(
+        summary=make_derived_summary_map(
             _nullable_any_dump_to_any(ch_call.summary_dump),
             _ensure_datetimes_have_tz(ch_call.started_at),
             _ensure_datetimes_have_tz(ch_call.ended_at),
             ch_call.exception,
             _empty_str_to_none(ch_call.display_name),
+            ch_call.op_name,
         ),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
@@ -1447,12 +1449,13 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=summary_dump_to_derived_summary_map(
+        summary=make_derived_summary_map(
             _nullable_any_dump_to_any(ch_call_dict.get("summary_dump")),
             _ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
             _ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
             ch_call_dict.get("exception"),
             _empty_str_to_none(ch_call_dict.get("display_name")),
+            ch_call_dict.get("op_name"),
         ),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
