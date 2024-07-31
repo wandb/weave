@@ -54,7 +54,7 @@ def test_anthropic(
     assert output.stop_sequence is None
     assert output.content[0].text == exp
     summary = call.summary
-    assert summary is not None
+    assert summary is not None and summary["usage"] is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
@@ -101,7 +101,7 @@ def test_anthropic_stream(
     assert output.stop_sequence is None
     assert output.content[0].text == exp
     summary = call.summary
-    assert summary is not None
+    assert summary is not None and summary["usage"] is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == output_tokens == 13
@@ -142,7 +142,7 @@ async def test_async_anthropic(
     assert output.stop_sequence is None
     assert output.content[0].text == exp
     summary = call.summary
-    assert summary is not None
+    assert summary is not None and summary["usage"] is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
@@ -191,7 +191,7 @@ async def test_async_anthropic_stream(
     assert output.stop_sequence is None
     assert output.content[0].text == exp
     summary = call.summary
-    assert summary is not None
+    assert summary is not None and summary["usage"] is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == output_tokens == 19
@@ -251,7 +251,7 @@ def test_tools_calling(
     assert output.stop_sequence is None
     assert output.content[0].input["location"] == exp
     summary = call.summary
-    assert summary is not None
+    assert summary is not None and summary["usage"] is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 56
