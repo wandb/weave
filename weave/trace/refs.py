@@ -149,7 +149,7 @@ def parse_uri(uri: str) -> AnyRef:
             entity=entity,
             project=project,
             id=unquote(remaining[0]),
-            extra=[(unquote(r[0]), unquote(r[1])) for r in remaining[1:]],
+            extra=tuple(unquote(r) for r in remaining[1:]),
         )
     elif kind == "object":
         name_quoted, version_quoted = remaining[0].split(":")
@@ -161,7 +161,7 @@ def parse_uri(uri: str) -> AnyRef:
             project=project,
             name=name,
             digest=version,
-            extra=[(unquote(r[0]), unquote(r[1])) for r in remaining[1:]],
+            extra=tuple(unquote(r) for r in remaining[1:]),
         )
     elif kind == "op":
         name_quoted, version_quoted = remaining[0].split(":")
@@ -173,7 +173,7 @@ def parse_uri(uri: str) -> AnyRef:
             project=project,
             name=name,
             digest=version,
-            extra=[(unquote(r[0]), unquote(r[1])) for r in remaining[1:]],
+            extra=tuple(unquote(r) for r in remaining[1:]),
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
