@@ -46,7 +46,7 @@ class UserSettings(BaseModel):
             self._reset()
 
         for name in self.model_fields:
-            context_var = _context_vars.get(name)
+            context_var = _context_vars[name]
             context_var.set(getattr(self, name))
 
 
