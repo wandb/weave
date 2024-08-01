@@ -41,6 +41,9 @@ import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-conte
 import {ReactComponent as ImportContractLeft} from '../../assets/icons/icon-contract-left.svg';
 import {ReactComponent as ImportCopy} from '../../assets/icons/icon-copy.svg';
 import {ReactComponent as ImportCreditCardPayment} from '../../assets/icons/icon-credit-card-payment.svg';
+import {ReactComponent as ImportCropBeginning} from '../../assets/icons/icon-crop-beginning.svg';
+import {ReactComponent as ImportCropEnd} from '../../assets/icons/icon-crop-end.svg';
+import {ReactComponent as ImportCropMiddle} from '../../assets/icons/icon-crop-middle.svg';
 import {ReactComponent as ImportCross} from '../../assets/icons/icon-cross.svg';
 import {ReactComponent as ImportCrownPro} from '../../assets/icons/icon-crown-pro.svg';
 import {ReactComponent as ImportCubeContainer} from '../../assets/icons/icon-cube-container.svg';
@@ -372,6 +375,15 @@ export const IconCopy = (props: SVGIconProps) => (
 );
 export const IconCreditCardPayment = (props: SVGIconProps) => (
   <ImportCreditCardPayment {...updateIconProps(props)} />
+);
+export const IconCropBeginning = (props: SVGIconProps) => (
+  <ImportCropBeginning {...updateIconProps(props)} />
+);
+export const IconCropEnd = (props: SVGIconProps) => (
+  <ImportCropEnd {...updateIconProps(props)} />
+);
+export const IconCropMiddle = (props: SVGIconProps) => (
+  <ImportCropMiddle {...updateIconProps(props)} />
 );
 export const IconCross = (props: SVGIconProps) => (
   <ImportCross {...updateIconProps(props)} />
@@ -1001,6 +1013,9 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'contract-left': IconContractLeft,
   copy: IconCopy,
   'credit-card-payment': IconCreditCardPayment,
+  'crop-beginning': IconCropBeginning,
+  'crop-end': IconCropEnd,
+  'crop-middle': IconCropMiddle,
   cross: IconCross,
   'crown-pro': IconCrownPro,
   'cube-container': IconCubeContainer,
