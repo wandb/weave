@@ -21,9 +21,8 @@ from weave.trace_server import (
     remote_http_trace_server,
     sqlite_trace_server,
 )
-from weave.trace_server import (
-    trace_server_interface as tsi,
-)
+from weave.trace_server import trace_server_interface as tsi
+from weave.weave_client import WeaveClient
 
 from . import autopatch, environment, logs
 from .tests import fixture_fakewandb
@@ -401,7 +400,7 @@ class TestOnlyUserInjectingExternalTraceServer(
 
 
 @pytest.fixture()
-def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+def client(request) -> Generator[WeaveClient, None, None]:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
     server: tsi.TraceServerInterface
@@ -435,7 +434,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = weave_client.WeaveClient(entity, project, server)
+        client = WeaveClient(entity, project, server)
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
