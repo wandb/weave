@@ -1121,14 +1121,7 @@ export const toGqlField = (
   } else if (forwardOp.op.name === 'artifactVersion-isLinkedToGlobalRegistry') {
     return gqlBasicField('isLinkedToGlobalRegistry');
   } else if (forwardOp.op.name === 'artifactVersion-tags') {
-    return [
-      gqlObjectField(forwardGraph, forwardOp, 'tags', undefined, {
-        extraFields: gqlBasicField('id')
-          .concat(gqlBasicField('name'))
-          .concat(gqlBasicField('tagCategoryName'))
-          .concat(gqlBasicField('attributes')),
-      }),
-    ];
+    return [gqlObjectField(forwardGraph, forwardOp, 'tags')];
   } else if (forwardOp.op.name === 'artifactVersion-artifactCollections') {
     return [
       {

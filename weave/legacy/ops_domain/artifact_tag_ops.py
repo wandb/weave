@@ -1,8 +1,8 @@
-import typing
-
+from weave import weave_types as types
 from weave.api import op
 
 from weave.legacy.ops_domain import wb_domain_types as wdt
+from weave.legacy.ops_domain.wandb_domain_gql import gql_prop_op
 
 
 # Section 1/6: Tag Getters
@@ -12,12 +12,7 @@ from weave.legacy.ops_domain import wb_domain_types as wdt
 # None
 
 # Section 3/6: Attribute Getters
-
-@op(
-    name="artifactTag-name",
-)
-def op_artifact_tag_name(tag: wdt.ArtifactTag) -> str:
-    return tag.name
+gql_prop_op("artifactTag-name", wdt.ArtifactTagType, "name", types.String())
 
 # Section 4/6: Direct Relationship Ops
 # None
