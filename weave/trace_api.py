@@ -8,10 +8,11 @@ from weave import client_context
 from weave.call_context import get_current_call as get_current_call
 from weave.legacy import wandb_api as _wandb_api
 from weave.trace import context as trace_context
-from weave.trace.op import Op
+from weave.trace.op import Op, op  # noqa: F401
 from weave.trace.refs import ObjectRef, parse_uri
 
 from . import urls, util, weave_client, weave_init
+from .table import Table  # noqa: F401
 from .trace.constants import TRACE_OBJECT_EMOJI
 
 

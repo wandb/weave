@@ -31,7 +31,6 @@ from . import types_numpy as _types_numpy
 
 from . import errors
 from weave.legacy.decorators import weave_class, mutation, type
-from weave.trace.op import Op, op
 
 from . import usage_analytics
 from weave.legacy.context import (
@@ -44,8 +43,7 @@ from weave.legacy.context import (
 from weave.legacy.panel import Panel
 
 from weave.legacy.arrow.list_ import ArrowWeaveList as WeaveList
-from .table import Table
 
 from .query_api import save, get, use, _get_ref, versions, expr, type_of, from_pandas
-from .trace_api import init, remote_client, init_local_client, local_client, as_op, publish, ref, obj_ref, output_of, attributes, serve, finish
+from .trace_api import init, remote_client, init_local_client, local_client, as_op, publish, ref, obj_ref, output_of, attributes, serve, finish, op, Table
 
