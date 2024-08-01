@@ -503,6 +503,7 @@ export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
 // Entity name should be lowercase, digits, dash, underscore
 // Unfortunately many teams have been created that violate this.
 const URL_PART = '([^/]+)';
+const ANY_CHAR = '(.*)';
 // const PATTERN_ENTITY = '([^/]+)';
 // const PATTERN_PROJECT = '([^\\#?%:]{1,128})'; // Project name
 const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
@@ -514,11 +515,11 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     '/',
     '(object|op)', // Weave kind
     '/',
-    URL_PART, // name
+    ANY_CHAR, // name
     ':',
     URL_PART, // version
     '/?', // Ref extra portion is optional
-    '(.*)', // Optional ref extra
+    ANY_CHAR, // Optional ref extra
     '$', // End of the string
   ].join('')
 );
@@ -531,7 +532,7 @@ const RE_WEAVE_TABLE_REF_PATHNAME = new RegExp(
     '/table/',
     URL_PART, // Digest
     '/?', // Ref extra portion is optional
-    '(.*)', // Optional ref extra
+    ANY_CHAR, // Optional ref extra
     '$', // End of the string
   ].join('')
 );
@@ -544,7 +545,7 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
     '/call/',
     URL_PART, // Call UUID
     '/?', // Ref extra portion is optional
-    '(.*)', // Optional ref extra
+    ANY_CHAR, // Optional ref extra
     '$', // End of the string
   ].join('')
 );
