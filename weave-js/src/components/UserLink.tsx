@@ -243,14 +243,24 @@ export const useUsers = (userIds: string[]) => {
 
   const [users, setUsers] = useState<UserResult>('load');
   useEffect(() => {
+    let mounted = true;
     setUsers('loading');
     fetchUsers(memoedUserIds)
       .then(userRes => {
+        if (!mounted) {
+          return;
+        }
         setUsers(userRes);
       })
       .catch(err => {
+        if (!mounted) {
+          return;
+        }
         setUsers('error');
       });
+    return () => {
+      mounted = false;
+    };
   }, [memoedUserIds]);
 
   return users;
