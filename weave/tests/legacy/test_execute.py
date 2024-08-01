@@ -7,8 +7,7 @@ import weave
 from weave import api, environment, weave_internal
 from weave import weave_types as types
 from weave.legacy import execute, ops
-
-from . import test_wb
+from weave.tests.legacy import test_wb
 
 execute_test_count_op_run_count = 0
 

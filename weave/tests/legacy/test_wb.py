@@ -18,7 +18,7 @@ from weave.legacy.ops_domain import table, wb_util, wbmedia
 from weave.legacy.ops_domain import wb_domain_types as wdt
 from weave.legacy.ops_primitives import dict_, list_
 from weave.legacy.ops_primitives.file import _as_w0_dict_
-from weave.tests.test_wb_domain_ops import assert_gql_str_equal
+from weave.tests.legacy.test_wb_domain_ops import assert_gql_str_equal
 
 from . import fixture_fakewandb as fwb
 from . import weavejs_ops

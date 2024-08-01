@@ -8,9 +8,8 @@ from weave.legacy import compile_domain, compile_table
 from weave.legacy import context_state as _context
 from weave.legacy.language_features.tagging import make_tag_getter_op
 from weave.legacy.ops_domain import run_ops
-
-from . import fixture_fakewandb as fwb
-from . import test_wb
+from weave.tests.legacy import fixture_fakewandb as fwb
+from weave.tests.legacy import test_wb
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
