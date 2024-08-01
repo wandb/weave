@@ -1097,11 +1097,16 @@ def _make_derived_summary_map(
     status = make_call_status_from_exception_and_ended_at(exception, ended_at_dt)
     latency = None if not ended_at_dt else (ended_at_dt - started_at_dt).microseconds
     display_name = display_name or op_name_simple_from_ref_str(op_name)
+    summary = summary_dump or {}
+    if "_weave" not in summary:
+        summary["_weave"] = {"costs": {}}
+    elif "costs" not in summary["_weave"]:
+        summary["_weave"]["costs"] = {}
     weave_derived_fields = tsi.WeaveSummarySchema(
         nice_trace_name=display_name,
         status=status,
         latency=latency,
+        costs=summary["_weave"]["costs"],
     )
-    summary = summary_dump or {}
     summary["_weave"] = weave_derived_fields
     return cast(tsi.SummaryMap, summary)

@@ -217,7 +217,7 @@ class CallsQuery(BaseModel):
     order_fields: list[OrderField] = Field(default_factory=list)
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
-    add_costs: bool = False
+    should_add_costs: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
         self.select_fields.append(get_field_by_name(field))
@@ -274,6 +274,10 @@ class CallsQuery(BaseModel):
             limit=self.limit,
             offset=self.offset,
         )
+
+    def add_costs(self, should_add_costs: bool) -> "CallsQuery":
+        self.should_add_costs = should_add_costs
+        return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
         """
@@ -395,7 +399,7 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not should_optimize:
+        if not should_optimize and not self.should_add_costs:
             return self._as_sql_base_format(pb, table_alias)
 
         # If so, build the two queries
@@ -430,16 +434,12 @@ class CallsQuery(BaseModel):
             outer_query.offset = self.offset
 
         raw_sql = f"""
-        -- First we get lightly filtered calls, to optimize later for heavy filters
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
         """
 
-        if self.add_costs:
+        if self.should_add_costs:
             raw_sql += f""",
-            -- Then we get all the calls we want, with all the data we need, with heavy filtering
             all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
-
-            -- Add Cost to the summary dump, of each call
             {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields])}
             """
 

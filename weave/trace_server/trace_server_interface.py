@@ -19,11 +19,25 @@ class ExtraKeysTypedDict(TypedDict):
 # https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
 ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
+cost_string_fields = [
+    "prompt_token_cost_unit",
+    "completion_token_cost_unit",
+    "effective_date",
+    "provider_id",
+    "pricing_level",
+    "pricing_level_id",
+]
 
-class WeaveSummarySchema(ExtraKeysTypedDict):
-    status: typing.Optional[typing.Literal["success", "error", "running"]]
-    nice_trace_name: typing.Optional[str]
-    latency: typing.Optional[int]
+cost_numeric_fields = [
+    "prompt_token_cost",
+    "completion_token_cost",
+    "prompt_tokens_cost",
+    "completion_tokens_cost",
+    "prompt_tokens",
+    "completion_tokens",
+    "requests",
+    "total_tokens",
+]
 
 
 class LLMUsageSchema(TypedDict, total=False):
@@ -33,6 +47,26 @@ class LLMUsageSchema(TypedDict, total=False):
     output_tokens: typing.Optional[int]
     requests: typing.Optional[int]
     total_tokens: typing.Optional[int]
+
+
+class LLMCostSchema(LLMUsageSchema):
+    prompt_tokens_cost: typing.Optional[float]
+    completion_tokens_cost: typing.Optional[float]
+    prompt_token_cost: typing.Optional[float]
+    completion_token_cost: typing.Optional[float]
+    prompt_token_cost_unit: typing.Optional[str]
+    completion_token_cost_unit: typing.Optional[str]
+    effective_date: typing.Optional[str]
+    provider_id: typing.Optional[str]
+    pricing_level: typing.Optional[str]
+    pricing_level_id: typing.Optional[str]
+
+
+class WeaveSummarySchema(ExtraKeysTypedDict):
+    status: typing.Optional[typing.Literal["success", "error", "running"]]
+    nice_trace_name: typing.Optional[str]
+    latency: typing.Optional[int]
+    costs: typing.Optional[typing.Dict[str, LLMCostSchema]]
 
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
