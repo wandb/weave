@@ -100,7 +100,8 @@ def universal_int_to_ext_ref_converter(
         external_project_id = int_to_ext_project_cache[project_id]
         if not external_project_id:
             return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
-        return f"{ri.WEAVE_SCHEME}:///{quote(external_project_id)}/{tail}"
+        unquoted_entity, unquoted_project = external_project_id.split("/")
+        return f"{ri.WEAVE_SCHEME}:///{quote(unquoted_entity)}/{quote(unquoted_project)}/{tail}"
 
     def mapper(obj: D) -> D:
         if isinstance(obj, str) and obj.startswith(weave_internal_prefix):
