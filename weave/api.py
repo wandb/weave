@@ -1,14 +1,5 @@
 """These are the top-level functions in the `import weave` namespace."""
 
-import time
-import typing
-from typing import Optional
-import os
-import contextlib
-import threading
-
-from . import urls
-
 from weave.legacy import graph as _graph
 from weave.legacy.graph import Node
 
