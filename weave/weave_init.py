@@ -1,6 +1,6 @@
 import typing
 
-from weave import client_context
+from weave.client_context import weave_client as weave_client_context
 
 from . import autopatch, errors, init_message, trace_sentry, weave_client
 from .trace_server import remote_http_trace_server, sqlite_trace_server
@@ -11,10 +11,10 @@ _current_inited_client = None
 class InitializedClient:
     def __init__(self, client: weave_client.WeaveClient):
         self.client = client
-        client_context.weave_client.set_weave_client_global(client)
+        weave_client_context.set_weave_client_global(client)
 
     def reset(self) -> None:
-        client_context.weave_client.set_weave_client_global(None)
+        weave_client_context.set_weave_client_global(None)
 
 
 def get_username() -> typing.Optional[str]:

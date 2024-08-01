@@ -1,18 +1,20 @@
+"""The top-level functions for Weave Trace API."""
+
 import contextlib
 import os
 import threading
 import time
 from typing import Any, Callable, Iterator, Optional
 
-from weave import client_context
 from weave.call_context import get_current_call
-from weave.trace import context
-from weave.trace.op import Op, op  # noqa: F401
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.client_context import weave_client as weave_client_context
 
 from . import urls, util, weave_client, weave_init
-from .table import Table  # noqa: F401
+from .table import Table
+from .trace import context
 from .trace.constants import TRACE_OBJECT_EMOJI
+from .trace.op import Op, op
+from .trace.refs import ObjectRef, parse_uri
 
 
 def init(project_name: str) -> weave_client.WeaveClient:
@@ -38,9 +40,7 @@ def init(project_name: str) -> weave_client.WeaveClient:
 
 
 @contextlib.contextmanager
-def remote_client(
-    project_name: str,
-) -> Iterator[weave_init.weave_client.WeaveClient]:
+def remote_client(project_name: str) -> Iterator[weave_init.weave_client.WeaveClient]:
     inited_client = weave_init.init_weave(project_name)
     try:
         yield inited_client.client
@@ -95,7 +95,7 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
     Returns:
         A weave Ref to the saved object.
     """
-    client = client_context.weave_client.require_weave_client()
+    client = weave_client_context.require_weave_client()
 
     save_name: str
     if name:
@@ -141,7 +141,7 @@ def ref(location: str) -> weave_client.ObjectRef:
         A weave Ref to the object.
     """
     if not "://" in location:
-        client = client_context.weave_client.get_weave_client()
+        client = weave_client_context.get_weave_client()
         if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")
         if "/" in location:
@@ -164,7 +164,7 @@ def obj_ref(obj: Any) -> Optional[weave_client.ObjectRef]:
 
 
 def output_of(obj: Any) -> Optional[weave_client.Call]:
-    client = client_context.weave_client.require_weave_client()
+    client = weave_client_context.require_weave_client()
 
     ref = obj_ref(obj)
     if ref is None:
@@ -198,7 +198,7 @@ def serve(
 
     from .serve_fastapi import object_method_app
 
-    client = client_context.weave_client.require_weave_client()
+    client = weave_client_context.require_weave_client()
     # if not isinstance(
     #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
     # ):
@@ -269,5 +269,5 @@ __all__ = [
     "ObjectRef",
     "parse_uri",
     "get_current_call",
-    "client_context",
+    "weave_client_context",
 ]

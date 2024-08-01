@@ -1,3 +1,5 @@
+"""The top-level functions for Weave Query API."""
+
 import typing
 
 from weave.legacy import graph as _graph
