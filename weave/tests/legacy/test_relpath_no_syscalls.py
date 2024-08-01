@@ -1,6 +1,6 @@
 import pytest
 
-from ..util import relpath_no_syscalls
+from weave.util import relpath_no_syscalls
 
 
 @pytest.mark.parametrize(

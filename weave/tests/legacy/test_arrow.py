@@ -28,9 +28,8 @@ from weave.legacy.op_def import map_type
 from weave.legacy.ops_domain import project_ops
 from weave.legacy.ops_primitives import list_, make_list
 from weave.tests import list_arrow_test_helpers as lath
-
-from ..tests import tag_test_util as ttu
-from ..tests import test_wb, weavejs_ops
+from weave.tests import tag_test_util as ttu
+from weave.tests import test_wb, weavejs_ops
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 # T in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation

@@ -3,8 +3,7 @@ from weave import registry_mem
 from weave import weave_types as types
 from weave.legacy import context_state as _context
 from weave.legacy import graph
-
-from ..weave_internal import make_const_node
+from weave.weave_internal import make_const_node
 
 _loading_builtins_token = _context.set_loading_built_ins()
 

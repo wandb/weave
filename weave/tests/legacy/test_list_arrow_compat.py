@@ -14,8 +14,8 @@ from weave.legacy.language_features.tagging import (
     tagged_value_type,
 )
 from weave.legacy.ops_primitives import dict_, list_
+from weave.tests import tag_test_util as ttu
 
-from ..tests import tag_test_util as ttu
 from . import list_arrow_test_helpers as lath
 
 

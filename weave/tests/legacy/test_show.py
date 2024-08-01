@@ -3,8 +3,8 @@
 # need to match what javascript expects.
 
 from weave.legacy import ops
+from weave.show import _show_params
 
-from ..show import _show_params
 from . import test_helpers
 
 
