@@ -226,7 +226,7 @@ export class DirectTraceServerClient {
         const blob = new Blob([textData], {type: contentType});
         const downloadUrl = URL.createObjectURL(blob);
 
-        // create a download link and click it
+        // Create a download link and click it
         const anchor = document.createElement('a');
         anchor.href = downloadUrl;
         const fileExtension = fileExtensions[contentType];
@@ -237,7 +237,6 @@ export class DirectTraceServerClient {
         URL.revokeObjectURL(downloadUrl);
         resolve();
       } catch (error) {
-        // Reject the promise if an error occurs
         reject(new Error(`Error downloading data: ${error}`));
       }
     });
