@@ -214,25 +214,6 @@ gql_prop_op(
 )
 
 
-@op(
-    name="artifactVersion-tags",
-    plugins=wb_gql_op_plugin(
-        lambda inputs, inner: """
-            tags {
-                id
-                name
-                tagCategoryName
-                attributes
-            }
-        """,
-    ),
-)
-def op_artifact_version_tags(
-    artifact: wdt.ArtifactVersion,
-) -> list[wdt.ArtifactTagType]:
-    return typing.cast(list[wdt.ArtifactTagType], artifact["tags"])
-
-
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
 def refine_metadata(
     artifactVersion: wdt.ArtifactVersion,
@@ -274,6 +255,14 @@ gql_direct_edge_op(
     wdt.ArtifactVersionType,
     "artifactSequence",
     wdt.ArtifactCollectionType,
+)
+
+gql_direct_edge_op(
+    "artifactVersion-tags",
+    wdt.ArtifactVersionType,
+    "tags",
+    wdt.ArtifactTagType,
+    is_many=True,
 )
 
 
