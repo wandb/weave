@@ -39,7 +39,7 @@ export const ExportRunsTableButton = ({
   const [clickedOption, setClickedOption] = useState<ContentType | null>(null);
   const fileName = `${pageName}-export`;
 
-  const {loading, result} = useCallsExportStream(
+  const {result, loading} = useCallsExportStream(
     callQueryParams.entity,
     callQueryParams.project,
     clickedOption ?? ContentTypeJson.jsonl,
@@ -49,35 +49,44 @@ export const ExportRunsTableButton = ({
     MAX_EXPORT,
     clickedOption == null
   );
+  const [data, setData] = useState<
+    string | BinaryData | Map<string, any> | null
+  >(null);
+  useEffect(() => {
+    if (loading) {
+      setData(null);
+    } else if (result) {
+      setData(result);
+    }
+  }, [result, loading]);
 
   useEffect(() => {
-    if (!clickedOption) {
+    if (!clickedOption || loading) {
       return;
-    } else if (loading && !result) {
+    }
+    if (!data) {
       // TODO(gst): warn if large download?
       return;
     }
 
-    if (!result) {
-      toast('Error, no calls to export', {type: 'error'});
-    } else {
-      try {
-        let extension = '';
-        if (clickedOption === ContentTypeJson.jsonl) {
-          extension = 'jsonl';
-        } else if (clickedOption === ContentTypeJson.json) {
-          extension = 'json';
-        } else if (clickedOption === ContentTypeText.csv) {
-          extension = 'csv';
-        }
-        saveAs(result, `${fileName}.${extension}`);
-      } catch {
-        toast('Error exporting calls', {type: 'error'});
-      } finally {
-        setClickedOption(null);
+    try {
+      let extension = '';
+      if (clickedOption === ContentTypeJson.jsonl) {
+        extension = 'jsonl';
+      } else if (clickedOption === ContentTypeJson.json) {
+        extension = 'json';
+      } else if (clickedOption === ContentTypeText.csv) {
+        extension = 'csv';
       }
+      saveAs(data, `${fileName}.${extension}`);
+    } catch (e) {
+      console.error(e);
+      toast('Error exporting calls', {type: 'error'});
+    } finally {
+      setClickedOption(null);
+      setData(null);
     }
-  }, [clickedOption, loading, result, fileName]);
+  }, [clickedOption, data, fileName, loading]);
 
   const selectedExport = () => {
     tableRef.current?.exportDataAsCsv({

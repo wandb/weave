@@ -529,7 +529,6 @@ const useCallsExport = (
     string | BinaryData | Map<string, any> | null
   >(null);
   const deepFilter = useDeepMemo(filter);
-
   const doFetch = useCallback(() => {
     if (opts?.skip) {
       return;
@@ -588,6 +587,15 @@ const useCallsExport = (
   }, [opts?.skip, doFetch]);
 
   return useMemo(() => {
+    console.log(
+      '>>>',
+      '.skip',
+      opts?.skip,
+      'callRes',
+      callRes,
+      'loadingRef',
+      loadingRef.current
+    );
     if (opts?.skip) {
       return {
         loading: false,
