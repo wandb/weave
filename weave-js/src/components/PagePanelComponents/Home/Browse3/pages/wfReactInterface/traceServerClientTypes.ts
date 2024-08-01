@@ -87,6 +87,7 @@ export type TraceCallSchema = {
 export type TraceCallReadReq = {
   project_id: string;
   id: string;
+  add_cost?: boolean;
 };
 
 export type TraceCallReadSuccess = {
@@ -117,6 +118,7 @@ export type TraceCallsQueryReq = {
   offset?: number;
   sort_by?: SortBy[];
   query?: Query;
+  add_cost?: boolean;
 };
 
 export type TraceCallsQueryRes = {

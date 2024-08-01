@@ -34,7 +34,8 @@ export const useCallsForQuery = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>
+  expandedColumns: Set<string>,
+  addCost?: boolean
 ) => {
   const {useCalls, useCallsStats} = useWFHooks();
   const lowLevelFilter: CallFilter = useMemo(() => {
@@ -95,6 +96,7 @@ export const useCallsForQuery = (
     expandedColumns,
     {
       refetchOnDelete: true,
+      addCost,
     }
   );
 
