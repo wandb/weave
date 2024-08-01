@@ -6,7 +6,6 @@ from typing import Any, Callable, Iterator, Optional
 
 from weave import client_context
 from weave.call_context import get_current_call
-from weave.legacy import wandb_api
 from weave.trace import context
 from weave.trace.op import Op, op  # noqa: F401
 from weave.trace.refs import ObjectRef, parse_uri
@@ -40,7 +39,7 @@ def init(project_name: str) -> weave_client.WeaveClient:
 
 @contextlib.contextmanager
 def remote_client(
-    project_name,
+    project_name: str,
 ) -> Iterator[weave_init.weave_client.WeaveClient]:
     inited_client = weave_init.init_weave(project_name)
     try:
@@ -195,6 +194,8 @@ def serve(
 ) -> str:
     import uvicorn
 
+    from weave.legacy import wandb_api
+
     from .serve_fastapi import object_method_app
 
     client = client_context.weave_client.require_weave_client()
@@ -213,7 +214,7 @@ def serve(
     app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
     trace_attrs = context.call_attributes.get()
 
-    def run():
+    def run() -> None:
         # This function doesn't return, because uvicorn.run does not return.
         with wandb_api.wandb_api_context(wandb_api_ctx):
             with attributes(trace_attrs):
