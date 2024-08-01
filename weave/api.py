@@ -17,7 +17,6 @@ from weave.legacy import graph_mapper as _graph_mapper
 
 from . import storage as _storage
 from . import ref_base as _ref_base
-from weave.legacy import artifact_wandb as _artifact_wandb
 from weave.legacy import wandb_api as _wandb_api
 
 from . import weave_internal as _weave_internal
