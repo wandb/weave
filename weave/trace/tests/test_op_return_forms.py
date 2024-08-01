@@ -2,9 +2,8 @@ import pytest
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import get_ref
-
-from ...trace_server import trace_server_interface as tsi
 
 
 def test_op_return_sync_empty(client):
