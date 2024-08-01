@@ -58,6 +58,7 @@ export type TraceCallsQueryReq = {
   offset?: number;
   sort_by?: SortBy[];
   query?: Query;
+  columns?: string[];
 };
 
 export type TraceCallsQueryRes = {

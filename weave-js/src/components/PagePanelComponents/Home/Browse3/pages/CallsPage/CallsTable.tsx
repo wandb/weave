@@ -515,6 +515,12 @@ export const CallsTable: FC<{
             filter: effectiveFilter,
             gridFilter: filterModel,
             gridSort: sortModel,
+            // TODO(gst): how do we manage order
+            columns: columnVisibilityModel
+              ? Object.keys(columnVisibilityModel).filter(
+                  col => columnVisibilityModel[col]
+                )
+              : undefined,
           }}
           rightmostButton={isReadonly}
         />
@@ -535,6 +541,7 @@ export const CallsTable: FC<{
     effectiveFilter,
     filterModel,
     sortModel,
+    columnVisibilityModel,
   ]);
 
   // Register Delete Button

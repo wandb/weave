@@ -274,7 +274,7 @@ function buildCallsTableColumns(
     //   },
     // },
     {
-      field: 'derived.status_code',
+      field: 'summary.weave.status',
       headerName: 'Status',
       headerAlign: 'center',
       sortable: false,
@@ -471,7 +471,7 @@ function buildCallsTableColumns(
   cols.push(startedAtCol);
 
   cols.push({
-    field: 'derived.tokens',
+    field: 'summary.weave.tokens',
     headerName: 'Tokens',
     width: 100,
     minWidth: 100,
@@ -492,7 +492,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'derived.cost',
+    field: 'summary.weave.cost',
     headerName: 'Cost',
     width: 100,
     minWidth: 100,
@@ -513,7 +513,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'derived.latency',
+    field: 'summary.weave.latency',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,

@@ -28,6 +28,7 @@ export const ExportRunsTableButton = ({
     filter: WFHighLevelCallFilter;
     gridFilter: GridFilterModel;
     gridSort?: GridSortModel;
+    columns?: string[];
   };
   pageName: string;
   rightmostButton?: boolean;
@@ -55,7 +56,8 @@ export const ExportRunsTableButton = ({
       MAX_EXPORT,
       0,
       sortBy,
-      filterBy
+      filterBy,
+      callQueryParams.columns
     )
       .then(() => {
         ///
@@ -69,6 +71,7 @@ export const ExportRunsTableButton = ({
   }, [
     callQueryParams.entity,
     callQueryParams.project,
+    callQueryParams.columns,
     lowLevelFilter,
     sortBy,
     filterBy,
@@ -111,8 +114,7 @@ export const ExportRunsTableButton = ({
             {
               value: 'export-json',
               text: 'Export to json',
-              // onClick: () => setClickedOption(ContentType.json),
-              disabled: true,
+              onClick: () => setClickedOption(ContentType.json),
             },
             {
               value: 'export-tsv',
