@@ -4,7 +4,7 @@ import typing
 import numpy as np
 import pytest
 
-from weave import query_api as weave
+import weave
 from weave.legacy import artifact_fs, derive_op, op_def
 from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
 
