@@ -1,6 +1,7 @@
 import shutil
 
-from .. import api as weave
+from weave import api as weave
+
 from ..show import _show_params
 
 

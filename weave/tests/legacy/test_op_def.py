@@ -5,9 +5,8 @@ from dataclasses import dataclass
 
 import pytest
 
+from weave import api as weave
 from weave.legacy import context_state
-
-from .. import api as weave
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 

@@ -1,9 +1,9 @@
 import pytest
 
 import weave
+from weave import storage, weave_internal
 from weave.legacy.panels import panel_plot
 
-from .. import storage, weave_internal
 from ..legacy.panels.panel_group import Group
 from ..legacy.panels.panel_slider import Slider
 

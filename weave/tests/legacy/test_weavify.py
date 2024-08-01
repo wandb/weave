@@ -1,9 +1,9 @@
 import pytest
 
+from weave import weave_internal, weavify
+from weave import weave_types as types
 from weave.legacy import graph, ops
 
-from .. import weave_internal, weavify
-from .. import weave_types as types
 from . import geom
 
 

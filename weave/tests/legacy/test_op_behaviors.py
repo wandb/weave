@@ -12,6 +12,7 @@ import typing
 import pytest
 
 import weave
+from weave import registry_mem, storage, weave_internal
 from weave.legacy import (
     graph,
     graph_debug,
@@ -25,7 +26,6 @@ from weave.legacy.language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
 
-from .. import registry_mem, storage, weave_internal
 from .concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,

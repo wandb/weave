@@ -3,12 +3,12 @@ import typing
 import pytest
 
 import weave
+from weave import stitch, weave_internal
 from weave.legacy import compile_domain, compile_table
 from weave.legacy import context_state as _context
 from weave.legacy.language_features.tagging import make_tag_getter_op
 from weave.legacy.ops_domain import run_ops
 
-from .. import stitch, weave_internal
 from . import fixture_fakewandb as fwb
 from . import test_wb
 

@@ -7,12 +7,12 @@ import numpy as np
 import pytest
 import wandb
 
+from weave import api as weave
+from weave import storage
+from weave import weave_types as types
 from weave.legacy import artifact_mem, artifact_wandb, mappers_python, ops_arrow
 from weave.legacy.arrow import list_ as arrow
 
-from .. import api as weave
-from .. import storage
-from .. import weave_types as types
 from ..weave_internal import make_const_node
 from ..weavejs_fixes import recursively_unwrap_unions
 from . import test_helpers

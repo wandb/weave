@@ -5,7 +5,7 @@ import pytest
 import weave
 from weave import Evaluation, Model
 
-from ..trace_server import trace_server_interface as tsi
+from ...trace_server import trace_server_interface as tsi
 
 
 def flatten_calls(
@@ -586,3 +586,53 @@ async def test_eval_supports_non_op_funcs(client):
 
     # # 2: Assert that the model was correctly oped
     # assert shouldBeModelRef.startswith("weave:///")
+
+
+@pytest.mark.asyncio
+async def test_evaluation_with_jagged_data(client):
+    data = [
+        {
+            "expected": {"a": 1, "b": {"c": 2}, "d": {}, "e": None},
+            "actual": {"a": 1, "b": {"c": 2}, "d": {}, "e": None},
+        },
+        {
+            "expected": {"a": None, "b": {"c": 2}, "d": {}, "e": None},
+            "actual": {"a": None, "b": {"c": 2}, "d": {}, "e": None},
+        },
+        {
+            "expected": {"a": 1, "b": {"c": 2}, "d": {}, "e": None},
+            "actual": {"a": 1, "b": {"c": 2}, "d": {}, "e": None},
+        },
+        {
+            "expected": {"a": None, "b": {"c": 2}, "d": {}, "e": None},
+            "actual": {"a": None, "b": {"c": 2}, "d": {}, "e": None},
+        },
+    ]
+
+    @weave.op
+    def model(model_res) -> dict:
+        return data[model_res]
+
+    def score_func(expected, model_output) -> dict:
+        return {"correct": expected == model_output}
+
+    evaluation = weave.Evaluation(
+        name="fruit_eval",
+        dataset=[{"model_res": i, "scorer_res": i} for i in range(len(data))],
+        scorers=[score_func],
+    )
+
+    res = await evaluation.evaluate(model)
+    assert res == {
+        "model_output": {
+            "a": {"mean": 3.0},
+            "b": {"c": {"mean": 2.0}},
+            "d": {"e": {"f": {"mean": 3.0}}},
+        },
+        "function_score": {
+            "a": {"mean": 3.0},
+            "b": {"c": {"mean": 2.0}},
+            "d": {"e": {"f": {"mean": 3.0}}},
+        },
+        "model_latency": {"mean": pytest.approx(0, abs=1)},
+    }

@@ -3,6 +3,7 @@ import itertools
 import numpy as np
 import pytest
 
+from weave import api as weave
 from weave import weave_internal
 from weave import weave_types as types
 from weave.legacy import box, ops
@@ -14,7 +15,6 @@ from weave.legacy.language_features.tagging import (
 )
 from weave.legacy.ops_primitives import dict_, list_
 
-from .. import api as weave
 from ..tests import tag_test_util as ttu
 from . import list_arrow_test_helpers as lath
 

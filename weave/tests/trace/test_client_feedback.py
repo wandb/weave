@@ -1,8 +1,8 @@
 import pytest
 
-from ..trace_server import trace_server_interface as tsi
-from ..trace_server.errors import InvalidRequest
-from ..trace_server.interface.query import Query
+from ...trace_server import trace_server_interface as tsi
+from ...trace_server.errors import InvalidRequest
+from ...trace_server.interface.query import Query
 
 
 def test_feedback_apis(client):

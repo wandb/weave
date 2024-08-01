@@ -7,6 +7,9 @@ import pyarrow as pa
 import pytest
 from PIL import Image
 
+from weave import api as weave
+from weave import errors, storage, weave_internal
+from weave import weave_types as types
 from weave.legacy import box, context_state, graph, mappers_arrow, ops
 
 # If you're thinking of import vectorize here, don't! Put your
@@ -26,9 +29,6 @@ from weave.legacy.ops_domain import project_ops
 from weave.legacy.ops_primitives import list_, make_list
 from weave.tests import list_arrow_test_helpers as lath
 
-from .. import api as weave
-from .. import errors, storage, weave_internal
-from .. import weave_types as types
 from ..tests import tag_test_util as ttu
 from ..tests import test_wb, weavejs_ops
 
