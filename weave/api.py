@@ -25,7 +25,6 @@ from . import errors as _errors
 from . import util as _util
 
 from weave.legacy import context as _context
-from weave.legacy import context_state as _context_state
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
 from weave import client_context
