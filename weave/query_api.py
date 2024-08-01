@@ -113,3 +113,40 @@ def type_of(obj: typing.Any) -> types.Type:
 def from_pandas(df):
     return _ops.pandas_to_awl(df)
 
+
+__all__ = [
+    # These seem to be important imports for query service...
+    # TODO: Remove as many as possible...
+    "_graph",
+    "Node",
+    "_graph_mapper",
+    "_storage",
+    "_ref_base",
+    "_wandb_api",
+    "_weave_internal",
+    "_util",
+    "_context",
+    "_weave_init",
+    "_weave_client",
+    "types",
+    "_types_numpy",
+    "errors",
+    "mutation",
+    "weave_class",
+    "type",
+    "usage_analytics",
+    "use_fixed_server_port",
+    "use_frontend_devmode",
+    "use_lazy_execution",
+    "Panel",
+    "WeaveList",
+    # These are the actual functions declared
+    "save",
+    "get",
+    "use",
+    "_get_ref",
+    "versions",
+    "expr",
+    "type_of",
+    "from_pandas",
+]

@@ -248,3 +248,25 @@ __docspec__ = [
     get_current_call,
     finish,
 ]
+
+
+__all__ = [
+    "init",
+    "remote_client",
+    "local_client",
+    "init_local_client",
+    "as_op",
+    "publish",
+    "ref",
+    "obj_ref",
+    "output_of",
+    "attributes",
+    "serve",
+    "finish",
+    "op",
+    "Table",
+    "ObjectRef",
+    "parse_uri",
+    "get_current_call",
+    "client_context",
+]
