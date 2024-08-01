@@ -595,10 +595,10 @@ async def test_eval_is_robust_to_missing_values(client):
     resp = [
         None,
         {"a": 1, "b": {"c": 2}, "always_none": None},
-        {"a": 1, "b": {"c": None}, "always_none": None},
-        {"a": 1, "b": {}, "always_none": None},
-        {"a": 1, "b": None, "always_none": None},
-        {"a": 1, "always_none": None},
+        {"a": 2, "b": {"c": None}, "always_none": None},
+        {"a": 3, "b": {}, "always_none": None},
+        {"a": 4, "b": None, "always_none": None},
+        {"a": 5, "always_none": None},
         {"a": None, "always_none": None},
         {"always_none": None},
         {},
@@ -613,14 +613,13 @@ async def test_eval_is_robust_to_missing_values(client):
 
     evaluation = weave.Evaluation(
         name="fruit_eval",
-        dataset=[
-            {"model_res": 0, "scorer_res": 0},
-            {"model_res": 1, "scorer_res": 1},
-            {"model_res": 2, "scorer_res": 2},
-            {"model_res": 3, "scorer_res": 3},
-        ],
+        dataset=[{"model_res": i, "scorer_res": i} for i in range(len(resp))],
         scorers=[function_score],
     )
 
     res = await evaluation.evaluate(model_func)
-    assert res != None
+    assert res == {
+        "model_output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
+        "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
+        "model_latency": {"mean": pytest.approx(0, abs=1)},
+    }
