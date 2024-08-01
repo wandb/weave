@@ -12,6 +12,8 @@ from weave.legacy import wandb_api as _wandb_api
 
 from . import weave_internal as _weave_internal
 
+from . import util as _util
+
 from weave.legacy import context as _context
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
@@ -22,10 +24,21 @@ from . import weave_types as types
 # needed to enable automatic numpy serialization
 from . import types_numpy as _types_numpy
 
-
 from . import errors
+from weave.legacy.decorators import weave_class, mutation, type
 
 from . import usage_analytics
+from weave.legacy.context import (
+    use_fixed_server_port,
+    use_frontend_devmode,
+    # eager_execution,
+    use_lazy_execution,
+)
+
+from weave.legacy.panel import Panel
+
+from weave.legacy.arrow.list_ import ArrowWeaveList as WeaveList
+
 
 def save(node_or_obj, name=None):
     from weave.legacy.ops_primitives.weave_api import get, save
