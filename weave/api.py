@@ -17,11 +17,6 @@ from . import util as _util
 from weave.legacy import context as _context
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
-from weave import client_context
-from weave.call_context import get_current_call as get_current_call
-from weave.trace import context as trace_context
-from .trace.constants import TRACE_OBJECT_EMOJI
-from weave.trace.refs import ObjectRef, parse_uri
 
 # exposed as part of api
 from . import weave_types as types
@@ -45,5 +40,5 @@ from weave.legacy.panel import Panel
 from weave.legacy.arrow.list_ import ArrowWeaveList as WeaveList
 
 from .query_api import save, get, use, _get_ref, versions, expr, type_of, from_pandas
-from .trace_api import init, remote_client, init_local_client, local_client, as_op, publish, ref, obj_ref, output_of, attributes, serve, finish, op, Table
+from .trace_api import init, remote_client, init_local_client, local_client, as_op, publish, ref, obj_ref, output_of, attributes, serve, finish, op, Table, ObjectRef, parse_uri, get_current_call, client_context
 
