@@ -204,15 +204,18 @@ export type TraceFileContentReadRes = {
   content: string;
 };
 
-export enum ContentTypeText {
+export enum ContentType {
   csv = 'text/csv',
   tsv = 'text/tab-separated-values',
-}
-
-export enum ContentTypeJson {
   any = '*/*',
   jsonl = 'application/jsonl',
   json = 'application/json',
 }
 
-export type ContentType = ContentTypeText | ContentTypeJson;
+export const fileExtensions = {
+  [ContentType.csv]: 'csv',
+  [ContentType.tsv]: 'tsv',
+  [ContentType.jsonl]: 'jsonl',
+  [ContentType.any]: 'jsonl',
+  [ContentType.json]: 'json',
+};

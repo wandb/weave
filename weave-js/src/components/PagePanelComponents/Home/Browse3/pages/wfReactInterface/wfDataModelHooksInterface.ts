@@ -188,7 +188,7 @@ export type WFDataModelHooksInterface = {
     callID: string,
     newName: string
   ) => Promise<void>;
-  useCallsExport: (
+  useCallsExport: () => (
     entity: string,
     project: string,
     contentType: ContentType,
@@ -196,10 +196,8 @@ export type WFDataModelHooksInterface = {
     limit?: number,
     offset?: number,
     sortBy?: traceServerClientTypes.SortBy[],
-    query?: Query,
-    expandedRefColumns?: Set<string>,
-    opts?: {skip?: boolean}
-  ) => Loadable<string | BinaryData | Map<string, any>>;
+    query?: Query
+  ) => Promise<void>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,

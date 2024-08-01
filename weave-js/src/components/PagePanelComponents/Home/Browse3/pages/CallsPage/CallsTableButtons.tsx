@@ -4,16 +4,12 @@ import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDr
 import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {saveAs} from 'file-saver';
 import React, {FC, useEffect, useState} from 'react';
 
-import {
-  ContentType,
-  ContentTypeJson,
-  ContentTypeText,
-} from '../wfReactInterface/traceServerClientTypes';
+import {useWFHooks} from '../wfReactInterface/context';
+import {ContentType} from '../wfReactInterface/traceServerClientTypes';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import {useCallsExportStream} from './callsTableQuery';
+import {useDownloadFilterSortby} from './callsTableQuery';
 
 const MAX_EXPORT = 100_000;
 
@@ -36,57 +32,49 @@ export const ExportRunsTableButton = ({
   pageName: string;
   rightmostButton?: boolean;
 }) => {
+  const {useCallsExport} = useWFHooks();
+  const download = useCallsExport();
   const [clickedOption, setClickedOption] = useState<ContentType | null>(null);
   const fileName = `${pageName}-export`;
 
-  const {result, loading} = useCallsExportStream(
-    callQueryParams.entity,
-    callQueryParams.project,
-    clickedOption ?? ContentTypeJson.jsonl,
+  const {sortBy, lowLevelFilter, filterBy} = useDownloadFilterSortby(
     callQueryParams.filter,
     callQueryParams.gridFilter,
-    callQueryParams.gridSort ?? null,
-    MAX_EXPORT,
-    clickedOption == null
+    callQueryParams.gridSort
   );
-  const [data, setData] = useState<
-    string | BinaryData | Map<string, any> | null
-  >(null);
-  useEffect(() => {
-    if (loading) {
-      setData(null);
-    } else if (result) {
-      setData(result);
-    }
-  }, [result, loading]);
 
   useEffect(() => {
-    if (!clickedOption || loading) {
+    if (!clickedOption) {
       return;
     }
-    if (!data) {
-      // TODO(gst): warn if large download?
-      return;
-    }
-
-    try {
-      let extension = '';
-      if (clickedOption === ContentTypeJson.jsonl) {
-        extension = 'jsonl';
-      } else if (clickedOption === ContentTypeJson.json) {
-        extension = 'json';
-      } else if (clickedOption === ContentTypeText.csv) {
-        extension = 'csv';
-      }
-      saveAs(data, `${fileName}.${extension}`);
-    } catch (e) {
-      console.error(e);
-      toast('Error exporting calls', {type: 'error'});
-    } finally {
-      setClickedOption(null);
-      setData(null);
-    }
-  }, [clickedOption, data, fileName, loading]);
+    download(
+      callQueryParams.entity,
+      callQueryParams.project,
+      clickedOption,
+      lowLevelFilter,
+      MAX_EXPORT,
+      0,
+      sortBy,
+      filterBy
+    )
+      .then(() => {
+        ///
+      })
+      .catch(e => {
+        toast(`Error downloading export: ${e}`, {type: 'error'});
+      })
+      .finally(() => {
+        setClickedOption(null);
+      });
+  }, [
+    callQueryParams.entity,
+    callQueryParams.project,
+    lowLevelFilter,
+    sortBy,
+    filterBy,
+    clickedOption,
+    download,
+  ]);
 
   const selectedExport = () => {
     tableRef.current?.exportDataAsCsv({
@@ -110,27 +98,31 @@ export const ExportRunsTableButton = ({
               className={rightmostButton ? 'mr-16' : 'mr-4'}
               icon="export-share-upload"
               variant="ghost"
-              disabled={loading}
             />
           }
-          disabled={loading}
           direction="left"
           search={false}
           options={[
             {
               value: 'export-jsonl',
               text: 'Export to jsonl',
-              onClick: () => setClickedOption(ContentTypeJson.jsonl),
+              onClick: () => setClickedOption(ContentType.jsonl),
             },
             {
               value: 'export-json',
               text: 'Export to json',
-              onClick: () => setClickedOption(ContentTypeJson.json),
+              // onClick: () => setClickedOption(ContentType.json),
+              disabled: true,
+            },
+            {
+              value: 'export-tsv',
+              text: 'Export to tsv',
+              onClick: () => setClickedOption(ContentType.tsv),
             },
             {
               value: 'export-csv',
               text: 'Export to csv',
-              onClick: () => setClickedOption(ContentTypeText.csv),
+              onClick: () => setClickedOption(ContentType.csv),
             },
             {
               value: 'export selected',

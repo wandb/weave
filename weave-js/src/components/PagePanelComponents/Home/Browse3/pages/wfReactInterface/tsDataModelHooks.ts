@@ -511,109 +511,44 @@ const useCallUpdateFunc = () => {
   return callUpdate;
 };
 
-const useCallsExport = (
-  entity: string,
-  project: string,
-  contentType: traceServerTypes.ContentType,
-  filter: CallFilter,
-  limit?: number,
-  offset?: number,
-  sortBy?: traceServerTypes.SortBy[],
-  query?: Query,
-  expandedRefColumns?: Set<string>,
-  opts?: {skip?: boolean}
-): Loadable<string | BinaryData | Map<string, any>> => {
+const useCallsExport = () => {
   const getTsClient = useGetTraceServerClientContext();
-  const loadingRef = useRef(false);
-  const [callRes, setCallRes] = useState<
-    string | BinaryData | Map<string, any> | null
-  >(null);
-  const deepFilter = useDeepMemo(filter);
-  const doFetch = useCallback(() => {
-    if (opts?.skip) {
-      return;
-    }
-    setCallRes(null);
-    loadingRef.current = true;
-    const req: traceServerTypes.TraceCallsQueryReq = {
-      project_id: projectIdFromParts({entity, project}),
-      filter: {
-        op_names: deepFilter.opVersionRefs,
-        input_refs: deepFilter.inputObjectVersionRefs,
-        output_refs: deepFilter.outputObjectVersionRefs,
-        parent_ids: deepFilter.parentIds,
-        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter.callIds,
-        trace_roots_only: deepFilter.traceRootsOnly,
-        wb_run_ids: deepFilter.runIds,
-        wb_user_ids: deepFilter.userIds,
-      },
-      limit,
-      offset,
-      sort_by: sortBy,
-      query,
-    };
-    const onSuccess = (res: string | BinaryData | Map<string, any>) => {
-      loadingRef.current = false;
-      setCallRes(res);
-    };
-    const onError = (e: any) => {
-      loadingRef.current = false;
-      console.error(e);
-      setCallRes(null);
-    };
-    getTsClient()
-      .callsStreamQueryExport(req, contentType)
-      .then(onSuccess)
-      .catch(onError);
-  }, [
-    entity,
-    project,
-    deepFilter,
-    limit,
-    opts?.skip,
-    getTsClient,
-    offset,
-    sortBy,
-    query,
-    contentType,
-  ]);
 
-  useEffect(() => {
-    if (opts?.skip) {
-      return;
-    }
-    doFetch();
-  }, [opts?.skip, doFetch]);
+  const downloadCallsExport = useCallback(
+    (
+      entity: string,
+      project: string,
+      contentType: traceServerTypes.ContentType,
+      filter: CallFilter,
+      limit?: number,
+      offset?: number,
+      sortBy?: traceServerTypes.SortBy[],
+      query?: Query
+    ) => {
+      const req: traceServerTypes.TraceCallsQueryReq = {
+        project_id: projectIdFromParts({entity, project}),
+        filter: {
+          op_names: filter.opVersionRefs,
+          input_refs: filter.inputObjectVersionRefs,
+          output_refs: filter.outputObjectVersionRefs,
+          parent_ids: filter.parentIds,
+          trace_ids: filter.traceId ? [filter.traceId] : undefined,
+          call_ids: filter.callIds,
+          trace_roots_only: filter.traceRootsOnly,
+          wb_run_ids: filter.runIds,
+          wb_user_ids: filter.userIds,
+        },
+        limit,
+        offset,
+        sort_by: sortBy,
+        query,
+      };
+      return getTsClient().callsStreamDownload(req, contentType);
+    },
+    [getTsClient]
+  );
 
-  return useMemo(() => {
-    console.log(
-      '>>>',
-      '.skip',
-      opts?.skip,
-      'callRes',
-      callRes,
-      'loadingRef',
-      loadingRef.current
-    );
-    if (opts?.skip) {
-      return {
-        loading: false,
-        result: null,
-      };
-    }
-    if (callRes == null || loadingRef.current) {
-      return {
-        loading: true,
-        result: null,
-      };
-    } else {
-      return {
-        loading: false,
-        result: callRes,
-      };
-    }
-  }, [callRes, opts?.skip]);
+  return downloadCallsExport;
 };
 
 const useFeedback = (

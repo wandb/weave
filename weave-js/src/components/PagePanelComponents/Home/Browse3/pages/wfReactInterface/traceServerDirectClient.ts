@@ -17,14 +17,13 @@ import fetch from 'isomorphic-unfetch';
 
 import {
   ContentType,
-  ContentTypeJson,
-  ContentTypeText,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
   FeedbackPurgeRes,
   FeedbackQueryReq,
   FeedbackQueryRes,
+  fileExtensions,
   TraceCallReadReq,
   TraceCallReadRes,
   TraceCallSchema,
@@ -159,16 +158,89 @@ export class DirectTraceServerClient {
     });
   }
 
-  public callsStreamQueryExport(
+  public callsStreamDownload(
     req: TraceCallsQueryReq,
-    contentType: ContentType = ContentTypeJson.any
-  ): Promise<BinaryData> {
-    return this.makeRequest<TraceCallsQueryReq, BinaryData>(
-      '/calls/stream_query',
-      req,
-      false,
-      contentType
-    );
+    contentType: ContentType = ContentType.any
+  ): Promise<void> {
+    const url = `${this.baseUrl}/calls/stream_query`;
+    const reqBody = JSON.stringify(req);
+
+    const headers: {[key: string]: string} = {
+      'Content-Type': 'application/json',
+      // This is a dummy auth header, the trace server requires
+      // that we send a basic auth header, but it uses cookies for
+      // authentication.
+      Authorization: 'Basic ' + btoa(':'),
+      Accept: contentType,
+    };
+    const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
+    if (useAdminPrivileges) {
+      headers['use-admin-privileges'] = 'true';
+    }
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Fetch the text data using streams
+        // eslint-disable-next-line wandb/no-unprefixed-urls
+        const response = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: reqBody,
+        });
+
+        // Check if the response is OK
+        if (!response.ok) {
+          try {
+            const error = await response.text();
+            console.error(error);
+          } catch (err) {
+            console.error(err);
+          }
+          reject(new Error(`Error fetching data: ${response.status}`));
+          return;
+        }
+
+        // Create a ReadableStream reader
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        const chunks: string[] = [];
+
+        while (true) {
+          // Read each chunk
+          const {done, value} = (await reader?.read()) ?? {
+            done: true,
+            value: new Uint8Array(),
+          };
+          if (done) {
+            break;
+          }
+
+          // Decode the chunk and add to the chunks array
+          const chunk = decoder.decode(value, {stream: true});
+          chunks.push(chunk);
+        }
+
+        // Combine all chunks into a single string
+        const textData = chunks.join('');
+        const blob = new Blob([textData], {type: contentType});
+        const downloadUrl = URL.createObjectURL(blob);
+
+        // create a download link and click it
+        const anchor = document.createElement('a');
+        anchor.href = downloadUrl;
+        const fileExtension = fileExtensions[contentType];
+        anchor.download = `export.${fileExtension}`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(downloadUrl);
+        resolve();
+      } catch (error) {
+        // Reject the promise if an error occurs
+        reject(new Error(`Error downloading data: ${error}`));
+      }
+    });
   }
 
   public callRead(req: TraceCallReadReq): Promise<TraceCallReadRes> {
@@ -275,19 +347,6 @@ export class DirectTraceServerClient {
       // authentication.
       Authorization: 'Basic ' + btoa(':'),
     };
-    if (contentType) {
-      if (contentType === ContentTypeText.csv) {
-        headers.Accept = 'text/csv';
-      } else if (contentType === ContentTypeText.tsv) {
-        headers.Accept = 'text/tab-separated-values';
-      } else if (
-        [ContentTypeJson.any, ContentTypeJson.jsonl].includes(contentType)
-      ) {
-        headers.Accept = 'application/jsonl';
-      } else if (contentType === ContentTypeJson.json) {
-        headers.Accept = 'application/json';
-      }
-    }
     const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
     if (useAdminPrivileges) {
       headers['use-admin-privileges'] = 'true';
@@ -302,8 +361,6 @@ export class DirectTraceServerClient {
       .then(response => {
         if (returnText) {
           return response.text();
-        } else if (contentType) {
-          return response.blob();
         }
         return response.json();
       })

@@ -14,7 +14,6 @@ import {useMemo} from 'react';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
-import {ContentType} from '../wfReactInterface/traceServerClientTypes';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
@@ -91,18 +90,11 @@ export const useCallsForQuery = (
   }, [callResults, calls.loading, total]);
 };
 
-export const useCallsExportStream = (
-  entity: string,
-  project: string,
-  contentType: ContentType,
+export const useDownloadFilterSortby = (
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
-  gridSort: GridSortModel | null,
-  limit: number,
-  skip: boolean
+  gridSort: GridSortModel | undefined
 ) => {
-  const {useCallsExport} = useWFHooks();
-
   const sortBy = useDeepMemo(
     useMemo(() => (gridSort ? getSortBy(gridSort) : []), [gridSort])
   );
@@ -115,29 +107,11 @@ export const useCallsExportStream = (
     [filterByRaw]
   );
 
-  const {result, loading} = useCallsExport(
-    entity,
-    project,
-    contentType,
-    lowLevelFilter,
-    limit,
-    0,
+  return {
     sortBy,
+    lowLevelFilter,
     filterBy,
-    undefined,
-    {skip}
-  );
-
-  const dataResult = useMemo(() => {
-    return result ?? null;
-  }, [result]);
-
-  return useMemo(() => {
-    return {
-      loading,
-      result: loading ? null : dataResult,
-    };
-  }, [dataResult, loading]);
+  };
 };
 
 const getFilterByRaw = (
