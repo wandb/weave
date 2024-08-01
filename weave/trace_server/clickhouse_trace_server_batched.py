@@ -352,8 +352,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(project_id=req.project_id)
-        cq.add_costs = False
-        
+        cq.add_costs(should_add_costs=True)
+
         # TODO (Perf): By allowing a sub-selection of columns
         # we will gain increased performance by not having to
         # fetch all columns from the database. Currently all use
@@ -1430,12 +1430,17 @@ def _make_derived_summary_map(
         None if not ended_at or not started_at else (ended_at - started_at).microseconds
     )
     display_name = display_name or op_name_simple_from_ref_str(op_name)
+    summary = summary_dump or {}
+    if "_weave" not in summary:
+        summary["_weave"] = {"costs": {}}
+    elif "costs" not in summary["_weave"]:
+        summary["_weave"]["costs"] = {}
     weave_derived_fields = tsi.WeaveSummarySchema(
         nice_trace_name=display_name,
         status=status,
         latency=latency,
+        costs=summary["_weave"]["costs"],
     )
-    summary = summary_dump or {}
     summary["_weave"] = weave_derived_fields
     return typing.cast(tsi.SummaryMap, summary)
 
@@ -1469,6 +1474,11 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
 
 # Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
+    attributes = _dict_dump_to_dict(ch_call_dict["attributes_dump"])
+    # Ensure _weave is included in attributes
+    if "_weave" not in attributes:
+        attributes["_weave"] = None  # or some default value if appropriate
+
     return dict(
         project_id=ch_call_dict.get("project_id"),
         id=ch_call_dict.get("id"),
@@ -1477,7 +1487,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         op_name=ch_call_dict.get("op_name"),
         started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
         ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-        attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
+        attributes=attributes,
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_make_derived_summary_map(

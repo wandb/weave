@@ -319,7 +319,7 @@ class Select:
                 j.query, self.all_columns, self.table.json_cols, param_builder
             )
             joined = combine_conditions(query_conds, "AND")
-            sql += f"\n{j.join_type} JOIN {j.table.name} ON {joined}"
+            sql += f"\n{j.join_type + ' ' if j.join_type != '' else ''}JOIN {j.table.name} ON {joined}"
 
         conditions = []
         if self._project_id:
@@ -535,18 +535,18 @@ def _transform_external_field_to_internal_field(
     raw_fields_used = set()
     json_path = None
 
-    # pops of table_prefix
-    table_prefix = None
-    unprefixed_field = field
-    if "." in field:
-        table_prefix, field = field.split(".", 1)
-
     for prefix in json_columns:
         if field == prefix:
             field = prefix + "_dump"
         elif field.startswith(prefix + "."):
             json_path = quote_json_path(field[len(prefix + ".") :])
             field = prefix + "_dump"
+
+    # pops of table_prefix
+    table_prefix = None
+    unprefixed_field = field
+    if "." in field:
+        table_prefix, field = field.split(".", 1)
 
     # validate field
     if (

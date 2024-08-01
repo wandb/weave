@@ -54,7 +54,7 @@ LLM_USAGE_COLUMNS = [
 
 
 # SELECT
-#     id, started_at,
+#     Extracted Usage Fields
 #     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{{}}') AS usage_raw,
 #     arrayJoin(
 #         arrayMap(
@@ -65,6 +65,7 @@ LLM_USAGE_COLUMNS = [
 #     kv.1 AS llm_id,
 #     JSONExtractInt(kv.2, 'requests') AS requests,
 #     -- Some libraries return prompt_tokens and completion_tokens, others prompt_tokens and completion_tokens
+#     -- If prompt_tokens is not present, we use input_tokens
 #     if(
 #         JSONHas(kv.2, 'prompt_tokens'),
 #         JSONExtractInt(kv.2, 'prompt_tokens'),
@@ -98,7 +99,7 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
 
     # Select fields
     usage_raw = "ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw"
-    kv = "arrayJoin(arrayMap(kv -> (kv.1, kv.2), JSONExtractKeysAndValuesRaw(usage_raw))) AS kv"
+    kv = "arrayJoin(JSONExtractKeysAndValuesRaw(usage_raw)) AS kv"
     llm_id = "kv.1 AS llm_id"
     requests = "JSONExtractInt(kv.2, 'requests') AS requests"
     prompt_tokens = """if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'input_tokens')) AS prompt_tokens"""
@@ -140,19 +141,9 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
 
 
 # SELECT
-#     lu.id, lu.llm_id, lu.started_at, ltp.prompt_token_cost, ltp.completion_token_cost, ltp.effective_date, ltp.pricing_level, ltp.pricing_level_id, ltp.provider_id, lu.requests,
-#     ROW_NUMBER() OVER (
-#         PARTITION BY lu.id, lu.llm_id
-#         ORDER BY
-#             CASE
-#                 -- Order by pricing level then by effective_date
-#                 -- WHEN ltp.pricing_level = 'org' AND ltp.pricing_level_id = ORG_NAME THEN 1
-#                 WHEN ltp.pricing_level = 'project' AND ltp.pricing_level_id = '{self.project_id}' THEN 2
-#                 WHEN ltp.pricing_level = 'default' AND ltp.pricing_level_id = 'default' THEN 3
-#                 ELSE 4
-#             END,
-#             ltp.effective_date DESC
-#     ) AS rank
+#     llm_usage_fields,
+#     price_fields,
+#     DERIVED_RANK_FIELD as rank
 # FROM
 #     {table_alias} AS lu
 # LEFT JOIN
@@ -238,7 +229,7 @@ def get_ranked_prices(
 
 
 # SELECT
-#     id, llm_id, prompt_token_cost, completion_token_cost, effective_date, pricing_level, pricing_level_id, provider_id
+#     price_fields
 # FROM
 #     {table_alias}
 # WHERE
@@ -272,15 +263,14 @@ def get_top_ranked_prices(
 
 
 # SELECT
-#     lu.id, lu.llm_id, lu.requests, lu.prompt_tokens, lu.completion_tokens, lu.total_tokens, lu.requests, trp.effective_date, trp.pricing_level, trp.pricing_level_id, trp.prompt_token_cost AS prompt_token_cost, trp.completion_token_cost AS completion_token_cost, trp.provider_id, prompt_tokens * prompt_token_cost AS prompt_tokens_cost, completion_tokens * completion_token_cost AS completion_tokens_cost
+#     llm_usage fields
+#     price_fields
 # FROM
 #     {usage_table_alias} AS lu
 # LEFT JOIN
 #     {price_table_alias} AS trp
 # ON
 #     lu.id = trp.id AND lu.llm_id = trp.llm_id
-
-
 # Join the call usage data with the top ranked prices to get the token costs
 def join_usage_with_costs(
     param_builder: ParamBuilder, usage_table_alias: str, price_table_alias: str
@@ -348,35 +338,12 @@ def join_usage_with_costs(
 
 
 # SELECT
-#       all_calls.project_id AS project_id, all_calls.id AS id, any(all_calls.op_name) AS op_name, all_calls.display_name, any(all_calls.trace_id) AS trace_id, any(all_calls.parent_id) AS parent_id, any(all_calls.started_at) AS started_at, any(all_calls.ended_at) AS ended_at, any(all_calls.exception) AS exception, array_concat_agg(all_calls.input_refs) AS input_refs, array_concat_agg(all_calls.output_refs) AS output_refs, any(all_calls.wb_user_id) AS wb_user_id, any(all_calls.wb_run_id) AS wb_run_id, any(all_calls.deleted_at) AS deleted_at, any(all_calls.attributes_dump) AS attributes_dump, any(all_calls.inputs_dump) AS inputs_dump, any(all_calls.output_dump) AS output_dump,
-#       -- Creates the cost object as a JSON string
-#       concat(
-#           -- Remove the last closing brace
-#           left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1),
-#           ',"costs":',
-#           concat('{', arrayStringConcat(groupUniqArray(
-#               concat('"', llm_id, '":{',
-#                   '"prompt_tokens":', toString(prompt_tokens), ',',
-#                   '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',',
-#                   '"completion_tokens_cost":', toString(completion_tokens_cost), ',',
-#                   '"completion_tokens":', toString(completion_tokens), ',',
-#                   '"prompt_token_cost":', toString(prompt_token_cost), ',',
-#                   '"completion_token_cost":', toString(completion_token_cost), ',',
-#                   '"total_tokens":', toString(total_tokens), ',',
-#                   '"requests":', toString(requests), ',',
-#                   '"effective_date":"', toString(effective_date), '",',
-#                   '"provider_id":"', toString(provider_id), '",',
-#                   '"pricing_level":"', toString(pricing_level), '",',
-#                   '"pricing_level_id":"', toString(pricing_level_id), '"}')
-#           ), ','), '}'),
-#       '}'
-#       ) AS summary_dump
+#   SELECT_FIELDS, (Passed in as a list)
+#   CONSTRUCTED_SUMMARY_OBJECT AS summary_dump
 # FROM all_calls
 # JOIN usage_with_costs
 #     ON all_calls.id = usage_with_costs.id
 # GROUP BY (all_calls.id, all_calls.project_id, all_calls.display_name)
-
-
 # From a calls like table, select all fields specified and add the cost object to the summary_dump
 def final_call_select_with_cost(
     param_builder: ParamBuilder,
@@ -384,31 +351,32 @@ def final_call_select_with_cost(
     price_table_alias: str,
     select_fields: list[str],
 ) -> PreparedSelect:
-    cost_snippet = """
-    ',"_weave":{',
+    numeric_fields_str = " ".join(
+        [
+            f""" '"{field}":', toString({field}), ',', """
+            for field in tsi.cost_numeric_fields
+        ]
+    )
+    string_fields_str = """ '",', """.join(
+        [f""" '"{field}":"', toString({field}), """ for field in tsi.cost_string_fields]
+    )
+
+    cost_snippet = f"""
+    ',"_weave":{{',
         '"costs":',
         concat(
-            '{',
+            '{{',
             arrayStringConcat(
                 groupUniqArray(
                     concat(
-                        '"', toString(llm_id), '":{',
-                        '"prompt_tokens":', toString(prompt_tokens), ',',
-                        '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',',
-                        '"completion_tokens_cost":', toString(completion_tokens_cost), ',',
-                        '"completion_tokens":', toString(completion_tokens), ',',
-                        '"prompt_token_cost":', toString(prompt_token_cost), ',',
-                        '"completion_token_cost":', toString(completion_token_cost), ',',
-                        '"total_tokens":', toString(total_tokens), ',',
-                        '"requests":', toString(requests), ',',
-                        '"effective_date":"', toString(effective_date), '",',
-                        '"provider_id":"', toString(provider_id), '",',
-                        '"pricing_level":"', toString(pricing_level), '",',
-                        '"pricing_level_id":"', toString(pricing_level_id), '"}'
+                        '"', toString(llm_id), '":{{',
+                        {numeric_fields_str}
+                        {string_fields_str}
+                    '"}}'
                     )
                 ), ','
             ),
-            '} }'
+            '}} }}'
         )
     """
 
@@ -456,6 +424,11 @@ def final_call_select_with_cost(
     return final_prepared_query
 
 
+# From a calls query we get the llm ids in the usage data
+# Then the prices and rank them
+# We get the top ranked prices and discard the rest
+# We join the top ranked prices with the usage data to get the token costs
+# Finally we pull all the data from the calls and add a costs object
 def cost_query(
     pb: ParamBuilder,
     call_table_alias: str,
@@ -471,12 +444,6 @@ def cost_query(
     ]
 
     raw_sql = f"""
-        -- From a calls query we get the llm ids in the usage data
-        -- Then the prices and rank them
-        -- We get the top ranked prices and discard the rest
-        -- We join the top ranked prices with the usage data to get the token costs
-        -- Finally we pull all the data from the calls and add a costs object
-        
         -- From the all_calls we get the usage data for LLMs
         llm_usage AS ({get_llm_usage(pb, call_table_alias).sql}),
 
