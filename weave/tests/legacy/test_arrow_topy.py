@@ -5,8 +5,7 @@ import pytest
 
 import weave
 from weave.legacy import ops_arrow
-
-from .concrete_tagged_value import (
+from weave.tests.legacy.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
     concrete_to_tagstore,

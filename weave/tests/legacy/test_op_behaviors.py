@@ -22,15 +22,13 @@ from weave.legacy import (
     ops_primitives,
 )
 from weave.legacy.language_features.tagging import make_tag_getter_op
-from weave.legacy.language_features.tagging.tagged_value_type import (
-    TaggedValueType,
-)
-
-from .concrete_tagged_value import (
+from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.tests.legacy.concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
     concrete_to_tagstore,
 )
+
 from .op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
 
 
