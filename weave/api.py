@@ -55,42 +55,7 @@ from weave.legacy.panel import Panel
 from weave.legacy.arrow.list_ import ArrowWeaveList as WeaveList
 from .table import Table
 
-from .query_api import save, get, use
-
-
-def _get_ref(obj):
-    if isinstance(obj, _storage.Ref):
-        return obj
-    ref = _storage.get_ref(obj)
-    if ref is None:
-        raise errors.WeaveApiError("obj is not a weave object: %s" % obj)
-    return ref
-
-
-def versions(obj):
-    if isinstance(obj, _graph.ConstNode):
-        obj = obj.val
-    elif isinstance(obj, _graph.OutputNode):
-        obj = use(obj)
-    ref = _get_ref(obj)
-    return ref.versions()  # type: ignore
-
-
-def expr(obj):
-    ref = _get_ref(obj)
-    return _trace.get_obj_expr(ref)
-
-
-def type_of(obj: typing.Any) -> types.Type:
-    return types.TypeRegistry.type_of(obj)
-
-
-# def weave(obj: typing.Any) -> RuntimeConstNode:
-#     return _weave_internal.make_const_node(type_of(obj), obj)  # type: ignore
-
-
-def from_pandas(df):
-    return _ops.pandas_to_awl(df)
+from .query_api import save, get, use, _get_ref, versions, expr, type_of, from_pandas
 
 
 #### Newer API below

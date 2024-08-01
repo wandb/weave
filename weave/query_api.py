@@ -16,6 +16,15 @@ from weave.legacy import context as _context
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
 
+# exposed as part of api
+from . import weave_types as types
+
+# needed to enable automatic numpy serialization
+from . import types_numpy as _types_numpy
+
+
+from . import errors
+
 from . import usage_analytics
 
 def save(node_or_obj, name=None):
@@ -53,3 +62,39 @@ def use(nodes, client=None):
     if client is None:
         client = _context.get_client()
     return _weave_internal.use(nodes, client)
+
+
+def _get_ref(obj):
+    if isinstance(obj, _storage.Ref):
+        return obj
+    ref = _storage.get_ref(obj)
+    if ref is None:
+        raise errors.WeaveApiError("obj is not a weave object: %s" % obj)
+    return ref
+
+
+def versions(obj):
+    if isinstance(obj, _graph.ConstNode):
+        obj = obj.val
+    elif isinstance(obj, _graph.OutputNode):
+        obj = use(obj)
+    ref = _get_ref(obj)
+    return ref.versions()  # type: ignore
+
+
+def expr(obj):
+    ref = _get_ref(obj)
+    return _trace.get_obj_expr(ref)
+
+
+def type_of(obj: typing.Any) -> types.Type:
+    return types.TypeRegistry.type_of(obj)
+
+
+# def weave(obj: typing.Any) -> RuntimeConstNode:
+#     return _weave_internal.make_const_node(type_of(obj), obj)  # type: ignore
+
+
+def from_pandas(df):
+    return _ops.pandas_to_awl(df)
+
