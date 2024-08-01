@@ -26,7 +26,7 @@ uri = WeaveURI.parse("$MODEL_REF")
 @stub.function(image=image, secret=Secret.from_dotenv(__file__))
 @asgi_app(label=safe_name(uri.name))
 def fastapi_app() -> FastAPI:
-    from weave import api
+    from weave import query_api as api
     from weave.serve_fastapi import object_method_app
 
     uri_ref = parse_uri(os.environ["MODEL_REF"])

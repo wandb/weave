@@ -1,6 +1,6 @@
 # Ideas for ops, but not production ready.
 
-from weave import api
+from weave import query_api as api
 from weave import weave_types as types
 from weave.api import op, weave_class
 

@@ -39,6 +39,8 @@ from weave.legacy.panel import Panel
 
 from weave.legacy.arrow.list_ import ArrowWeaveList as WeaveList
 
+# TODO: This is here because the op overloaded...
+from weave.trace.op import op  # noqa: F401
 
 def save(node_or_obj, name=None):
     from weave.legacy.ops_primitives.weave_api import get, save

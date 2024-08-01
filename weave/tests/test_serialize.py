@@ -1,7 +1,8 @@
 import pytest
 
 import weave
-from weave import api, registry_mem, weave_internal
+from weave import query_api as api
+from weave import registry_mem, weave_internal
 from weave import weave_types as types
 from weave.legacy import graph, op_args, ops, serialize
 from weave.legacy.ops_primitives import list_
