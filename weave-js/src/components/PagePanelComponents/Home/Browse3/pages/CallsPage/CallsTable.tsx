@@ -69,7 +69,7 @@ import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
-  ExportRunsTableButton,
+  ExportSelector,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
 import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
@@ -505,22 +505,15 @@ export const CallsTable: FC<{
   useEffect(() => {
     addExtra('exportRunsTableButton', {
       node: (
-        <ExportRunsTableButton
-          pageName={isEvaluateTable ? 'evaluations' : 'calls'}
-          tableRef={apiRef}
-          selectedCalls={selectedCalls}
+        <ExportSelector
+          disabled={tableData.length === 0}
+          columnVisibilityModel={columnVisibilityModel}
           callQueryParams={{
             entity,
             project,
             filter: effectiveFilter,
             gridFilter: filterModel,
             gridSort: sortModel,
-            // TODO(gst): how do we manage order
-            columns: columnVisibilityModel
-              ? Object.keys(columnVisibilityModel).filter(
-                  col => columnVisibilityModel[col]
-                )
-              : undefined,
           }}
           rightmostButton={isReadonly}
         />
@@ -530,14 +523,12 @@ export const CallsTable: FC<{
 
     return () => removeExtra('exportRunsTableButton');
   }, [
-    apiRef,
+    entity, 
+    project,
     isReadonly,
-    isEvaluateTable,
     addExtra,
     removeExtra,
-    selectedCalls,
-    entity,
-    project,
+    tableData.length,
     effectiveFilter,
     filterModel,
     sortModel,
