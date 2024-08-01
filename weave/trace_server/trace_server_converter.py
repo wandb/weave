@@ -1,9 +1,11 @@
 import typing
-from urllib.parse import quote, unquote
+from urllib.parse import unquote
 
 from pydantic import BaseModel
 
 from . import refs_internal as ri
+
+quote = ri.quote
 
 A = typing.TypeVar("A")
 B = typing.TypeVar("B")

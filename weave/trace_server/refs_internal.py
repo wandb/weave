@@ -7,7 +7,8 @@
 
 import dataclasses
 from typing import Union
-from urllib.parse import quote, unquote
+from urllib.parse import quote as urllib_quote
+from urllib.parse import unquote
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -17,6 +18,10 @@ DICT_KEY_EDGE_NAME = "key"
 LIST_INDEX_EDGE_NAME = "index"
 OBJECT_ATTR_EDGE_NAME = "attr"
 TABLE_ROW_ID_EDGE_NAME = "id"
+
+
+def quote(s: str) -> str:
+    return urllib_quote(s, safe="")
 
 
 @dataclasses.dataclass
@@ -103,7 +108,7 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
             project_id=project_id,
             name=name,
             version=version,
-            extra=remaining[1:],
+            extra=[unquote(r) for r in remaining[1:]],
         )
     elif kind == "op":
         name_quoted, version_quoted = remaining[0].split(":")
@@ -115,7 +120,7 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
             project_id=project_id,
             name=name,
             version=version,
-            extra=remaining[1:],
+            extra=[unquote(r) for r in remaining[1:]],
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")

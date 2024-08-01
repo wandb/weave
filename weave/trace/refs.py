@@ -1,6 +1,6 @@
 import dataclasses
 from typing import Any, Union
-from urllib.parse import quote, unquote
+from urllib.parse import unquote
 
 from ..trace_server import refs_internal
 
@@ -8,6 +8,9 @@ DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
 OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
 TABLE_ROW_ID_EDGE_NAME = refs_internal.TABLE_ROW_ID_EDGE_NAME
+
+
+quote = refs_internal.quote
 
 
 @dataclasses.dataclass(frozen=True)

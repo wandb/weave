@@ -1,8 +1,9 @@
 import random
-from urllib.parse import quote
 
 from weave.trace import refs
 from weave.trace_server import refs_internal
+
+quote = refs_internal.quote
 
 
 def test_isdescended_from():
@@ -25,13 +26,13 @@ def test_ref_parsing_external():
         project=string_with_every_char(),
         name=string_with_every_char(),
         digest=string_with_every_char(),
-        extra=[string_with_every_char(), string_with_every_char()],
+        extra=(string_with_every_char(), string_with_every_char()),
     )
 
     ref_str = ref_start.uri()
     assert (
         ref_str
-        == f"${refs_internal.WEAVE_SCHEME}:///{quote(ref_start.entity)}/{quote(ref_start.project)}/object/{quote(ref_start.name)}:{quote(ref_start.digest)}/{quote(ref_start.extra[0])}/{quote(ref_start.extra[1])}"
+        == f"{refs_internal.WEAVE_SCHEME}:///{quote(ref_start.entity)}/{quote(ref_start.project)}/object/{quote(ref_start.name)}:{quote(ref_start.digest)}/{quote(ref_start.extra[0])}/{quote(ref_start.extra[1])}"
     )
 
     parsed = refs.parse_uri(ref_str)
@@ -47,14 +48,14 @@ def test_ref_parsing_internal():
     ref_start = refs_internal.InternalObjectRef(
         project_id=string_with_every_char(),
         name=string_with_every_char(),
-        digest=string_with_every_char(),
+        version=string_with_every_char(),
         extra=[string_with_every_char(), string_with_every_char()],
     )
 
     ref_str = ref_start.uri()
     assert (
         ref_str
-        == f"${refs_internal.WEAVE_SCHEME}:///{quote(ref_start.project_id)}/object/{quote(ref_start.name)}:{quote(ref_start.digest)}/{quote(ref_start.extra[0])}/{quote(ref_start.extra[1])}"
+        == f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///{quote(ref_start.project_id)}/object/{quote(ref_start.name)}:{quote(ref_start.version)}/{quote(ref_start.extra[0])}/{quote(ref_start.extra[1])}"
     )
 
     parsed = refs_internal.parse_internal_uri(ref_str)
