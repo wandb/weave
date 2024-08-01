@@ -29,8 +29,8 @@ from weave.trace_server import (
 )
 
 from . import autopatch, environment, logs
-from .tests import fixture_fakewandb
-from .tests.trace_server_clickhouse_conftest import *
+from .tests.legacy import fixture_fakewandb
+from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
 
 logs.configure_logger()
