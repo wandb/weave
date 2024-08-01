@@ -20,7 +20,6 @@ from . import ref_base as _ref_base
 from weave.legacy import wandb_api as _wandb_api
 
 from . import weave_internal as _weave_internal
-from . import errors as _errors
 
 from . import util as _util
 
@@ -99,7 +98,7 @@ def _get_ref(obj):
         return obj
     ref = _storage.get_ref(obj)
     if ref is None:
-        raise _errors.WeaveApiError("obj is not a weave object: %s" % obj)
+        raise errors.WeaveApiError("obj is not a weave object: %s" % obj)
     return ref
 
 
