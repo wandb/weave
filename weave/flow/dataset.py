@@ -1,10 +1,14 @@
 from typing import Any
 
+import pandas as pd
 from pydantic import field_validator
 
 import weave
 from weave.flow.obj import Object
 from weave.trace.vals import WeaveTable
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 def short_str(obj: Any, limit: int = 25) -> str:
@@ -64,3 +68,18 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+
+    @weave.op
+    def add(self, row: dict) -> None:
+        """Add a row to the dataset."""
+        self.rows.add(row)
+
+    @weave.op
+    def remove(self, index: int) -> None:
+        """Remove a row from the dataset."""
+        self.rows.remove(index)
+
+    @weave.op
+    def to_pandas(self) -> "pd.DataFrame":
+        """Convert the dataset to a pandas DataFrame."""
+        return self.rows.to_pandas()

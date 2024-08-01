@@ -1,6 +1,9 @@
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING, Any, Iterator, Optional
 
 from weave.trace.refs import TableRef
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class Table:
@@ -28,3 +31,23 @@ class Table:
 
     def __iter__(self) -> Iterator:
         return iter(self.rows)
+
+    def __eq__(self, other: Any) -> bool:
+        return self.rows == other
+
+    def add(self, row: dict) -> None:
+        """Add a row to the table."""
+        self.rows.append(row)
+
+    def remove(self, index: int) -> None:
+        """Remove a row at the given index from the table."""
+        self.rows.pop(index)
+
+    def to_pandas(self) -> "pd.DataFrame":
+        """Convert the table to a pandas DataFrame."""
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ValueError("pandas is not installed")
+
+        return pd.DataFrame(self.rows)

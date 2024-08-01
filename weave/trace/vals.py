@@ -3,6 +3,7 @@ import inspect
 import operator
 import typing
 from typing import (
+    TYPE_CHECKING,
     Any,
     Generator,
     Iterator,
@@ -12,6 +13,7 @@ from typing import (
     Union,
 )
 
+import pandas as pd
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
@@ -37,6 +39,9 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     _TableRowFilter,
 )
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 @dataclasses.dataclass
@@ -270,14 +275,16 @@ class WeaveTable(Traceable):
         self._loaded_rows = rows
         self._mark_dirty()
 
+    def _load_rows_if_not_exists(self) -> None:
+        if self._loaded_rows is None:
+            self._loaded_rows = [row for row in self._remote_iter()]
+
     def _all_rows(self) -> typing.List[typing.Dict]:
         # TODO: This is not an efficient way to do this - we essentially
         # load the entire set of rows the first time we need anything. However
         # the previous implementation loaded the entire set of rows for every action
         # so this is still better.
-        if self._loaded_rows is None:
-            self._loaded_rows = [row for row in self._remote_iter()]
-
+        self._load_rows_if_not_exists()
         return typing.cast(typing.List[typing.Dict], self._loaded_rows)
 
     def _remote_iter(self) -> Generator[typing.Dict, None, None]:
@@ -325,8 +332,26 @@ class WeaveTable(Traceable):
             yield row
 
     def append(self, row: typing.Dict) -> None:
+        self._load_rows_if_not_exists()
         self._loaded_rows.append(row)
         self._mark_dirty()
+
+    def add(self, row: typing.Dict) -> None:
+        self.append(row)
+
+    def remove(self, index: int) -> None:
+        self._load_rows_if_not_exists()
+        self._loaded_rows.pop(index)
+        self._mark_dirty()
+
+    def to_pandas(self) -> "pd.DataFrame":
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ValueError("pandas is not installed")
+
+        self._load_rows_if_not_exists()
+        return pd.DataFrame(self._loaded_rows)
 
 
 class WeaveList(Traceable, list):
