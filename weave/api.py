@@ -41,7 +41,6 @@ from . import weave_types as types
 # needed to enable automatic numpy serialization
 from . import types_numpy as _types_numpy
 
-from . import errors
 from weave.legacy.decorators import weave_class, mutation, type
 from weave.trace.op import Op, op
 
