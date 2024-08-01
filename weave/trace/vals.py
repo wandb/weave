@@ -241,18 +241,34 @@ class WeaveTable(Traceable):
         server: TraceServerInterface,
         filter: _TableRowFilter,
         root: typing.Optional[Traceable],
+        parent: Optional[Traceable] = None,
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
         self.ref = ref  # type: ignore
-        self.server: TraceServerInterface = server
-        if root is None:
-            root = self
-        self.root = root
+        self.server = server
+        self.root = root or self
+        self.parent = parent
         self._loaded_rows: typing.Optional[typing.List[typing.Dict]] = None
 
     def __len__(self) -> int:
         return len(self._all_rows())
+
+    def __eq__(self, other: Any) -> bool:
+        return self._all_rows() == other
+
+    def _mark_dirty(self) -> None:
+        self.table_ref = None
+        super()._mark_dirty()
+
+    @property
+    def rows(self) -> typing.List[typing.Dict]:
+        return self._all_rows()
+
+    @rows.setter
+    def rows(self, rows: typing.List[typing.Dict]) -> None:
+        self._loaded_rows = rows
+        self._mark_dirty()
 
     def _all_rows(self) -> typing.List[typing.Dict]:
         # TODO: This is not an efficient way to do this - we essentially
@@ -308,9 +324,9 @@ class WeaveTable(Traceable):
         for row in self._all_rows():
             yield row
 
-    def append(self, val: Any) -> None:
-        if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only append to object refs")
+    def append(self, row: typing.Dict) -> None:
+        self._loaded_rows.append(row)
+        self._mark_dirty()
 
 
 class WeaveList(Traceable, list):

@@ -246,3 +246,45 @@ def test_dict_mutation_saving_nested_lists(client):
     assert d3["a"] == [1, 2]
     assert d3["b"] == [3, 4]
     assert d3["c"] == [5, 6]
+
+
+def test_table_mutation_saving_append_rows(client):
+    t = weave.Table(
+        rows=[
+            {"a": 1, "b": 2},
+            {"a": 3, "b": 4},
+        ]
+    )
+    ref = weave.publish(t)
+
+    t2 = ref.get()
+    assert t2 == [
+        {"a": 1, "b": 2},
+        {"a": 3, "b": 4},
+    ]
+    t2.append({"a": 5, "b": 6})
+    ref2 = weave.publish(t2)
+
+    t3 = ref2.get()
+    assert t3 == [
+        {"a": 1, "b": 2},
+        {"a": 3, "b": 4},
+        {"a": 5, "b": 6},
+    ]
+
+
+def test_table_mutation_saving_replace_rows(client):
+    t = weave.Table(
+        rows=[
+            {"a": 1, "b": 2},
+            {"a": 3, "b": 4},
+        ]
+    )
+    ref = weave.publish(t)
+
+    t2 = ref.get()
+    t2.rows = [{"a": 5, "b": 6}]
+    ref2 = weave.publish(t2)
+
+    t3 = ref2.get()
+    assert t3.rows == [{"a": 5, "b": 6}]

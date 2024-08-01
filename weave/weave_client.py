@@ -139,6 +139,8 @@ def map_to_refs(obj: Any) -> Any:
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
         return obj.ref
+    elif isinstance(obj, WeaveTable):
+        return obj.ref
     elif isinstance(obj, list):
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
@@ -744,7 +746,9 @@ class WeaveClient:
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
-        if getattr(val, "_is_dirty", False):
+        # The WeaveTable case is special because object saving happens inside
+        # _save_object_nested and it has a special table_ref -- skip it here.
+        if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
             val.ref = None
 
         is_opdef = isinstance(val, Op)
@@ -795,6 +799,9 @@ class WeaveClient:
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
         elif isinstance(obj, Table):
+            table_ref = self._save_table(obj)
+            obj.ref = table_ref
+        elif isinstance(obj, WeaveTable):
             table_ref = self._save_table(obj)
             obj.ref = table_ref
         elif isinstance_namedtuple(obj):
