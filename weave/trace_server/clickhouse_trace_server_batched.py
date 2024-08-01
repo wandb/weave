@@ -311,6 +311,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     call_ids=[req.id],
                 ),
                 limit=1,
+                add_cost=req.add_cost,
             )
         )
         try:
@@ -352,7 +353,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(project_id=req.project_id)
-        cq.add_costs(should_add_costs=True)
+        cq.add_cost(req.add_cost or False)
 
         # TODO (Perf): By allowing a sub-selection of columns
         # we will gain increased performance by not having to
@@ -1432,9 +1433,9 @@ def _make_derived_summary_map(
     display_name = display_name or op_name_simple_from_ref_str(op_name)
     summary = summary_dump or {}
     if "_weave" not in summary:
-        summary["_weave"] = {"costs": {}}
+        summary["_weave"] = {"costs": None}
     elif "costs" not in summary["_weave"]:
-        summary["_weave"]["costs"] = {}
+        summary["_weave"]["costs"] = None
     weave_derived_fields = tsi.WeaveSummarySchema(
         nice_trace_name=display_name,
         status=status,

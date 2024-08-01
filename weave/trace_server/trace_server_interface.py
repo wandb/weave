@@ -240,6 +240,7 @@ class CallEndRes(BaseModel):
 class CallReadReq(BaseModel):
     project_id: str
     id: str
+    add_cost: typing.Optional[bool] = False
 
 
 class CallReadRes(BaseModel):
@@ -287,6 +288,7 @@ class CallsQueryReq(BaseModel):
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[_SortBy]] = None
     query: typing.Optional[Query] = None
+    add_cost: typing.Optional[bool] = False
 
 
 class CallsQueryRes(BaseModel):
