@@ -5,9 +5,9 @@ import time
 from typing import Any, Callable, Iterator, Optional
 
 from weave import client_context
-from weave.call_context import get_current_call as get_current_call
-from weave.legacy import wandb_api as _wandb_api
-from weave.trace import context as trace_context
+from weave.call_context import get_current_call
+from weave.legacy import wandb_api
+from weave.trace import context
 from weave.trace.op import Op, op  # noqa: F401
 from weave.trace.refs import ObjectRef, parse_uri
 
@@ -176,14 +176,14 @@ def output_of(obj: Any) -> Optional[weave_client.Call]:
 
 @contextlib.contextmanager
 def attributes(attributes: dict[str, Any]) -> Iterator:
-    cur_attributes = {**trace_context.call_attributes.get()}
+    cur_attributes = {**context.call_attributes.get()}
     cur_attributes.update(attributes)
 
-    token = trace_context.call_attributes.set(cur_attributes)
+    token = context.call_attributes.set(cur_attributes)
     try:
         yield
     finally:
-        trace_context.call_attributes.reset(token)
+        context.call_attributes.reset(token)
 
 
 def serve(
@@ -209,13 +209,13 @@ def serve(
     os.environ["PROJECT_NAME"] = f"{client.entity}/{client.project}"
     os.environ["MODEL_REF"] = str(model_ref)
 
-    wandb_api_ctx = _wandb_api.get_wandb_api_context()
+    wandb_api_ctx = wandb_api.get_wandb_api_context()
     app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
-    trace_attrs = trace_context.call_attributes.get()
+    trace_attrs = context.call_attributes.get()
 
     def run():
         # This function doesn't return, because uvicorn.run does not return.
-        with _wandb_api.wandb_api_context(wandb_api_ctx):
+        with wandb_api.wandb_api_context(wandb_api_ctx):
             with attributes(trace_attrs):
                 uvicorn.run(app, host="0.0.0.0", port=port)
 
