@@ -4,7 +4,7 @@ from weave.trace.patcher import SymbolPatcher
 
 
 def test_symbol_patcher():
-    from .test_patcher_module.example_class import ExampleClass
+    from weave.trace.tests.test_patcher_module.example_class import ExampleClass
 
     patcher = SymbolPatcher(
         lambda: importlib.import_module(
@@ -49,7 +49,7 @@ def test_symbol_patcher_invalid_attr():
 
 
 def test_symbol_patcher_invalid_patching():
-    from .test_patcher_module.example_class import ExampleClass
+    from weave.trace.tests.test_patcher_module.example_class import ExampleClass
 
     patcher = SymbolPatcher(
         lambda: importlib.import_module(

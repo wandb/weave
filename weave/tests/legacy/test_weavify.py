@@ -3,8 +3,7 @@ import pytest
 from weave import weave_internal, weavify
 from weave import weave_types as types
 from weave.legacy import graph, ops
-
-from . import geom
+from weave.tests.legacy import geom
 
 
 @pytest.mark.parametrize(

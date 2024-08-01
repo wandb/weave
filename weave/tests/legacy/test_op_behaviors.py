@@ -28,8 +28,7 @@ from weave.tests.legacy.concrete_tagged_value import (
     concrete_from_tagstore,
     concrete_to_tagstore,
 )
-
-from .op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
+from weave.tests.legacy.op_specs import OP_TEST_SPECS, OpSpec, OpSpecTestCase
 
 
 def assert_equal_with_tags(node: graph.Node, v: typing.Any, expected: typing.Any):

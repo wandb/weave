@@ -12,10 +12,9 @@ from weave import storage
 from weave import weave_types as types
 from weave.legacy import artifact_mem, artifact_wandb, mappers_python, ops_arrow
 from weave.legacy.arrow import list_ as arrow
+from weave.tests.legacy import test_helpers
 from weave.weave_internal import make_const_node
 from weave.weavejs_fixes import recursively_unwrap_unions
-
-from . import test_helpers
 
 
 @weave.type()
