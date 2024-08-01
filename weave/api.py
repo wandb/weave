@@ -2,11 +2,9 @@
 
 import time
 import typing
-from typing import Optional, Union
+from typing import Optional
 import os
 import contextlib
-import dataclasses
-from typing import Any
 import threading
 
 from . import urls
