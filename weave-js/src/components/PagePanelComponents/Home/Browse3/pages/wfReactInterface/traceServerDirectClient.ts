@@ -277,18 +277,17 @@ export class DirectTraceServerClient {
     };
     if (contentType) {
       if (contentType === ContentTypeText.csv) {
-        headers['Accept'] = 'text/csv';
+        headers.Accept = 'text/csv';
       } else if (contentType === ContentTypeText.tsv) {
-        headers['Accept'] = 'text/tab-separated-values';
+        headers.Accept = 'text/tab-separated-values';
       } else if (
         [ContentTypeJson.any, ContentTypeJson.jsonl].includes(contentType)
       ) {
-        headers['Accept'] = 'application/jsonl';
+        headers.Accept = 'application/jsonl';
       } else if (contentType === ContentTypeJson.json) {
-        headers['Accept'] = 'application/json';
+        headers.Accept = 'application/json';
       }
     }
-    console.log('HEADERS', headers);
     const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
     if (useAdminPrivileges) {
       headers['use-admin-privileges'] = 'true';
