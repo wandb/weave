@@ -109,6 +109,7 @@ line-length = 88
 show-fixes = true
 exclude = [
   "weave/query_api.py",
+  "weave/tests/legacy/tag_test_util.py",
   "weave/__init__.py",
   "weave/legacy/**/*.py",
   "examples",
