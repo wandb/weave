@@ -1,7 +1,6 @@
 import {IconName} from '../Icon';
 import * as Panel from './panel';
 import {Spec as PanelArtifactVersionAliasesSpec} from './PanelArtifactVersionAliases';
-import {Spec as PanelArtifactVersionTagsSpec} from './PanelArtifactVersionTags';
 import {Spec as AudioSpec} from './PanelAudio';
 import {Spec as BarChartSpec} from './PanelBarChart';
 import {Spec as BokehSpec} from './PanelBokeh';
@@ -160,7 +159,6 @@ const initSpecs = () => {
       NDArraySpec,
 
       PanelArtifactVersionAliasesSpec,
-      PanelArtifactVersionTagsSpec,
 
       PanelTraceTreeTraceTableViewerSpec,
       PanelTraceTreeFromHistoryTraceTableViewerSpec,

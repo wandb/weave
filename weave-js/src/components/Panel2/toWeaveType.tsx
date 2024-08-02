@@ -19,7 +19,6 @@ export const panelIdAlternativeMapping: {[jsId: string]: string} = {
   'run-overview': 'PanelRunOverview',
   none: 'PanelNone',
   artifactVersionAliases: 'PanelArtifactVersionAliases',
-  artifactVersionTags: 'PanelArtifactVersionTags',
   netron: 'PanelNetron',
   object: 'PanelObject',
   'audio-file': 'PanelAudioFile',
