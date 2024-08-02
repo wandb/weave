@@ -501,20 +501,17 @@ export const CallsTable: FC<{
     history,
   ]);
 
-  const visibleColumns = useMemo(() => {
+  // Register Export Button
+  useEffect(() => {
     // We really want to use columns here, but because visibileColumns
     // is a prop to ExportSelector, and that gets mounted in the table (?)
     // we have a circular dependency causing infinite reloads
-    if (tableData.length === 0) {
-      return [];
-    }
-    return Object.keys(tableData[0]).filter(
-      col => columnVisibilityModel?.[col] !== false
-    );
-  }, [tableData, columnVisibilityModel]);
-
-  // Register Export Button
-  useEffect(() => {
+    const visibleColumns =
+      tableData.length > 0
+        ? Object.keys(tableData[0]).filter(
+            col => columnVisibilityModel?.[col] !== false
+          )
+        : [];
     addExtra('exportButton', {
       node: (
         <ExportSelector
@@ -539,10 +536,11 @@ export const CallsTable: FC<{
   }, [
     selectedCalls,
     callsTotal,
+    tableData,
+    columnVisibilityModel,
     entity,
     project,
     isReadonly,
-    visibleColumns,
     effectiveFilter,
     filterModel,
     sortModel,
