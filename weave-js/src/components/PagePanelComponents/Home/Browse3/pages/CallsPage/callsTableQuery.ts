@@ -37,18 +37,12 @@ export const useCallsForQuery = (
   expandedColumns: Set<string>
 ) => {
   const {useCalls, useCallsStats} = useWFHooks();
-  const lowLevelFilter: CallFilter = useMemo(() => {
-    return convertHighLevelFilterToLowLevelFilter(filter);
-  }, [filter]);
-
   const offset = gridPage.page * gridPage.pageSize;
   const limit = gridPage.pageSize;
-
-  const sortBy = useDeepMemo(useMemo(() => getSortBy(gridSort), [gridSort]));
-  const filterByRaw = useMemo(() => getFilterByRaw(gridFilter), [gridFilter]);
-  const filterBy: Query | undefined = useMemo(
-    () => getFilterBy(filterByRaw),
-    [filterByRaw]
+  const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
+    filter,
+    gridFilter,
+    gridSort
   );
 
   const calls = useCalls(
@@ -90,7 +84,7 @@ export const useCallsForQuery = (
   }, [callResults, calls.loading, total]);
 };
 
-export const useDownloadFilterSortby = (
+export const useFilterSortby = (
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
   gridSort: GridSortModel | undefined

@@ -1,10 +1,5 @@
 import {Box, Popover} from '@mui/material';
-import {
-  GridApiPro,
-  GridColumnVisibilityModel,
-  GridFilterModel,
-  GridSortModel,
-} from '@mui/x-data-grid-pro';
+import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {TextField} from '@wandb/weave/components/Form/TextField';
@@ -12,14 +7,14 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralize} from '@wandb/weave/core/util/string';
-import React, {FC, useRef, useState} from 'react';
+import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
 import {ContentType} from '../wfReactInterface/traceServerClientTypes';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import {useDownloadFilterSortby} from './callsTableQuery';
+import {useFilterSortby} from './callsTableQuery';
 
-const MAX_EXPORT = 100_000;
+const MAX_EXPORT = 10_000;
 
 type SelectionState = {
   allChecked?: boolean;
@@ -30,17 +25,15 @@ type SelectionState = {
 
 export const ExportSelector = ({
   selectedCalls,
-  tableRef,
   numTotalCalls,
-  columnVisibilityModel,
+  visibleColumns,
   disabled,
   callQueryParams,
   rightmostButton = false,
 }: {
   selectedCalls: string[];
-  tableRef: React.MutableRefObject<GridApiPro>;
   numTotalCalls: number;
-  columnVisibilityModel: GridColumnVisibilityModel | undefined;
+  visibleColumns: string[];
   callQueryParams: {
     entity: string;
     project: string;
@@ -63,45 +56,38 @@ export const ExportSelector = ({
 
   const open = Boolean(anchorEl);
   const id = open ? 'simple-popper' : undefined;
-  const cols = columnVisibilityModel ?? {};
-  const numVisible = Object.values(cols).filter(v => v === true).length;
 
   const {useCallsExport} = useWFHooks();
   const download = useCallsExport();
 
-  const {sortBy, lowLevelFilter, filterBy} = useDownloadFilterSortby(
+  const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
     callQueryParams.filter,
     callQueryParams.gridFilter,
     callQueryParams.gridSort
   );
 
   const onClickDownload = (contentType: ContentType) => {
-    if (selectionState.selectedChecked) {
-      // download from datagrid table
-      tableRef.current?.exportDataAsCsv({
-        getRowsToExport: () => selectedCalls,
-        fileName: `${callQueryParams.project}-export`,
-      });
+    lowLevelFilter.callIds = selectionState.selectedChecked
+      ? selectedCalls
+      : undefined;
+    // TODO(gst): allow user to specify offset?
+    const offset = 0;
+    const limit = selectionState.limitChecked
+      ? Math.min(MAX_EXPORT, parseInt(selectionState.limit ?? '100', 10))
+      : MAX_EXPORT;
+    download(
+      callQueryParams.entity,
+      callQueryParams.project,
+      contentType,
+      lowLevelFilter,
+      limit,
+      offset,
+      sortBy,
+      filterBy,
+      visibleColumns
+    ).then(() => {
       setAnchorEl(null);
-    } else {
-      // download from server
-      const limit = selectionState.limitChecked
-        ? Math.min(MAX_EXPORT, parseInt(selectionState.limit ?? '100', 10))
-        : MAX_EXPORT;
-      download(
-        callQueryParams.entity,
-        callQueryParams.project,
-        contentType,
-        lowLevelFilter,
-        limit,
-        0,
-        sortBy,
-        filterBy,
-        Object.keys(cols).filter(v => cols[v] === true)
-      ).then(() => {
-        setAnchorEl(null);
-      });
-    }
+    });
     setSelectionState({allChecked: true});
   };
 
@@ -124,13 +110,6 @@ export const ExportSelector = ({
           vertical: 'bottom',
           horizontal: 'center',
         }}
-        slotProps={{
-          paper: {
-            sx: {
-              overflow: 'visible',
-            },
-          },
-        }}
         onClose={() => {
           setAnchorEl(null);
           setSelectionState({allChecked: true});
@@ -140,84 +119,16 @@ export const ExportSelector = ({
             <div className="flex items-center pb-8">
               <div className="flex-auto text-xl font-semibold">Export</div>
               <div className="ml-16 text-moon-500">
-                {maybePluralize(numVisible, 'column', 's')}
+                {maybePluralize(visibleColumns.length, 'column', 's')}
               </div>
             </div>
-            <div className="flex items-center">
-              <div className="ml-2" />
-              <Checkbox
-                checked={selectionState.allChecked ?? false}
-                onCheckedChange={() =>
-                  setSelectionState(s => ({allChecked: !s.allChecked}))
-                }
-              />
-              <div className="ml-6 mr-24">all rows ({numTotalCalls})</div>
-              <Checkbox
-                checked={selectionState.selectedChecked ?? false}
-                onCheckedChange={() =>
-                  setSelectionState(s => ({
-                    selectedChecked: !s.selectedChecked,
-                  }))
-                }
-              />
-              <div className="ml-8 mr-6">first</div>
-              <div className="w-auto min-w-[50px]">
-                <TextField
-                  type="number"
-                  placeholder="1000"
-                  value={selectionState.limit ?? ''}
-                  onChange={value =>
-                    setSelectionState(s => ({
-                      selectedChecked: s.selectedChecked,
-                      limit: value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="ml-4 mr-16">rows</div>
-              {selectedCalls.length > 0 &&
-                selectedCalls.length !== numTotalCalls && (
-                  <>
-                    <Checkbox
-                      checked={selectionState.limitChecked ?? false}
-                      onCheckedChange={() =>
-                        setSelectionState(s => ({
-                          limitChecked: !s.limitChecked,
-                        }))
-                      }
-                    />
-                    <div className="ml-4">
-                      selected rows ({selectedCalls.length})
-                    </div>
-                  </>
-                )}
-            </div>
-            <div className="mt-12 flex items-center">
-              <ClickableOutlinedCardWithIcon
-                iconName="export-share-upload"
-                onClick={() => onClickDownload(ContentType.csv)}>
-                Export to CSV
-              </ClickableOutlinedCardWithIcon>
-              <div className="ml-8" />
-              <ClickableOutlinedCardWithIcon
-                iconName="export-share-upload"
-                onClick={() => onClickDownload(ContentType.tsv)}>
-                Export to TSV
-              </ClickableOutlinedCardWithIcon>
-            </div>
-            <div className="mt-8 flex items-center">
-              <ClickableOutlinedCardWithIcon
-                iconName="export-share-upload"
-                onClick={() => onClickDownload(ContentType.jsonl)}>
-                Export to JSONL
-              </ClickableOutlinedCardWithIcon>
-              <div className="ml-8" />
-              <ClickableOutlinedCardWithIcon
-                iconName="export-share-upload"
-                onClick={() => onClickDownload(ContentType.json)}>
-                Export to JSON
-              </ClickableOutlinedCardWithIcon>
-            </div>
+            <SelectionCheckboxes
+              selectedCalls={selectedCalls}
+              numTotalCalls={numTotalCalls}
+              selectionState={selectionState}
+              setSelectionState={setSelectionState}
+            />
+            <DownloadGrid onClickDownload={onClickDownload} />
             <div className="mt-12 flex items-center text-moon-500">
               <IconOnlyPill color="moon" icon="warning" />
               <div className="ml-6">
@@ -228,6 +139,62 @@ export const ExportSelector = ({
         </Tailwind>
       </Popover>
     </>
+  );
+};
+
+const SelectionCheckboxes: FC<{
+  selectedCalls: string[];
+  numTotalCalls: number;
+  selectionState: SelectionState;
+  setSelectionState: Dispatch<SetStateAction<SelectionState>>;
+}> = ({selectedCalls, numTotalCalls, selectionState, setSelectionState}) => {
+  return (
+    <div className="flex items-center">
+      <div className="ml-2" />
+      <Checkbox
+        checked={selectionState.allChecked ?? false}
+        onCheckedChange={() => setSelectionState(s => ({allChecked: true}))}
+      />
+      <div className="ml-6 mr-24">all rows ({numTotalCalls})</div>
+      <Checkbox
+        checked={selectionState.selectedChecked ?? false}
+        onCheckedChange={() =>
+          setSelectionState(s => ({
+            selectedChecked: !s.selectedChecked,
+            allChecked: s.selectedChecked,
+          }))
+        }
+      />
+      <div className="ml-8 mr-6">first</div>
+      <div className="w-auto min-w-[50px]">
+        <TextField
+          type="number"
+          placeholder="1000"
+          value={selectionState.limit ?? ''}
+          onChange={value =>
+            setSelectionState(s => ({
+              selectedChecked: s.selectedChecked,
+              limit: value,
+            }))
+          }
+        />
+      </div>
+      <div className="ml-4 mr-16">rows</div>
+      {selectedCalls.length > 0 && selectedCalls.length !== numTotalCalls && (
+        <>
+          <Checkbox
+            checked={selectionState.limitChecked ?? false}
+            onCheckedChange={() =>
+              setSelectionState(s => ({
+                limitChecked: !s.limitChecked,
+                allChecked: s.limitChecked,
+              }))
+            }
+          />
+          <div className="ml-4">selected rows ({selectedCalls.length})</div>
+        </>
+      )}
+    </div>
   );
 };
 
@@ -244,6 +211,41 @@ const ClickableOutlinedCardWithIcon: FC<{
     <div className="ml-4">{children}</div>
   </div>
 );
+
+const DownloadGrid: FC<{
+  onClickDownload: (contentType: ContentType) => void;
+}> = ({onClickDownload}) => {
+  return (
+    <>
+      <div className="mt-12 flex items-center">
+        <ClickableOutlinedCardWithIcon
+          iconName="export-share-upload"
+          onClick={() => onClickDownload(ContentType.csv)}>
+          Export to CSV
+        </ClickableOutlinedCardWithIcon>
+        <div className="ml-8" />
+        <ClickableOutlinedCardWithIcon
+          iconName="export-share-upload"
+          onClick={() => onClickDownload(ContentType.tsv)}>
+          Export to TSV
+        </ClickableOutlinedCardWithIcon>
+      </div>
+      <div className="mt-8 flex items-center">
+        <ClickableOutlinedCardWithIcon
+          iconName="export-share-upload"
+          onClick={() => onClickDownload(ContentType.jsonl)}>
+          Export to JSONL
+        </ClickableOutlinedCardWithIcon>
+        <div className="ml-8" />
+        <ClickableOutlinedCardWithIcon
+          iconName="export-share-upload"
+          onClick={() => onClickDownload(ContentType.json)}>
+          Export to JSON
+        </ClickableOutlinedCardWithIcon>
+      </div>
+    </>
+  );
+};
 
 export const CompareEvaluationsTableButton: FC<{
   onClick: () => void;

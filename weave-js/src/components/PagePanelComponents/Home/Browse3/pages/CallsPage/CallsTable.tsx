@@ -501,16 +501,21 @@ export const CallsTable: FC<{
     history,
   ]);
 
+  const visibleColumns = useMemo(() => {
+    return Object.keys(tableData).filter(
+      col => columnVisibilityModel?.[col] !== false
+    );
+  }, [tableData, columnVisibilityModel]);
+
   // Register Export Button
   useEffect(() => {
     addExtra('exportRunsTableButton', {
       node: (
         <ExportSelector
-          tableRef={apiRef}
           selectedCalls={selectedCalls}
           numTotalCalls={callsTotal}
           disabled={callsTotal === 0}
-          columnVisibilityModel={columnVisibilityModel}
+          visibleColumns={visibleColumns}
           callQueryParams={{
             entity,
             project,
@@ -526,19 +531,17 @@ export const CallsTable: FC<{
 
     return () => removeExtra('exportRunsTableButton');
   }, [
-    apiRef,
     selectedCalls,
     callsTotal,
     entity,
     project,
     isReadonly,
-    addExtra,
-    removeExtra,
-    tableData.length,
+    visibleColumns,
     effectiveFilter,
     filterModel,
     sortModel,
-    columnVisibilityModel,
+    addExtra,
+    removeExtra,
   ]);
 
   // Register Delete Button
