@@ -26,13 +26,6 @@ type SelectionState = {
   selectedChecked?: boolean;
   limitChecked?: boolean;
   limit?: string | null;
-  exportOption: ContentTypeOption;
-};
-
-type ContentTypeOption = {
-  value: ContentType | 'python' | 'curl';
-  text: string;
-  disabled?: boolean;
 };
 
 export const ExportSelector = ({
@@ -58,13 +51,9 @@ export const ExportSelector = ({
   disabled: boolean;
   rightmostButton?: boolean;
 }) => {
-  const defaultSelectionState = {
-    exportOption: {value: ContentType.jsonl, text: 'jsonl'},
+  const [selectionState, setSelectionState] = useState<SelectionState>({
     allChecked: true,
-  };
-  const [selectionState, setSelectionState] = useState<SelectionState>(
-    defaultSelectionState
-  );
+  });
 
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -86,13 +75,7 @@ export const ExportSelector = ({
     callQueryParams.gridSort
   );
 
-  const onClickDownload = () => {
-    if (
-      selectionState.exportOption.value == null ||
-      ['curl', 'python'].includes(selectionState.exportOption.value)
-    ) {
-      return;
-    }
+  const onClickDownload = (contentType: ContentType) => {
     if (selectionState.selectedChecked) {
       // download from datagrid table
       tableRef.current?.exportDataAsCsv({
@@ -102,14 +85,13 @@ export const ExportSelector = ({
       setAnchorEl(null);
     } else {
       // download from server
-      const exportType = selectionState.exportOption.value as ContentType;
       const limit = selectionState.limitChecked
         ? Math.min(MAX_EXPORT, parseInt(selectionState.limit ?? '100', 10))
         : MAX_EXPORT;
       download(
         callQueryParams.entity,
         callQueryParams.project,
-        exportType,
+        contentType,
         lowLevelFilter,
         limit,
         0,
@@ -120,7 +102,7 @@ export const ExportSelector = ({
         setAnchorEl(null);
       });
     }
-    setSelectionState(defaultSelectionState);
+    setSelectionState({allChecked: true});
   };
 
   return (
@@ -151,7 +133,7 @@ export const ExportSelector = ({
         }}
         onClose={() => {
           setAnchorEl(null);
-          setSelectionState(defaultSelectionState);
+          setSelectionState({allChecked: true});
         }}>
         <Tailwind>
           <div className="min-w-[460px] p-12">
@@ -166,10 +148,7 @@ export const ExportSelector = ({
               <Checkbox
                 checked={selectionState.allChecked ?? false}
                 onCheckedChange={() =>
-                  setSelectionState(s => ({
-                    exportOption: s.exportOption,
-                    allChecked: !s.allChecked,
-                  }))
+                  setSelectionState(s => ({allChecked: !s.allChecked}))
                 }
               />
               <div className="ml-6 mr-24">all rows ({numTotalCalls})</div>
@@ -177,7 +156,6 @@ export const ExportSelector = ({
                 checked={selectionState.selectedChecked ?? false}
                 onCheckedChange={() =>
                   setSelectionState(s => ({
-                    exportOption: s.exportOption,
                     selectedChecked: !s.selectedChecked,
                   }))
                 }
@@ -190,7 +168,6 @@ export const ExportSelector = ({
                   value={selectionState.limit ?? ''}
                   onChange={value =>
                     setSelectionState(s => ({
-                      exportOption: s.exportOption,
                       selectedChecked: s.selectedChecked,
                       limit: value,
                     }))
@@ -205,7 +182,6 @@ export const ExportSelector = ({
                       checked={selectionState.limitChecked ?? false}
                       onCheckedChange={() =>
                         setSelectionState(s => ({
-                          exportOption: s.exportOption,
                           limitChecked: !s.limitChecked,
                         }))
                       }
@@ -219,8 +195,27 @@ export const ExportSelector = ({
             <div className="mt-12 flex items-center">
               <ClickableOutlinedCardWithIcon
                 iconName="export-share-upload"
-                onClick={onClickDownload}>
-                Export to {selectionState.exportOption.text}
+                onClick={() => onClickDownload(ContentType.csv)}>
+                Export to CSV
+              </ClickableOutlinedCardWithIcon>
+              <div className="ml-8" />
+              <ClickableOutlinedCardWithIcon
+                iconName="export-share-upload"
+                onClick={() => onClickDownload(ContentType.tsv)}>
+                Export to TSV
+              </ClickableOutlinedCardWithIcon>
+            </div>
+            <div className="mt-8 flex items-center">
+              <ClickableOutlinedCardWithIcon
+                iconName="export-share-upload"
+                onClick={() => onClickDownload(ContentType.jsonl)}>
+                Export to JSONL
+              </ClickableOutlinedCardWithIcon>
+              <div className="ml-8" />
+              <ClickableOutlinedCardWithIcon
+                iconName="export-share-upload"
+                onClick={() => onClickDownload(ContentType.json)}>
+                Export to JSON
               </ClickableOutlinedCardWithIcon>
             </div>
             <div className="mt-12 flex items-center text-moon-500">
