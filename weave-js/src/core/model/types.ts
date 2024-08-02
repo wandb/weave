@@ -19,7 +19,6 @@ export const ALL_BASIC_TYPES = [
   'artifactVersion',
   'artifactType',
   'artifactAlias',
-  'artifactTag',
   'run',
   'entity',
   'project',

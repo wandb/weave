@@ -257,13 +257,32 @@ gql_direct_edge_op(
     wdt.ArtifactCollectionType,
 )
 
-gql_direct_edge_op(
-    "artifactVersion-tags",
-    wdt.ArtifactVersionType,
-    "tags",
-    wdt.ArtifactTagType,
-    is_many=True,
+
+@op(
+    name="artifactVersion-tags",
+    output_type=types.List(
+        types.TypedDict(
+            {
+                "id": types.String(),
+                "name": types.String(),
+                "tagCategoryName": types.String(),
+                "attributes": types.String(),
+            }
+        )
+    ),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+        tags {
+            id
+            name
+            tagCategoryName
+            attributes
+        }
+        """
+    ),
 )
+def artifact_version_raw_tags(artifact: wdt.ArtifactVersion):
+    return artifact["tags"]
 
 
 @op(

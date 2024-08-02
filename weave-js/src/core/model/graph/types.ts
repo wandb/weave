@@ -257,8 +257,6 @@ export type TypeToTSTypeInner<T> = T extends 'any'
   : T extends 'artifactVersion'
   ? any // TODO
   : T extends 'artifactAlias'
-  ? any // TODO
-  : T extends 'artifactTag'
   ? any
   : T extends 'artifactMembership'
   ? any // TODO

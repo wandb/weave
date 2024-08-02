@@ -1121,7 +1121,16 @@ export const toGqlField = (
   } else if (forwardOp.op.name === 'artifactVersion-isLinkedToGlobalRegistry') {
     return gqlBasicField('isLinkedToGlobalRegistry');
   } else if (forwardOp.op.name === 'artifactVersion-tags') {
-    return [gqlObjectField(forwardGraph, forwardOp, 'tags')];
+    return [
+      {
+        name: 'tags',
+        fields: gqlBasicField('id')
+          .concat(gqlBasicField('name'))
+          .concat(gqlBasicField('tagCategoryName'))
+          .concat(gqlBasicField('attributes')),
+      },
+    ];
+    // return [gqlObjectField(forwardGraph, forwardOp, 'tags')];
   } else if (forwardOp.op.name === 'artifactVersion-artifactCollections') {
     return [
       {
@@ -1264,8 +1273,6 @@ export const toGqlField = (
     return gqlBasicField('alias');
   } else if (forwardOp.op.name === 'artifactAlias-artifact') {
     return [gqlObjectField(forwardGraph, forwardOp, 'artifactCollection')];
-  } else if (forwardOp.op.name === 'artifactTag-name') {
-    return gqlBasicField('name');
   } else if (forwardOp.op.name === 'run-id') {
     return gqlBasicField('name');
   } else if (forwardOp.op.name === 'run-name') {

@@ -11,7 +11,6 @@ from . import run_ops
 from . import artifact_type_ops
 from . import artifact_collection_ops
 from . import artifact_alias_ops
-from . import artifact_tag_ops
 from . import artifact_membership_ops
 from . import artifact_version_ops
 from . import org_ops

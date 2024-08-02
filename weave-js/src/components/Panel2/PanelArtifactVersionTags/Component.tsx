@@ -1,8 +1,8 @@
 import {Tag, TagType} from '@wandb/weave/common/components/Tags';
-import * as Op from '@wandb/weave/core';
 import React from 'react';
 import styled from 'styled-components';
 
+import * as GQLGenerated from '../../../generated/graphql';
 import * as CGReact from '../../../react';
 import * as Panel2 from '../panel';
 import {Panel2Loader} from '../PanelComp';
@@ -33,9 +33,7 @@ type PanelArtifactVersionTagsProps = Panel2.PanelProps<typeof inputType>;
 const PanelArtifactVersionTags: React.FC<
   PanelArtifactVersionTagsProps
 > = props => {
-  const nodeValueQuery = CGReact.useNodeValue(
-    Op.opArtifactTagName({artifactTag: props.input as any})
-  );
+  const nodeValueQuery = CGReact.useNodeValue(props.input as any);
   if (nodeValueQuery.loading) {
     return <Panel2Loader />;
   }
@@ -44,12 +42,12 @@ const PanelArtifactVersionTags: React.FC<
   }
   return (
     <Wrapper>
-      {nodeValueQuery.result.map((artifactVersionTag: string) => {
+      {nodeValueQuery.result.map((artifactVersionTag: GQLGenerated.Tag) => {
         return (
           <Tag
-            key={artifactVersionTag}
+            key={artifactVersionTag.name}
             tag={{
-              name: artifactVersionTag,
+              name: artifactVersionTag.name,
               colorIndex: TagType.TAG,
             }}
             noun="tag"
