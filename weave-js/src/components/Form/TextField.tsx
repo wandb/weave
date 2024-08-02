@@ -57,6 +57,7 @@ export const TextField = ({
   dataTest,
 }: TextFieldProps) => {
   const textFieldSize = size ?? 'medium';
+  const leftPaddingForIcon = textFieldSize === 'medium' ? 'pl-34' : 'pl-36';
 
   const handleChange = onChange
     ? (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,34 +79,37 @@ export const TextField = ({
     <Tailwind style={{width: '100%'}}>
       <div
         className={classNames(
-          'relative',
-          textFieldSize === 'medium' ? 'h-32' : 'h-40'
+          'relative rounded-sm',
+          textFieldSize === 'medium' ? 'h-32' : 'h-40',
+          'outline outline-1 outline-moon-250',
+          {
+            'hover:outline-2 [&:hover:not(:focus-within)]:outline-[#83E4EB]':
+              !errorState,
+            'focus-within:outline-2 focus-within:outline-teal-400': !errorState,
+            'outline-2 outline-red-450': errorState,
+            'pointer-events-none opacity-50': disabled,
+          }
         )}>
-        <div
-          className={classNames(
-            'absolute bottom-0 top-0 flex w-full items-center rounded-sm',
-            'outline outline-1 outline-moon-250',
-            disabled
-              ? 'opacity-50'
-              : 'hover:outline hover:outline-2 hover:outline-teal-500/40 focus:outline-2',
-            errorState
-              ? 'outline outline-2 outline-red-450 hover:outline-red-450 focus:outline-red-450'
-              : 'outline outline-1 outline-moon-250 hover:outline-teal-500/40 focus:outline-teal-500/40'
-          )}>
-          {prefix && <div className="text-gray-800 pl-8 pr-1">{prefix}</div>}
+        <div className="absolute bottom-0 top-0 flex w-full items-center rounded-sm">
+          {prefix && (
+            <div
+              className={classNames(
+                'text-gray-800 pr-1',
+                icon ? leftPaddingForIcon : 'pl-8'
+              )}>
+              {prefix}
+            </div>
+          )}
           <input
             className={classNames(
-              'h-full w-full flex-1',
+              'h-full w-full flex-1 rounded-sm pr-8',
               'appearance-none border-none',
               'focus:outline-none',
-              'placeholder-moon-500 dark:placeholder-moon-600',
-              icon
-                ? textFieldSize === 'medium'
-                  ? 'pl-34'
-                  : 'pl-36'
-                : prefix
-                ? null
-                : 'pl-8'
+              'placeholder-moon-500',
+              {
+                [leftPaddingForIcon]: icon && !prefix,
+                'pl-8': !icon && !prefix,
+              }
             )}
             placeholder={placeholder}
             value={value}
@@ -131,7 +135,7 @@ export const TextField = ({
               'absolute left-8',
               textFieldSize === 'medium'
                 ? 'top-8 h-18 w-18'
-                : 'top-10  h-20 w-20',
+                : 'top-10 h-20 w-20',
               value ? 'text-moon-800' : 'text-moon-500'
             )}
           />
