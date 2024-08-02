@@ -586,3 +586,40 @@ async def test_eval_supports_non_op_funcs(client):
 
     # # 2: Assert that the model was correctly oped
     # assert shouldBeModelRef.startswith("weave:///")
+
+
+@pytest.mark.asyncio
+async def test_eval_is_robust_to_missing_values(client):
+    # At least 1 None
+    # All dicts have "d": None
+    resp = [
+        None,
+        {"a": 1, "b": {"c": 2}, "always_none": None},
+        {"a": 2, "b": {"c": None}, "always_none": None},
+        {"a": 3, "b": {}, "always_none": None},
+        {"a": 4, "b": None, "always_none": None},
+        {"a": 5, "always_none": None},
+        {"a": None, "always_none": None},
+        {"always_none": None},
+        {},
+    ]
+
+    @weave.op
+    def model_func(model_res) -> dict:
+        return resp[model_res]
+
+    def function_score(scorer_res, model_output) -> dict:
+        return resp[scorer_res]
+
+    evaluation = weave.Evaluation(
+        name="fruit_eval",
+        dataset=[{"model_res": i, "scorer_res": i} for i in range(len(resp))],
+        scorers=[function_score],
+    )
+
+    res = await evaluation.evaluate(model_func)
+    assert res == {
+        "model_output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
+        "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
+        "model_latency": {"mean": pytest.approx(0, abs=1)},
+    }
