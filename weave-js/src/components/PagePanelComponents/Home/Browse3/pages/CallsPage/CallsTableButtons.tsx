@@ -9,8 +9,8 @@ import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDr
 import {toast} from '@wandb/weave/common/components/elements/Toast';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
-import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {TextField} from '@wandb/weave/components/Form/TextField';
+import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralize} from '@wandb/weave/core/util/string';
@@ -187,11 +187,13 @@ export const ExportSelector = ({
   disabled: boolean;
   rightmostButton?: boolean;
 }) => {
-  const defaultOption = {value: ContentType.jsonl, text: 'jsonl'};
-  const [selectionState, setSelectionState] = useState<SelectionState>({
-    exportOption: defaultOption,
-  });
-  const [isExportTypeOpen, setIsExportTypeOpen] = useState(false);
+  const defaultSelectionState = {
+    exportOption: {value: ContentType.jsonl, text: 'jsonl'},
+    allChecked: true,
+  };
+  const [selectionState, setSelectionState] = useState<SelectionState>(
+    defaultSelectionState
+  );
 
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -213,65 +215,41 @@ export const ExportSelector = ({
     callQueryParams.gridSort
   );
 
-  const options: ContentTypeOption[] = [
-    {value: ContentType.jsonl, text: 'jsonl'},
-    {value: ContentType.json, text: 'json'},
-    {value: ContentType.tsv, text: 'tsv'},
-    {value: ContentType.csv, text: 'csv'},
-    // TODO: implement python and curl
-    {value: 'python', text: 'python', disabled: true},
-    {value: 'curl', text: 'curl', disabled: true},
-  ];
-
   const onClickDownload = () => {
-    if (selectionState.exportOption.value == null) {
-      return;
-    }
-    if (['python', 'curl'].includes(selectionState.exportOption.value)) {
-      console.error(
-        'Export type not supported:',
-        selectionState.exportOption.value
-      );
+    if (
+      selectionState.exportOption.value == null ||
+      ['curl', 'python'].includes(selectionState.exportOption.value)
+    ) {
       return;
     }
     if (selectionState.selectedChecked) {
+      // download from datagrid table
       tableRef.current?.exportDataAsCsv({
         getRowsToExport: () => selectedCalls,
         fileName: `${callQueryParams.project}-export`,
       });
-      setSelectionState(s => ({
-        exportOption: defaultOption,
-        limit: null,
-        limitChecked: false,
-        selectedChecked: false,
-        allChecked: false,
-      }));
-      return;
+      setAnchorEl(null);
+    } else {
+      // download from server
+      const exportType = selectionState.exportOption.value as ContentType;
+      const limit = selectionState.limitChecked
+        ? Math.min(MAX_EXPORT, parseInt(selectionState.limit ?? '100', 10))
+        : MAX_EXPORT;
+      download(
+        callQueryParams.entity,
+        callQueryParams.project,
+        exportType,
+        lowLevelFilter,
+        limit,
+        0,
+        sortBy,
+        filterBy,
+        Object.keys(cols).filter(v => cols[v] === true)
+      ).then(() => {
+        setAnchorEl(null);
+      });
     }
-    const exportType = selectionState.exportOption.value as ContentType;
-    const limit = selectionState.limitChecked
-      ? Math.min(MAX_EXPORT, parseInt(selectionState.limit ?? '100'))
-      : MAX_EXPORT;
-    download(
-      callQueryParams.entity,
-      callQueryParams.project,
-      exportType,
-      lowLevelFilter,
-      limit,
-      0,
-      sortBy,
-      filterBy,
-      Object.keys(cols).filter(v => cols[v] === true)
-    ).then(() => {
-      setSelectionState(s => ({
-        ...s,
-        exportOption: s.exportOption,
-        limit: null,
-        limitChecked: false,
-        selectedChecked: false,
-        allChecked: false,
-      }));
-    });
+    setSelectionState(defaultSelectionState);
   };
 
   return (
@@ -310,6 +288,7 @@ export const ExportSelector = ({
               </div>
             </div>
             <div className="flex items-center">
+              <div className="ml-2" />
               <Checkbox
                 checked={selectionState.allChecked ?? false}
                 onCheckedChange={() =>
@@ -319,9 +298,7 @@ export const ExportSelector = ({
                   }))
                 }
               />
-              <div className="ml-4 mr-24">
-                all {maybePluralize(numTotalCalls, 'row', 's')}
-              </div>
+              <div className="ml-6 mr-24">all rows ({numTotalCalls})</div>
               <Checkbox
                 checked={selectionState.selectedChecked ?? false}
                 onCheckedChange={() =>
@@ -360,47 +337,22 @@ export const ExportSelector = ({
                       }
                     />
                     <div className="ml-4">
-                      selected (
-                      {maybePluralize(selectedCalls.length, 'row', 's')})
+                      selected rows ({selectedCalls.length})
                     </div>
                   </>
                 )}
             </div>
             <div className="mt-12 flex items-center">
-              <Button size="small" variant="primary" onClick={onClickDownload}>
-                Export
-              </Button>
-              <span className="ml-4 font-semibold">as</span>
-              <DropdownMenu.Root
-                open={isExportTypeOpen}
-                onOpenChange={setIsExportTypeOpen}>
-                <DropdownMenu.Trigger>
-                  <div className="ml-4 flex items-center">
-                    <Button size="small" variant="secondary">
-                      {selectionState?.exportOption.text}
-                    </Button>
-                  </div>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Content
-                  onCloseAutoFocus={e => e.preventDefault()}>
-                  {options.map(item => (
-                    <DropdownMenu.Item
-                      className="max-w-[70px]"
-                      key={item.value}
-                      onClick={() =>
-                        setSelectionState(s => ({...s, exportOption: item}))
-                      }
-                      disabled={item.disabled}>
-                      {item.text}
-                    </DropdownMenu.Item>
-                  ))}
-                </DropdownMenu.Content>
-              </DropdownMenu.Root>
+              <OutlinedCardWithIcon
+                iconName="export-share-upload"
+                onClick={onClickDownload}>
+                Export to {selectionState.exportOption.text}
+              </OutlinedCardWithIcon>
             </div>
             <div className="mt-12 flex items-center text-moon-500">
               <IconOnlyPill color="moon" icon="warning" />
               <div className="ml-6">
-                Exporting is currently in beta, and is subject to change.
+                This export experience is in beta and subject to change.
               </div>
             </div>
           </div>
@@ -409,6 +361,20 @@ export const ExportSelector = ({
     </>
   );
 };
+
+const OutlinedCardWithIcon: FC<{
+  iconName: IconName;
+  onClick: () => void;
+}> = ({iconName, children, onClick}) => (
+  <div
+    className="flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16"
+    onClick={onClick}>
+    <div className="mr-4 rounded-2xl bg-moon-200 p-4">
+      <Icon size="xlarge" color="moon" name={iconName} />
+    </div>
+    <div className="ml-4">{children}</div>
+  </div>
+);
 
 export const CompareEvaluationsTableButton: FC<{
   onClick: () => void;
