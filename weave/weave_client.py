@@ -142,6 +142,10 @@ def map_to_refs(obj: Any) -> Any:
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
+
+    # This path should only be reached if the object is both:
+    # 1. A `WeaveObject`; and
+    # 2. Has been dirtied (edited in any way), causing obj.ref=None
     elif isinstance(obj, WeaveObject):
         return map_to_refs(obj._val)
 

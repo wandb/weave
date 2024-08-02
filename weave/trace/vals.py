@@ -104,13 +104,9 @@ class Traceable:
     def add_mutation(
         self, path: tuple[str, ...], operation: MutationOperation, *args: Any
     ) -> None:
-        """Adds a mutation to the object.
-
-        TODO: This function is currently unused"""
         if self.mutations is None:
             self.mutations = []
         self.mutations.append(make_mutation(path, operation, args))
-        self._mark_dirty()
 
     def save(self) -> ObjectRef:
         if not isinstance(self.ref, ObjectRef):
@@ -219,15 +215,6 @@ class WeaveObject(Traceable):
         ]:
             return object.__setattr__(self, __name, __value)
         else:
-            full_path: tuple[str, ...]
-            if not isinstance(self.ref, ObjectRef):
-                # We used to raise ValueError here to only set attributes on
-                # object refs but I don't understand why that's necessary.
-                full_path = (__name,)
-            else:
-                full_path = self.ref.extra + (__name,)
-            base_root = object.__getattribute__(self, "root")
-
             self._mark_dirty()
             if isinstance(__value, Traceable):
                 __value.parent = self
