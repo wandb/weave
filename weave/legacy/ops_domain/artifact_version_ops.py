@@ -259,7 +259,7 @@ gql_direct_edge_op(
 
 
 @op(
-    name="artifactVersion-tags",
+    name="artifactVersion-rawTags",
     output_type=types.List(
         types.TypedDict(
             {

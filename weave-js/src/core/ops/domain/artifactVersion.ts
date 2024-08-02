@@ -541,8 +541,8 @@ export const opArtifactVersionAliases = makeArtifactVersionOp({
     ),
 });
 
-export const opArtifactVersionTags = makeArtifactVersionOp({
-  name: 'artifactVersion-tags',
+export const opArtifactVersionRawTags = makeArtifactVersionOp({
+  name: 'artifactVersion-rawTags',
   argTypes: artifactVersionArgTypes,
   description: `Returns the tags for a ${docType('artifactVersion')}`,
   argDescriptions: {

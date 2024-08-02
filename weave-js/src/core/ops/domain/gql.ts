@@ -1120,7 +1120,7 @@ export const toGqlField = (
     return gqlBasicField('isGenerated');
   } else if (forwardOp.op.name === 'artifactVersion-isLinkedToGlobalRegistry') {
     return gqlBasicField('isLinkedToGlobalRegistry');
-  } else if (forwardOp.op.name === 'artifactVersion-tags') {
+  } else if (forwardOp.op.name === 'artifactVersion-rawTags') {
     return [
       {
         name: 'tags',
