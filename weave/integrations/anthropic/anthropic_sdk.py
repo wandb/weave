@@ -8,7 +8,7 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
     from anthropic.types import Message, MessageStreamEvent
-
+    from anthropic.lib.streaming import MessageStream
 
 def anthropic_accumulator(
     acc: typing.Optional["Message"],
@@ -80,7 +80,6 @@ def create_wrapper_sync(
 
     return wrapper
 
-
 # Surprisingly, the async `client.chat.completions.create` does not pass
 # `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
 # it manually here...
@@ -103,11 +102,37 @@ def create_wrapper_async(
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
-            should_accumulate=should_use_accumulator,
         )
 
     return wrapper
 
+
+def anthropic_stream_accumulator(
+    acc: typing.Optional["Message"],
+    value: "MessageStream",
+) -> "Message":
+    from anthropic.lib.streaming._types import MessageStopEvent
+    
+    print(f"    type(value): {type(value)}")
+    if acc is None:
+        acc = {}
+    if isinstance(value, MessageStopEvent):
+        print(f"Here we go!")
+        acc = value
+    return acc
+
+
+def create_stream_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Callable]:
+    def wrapper(fn: typing.Callable) -> typing.Callable:
+        op = weave.op()(fn)
+        op.name = name  # type: ignore
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda _: anthropic_stream_accumulator,
+            should_accumulate=lambda _: True,
+        )
+
+    return wrapper
 
 anthropic_patcher = MultiPatcher(
     [
@@ -121,6 +146,11 @@ anthropic_patcher = MultiPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "AsyncMessages.create",
             create_wrapper_async(name="anthropic.AsyncMessages.create"),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("anthropic.resources.messages"),
+            "Messages.stream",
+            create_stream_wrapper(name="anthropic.Messages.stream"),
         ),
     ]
 )
