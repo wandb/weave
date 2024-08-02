@@ -74,7 +74,7 @@ export function prepareFlattenedCallDataForTable(
       }
 
       // Finally, we remove any keys that start with underscore
-      if (newKey.includes('._')) {
+      if (newKey.includes('._') && !newKey.includes('summary._weave')) {
         return;
       }
 
