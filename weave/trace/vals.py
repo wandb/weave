@@ -403,15 +403,6 @@ class WeaveDict(Traceable, dict):
         return make_trace_obj(v, new_ref, self.server, self.root)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        full_path: tuple[str, ...]
-        if not isinstance(self.ref, ObjectRef):
-            # We used to raise ValueError here to only set attributes on
-            # object refs but I don't understand why that's necessary.
-            full_path = (key,)
-        else:
-            full_path = self.ref.extra + (key,)
-        base_root = object.__getattribute__(self, "root")
-
         # Though this ostensibly only marks the parent (dict) as dirty, siblings
         # will also get new refs because their old refs are relative to the parent
         # (the element refs will be extras of the new parent ref)
