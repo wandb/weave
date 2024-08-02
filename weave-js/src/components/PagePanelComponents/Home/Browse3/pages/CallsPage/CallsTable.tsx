@@ -506,7 +506,10 @@ export const CallsTable: FC<{
     addExtra('exportRunsTableButton', {
       node: (
         <ExportSelector
-          disabled={tableData.length === 0}
+          tableRef={apiRef}
+          selectedCalls={selectedCalls}
+          numTotalCalls={callsTotal}
+          disabled={callsTotal === 0}
           columnVisibilityModel={columnVisibilityModel}
           callQueryParams={{
             entity,
@@ -523,7 +526,10 @@ export const CallsTable: FC<{
 
     return () => removeExtra('exportRunsTableButton');
   }, [
-    entity, 
+    apiRef,
+    selectedCalls,
+    callsTotal,
+    entity,
     project,
     isReadonly,
     addExtra,

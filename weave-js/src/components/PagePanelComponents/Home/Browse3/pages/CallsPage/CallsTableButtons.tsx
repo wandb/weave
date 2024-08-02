@@ -7,10 +7,11 @@ import {
 } from '@mui/x-data-grid-pro';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import {toast} from '@wandb/weave/common/components/elements/Toast';
-import {Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
+import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {TextField} from '@wandb/weave/components/Form/TextField';
+import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralize} from '@wandb/weave/core/util/string';
 import React, {FC, useEffect, useRef, useState} from 'react';
@@ -149,12 +150,32 @@ export const ExportRunsTableButton = ({
   );
 };
 
+type SelectionState = {
+  allChecked?: boolean;
+  selectedChecked?: boolean;
+  limitChecked?: boolean;
+  limit?: string | null;
+  exportOption: ContentTypeOption;
+};
+
+type ContentTypeOption = {
+  value: ContentType | 'python' | 'curl';
+  text: string;
+  disabled?: boolean;
+};
+
 export const ExportSelector = ({
+  selectedCalls,
+  tableRef,
+  numTotalCalls,
   columnVisibilityModel,
   disabled,
   callQueryParams,
   rightmostButton = false,
 }: {
+  selectedCalls: string[];
+  tableRef: React.MutableRefObject<GridApiPro>;
+  numTotalCalls: number;
   columnVisibilityModel: GridColumnVisibilityModel | undefined;
   callQueryParams: {
     entity: string;
@@ -166,15 +187,16 @@ export const ExportSelector = ({
   disabled: boolean;
   rightmostButton?: boolean;
 }) => {
-  const [search, setSearch] = useState('');
-  const [allVisibleColumns, setAllVisibleColumns] = useState(true);
+  const defaultOption = {value: ContentType.jsonl, text: 'jsonl'};
+  const [selectionState, setSelectionState] = useState<SelectionState>({
+    exportOption: defaultOption,
+  });
   const [isExportTypeOpen, setIsExportTypeOpen] = useState(false);
 
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : ref.current);
-    setSearch('');
   };
 
   const open = Boolean(anchorEl);
@@ -184,7 +206,6 @@ export const ExportSelector = ({
 
   const {useCallsExport} = useWFHooks();
   const download = useCallsExport();
-  const [clickedOption, setClickedOption] = useState<ContentType | null>(null);
 
   const {sortBy, lowLevelFilter, filterBy} = useDownloadFilterSortby(
     callQueryParams.filter,
@@ -192,57 +213,66 @@ export const ExportSelector = ({
     callQueryParams.gridSort
   );
 
-  const options = [
-    {
-      value: 'export-jsonl',
-      text: 'jsonl',
-      onClick: () => setClickedOption(ContentType.jsonl),
-    },
-    {
-      value: 'export-json',
-      text: 'json',
-      onClick: () => setClickedOption(ContentType.json),
-    },
-    {
-      value: 'export-tsv',
-      text: 'tsv',
-      onClick: () => setClickedOption(ContentType.tsv),
-    },
-    {
-      value: 'export-csv',
-      text: 'csv',
-      onClick: () => setClickedOption(ContentType.csv),
-    },
-    {
-      value: 'export-python',
-      text: 'python',
-      onClick: () => {
-        console.log('python');
-        setClickedOption('python');
-      },
-      disabled: true,
-    },
+  const options: ContentTypeOption[] = [
+    {value: ContentType.jsonl, text: 'jsonl'},
+    {value: ContentType.json, text: 'json'},
+    {value: ContentType.tsv, text: 'tsv'},
+    {value: ContentType.csv, text: 'csv'},
+    // TODO: implement python and curl
+    {value: 'python', text: 'python', disabled: true},
+    {value: 'curl', text: 'curl', disabled: true},
   ];
 
   const onClickDownload = () => {
-    if (clickedOption === null) {
+    if (selectionState.exportOption.value == null) {
       return;
     }
-    
+    if (['python', 'curl'].includes(selectionState.exportOption.value)) {
+      console.error(
+        'Export type not supported:',
+        selectionState.exportOption.value
+      );
+      return;
+    }
+    if (selectionState.selectedChecked) {
+      tableRef.current?.exportDataAsCsv({
+        getRowsToExport: () => selectedCalls,
+        fileName: `${callQueryParams.project}-export`,
+      });
+      setSelectionState(s => ({
+        exportOption: defaultOption,
+        limit: null,
+        limitChecked: false,
+        selectedChecked: false,
+        allChecked: false,
+      }));
+      return;
+    }
+    const exportType = selectionState.exportOption.value as ContentType;
+    const limit = selectionState.limitChecked
+      ? Math.min(MAX_EXPORT, parseInt(selectionState.limit ?? '100'))
+      : MAX_EXPORT;
     download(
       callQueryParams.entity,
       callQueryParams.project,
-      clickedOption,
+      exportType,
       lowLevelFilter,
-      MAX_EXPORT,
+      limit,
       0,
       sortBy,
       filterBy,
       Object.keys(cols).filter(v => cols[v] === true)
-    );
+    ).then(() => {
+      setSelectionState(s => ({
+        ...s,
+        exportOption: s.exportOption,
+        limit: null,
+        limitChecked: false,
+        selectedChecked: false,
+        allChecked: false,
+      }));
+    });
   };
-
-  const STYLE_MENU_CONTENT = {zIndex: 2};
 
   return (
     <>
@@ -255,7 +285,6 @@ export const ExportSelector = ({
           disabled={disabled}
         />
       </span>
-
       <Popover
         id={id}
         open={open}
@@ -273,38 +302,71 @@ export const ExportSelector = ({
         }}
         onClose={() => setAnchorEl(null)}>
         <Tailwind>
-          <div className="min-w-[360px] p-12">
+          <div className="min-w-[460px] p-12">
             <div className="flex items-center pb-8">
               <div className="flex-auto text-xl font-semibold">Export</div>
               <div className="ml-16 text-moon-500">
-                {maybePluralize(numVisible, 'visible column', 's')}
+                {maybePluralize(numVisible, 'column', 's')}
               </div>
             </div>
-            <div className="flex justify-start">
-              <div className="mr-8">Export all visible columns</div>
-              <Switch.Root
-                id="switch-visible"
-                size="small"
-                className="mt-4"
-                checked={allVisibleColumns}
-                onCheckedChange={isOn => {
-                  setAllVisibleColumns(isOn);
-                }}>
-                <Switch.Thumb size="small" checked={allVisibleColumns} />
-              </Switch.Root>
-            </div>
-            {!allVisibleColumns && (
-              <div className="mb-8">
+            <div className="flex items-center">
+              <Checkbox
+                checked={selectionState.allChecked ?? false}
+                onCheckedChange={() =>
+                  setSelectionState(s => ({
+                    exportOption: s.exportOption,
+                    allChecked: !s.allChecked,
+                  }))
+                }
+              />
+              <div className="ml-4 mr-24">
+                all {maybePluralize(numTotalCalls, 'row', 's')}
+              </div>
+              <Checkbox
+                checked={selectionState.selectedChecked ?? false}
+                onCheckedChange={() =>
+                  setSelectionState(s => ({
+                    exportOption: s.exportOption,
+                    selectedChecked: !s.selectedChecked,
+                  }))
+                }
+              />
+              <div className="ml-8 mr-6">first</div>
+              <div className="w-[42px]">
                 <TextField
-                  placeholder="Filter columns"
-                  autoFocus
-                  value={search}
-                  onChange={setSearch}
+                  type="number"
+                  placeholder="100"
+                  value={selectionState.limit ?? ''}
+                  onChange={value =>
+                    setSelectionState(s => ({
+                      exportOption: s.exportOption,
+                      selectedChecked: s.selectedChecked,
+                      limit: value,
+                    }))
+                  }
                 />
               </div>
-            )}
-
-            <div className="mt-8 flex items-center">
+              <div className="ml-4 mr-16">rows</div>
+              {selectedCalls.length > 0 &&
+                selectedCalls.length !== numTotalCalls && (
+                  <>
+                    <Checkbox
+                      checked={selectionState.limitChecked ?? false}
+                      onCheckedChange={() =>
+                        setSelectionState(s => ({
+                          exportOption: s.exportOption,
+                          limitChecked: !s.limitChecked,
+                        }))
+                      }
+                    />
+                    <div className="ml-4">
+                      selected (
+                      {maybePluralize(selectedCalls.length, 'row', 's')})
+                    </div>
+                  </>
+                )}
+            </div>
+            <div className="mt-12 flex items-center">
               <Button size="small" variant="primary" onClick={onClickDownload}>
                 Export
               </Button>
@@ -315,25 +377,31 @@ export const ExportSelector = ({
                 <DropdownMenu.Trigger>
                   <div className="ml-4 flex items-center">
                     <Button size="small" variant="secondary">
-                      {clickedOption ?? 'jsonl'}
+                      {selectionState?.exportOption.text}
                     </Button>
                   </div>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content
-                  // align="end"
-                  style={STYLE_MENU_CONTENT}
                   onCloseAutoFocus={e => e.preventDefault()}>
                   {options.map(item => (
                     <DropdownMenu.Item
                       className="max-w-[70px]"
                       key={item.value}
-                      onClick={item.onClick}
+                      onClick={() =>
+                        setSelectionState(s => ({...s, exportOption: item}))
+                      }
                       disabled={item.disabled}>
                       {item.text}
                     </DropdownMenu.Item>
                   ))}
                 </DropdownMenu.Content>
               </DropdownMenu.Root>
+            </div>
+            <div className="mt-12 flex items-center text-moon-500">
+              <IconOnlyPill color="moon" icon="warning" />
+              <div className="ml-6">
+                Exporting is currently in beta, and is subject to change.
+              </div>
             </div>
           </div>
         </Tailwind>
