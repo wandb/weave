@@ -157,6 +157,10 @@ export type FeedbackKey = {
   weaveRef: string;
 };
 
+export type Refetchable = {
+  refetch: () => void;
+};
+
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
@@ -233,7 +237,10 @@ export type WFDataModelHooksInterface = {
     digest: string,
     opts?: {skip?: boolean}
   ) => Loadable<string>;
-  useFeedback: (key: FeedbackKey | null) => LoadableWithError<any[] | null>;
+  useFeedback: (
+    key: FeedbackKey | null,
+    sortBy?: traceServerClientTypes.SortBy[]
+  ) => LoadableWithError<any[] | null> & Refetchable;
   derived: {
     useChildCallsForCompare: (
       entity: string,
