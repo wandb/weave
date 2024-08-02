@@ -79,14 +79,18 @@ export const TextField = ({
     <Tailwind style={{width: '100%'}}>
       <div
         className={classNames(
+          'night-aware',
           'relative rounded-sm',
           textFieldSize === 'medium' ? 'h-32' : 'h-40',
-          'outline outline-1 outline-moon-250',
+          'bg-white dark:bg-moon-900',
+          'text-moon-800 dark:text-moon-200',
+          'outline outline-1 outline-moon-250 dark:outline-moon-700',
           {
-            'hover:outline-2 [&:hover:not(:focus-within)]:outline-[#83E4EB]':
+            'hover:outline-2 [&:hover:not(:focus-within)]:outline-[#83E4EB] dark:[&:hover:not(:focus-within)]:outline-teal-650':
               !errorState,
-            'focus-within:outline-2 focus-within:outline-teal-400': !errorState,
-            'outline-2 outline-red-450': errorState,
+            'focus-within:outline-2 focus-within:outline-teal-400 dark:focus-within:outline-teal-600':
+              !errorState,
+            'outline-2 outline-red-450 dark:outline-red-550': errorState,
             'pointer-events-none opacity-50': disabled,
           }
         )}>
@@ -102,10 +106,11 @@ export const TextField = ({
           )}
           <input
             className={classNames(
-              'h-full w-full flex-1 rounded-sm pr-8',
+              'h-full w-full flex-1 rounded-sm bg-inherit pr-8',
               'appearance-none border-none',
               'focus:outline-none',
               'placeholder-moon-500',
+              'dark:selection:bg-moon-650 dark:selection:text-moon-200',
               {
                 [leftPaddingForIcon]: icon && !prefix,
                 'pl-8': !icon && !prefix,
@@ -136,7 +141,7 @@ export const TextField = ({
               textFieldSize === 'medium'
                 ? 'top-8 h-18 w-18'
                 : 'top-10 h-20 w-20',
-              value ? 'text-moon-800' : 'text-moon-500'
+              value ? 'text-moon-800 dark:text-moon-200' : 'text-moon-500'
             )}
           />
         )}
