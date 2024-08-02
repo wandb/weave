@@ -10,7 +10,10 @@ import {maybePluralize} from '@wandb/weave/core/util/string';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
-import {ContentType} from '../wfReactInterface/traceServerClientTypes';
+import {
+  ContentType,
+  fileExtensions,
+} from '../wfReactInterface/traceServerClientTypes';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
@@ -48,18 +51,18 @@ export const ExportSelector = ({
     allChecked: true,
   });
 
+  // Popover management
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : ref.current);
   };
-
   const open = Boolean(anchorEl);
   const id = open ? 'simple-popper' : undefined;
 
+  // Call download query
   const {useCallsExport} = useWFHooks();
   const download = useCallsExport();
-
   const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
     callQueryParams.filter,
     callQueryParams.gridFilter,
@@ -85,7 +88,11 @@ export const ExportSelector = ({
       sortBy,
       filterBy,
       visibleColumns
-    ).then(() => {
+    ).then(blob => {
+      const fileExtension = fileExtensions[contentType];
+      const date = new Date().toISOString().split('T')[0];
+      const fileName = `weave_export_${callQueryParams.project}_${date}.${fileExtension}`;
+      initiateDownloadFromBlob(blob, fileName);
       setAnchorEl(null);
     });
     setSelectionState({allChecked: true});
@@ -294,3 +301,15 @@ export const BulkDeleteButton: FC<{
     </Box>
   );
 };
+
+function initiateDownloadFromBlob(blob: Blob, fileName: string) {
+  const downloadUrl = URL.createObjectURL(blob);
+  // Create a download link and click it
+  const anchor = document.createElement('a');
+  anchor.href = downloadUrl;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(downloadUrl);
+}

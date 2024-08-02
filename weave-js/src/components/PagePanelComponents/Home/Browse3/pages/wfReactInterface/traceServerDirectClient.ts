@@ -23,7 +23,6 @@ import {
   FeedbackPurgeRes,
   FeedbackQueryReq,
   FeedbackQueryRes,
-  fileExtensions,
   TraceCallReadReq,
   TraceCallReadRes,
   TraceCallSchema,
@@ -158,10 +157,16 @@ export class DirectTraceServerClient {
     });
   }
 
+  /*
+  This implementation of the calls stream query is a convenience in order
+  to explicitly handle large streams of data. It should be kept in close
+  sync with makeRequest.
+  */
+
   public callsStreamDownload(
     req: TraceCallsQueryReq,
     contentType: ContentType = ContentType.any
-  ): Promise<void> {
+  ): Promise<Blob> {
     const url = `${this.baseUrl}/calls/stream_query`;
     const reqBody = JSON.stringify(req);
 
@@ -224,18 +229,7 @@ export class DirectTraceServerClient {
         // Combine all chunks into a single string
         const textData = chunks.join('');
         const blob = new Blob([textData], {type: contentType});
-        const downloadUrl = URL.createObjectURL(blob);
-
-        // Create a download link and click it
-        const anchor = document.createElement('a');
-        anchor.href = downloadUrl;
-        const fileExtension = fileExtensions[contentType];
-        anchor.download = `export.${fileExtension}`;
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
-        URL.revokeObjectURL(downloadUrl);
-        resolve();
+        resolve(blob);
       } catch (error) {
         reject(new Error(`Error downloading data: ${error}`));
       }

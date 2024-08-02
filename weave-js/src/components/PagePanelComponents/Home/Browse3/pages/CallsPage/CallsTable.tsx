@@ -502,14 +502,20 @@ export const CallsTable: FC<{
   ]);
 
   const visibleColumns = useMemo(() => {
-    return Object.keys(tableData).filter(
+    // We really want to use columns here, but because visibileColumns
+    // is a prop to ExportSelector, and that gets mounted in the table (?)
+    // we have a circular dependency causing infinite reloads
+    if (tableData.length === 0) {
+      return [];
+    }
+    return Object.keys(tableData[0]).filter(
       col => columnVisibilityModel?.[col] !== false
     );
   }, [tableData, columnVisibilityModel]);
 
   // Register Export Button
   useEffect(() => {
-    addExtra('exportRunsTableButton', {
+    addExtra('exportButton', {
       node: (
         <ExportSelector
           selectedCalls={selectedCalls}
@@ -529,7 +535,7 @@ export const CallsTable: FC<{
       order: 2,
     });
 
-    return () => removeExtra('exportRunsTableButton');
+    return () => removeExtra('exportButton');
   }, [
     selectedCalls,
     callsTotal,
