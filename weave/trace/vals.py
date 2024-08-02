@@ -340,7 +340,6 @@ class WeaveList(Traceable, list):
             raise ValueError("Slices not yet supported")
         if (index := operator.index(i)) >= len(self):
             raise IndexError("list assignment index out of range")
-        base_root = object.__getattribute__(self, "root")
 
         # Though this ostensibly only marks the parent (list) as dirty, siblings
         # will also get new refs because their old refs are relative to the parent
@@ -352,8 +351,6 @@ class WeaveList(Traceable, list):
         super().__setitem__(index, value)
 
     def append(self, item: Any) -> None:
-        base_root = object.__getattribute__(self, "root")
-
         self._mark_dirty()
         if isinstance(item, Traceable):
             item.parent = self
