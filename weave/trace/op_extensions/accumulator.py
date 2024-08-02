@@ -211,6 +211,8 @@ class _IteratorWrapper(Generic[V]):
         return getattr(self._iterator, name)
 
     def __enter__(self) -> "_IteratorWrapper":
+        if hasattr(self._iterator, "__enter__"):
+            return self._iterator.__enter__()
         return self
 
     def __exit__(
@@ -219,6 +221,8 @@ class _IteratorWrapper(Generic[V]):
         exc_value: Optional[BaseException],
         traceback: Optional[Any],
     ) -> None:
+        if hasattr(self._iterator, "__exit__"):
+            self._iterator.__exit__(exc_type, exc_value, traceback)
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
         self._call_on_close_once()
