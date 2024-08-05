@@ -108,7 +108,7 @@ known-third-party = ["wandb"]
 line-length = 88
 show-fixes = true
 exclude = [
-  "weave/api.py",
+  "weave/query_api.py",
   "weave/__init__.py",
   "weave/legacy/**/*.py",
   "examples",

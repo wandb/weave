@@ -44,6 +44,10 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
     if not data:
         return {}
     data = [x for x in data if x is not None]
+
+    if not data:
+        return None
+
     val = data[0]
 
     if isinstance(val, bool):
@@ -55,8 +59,13 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
         return {"mean": np.mean(data).item()}
     elif isinstance(val, dict):
         result = {}
-        for k in val:
-            if (summary := auto_summarize([x[k] for x in data])) is not None:
+        all_keys = set().union(*[x.keys() for x in data if isinstance(x, dict)])
+        for k in all_keys:
+            if (
+                summary := auto_summarize(
+                    [x.get(k) for x in data if isinstance(x, dict)]
+                )
+            ) is not None:
                 if k in summary:
                     result.update(summary)
                 else:

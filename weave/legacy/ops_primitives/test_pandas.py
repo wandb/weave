@@ -1,6 +1,6 @@
 import pandas as pd
 
-from weave import api as weave
+from weave import query_api as weave
 from weave import weave_types as types
 from weave.legacy.ops_primitives import pandas_ as op_pandas
 
