@@ -843,7 +843,10 @@ const useParentIdOptions = (
           project,
           callId: effectiveFilter.parentId,
         }
-      : null
+      : null,
+    {
+      addCost: true,
+    }
   );
   return useMemo(() => {
     if (parentCall.loading || parentCall.result == null) {

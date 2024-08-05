@@ -200,9 +200,9 @@ export const CustomGridTreeDataGroupingCell: FC<
                 {opNiceName(call.spanName)}
               </Box>
             </Box>
-            {call?.rawSpan?.summary && (
+            {call?.traceCall?.summary && (
               <TraceUsageStats
-                costData={call.rawSpan.summary._weave?.costs}
+                costData={call?.traceCall?.summary?._weave?.costs}
                 latency_s={call.rawSpan.summary.latency_s}
               />
             )}
