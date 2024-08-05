@@ -100,8 +100,8 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
     save_name: str
     if name:
         save_name = name
-    elif hasattr(obj, "name"):
-        save_name = obj.name
+    elif n := getattr(obj, "name", None):
+        save_name = n
     else:
         save_name = obj.__class__.__name__
 
