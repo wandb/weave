@@ -6,7 +6,7 @@ import pyarrow.compute as pc
 
 from weave import engine_trace
 from weave import weave_types as types
-from weave.api import op
+from weave.query_api import op
 from weave.legacy import graph
 from weave.legacy.arrow import convert
 from weave.legacy.arrow.arrow import (
