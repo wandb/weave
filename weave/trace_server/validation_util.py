@@ -22,7 +22,7 @@ def require_uuid(s: str) -> str:
 
 def require_base64(s: str) -> str:
     try:
-        s_prime = base64.b64encode(base64.b64decode(s))
+        s_prime = base64.b64encode(base64.b64decode(s)).decode("utf-8")
     except Exception as e:
         raise ValueError(f"Invalid base64 string: {s}")
 
