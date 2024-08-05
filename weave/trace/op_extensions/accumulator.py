@@ -221,10 +221,10 @@ class _IteratorWrapper(Generic[V]):
         exc_value: Optional[BaseException],
         traceback: Optional[Any],
     ) -> None:
-        if hasattr(self._iterator, "__exit__"):
-            self._iterator.__exit__(exc_type, exc_value, traceback)
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
+        if hasattr(self._iterator, "__exit__"): #case where is a context mngr
+            self._iterator.__exit__(exc_type, exc_value, traceback)
         self._call_on_close_once()
 
     async def __aenter__(self) -> "_IteratorWrapper":
