@@ -4,7 +4,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from weave import weave_types as types
-from weave.api import op
+from weave.query_api import op
 from weave.legacy.arrow.arrow import ArrowWeaveListType, offsets_starting_at_zero
 from weave.legacy.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.legacy.decorator_arrow_op import arrow_op

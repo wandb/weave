@@ -5,7 +5,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from weave import weave_types as types
-from weave.api import op
+from weave.query_api import op
 from weave.legacy import timestamp as weave_timestamp
 from weave.legacy.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.legacy.decorator_arrow_op import arrow_op

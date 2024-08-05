@@ -39,7 +39,7 @@ import typing
 
 from weave import engine_trace
 from weave import weave_types as types
-from weave.api import op
+from weave.query_api import op
 from weave.legacy import compile_table
 from weave.legacy.gql_op_plugin import wb_gql_op_plugin
 from weave.legacy.input_provider import InputAndStitchProvider
