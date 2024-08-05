@@ -10,7 +10,7 @@ import pyarrow.parquet as pq
 
 from weave import errors
 from weave import weave_types as types
-from weave.api import op, weave_class
+from weave.query_api import op, weave_class
 from weave.legacy import box, file_base, graph, mappers_python
 from weave.legacy.language_features.tagging import tag_store, tagged_value_type
 from weave.legacy.ops_primitives import list_

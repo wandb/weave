@@ -110,4 +110,4 @@ To track system attributes, such as a System Prompt, we recommend using [weave M
 
 ## What's next?
 
-- Follow the [Build an Evaluation pipeline tutorial](/tutorial-eval) to start iteratively improving your applications.
+- Follow the [App Versioning tutorial](/tutorial-weave_models) to capture, version and organize ad-hoc prompt, model, and application changes.

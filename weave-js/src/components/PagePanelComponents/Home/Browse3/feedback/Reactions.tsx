@@ -2,8 +2,12 @@ import React, {useEffect, useState} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {parseRef} from '../../../../../react';
+import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../pages/wfReactInterface/traceServerClientContext';
-import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
+import {
+  Feedback,
+  SortBy,
+} from '../pages/wfReactInterface/traceServerClientTypes';
 import {ReactionsLoaded} from './ReactionsLoaded';
 
 type ReactionsProps = {
@@ -16,6 +20,8 @@ type ReactionsProps = {
 
   twWrapperStyles?: React.CSSProperties;
 };
+
+const SORT_BY: SortBy[] = [{field: 'created_at', direction: 'asc'}];
 
 export const Reactions = ({
   weaveRef,
@@ -33,32 +39,25 @@ export const Reactions = ({
   const {entityName: entity, projectName: project} = parsedRef;
   const projectId = `${entity}/${project}`;
 
+  const {useFeedback} = useWFHooks();
+  const query = useFeedback(
+    {
+      entity,
+      project,
+      weaveRef,
+    },
+    SORT_BY
+  );
   const getTsClient = useGetTraceServerClientContext();
-
   useEffect(() => {
-    let mounted = true;
-    getTsClient()
-      .feedbackQuery({
-        project_id: projectId,
-        query: {
-          $expr: {
-            $eq: [{$getField: 'weave_ref'}, {$literal: weaveRef}],
-          },
-        },
-        sort_by: [{field: 'created_at', direction: 'asc'}],
-      })
-      .then(res => {
-        if (!mounted) {
-          return;
-        }
-        if ('result' in res) {
-          setFeedback(res.result);
-        }
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [getTsClient, projectId, weaveRef]);
+    return getTsClient().registerOnFeedbackListener(weaveRef, query.refetch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (query.result) {
+      setFeedback(query.result);
+    }
+  }, [query.result]);
 
   const onAddEmoji = (emoji: string) => {
     const req = {
@@ -68,25 +67,7 @@ export const Reactions = ({
       feedback_type: 'wandb.reaction.1',
       payload: {emoji},
     };
-    getTsClient()
-      .feedbackCreate(req)
-      .then(res => {
-        if (feedback === null) {
-          return;
-        }
-        if ('detail' in res) {
-          return;
-        }
-        const newReaction = {
-          ...req,
-          id: res.id,
-          created_at: res.created_at,
-          wb_user_id: res.wb_user_id,
-          payload: res.payload,
-        };
-        const newFeedback = [...feedback, newReaction];
-        setFeedback(newFeedback);
-      });
+    getTsClient().feedbackCreate(req);
   };
   const onAddNote = (note: string) => {
     const req = {
@@ -96,43 +77,18 @@ export const Reactions = ({
       feedback_type: 'wandb.note.1',
       payload: {note},
     };
-    getTsClient()
-      .feedbackCreate(req)
-      .then(res => {
-        if (feedback === null) {
-          return;
-        }
-        if ('detail' in res) {
-          return;
-        }
-        const newReaction = {
-          ...req,
-          id: res.id,
-          created_at: res.created_at,
-          wb_user_id: res.wb_user_id,
-        };
-        const newFeedback = [...feedback, newReaction];
-        setFeedback(newFeedback);
-      });
+    getTsClient().feedbackCreate(req);
   };
 
   const onRemoveFeedback = (id: string) => {
-    getTsClient()
-      .feedbackPurge({
-        project_id: projectId,
-        query: {
-          $expr: {
-            $eq: [{$getField: 'id'}, {$literal: id}],
-          },
+    getTsClient().feedbackPurge({
+      project_id: projectId,
+      query: {
+        $expr: {
+          $eq: [{$getField: 'id'}, {$literal: id}],
         },
-      })
-      .then(res => {
-        if (!feedback) {
-          return;
-        }
-        const newFeedback = feedback.filter(f => f.id !== id);
-        setFeedback(newFeedback);
-      });
+      },
+    });
   };
 
   if (loadingUserInfo || feedback === null) {
@@ -142,11 +98,11 @@ export const Reactions = ({
 
   // Always readonly if anonymous.
   // TODO: Consider W&B admin privileges.
-  const viewer = userInfo ? userInfo.username : null;
+  const viewer = userInfo ? userInfo.id : null;
   const isReadonly = !viewer || !userInfo?.teams.includes(entity) || readonly;
   return (
     <ReactionsLoaded
-      viewer={viewer}
+      currentViewerId={viewer}
       reactions={feedback}
       onAddEmoji={onAddEmoji}
       onAddNote={onAddNote}

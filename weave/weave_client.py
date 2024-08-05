@@ -18,7 +18,8 @@ from typing import (
 import pydantic
 from requests import HTTPError
 
-from weave import call_context, client_context, trace_sentry, urls, version
+from weave import call_context, trace_sentry, urls, version
+from weave.client_context import weave_client as weave_client_context
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
@@ -200,7 +201,7 @@ class Call:
 
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
         return CallsIter(
@@ -210,7 +211,7 @@ class Call:
         )
 
     def delete(self) -> bool:
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
@@ -220,7 +221,7 @@ class Call:
             )
         if name == self.display_name:
             return
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         client._set_call_display_name(call=self, display_name=name)
         self.display_name = name
 
