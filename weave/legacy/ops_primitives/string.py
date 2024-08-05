@@ -5,7 +5,7 @@ import typing
 import numpy as np
 
 from weave import weave_types as types
-from weave.api import op, weave_class
+from weave.query_api import op, weave_class
 
 
 @op(name="root-string")

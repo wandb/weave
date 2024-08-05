@@ -13,8 +13,8 @@ _loading_builtins_token = _context_state.set_loading_built_ins()
 from . import weave_types as types
 from . import storage
 
-from .api import *
-
+from .query_api import *
+from .trace_api import *
 
 from .errors import *
 

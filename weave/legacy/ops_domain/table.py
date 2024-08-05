@@ -7,7 +7,7 @@ import typing
 
 from weave import engine_trace, errors, util, weave_internal
 from weave import weave_types as types
-from weave.api import op, weave_class
+from weave.query_api import op, weave_class
 from weave.legacy import (
     artifact_fs,
     artifact_wandb,

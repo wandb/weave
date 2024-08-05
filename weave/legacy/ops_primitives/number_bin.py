@@ -1,7 +1,7 @@
 import math
 
 from weave import weave_types as types
-from weave.api import op, use
+from weave.query_api import op, use
 from weave.legacy import graph
 from weave.legacy.ops_primitives import date
 from weave.legacy.ops_primitives.dict import dict_
