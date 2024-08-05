@@ -3,7 +3,6 @@ import inspect
 import operator
 import typing
 from typing import (
-    TYPE_CHECKING,
     Any,
     Generator,
     Iterator,
@@ -13,7 +12,6 @@ from typing import (
     Union,
 )
 
-import pandas as pd
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
@@ -39,9 +37,6 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     _TableRowFilter,
 )
-
-if TYPE_CHECKING:
-    import pandas as pd
 
 
 @dataclasses.dataclass
@@ -331,29 +326,9 @@ class WeaveTable(Traceable):
         for row in self.rows:
             yield row
 
-    def append(self, row: typing.Dict) -> None:
-        self._load_rows_if_not_exists()
-        assert self._loaded_rows is not None
-        self._loaded_rows.append(row)
-        self._mark_dirty()
-
-    def add(self, row: typing.Dict) -> None:
-        self.append(row)
-
-    def remove(self, index: int) -> None:
-        self._load_rows_if_not_exists()
-        assert self._loaded_rows is not None
-        self._loaded_rows.pop(index)
-        self._mark_dirty()
-
-    def to_pandas(self) -> "pd.DataFrame":
-        try:
-            import pandas as pd
-        except ImportError:
-            raise ValueError("pandas is not installed")
-
-        self._load_rows_if_not_exists()
-        return pd.DataFrame(self._loaded_rows)
+    def append(self, val: Any) -> None:
+        if not isinstance(self.ref, ObjectRef):
+            raise ValueError("Can only append to object refs")
 
 
 class WeaveList(Traceable, list):
