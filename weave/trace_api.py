@@ -4,7 +4,7 @@ import contextlib
 import os
 import threading
 import time
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional, Union
 
 from weave.call_context import get_current_call
 from weave.client_context import weave_client as weave_client_context
@@ -15,9 +15,14 @@ from .trace import context
 from .trace.constants import TRACE_OBJECT_EMOJI
 from .trace.op import Op, op
 from .trace.refs import ObjectRef, parse_uri
+from .trace.settings import UserSettings, parse_and_apply_settings
 
 
-def init(project_name: str) -> weave_client.WeaveClient:
+def init(
+    project_name: str,
+    *,
+    settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
+) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
     Logging is initialized globally, so you do not need to keep a reference
@@ -36,6 +41,7 @@ def init(project_name: str) -> weave_client.WeaveClient:
     # trace-server backend.
     # return weave_init.init_wandb(project_name).client
     # return weave_init.init_trace_remote(project_name).client
+    parse_and_apply_settings(settings)
     return weave_init.init_weave(project_name).client
 
 
@@ -100,8 +106,8 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
     save_name: str
     if name:
         save_name = name
-    elif hasattr(obj, "name"):
-        save_name = obj.name
+    elif n := getattr(obj, "name", None):
+        save_name = n
     else:
         save_name = obj.__class__.__name__
 

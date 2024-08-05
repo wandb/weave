@@ -123,9 +123,9 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
-    ref = _get_direct_ref(obj)
-    if ref:
+    if ref := _get_direct_ref(obj):
         return ref
+
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
@@ -140,6 +140,12 @@ def map_to_refs(obj: Any) -> Any:
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
+
+    # This path should only be reached if the object is both:
+    # 1. A `WeaveObject`; and
+    # 2. Has been dirtied (edited in any way), causing obj.ref=None
+    elif isinstance(obj, WeaveObject):
+        return map_to_refs(obj._val)
 
     return obj
 
@@ -735,6 +741,9 @@ class WeaveClient:
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
+        if getattr(val, "_is_dirty", False):
+            val.ref = None
+
         is_opdef = isinstance(val, Op)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
