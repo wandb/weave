@@ -102,6 +102,8 @@ class CallStartCHInsertable(BaseModel):
     _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
     _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
     _op_name_v = field_validator("op_name")(validation.op_name_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
     _display_name_v = field_validator("display_name")(validation.display_name_validator)
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
@@ -119,6 +121,8 @@ class CallEndCHInsertable(BaseModel):
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
 
 
 class CallDeleteCHInsertable(BaseModel):
@@ -135,6 +139,8 @@ class CallDeleteCHInsertable(BaseModel):
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
 
 
 class CallUpdateCHInsertable(BaseModel):
@@ -152,6 +158,9 @@ class CallUpdateCHInsertable(BaseModel):
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _display_name_v = field_validator("display_name")(validation.display_name_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
 
 
 CallCHInsertable = typing.Union[
@@ -226,6 +235,7 @@ class ObjCHInsertable(BaseModel):
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _object_id_v = field_validator("object_id")(validation.object_id_validator)
+    _refs = field_validator("refs")(validation.refs_list_validator)
 
 
 class SelectableCHObjSchema(BaseModel):

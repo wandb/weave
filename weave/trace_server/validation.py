@@ -1,5 +1,7 @@
 import typing
 
+from weave.trace_server import refs_internal
+
 from . import validation_util
 
 
@@ -30,7 +32,7 @@ def display_name_validator(s: typing.Optional[str]) -> typing.Optional[str]:
 
 
 def op_name_validator(s: str) -> str:
-    if "://" in s:
+    if refs_internal.string_will_be_interpreted_as_ref(s):
         validation_util.require_ref_uri(s)
     else:
         validation_util.require_max_str_len(s, 128)
@@ -59,3 +61,7 @@ def wb_run_id_validator(s: typing.Optional[str]) -> typing.Optional[str]:
 
 def object_id_validator(s: str) -> str:
     return validation_util.require_max_str_len(s, 128)
+
+
+def refs_list_validator(s: typing.List[str]) -> typing.List[str]:
+    return [validation_util.require_ref_uri(ref) for ref in s]

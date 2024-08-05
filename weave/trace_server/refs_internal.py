@@ -101,3 +101,9 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
+
+
+def string_will_be_interpreted_as_ref(s: str) -> bool:
+    return s.startswith(f"{WEAVE_INTERNAL_SCHEME}:///") or s.startswith(
+        f"{WEAVE_SCHEME}:///"
+    )
