@@ -107,18 +107,18 @@ def create_wrapper_async(
     return wrapper
 
 
+
+## Deal with Stream
 def anthropic_stream_accumulator(
     acc: typing.Optional["Message"],
     value: "MessageStream",
 ) -> "Message":
     from anthropic.lib.streaming._types import MessageStopEvent
     
-    print(f"    type(value): {type(value)}")
     if acc is None:
         acc = {}
     if isinstance(value, MessageStopEvent):
-        print(f"Here we go!")
-        acc = value
+        acc = value.message
     return acc
 
 
@@ -131,7 +131,6 @@ def create_stream_wrapper(name: str) -> typing.Callable[[typing.Callable], typin
             make_accumulator=lambda _: anthropic_stream_accumulator,
             should_accumulate=lambda _: True,
         )
-
     return wrapper
 
 anthropic_patcher = MultiPatcher(
@@ -151,6 +150,11 @@ anthropic_patcher = MultiPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "Messages.stream",
             create_stream_wrapper(name="anthropic.Messages.stream"),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("anthropic.resources.messages"),
+            "AsyncMessages.stream",
+            create_stream_wrapper(name="anthropic.AsyncMessages.stream"),
         ),
     ]
 )
