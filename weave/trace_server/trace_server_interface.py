@@ -2,13 +2,58 @@ import abc
 import datetime
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from typing_extensions import TypedDict
 
 from .interface.query import Query
 
 WB_USER_ID_DESCRIPTION = (
     "Do not set directly. Server will automatically populate this field."
 )
+
+
+class ExtraKeysTypedDict(TypedDict):
+    pass
+
+
+# https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
+ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
+
+
+class WeaveSummarySchema(ExtraKeysTypedDict):
+    status: typing.Optional[typing.Literal["success", "error", "running"]]
+    nice_trace_name: typing.Optional[str]
+    latency: typing.Optional[int]
+
+
+class LLMUsageSchema(TypedDict, total=False):
+    prompt_tokens: typing.Optional[int]
+    input_tokens: typing.Optional[int]
+    completion_tokens: typing.Optional[int]
+    output_tokens: typing.Optional[int]
+    requests: typing.Optional[int]
+    total_tokens: typing.Optional[int]
+
+
+class SummaryInsertMap(ExtraKeysTypedDict, total=False):
+    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
+
+
+class SummaryMap(SummaryInsertMap):
+    _weave: typing.Optional[WeaveSummarySchema]
+
+
+class WeaveAttributeSchema(TypedDict):
+    client_version: typing.Optional[str]
+    source: typing.Optional[str]
+    os_name: typing.Optional[str]
+    os_version: typing.Optional[str]
+    os_release: typing.Optional[str]
+    sys_version: typing.Optional[str]
+
+
+class AttributeMap(ExtraKeysTypedDict):
+    _weave: typing.Optional[WeaveAttributeSchema]
 
 
 class CallSchema(BaseModel):
@@ -20,36 +65,42 @@ class CallSchema(BaseModel):
     # Optional display name of the call
     display_name: typing.Optional[str] = None
 
-    ## Trace ID
+    # Trace ID
     trace_id: str
-    ## Parent ID is optional because the call may be a root
+    # Parent ID is optional because the call may be a root
     parent_id: typing.Optional[str] = None
 
-    ## Start time is required
+    # Start time is required
     started_at: datetime.datetime
-    ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    # Attributes: properties of the call
+    attributes: AttributeMap
 
-    ## Inputs
+    # Inputs
     inputs: typing.Dict[str, typing.Any]
 
-    ## End time is required if finished
+    # End time is required if finished
     ended_at: typing.Optional[datetime.datetime] = None
 
-    ## Exception is present if the call failed
+    # Exception is present if the call failed
     exception: typing.Optional[str] = None
 
-    ## Outputs
+    # Outputs
     output: typing.Optional[typing.Any] = None
 
-    ## Summary: a summary of the call
-    summary: typing.Optional[typing.Dict[str, typing.Any]] = None
+    # Summary: a summary of the call
+    summary: typing.Optional[SummaryMap] = None
 
     # WB Metadata
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
+
+    @field_serializer("attributes", "summary", when_used="unless-none")
+    def serialize_typed_dicts(
+        self, v: typing.Dict[str, typing.Any]
+    ) -> typing.Dict[str, typing.Any]:
+        return dict(v)
 
 
 # Essentially a partial of StartedCallSchema. Mods:
@@ -64,39 +115,51 @@ class StartedCallSchemaForInsert(BaseModel):
     # Optional display name of the call
     display_name: typing.Optional[str] = None
 
-    ## Trace ID
+    # Trace ID
     trace_id: typing.Optional[str] = None  # Will be generated if not provided
-    ## Parent ID is optional because the call may be a root
+    # Parent ID is optional because the call may be a root
     parent_id: typing.Optional[str] = None
 
-    ## Start time is required
+    # Start time is required
     started_at: datetime.datetime
-    ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    # Attributes: properties of the call
+    attributes: AttributeMap
 
-    ## Inputs
+    # Inputs
     inputs: typing.Dict[str, typing.Any]
 
     # WB Metadata
     wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: typing.Optional[str] = None
 
+    @field_serializer("attributes")
+    def serialize_typed_dicts(
+        self, v: typing.Dict[str, typing.Any]
+    ) -> typing.Dict[str, typing.Any]:
+        return dict(v)
+
 
 class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
 
-    ## End time is required
+    # End time is required
     ended_at: datetime.datetime
 
-    ## Exception is present if the call failed
+    # Exception is present if the call failed
     exception: typing.Optional[str] = None
 
-    ## Outputs
+    # Outputs
     output: typing.Optional[typing.Any] = None
 
-    ## Summary: a summary of the call
-    summary: typing.Dict[str, typing.Any]
+    # Summary: a summary of the call
+    summary: SummaryInsertMap
+
+    @field_serializer("summary")
+    def serialize_typed_dicts(
+        self, v: typing.Dict[str, typing.Any]
+    ) -> typing.Dict[str, typing.Any]:
+        return dict(v)
 
 
 class ObjSchema(BaseModel):
