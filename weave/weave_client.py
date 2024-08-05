@@ -5,15 +5,7 @@ import sys
 import typing
 import uuid
 from functools import lru_cache
-from typing import (
-    Any,
-    Dict,
-    Iterator,
-    Optional,
-    Sequence,
-    TypedDict,
-    Union,
-)
+from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, TypedDict, Union
 
 import pydantic
 from requests import HTTPError
@@ -161,9 +153,9 @@ class Call:
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
-    summary: Optional[dict] = None
+    summary: Optional[Mapping] = None
     display_name: Optional[str] = None
-    attributes: Optional[dict] = None
+    attributes: Optional[Mapping] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
@@ -312,7 +304,7 @@ def make_client_call(
     return WeaveObject(call, CallRef(entity, project, call.id), server, None)
 
 
-def sum_dict_leaves(dicts: list[dict]) -> dict:
+def sum_dict_leaves(dicts: list[Mapping]) -> dict:
     # dicts is a list of dictionaries, that may or may not
     # have nested dictionaries. Sum all the leaves that match
     result: dict = {}
@@ -338,12 +330,12 @@ class WeaveKeyDict(dict):
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
 
-    The `weave` key is reserved for internal use and cannot be set directly.
+    The `_weave` key is reserved for internal use and cannot be set directly.
     """
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
-        dict.__setitem__(self, "weave", WeaveKeyDict())
+        dict.__setitem__(self, "_weave", WeaveKeyDict())
 
         if kwargs:
             for key, value in kwargs.items():
@@ -355,13 +347,13 @@ class AttributesDict(dict):
                     self[key] = value
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        if key == "weave":
-            raise KeyError("Cannot set 'weave' directly -- for internal use only!")
+        if key == "_weave":
+            raise KeyError("Cannot set '_weave' directly -- for internal use only!")
         super().__setitem__(key, value)
 
     def _set_weave_item(self, subkey: Any, value: Any) -> None:
-        """Internal method to set items in the 'weave' subdictionary."""
-        dict.__setitem__(self["weave"], subkey, value)
+        """Internal method to set items in the '_weave' subdictionary."""
+        dict.__setitem__(self["_weave"], subkey, value)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"

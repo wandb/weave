@@ -271,7 +271,7 @@ def test_call_create(client):
         summary={},
         _children=[],
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -298,7 +298,7 @@ def test_calls_query(client):
         inputs={"a": 5, "b": 10},
         id=call0.id,
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -316,7 +316,7 @@ def test_calls_query(client):
         inputs={"a": 6, "b": 11},
         id=call1.id,
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),

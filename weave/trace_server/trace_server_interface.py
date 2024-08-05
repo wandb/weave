@@ -2,13 +2,66 @@ import abc
 import datetime
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
+from typing_extensions import TypedDict
 
 from .interface.query import Query
 
 WB_USER_ID_DESCRIPTION = (
     "Do not set directly. Server will automatically populate this field."
 )
+
+
+# `total=False` means keys are non-required
+# ConfigDict(extra="allow") allows for extra keys in the dictionary
+class WeaveSummarySchema(TypedDict, total=False):
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
+
+    # Computed properties w.r.t export project go here
+    # latency: ...
+    # Calculated costs go here
+    # costs: ...
+    pass
+
+
+class LLMUsageSchema(TypedDict, total=False):
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
+
+    prompt_tokens: typing.Optional[int]
+    input_tokens: typing.Optional[int]
+    completion_tokens: typing.Optional[int]
+    output_tokens: typing.Optional[int]
+    requests: typing.Optional[int]
+    total_tokens: typing.Optional[int]
+
+
+class SummaryInsertMap(TypedDict, total=False):
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
+
+    usage: typing.Optional[typing.Dict[str, SerializeAsAny[LLMUsageSchema]]]
+
+
+class SummaryMap(SummaryInsertMap, total=False):
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
+
+    _weave: typing.Optional[SerializeAsAny[WeaveSummarySchema]]
+
+
+class WeaveAttributeSchema(TypedDict, total=False):
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
+
+    client_version: typing.Optional[str]
+    source: typing.Optional[str]
+    os_name: typing.Optional[str]
+    os_version: typing.Optional[str]
+    os_release: typing.Optional[str]
+    sys_version: typing.Optional[str]
+
+
+class AttributeMap(TypedDict, total=False):
+    __pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
+
+    _weave: typing.Optional[WeaveAttributeSchema]
 
 
 class CallSchema(BaseModel):
@@ -28,7 +81,7 @@ class CallSchema(BaseModel):
     ## Start time is required
     started_at: datetime.datetime
     ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    attributes: SerializeAsAny[AttributeMap]
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
@@ -43,7 +96,7 @@ class CallSchema(BaseModel):
     output: typing.Optional[typing.Any] = None
 
     ## Summary: a summary of the call
-    summary: typing.Optional[typing.Dict[str, typing.Any]] = None
+    summary: typing.Optional[SerializeAsAny[SummaryMap]] = None
 
     # WB Metadata
     wb_user_id: typing.Optional[str] = None
@@ -72,7 +125,7 @@ class StartedCallSchemaForInsert(BaseModel):
     ## Start time is required
     started_at: datetime.datetime
     ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    attributes: SerializeAsAny[AttributeMap]
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
@@ -96,7 +149,7 @@ class EndedCallSchemaForInsert(BaseModel):
     output: typing.Optional[typing.Any] = None
 
     ## Summary: a summary of the call
-    summary: typing.Dict[str, typing.Any]
+    summary: SummaryInsertMap
 
 
 class ObjSchema(BaseModel):
