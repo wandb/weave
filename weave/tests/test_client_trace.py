@@ -102,12 +102,14 @@ def test_dataset(client):
 
 def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
+    trace_id = generate_id()
+    parent_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
         project_id=client._project_id(),
         id=call_id,
         op_name="test_name",
-        trace_id="test_trace_id",
-        parent_id="test_parent_id",
+        trace_id=trace_id,
+        parent_id=parent_id,
         started_at=datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
         attributes={"a": 5},
@@ -147,8 +149,8 @@ def test_trace_server_call_start_and_end(client):
         "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
-        "trace_id": "test_trace_id",
-        "parent_id": "test_parent_id",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": None,
         "exception": None,
@@ -186,8 +188,8 @@ def test_trace_server_call_start_and_end(client):
         "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
-        "trace_id": "test_trace_id",
-        "parent_id": "test_parent_id",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": FuzzyDateTimeMatcher(end.ended_at),
         "exception": None,
