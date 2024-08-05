@@ -26,14 +26,14 @@ def parent_id_validator(s: typing.Optional[str]) -> typing.Optional[str]:
 def display_name_validator(s: typing.Optional[str]) -> typing.Optional[str]:
     if s is None:
         return None
-    return validation_util.assert_str_128(s)
+    return validation_util.require_max_str_len(s, 128)
 
 
 def op_name_validator(s: str) -> str:
     if "://" in s:
-        validation_util.assert_valid_ref(s)
+        validation_util.require_ref_uri(s)
     else:
-        validation_util.assert_str_128(s)
+        validation_util.require_max_str_len(s, 128)
 
     return s
 
@@ -58,4 +58,4 @@ def wb_run_id_validator(s: typing.Optional[str]) -> typing.Optional[str]:
 
 
 def object_id_validator(s: str) -> str:
-    return validation_util.assert_str_128(s)
+    return validation_util.require_max_str_len(s, 128)

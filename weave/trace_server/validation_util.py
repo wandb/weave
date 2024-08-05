@@ -1,5 +1,4 @@
 import base64
-import typing
 import uuid
 
 from . import refs_internal
@@ -33,7 +32,7 @@ def require_base64(s: str) -> str:
     return s
 
 
-def assert_valid_ref(s: str) -> str:
+def require_ref_uri(s: str) -> str:
     parsed = refs_internal.parse_internal_uri(s)
     parsed_str = parsed.uri()
     if parsed_str != s:
@@ -41,13 +40,7 @@ def assert_valid_ref(s: str) -> str:
     return s
 
 
-def make_assert_valid_len_str(length: int) -> typing.Callable[[str], str]:
-    def assert_valid_len_str(s: str) -> str:
-        if len(s) >= length:
-            raise ValueError(f"String too long: {s}")
-        return s
-
-    return assert_valid_len_str
-
-
-assert_str_128 = make_assert_valid_len_str(128)
+def require_max_str_len(s: str, length: int) -> str:
+    if len(s) >= length:
+        raise ValueError(f"String too long: {s}")
+    return s
