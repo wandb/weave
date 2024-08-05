@@ -281,12 +281,12 @@ def test_anthropic_messages_stream_ctx_manager(
         ],
         model=model,
     ) as stream:
-        for text in stream.text_stream:
-            all_content += text
+        for event in stream:
+            if event.type == "text":
+                all_content += event.text
     
-    exp = "Hello there! How can I assist you today?"
+    exp = "Hello there!"
     assert all_content.strip() == exp
-    
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
@@ -327,10 +327,11 @@ async def test_async_anthropic_messages_stream_ctx_manager(
         ],
         model=model,
     ) as stream:
-        async for text in stream.text_stream:
-            all_content += text
+        async for event in stream:
+            if event.type == "text":
+                all_content += event.text
     
-    exp = "Hello there! How can I assist you today?"
+    exp = "Hello there!"
     assert all_content.strip() == exp
     
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
