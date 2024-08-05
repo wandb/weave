@@ -66,6 +66,7 @@ def init_weave(
 ) -> InitializedClient:
     global _current_inited_client
     if _current_inited_client is not None:
+        # TODO: Prob should move into settings
         if (
             _current_inited_client.client.project == project_name
             and _current_inited_client.client.ensure_project_exists
