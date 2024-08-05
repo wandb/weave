@@ -3,7 +3,7 @@ import typing
 from . import validation_util
 
 
-def project_id_validator(s: typing.Optional[str]) -> typing.Optional[s]:
+def project_id_validator(s: typing.Optional[str]) -> typing.Optional[str]:
     if s is None:
         return None
     return validation_util.require_base64(s)
@@ -34,6 +34,8 @@ def op_name_validator(s: str) -> str:
         validation_util.assert_valid_ref(s)
     else:
         validation_util.assert_str_128(s)
+
+    return s
 
 
 def wb_user_id_validator(s: typing.Optional[str]) -> typing.Optional[str]:
