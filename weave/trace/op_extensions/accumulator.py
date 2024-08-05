@@ -211,8 +211,8 @@ class _IteratorWrapper(Generic[V]):
         return getattr(self._iterator, name)
 
     def __enter__(self) -> "_IteratorWrapper":
-        if hasattr(self._iterator, "__enter__"):
-            return self._iterator.__enter__()
+        if hasattr(self._iterator, "__enter__"): # let's enter the context manager
+            self._iterator = self._iterator.__enter__()
         return self
 
     def __exit__(
@@ -228,6 +228,8 @@ class _IteratorWrapper(Generic[V]):
         self._call_on_close_once()
 
     async def __aenter__(self) -> "_IteratorWrapper":
+        if hasattr(self._iterator, "__aenter__"): # let's enter the context manager
+            self._iterator = await self._iterator.__aenter__()
         return self
 
     async def __aexit__(
