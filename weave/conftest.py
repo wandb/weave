@@ -1,4 +1,4 @@
-import hashlib
+import base64
 import logging
 import os
 import pathlib
@@ -345,8 +345,9 @@ class TwoWayMapping:
         return self._int_to_ext_map[key]
 
 
-def simple_hash(s: str) -> str:
-    return hashlib.sha256(s.encode()).hexdigest()
+def b64(s: str) -> str:
+    # Base64 encode the string
+    return base64.b64encode(s.encode("ascii")).decode("ascii")
 
 
 class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
@@ -356,22 +357,23 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
         self._user_map = TwoWayMapping()
 
     def ext_to_int_project_id(self, project_id: str) -> str:
-        return self._project_map.ext_to_int(project_id, simple_hash(project_id))
+        return self._project_map.ext_to_int(project_id, b64(project_id))
 
     def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
-        return self._project_map.int_to_ext(project_id, simple_hash(project_id))
+        return self._project_map.int_to_ext(project_id, b64(project_id))
 
     def ext_to_int_run_id(self, run_id: str) -> str:
-        return self._run_map.ext_to_int(run_id, simple_hash(run_id))
+        return self._run_map.ext_to_int(run_id, b64(run_id) + ":" + run_id)
 
     def int_to_ext_run_id(self, run_id: str) -> str:
-        return self._run_map.int_to_ext(run_id, simple_hash(run_id))
+        exp = run_id.split(":")[1]
+        return self._run_map.int_to_ext(run_id, exp)
 
     def ext_to_int_user_id(self, user_id: str) -> str:
-        return self._user_map.ext_to_int(user_id, simple_hash(user_id))
+        return self._user_map.ext_to_int(user_id, b64(user_id))
 
     def int_to_ext_user_id(self, user_id: str) -> str:
-        return self._user_map.int_to_ext(user_id, simple_hash(user_id))
+        return self._user_map.int_to_ext(user_id, b64(user_id))
 
 
 class TestOnlyUserInjectingExternalTraceServer(
