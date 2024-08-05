@@ -1130,7 +1130,6 @@ export const toGqlField = (
           .concat(gqlBasicField('attributes')),
       },
     ];
-    // return [gqlObjectField(forwardGraph, forwardOp, 'tags')];
   } else if (forwardOp.op.name === 'artifactVersion-artifactCollections') {
     return [
       {
