@@ -508,11 +508,7 @@ async def test_evaluation_data_topology(client):
     assert evaluate_call.summary == predict_usage_summary
 
 
-@pytest.mark.asyncio
-async def test_eval_supports_non_op_funcs(client):
-    def function_model(sentence: str) -> dict:
-        return ""
-
+def make_test_eval():
     def function_score(target: dict, model_output: dict) -> dict:
         return {"correct": target == model_output}
 
@@ -523,6 +519,50 @@ async def test_eval_supports_non_op_funcs(client):
         ],
         scorers=[function_score],
     )
+    return evaluation
+
+
+@pytest.mark.asyncio
+async def test_eval_supports_model_as_op(client):
+    @weave.op
+    def function_model(sentence: str) -> dict:
+        return ""
+
+    evaluation = make_test_eval()
+
+    res = await evaluation.evaluate(function_model)
+    assert res != None
+
+    gotten_op = weave.ref(function_model.ref.uri()).get()
+    res = await evaluation.evaluate(gotten_op)
+    assert res != None
+
+
+class MyTestModel(Model):
+    @weave.op
+    def predict(self, sentence: str) -> dict:
+        return ""
+
+
+@pytest.mark.asyncio
+async def test_eval_supports_model_class(client):
+    evaluation = make_test_eval()
+
+    model = MyTestModel()
+    res = await evaluation.evaluate(model)
+    assert res != None
+
+    gotten_model = weave.ref(model.ref.uri()).get()
+    res = await evaluation.evaluate(gotten_model)
+    assert res != None
+
+
+@pytest.mark.asyncio
+async def test_eval_supports_non_op_funcs(client):
+    def function_model(sentence: str) -> dict:
+        return ""
+
+    evaluation = make_test_eval()
 
     with pytest.raises(ValueError):
         res = await evaluation.evaluate(function_model)
@@ -546,3 +586,40 @@ async def test_eval_supports_non_op_funcs(client):
 
     # # 2: Assert that the model was correctly oped
     # assert shouldBeModelRef.startswith("weave:///")
+
+
+@pytest.mark.asyncio
+async def test_eval_is_robust_to_missing_values(client):
+    # At least 1 None
+    # All dicts have "d": None
+    resp = [
+        None,
+        {"a": 1, "b": {"c": 2}, "always_none": None},
+        {"a": 2, "b": {"c": None}, "always_none": None},
+        {"a": 3, "b": {}, "always_none": None},
+        {"a": 4, "b": None, "always_none": None},
+        {"a": 5, "always_none": None},
+        {"a": None, "always_none": None},
+        {"always_none": None},
+        {},
+    ]
+
+    @weave.op
+    def model_func(model_res) -> dict:
+        return resp[model_res]
+
+    def function_score(scorer_res, model_output) -> dict:
+        return resp[scorer_res]
+
+    evaluation = weave.Evaluation(
+        name="fruit_eval",
+        dataset=[{"model_res": i, "scorer_res": i} for i in range(len(resp))],
+        scorers=[function_score],
+    )
+
+    res = await evaluation.evaluate(model_func)
+    assert res == {
+        "model_output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
+        "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
+        "model_latency": {"mean": pytest.approx(0, abs=1)},
+    }

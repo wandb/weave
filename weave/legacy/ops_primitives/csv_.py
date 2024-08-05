@@ -3,7 +3,7 @@ import csv
 import pyarrow as pa
 import pyarrow.csv as pa_csv
 
-from weave import api as weave
+from weave import query_api as weave
 from weave.legacy import file_base
 
 

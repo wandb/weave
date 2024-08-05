@@ -18,6 +18,8 @@ import {
   SourceType,
 } from './ecpTypes';
 
+export const EVALUATION_NAME_DEFAULT = 'Evaluation';
+
 export const flattenedDimensionPath = (dim: MetricDefinition): string => {
   const paths = [...dim.metricSubPath];
   if (dim.source === 'scorer') {

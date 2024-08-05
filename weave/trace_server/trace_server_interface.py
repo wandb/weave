@@ -191,6 +191,10 @@ class CallsQueryReq(BaseModel):
     sort_by: typing.Optional[typing.List[_SortBy]] = None
     query: typing.Optional[Query] = None
 
+    # TODO: type this with call schema columns, following the same rules as
+    # _SortBy and thus GetFieldOperator.get_field_ (without direction)
+    columns: typing.Optional[typing.List[str]] = None
+
 
 class CallsQueryRes(BaseModel):
     calls: typing.List[CallSchema]

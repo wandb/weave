@@ -1,6 +1,6 @@
 import typing
 
-from weave.api import op
+from weave.query_api import op
 from weave.legacy import artifact_fs
 
 

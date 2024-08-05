@@ -1,7 +1,7 @@
 import typing
 
 from weave import weave_types as types
-from weave.api import op, weave_class
+from weave.query_api import op, weave_class
 from weave.legacy import dispatch
 from weave.legacy.ops_primitives.dict import dict_
 
