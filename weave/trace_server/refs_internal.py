@@ -18,6 +18,10 @@ OBJECT_ATTR_EDGE_NAME = "attr"
 TABLE_ROW_ID_EDGE_NAME = "id"
 
 
+class InvalidInternalRef(ValueError):
+    pass
+
+
 @dataclasses.dataclass
 class InternalTableRef:
     project_id: str
@@ -68,19 +72,21 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
         path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
         parts = path.split("/")
         if len(parts) < 2:
-            raise ValueError(f"Invalid URI: {uri}")
+            raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 2 parts")
         project_id, kind = parts[:2]
         remaining = parts[2:]
     elif uri.startswith(f"{WEAVE_SCHEME}:///"):
         path = uri[len(f"{WEAVE_SCHEME}:///") :]
         parts = path.split("/")
         if len(parts) < 3:
-            raise ValueError(f"Invalid URI: {uri}")
+            raise ValueError(f"Invalid URI: {uri}. Must have at least 3 parts")
         entity, project, kind = parts[:3]
         project_id = f"{entity}/{project}"
         remaining = parts[3:]
     else:
-        raise ValueError(f"Invalid URI: {uri}")
+        raise InvalidInternalRef(
+            f"Invalid URI: {uri}. Must start with {WEAVE_INTERNAL_SCHEME}:/// or {WEAVE_SCHEME}:///"
+        )
     if kind == "table":
         return InternalTableRef(project_id=project_id, digest=remaining[0])
     elif kind == "object":
@@ -100,7 +106,7 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
             extra=remaining[1:],
         )
     else:
-        raise ValueError(f"Unknown ref kind: {kind}")
+        raise InvalidInternalRef(f"Unknown ref kind: {kind}")
 
 
 def string_will_be_interpreted_as_ref(s: str) -> bool:

@@ -5,9 +5,7 @@ from weave.trace_server import refs_internal
 from . import validation_util
 
 
-def project_id_validator(s: typing.Optional[str]) -> typing.Optional[str]:
-    if s is None:
-        return None
+def project_id_validator(s: str) -> str:
     return validation_util.require_base64(s)
 
 
