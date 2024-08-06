@@ -1,5 +1,6 @@
 import datetime
 import typing
+
 from pydantic import BaseModel
 
 
@@ -54,9 +55,12 @@ class CallUpdateCHInsertable(BaseModel):
     # required types
     input_refs: typing.List[str] = []
     output_refs: typing.List[str] = []
+
+
 # Very critical that this matches the calls table schema! This should
 # essentially be the DB version of CallSchema with the addition of the
 # created_at and updated_at fields
+
 
 class SelectableCHCallSchema(BaseModel):
     project_id: str
@@ -84,6 +88,8 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
+
+
 class ObjCHInsertable(BaseModel):
     project_id: str
     kind: str

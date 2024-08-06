@@ -1,5 +1,7 @@
-import requests
+# script to load data into llm_token_prices table in ClickHouse
 from datetime import datetime
+
+import requests
 
 # Load the data
 url = "https://raw.githubusercontent.com/AgentOps-AI/tokencost/main/tokencost/model_prices.json"

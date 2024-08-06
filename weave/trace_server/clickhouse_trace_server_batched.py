@@ -257,11 +257,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # fetch all columns from the database. Currently all use
         # cases call for every column to be fetched, so we have not
         # implemented this yet.
+        columns = all_call_select_columns
         # We put summary_dump last so that when we compute the costs and summary its in the right place
-        columns = [
-            *[col for col in all_call_select_columns if col != "summary_dump"],
-            "summary_dump",
-        ]
+        if req.include_costs:
+            columns = [
+                *[col for col in all_call_select_columns if col != "summary_dump"],
+                "summary_dump",
+            ]
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -1337,11 +1339,6 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
 
 # Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
-    attributes = _dict_dump_to_dict(ch_call_dict["attributes_dump"])
-    # Ensure _weave is included in attributes
-    if "_weave" not in attributes:
-        attributes["_weave"] = None  # or some default value if appropriate
-
     return dict(
         project_id=ch_call_dict.get("project_id"),
         id=ch_call_dict.get("id"),
@@ -1350,7 +1347,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         op_name=ch_call_dict.get("op_name"),
         started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
         ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-        attributes=attributes,
+        attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),

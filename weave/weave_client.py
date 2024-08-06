@@ -232,14 +232,16 @@ class Call:
 class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
+    include_costs: bool
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter, include_costs: bool = False
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
         self._page_size = 1000
+        self.include_costs = include_costs
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
@@ -252,6 +254,7 @@ class CallsIter:
                 filter=self.filter,
                 offset=index * self._page_size,
                 limit=self._page_size,
+                include_costs=self.include_costs,
             )
         )
         return response.calls
@@ -310,7 +313,7 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        summary=dict(server_call.summary) if server_call.summary else None,
+        summary=dict(server_call.summary if server_call.summary else {}),
         display_name=server_call.display_name,
         attributes=server_call.attributes,
     )
@@ -327,7 +330,7 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
         for k, v in d.items():
             if isinstance(v, dict):
                 result[k] = sum_dict_leaves([result.get(k, {}), v])
-            elif v is not None:
+            else:
                 result[k] = result.get(k, 0) + v
     return result
 
@@ -462,18 +465,19 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
+    def calls(self, filter: Optional[_CallsFilter] = None, include_costs: Optional[bool] = False) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
 
-        return CallsIter(self.server, self._project_id(), filter)
+        return CallsIter(self.server, self._project_id(), filter, include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
-    def call(self, call_id: str) -> WeaveObject:
+    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
                 filter=_CallsFilter(call_ids=[call_id]),
+                include_costs=include_costs,
             )
         )
         if not response.calls:
@@ -589,9 +593,7 @@ class WeaveClient:
         # Summary handling
         summary = {}
         if call._children:
-            summary = sum_dict_leaves(
-                [child.summary for child in call._children if child.summary]
-            )
+            summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
             isinstance(original_output, dict)
             and "usage" in original_output
