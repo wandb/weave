@@ -1,10 +1,12 @@
 import importlib
 import typing
 from functools import wraps
+from typing import Any, Union
+
+from typing_extensions import AsyncIterator, Iterator
 
 import weave
-from weave.trace.op_extensions.accumulator import (_IteratorWrapper,
-                                                   add_accumulator)
+from weave.trace.op_extensions.accumulator import _IteratorWrapper, add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
@@ -16,8 +18,13 @@ def anthropic_accumulator(
     acc: typing.Optional["Message"],
     value: "MessageStreamEvent",
 ) -> "Message":
-    from anthropic.types import (ContentBlockDeltaEvent, Message,
-                                 MessageDeltaEvent, TextBlock, Usage)
+    from anthropic.types import (
+        ContentBlockDeltaEvent,
+        Message,
+        MessageDeltaEvent,
+        TextBlock,
+        Usage,
+    )
 
     if acc is None:
         if hasattr(value, "message"):
@@ -125,9 +132,6 @@ def anthropic_stream_accumulator(
     return acc
 
 
-from typing import Any, Union
-
-from typing_extensions import AsyncIterator, Iterator
 
 
 class AnthropicIteratorWrapper(_IteratorWrapper):
@@ -176,7 +180,7 @@ def create_stream_wrapper(
             op,  # type: ignore
             make_accumulator=lambda _: anthropic_stream_accumulator,
             should_accumulate=lambda _: True,
-            iterator_wrapper=AnthropicIteratorWrapper,
+            iterator_wrapper=AnthropicIteratorWrapper,  # type: ignore
         )
 
     return wrapper
