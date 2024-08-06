@@ -1,4 +1,5 @@
 import base64
+import typing
 import uuid
 
 from . import refs_internal
@@ -32,8 +33,16 @@ def require_base64(s: str) -> str:
     return s
 
 
-def require_ref_uri(s: str) -> str:
+def require_internal_ref_uri(
+    s: str, refClass: typing.Optional[typing.Type] = None
+) -> str:
+    if not s.startswith(f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"):
+        raise ValueError(f"Invalid ref: {s}")
+
     parsed = refs_internal.parse_internal_uri(s)
+
+    if refClass is not None and not isinstance(parsed, refClass):
+        raise ValueError(f"Invalid ref: {s}")
     parsed_str = parsed.uri()
     if parsed_str != s:
         raise ValueError(f"Invalid ref: {s}")
