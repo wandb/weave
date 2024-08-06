@@ -3,7 +3,7 @@ import typing
 
 from weave import engine_trace, environment, errors
 from weave import weave_types as types
-from weave.api import op
+from weave.query_api import op
 from weave.legacy import mappers_gql, partial_object
 from weave.legacy.language_features.tagging import tagged_value_type
 from weave.legacy.ops_domain import wb_domain_types as wdt

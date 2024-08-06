@@ -7,7 +7,7 @@ import pathlib
 import re
 import typing
 
-from weave import client_context
+from weave.client_context import weave_client as weave_client_context
 from weave.legacy import (
     artifact_base,
     artifact_fs,
@@ -478,7 +478,7 @@ def to_json_with_refs(
         ]
     elif isinstance(obj, op_def.OpDef):
         try:
-            gc = client_context.weave_client.require_weave_client()
+            gc = weave_client_context.require_weave_client()
         except errors.WeaveInitError:
             raise errors.WeaveSerializeError(
                 "Can't serialize OpDef with a client initialization"

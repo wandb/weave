@@ -36,7 +36,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
-from weave import call_context, client_context
+from weave import call_context
+from weave.client_context import weave_client as weave_client_context
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
 
@@ -97,7 +98,7 @@ if not import_failed:
         def __init__(self, **kwargs: Any) -> None:
             self._call_map: Dict[str, Call] = {}
             self.latest_run: Optional[Run] = None
-            self.gc = client_context.weave_client.require_weave_client()
+            self.gc = weave_client_context.require_weave_client()
             super().__init__()
 
         def _persist_run(self, run: Run) -> None:
