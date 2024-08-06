@@ -24,8 +24,6 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
-import {buildDynamicColumns} from './CallsPage/callsTableColumns';
-import {prepareFlattenedDataForTable} from './CallsPage/callsTableDataProcessing';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
 import {
@@ -36,6 +34,10 @@ import {
 import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {
+  buildDynamicColumns,
+  prepareFlattenedDataForTable,
+} from './common/tabularListViews/columnBuilder';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useControllableState, useURLSearchParamsDict} from './util';
 import {OBJECT_ATTR_EDGE_NAME} from './wfReactInterface/constants';
