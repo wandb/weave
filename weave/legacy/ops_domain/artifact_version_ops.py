@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 from weave import errors
 from weave import weave_types as types
-from weave.api import op
+from weave.query_api import op
 from weave.legacy import artifact_fs, artifact_wandb, input_provider
 from weave.legacy.gql_op_plugin import wb_gql_op_plugin
 from weave.legacy.ops_domain import wb_domain_types as wdt
@@ -256,6 +256,33 @@ gql_direct_edge_op(
     "artifactSequence",
     wdt.ArtifactCollectionType,
 )
+
+
+@op(
+    name="artifactVersion-rawTags",
+    output_type=types.List(
+        types.TypedDict(
+            {
+                "id": types.String(),
+                "name": types.String(),
+                "tagCategoryName": types.String(),
+                "attributes": types.String(),
+            }
+        )
+    ),
+    plugins=wb_gql_op_plugin(
+        lambda inputs, inner: """
+        tags {
+            id
+            name
+            tagCategoryName
+            attributes
+        }
+        """
+    ),
+)
+def artifact_version_raw_tags(artifact: wdt.ArtifactVersion):
+    return artifact["tags"]
 
 
 @op(

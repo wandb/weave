@@ -11,7 +11,7 @@ from weave import (
     weave_internal,
 )
 from weave import weave_types as types
-from weave.api import mutation, op, weave_class
+from weave.query_api import mutation, op, weave_class
 from weave.legacy import (
     artifact_fs,
     artifact_local,

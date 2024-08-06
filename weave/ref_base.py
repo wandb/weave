@@ -5,7 +5,7 @@ import typing
 import weakref
 from typing import Sequence
 
-from weave import client_context
+from weave.client_context import weave_client as weave_client_context
 from weave.legacy import box, context_state, object_context
 from weave.legacy.language_features.tagging import tag_store
 
@@ -156,11 +156,11 @@ class Ref:
         return str(self.uri)
 
     def input_to(self) -> Sequence["weave_client.Call"]:
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         return client._ref_input_to(self)
 
     def value_input_to(self) -> Sequence["weave_client.Call"]:
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         return client._ref_value_input_to(self)
 
 

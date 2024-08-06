@@ -13,7 +13,7 @@ from weave import (
     weavify,
 )
 from weave import weave_types as types
-from weave.api import op, use
+from weave.query_api import op, use
 from weave.legacy import dispatch, graph, graph_debug, op_args, op_def
 from weave.legacy.arrow import convert
 from weave.legacy.arrow.arrow import ArrowWeaveListType

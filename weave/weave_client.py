@@ -18,7 +18,8 @@ from typing import (
 import pydantic
 from requests import HTTPError
 
-from weave import call_context, client_context, trace_sentry, urls, version
+from weave import call_context, trace_sentry, urls, version
+from weave.client_context import weave_client as weave_client_context
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
@@ -125,9 +126,9 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
-    ref = _get_direct_ref(obj)
-    if ref:
+    if ref := _get_direct_ref(obj):
         return ref
+
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
@@ -142,6 +143,12 @@ def map_to_refs(obj: Any) -> Any:
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
+
+    # This path should only be reached if the object is both:
+    # 1. A `WeaveObject`; and
+    # 2. Has been dirtied (edited in any way), causing obj.ref=None
+    elif isinstance(obj, WeaveObject):
+        return map_to_refs(obj._val)
 
     return obj
 
@@ -194,7 +201,7 @@ class Call:
 
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
         return CallsIter(
@@ -204,7 +211,7 @@ class Call:
         )
 
     def delete(self) -> bool:
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
@@ -214,7 +221,7 @@ class Call:
             )
         if name == self.display_name:
             return
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         client._set_call_display_name(call=self, display_name=name)
         self.display_name = name
 
@@ -737,6 +744,9 @@ class WeaveClient:
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
+        if getattr(val, "_is_dirty", False):
+            val.ref = None
+
         is_opdef = isinstance(val, Op)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):

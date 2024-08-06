@@ -42,6 +42,7 @@ import {
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
+  Refetchable,
   RefMutation,
   TableQuery,
   WFDataModelHooksInterface,
@@ -512,8 +513,9 @@ const useCallUpdateFunc = () => {
 };
 
 const useFeedback = (
-  key: FeedbackKey | null
-): LoadableWithError<traceServerTypes.Feedback[]> => {
+  key: FeedbackKey | null,
+  sortBy?: traceServerTypes.SortBy[]
+): LoadableWithError<traceServerTypes.Feedback[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
 
   const [result, setResult] = useState<
@@ -523,10 +525,18 @@ const useFeedback = (
     result: null,
     error: null,
   });
+  const [doReload, setDoReload] = useState(false);
+  const refetch = useCallback(() => {
+    setDoReload(true);
+  }, [setDoReload]);
 
   const deepKey = useDeepMemo(key);
 
   useEffect(() => {
+    let mounted = true;
+    if (doReload) {
+      setDoReload(false);
+    }
     if (!deepKey) {
       return;
     }
@@ -542,20 +552,29 @@ const useFeedback = (
             $eq: [{$getField: 'weave_ref'}, {$literal: deepKey.weaveRef}],
           },
         },
-        sort_by: [{field: 'created_at', direction: 'desc'}],
+        sort_by: sortBy ?? [{field: 'created_at', direction: 'desc'}],
       })
       .then(res => {
+        if (!mounted) {
+          return;
+        }
         if ('result' in res) {
           setResult({loading: false, result: res.result, error: null});
         }
         // TODO: handle error case
       })
       .catch(err => {
+        if (!mounted) {
+          return;
+        }
         setResult({loading: false, result: null, error: err});
       });
-  }, [deepKey, getTsClient]);
+    return () => {
+      mounted = false;
+    };
+  }, [deepKey, getTsClient, doReload, sortBy]);
 
-  return result;
+  return {...result, refetch};
 };
 
 const useOpVersion = (
