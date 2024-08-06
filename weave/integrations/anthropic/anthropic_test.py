@@ -127,7 +127,6 @@ async def test_async_anthropic(
         max_tokens=1024,
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
-
     all_content = message.content[0]
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content.text == exp

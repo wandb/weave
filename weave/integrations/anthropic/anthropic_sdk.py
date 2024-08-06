@@ -3,7 +3,7 @@ import typing
 from functools import wraps
 
 import weave
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op_extensions.accumulator import add_accumulator, _IteratorWrapper
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
@@ -102,6 +102,7 @@ def create_wrapper_async(
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
+            should_accumulate=should_use_accumulator,
         )
 
     return wrapper
@@ -116,10 +117,49 @@ def anthropic_stream_accumulator(
     from anthropic.lib.streaming._types import MessageStopEvent
     
     if acc is None:
-        acc = {}
+        acc = ""
     if isinstance(value, MessageStopEvent):
         acc = value.message
     return acc
+
+
+from typing import Any, Union
+from typing_extensions import Iterator, AsyncIterator
+
+class AnthropicIteratorWrapper(_IteratorWrapper):
+    def __getattr__(self, name: str) -> Any:
+        """Delegate all other attributes to the wrapped iterator."""
+        if name in [
+            "_iterator_or_ctx_manager",
+            "_on_yield",
+            "_on_error",
+            "_on_close",
+            "_on_finished_called",
+            "_call_on_error_once",
+            "text_stream",
+        ]:
+            return object.__getattribute__(self, name)
+        return getattr(self._iterator_or_ctx_manager, name)
+    
+    def __stream_text__(self) -> Union[Iterator[str], AsyncIterator[str]]:
+        if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
+            return self.__async_stream_text__()
+        else:
+            return self.__sync_stream_text__()
+
+    def __sync_stream_text__(self) -> Iterator[str]:
+        for chunk in self:
+            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
+                yield chunk.delta.text
+
+    async def __async_stream_text__(self) -> AsyncIterator[str]:
+        async for chunk in self:
+            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
+                yield chunk.delta.text
+
+    @property
+    def text_stream(self) -> Union[Iterator[str], AsyncIterator[str]]:
+        return self.__stream_text__()
 
 
 def create_stream_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Callable]:
@@ -130,6 +170,7 @@ def create_stream_wrapper(name: str) -> typing.Callable[[typing.Callable], typin
             op,  # type: ignore
             make_accumulator=lambda _: anthropic_stream_accumulator,
             should_accumulate=lambda _: True,
+            iterator_wrapper=AnthropicIteratorWrapper,
         )
     return wrapper
 
