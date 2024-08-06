@@ -449,6 +449,7 @@ def init_client(request) -> Generator[InitializedClient, None, None]:
         inited_client.reset()
 
 
+@pytest.fixture()
 def client(inited_client) -> Generator[weave_client.WeaveClient, None, None]:
     yield inited_client.client
 
