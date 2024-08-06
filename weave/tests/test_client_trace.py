@@ -1,7 +1,5 @@
-import asyncio
 import dataclasses
 import datetime
-import os
 import platform
 import sys
 import time
@@ -16,17 +14,15 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor, weave_client
-from weave.legacy import context_state
-from weave.trace.vals import MissingSelfInstanceError, WeaveObject
+from weave.trace.vals import MissingSelfInstanceError
+from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-from weave.weave_client import Call
 
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
-    generate_id,
 )
 
 pytestmark = pytest.mark.trace
