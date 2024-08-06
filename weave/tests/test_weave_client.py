@@ -13,6 +13,7 @@ import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation, weave_client
 from weave.legacy import op_def
+from weave.tests.test_client_trace import AnyIntMatcher
 from weave.trace import refs
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
@@ -268,10 +269,18 @@ def test_call_create(client):
         id=call.id,
         output="hello",
         exception=None,
-        summary={},
+        summary={
+            "_weave": tsi.WeaveSummarySchema(
+                **{
+                    "status": "success",
+                    "nice_trace_name": "x",
+                    "latency": AnyIntMatcher(),
+                }
+            ),
+        },
         _children=[],
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -285,7 +294,7 @@ def test_call_create(client):
 
 
 def test_calls_query(client):
-    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0 = client.create_call("x", {"a": 5, "b": 10}, attributes={"foobar": 1})
     call1 = client.create_call("x", {"a": 6, "b": 11})
     call2 = client.create_call("y", {"a": 5, "b": 10})
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
@@ -298,7 +307,7 @@ def test_calls_query(client):
         inputs={"a": 5, "b": 10},
         id=call0.id,
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -306,6 +315,16 @@ def test_calls_query(client):
                 "os_release": platform.release(),
                 "sys_version": sys.version,
             },
+            "foobar": 1,
+        },
+        summary={
+            "_weave": tsi.WeaveSummarySchema(
+                **{
+                    "status": "running",
+                    "nice_trace_name": "x",
+                    "latency": None,
+                }
+            ),
         },
     )
     assert result[1] == weave_client.Call(
@@ -316,7 +335,7 @@ def test_calls_query(client):
         inputs={"a": 6, "b": 11},
         id=call1.id,
         attributes={
-            "weave": {
+            "_weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -324,6 +343,15 @@ def test_calls_query(client):
                 "os_release": platform.release(),
                 "sys_version": sys.version,
             },
+        },
+        summary={
+            "_weave": tsi.WeaveSummarySchema(
+                **{
+                    "status": "running",
+                    "nice_trace_name": "x",
+                    "latency": None,
+                }
+            ),
         },
     )
     client.finish_call(call2, None)

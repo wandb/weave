@@ -29,6 +29,10 @@ from weave.trace_server.refs_internal import (
     InternalTableRef,
     parse_internal_uri,
 )
+from weave.trace_server.trace_server_common import (
+    make_call_status_from_exception_and_ended_at,
+    op_name_simple_from_ref_str,
+)
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     generate_id,
@@ -429,7 +433,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         print("QUERY", query)
 
         cursor.execute(query)
-
         query_result = cursor.fetchall()
         return tsi.CallsQueryRes(
             calls=[
@@ -446,7 +449,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     inputs=json.loads(row[9]),
                     output=None if row[11] is None else json.loads(row[11]),
                     output_refs=None if row[12] is None else json.loads(row[12]),
-                    summary=json.loads(row[13]) if row[13] else None,
+                    summary=_make_derived_summary_map(
+                        None if row[13] is None else json.loads(row[13]),
+                        row[5],
+                        row[6],
+                        row[7],
+                        row[17],
+                        row[4],
+                    ),
                     wb_user_id=row[14],
                     wb_run_id=row[15],
                     display_name=row[17] if row[17] != "" else None,
@@ -1070,3 +1080,33 @@ def _transform_external_calls_field_to_internal_calls_field(
         )
 
     return field
+
+
+def _make_derived_summary_map(
+    summary_dump: Optional[dict],
+    started_at: str,
+    ended_at: Optional[str],
+    exception: Optional[str],
+    display_name: Optional[str],
+    op_name: Optional[str],
+) -> tsi.SummaryMap:
+    ended_at_dt = (
+        None if ended_at is None else datetime.datetime.fromisoformat(ended_at)
+    )
+    started_at_dt = datetime.datetime.fromisoformat(started_at)
+    status = make_call_status_from_exception_and_ended_at(exception, ended_at_dt)
+    latency = None if not ended_at_dt else (ended_at_dt - started_at_dt).microseconds
+    display_name = display_name or op_name_simple_from_ref_str(op_name)
+    summary = summary_dump or {}
+    if "_weave" not in summary:
+        summary["_weave"] = {"costs": None}
+    elif "costs" not in summary["_weave"]:
+        summary["_weave"]["costs"] = None
+    weave_derived_fields = tsi.WeaveSummarySchema(
+        nice_trace_name=display_name,
+        status=status,
+        latency=latency,
+        costs=summary["_weave"]["costs"],
+    )
+    summary["_weave"] = weave_derived_fields
+    return cast(tsi.SummaryMap, summary)

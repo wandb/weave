@@ -158,15 +158,14 @@ class Call:
     project_id: str
     parent_id: Optional[str]
     inputs: dict
+    attributes: dict
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
     display_name: Optional[str] = None
-    attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
-
     _feedback: Optional[RefFeedbackQuery] = None
 
     @property
@@ -232,7 +231,7 @@ class CallsIter:
         self.server = server
         self.project_id = project_id
         self.filter = filter
-        self._page_size = 10
+        self._page_size = 1000
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
@@ -303,9 +302,9 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        summary=server_call.summary,
+        summary=dict(server_call.summary) if server_call.summary else None,
         display_name=server_call.display_name,
-        attributes=server_call.attributes,
+        attributes=dict(server_call.attributes),
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -320,9 +319,12 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
         for k, v in d.items():
             if isinstance(v, dict):
                 result[k] = sum_dict_leaves([result.get(k, {}), v])
-            else:
+            elif v is not None:
                 result[k] = result.get(k, 0) + v
     return result
+
+
+WEAVE_KEY = "_weave"
 
 
 class WeaveKeyDict(dict):
@@ -332,22 +334,24 @@ class WeaveKeyDict(dict):
     """
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
+        raise KeyError(
+            f"Cannot modify `{WEAVE_KEY}` dict directly -- for internal use only!"
+        )
 
 
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
 
-    The `weave` key is reserved for internal use and cannot be set directly.
+    The `_weave` key is reserved for internal use and cannot be set directly.
     """
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
-        dict.__setitem__(self, "weave", WeaveKeyDict())
+        dict.__setitem__(self, WEAVE_KEY, WeaveKeyDict())
 
         if kwargs:
             for key, value in kwargs.items():
-                if key == "weave":
+                if key == WEAVE_KEY:
                     if isinstance(value, dict):
                         for subkey, subvalue in value.items():
                             self._set_weave_item(subkey, subvalue)
@@ -355,13 +359,15 @@ class AttributesDict(dict):
                     self[key] = value
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        if key == "weave":
-            raise KeyError("Cannot set 'weave' directly -- for internal use only!")
+        if key == WEAVE_KEY:
+            raise KeyError(
+                f"Cannot set `{WEAVE_KEY}` directly -- for internal use only!"
+            )
         super().__setitem__(key, value)
 
     def _set_weave_item(self, subkey: Any, value: Any) -> None:
-        """Internal method to set items in the 'weave' subdictionary."""
-        dict.__setitem__(self["weave"], subkey, value)
+        """Internal method to set items in the '_weave' subdictionary."""
+        dict.__setitem__(self[WEAVE_KEY], subkey, value)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"
@@ -582,7 +588,9 @@ class WeaveClient:
         # Summary handling
         summary = {}
         if call._children:
-            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+            summary = sum_dict_leaves(
+                [child.summary for child in call._children if child.summary]
+            )
         elif (
             isinstance(original_output, dict)
             and "usage" in original_output

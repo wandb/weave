@@ -6,6 +6,7 @@ import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Br
 import React, {useEffect, useRef, useState} from 'react';
 import styled from 'styled-components';
 
+import {useDeepMemo} from '../hookUtils';
 import {Button} from './Button';
 import {
   DraggableGrow,
@@ -18,17 +19,14 @@ import {LoadingDots} from './LoadingDots';
 import {A, Link} from './PagePanelComponents/Home/Browse3/pages/common/Links';
 
 const FIND_USER_QUERY = gql`
-  query FindUser($username: String!) {
-    users(usernames: [$username], first: 1) {
-      edges {
-        node {
-          id
-          name
-          email
-          photoUrl
-          deletedAt
-        }
-      }
+  query FindUser($userId: ID!) {
+    user(id: $userId) {
+      id
+      name
+      email
+      photoUrl
+      deletedAt
+      username
     }
   }
 `;
@@ -82,13 +80,14 @@ Label.displayName = 'S.Label';
 
 type UserInfo = {
   id: string;
-  name: string;
-  email: string;
-  username: string;
-  photoUrl: string;
+  // We might not have permission to read these fields
+  name?: string;
+  email?: string;
+  username?: string;
+  photoUrl?: string;
 };
 
-type UserResult = 'NA' | 'load' | 'loading' | 'error' | UserInfo;
+type UserResult = 'load' | 'loading' | 'error' | UserInfo[];
 
 const onClickDoNothing = (e: React.MouseEvent) => {
   e.preventDefault();
@@ -216,54 +215,59 @@ const UserInner = ({user, includeName, placement}: UserInnerProps) => {
 };
 
 type UserLinkProps = {
-  username: string | null;
+  userId: string | null;
   includeName?: boolean; // Default is to show avatar image only.
   placement?: TooltipProps['placement'];
 };
 
-export const UserLink = ({username, includeName, placement}: UserLinkProps) => {
-  const [user, setUser] = useState<UserResult>(username ? 'load' : 'NA');
-  useEffect(
-    () => {
-      if (user !== 'load') {
-        return;
-      }
-      setUser('loading');
-      apolloClient
-        .query({
-          query: FIND_USER_QUERY as any,
-          variables: {
-            username,
-          },
-        })
-        .then(result => {
-          const {edges} = result.data.users;
-          if (edges.length > 0) {
-            const u = edges[0].node;
-            setUser({
-              ...u,
-              username,
-            });
-          } else {
-            setUser('error');
-          }
-        })
-        .catch(err => {
-          setUser('error');
-        });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
-  if (user === 'NA') {
+const fetchUser = (userId: string) => {
+  return apolloClient
+    .query({
+      query: FIND_USER_QUERY as any,
+      variables: {
+        userId,
+      },
+    })
+    .then(result => {
+      return result.data.user as UserInfo;
+    });
+};
+
+const fetchUsers = (userIds: string[]) => {
+  // This is not great, gorilla does not allow multi-user-lookup by id :(
+  return Promise.all(userIds.map(fetchUser));
+};
+
+export const useUsers = (userIds: string[]) => {
+  const memoedUserIds = useDeepMemo(userIds);
+
+  const [users, setUsers] = useState<UserResult>('load');
+  useEffect(() => {
+    setUsers('loading');
+    fetchUsers(memoedUserIds)
+      .then(userRes => {
+        setUsers(userRes);
+      })
+      .catch(err => {
+        setUsers('error');
+      });
+  }, [memoedUserIds]);
+
+  return users;
+};
+
+export const UserLink = ({userId, includeName, placement}: UserLinkProps) => {
+  const users = useUsers(userId ? [userId] : []);
+  if (userId == null) {
     return <NotApplicable />;
   }
-  if (user === 'load' || user === 'loading') {
+  if (users === 'load' || users === 'loading') {
     return <LoadingDots />;
   }
-  if (user === 'error') {
-    return <div>{username}</div>;
+  if (users === 'error') {
+    return <NotApplicable />;
   }
+  const user = users[0];
   return (
     <UserInner user={user} placement={placement} includeName={includeName} />
   );

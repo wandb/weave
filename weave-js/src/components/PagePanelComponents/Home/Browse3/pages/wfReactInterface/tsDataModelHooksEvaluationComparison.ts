@@ -81,7 +81,10 @@ import {
   EvaluationComparisonData,
   MetricDefinition,
 } from '../CompareEvaluationsPage/ecpTypes';
-import {metricDefinitionId} from '../CompareEvaluationsPage/ecpUtil';
+import {
+  EVALUATION_NAME_DEFAULT,
+  metricDefinitionId,
+} from '../CompareEvaluationsPage/ecpUtil';
 import {getScoreKeyNameFromScorerRef} from '../CompareEvaluationsPage/ecpUtil';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
@@ -183,8 +186,7 @@ const fetchEvaluationComparisonData = async (
       call.id,
       {
         callId: call.id,
-        // TODO: Get user-defined name for the evaluation
-        name: 'Evaluation',
+        name: call.display_name ?? EVALUATION_NAME_DEFAULT,
         color: pickColor(ndx),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
@@ -226,11 +228,15 @@ const fetchEvaluationComparisonData = async (
     if (evalObj == null) {
       return;
     }
+    const output = evaluationCallCache[evalCall.callId].output;
+    if (output == null) {
+      return;
+    }
 
     // Add the user-defined scores
     evalObj.scorerRefs.forEach(scorerRef => {
       const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-      const score = evaluationCallCache[evalCall.callId].output[scorerKey];
+      const score = output[scorerKey];
       const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
         if (isBinarySummaryScore(scoreVal)) {
           const metricDimension: MetricDefinition = {
@@ -304,15 +310,13 @@ const fetchEvaluationComparisonData = async (
 
     // Add the derived metrics
     // Model latency
-    const model_latency =
-      evaluationCallCache[evalCall.callId].output.model_latency;
-    if (model_latency != null) {
+    if (output.model_latency != null) {
       const metricId = metricDefinitionId(modelLatencyMetricDimension);
       result.summaryMetrics[metricId] = {
         ...modelLatencyMetricDimension,
       };
       evalCall.summaryMetrics[metricId] = {
-        value: model_latency.mean,
+        value: output.model_latency.mean,
         sourceCallId: evalCallId,
       };
       result.scoreMetrics[metricId] = {
@@ -323,11 +327,10 @@ const fetchEvaluationComparisonData = async (
     // Total Tokens
     // TODO: This "mean" is incorrect - really should average across all model
     // calls since this includes LLM scorers
-    const totalTokens = sum(
-      Object.values(
-        evaluationCallCache[evalCall.callId].summary.usage ?? {}
-      ).map(v => v.total_tokens)
-    );
+    const summary = evaluationCallCache[evalCall.callId].summary;
+    const totalTokens = summary
+      ? sum(Object.values(summary.usage ?? {}).map(v => v.total_tokens))
+      : null;
     if (totalTokens != null) {
       const metricId = metricDefinitionId(totalTokensMetricDimension);
       result.summaryMetrics[metricId] = {

@@ -64,7 +64,7 @@ def test_mistral_quickstart(client: weave.weave_client.WeaveClient) -> None:
     assert output.object == chat_response.object
     assert output.created == chat_response.created
     summary = call.summary
-    assert summary is not None
+    assert summary is not None and summary["usage"] is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
     assert output.usage.completion_tokens == model_usage["completion_tokens"] == 299
@@ -113,7 +113,7 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
     assert output.object == chat_response.object
     assert output.created == chat_response.created
     summary = call.summary
-    assert summary is not None
+    assert summary is not None and summary["usage"] is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
     assert output.usage.completion_tokens == model_usage["completion_tokens"] == 297
@@ -168,7 +168,7 @@ def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) 
     assert output.object == chunk.object
     assert output.created == chunk.created
     summary = call.summary
-    assert summary is not None
+    assert summary is not None and summary["usage"] is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
     assert output.usage.completion_tokens == model_usage["completion_tokens"] == 274
@@ -224,7 +224,7 @@ async def test_mistral_quickstart_with_stream_async(
     assert output.object == chunk.object
     assert output.created == chunk.created
     summary = call.summary
-    assert summary is not None
+    assert summary is not None and summary["usage"] is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
     assert output.usage.completion_tokens == model_usage["completion_tokens"] == 242
