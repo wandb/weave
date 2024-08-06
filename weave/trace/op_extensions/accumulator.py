@@ -19,7 +19,6 @@ S = TypeVar("S")
 V = TypeVar("V")
 
 
-
 _OnYieldType = Callable[[V], None]
 _OnErrorType = Callable[[Exception], None]
 _OnCloseType = Callable[[], None]
@@ -112,7 +111,7 @@ class _IteratorWrapper(Generic[V]):
         return getattr(self._iterator_or_ctx_manager, name)
 
     def __enter__(self) -> "_IteratorWrapper":
-        if hasattr(self._iterator_or_ctx_manager, "__enter__"): 
+        if hasattr(self._iterator_or_ctx_manager, "__enter__"):
             # let's enter the context manager to get the stream iterator
             self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.__enter__()
         return self
@@ -125,13 +124,19 @@ class _IteratorWrapper(Generic[V]):
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
-        if hasattr(self._iterator_or_ctx_manager, "__exit__"): #case where is a context mngr
+        if hasattr(
+            self._iterator_or_ctx_manager, "__exit__"
+        ):  # case where is a context mngr
             self._iterator_or_ctx_manager.__exit__(exc_type, exc_value, traceback)
         self._call_on_close_once()
 
     async def __aenter__(self) -> "_IteratorWrapper":
-        if hasattr(self._iterator_or_ctx_manager, "__aenter__"): # let's enter the context manager
-            self._iterator_or_ctx_manager = await self._iterator_or_ctx_manager.__aenter__()
+        if hasattr(
+            self._iterator_or_ctx_manager, "__aenter__"
+        ):  # let's enter the context manager
+            self._iterator_or_ctx_manager = (
+                await self._iterator_or_ctx_manager.__aenter__()
+            )
         return self
 
     async def __aexit__(
@@ -192,7 +197,10 @@ def add_accumulator(
             # we build the accumulator here dependent on the inputs (optional)
             accumulator = make_accumulator(inputs)
             return _build_iterator_from_accumulator_for_op(
-                value, accumulator, wrapped_on_finish, iterator_wrapper,
+                value,
+                accumulator,
+                wrapped_on_finish,
+                iterator_wrapper,
             )
         else:
             wrapped_on_finish(value)
@@ -245,4 +253,3 @@ class _Accumulator(Generic[S, V]):
 
     def get_state(self) -> Optional[S]:
         return self._state
-

@@ -10,6 +10,7 @@ if typing.TYPE_CHECKING:
     from anthropic.types import Message, MessageStreamEvent
     from anthropic.lib.streaming import MessageStream
 
+
 def anthropic_accumulator(
     acc: typing.Optional["Message"],
     value: "MessageStreamEvent",
@@ -80,6 +81,7 @@ def create_wrapper_sync(
 
     return wrapper
 
+
 # Surprisingly, the async `client.chat.completions.create` does not pass
 # `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
 # it manually here...
@@ -108,14 +110,13 @@ def create_wrapper_async(
     return wrapper
 
 
-
 ## Deal with Stream
 def anthropic_stream_accumulator(
     acc: typing.Optional["Message"],
     value: "MessageStream",
 ) -> "Message":
     from anthropic.lib.streaming._types import MessageStopEvent
-    
+
     if acc is None:
         acc = ""
     if isinstance(value, MessageStopEvent):
@@ -125,6 +126,7 @@ def anthropic_stream_accumulator(
 
 from typing import Any, Union
 from typing_extensions import Iterator, AsyncIterator
+
 
 class AnthropicIteratorWrapper(_IteratorWrapper):
     def __getattr__(self, name: str) -> Any:
@@ -140,7 +142,7 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
         ]:
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
-    
+
     def __stream_text__(self) -> Union[Iterator[str], AsyncIterator[str]]:
         if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
             return self.__async_stream_text__()
@@ -162,7 +164,9 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
         return self.__stream_text__()
 
 
-def create_stream_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Callable]:
+def create_stream_wrapper(
+    name: str,
+) -> typing.Callable[[typing.Callable], typing.Callable]:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
@@ -172,7 +176,9 @@ def create_stream_wrapper(name: str) -> typing.Callable[[typing.Callable], typin
             should_accumulate=lambda _: True,
             iterator_wrapper=AnthropicIteratorWrapper,
         )
+
     return wrapper
+
 
 anthropic_patcher = MultiPatcher(
     [
