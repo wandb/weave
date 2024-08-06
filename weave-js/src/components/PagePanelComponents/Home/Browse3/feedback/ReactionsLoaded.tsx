@@ -10,7 +10,6 @@ import React, {useRef, useState} from 'react';
 import styled from 'styled-components';
 import {twMerge} from 'tailwind-merge';
 
-import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip as WeaveTooltip} from '../../../../Tooltip';
@@ -34,7 +33,7 @@ export const StyledTooltip = styled(
 }));
 
 type ReactionsLoadedProps = {
-  currentViewerId: string | null;
+  viewer: string | null;
   reactions: Feedback[];
   onAddEmoji: (emoji: string) => void;
   onAddNote: (note: string) => void;
@@ -45,7 +44,7 @@ type ReactionsLoadedProps = {
 };
 
 export const ReactionsLoaded = ({
-  currentViewerId,
+  viewer,
   reactions,
   onAddEmoji,
   onAddNote,
@@ -88,29 +87,14 @@ export const ReactionsLoaded = ({
   const idNotes = isOpenNotes ? 'simple-popper' : undefined;
 
   // TODO: Would need to revisit this if we want to support skin tones
-  const {loading: userInfoLoading, userInfo} = useViewerInfo();
   const onToggleEmoji = (emoji: string) => {
-    if (!currentViewerId) {
+    if (!viewer) {
       return;
     }
-
-    // TODO (Tim): After https://github.com/wandb/core/pull/22947 is deployed,
-    // Remove `existingLegacy`
-    const legacyUsername = !userInfoLoading ? userInfo?.username : null;
-    const userReactionsLegacy = legacyUsername
-      ? groupedByUser[legacyUsername]
-      : [];
-    const existingLegacy = _.find(
-      userReactionsLegacy,
-      r => r.payload.emoji === emoji
-    );
-
-    const userReactions = groupedByUser[currentViewerId];
+    const userReactions = groupedByUser[viewer];
     const existing = _.find(userReactions, r => r.payload.emoji === emoji);
     if (existing) {
       onRemoveFeedback(existing.id);
-    } else if (existingLegacy) {
-      onRemoveFeedback(existingLegacy.id);
     } else {
       onAddEmoji(emoji);
     }
@@ -169,7 +153,7 @@ export const ReactionsLoaded = ({
               return (
                 <EmojiButton
                   key={group}
-                  currentViewerId={currentViewerId}
+                  viewer={viewer}
                   reactions={groupReactions}
                   onToggleEmoji={onToggleEmoji}
                   readonly={readonly}
@@ -258,7 +242,7 @@ export const ReactionsLoaded = ({
                 horizontal: 'left',
               }}>
               <Notes
-                currentViewerId={currentViewerId}
+                viewer={viewer}
                 readonly={readonly}
                 notes={notes}
                 note={note}

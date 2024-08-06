@@ -75,7 +75,7 @@ def test_litellm_quickstart(
     assert output["object"] == chat_response.object
     assert output["created"] == Nearly(chat_response.created)
     summary = call.summary
-    assert summary is not None and summary["usage"] is not None
+    assert summary is not None
     model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
     assert (
@@ -116,7 +116,7 @@ async def test_litellm_quickstart_async(
     assert output["object"] == chat_response.object
     assert output["created"] == Nearly(chat_response.created)
     summary = call.summary
-    assert summary is not None and summary["usage"] is not None
+    assert summary is not None
     model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
     assert (
@@ -160,7 +160,7 @@ def test_litellm_quickstart_stream(
     assert output["model"] == chunk.model
     assert output["created"] == Nearly(chunk.created)
     summary = call.summary
-    assert summary is not None and summary["usage"] is not None
+    assert summary is not None
     model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
     assert model_usage["completion_tokens"] == 31
@@ -202,7 +202,7 @@ async def test_litellm_quickstart_stream_async(
     assert output["model"] == chunk.model
     assert output["created"] == Nearly(chunk.created)
     summary = call.summary
-    assert summary is not None and summary["usage"] is not None
+    assert summary is not None
     model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
     assert model_usage["completion_tokens"] == 41

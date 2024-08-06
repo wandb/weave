@@ -12,7 +12,6 @@ import {
 import {
   GridColumnVisibilityModel,
   GridPaginationModel,
-  GridPinnedColumns,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
@@ -62,16 +61,13 @@ import {
   DEFAULT_PAGE_SIZE,
   getValidPaginationModel,
 } from './Browse3/grid/pagination';
-import {getValidPinModel, removeAlwaysLeft} from './Browse3/grid/pin';
 import {getValidSortModel} from './Browse3/grid/sort';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
-  ALWAYS_PIN_LEFT_CALLS,
   DEFAULT_COLUMN_VISIBILITY_CALLS,
-  DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
 } from './Browse3/pages/CallsPage/CallsTable';
 import {Empty} from './Browse3/pages/common/Empty';
@@ -700,19 +696,6 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
-  const pinModel = useMemo(
-    () => getValidPinModel(query.pin, DEFAULT_PIN_CALLS, ALWAYS_PIN_LEFT_CALLS),
-    [query.pin]
-  );
-  const setPinModel = (newModel: GridPinnedColumns) => {
-    const newQuery = new URLSearchParams(location.search);
-    newQuery.set(
-      'pin',
-      JSON.stringify(removeAlwaysLeft(newModel, ALWAYS_PIN_LEFT_CALLS))
-    );
-    history.push({search: newQuery.toString()});
-  };
-
   const sortModel = useMemo(
     () => getValidSortModel(query.sort, DEFAULT_SORT_CALLS),
     [query.sort]
@@ -756,8 +739,6 @@ const CallsPageBinding = () => {
       onFilterUpdate={onFilterUpdate}
       columnVisibilityModel={columnVisibilityModel}
       setColumnVisibilityModel={setColumnVisibilityModel}
-      pinModel={pinModel}
-      setPinModel={setPinModel}
       sortModel={sortModel}
       setSortModel={setSortModel}
       paginationModel={paginationModel}

@@ -224,15 +224,7 @@ def _wandb_api_key_via_env() -> typing.Optional[str]:
 
 
 def _wandb_api_key_via_netrc() -> typing.Optional[str]:
-    for filepath in ("~/.netrc", "~/_netrc"):
-        api_key = _wandb_api_key_via_netrc_file(filepath)
-        if api_key:
-            return api_key
-    return None
-
-
-def _wandb_api_key_via_netrc_file(filepath: str) -> typing.Optional[str]:
-    netrc_path = os.path.expanduser(filepath)
+    netrc_path = os.path.expanduser("~/.netrc")
     if not os.path.exists(netrc_path):
         return None
     nrc = netrc.netrc(netrc_path)
@@ -242,7 +234,7 @@ def _wandb_api_key_via_netrc_file(filepath: str) -> typing.Optional[str]:
         user, account, api_key = res
     if api_key and is_public():
         raise errors.WeaveConfigurationError(
-            f"{filepath} should not be set in public mode."
+            "~/.netrc should not be set in public mode."
         )
     return api_key
 

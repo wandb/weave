@@ -440,12 +440,13 @@ function buildCallsTableColumns(
     align: 'center',
     sortable: false,
     resizable: false,
+    disableColumnMenu: true,
     renderCell: cellParams => {
       const userId = cellParams.row.wb_user_id;
       if (userId == null) {
         return null;
       }
-      return <UserLink userId={userId} />;
+      return <UserLink username={userId} />;
     },
   });
 

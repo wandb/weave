@@ -68,7 +68,7 @@ export const FeedbackGridInner = ({feedback}: FeedbackGridInnerProps) => {
         ) {
           return params.row.creator;
         }
-        return <UserLink userId={params.row.wb_user_id} includeName />;
+        return <UserLink username={params.row.wb_user_id} includeName />;
       },
     },
   ];

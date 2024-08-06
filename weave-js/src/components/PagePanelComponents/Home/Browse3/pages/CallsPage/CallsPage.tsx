@@ -1,7 +1,6 @@
 import {
   GridColumnVisibilityModel,
   GridPaginationModel,
-  GridPinnedColumns,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
@@ -37,9 +36,6 @@ export const CallsPage: FC<{
 
   columnVisibilityModel: GridColumnVisibilityModel;
   setColumnVisibilityModel: (newModel: GridColumnVisibilityModel) => void;
-
-  pinModel: GridPinnedColumns;
-  setPinModel: (newModel: GridPinnedColumns) => void;
 
   sortModel: GridSortModel;
   setSortModel: (newModel: GridSortModel) => void;
@@ -92,8 +88,6 @@ export const CallsPage: FC<{
                 onFilterUpdate={setFilter}
                 columnVisibilityModel={props.columnVisibilityModel}
                 setColumnVisibilityModel={props.setColumnVisibilityModel}
-                pinModel={props.pinModel}
-                setPinModel={props.setPinModel}
                 sortModel={props.sortModel}
                 setSortModel={props.setSortModel}
                 paginationModel={props.paginationModel}

@@ -19,7 +19,7 @@ from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.legacy import context_state
 from weave.trace.vals import MissingSelfInstanceError, WeaveObject
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-from weave.weave_client import WEAVE_KEY, Call
+from weave.weave_client import Call
 
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
@@ -50,11 +50,6 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 ## End hacky interface compatibility helpers
 
 
-class AnyIntMatcher:
-    def __eq__(self, other):
-        return isinstance(other, int)
-
-
 def test_simple_op(client):
     @weave.op()
     def my_op(a: int) -> int:
@@ -75,22 +70,16 @@ def test_simple_op(client):
     )
     assert fetched_call == weave_client.Call(
         op_name=expected_name,
-        project_id=fetched_call.project_id,
+        project_id=f"{client.entity}/{client.project}",
         trace_id=fetched_call.trace_id,
         parent_id=None,
         id=fetched_call.id,
         inputs={"a": 5},
         exception=None,
         output=6,
-        summary={
-            "_weave": {
-                "nice_trace_name": "my_op",
-                "latency": AnyIntMatcher(),
-                "status": "success",
-            },
-        },
+        summary={},
         attributes={
-            WEAVE_KEY: {
+            "weave": {
                 "client_version": weave.version.VERSION,
                 "source": "python-sdk",
                 "os_name": platform.system(),
@@ -121,7 +110,7 @@ def test_trace_server_call_start_and_end(client):
         parent_id="test_parent_id",
         started_at=datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
-        attributes={"a": 5, "_weave": None},
+        attributes={"a": 5},
         inputs={"b": 5},
     )
     client.server.call_start(tsi.CallStartReq(start=start))
@@ -163,16 +152,10 @@ def test_trace_server_call_start_and_end(client):
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": None,
         "exception": None,
-        "attributes": {"a": 5, "_weave": None},
+        "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": None,
-        "summary": {
-            "_weave": {
-                "nice_trace_name": "test_name",
-                "latency": None,
-                "status": "running",
-            },
-        },
+        "summary": None,
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -183,10 +166,7 @@ def test_trace_server_call_start_and_end(client):
         project_id=client._project_id(),
         id=call_id,
         ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-        summary={
-            "c": 5,
-            "_weave": None,
-        },
+        summary={"c": 5},
         output={"d": 5},
     )
     client.server.call_end(tsi.CallEndReq(end=end))
@@ -211,17 +191,10 @@ def test_trace_server_call_start_and_end(client):
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": FuzzyDateTimeMatcher(end.ended_at),
         "exception": None,
-        "attributes": {"a": 5, "_weave": None},
+        "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": {"d": 5},
-        "summary": {
-            "c": 5,
-            "_weave": {
-                "nice_trace_name": "test_name",
-                "latency": AnyIntMatcher(),
-                "status": "success",
-            },
-        },
+        "summary": {"c": 5},
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -1293,7 +1266,7 @@ def test_attributes_on_ops(client):
     assert len(res.calls) == 1
     assert res.calls[0].attributes == {
         "custom": "attribute",
-        WEAVE_KEY: {
+        "weave": {
             "client_version": weave.version.VERSION,
             "source": "python-sdk",
             "os_name": platform.system(),
@@ -1702,7 +1675,6 @@ def map_with_copying_thread_executor(fn, vals):
 
 
 # TODO: Make an async version of this
-@pytest.mark.flaky(retries=3)  # <-- Flakes in CI
 @pytest.mark.parametrize(
     "mapper",
     [
@@ -2295,8 +2267,8 @@ def test_call_has_client_version(client):
         return 1
 
     _, c = test.call()
-    assert WEAVE_KEY in c.attributes
-    assert "client_version" in c.attributes[WEAVE_KEY]
+    assert "weave" in c.attributes
+    assert "client_version" in c.attributes["weave"]
 
 
 def test_user_cannot_modify_call_weave_dict(client):
@@ -2309,12 +2281,12 @@ def test_user_cannot_modify_call_weave_dict(client):
     call.attributes["test"] = 123
 
     with pytest.raises(KeyError):
-        call.attributes[WEAVE_KEY] = {"anything": "blah"}
+        call.attributes["weave"] = {"anything": "blah"}
 
     with pytest.raises(KeyError):
-        call.attributes[WEAVE_KEY]["anything"] = "blah"
+        call.attributes["weave"]["anything"] = "blah"
 
-    # you can set call.attributes[WEAVE_KEY]["anything"]["something_else"] = "blah"
+    # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
     # but at that point you're on your own :)
 
 
@@ -2368,7 +2340,7 @@ def test_calls_iter_different_value_same_page_cached(client):
     end_time1 = time.time()
     elapsed_time1 = end_time1 - start_time1
 
-    # default page size is 1000, so these lookups should be cached too
+    # default page size is 10, so these lookups should be cached too
     start_time2 = time.time()
     c2 = calls[1]
     end_time2 = time.time()

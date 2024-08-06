@@ -45,10 +45,6 @@ from weave.trace_server.calls_query_builder import (
     HardCodedFilter,
     combine_conditions,
 )
-from weave.trace_server.trace_server_common import (
-    make_call_status_from_exception_and_ended_at,
-    op_name_simple_from_ref_str,
-)
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
@@ -1418,34 +1414,6 @@ def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
     return val if val != "" else None
 
 
-def _make_derived_summary_map(
-    summary_dump: typing.Optional[dict],
-    started_at: typing.Optional[datetime.datetime],
-    ended_at: typing.Optional[datetime.datetime],
-    exception: typing.Optional[str],
-    display_name: typing.Optional[str],
-    op_name: typing.Optional[str],
-) -> tsi.SummaryMap:
-    status = make_call_status_from_exception_and_ended_at(exception, ended_at)
-    latency = (
-        None if not ended_at or not started_at else (ended_at - started_at).microseconds
-    )
-    display_name = display_name or op_name_simple_from_ref_str(op_name)
-    summary = summary_dump or {}
-    if "_weave" not in summary:
-        summary["_weave"] = {"costs": None}
-    elif "costs" not in summary["_weave"]:
-        summary["_weave"]["costs"] = None
-    weave_derived_fields = tsi.WeaveSummarySchema(
-        nice_trace_name=display_name,
-        status=status,
-        latency=latency,
-        costs=summary["_weave"]["costs"],
-    )
-    summary["_weave"] = weave_derived_fields
-    return typing.cast(tsi.SummaryMap, summary)
-
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1458,14 +1426,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=_make_derived_summary_map(
-            _nullable_any_dump_to_any(ch_call.summary_dump),
-            _ensure_datetimes_have_tz(ch_call.started_at),
-            _ensure_datetimes_have_tz(ch_call.ended_at),
-            ch_call.exception,
-            _empty_str_to_none(ch_call.display_name),
-            ch_call.op_name,
-        ),
+        summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
@@ -1491,14 +1452,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         attributes=attributes,
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=_make_derived_summary_map(
-            _nullable_any_dump_to_any(ch_call_dict.get("summary_dump")),
-            _ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
-            _ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-            ch_call_dict.get("exception"),
-            _empty_str_to_none(ch_call_dict.get("display_name")),
-            ch_call_dict.get("op_name"),
-        ),
+        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
@@ -1534,7 +1488,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         parent_id=start_call.parent_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
-        attributes_dump=_dict_value_to_dump(dict(start_call.attributes)),
+        attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
@@ -1553,7 +1507,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
-        summary_dump=_dict_value_to_dump(dict(end_call.summary)),
+        summary_dump=_dict_value_to_dump(end_call.summary),
         output_dump=_any_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(end_call.output),
     )

@@ -4,7 +4,6 @@ import pytest
 
 import weave
 from weave import Evaluation, Model
-from weave.tests.test_client_trace import AnyIntMatcher
 
 from ..trace_server import trace_server_interface as tsi
 
@@ -269,7 +268,7 @@ class MyDictScorerWithCustomDictSummary(weave.Scorer):
         }
 
 
-@pytest.mark.asynciotest_evaluation_data_topology
+@pytest.mark.asyncio
 async def test_evaluation_data_topology(client):
     """We support a number of different types of scorers, and we want to ensure that
     the data stored matches the expected structure. This test is a bit more complex
@@ -394,12 +393,7 @@ async def test_evaluation_data_topology(client):
                 "prompt_tokens": 11,
                 "total_tokens": 39,
             }
-        },
-        "_weave": {
-            "latency": AnyIntMatcher(),
-            "nice_trace_name": "SimpleModelWithConfidence.predict",
-            "status": "success",
-        },
+        }
     }
 
     # Prediction
@@ -470,12 +464,7 @@ async def test_evaluation_data_topology(client):
                     "total_tokens"
                 ]
                 * 2,
-            },
-            "_weave": {
-                "latency": AnyIntMatcher(),
-                "nice_trace_name": "SimpleModelWithConfidence.predict",
-                "status": "success",
-            },
+            }
         }
     }
 
@@ -519,7 +508,11 @@ async def test_evaluation_data_topology(client):
     assert evaluate_call.summary == predict_usage_summary
 
 
-def make_test_eval():
+@pytest.mark.asyncio
+async def test_eval_supports_non_op_funcs(client):
+    def function_model(sentence: str) -> dict:
+        return ""
+
     def function_score(target: dict, model_output: dict) -> dict:
         return {"correct": target == model_output}
 
@@ -530,50 +523,6 @@ def make_test_eval():
         ],
         scorers=[function_score],
     )
-    return evaluation
-
-
-@pytest.mark.asyncio
-async def test_eval_supports_model_as_op(client):
-    @weave.op
-    def function_model(sentence: str) -> dict:
-        return ""
-
-    evaluation = make_test_eval()
-
-    res = await evaluation.evaluate(function_model)
-    assert res != None
-
-    gotten_op = weave.ref(function_model.ref.uri()).get()
-    res = await evaluation.evaluate(gotten_op)
-    assert res != None
-
-
-class MyTestModel(Model):
-    @weave.op
-    def predict(self, sentence: str) -> dict:
-        return ""
-
-
-@pytest.mark.asyncio
-async def test_eval_supports_model_class(client):
-    evaluation = make_test_eval()
-
-    model = MyTestModel()
-    res = await evaluation.evaluate(model)
-    assert res != None
-
-    gotten_model = weave.ref(model.ref.uri()).get()
-    res = await evaluation.evaluate(gotten_model)
-    assert res != None
-
-
-@pytest.mark.asyncio
-async def test_eval_supports_non_op_funcs(client):
-    def function_model(sentence: str) -> dict:
-        return ""
-
-    evaluation = make_test_eval()
 
     with pytest.raises(ValueError):
         res = await evaluation.evaluate(function_model)
