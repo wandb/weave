@@ -1,17 +1,12 @@
 import base64
 import hashlib
 import typing
-import uuid
 
 from . import refs_internal
 
 TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"
 WILDCARD_ARTIFACT_VERSION_AND_PATH = ":*"
-
-
-def generate_id() -> str:
-    return str(uuid.uuid4())
 
 
 def bytes_digest(json_val: bytes) -> str:
