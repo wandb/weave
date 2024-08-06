@@ -42,6 +42,8 @@ import {
 import {
   EXPANDED_REF_REF_KEY,
   EXPANDED_REF_VAL_KEY,
+  ExpandedRefWithValue,
+  isExpandedRefWithValue,
   isTableRef,
 } from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
@@ -498,21 +500,7 @@ const refIsExpandable = (ref: string): boolean => {
   return false;
 };
 
-type ExpandedRefWithValue<T = any> = {
-  [EXPANDED_REF_REF_KEY]: string;
-  [EXPANDED_REF_VAL_KEY]: T;
-};
-
 export type ExpandedRefWithValueAsTableRef = ExpandedRefWithValue<string>;
-
-const isExpandedRefWithValue = (ref: any): ref is ExpandedRefWithValue => {
-  return (
-    typeof ref === 'object' &&
-    ref !== null &&
-    EXPANDED_REF_REF_KEY in ref &&
-    EXPANDED_REF_VAL_KEY in ref
-  );
-};
 
 const isExpandedRefWithValueAsTableRef = (
   ref: any

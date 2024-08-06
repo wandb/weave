@@ -10,6 +10,7 @@ import {privateRefToSimpleName} from '../wfReactInterface/tsDataModelHooks';
 import {
   EXPANDED_REF_REF_KEY,
   EXPANDED_REF_VAL_KEY,
+  makeRefExpandedPayload,
 } from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ExpandedRefWithValueAsTableRef} from './callsTableColumns';
@@ -137,11 +138,9 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
                 lookupPath.pop();
               }
               if (parentRef) {
-                const newVal: ExpandedRefWithValueAsTableRef = {
-                  [EXPANDED_REF_REF_KEY]:
-                    parentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/' + attr,
-                  [EXPANDED_REF_VAL_KEY]: val,
-                };
+                const newVal: ExpandedRefWithValueAsTableRef = makeRefExpandedPayload(
+                  parentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/' + attr, val,
+                )
                 return [key, newVal];
               }
             }
