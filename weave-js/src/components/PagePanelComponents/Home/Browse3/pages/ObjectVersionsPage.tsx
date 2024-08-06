@@ -1,3 +1,14 @@
+/**
+ * This page is the list-view for object versions. When a single object is selected, it
+ * becomes a rich table of versions. It is likely that we will want to outfit it
+ * with features similar to the calls table. For example:
+ * [ ] Add the ability to expand refs
+ * [ ] Paginate & stream responses similar to calls
+ * [ ] Add the ability to sort / filter on values
+ * [ ] Add the ability to sort / filter on expanded values (blocked by general support for expansion operations)
+ * [ ] Add sort / filter state to URL
+ */
+
 import {
   GridColDef,
   GridColumnGroupingModel,
@@ -175,6 +186,10 @@ const ObjectVersionsTable: React.FC<{
     });
   }, [props.objectVersions]);
 
+  // TODO: We should make this page very robust similar to the CallsTable page.
+  // We will want to do nearly all the same things: URL state management,
+  // sorting, filtering, ref expansion, etc... A lot of common logic should be
+  // extracted and shared.
   const {cols: columns, groups: columnGroupingModel} = useMemo(() => {
     let groups: GridColumnGroupingModel = [];
     const cols: GridColDef[] = [
@@ -230,7 +245,10 @@ const ObjectVersionsTable: React.FC<{
           const obj: ObjectVersionSchema = (row as any).obj;
           const res = obj.val?.[key];
           if (isTableRef(res)) {
-            // This whole block is a hack to make the table ref clickable
+            // This whole block is a hack to make the table ref clickable. This
+            // is The same thing that the CallsTable does for expanded fields.
+            // Once we come up with a common pattern for ref expansion, this
+            // will go away.
             const selfRefUri = objectVersionKeyToRefUri(obj);
             const targetRefUri =
               selfRefUri +
