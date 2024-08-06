@@ -1,0 +1,13 @@
+DROP FUNCTION is_object_ref;
+DROP FUNCTION parse_object_ref_project_id;
+DROP FUNCTION parse_object_ref_object_id;
+DROP FUNCTION parse_object_ref_version_digest;
+DROP FUNCTION parse_object_ref_extra;
+DROP FUNCTION is_table_row_ref;
+DROP FUNCTION parse_table_row_ref_project_id;
+DROP FUNCTION parse_table_row_ref_table_digest;
+DROP FUNCTION parse_table_row_ref_row_index;
+DROP FUNCTION parse_table_row_ref_extra;
+DROP FUNCTION every_other_item;
+DROP FUNCTION parse_extra_to_parts;
+DROP FUNCTION resolve_data_through_refs_for_path;

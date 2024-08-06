@@ -91,11 +91,17 @@ class CallsMergedDynamicField(CallsMergedAggField):
     ) -> str:
         res = super().as_sql(pb, table_alias)
         if cast != "exists":
-            path_str = "'$'"
+            # path_str = "'$'"
+            # if self.extra_path:
+            #     param_name = pb.add_param(quote_json_path_parts(self.extra_path))
+            #     path_str = _param_slot(param_name, "String")
+            # val = f"JSON_VALUE({res}, {path_str})"
+            extra_path = []
             if self.extra_path:
-                param_name = pb.add_param(quote_json_path_parts(self.extra_path))
-                path_str = _param_slot(param_name, "String")
-            val = f"JSON_VALUE({res}, {path_str})"
+                extra_path = self.extra_path
+            param_name = pb.add_param(extra_path)
+            path_str = _param_slot(param_name, "Array(String)")
+            val = f"resolve_data_through_refs_for_path({res}, {path_str}, '60ef21fe774a43865c944cce3938cdd04ce854418ab4c2acc67dd22137e553bf')"
             return clickhouse_cast(val, cast)
         else:
             # UGG - this is an ugly part of clickhouse! It is really difficult to differentiate
@@ -216,6 +222,7 @@ class CallsQuery(BaseModel):
     order_fields: list[OrderField] = Field(default_factory=list)
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
+    expand_paths: typing.List[str] = Field(default_factory=list)
 
     def add_field(self, field: str) -> "CallsQuery":
         self.select_fields.append(get_field_by_name(field))
@@ -244,6 +251,10 @@ class CallsQuery(BaseModel):
         self.order_fields.append(
             OrderField(field=get_field_by_name(field), direction=direction)
         )
+        return self
+
+    def add_expand_path(self, path: str) -> "CallsQuery":
+        self.expand_paths.append(path)
         return self
 
     def set_limit(self, limit: int) -> "CallsQuery":
@@ -501,6 +512,75 @@ class CallsQuery(BaseModel):
         """
 
         return _safely_format_sql(raw_sql)
+
+
+def expand_field_for_table(base_table_sql: str, field: str) -> str:
+    """This method "expands" a field on a base table.
+
+    Ref expansion is quite complex and involves a few steps:
+
+    1. A "ref" is a string in the format of: `weave-trace-internal://project_id/TYPE/ID[/EXTRA]`
+       * `TYPE` is one of `table`, `object`, or `op`.
+       * `ID` is the ID of the object. For `table`, this is `DIGEST`. For `object` and `op`, this is `NAME:DIGEST`.
+       * `EXTRA` is an optional additional path to walk, in the format of tuples of `/PATH_TYPE/PATH_VALUE`
+    2. "Data" is any valid JSON data - a primitive, an object, an array, etc.
+    3. "refs" can appear anywhere in the data, and can be nested. Refs can be the entire data, or just a part of it.
+    4. Our general problem can be reduced to a SQL procedure similar to the `expand` method expressed in python here:
+        ```python
+        def expand(data: Any, up_to_and_including_path: list[str] = []) -> Any:
+            if data is None:
+                return None:
+            replacement = fetch_data_at_path(data, up_to_and_including_path)
+            if replacement is None:
+                return data
+            return replace_data_at_path(data, up_to_and_including_path, replacement)
+
+        def replace_data_at_path(data: Any, path: list[str], new_data: Any) -> Any:
+            # General purpose function to replace data at a path
+            pass
+
+        def fetch_data_at_path(data: Any, path: list[str]) -> Any:
+            if data is None:
+                return None
+            elif data_is_ref(data):
+                ref_base, ref_extra = parse_ref(data)
+                ref_data = fetch_ref_data(ref_base)
+                return fetch_data_at_path(ref_data, ref_extra + path)
+            elif len(path) == 0:
+                return data
+            elif data_is_dict(data):
+                return data.get(path[0], None)
+            elif data_is_list(data):
+                try:
+                    index = int(path[0])
+                except ValueError:
+                    return None
+                return fetch_data_at_path(data[index], path[1:])
+            else:
+                return None
+        ```
+        * Note: from a performance perspective, we want to operate on lists of paths (or maybe path trees)
+        to minimize the number of queries we need to make.
+
+        Ok, this is ... idea: UDFs
+    """
+
+    raw_sql = """
+    SELECT
+        base_table.*,
+        'a' AS expanded_field_value,
+        'b' AS expanded_field_db_table,
+        'c' AS expanded_field_object_id, -- only valid if db_table is 'objects'
+        'c' AS expanded_field_digest
+    
+    
+    SOMETHING as expanded_field,
+    FROM (
+        {BASE_TABLE_SQL}
+    ) AS base_table
+    LEFT JOIN objects ON base_table.id = expanded_table.id
+    """
+    raise NotImplementedError("Implement me!")
 
 
 ALLOWED_CALL_FIELDS = {
