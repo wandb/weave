@@ -51,7 +51,6 @@ class Metadata(weave.Model):
     openai_max_tokens: int = 2048
     max_bootstrapped_demos: int = 8
     max_labeled_demos: int = 8
-    validation_size_for_optimization: int = 10
 
 
 metadata = Metadata()
@@ -180,11 +179,11 @@ rich.print(prediction)
 
 Now that we have a baseline prompting strategy, let's evaluate it on our validation set using [`weave.Evaluation`](./../guides/core-types/evaluations.md) on a simple metric that matches the predicted answer with the ground truth. Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
 
-First, we need to create a simple evalaution metric function that tells whether the answer from the baseline module's output is the same as the ground truth answer or not.
+First, we need to create a simple weave evaluation scoring function that tells whether the answer from the baseline module's output is the same as the ground truth answer or not. Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
 
 ```python
 @weave.op()
-def weave_evaluation_metric(answer: str, model_output: Output) -> dict:
+def weave_evaluation_scorer(answer: str, model_output: Output) -> dict:
     return {
         "match": int(answer.lower() == model_output["answer"].lower())
     }
@@ -200,7 +199,7 @@ validation_dataset = weave.ref(
 evaluation = weave.Evaluation(
     name="baseline_causal_reasoning_module",
     dataset=validation_dataset,
-    scorers=[weave_evaluation_metric]
+    scorers=[weave_evaluation_scorer]
 )
 
 await evaluation.evaluate(baseline_module.forward)
@@ -218,24 +217,23 @@ asyncio.run(evaluation.evaluate(baseline_module.forward))
 Now, that we have a baseline DSPy program, let us try to improve its performance for causal reasoning. We would do this using a [DSPy teleprompter](https://dspy-docs.vercel.app/docs/building-blocks/optimizers) is an algorithm that can tune the parameters of a DSPy program (i.e., the prompts and/or the LM weights) to maximize the metrics you specify, like accuracy. When compiling a DSPy program, we generally invoke a teleprompter, which is an optimizer that takes the program, a training set, and a metric—and returns a new optimized program. In this tutorial, we use the [BootstrapFewShot](https://dspy-docs.vercel.app/api/category/optimizers) teleprompter.
 
 ```python
-from dspy.teleprompt import BootstrapFewShotWithRandomSearch
+from dspy.teleprompt import BootstrapFewShot
 
 
 @weave.op()
 def get_optimized_program(model: dspy.Module, metadata: Metadata) -> dspy.Module:
-    
+
     @weave.op()
     def dspy_evaluation_metric(true, prediction, trace=None):
         return prediction["answer"].lower() == true.answer.lower()
 
 
-    teleprompter = BootstrapFewShotWithRandomSearch(
-        metric=dspy_evaluation_metric, 
+    teleprompter = BootstrapFewShot(
+        metric=dspy_evaluation_metric,
         max_bootstrapped_demos=metadata.max_bootstrapped_demos,
         max_labeled_demos=metadata.max_labeled_demos,
     )
-    valset = dspy_val_examples[:metadata.validation_size_for_optimization]
-    return teleprompter.compile(model, trainset=dspy_train_examples, valset=valset)
+    return teleprompter.compile(model, trainset=dspy_train_examples)
 
 
 optimized_module = get_optimized_program(baseline_module, metadata)
@@ -251,7 +249,7 @@ Now that we have our optimized program (the optimized prompting strategy), let's
 evaluation = weave.Evaluation(
     name="optimized_causal_reasoning_module",
     dataset=validation_dataset,
-    scorers=[weave_evaluation_metric]
+    scorers=[weave_evaluation_scorer]
 )
 
 await evaluation.evaluate(optimized_module.forward)
