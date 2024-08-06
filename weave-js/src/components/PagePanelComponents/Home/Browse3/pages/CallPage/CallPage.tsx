@@ -42,7 +42,7 @@ export const CallPage: FC<{
       project: props.project,
       callId: props.callId,
     },
-    {addCost: true}
+    {includeCosts: false}
   );
 
   if (call.loading) {

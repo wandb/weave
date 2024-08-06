@@ -14,6 +14,8 @@ import {
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ExpandedRefWithValueAsTableRef} from './callsTableColumns';
 
+const INCLUDED_SUMMARY_FIELDS = ['_weave'];
+
 /**
  * This function is responsible for taking the raw calls data and flattening it
  * into a format that can be consumed by the MUI Data Grid. Importantly, we strip
@@ -74,7 +76,10 @@ export function prepareFlattenedCallDataForTable(
       }
 
       // Finally, we remove any keys that start with underscore
-      if (newKey.includes('._') && !newKey.includes('summary._weave')) {
+      if (
+        newKey.includes('._') &&
+        !INCLUDED_SUMMARY_FIELDS.some(f => newKey.includes(f))
+      ) {
         return;
       }
 

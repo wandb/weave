@@ -14,6 +14,7 @@ import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CursorBox} from './CursorBox';
+import {TraceCostStats} from './TraceCostStats';
 import {TraceUsageStats} from './TraceUsageStats';
 
 const INSET_SPACING = 54;
@@ -200,9 +201,15 @@ export const CustomGridTreeDataGroupingCell: FC<
                 {opNiceName(call.spanName)}
               </Box>
             </Box>
-            {call?.traceCall?.summary && (
-              <TraceUsageStats
+            {call?.traceCall?.summary &&
+            call?.traceCall?.summary?._weave?.costs ? (
+              <TraceCostStats
                 costData={call?.traceCall?.summary?._weave?.costs}
+                latency_s={call.rawSpan.summary.latency_s}
+              />
+            ) : (
+              <TraceUsageStats
+                usage={call.rawSpan.summary.usage}
                 latency_s={call.rawSpan.summary.latency_s}
               />
             )}

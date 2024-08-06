@@ -25,10 +25,7 @@ import {ExpandHeader} from '../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {Reactions} from '../../feedback/Reactions';
-import {
-  getCostFromCellParams,
-  getTokensAndCostFromCostData,
-} from '../CallPage/TraceUsageStats';
+import {getTokensAndCostFromCellParams} from '../CallPage/TraceCostStats';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {isRef} from '../common/util';
@@ -481,13 +478,13 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: cellParams => {
-      const costData = getCostFromCellParams(cellParams.row);
-      const {tokensNum} = getTokensAndCostFromCostData(costData);
+      const {tokensNum} = getTokensAndCostFromCellParams(cellParams.row);
       return tokensNum;
     },
     renderCell: cellParams => {
-      const costData = getCostFromCellParams(cellParams.row);
-      const {tokens, tokenToolTip} = getTokensAndCostFromCostData(costData);
+      const {tokens, tokenToolTip} = getTokensAndCostFromCellParams(
+        cellParams.row
+      );
       return <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTip} />;
     },
   });
@@ -502,13 +499,13 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: cellParams => {
-      const costData = getCostFromCellParams(cellParams.row);
-      const {costNum} = getTokensAndCostFromCostData(costData);
+      const {costNum} = getTokensAndCostFromCellParams(cellParams.row);
       return costNum;
     },
     renderCell: cellParams => {
-      const costData = getCostFromCellParams(cellParams.row);
-      const {cost, costToolTip} = getTokensAndCostFromCostData(costData);
+      const {cost, costToolTip} = getTokensAndCostFromCellParams(
+        cellParams.row
+      );
       return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
     },
   });

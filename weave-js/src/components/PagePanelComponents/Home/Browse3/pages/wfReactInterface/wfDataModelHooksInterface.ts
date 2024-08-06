@@ -163,7 +163,7 @@ export type Refetchable = {
 export type WFDataModelHooksInterface = {
   useCall: (
     key: CallKey | null,
-    opts?: {addCost?: boolean}
+    opts?: {includeCosts?: boolean}
   ) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
@@ -174,7 +174,7 @@ export type WFDataModelHooksInterface = {
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
     expandedRefColumns?: Set<string>,
-    opts?: {skip?: boolean; refetchOnDelete?: boolean; addCost?: boolean}
+    opts?: {skip?: boolean; refetchOnDelete?: boolean; includeCosts?: boolean}
   ) => Loadable<CallSchema[]>;
   useCallsStats: (
     entity: string,

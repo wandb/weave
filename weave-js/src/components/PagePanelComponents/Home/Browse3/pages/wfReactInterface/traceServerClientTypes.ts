@@ -8,7 +8,7 @@ type WeaveSummarySchema = {
   cost?: {[key: string]: LLMCostSchema};
 } & ExtraKeysAllowed;
 
-type LLMUsageSchema = {
+export type LLMUsageSchema = {
   // Should collapse prompt and input? Ideally yes, but
   // back compat is a concern.
   prompt_tokens?: number;
@@ -87,7 +87,7 @@ export type TraceCallSchema = {
 export type TraceCallReadReq = {
   project_id: string;
   id: string;
-  add_cost?: boolean;
+  include_costs?: boolean;
 };
 
 export type TraceCallReadSuccess = {
@@ -118,7 +118,7 @@ export type TraceCallsQueryReq = {
   offset?: number;
   sort_by?: SortBy[];
   query?: Query;
-  add_cost?: boolean;
+  include_costs?: boolean;
 };
 
 export type TraceCallsQueryRes = {

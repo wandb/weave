@@ -1,45 +1,49 @@
 import {Divider} from '@mui/material';
 import Box from '@mui/material/Box';
+import {Pill} from '@wandb/weave/components/Tag';
 import {formatNumber} from '@wandb/weave/core/util/number';
 import {
   FORMAT_NUMBER_NO_DECIMALS,
   formatTokenCost,
   formatTokenCount,
-  getLLMTokenCost,
-  getLLMTotalTokenCost,
 } from '@wandb/weave/util/llmTokenCosts';
-import React from 'react';
+import React, {ReactNode} from 'react';
 
 import {MOON_600} from '../../../../../../common/css/color.styles';
-import {LLMUsageSchema} from '../wfReactInterface/traceServerClientTypes';
-import {TraceStat} from './TraceCostStats';
+import {IconName} from '../../../../../Icon';
+import {Tooltip} from '../../../../../Tooltip';
+import {LLMCostSchema} from '../wfReactInterface/traceServerClientTypes';
 
-type UsageDataKeys = keyof LLMUsageSchema;
-const isUsageDataKey = (key: any): key is UsageDataKeys => {
+type CostDataKey = keyof LLMCostSchema;
+const isCostDataKey = (key: any): key is CostDataKey => {
   if (typeof key !== 'string') {
     return false;
   }
 
-  const usageDataKeys: UsageDataKeys[] = [
+  const costDataKeys: CostDataKey[] = [
     'requests',
     'prompt_tokens',
     'completion_tokens',
     'total_tokens',
     'input_tokens',
     'output_tokens',
+    'prompt_tokens_cost',
+    'completion_tokens_cost',
+    'prompt_token_cost',
+    'completion_token_cost',
   ];
-  return usageDataKeys.includes(key as UsageDataKeys);
+  return costDataKeys.includes(key as CostDataKey);
 };
 
-export const TraceUsageStats = ({
-  usage,
+export const TraceCostStats = ({
+  costData,
   latency_s,
 }: {
-  usage: {[key: string]: LLMUsageSchema};
+  costData: {[key: string]: LLMCostSchema};
   latency_s: number;
 }) => {
   const {cost, tokens, costToolTip, tokenToolTip} =
-    getTokensAndCostFromUsage(usage);
+    getTokensAndCostFromCostData(costData);
 
   const latency =
     (latency_s < 0.01 ? '<0.01' : formatNumber(latency_s, 'Number')) + 's';
@@ -51,7 +55,7 @@ export const TraceUsageStats = ({
         alignItems: 'center',
       }}>
       <TraceStat icon="recent-clock" label={latency} />
-      {usage && (
+      {costData && (
         <>
           {/* Tokens */}
           <TraceStat
@@ -67,41 +71,46 @@ export const TraceUsageStats = ({
   );
 };
 
-export const getUsageFromCellParams = (params: {[key: string]: any}) => {
-  const usage: {[key: string]: LLMUsageSchema} = {};
+export const getCostFromCellParams = (params: {[key: string]: any}) => {
+  const costData: {[key: string]: LLMCostSchema} = {};
   for (const key in params) {
-    if (key.startsWith('summary.usage')) {
-      const usageKeys = key.replace('summary.usage.', '').split('.');
-      const usageKey = usageKeys.pop() || '';
-      if (isUsageDataKey(usageKey)) {
-        const model = usageKeys.join('.');
-        if (!usage[model]) {
-          usage[model] = {
+    if (key.startsWith('summary._weave.costs')) {
+      const costKeys = key.replace('summary._weave.costs.', '').split('.');
+      const costKey = costKeys.pop() || '';
+      if (isCostDataKey(costKey)) {
+        const model = costKeys.join('.');
+        if (!costData[model]) {
+          costData[model] = {
             requests: 0,
             prompt_tokens: 0,
             completion_tokens: 0,
             total_tokens: 0,
-          };
+            prompt_tokens_cost: 0,
+            completion_tokens_cost: 0,
+            prompt_token_cost: 0,
+            completion_token_cost: 0,
+          } as LLMCostSchema;
         }
-        usage[model][usageKey] = params[key];
+        // this is giving a type error: cant assign any to never
+        (costData[model] as any)[costKey] = params[key];
       }
     }
   }
-  return usage;
+  return costData;
 };
 
 // This needs to updated eventually, to either include more possible keys or to be more dynamic
 // accounts for openai and anthropic usage objects (prompt_tokens, input_tokens)
-export const getUsageInputTokens = (usage: LLMUsageSchema) => {
-  return usage.input_tokens ?? usage.prompt_tokens ?? 0;
+export const getInputTokens = (cost: LLMCostSchema) => {
+  return cost.input_tokens ?? cost.prompt_tokens ?? 0;
 };
 
-export const getUsageOutputTokens = (usage: LLMUsageSchema) => {
-  return usage.output_tokens ?? usage.completion_tokens ?? 0;
+export const getOutputTokens = (cost: LLMCostSchema) => {
+  return cost.output_tokens ?? cost.completion_tokens ?? 0;
 };
 
-export const getTokensAndCostFromUsage = (usage: {
-  [key: string]: LLMUsageSchema;
+export const getTokensAndCostFromCostData = (cost: {
+  [key: string]: LLMCostSchema;
 }) => {
   const metrics: {
     inputs: {
@@ -124,12 +133,12 @@ export const getTokensAndCostFromUsage = (usage: {
       tokens: {total: 0},
     },
   };
-  if (usage) {
-    for (const model of Object.keys(usage)) {
-      const inputTokens = getUsageInputTokens(usage[model]);
-      const outputTokens = getUsageOutputTokens(usage[model]);
-      const inputCost = getLLMTokenCost(model, 'input', inputTokens);
-      const outputCost = getLLMTokenCost(model, 'output', outputTokens);
+  if (cost) {
+    for (const model of Object.keys(cost)) {
+      const inputTokens = getInputTokens(cost[model]);
+      const outputTokens = getOutputTokens(cost[model]);
+      const inputCost = cost[model].prompt_tokens_cost ?? 0;
+      const outputCost = cost[model].completion_tokens_cost ?? 0;
 
       metrics.inputs.cost[model] = inputCost;
       metrics.inputs.tokens[model] = inputTokens;
@@ -143,7 +152,7 @@ export const getTokensAndCostFromUsage = (usage: {
     }
   }
   const costNum = metrics.inputs.cost.total + metrics.outputs.cost.total;
-  const cost = formatTokenCost(costNum);
+  const formattedCost = formatTokenCost(costNum);
   const tokensNum = metrics.inputs.tokens.total + metrics.outputs.tokens.total;
   const tokens = formatTokenCount(tokensNum);
 
@@ -204,11 +213,45 @@ export const getTokensAndCostFromUsage = (usage: {
       ))}
     </Box>
   );
-  return {costNum, cost, tokensNum, tokens, costToolTip, tokenToolTip};
+  return {
+    costNum,
+    cost: formattedCost,
+    tokensNum,
+    tokens,
+    costToolTip,
+    tokenToolTip,
+  };
 };
 
-export const sumUsageData = (usage: {[key: string]: LLMUsageSchema}) => {
-  const usageData = Object.entries(usage ?? {}).map(([k, v]) => {
+export const TraceStat = ({
+  icon,
+  label,
+  tooltip,
+}: {
+  icon?: IconName;
+  label: string;
+  tooltip?: ReactNode;
+}) => {
+  const trigger = (
+    <div>
+      <Pill
+        icon={icon}
+        label={label}
+        color="moon"
+        className="bg-transparent text-moon-500 dark:bg-transparent dark:text-moon-500"
+      />
+    </div>
+  );
+
+  if (!tooltip) {
+    return trigger;
+  }
+
+  return <Tooltip trigger={trigger} content={tooltip} />;
+};
+
+export const sumCostData = (costs: {[key: string]: LLMCostSchema}) => {
+  const costData: any[] = Object.entries(costs ?? {}).map(([k, v]) => {
     const promptTokens = v.input_tokens ?? v.prompt_tokens ?? 0;
     const completionTokens = v.output_tokens ?? v.completion_tokens ?? 0;
     return {
@@ -216,22 +259,21 @@ export const sumUsageData = (usage: {[key: string]: LLMUsageSchema}) => {
       ...v,
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
-      total_tokens: v.total_tokens || promptTokens + completionTokens,
-      cost: getLLMTotalTokenCost(k, promptTokens, completionTokens),
+      total_tokens: promptTokens + completionTokens,
+      cost: (v.completion_tokens_cost ?? 0) + (v.prompt_tokens_cost ?? 0),
     };
   });
 
   // if more than one model is used, add a row for the total usage
-  if (usageData.length > 1) {
-    const totalUsage = usageData.reduce(
+  if (costData.length > 1) {
+    const totalUsage = costData.reduce(
       (acc, curr) => {
         const promptTokens = curr.input_tokens ?? curr.prompt_tokens;
         const completionTokens = curr.output_tokens ?? curr.completion_tokens;
-        acc.requests += curr.requests ?? 0;
+        acc.requests += curr.requests;
         acc.prompt_tokens += promptTokens;
         acc.completion_tokens += completionTokens;
-        acc.total_tokens +=
-          curr.total_tokens || promptTokens + completionTokens;
+        acc.total_tokens += promptTokens + completionTokens;
         acc.cost += curr.cost;
         return acc;
       },
@@ -244,11 +286,18 @@ export const sumUsageData = (usage: {[key: string]: LLMUsageSchema}) => {
       }
     );
 
-    usageData.push({
+    costData.push({
       id: 'Total',
       ...totalUsage,
     });
   }
 
-  return usageData;
+  return costData;
+};
+
+export const getTokensAndCostFromCellParams = (params: {
+  [key: string]: any;
+}) => {
+  const costData = getCostFromCellParams(params);
+  return getTokensAndCostFromCostData(costData);
 };
