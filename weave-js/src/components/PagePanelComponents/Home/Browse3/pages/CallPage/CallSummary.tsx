@@ -6,11 +6,15 @@ import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
+import {LLMCostSchema} from '../wfReactInterface/traceServerClientTypes';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './CostTable';
-import {UsageData} from './TraceUsageStats';
 
-const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = ['latency_s', 'usage'];
+const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
+  'latency_s',
+  'usage',
+  '_weave',
+];
 
 export const CallSummary: React.FC<{
   call: CallSchema;
@@ -30,6 +34,8 @@ export const CallSummary: React.FC<{
         !SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER.includes(k)
     )
   );
+
+  const costs = span.summary._weave?.costs as {[key: string]: LLMCostSchema};
 
   return (
     <div style={{padding: 8}}>
@@ -63,7 +69,7 @@ export const CallSummary: React.FC<{
           ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
         }}
       />
-      {span.summary.usage && (
+      {costs && (
         <>
           <Divider sx={{marginY: '16px'}} />
           <div>
@@ -76,9 +82,7 @@ export const CallSummary: React.FC<{
               }}>
               Usage
             </p>
-            <CostTable
-              usage={span.summary.usage as {[key: string]: UsageData}}
-            />
+            <CostTable costs={costs} />
           </div>
         </>
       )}

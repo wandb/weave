@@ -158,7 +158,10 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
+const useCall = (
+  key: CallKey | null,
+  opts?: {addCost?: boolean}
+): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const cachedCall = key ? callCache.get(key) : null;
@@ -173,13 +176,14 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         .callRead({
           project_id: projectIdFromParts(deepKey),
           id: deepKey.callId,
+          add_cost: opts?.addCost,
         })
         .then(res => {
           loadingRef.current = false;
           setCallRes(res);
         });
     }
-  }, [deepKey, getTsClient]);
+  }, [deepKey, getTsClient, opts?.addCost]);
 
   useEffect(() => {
     doFetch();
@@ -231,7 +235,7 @@ const useCallsNoExpansion = (
   offset?: number,
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  opts?: {skip?: boolean; refetchOnDelete?: boolean; addCost?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -262,6 +266,7 @@ const useCallsNoExpansion = (
       offset,
       sort_by: sortBy,
       query,
+      add_cost: opts?.addCost,
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -278,6 +283,7 @@ const useCallsNoExpansion = (
     project,
     deepFilter,
     limit,
+    opts?.addCost,
     opts?.skip,
     getTsClient,
     offset,
@@ -351,7 +357,7 @@ const useCalls = (
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
   expandedRefColumns?: Set<string>,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  opts?: {skip?: boolean; refetchOnDelete?: boolean; addCost?: boolean}
 ): Loadable<CallSchema[]> => {
   const calls = useCallsNoExpansion(
     entity,

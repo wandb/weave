@@ -237,7 +237,8 @@ export const CallsTable: FC<{
     filterModel,
     sortModelResolved,
     paginationModelResolved,
-    expandedRefCols
+    expandedRefCols,
+    true
   );
 
   // Here, we only update our local state once the calls have loaded.
