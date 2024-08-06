@@ -256,6 +256,7 @@ def test_tools_calling(
     assert output.usage.output_tokens == model_usage["output_tokens"] == 56
     assert output.usage.input_tokens == model_usage["input_tokens"] == 354
 
+
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -268,7 +269,7 @@ def test_anthropic_messages_stream_ctx_manager(
     anthropic_client = Anthropic(
         api_key=api_key,
     )
-    
+
     all_content = ""
     with anthropic_client.messages.stream(
         max_tokens=1024,
@@ -283,7 +284,7 @@ def test_anthropic_messages_stream_ctx_manager(
         for event in stream:
             if event.type == "text":
                 all_content += event.text
-    
+
     exp = "Hello there!"
     assert all_content.strip() == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
@@ -302,6 +303,7 @@ def test_anthropic_messages_stream_ctx_manager(
     assert output.usage.output_tokens == model_usage["output_tokens"]
     assert output.usage.input_tokens == model_usage["input_tokens"]
 
+
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -314,7 +316,7 @@ async def test_async_anthropic_messages_stream_ctx_manager(
     anthropic_client = AsyncAnthropic(
         api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
-    
+
     all_content = ""
     async with anthropic_client.messages.stream(
         max_tokens=1024,
@@ -329,10 +331,10 @@ async def test_async_anthropic_messages_stream_ctx_manager(
         async for event in stream:
             if event.type == "text":
                 all_content += event.text
-    
+
     exp = "Hello there!"
     assert all_content.strip() == exp
-    
+
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
@@ -362,7 +364,7 @@ def test_anthropic_messages_stream_ctx_manager_text(
     anthropic_client = Anthropic(
         api_key=api_key,
     )
-    
+
     all_content = ""
     with anthropic_client.messages.stream(
         max_tokens=1024,
@@ -376,7 +378,7 @@ def test_anthropic_messages_stream_ctx_manager_text(
     ) as stream:
         for text in stream.text_stream:
             all_content += text
-    
+
     exp = "Hello there!"
     assert all_content.strip() == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
@@ -408,7 +410,7 @@ async def test_async_anthropic_messages_stream_ctx_manager_text(
     anthropic_client = AsyncAnthropic(
         api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
-    
+
     all_content = ""
     async with anthropic_client.messages.stream(
         max_tokens=1024,
@@ -422,10 +424,10 @@ async def test_async_anthropic_messages_stream_ctx_manager_text(
     ) as stream:
         async for text in stream.text_stream:
             all_content += text
-    
+
     exp = "Hello there!"
     assert all_content.strip() == exp
-    
+
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
