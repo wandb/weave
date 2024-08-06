@@ -212,22 +212,6 @@ const ObjectVersionsTable: React.FC<{
       }),
     ];
 
-    cols.push(
-      basicField('baseObjectClass', 'Category', {
-        width: 100,
-        valueGetter: cellParams => {
-          return cellParams.row.obj.baseObjectClass;
-        },
-        renderCell: cellParams => {
-          const category = cellParams.value;
-          if (category === 'Model' || category === 'Dataset') {
-            return <TypeVersionCategoryChip baseObjectClass={category} />;
-          }
-          return null;
-        },
-      })
-    );
-
     if (!props.usingLatestFilter) {
       const dynamicFields: string[] = [];
       const dynamicFieldSet = new Set<string>();
@@ -263,6 +247,22 @@ const ObjectVersionsTable: React.FC<{
       cols.push(...newCols);
       groups = groupingModel;
     }
+
+    cols.push(
+      basicField('baseObjectClass', 'Category', {
+        width: 100,
+        valueGetter: cellParams => {
+          return cellParams.row.obj.baseObjectClass;
+        },
+        renderCell: cellParams => {
+          const category = cellParams.value;
+          if (category === 'Model' || category === 'Dataset') {
+            return <TypeVersionCategoryChip baseObjectClass={category} />;
+          }
+          return null;
+        },
+      })
+    );
 
     cols.push(
       basicField('createdAtMs', 'Created', {
