@@ -38,7 +38,7 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
@@ -49,7 +49,7 @@ from weave.trace_server.ids import generate_id
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
-from . import refs_internal
+from . import refs_internal, validation
 from . import trace_server_interface as tsi
 from .emoji_util import detone_emojis
 from .errors import InvalidRequest, RequestTooLarge
@@ -97,6 +97,17 @@ class CallStartCHInsertable(BaseModel):
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
 
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _id_v = field_validator("id")(validation.call_id_validator)
+    _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
+    _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
+    _op_name_v = field_validator("op_name")(validation.op_name_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+    _display_name_v = field_validator("display_name")(validation.display_name_validator)
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
+
 
 class CallEndCHInsertable(BaseModel):
     project_id: str
@@ -107,6 +118,11 @@ class CallEndCHInsertable(BaseModel):
     output_dump: str
     input_refs: typing.List[str] = []  # sadly, this is required
     output_refs: typing.List[str]
+
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _id_v = field_validator("id")(validation.call_id_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
 
 
 class CallDeleteCHInsertable(BaseModel):
@@ -120,6 +136,12 @@ class CallDeleteCHInsertable(BaseModel):
     input_refs: typing.List[str] = []
     output_refs: typing.List[str] = []
 
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _id_v = field_validator("id")(validation.call_id_validator)
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+
 
 class CallUpdateCHInsertable(BaseModel):
     project_id: str
@@ -132,6 +154,13 @@ class CallUpdateCHInsertable(BaseModel):
     # required types
     input_refs: typing.List[str] = []
     output_refs: typing.List[str] = []
+
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _id_v = field_validator("id")(validation.call_id_validator)
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _display_name_v = field_validator("display_name")(validation.display_name_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
 
 
 CallCHInsertable = typing.Union[
@@ -203,6 +232,10 @@ class ObjCHInsertable(BaseModel):
     refs: typing.List[str]
     val_dump: str
     digest: str
+
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _object_id_v = field_validator("object_id")(validation.object_id_validator)
+    _refs = field_validator("refs")(validation.refs_list_validator)
 
 
 class SelectableCHObjSchema(BaseModel):

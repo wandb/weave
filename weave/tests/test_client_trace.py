@@ -98,12 +98,14 @@ def test_dataset(client):
 
 def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
+    trace_id = generate_id()
+    parent_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
         project_id=client._project_id(),
         id=call_id,
         op_name="test_name",
-        trace_id="test_trace_id",
-        parent_id="test_parent_id",
+        trace_id=trace_id,
+        parent_id=parent_id,
         started_at=datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
         attributes={"a": 5},
@@ -143,8 +145,8 @@ def test_trace_server_call_start_and_end(client):
         "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
-        "trace_id": "test_trace_id",
-        "parent_id": "test_parent_id",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": None,
         "exception": None,
@@ -182,8 +184,8 @@ def test_trace_server_call_start_and_end(client):
         "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
-        "trace_id": "test_trace_id",
-        "parent_id": "test_parent_id",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": FuzzyDateTimeMatcher(end.ended_at),
         "exception": None,
@@ -1378,7 +1380,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:PHOGkwSOn7DqLgIUNgUAq7d2vXpOmG8NGLltn6slzeU/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
