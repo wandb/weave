@@ -450,8 +450,8 @@ def init_client(request) -> Generator[InitializedClient, None, None]:
 
 
 @pytest.fixture()
-def client(inited_client) -> Generator[weave_client.WeaveClient, None, None]:
-    yield inited_client.client
+def client(init_client) -> Generator[weave_client.WeaveClient, None, None]:
+    yield init_client.client
 
 
 @pytest.fixture
