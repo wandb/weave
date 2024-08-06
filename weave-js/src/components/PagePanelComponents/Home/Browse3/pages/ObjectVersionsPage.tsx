@@ -246,7 +246,7 @@ const ObjectVersionsTable: React.FC<{
           const res = obj.val?.[key];
           if (isTableRef(res)) {
             // This whole block is a hack to make the table ref clickable. This
-            // is The same thing that the CallsTable does for expanded fields.
+            // is the same thing that the CallsTable does for expanded fields.
             // Once we come up with a common pattern for ref expansion, this
             // will go away.
             const selfRefUri = objectVersionKeyToRefUri(obj);

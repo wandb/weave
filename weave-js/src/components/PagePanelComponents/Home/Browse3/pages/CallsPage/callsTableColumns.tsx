@@ -309,9 +309,9 @@ function buildCallsTableColumns(
     key => columnsWithRefs.has(key),
     onCollapse,
     onExpand,
-    // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+    // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
     key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-    // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+    // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
     key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key)
   );
   cols.push(...newCols);
@@ -609,8 +609,8 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         return (
           <ErrorBoundary>
             {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
-            into `CallValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
-            CallsTable-specific data structure and we might not want to leak that into the
+            into `CellValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
+            Table-specific data structure and we might not want to leak that into the
             rest of the system*/}
             {isExpandedRefWithValueAsTableRef(val) ? (
               <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
