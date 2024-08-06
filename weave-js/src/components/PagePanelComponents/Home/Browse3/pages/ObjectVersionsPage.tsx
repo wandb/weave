@@ -50,6 +50,8 @@ import {
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
 
+const DATASET_BASE_OBJECT_CLASS = 'Dataset';
+
 export const ObjectVersionsPage: React.FC<{
   entity: string;
   project: string;
@@ -144,7 +146,7 @@ export const FilterableObjectVersionsTable: React.FC<{
     const base = props.initialFilter?.baseObjectClass;
     if ('Model' === base) {
       propsEmpty = EMPTY_PROPS_MODEL;
-    } else if ('Dataset' === base) {
+    } else if (DATASET_BASE_OBJECT_CLASS === base) {
       propsEmpty = EMPTY_PROPS_DATASETS;
     }
     return <Empty {...propsEmpty} />;
@@ -171,16 +173,27 @@ const ObjectVersionsTable: React.FC<{
   objectVersions: ObjectVersionSchema[];
   usingLatestFilter?: boolean;
 }> = props => {
+  // `showPropsAsColumns` probably needs to be a bit more robust
+  const showPropsAsColumns = !props.usingLatestFilter;
   const rows: GridRowsProp = useMemo(() => {
     const vals = props.objectVersions.map(ov => ov.val);
     const flat = prepareFlattenedDataForTable(vals);
 
     return props.objectVersions.map((ov, i) => {
+      let val = flat[i];
+      if (ov.baseObjectClass === DATASET_BASE_OBJECT_CLASS) {
+        // We don't want to show the rows column for datasets
+        // because it is redundant. Probably want a more generic
+        // solution here in the future. Maybe exclude table refs?
+        val = _.omit(val, 'rows');
+      }
+      // We don't want to show name (because it is the same as the object id)
+      val = _.omit(val, 'name');
       return {
         id: objectVersionKeyToRefUri(ov),
         obj: {
           ...ov,
-          val: flat[i],
+          val,
         },
       };
     });
@@ -212,7 +225,7 @@ const ObjectVersionsTable: React.FC<{
       }),
     ];
 
-    if (!props.usingLatestFilter) {
+    if (showPropsAsColumns) {
       const dynamicFields: string[] = [];
       const dynamicFieldSet = new Set<string>();
       rows.forEach(r => {
@@ -291,7 +304,7 @@ const ObjectVersionsTable: React.FC<{
     }
 
     return {cols, groups};
-  }, [props.usingLatestFilter, rows]);
+  }, [showPropsAsColumns, props.usingLatestFilter, rows]);
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
