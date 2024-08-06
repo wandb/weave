@@ -44,3 +44,6 @@ pysqlite3-binary==0.5.3     # LangChain
 cohere>=5.5.8               # Cohere
 groq>=0.9.0                 # Groq
 google-generativeai==0.7.2  # Google Generative AI
+
+# Used for Integration Tests
+semver

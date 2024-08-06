@@ -1,6 +1,6 @@
 import typing
 
-from weave import api as weave
+from weave import query_api as weave
 
 # TODO: Fix, these should be available from weave
 from weave.legacy import context_state, op_def, ops, panel, panels

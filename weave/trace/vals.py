@@ -87,12 +87,19 @@ def make_mutation(
 
 
 class Traceable:
-    mutated_value: Any = None
-    ref: RefWithExtra
-    list_mutations: Optional[list] = None
+    ref: Optional[RefWithExtra]
     mutations: Optional[list[Mutation]] = None
     root: "Traceable"
+    parent: Optional["Traceable"] = None
     server: TraceServerInterface
+    _is_dirty: bool = False
+
+    def _mark_dirty(self) -> None:
+        """Recursively mark this object and its ancestors as dirty and removes their refs."""
+        self._is_dirty = True
+        self.ref = None
+        if self.parent is not self and self.parent is not None:
+            self.parent._mark_dirty()
 
     def add_mutation(
         self, path: tuple[str, ...], operation: MutationOperation, *args: Any
@@ -147,25 +154,19 @@ def attribute_access_result(
     if callable(val_attr_val):
         return maybe_bind_method(val_attr_val, self)
 
-    ref = None
-    try:
-        ref = self.ref  # type: ignore
-    except AttributeError:
-        pass
-    if ref is None:
+    if (ref := getattr(self, "ref", None)) is None:
         return val_attr_val
-
-    new_ref = ref.with_attr(attr_name)
-
     if server is None:
         return val_attr_val
+
+    root = getattr(self, "root", None)
+    new_ref = ref.with_attr(attr_name)
 
     return make_trace_obj(
         val_attr_val,
         new_ref,
         server,
-        None,  # TODO: not passing root, needed for mutate which is not implemented yet
-        # self.root,
+        root,
         self,
     )
 
@@ -174,16 +175,16 @@ class WeaveObject(Traceable):
     def __init__(
         self,
         val: Any,
-        ref: RefWithExtra,
+        ref: Optional[RefWithExtra],
         server: TraceServerInterface,
         root: typing.Optional[Traceable],
+        parent: Optional[Traceable] = None,
     ) -> None:
         self._val = val
         self.ref = ref
         self.server = server
-        if root is None:
-            root = self
-        self.root = root
+        self.root = root or self
+        self.parent = parent
 
     def __getattribute__(self, __name: str) -> Any:
         try:
@@ -192,6 +193,7 @@ class WeaveObject(Traceable):
             pass
         val_attr_val = object.__getattribute__(self._val, __name)
         result = attribute_access_result(self, val_attr_val, __name, server=self.server)
+
         # Store the result on _val so we don't deref next time.
         try:
             object.__setattr__(self._val, __name, result)
@@ -202,15 +204,22 @@ class WeaveObject(Traceable):
         return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
-        if __name in ["_val", "ref", "server", "root", "mutations"]:
+        if __name in [
+            "_val",
+            "ref",
+            "server",
+            "root",
+            "mutations",
+            "_is_dirty",
+            "parent",
+        ]:
             return object.__setattr__(self, __name, __value)
         else:
-            if not isinstance(self.ref, ObjectRef):
-                raise ValueError("Can only set attributes on object refs")
-            object.__getattribute__(self, "root").add_mutation(
-                self.ref.extra, "setattr", __name, __value
-            )
-            return object.__setattr__(self._val, __name, __value)
+            self._mark_dirty()
+            if isinstance(__value, Traceable):
+                __value.parent = self
+
+            return setattr(self._val, __name, __value)
 
     def __dir__(self) -> list[str]:
         return dir(self._val)
@@ -270,7 +279,7 @@ class WeaveTable(Traceable):
                 )
             )
             for item in response.rows:
-                new_ref = self.ref.with_item(item.digest)
+                new_ref = self.ref.with_item(item.digest) if self.ref else None
                 yield make_trace_obj(
                     item.val,
                     new_ref,
@@ -302,7 +311,6 @@ class WeaveTable(Traceable):
     def append(self, val: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
             raise ValueError("Can only append to object refs")
-        self.root.add_mutation(self.ref.extra, "append", val)
 
 
 class WeaveList(Traceable, list):
@@ -323,9 +331,31 @@ class WeaveList(Traceable, list):
         if isinstance(i, slice):
             raise ValueError("Slices not yet supported")
         index = operator.index(i)
-        new_ref = self.ref.with_index(index)
+        new_ref = self.ref.with_index(index) if self.ref else None
         index_val = super().__getitem__(index)
         return make_trace_obj(index_val, new_ref, self.server, self.root)
+
+    def __setitem__(self, i: Union[SupportsIndex, slice], value: Any) -> None:
+        if isinstance(i, slice):
+            raise ValueError("Slices not yet supported")
+        if (index := operator.index(i)) >= len(self):
+            raise IndexError("list assignment index out of range")
+
+        # Though this ostensibly only marks the parent (list) as dirty, siblings
+        # will also get new refs because their old refs are relative to the parent
+        # (the element refs will be extras of the new parent ref)
+        self._mark_dirty()
+        if isinstance(value, Traceable):
+            value.parent = self
+
+        super().__setitem__(index, value)
+
+    def append(self, item: Any) -> None:
+        self._mark_dirty()
+        if isinstance(item, Traceable):
+            item.parent = self
+
+        super().append(item)
 
     def __iter__(self) -> Iterator[Any]:
         for i in range(len(self)):
@@ -334,6 +364,16 @@ class WeaveList(Traceable, list):
     def __repr__(self) -> str:
         return f"WeaveList({super().__repr__()})"
 
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, list):
+            return False
+        if len(self) != len(other):
+            return False
+        for v1, v2 in zip(self, other):
+            if v1 != v2:
+                return False
+        return True
+
 
 class WeaveDict(Traceable, dict):
     def __init__(
@@ -341,7 +381,7 @@ class WeaveDict(Traceable, dict):
         *args: Any,
         **kwargs: Any,
     ):
-        self.ref: RefWithExtra = kwargs.pop("ref")
+        self.ref: Optional[RefWithExtra] = kwargs.pop("ref")
         self.server: TraceServerInterface = kwargs.pop("server")
         root: Optional[Traceable] = kwargs.pop("root", None)
         if root is None:
@@ -350,29 +390,33 @@ class WeaveDict(Traceable, dict):
         super().__init__(*args, **kwargs)
 
     def __getitem__(self, key: str) -> Any:
-        new_ref = self.ref.with_key(key)
-        return make_trace_obj(super().__getitem__(key), new_ref, self.server, self.root)
+        new_ref = self.ref.with_key(key) if self.ref else None
+        v = super().__getitem__(key)
+        return make_trace_obj(v, new_ref, self.server, self.root)
 
     def get(self, key: str, default: Any = None) -> Any:
-        new_ref = self.ref.with_key(key)
-        return make_trace_obj(
-            super().get(key, default), new_ref, self.server, self.root
-        )
+        new_ref = self.ref.with_key(key) if self.ref else None
+        v = super().get(key, default)
+        return make_trace_obj(v, new_ref, self.server, self.root)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only set items on object refs")
+        # Though this ostensibly only marks the parent (dict) as dirty, siblings
+        # will also get new refs because their old refs are relative to the parent
+        # (the element refs will be extras of the new parent ref)
+        self._mark_dirty()
+        if isinstance(value, Traceable):
+            value.parent = self
+
         super().__setitem__(key, value)
-        self.root.add_mutation(self.ref.extra, "setitem", key, value)
 
-    def keys(self):  # type: ignore
-        return super().keys()
+    def keys(self) -> Generator[Any, Any, Any]:  # type: ignore
+        yield from super().keys()
 
-    def values(self):  # type: ignore
+    def values(self) -> Generator[Any, Any, Any]:  # type: ignore
         for k in self.keys():
             yield self[k]
 
-    def items(self):  # type: ignore
+    def items(self) -> Generator[tuple[Any, Any], Any, Any]:  # type: ignore
         for k in self.keys():
             yield k, self[k]
 
@@ -385,10 +429,22 @@ class WeaveDict(Traceable, dict):
     def __repr__(self) -> str:
         return f"WeaveDict({super().__repr__()})"
 
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, dict):
+            return False
+        if len(self) != len(other):
+            return False
+        for k, v in self.items():
+            if k not in other:
+                return False
+            if other[k] != v:
+                return False
+        return True
+
 
 def make_trace_obj(
     val: Any,
-    new_ref: RefWithExtra,
+    new_ref: Optional[RefWithExtra],  # Can this actually be None?
     server: TraceServerInterface,
     root: Optional[Traceable],
     parent: Any = None,
@@ -453,9 +509,9 @@ def make_trace_obj(
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return WeaveObject(val, new_ref, server, root)
+            return WeaveObject(val, new_ref, server, root, parent)
         elif isinstance(val, list):
-            return WeaveList(val, ref=new_ref, server=server, root=root)
+            return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
             return WeaveDict(val, ref=new_ref, server=server, root=root)
     if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
@@ -493,7 +549,8 @@ def make_trace_obj(
 
         pass
     else:
-        setattr(box_val, "ref", new_ref)
+        if hasattr(box_val, "ref"):
+            setattr(box_val, "ref", new_ref)
     return box_val
 
 
