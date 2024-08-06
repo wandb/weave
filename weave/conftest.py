@@ -406,7 +406,7 @@ class TestOnlyUserInjectingExternalTraceServer(
 
 
 @pytest.fixture()
-def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+def init_client(request) -> Generator[weave_client.WeaveClient, None, None]:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
     server: tsi.TraceServerInterface
@@ -444,9 +444,13 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
-        yield inited_client.client
+        yield inited_client
     finally:
         inited_client.reset()
+
+
+def client(inited_client) -> Generator[weave_client.WeaveClient, None, None]:
+    yield inited_client.client
 
 
 @pytest.fixture
