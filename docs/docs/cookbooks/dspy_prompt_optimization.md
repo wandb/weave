@@ -4,6 +4,8 @@ hide_table_of_contents: true
 
 # Optimizing LLM Workflows Using DSPy and Weave
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/master/docs/docs/cookbooks/notebooks/dspy_prompt_optimization.ipynb)
+
 The [BIG-bench (Beyond the Imitation Game Benchmark)](https://github.com/google/BIG-bench) is a collaborative benchmark intended to probe large language models and extrapolate their future capabilities consisting of more than 200 tasks. The [BIG-Bench Hard (BBH)](https://github.com/suzgunmirac/BIG-Bench-Hard) is a suite of 23 most challenging BIG-Bench tasks that can be quite difficult to be solved using the current generation of language models.
 
 This tutorial demonstrates how we can improve the performance of our LLM workflow implemented  on the **causal judgement task** from the BIG-bench Hard benchmark and evaluate our prompting strategies. We will use [DSPy](https://dspy-docs.vercel.app/) for implementing our LLM workflow and optimizing our prompting strategy. We would also use [Weave](../introduction.md) to track our LLM workflow and evaluate our prompting strategies.
@@ -99,6 +101,8 @@ dspy_train_examples, dspy_val_examples = get_dataset(metadata)
 
 ## The DSPy Program
 
+[DSPy](https://dspy-docs.vercel.app) is a framework that pushes building new LM pipelines away from manipulating free-form strings and closer to programming (composing modular operators to build text transformation graphs) where a compiler automatically generates optimized LM invocation strategies and prompts from a program.
+
 We're gonna use the [`dspy.OpenAI`](https://dspy-docs.vercel.app/api/language_model_clients/OpenAI) abstraction to make LLM calls to [GPT3.5 Turbo](https://platform.openai.com/docs/models/gpt-3-5-turbo).
 
 ```python
@@ -112,19 +116,9 @@ llm = dspy.OpenAI(model="gpt-3.5-turbo", system_prompt=system_prompt)
 dspy.settings.configure(lm=llm)
 ```
 
-DSPy is a framework that pushes building new LM pipelines away from manipulating free-form strings and closer to programming (composing modular operators to build text transformation graphs) where a compiler automatically generates optimized LM invocation strategies and prompts from a program.
-
-According to the DSPy programming model, first string-based prompting techniques are translated into declarative modules that carry natural-language typed signatures. Then, each module is the parameterized so that it can learn its desired behavior by iteratively bootstrapping useful demonstrations within the pipeline.
-
-Check the following papers to learn more about the DSPy paradigm:
-
-- [DSPy: Compiling Declarative Language Model Calls into Self-Improving Pipelines](https://arxiv.org/abs/2310.03714)
-- [DSPy Assertions: Computational Constraints for Self-Refining Language Model Pipelines](https://arxiv.org/abs/2312.13382)
-- [Optimizing Instructions and Demonstrations for Multi-Stage Language Model Programs](https://arxiv.org/abs/2406.11695v1)
-
 ### Writing the Causal Reasoning Signature
 
-A [signature](https://dspy-docs.vercel.app/docs/building-blocks/signatures) is a declarative specification of input/output behavior of a [DSPy module](https://dspy-docs.vercel.app/docs/building-blocks/modules). Signatures allow you to tell the LM what it needs to do, rather than specify how we should ask the LM to do it. This enables us to organize our prompting strategy using modular and clean code, in which LM calls can be optimized into high-quality prompts (or automatic finetunes).
+A [signature](https://dspy-docs.vercel.app/docs/building-blocks/signatures) is a declarative specification of input/output behavior of a [DSPy module](https://dspy-docs.vercel.app/docs/building-blocks/modules) which are task-adaptive components—akin to neural network layers—that abstract any particular text transformation.
 
 ```python
 from pydantic import BaseModel, Field
@@ -143,11 +137,8 @@ class Output(BaseModel):
 class QuestionAnswerSignature(dspy.Signature):
     input: Input = dspy.InputField()
     output: Output = dspy.OutputField()
-```
 
-[DSPy modules](https://dspy-docs.vercel.app/docs/building-blocks/modules) are task-adaptive components—akin to neural network layers—that abstract any particular text transformation, in this case returning a structured question-answering result by executing causal reasoning.
 
-```python
 class CausalReasoningModule(dspy.Module):
     
     def __init__(self):
@@ -157,8 +148,6 @@ class CausalReasoningModule(dspy.Module):
     def forward(self, question) -> dict:
         return self.prog(input=Input(query=question)).output.dict()
 ```
-
-Note that we use [`dspy.TypedPredictor`](https://dspy-docs.vercel.app/docs/building-blocks/typed_predictors) which enforces the type constraints on the inputs and outputs of the fields in a DSPy signature. This enables us to always get the output in the form of a `pydantic.BaseModel` structuring the output of the LLM workflow according a fixed schema, making it easy to parse.
 
 Let's test our LLM workflow, i.e., the `CausalReasoningModule` on an example from the causal reasoning subset of Big-Bench Hard.
 
@@ -214,7 +203,7 @@ asyncio.run(evaluation.evaluate(baseline_module.forward))
 
 ## Optimizing our DSPy Program
 
-Now, that we have a baseline DSPy program, let us try to improve its performance for causal reasoning. We would do this using a [DSPy teleprompter](https://dspy-docs.vercel.app/docs/building-blocks/optimizers) is an algorithm that can tune the parameters of a DSPy program (i.e., the prompts and/or the LM weights) to maximize the metrics you specify, like accuracy. When compiling a DSPy program, we generally invoke a teleprompter, which is an optimizer that takes the program, a training set, and a metric—and returns a new optimized program. In this tutorial, we use the [BootstrapFewShot](https://dspy-docs.vercel.app/api/category/optimizers) teleprompter.
+Now, that we have a baseline DSPy program, let us try to improve its performance for causal reasoning using a [DSPy teleprompter](https://dspy-docs.vercel.app/docs/building-blocks/optimizers) that can tune the parameters of a DSPy program to maximize the specified metrics. In this tutorial, we use the [BootstrapFewShot](https://dspy-docs.vercel.app/api/category/optimizers) teleprompter.
 
 ```python
 from dspy.teleprompt import BootstrapFewShot
