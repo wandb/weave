@@ -1,11 +1,10 @@
 import importlib
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict
 
 from google.ai.generativelanguage_v1beta.types.safety import SafetyRating
 from google.generativeai.types.generation_types import GenerateContentResponse
 
 import weave
-from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
