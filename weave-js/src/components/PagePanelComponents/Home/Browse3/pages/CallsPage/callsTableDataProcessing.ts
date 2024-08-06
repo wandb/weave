@@ -41,9 +41,15 @@ import {ExpandedRefWithValueAsTableRef} from './callsTableColumns';
 export function prepareFlattenedCallDataForTable(
   callsResult: CallSchema[]
 ): Array<TraceCallSchema & {[key: string]: string}> {
-  return callsResult.map(r => {
+  return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
+}
+
+export function prepareFlattenedDataForTable<T,>(
+  data: T[]
+): Array<T & {[key: string]: string}> {
+  return data.map(r => {
     // First, flatten the inner trace call (this is the on-wire format)
-    let flattened = flattenObject(r.traceCall ?? {});
+    let flattened = flattenObject(r ?? {});
 
     flattened = replaceTableRefsInFlattenedData(flattened);
 
@@ -74,7 +80,7 @@ export function prepareFlattenedCallDataForTable(
       }
 
       // Finally, we remove any keys that start with underscore
-      if (newKey.includes('._')) {
+      if (newKey.includes('._') || newKey.startsWith('_')) {
         return;
       }
 
@@ -82,7 +88,7 @@ export function prepareFlattenedCallDataForTable(
       cleaned[newKey] = flattened[key];
     });
 
-    return cleaned as TraceCallSchema & {[key: string]: string};
+    return cleaned as T & {[key: string]: string};
   });
 }
 /**

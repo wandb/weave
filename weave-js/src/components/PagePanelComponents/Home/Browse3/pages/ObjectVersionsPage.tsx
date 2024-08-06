@@ -13,6 +13,8 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
+import {buildDynamicColumns} from './CallsPage/callsTableColumns';
+import {prepareFlattenedDataForTable} from './CallsPage/callsTableDataProcessing';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
 import {
@@ -154,65 +156,115 @@ const ObjectVersionsTable: React.FC<{
   usingLatestFilter?: boolean;
 }> = props => {
   const rows: GridRowsProp = useMemo(() => {
+    const vals = props.objectVersions.map(ov => ov.val);
+    const flat = prepareFlattenedDataForTable(vals);
+
     return props.objectVersions.map((ov, i) => {
       return {
-        ...ov,
         id: objectVersionKeyToRefUri(ov),
-        object: `${ov.objectId}:v${ov.versionIndex}`,
-        obj: ov,
+        obj: {
+          ...ov,
+          val: flat[i],
+        },
       };
     });
   }, [props.objectVersions]);
-  const columns: GridColDef[] = [
-    basicField('object', 'Object', {
-      hideable: false,
-      renderCell: cellParams => {
-        // Icon to indicate navigation to the object version
-        const obj: ObjectVersionSchema = cellParams.row.obj;
-        return (
-          <ObjectVersionLink
-            entityName={obj.entity}
-            projectName={obj.project}
-            objectName={obj.objectId}
-            version={obj.versionHash}
-            versionIndex={obj.versionIndex}
-            fullWidth={true}
-          />
+
+  const {cols: columns, groups: columnGroupingModel} = useMemo(() => {
+    let groups: GridColumnGroupingModel = [];
+    const cols: GridColDef[] = [
+      basicField('object', 'Object', {
+        hideable: false,
+        renderCell: cellParams => {
+          // Icon to indicate navigation to the object version
+          const obj: ObjectVersionSchema = cellParams.row.obj;
+          return (
+            <ObjectVersionLink
+              entityName={obj.entity}
+              projectName={obj.project}
+              objectName={obj.objectId}
+              version={obj.versionHash}
+              versionIndex={obj.versionIndex}
+              fullWidth={true}
+            />
+          );
+        },
+      }),
+    ];
+
+    cols.push(
+      basicField('baseObjectClass', 'Category', {
+        width: 100,
+        valueGetter: cellParams => {
+          return cellParams.row.obj.baseObjectClass;
+        },
+        renderCell: cellParams => {
+          const category = cellParams.value;
+          if (category === 'Model' || category === 'Dataset') {
+            return <TypeVersionCategoryChip baseObjectClass={category} />;
+          }
+          return null;
+        },
+      })
+    );
+
+    if (!props.usingLatestFilter) {
+      const dynamicFields: string[] = [];
+      const dynamicFieldSet = new Set<string>();
+      rows.forEach(r => {
+        Object.keys(r.obj.val).forEach(k => {
+          if (!dynamicFieldSet.has(k)) {
+            dynamicFieldSet.add(k);
+            dynamicFields.push(k);
+          }
+        });
+      });
+
+      console.log(rows);
+
+      const {cols: newCols, groupingModel} =
+        buildDynamicColumns<ObjectVersionSchema>(
+          dynamicFields,
+          col => false,
+          col => false,
+          col => false,
+          col => false,
+          col => false,
+          col => false,
+          (row, key) => (row as any)?.obj?.val?.[key]
         );
-      },
-    }),
-    basicField('baseObjectClass', 'Category', {
-      width: 100,
-      renderCell: cellParams => {
-        const category = cellParams.value;
-        if (category === 'Model' || category === 'Dataset') {
-          return <TypeVersionCategoryChip baseObjectClass={category} />;
-        }
-        return null;
-      },
-    }),
-    basicField('createdAtMs', 'Created', {
-      width: 100,
-      renderCell: cellParams => {
-        const createdAtMs = cellParams.value;
-        return <Timestamp value={createdAtMs / 1000} format="relative" />;
-      },
-    }),
-    ...(props.usingLatestFilter
-      ? [
-          basicField('peerVersions', 'Versions', {
-            width: 100,
-            sortable: false,
-            filterable: false,
-            renderCell: cellParams => {
-              const obj: ObjectVersionSchema = cellParams.row.obj;
-              return <PeerVersionsLink obj={obj} />;
-            },
-          }),
-        ]
-      : []),
-  ];
-  const columnGroupingModel: GridColumnGroupingModel = [];
+      cols.push(...newCols);
+      groups = groupingModel;
+    }
+
+    cols.push(
+      basicField('createdAtMs', 'Created', {
+        width: 100,
+        valueGetter: cellParams => {
+          return cellParams.row.obj.createdAtMs;
+        },
+        renderCell: cellParams => {
+          const createdAtMs = cellParams.value;
+          return <Timestamp value={createdAtMs / 1000} format="relative" />;
+        },
+      })
+    );
+    if (props.usingLatestFilter) {
+      cols.push(
+        basicField('peerVersions', 'Versions', {
+          width: 100,
+          sortable: false,
+          filterable: false,
+          renderCell: cellParams => {
+            const obj: ObjectVersionSchema = cellParams.row.obj;
+            return <PeerVersionsLink obj={obj} />;
+          },
+        })
+      );
+    }
+
+    return {cols, groups};
+  }, [props.usingLatestFilter, rows]);
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();

@@ -9,6 +9,7 @@ import {
   GridColumnGroupingModel,
   GridColumnNode,
   GridRenderCellParams,
+  GridValidRowModel,
 } from '@mui/x-data-grid-pro';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
@@ -299,135 +300,19 @@ function buildCallsTableColumns(
     },
   ];
 
-  const tree = buildTree([...filteredDynamicColumnNames]);
-  let groupingModel: GridColumnGroupingModel = tree.children.filter(
-    c => 'groupId' in c
-  ) as GridColumnGroup[];
-
-  const walkGroupingModel = (
-    nodes: GridColumnNode[],
-    fn: (node: GridColumnNode) => GridColumnNode
-  ) => {
-    return nodes.map(node => {
-      node = fn(node);
-      if ('children' in node) {
-        node.children = walkGroupingModel(node.children, fn);
-      }
-      return node;
-    });
-  };
-  const groupIds = new Set<string>();
-  groupingModel = walkGroupingModel(groupingModel, node => {
-    if ('groupId' in node) {
-      const key = node.groupId;
-      groupIds.add(key);
-      if (expandedRefCols.has(key)) {
-        node.renderHeaderGroup = () => {
-          return (
-            <CollapseHeader
-              headerName={key.split('.').slice(-1)[0]}
-              field={key}
-              onCollapse={onCollapse}
-            />
-          );
-        };
-      } else if (columnsWithRefs.has(key)) {
-        node.renderHeaderGroup = () => {
-          return (
-            <ExpandHeader
-              headerName={key.split('.').slice(-1)[0]}
-              field={key}
-              hasExpand
-              onExpand={onExpand}
-            />
-          );
-        };
-      }
-    }
-    return node;
-  }) as GridColumnGroupingModel;
-
-  for (const key of filteredDynamicColumnNames) {
-    const col: GridColDef<TraceCallSchema> = {
-      flex: 1,
-      minWidth: 150,
-      field: key,
-      // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-      filterable: !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-      // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-      sortable: !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-      filterOperators: allOperators,
-      headerName: key,
-      renderHeader: () => {
-        return (
-          <div
-            style={{
-              fontWeight: 600,
-            }}>
-            {key.split('.').slice(-1)[0]}
-          </div>
-        );
-      },
-      valueGetter: cellParams => {
-        const val = (cellParams.row as any)[key];
-        if (Array.isArray(val) || typeof val === 'object') {
-          try {
-            return JSON.stringify(val);
-          } catch {
-            return val;
-          }
-        }
-        return val;
-      },
-      renderCell: cellParams => {
-        const val = (cellParams.row as any)[key];
-        if (val === undefined) {
-          return <NotApplicable />;
-        }
-        return (
-          <ErrorBoundary>
-            {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
-            into `CallValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
-            CallsTable-specific data structure and we might not want to leak that into the
-            rest of the system*/}
-            {isExpandedRefWithValueAsTableRef(val) ? (
-              <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
-            ) : (
-              <CellValue value={val} />
-            )}
-          </ErrorBoundary>
-        );
-      },
-    };
-
-    if (groupIds.has(key)) {
-      col.renderHeader = () => {
-        return <></>;
-      };
-    } else if (expandedRefCols.has(key)) {
-      col.renderHeader = () => {
-        return (
-          <CollapseHeader
-            headerName={key.split('.').slice(-1)[0]}
-            field={key}
-            onCollapse={onCollapse}
-          />
-        );
-      };
-    } else if (columnsWithRefs.has(key)) {
-      col.renderHeader = () => {
-        return (
-          <ExpandHeader
-            headerName={key.split('.').slice(-1)[0]}
-            field={key}
-            hasExpand
-            onExpand={onExpand}
-          />
-        );
-      };
-    }
-    cols.push(col);
-  }
+  const {cols: newCols, groupingModel} = buildDynamicColumns<TraceCallSchema>(
+    filteredDynamicColumnNames,
+    key => expandedRefCols.has(key),
+    key => columnsWithRefs.has(key),
+    onCollapse,
+    onExpand,
+    // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
+    // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
+    (row, key) => (row as any)[key]
+  );
+  cols.push(...newCols);
 
   cols.push({
     field: 'wb_user_id',
@@ -636,4 +521,147 @@ const isExpandedRefWithValueAsTableRef = (
     return false;
   }
   return isTableRef(ref[EXPANDED_REF_VAL_KEY]);
+};
+
+export const buildDynamicColumns = <T extends GridValidRowModel>(
+  filteredDynamicColumnNames: string[],
+  columnIsExpanded: (col: string) => boolean,
+  columnCanBeExpanded: (col: string) => boolean,
+  onCollapse: (col: string) => void,
+  onExpand: (col: string) => void,
+  columnIsFilterable: (col: string) => boolean,
+  columnIsSortable: (col: string) => boolean,
+  valueForKey: (row: T, key: string) => any
+) => {
+  const cols: Array<GridColDef<T>> = [];
+
+  const tree = buildTree([...filteredDynamicColumnNames]);
+  let groupingModel: GridColumnGroupingModel = tree.children.filter(
+    c => 'groupId' in c
+  ) as GridColumnGroup[];
+
+  const walkGroupingModel = (
+    nodes: GridColumnNode[],
+    fn: (node: GridColumnNode) => GridColumnNode
+  ) => {
+    return nodes.map(node => {
+      node = fn(node);
+      if ('children' in node) {
+        node.children = walkGroupingModel(node.children, fn);
+      }
+      return node;
+    });
+  };
+  const groupIds = new Set<string>();
+  groupingModel = walkGroupingModel(groupingModel, node => {
+    if ('groupId' in node) {
+      const key = node.groupId;
+      groupIds.add(key);
+      if (columnIsExpanded(key)) {
+        node.renderHeaderGroup = () => {
+          return (
+            <CollapseHeader
+              headerName={key.split('.').slice(-1)[0]}
+              field={key}
+              onCollapse={onCollapse}
+            />
+          );
+        };
+      } else if (columnCanBeExpanded(key)) {
+        node.renderHeaderGroup = () => {
+          return (
+            <ExpandHeader
+              headerName={key.split('.').slice(-1)[0]}
+              field={key}
+              hasExpand
+              onExpand={onExpand}
+            />
+          );
+        };
+      }
+    }
+    return node;
+  }) as GridColumnGroupingModel;
+
+  for (const key of filteredDynamicColumnNames) {
+    const col: GridColDef<T> = {
+      flex: 1,
+      minWidth: 150,
+      field: key,
+      filterable: columnIsFilterable(key),
+      sortable: columnIsSortable(key),
+      filterOperators: allOperators,
+      headerName: key,
+      renderHeader: () => {
+        return (
+          <div
+            style={{
+              fontWeight: 600,
+            }}>
+            {key.split('.').slice(-1)[0]}
+          </div>
+        );
+      },
+      valueGetter: cellParams => {
+        const val = valueForKey(cellParams.row, key);
+        if (Array.isArray(val) || typeof val === 'object') {
+          try {
+            return JSON.stringify(val);
+          } catch {
+            return val;
+          }
+        }
+        return val;
+      },
+      renderCell: cellParams => {
+        const val = valueForKey(cellParams.row, key);
+        if (val === undefined) {
+          return <NotApplicable />;
+        }
+        return (
+          <ErrorBoundary>
+            {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
+            into `CallValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
+            CallsTable-specific data structure and we might not want to leak that into the
+            rest of the system*/}
+            {isExpandedRefWithValueAsTableRef(val) ? (
+              <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
+            ) : (
+              <CellValue value={val} />
+            )}
+          </ErrorBoundary>
+        );
+      },
+    };
+
+    if (groupIds.has(key)) {
+      col.renderHeader = () => {
+        return <></>;
+      };
+    } else if (columnIsExpanded(key)) {
+      col.renderHeader = () => {
+        return (
+          <CollapseHeader
+            headerName={key.split('.').slice(-1)[0]}
+            field={key}
+            onCollapse={onCollapse}
+          />
+        );
+      };
+    } else if (columnCanBeExpanded(key)) {
+      col.renderHeader = () => {
+        return (
+          <ExpandHeader
+            headerName={key.split('.').slice(-1)[0]}
+            field={key}
+            hasExpand
+            onExpand={onExpand}
+          />
+        );
+      };
+    }
+    cols.push(col);
+  }
+
+  return {cols, groupingModel};
 };
