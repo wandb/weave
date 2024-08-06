@@ -25,6 +25,10 @@ valid_edge_names = (
 )
 
 
+class InvalidInternalRef(ValueError):
+    pass
+
+
 def quote_select(s: str, quote_chars: tuple[str, ...] = ("/", ":", "%")) -> str:
     """We don't need to quote every single character, rather
     we just need to quote the characters that are used as
@@ -46,7 +50,7 @@ def quote_select(s: str, quote_chars: tuple[str, ...] = ("/", ":", "%")) -> str:
 
 def validate_extra(extra: list[str]) -> None:
     if len(extra) % 2 != 0:
-        raise ValueError("Extra fields must be key-value pairs.")
+        raise InvalidInternalRef("Extra fields must be key-value pairs.")
     for i, e in enumerate(extra):
         if i % 2 == 0:
             if e not in (
@@ -55,29 +59,29 @@ def validate_extra(extra: list[str]) -> None:
                 OBJECT_ATTR_EDGE_NAME,
                 TABLE_ROW_ID_EDGE_NAME,
             ):
-                raise ValueError(f"Invalid extra edge name at index {i}: {extra}")
+                raise InvalidInternalRef(
+                    f"Invalid extra edge name at index {i}: {extra}"
+                )
         else:
             # There is only a single rule here:
             if extra[i - 1] == LIST_INDEX_EDGE_NAME:
                 try:
                     int(e)
                 except ValueError:
-                    raise ValueError(f"Invalid list edge value at index {i}: {extra}")
+                    raise InvalidInternalRef(
+                        f"Invalid list edge value at index {i}: {extra}"
+                    )
             pass
 
 
-def validate_no_slashes(s: str) -> None:
+def validate_no_slashes(s: str, field_name: str) -> None:
     if "/" in s:
-        raise ValueError("String cannot contain '/'")
+        raise InvalidInternalRef(f"{field_name} cannot contain '/'")
 
 
-def validate_no_colons(s: str) -> None:
+def validate_no_colons(s: str, field_name: str) -> None:
     if ":" in s:
-        raise ValueError("String cannot contain ':'")
-
-
-class InvalidInternalRef(ValueError):
-    pass
+        raise InvalidInternalRef(f"{field_name} cannot contain ':'")
 
 
 @dataclasses.dataclass
@@ -86,8 +90,8 @@ class InternalTableRef:
     digest: str
 
     def __post_init__(self) -> None:
-        validate_no_slashes(self.project_id)
-        validate_no_slashes(self.digest)
+        validate_no_slashes(self.project_id, "project_id")
+        validate_no_slashes(self.digest, "digest")
 
     def uri(self) -> str:
         return f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/table/{self.digest}"
@@ -101,9 +105,9 @@ class InternalObjectRef:
     extra: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self) -> None:
-        validate_no_slashes(self.project_id)
-        validate_no_slashes(self.version)
-        validate_no_colons(self.version)
+        validate_no_slashes(self.project_id, "project_id")
+        validate_no_slashes(self.version, "version")
+        validate_no_colons(self.version, "version")
         validate_extra(self.extra)
 
     def uri(self) -> str:
@@ -129,8 +133,8 @@ class InternalCallRef:
     extra: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self) -> None:
-        validate_no_slashes(self.project_id)
-        validate_no_slashes(self.id)
+        validate_no_slashes(self.project_id, "project_id")
+        validate_no_slashes(self.id, "id")
         # Note: we don't actually support extra fields for calls, but when
         # we do, we need to add edge names to the known list
         validate_extra(self.extra)
@@ -154,7 +158,7 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
         path = uri[len(f"{WEAVE_SCHEME}:///") :]
         parts = path.split("/")
         if len(parts) < 3:
-            raise ValueError(f"Invalid URI: {uri}. Must have at least 3 parts")
+            raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 3 parts")
         entity, project, kind = parts[:3]
         project_id = f"{entity}/{project}"
         remaining = parts[3:]
