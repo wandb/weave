@@ -18,7 +18,8 @@ from typing import (
 import pydantic
 from requests import HTTPError
 
-from weave import call_context, client_context, trace_sentry, urls, version
+from weave import call_context, trace_sentry, urls, version
+from weave.client_context import weave_client as weave_client_context
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
@@ -125,9 +126,9 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
-    ref = _get_direct_ref(obj)
-    if ref:
+    if ref := _get_direct_ref(obj):
         return ref
+
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
@@ -142,6 +143,12 @@ def map_to_refs(obj: Any) -> Any:
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
+
+    # This path should only be reached if the object is both:
+    # 1. A `WeaveObject`; and
+    # 2. Has been dirtied (edited in any way), causing obj.ref=None
+    elif isinstance(obj, WeaveObject):
+        return map_to_refs(obj._val)
 
     return obj
 
@@ -158,14 +165,15 @@ class Call:
     project_id: str
     parent_id: Optional[str]
     inputs: dict
-    attributes: dict
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
     display_name: Optional[str] = None
+    attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
+
     _feedback: Optional[RefFeedbackQuery] = None
 
     @property
@@ -193,7 +201,7 @@ class Call:
 
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
         return CallsIter(
@@ -203,7 +211,7 @@ class Call:
         )
 
     def delete(self) -> bool:
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
@@ -213,7 +221,7 @@ class Call:
             )
         if name == self.display_name:
             return
-        client = client_context.weave_client.require_weave_client()
+        client = weave_client_context.require_weave_client()
         client._set_call_display_name(call=self, display_name=name)
         self.display_name = name
 
@@ -224,14 +232,20 @@ class Call:
 class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
+    include_costs: bool
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: _CallsFilter,
+        include_costs: bool = False,
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
         self._page_size = 1000
+        self.include_costs = include_costs
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
@@ -244,6 +258,7 @@ class CallsIter:
                 filter=self.filter,
                 offset=index * self._page_size,
                 limit=self._page_size,
+                include_costs=self.include_costs,
             )
         )
         return response.calls
@@ -302,9 +317,9 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        summary=dict(server_call.summary) if server_call.summary else None,
+        summary=dict(server_call.summary if server_call.summary else {}),
         display_name=server_call.display_name,
-        attributes=dict(server_call.attributes),
+        attributes=server_call.attributes,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -319,12 +334,9 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
         for k, v in d.items():
             if isinstance(v, dict):
                 result[k] = sum_dict_leaves([result.get(k, {}), v])
-            elif v is not None:
+            else:
                 result[k] = result.get(k, 0) + v
     return result
-
-
-WEAVE_KEY = "_weave"
 
 
 class WeaveKeyDict(dict):
@@ -334,24 +346,22 @@ class WeaveKeyDict(dict):
     """
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        raise KeyError(
-            f"Cannot modify `{WEAVE_KEY}` dict directly -- for internal use only!"
-        )
+        raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
 
 
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
 
-    The `_weave` key is reserved for internal use and cannot be set directly.
+    The `weave` key is reserved for internal use and cannot be set directly.
     """
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
-        dict.__setitem__(self, WEAVE_KEY, WeaveKeyDict())
+        dict.__setitem__(self, "weave", WeaveKeyDict())
 
         if kwargs:
             for key, value in kwargs.items():
-                if key == WEAVE_KEY:
+                if key == "weave":
                     if isinstance(value, dict):
                         for subkey, subvalue in value.items():
                             self._set_weave_item(subkey, subvalue)
@@ -359,15 +369,13 @@ class AttributesDict(dict):
                     self[key] = value
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        if key == WEAVE_KEY:
-            raise KeyError(
-                f"Cannot set `{WEAVE_KEY}` directly -- for internal use only!"
-            )
+        if key == "weave":
+            raise KeyError("Cannot set 'weave' directly -- for internal use only!")
         super().__setitem__(key, value)
 
     def _set_weave_item(self, subkey: Any, value: Any) -> None:
-        """Internal method to set items in the '_weave' subdictionary."""
-        dict.__setitem__(self[WEAVE_KEY], subkey, value)
+        """Internal method to set items in the 'weave' subdictionary."""
+        dict.__setitem__(self["weave"], subkey, value)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"
@@ -461,18 +469,25 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
+    def calls(
+        self,
+        filter: Optional[_CallsFilter] = None,
+        include_costs: Optional[bool] = False,
+    ) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
 
-        return CallsIter(self.server, self._project_id(), filter)
+        return CallsIter(
+            self.server, self._project_id(), filter, include_costs or False
+        )
 
     @trace_sentry.global_trace_sentry.watch()
-    def call(self, call_id: str) -> WeaveObject:
+    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
                 filter=_CallsFilter(call_ids=[call_id]),
+                include_costs=include_costs,
             )
         )
         if not response.calls:
@@ -588,9 +603,7 @@ class WeaveClient:
         # Summary handling
         summary = {}
         if call._children:
-            summary = sum_dict_leaves(
-                [child.summary for child in call._children if child.summary]
-            )
+            summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
             isinstance(original_output, dict)
             and "usage" in original_output
@@ -745,6 +758,9 @@ class WeaveClient:
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
+        if getattr(val, "_is_dirty", False):
+            val.ref = None
+
         is_opdef = isinstance(val, Op)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):

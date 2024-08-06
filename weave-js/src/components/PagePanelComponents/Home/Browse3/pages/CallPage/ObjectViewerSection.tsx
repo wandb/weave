@@ -1,7 +1,13 @@
 import Box from '@mui/material/Box';
 import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useContext, useMemo, useState} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import styled from 'styled-components';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
@@ -86,9 +92,7 @@ const ObjectViewerSectionNonEmpty = ({
   isExpanded,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
-  const [mode, setMode] = useState(
-    isSimpleData(data) || isExpanded ? 'expanded' : 'collapsed'
-  );
+  const [mode, setMode] = useState('collapsed');
   const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   const body = useMemo(() => {
@@ -152,6 +156,18 @@ const ObjectViewerSectionNonEmpty = ({
     setMode('expanded');
     setExpandedIds(getGroupIds());
   };
+
+  // On first render and when data changes, recompute expansion state
+  useEffect(() => {
+    const isSimple = isSimpleData(data);
+    const newMode = isSimple || isExpanded ? 'expanded' : 'collapsed';
+    if (newMode === 'expanded') {
+      onClickExpanded();
+    } else {
+      onClickCollapsed();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, isExpanded]);
 
   return (
     <>

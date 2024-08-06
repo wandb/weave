@@ -23,7 +23,7 @@ def generate_start(id) -> tsi.StartedCallSchemaForInsert:
         parent_id="test_parent_id",
         started_at=datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
-        attributes={"a": 5, "_weave": None},
+        attributes={"a": 5},
         inputs={"b": 5},
     )
 

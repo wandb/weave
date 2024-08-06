@@ -1,6 +1,10 @@
 import _ from 'lodash';
 
 import {
+  FeedbackCreateReq,
+  FeedbackCreateRes,
+  FeedbackPurgeReq,
+  FeedbackPurgeRes,
   TraceCallsDeleteReq,
   TraceCallUpdateReq,
   TraceRefsReadBatchReq,
@@ -19,6 +23,7 @@ export class TraceServerClient extends DirectTraceServerClient {
   }> = [];
   private onDeleteListeners: Array<() => void>;
   private onRenameListeners: Array<() => void>;
+  private onFeedbackListeners: Record<string, Array<() => void>>;
 
   constructor(baseUrl: string) {
     super(baseUrl);
@@ -26,6 +31,7 @@ export class TraceServerClient extends DirectTraceServerClient {
     this.scheduleReadBatch();
     this.onDeleteListeners = [];
     this.onRenameListeners = [];
+    this.onFeedbackListeners = {};
   }
 
   /**
@@ -52,6 +58,25 @@ export class TraceServerClient extends DirectTraceServerClient {
       );
     };
   }
+  public registerOnFeedbackListener(
+    weaveRef: string,
+    callback: () => void
+  ): () => void {
+    if (!(weaveRef in this.onFeedbackListeners)) {
+      this.onFeedbackListeners[weaveRef] = [];
+    }
+    this.onFeedbackListeners[weaveRef].push(callback);
+    return () => {
+      const newListeners = this.onFeedbackListeners[weaveRef].filter(
+        listener => listener !== callback
+      );
+      if (newListeners.length) {
+        this.onFeedbackListeners[weaveRef] = newListeners;
+      } else {
+        delete this.onFeedbackListeners[weaveRef];
+      }
+    };
+  }
 
   public callsDelete(req: TraceCallsDeleteReq): Promise<void> {
     const res = super.callsDelete(req).then(() => {
@@ -63,6 +88,27 @@ export class TraceServerClient extends DirectTraceServerClient {
   public callUpdate(req: TraceCallUpdateReq): Promise<void> {
     const res = super.callUpdate(req).then(() => {
       this.onRenameListeners.forEach(listener => listener());
+    });
+    return res;
+  }
+
+  public feedbackCreate(req: FeedbackCreateReq): Promise<FeedbackCreateRes> {
+    const res = super.feedbackCreate(req).then(createRes => {
+      const listeners = this.onFeedbackListeners[req.weave_ref] ?? [];
+      listeners.forEach(listener => listener());
+      return createRes;
+    });
+    return res;
+  }
+  public feedbackPurge(req: FeedbackPurgeReq): Promise<FeedbackPurgeRes> {
+    const res = super.feedbackPurge(req).then(purgeRes => {
+      // TODO: Since purge takes a query, we need to change the result to include
+      //       information about the refs that were modified.
+      //       For now, just call all registered feedback listeners.
+      for (const listeners of Object.values(this.onFeedbackListeners)) {
+        listeners.forEach(listener => listener());
+      }
+      return purgeRes;
     });
     return res;
   }

@@ -38,22 +38,26 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from pydantic import BaseModel
 
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     combine_conditions,
 )
-from weave.trace_server.trace_server_common import (
-    make_call_status_from_exception_and_ended_at,
-    op_name_simple_from_ref_str,
-)
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
 from . import refs_internal
 from . import trace_server_interface as tsi
+from .clickhouse_schema import (
+    CallDeleteCHInsertable,
+    CallEndCHInsertable,
+    CallStartCHInsertable,
+    CallUpdateCHInsertable,
+    ObjCHInsertable,
+    SelectableCHCallSchema,
+    SelectableCHObjSchema,
+)
 from .emoji_util import detone_emojis
 from .errors import InvalidRequest, RequestTooLarge
 from .feedback import (
@@ -85,96 +89,12 @@ class NotFoundError(Exception):
     pass
 
 
-class CallStartCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    trace_id: str
-    parent_id: typing.Optional[str] = None
-    op_name: str
-    started_at: datetime.datetime
-    attributes_dump: str
-    inputs_dump: str
-    input_refs: typing.List[str]
-    output_refs: typing.List[str] = []  # sadly, this is required
-    display_name: typing.Optional[str] = None
-
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
-
-
-class CallEndCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    ended_at: datetime.datetime
-    exception: typing.Optional[str] = None
-    summary_dump: str
-    output_dump: str
-    input_refs: typing.List[str] = []  # sadly, this is required
-    output_refs: typing.List[str]
-
-
-class CallDeleteCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    wb_user_id: str
-
-    deleted_at: datetime.datetime
-
-    # required types
-    input_refs: typing.List[str] = []
-    output_refs: typing.List[str] = []
-
-
-class CallUpdateCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    wb_user_id: str
-
-    # update types
-    display_name: typing.Optional[str] = None
-
-    # required types
-    input_refs: typing.List[str] = []
-    output_refs: typing.List[str] = []
-
-
 CallCHInsertable = typing.Union[
     CallStartCHInsertable,
     CallEndCHInsertable,
     CallDeleteCHInsertable,
     CallUpdateCHInsertable,
 ]
-
-
-# Very critical that this matches the calls table schema! This should
-# essentially be the DB version of CallSchema with the addition of the
-# created_at and updated_at fields
-class SelectableCHCallSchema(BaseModel):
-    project_id: str
-    id: str
-
-    op_name: str
-    display_name: typing.Optional[str] = None
-
-    trace_id: str
-    parent_id: typing.Optional[str] = None
-
-    started_at: datetime.datetime
-    ended_at: typing.Optional[datetime.datetime] = None
-    exception: typing.Optional[str] = None
-
-    attributes_dump: str
-    inputs_dump: str
-    output_dump: typing.Optional[str] = None
-    summary_dump: typing.Optional[str] = None
-
-    input_refs: typing.List[str]
-    output_refs: typing.List[str]
-
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
-
-    deleted_at: typing.Optional[datetime.datetime] = None
 
 
 all_call_insert_columns = list(
@@ -197,30 +117,6 @@ call_select_raw_columns = ["id", "project_id"]  # no aggregation
 call_select_arrays_columns = ["input_refs", "output_refs"]  # array_concat_agg
 call_select_argmax_columns = ["display_name"]  # argMaxMerge
 # all others use `any`
-
-
-class ObjCHInsertable(BaseModel):
-    project_id: str
-    kind: str
-    base_object_class: typing.Optional[str]
-    object_id: str
-    refs: typing.List[str]
-    val_dump: str
-    digest: str
-
-
-class SelectableCHObjSchema(BaseModel):
-    project_id: str
-    object_id: str
-    created_at: datetime.datetime
-    refs: typing.List[str]
-    val_dump: str
-    kind: str
-    base_object_class: typing.Optional[str]
-    digest: str
-    version_index: int
-    is_latest: int
-
 
 all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
 all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
@@ -311,7 +207,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     call_ids=[req.id],
                 ),
                 limit=1,
-                add_cost=req.add_cost,
+                include_costs=req.include_costs,
             )
         )
         try:
@@ -352,19 +248,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        cq = CallsQuery(project_id=req.project_id)
-        cq.add_cost(req.add_cost or False)
+        cq = CallsQuery(
+            project_id=req.project_id, include_costs=req.include_costs or False
+        )
 
         # TODO (Perf): By allowing a sub-selection of columns
         # we will gain increased performance by not having to
         # fetch all columns from the database. Currently all use
         # cases call for every column to be fetched, so we have not
         # implemented this yet.
+        columns = all_call_select_columns
         # We put summary_dump last so that when we compute the costs and summary its in the right place
-        columns = [
-            *[col for col in all_call_select_columns if col != "summary_dump"],
-            "summary_dump",
-        ]
+        if req.include_costs:
+            columns = [
+                *[col for col in all_call_select_columns if col != "summary_dump"],
+                "summary_dump",
+            ]
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -1418,34 +1317,6 @@ def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
     return val if val != "" else None
 
 
-def _make_derived_summary_map(
-    summary_dump: typing.Optional[dict],
-    started_at: typing.Optional[datetime.datetime],
-    ended_at: typing.Optional[datetime.datetime],
-    exception: typing.Optional[str],
-    display_name: typing.Optional[str],
-    op_name: typing.Optional[str],
-) -> tsi.SummaryMap:
-    status = make_call_status_from_exception_and_ended_at(exception, ended_at)
-    latency = (
-        None if not ended_at or not started_at else (ended_at - started_at).microseconds
-    )
-    display_name = display_name or op_name_simple_from_ref_str(op_name)
-    summary = summary_dump or {}
-    if "_weave" not in summary:
-        summary["_weave"] = {"costs": None}
-    elif "costs" not in summary["_weave"]:
-        summary["_weave"]["costs"] = None
-    weave_derived_fields = tsi.WeaveSummarySchema(
-        nice_trace_name=display_name,
-        status=status,
-        latency=latency,
-        costs=summary["_weave"]["costs"],
-    )
-    summary["_weave"] = weave_derived_fields
-    return typing.cast(tsi.SummaryMap, summary)
-
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1458,14 +1329,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=_make_derived_summary_map(
-            _nullable_any_dump_to_any(ch_call.summary_dump),
-            _ensure_datetimes_have_tz(ch_call.started_at),
-            _ensure_datetimes_have_tz(ch_call.ended_at),
-            ch_call.exception,
-            _empty_str_to_none(ch_call.display_name),
-            ch_call.op_name,
-        ),
+        summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
@@ -1475,11 +1339,6 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
 
 # Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
-    attributes = _dict_dump_to_dict(ch_call_dict["attributes_dump"])
-    # Ensure _weave is included in attributes
-    if "_weave" not in attributes:
-        attributes["_weave"] = None  # or some default value if appropriate
-
     return dict(
         project_id=ch_call_dict.get("project_id"),
         id=ch_call_dict.get("id"),
@@ -1488,17 +1347,10 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         op_name=ch_call_dict.get("op_name"),
         started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
         ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-        attributes=attributes,
+        attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=_make_derived_summary_map(
-            _nullable_any_dump_to_any(ch_call_dict.get("summary_dump")),
-            _ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
-            _ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-            ch_call_dict.get("exception"),
-            _empty_str_to_none(ch_call_dict.get("display_name")),
-            ch_call_dict.get("op_name"),
-        ),
+        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
@@ -1534,7 +1386,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         parent_id=start_call.parent_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
-        attributes_dump=_dict_value_to_dump(dict(start_call.attributes)),
+        attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,

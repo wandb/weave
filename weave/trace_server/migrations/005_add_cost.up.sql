@@ -43,7 +43,17 @@ CREATE TABLE llm_token_prices (
     /*
     `completion_token_cost_unit`: The unit of completion token cost in the specified LLM.
     */
-    completion_token_cost_unit String
+    completion_token_cost_unit String,
+
+    /*
+    `inserted_by`: User ID of the user who inserted the record, or the system if the record was inserted by the system.
+    */
+    inserted_by String,
+
+    /*
+    `inserted_at`: When the record was inserted.
+    */
+    inserted_at DateTime64(3) DEFAULT now64(3),
 
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (pricing_level, pricing_level_id, provider_id, llm_id, effective_date);

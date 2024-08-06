@@ -19,26 +19,6 @@ class ExtraKeysTypedDict(TypedDict):
 # https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
 ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
-cost_string_fields = [
-    "prompt_token_cost_unit",
-    "completion_token_cost_unit",
-    "effective_date",
-    "provider_id",
-    "pricing_level",
-    "pricing_level_id",
-]
-
-cost_numeric_fields = [
-    "prompt_token_cost",
-    "completion_token_cost",
-    "prompt_tokens_cost",
-    "completion_tokens_cost",
-    "prompt_tokens",
-    "completion_tokens",
-    "requests",
-    "total_tokens",
-]
-
 
 class LLMUsageSchema(TypedDict, total=False):
     prompt_tokens: typing.Optional[int]
@@ -70,11 +50,11 @@ class WeaveSummarySchema(ExtraKeysTypedDict):
 
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
-    usage: typing.Optional[typing.Dict[str, LLMUsageSchema]]
+    usage: typing.Dict[str, LLMUsageSchema]
 
 
-class SummaryMap(SummaryInsertMap):
-    _weave: typing.Optional[WeaveSummarySchema]
+class SummaryMap(SummaryInsertMap, total=False):
+    weave: typing.Optional[WeaveSummarySchema]
 
 
 class WeaveAttributeSchema(TypedDict):
@@ -86,42 +66,38 @@ class WeaveAttributeSchema(TypedDict):
     sys_version: typing.Optional[str]
 
 
-class AttributeMap(ExtraKeysTypedDict):
-    _weave: typing.Optional[WeaveAttributeSchema]
-
-
 class CallSchema(BaseModel):
     id: str
     project_id: str
 
-    # Name of the calling function (op)
+    ## Name of the calling function (op)
     op_name: str
-    # Optional display name of the call
+    ## Optional display name of the call
     display_name: typing.Optional[str] = None
 
-    # Trace ID
+    ## Trace ID
     trace_id: str
-    # Parent ID is optional because the call may be a root
+    ## Parent ID is optional because the call may be a root
     parent_id: typing.Optional[str] = None
 
-    # Start time is required
+    ## Start time is required
     started_at: datetime.datetime
-    # Attributes: properties of the call
-    attributes: AttributeMap
+    ## Attributes: properties of the call
+    attributes: typing.Dict[str, typing.Any]
 
-    # Inputs
+    ## Inputs
     inputs: typing.Dict[str, typing.Any]
 
-    # End time is required if finished
+    ## End time is required if finished
     ended_at: typing.Optional[datetime.datetime] = None
 
-    # Exception is present if the call failed
+    ## Exception is present if the call failed
     exception: typing.Optional[str] = None
 
-    # Outputs
+    ## Outputs
     output: typing.Optional[typing.Any] = None
 
-    # Summary: a summary of the call
+    ## Summary: a summary of the call
     summary: typing.Optional[SummaryMap] = None
 
     # WB Metadata
@@ -149,28 +125,22 @@ class StartedCallSchemaForInsert(BaseModel):
     # Optional display name of the call
     display_name: typing.Optional[str] = None
 
-    # Trace ID
+    ## Trace ID
     trace_id: typing.Optional[str] = None  # Will be generated if not provided
-    # Parent ID is optional because the call may be a root
+    ## Parent ID is optional because the call may be a root
     parent_id: typing.Optional[str] = None
 
-    # Start time is required
+    ## Start time is required
     started_at: datetime.datetime
-    # Attributes: properties of the call
-    attributes: AttributeMap
+    ## Attributes: properties of the call
+    attributes: typing.Dict[str, typing.Any]
 
-    # Inputs
+    ## Inputs
     inputs: typing.Dict[str, typing.Any]
 
     # WB Metadata
     wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: typing.Optional[str] = None
-
-    @field_serializer("attributes")
-    def serialize_typed_dicts(
-        self, v: typing.Dict[str, typing.Any]
-    ) -> typing.Dict[str, typing.Any]:
-        return dict(v)
 
 
 class EndedCallSchemaForInsert(BaseModel):
@@ -240,7 +210,7 @@ class CallEndRes(BaseModel):
 class CallReadReq(BaseModel):
     project_id: str
     id: str
-    add_cost: typing.Optional[bool] = False
+    include_costs: typing.Optional[bool] = False
 
 
 class CallReadRes(BaseModel):
@@ -288,7 +258,11 @@ class CallsQueryReq(BaseModel):
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[_SortBy]] = None
     query: typing.Optional[Query] = None
-    add_cost: typing.Optional[bool] = False
+    include_costs: typing.Optional[bool] = False
+
+    # TODO: type this with call schema columns, following the same rules as
+    # _SortBy and thus GetFieldOperator.get_field_ (without direction)
+    columns: typing.Optional[typing.List[str]] = None
 
 
 class CallsQueryRes(BaseModel):
