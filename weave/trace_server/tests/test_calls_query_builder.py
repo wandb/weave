@@ -282,10 +282,9 @@ def assert_sql(cq: CallsQuery, exp_query, exp_params):
 
 
 def test_query_light_column_with_costs() -> None:
-    cq = CallsQuery(project_id="project")
+    cq = CallsQuery(project_id="project", include_costs=True)
     cq.add_field("id")
     cq.add_field("started_at")
-    cq.add_costs(should_add_costs=True)
     cq.set_hardcoded_filter(
         HardCodedFilter(
             filter=tsi._CallsFilter(

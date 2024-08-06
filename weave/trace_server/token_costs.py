@@ -1,5 +1,28 @@
+from datetime import datetime
+
 from . import trace_server_interface as tsi
-from .orm import Column, ParamBuilder, PreparedSelect, Table
+from .clickhouse_schema import SelectableCHCallSchema
+from .orm import Column, ColumnType, ParamBuilder, PreparedSelect, Table
+
+cost_string_fields = [
+    "prompt_token_cost_unit",
+    "completion_token_cost_unit",
+    "effective_date",
+    "provider_id",
+    "pricing_level",
+    "pricing_level_id",
+]
+
+cost_numeric_fields = [
+    "prompt_token_cost",
+    "completion_token_cost",
+    "prompt_tokens_cost",
+    "completion_tokens_cost",
+    "prompt_tokens",
+    "completion_tokens",
+    "requests",
+    "total_tokens",
+]
 
 LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="pricing_level", type="string"),
@@ -17,30 +40,20 @@ LLM_TOKEN_PRICES_TABLE = Table(
     name=LLM_TOKEN_PRICES_TABLE_NAME, cols=LLM_TOKEN_PRICES_COLUMNS
 )
 
-CALLS_MERGED_COLUMNS = [
-    Column(name="project_id", type="string"),
-    Column(name="id", type="string"),
-    Column(name="trace_id", type="string"),
-    Column(name="parent_id", type="string"),
-    Column(name="op_name", type="string"),
-    Column(name="started_at", type="datetime"),
-    Column(name="attributes_dump", type="string"),
-    Column(name="inputs_dump", type="string"),
-    Column(name="ended_at", type="datetime"),
-    Column(name="output_dump", type="string"),
-    Column(name="summary_dump", type="string"),
-    Column(name="exception", type="string"),
-    Column(name="wb_user_id", type="string"),
-    Column(name="wb_run_id", type="string"),
-    Column(name="deleted_at", type="datetime"),
-    Column(name="display_name", type="string"),
-    Column(name="input_refs", type="string"),
-    Column(name="output_refs", type="string"),
-]
+
+def get_calls_merged_columns() -> list[Column]:
+    fields = SelectableCHCallSchema.model_fields.items()
+    columns = []
+    for field_name, field_info in fields:
+        field_type: ColumnType = "string"
+        if field_info.annotation == datetime:
+            field_type = "datetime"
+        columns.append(Column(name=field_name, type=field_type))
+    return columns
 
 
 def calls_merged_table(table_alias: str) -> Table:
-    return Table(table_alias, CALLS_MERGED_COLUMNS)
+    return Table(table_alias, get_calls_merged_columns())
 
 
 LLM_USAGE_COLUMNS = [
@@ -84,7 +97,7 @@ LLM_USAGE_COLUMNS = [
 # From a calls table alias, get the usage data for LLMs
 def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSelect:
     cols = [
-        *CALLS_MERGED_COLUMNS,
+        *get_calls_merged_columns(),
         # Derived cols that we will select
         Column(name="usage_raw", type="string"),
         Column(name="kv", type="string"),
@@ -354,11 +367,11 @@ def final_call_select_with_cost(
     numeric_fields_str = " ".join(
         [
             f""" '"{field}":', toString({field}), ',', """
-            for field in tsi.cost_numeric_fields
+            for field in cost_numeric_fields
         ]
     )
     string_fields_str = """ '",', """.join(
-        [f""" '"{field}":"', toString({field}), """ for field in tsi.cost_string_fields]
+        [f""" '"{field}":"', toString({field}), """ for field in cost_string_fields]
     )
 
     cost_snippet = f"""

@@ -217,7 +217,7 @@ class CallsQuery(BaseModel):
     order_fields: list[OrderField] = Field(default_factory=list)
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
-    should_add_cost: bool = False
+    include_costs: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
         self.select_fields.append(get_field_by_name(field))
@@ -275,8 +275,8 @@ class CallsQuery(BaseModel):
             offset=self.offset,
         )
 
-    def add_cost(self, should_add_cost: bool) -> "CallsQuery":
-        self.should_add_cost = should_add_cost
+    def set_include_costs(self, include_costs: bool) -> "CallsQuery":
+        self.include_costs = include_costs
         return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
@@ -399,7 +399,7 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.should_add_cost:
+        if not should_optimize and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
 
         # If so, build the two queries
@@ -437,7 +437,7 @@ class CallsQuery(BaseModel):
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
         """
 
-        if self.should_add_cost:
+        if self.include_costs:
             raw_sql += f""",
             all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
             {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields])}
