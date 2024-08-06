@@ -1545,8 +1545,8 @@ def test_unknown_attribute(client):
 
 
 # Note: this test only works with the `trace_init_client` fixture
-def test_ref_get_no_client(init_client):
-    trace_client = init_client.client
+def test_ref_get_no_client(trace_init_client):
+    trace_client = trace_init_client.client
     data = weave.publish(42)
     data_got = weave.ref(data.uri()).get()
     assert data_got == 42
