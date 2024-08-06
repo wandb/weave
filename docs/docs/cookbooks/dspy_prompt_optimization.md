@@ -194,12 +194,18 @@ evaluation = weave.Evaluation(
 await evaluation.evaluate(baseline_module.forward)
 ```
 
+:::note
 If you're running from a python script, you can use the following code to run the evaluation:
 
 ```python
 import asyncio
 asyncio.run(evaluation.evaluate(baseline_module.forward))
 ```
+:::
+
+:::warning
+Running the evaluation causal reasoning dataset will cost approximately $0.24 in OpenAI credits.
+:::
 
 ## Optimizing our DSPy Program
 
@@ -227,6 +233,10 @@ def get_optimized_program(model: dspy.Module, metadata: Metadata) -> dspy.Module
 
 optimized_module = get_optimized_program(baseline_module, metadata)
 ```
+
+:::warning
+Running the evaluation causal reasoning dataset will cost approximately $0.04 in OpenAI credits.
+:::
 
 | ![](./assets/dspy_prompt_optimization/dspy_compile.png) |
 |---|
