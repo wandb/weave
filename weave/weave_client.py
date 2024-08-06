@@ -235,7 +235,11 @@ class CallsIter:
     include_costs: bool
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter, include_costs: bool = False
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: _CallsFilter,
+        include_costs: bool = False,
     ) -> None:
         self.server = server
         self.project_id = project_id
@@ -465,11 +469,17 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None, include_costs: Optional[bool] = False) -> CallsIter:
+    def calls(
+        self,
+        filter: Optional[_CallsFilter] = None,
+        include_costs: Optional[bool] = False,
+    ) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
 
-        return CallsIter(self.server, self._project_id(), filter, include_costs)
+        return CallsIter(
+            self.server, self._project_id(), filter, include_costs or False
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
