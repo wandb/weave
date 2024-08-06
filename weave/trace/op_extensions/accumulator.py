@@ -19,12 +19,139 @@ S = TypeVar("S")
 V = TypeVar("V")
 
 
+
+_OnYieldType = Callable[[V], None]
+_OnErrorType = Callable[[Exception], None]
+_OnCloseType = Callable[[], None]
+
+
+class _IteratorWrapper(Generic[V]):
+    """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
+    that this class will be helpful in other contexts and might be moved to a more general location in the future."""
+
+    def __init__(
+        self,
+        iterator_or_ctx_manager: Union[Iterator, AsyncIterator],
+        on_yield: _OnYieldType,
+        on_error: _OnErrorType,
+        on_close: _OnCloseType,
+    ) -> None:
+        self._iterator_or_ctx_manager = iterator_or_ctx_manager
+        self._on_yield = on_yield
+        self._on_error = on_error
+        self._on_close = on_close
+        self._on_finished_called = False
+
+        atexit.register(weakref.WeakMethod(self._call_on_close_once))
+
+    def _call_on_close_once(self) -> None:
+        if not self._on_finished_called:
+            self._on_close()  # type: ignore
+            self._on_finished_called = True
+
+    def _call_on_error_once(self, e: Exception) -> None:
+        if not self._on_finished_called:
+            self._on_error(e)
+            self._on_finished_called = True
+
+    def __iter__(self) -> "_IteratorWrapper":
+        return self
+
+    def __next__(self) -> Generator[None, None, V]:
+        if not hasattr(self._iterator_or_ctx_manager, "__next__"):
+            raise TypeError(
+                f"Cannot call next on an iterator of type {type(self._iterator_or_ctx_manager)}"
+            )
+        try:
+            value = next(self._iterator_or_ctx_manager)  # type: ignore
+            self._on_yield(value)
+            return value
+        except (StopIteration, StopAsyncIteration) as e:
+            self._call_on_close_once()
+            raise
+        except Exception as e:
+            self._call_on_error_once(e)
+            raise
+
+    def __aiter__(self) -> "_IteratorWrapper":
+        return self
+
+    async def __anext__(self) -> Generator[None, None, V]:
+        if not hasattr(self._iterator_or_ctx_manager, "__anext__"):
+            raise TypeError(
+                f"Cannot call anext on an iterator of type {type(self._iterator_or_ctx_manager)}"
+            )
+        try:
+            value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
+            self._on_yield(value)
+            return value
+        except (StopAsyncIteration, StopIteration) as e:
+            self._call_on_close_once()
+            raise StopAsyncIteration
+        except Exception as e:
+            self._call_on_error_once(e)
+            raise
+
+    def __del__(self) -> None:
+        self._call_on_close_once()
+
+    def close(self) -> None:
+        self._call_on_close_once()
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate all other attributes to the wrapped iterator."""
+        if name in [
+            "_iterator_or_ctx_manager",
+            "_on_yield",
+            "_on_error",
+            "_on_close",
+            "_on_finished_called",
+            "_call_on_error_once",
+        ]:
+            return object.__getattribute__(self, name)
+        return getattr(self._iterator_or_ctx_manager, name)
+
+    def __enter__(self) -> "_IteratorWrapper":
+        if hasattr(self._iterator_or_ctx_manager, "__enter__"): 
+            # let's enter the context manager to get the stream iterator
+            self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.__enter__()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[Exception],
+        exc_value: Optional[BaseException],
+        traceback: Optional[Any],
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        if hasattr(self._iterator_or_ctx_manager, "__exit__"): #case where is a context mngr
+            self._iterator_or_ctx_manager.__exit__(exc_type, exc_value, traceback)
+        self._call_on_close_once()
+
+    async def __aenter__(self) -> "_IteratorWrapper":
+        if hasattr(self._iterator_or_ctx_manager, "__aenter__"): # let's enter the context manager
+            self._iterator_or_ctx_manager = await self._iterator_or_ctx_manager.__aenter__()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Exception],
+        exc_value: Optional[BaseException],
+        traceback: Optional[Any],
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        self._call_on_close_once()
+
+
 def add_accumulator(
     op: Op,
     make_accumulator: Callable[[Dict], Callable[[S, V], S]],
     *,
     should_accumulate: Optional[Callable[[Dict], bool]] = None,
     on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
+    iterator_wrapper: "_IteratorWrapper" = _IteratorWrapper,
 ) -> Op:
     """This is to be used internally only - specifically designed for integrations with streaming libraries.
 
@@ -65,7 +192,7 @@ def add_accumulator(
             # we build the accumulator here dependent on the inputs (optional)
             accumulator = make_accumulator(inputs)
             return _build_iterator_from_accumulator_for_op(
-                value, accumulator, wrapped_on_finish
+                value, accumulator, wrapped_on_finish, iterator_wrapper,
             )
         else:
             wrapped_on_finish(value)
@@ -79,6 +206,7 @@ def _build_iterator_from_accumulator_for_op(
     value: Iterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
+    iterator_wrapper: "_IteratorWrapper" = _IteratorWrapper,
 ) -> "_IteratorWrapper":
     acc: _Accumulator = _Accumulator(accumulator)
 
@@ -91,7 +219,7 @@ def _build_iterator_from_accumulator_for_op(
     def on_close() -> None:
         on_finish(acc.get_state(), None)
 
-    return _IteratorWrapper(value, on_yield, on_error, on_close)
+    return iterator_wrapper(value, on_yield, on_error, on_close)
 
 
 class _Accumulator(Generic[S, V]):
@@ -118,126 +246,3 @@ class _Accumulator(Generic[S, V]):
     def get_state(self) -> Optional[S]:
         return self._state
 
-
-_OnYieldType = Callable[[V], None]
-_OnErrorType = Callable[[Exception], None]
-_OnCloseType = Callable[[], None]
-
-
-class _IteratorWrapper(Generic[V]):
-    """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
-    that this class will be helpful in other contexts and might be moved to a more general location in the future."""
-
-    def __init__(
-        self,
-        iterator: Union[Iterator, AsyncIterator],
-        on_yield: _OnYieldType,
-        on_error: _OnErrorType,
-        on_close: _OnCloseType,
-    ) -> None:
-        self._iterator = iterator
-        self._on_yield = on_yield
-        self._on_error = on_error
-        self._on_close = on_close
-        self._on_finished_called = False
-
-        atexit.register(weakref.WeakMethod(self._call_on_close_once))
-
-    def _call_on_close_once(self) -> None:
-        if not self._on_finished_called:
-            self._on_close()  # type: ignore
-            self._on_finished_called = True
-
-    def _call_on_error_once(self, e: Exception) -> None:
-        if not self._on_finished_called:
-            self._on_error(e)
-            self._on_finished_called = True
-
-    def __iter__(self) -> "_IteratorWrapper":
-        return self
-
-    def __next__(self) -> Generator[None, None, V]:
-        if not hasattr(self._iterator, "__next__"):
-            raise TypeError(
-                f"Cannot call next on an iterator of type {type(self._iterator)}"
-            )
-        try:
-            value = next(self._iterator)  # type: ignore
-            self._on_yield(value)
-            return value
-        except (StopIteration, StopAsyncIteration) as e:
-            self._call_on_close_once()
-            raise
-        except Exception as e:
-            self._call_on_error_once(e)
-            raise
-
-    def __aiter__(self) -> "_IteratorWrapper":
-        return self
-
-    async def __anext__(self) -> Generator[None, None, V]:
-        if not hasattr(self._iterator, "__anext__"):
-            raise TypeError(
-                f"Cannot call anext on an iterator of type {type(self._iterator)}"
-            )
-        try:
-            value = await self._iterator.__anext__()  # type: ignore
-            self._on_yield(value)
-            return value
-        except (StopAsyncIteration, StopIteration) as e:
-            self._call_on_close_once()
-            raise StopAsyncIteration
-        except Exception as e:
-            self._call_on_error_once(e)
-            raise
-
-    def __del__(self) -> None:
-        self._call_on_close_once()
-
-    def close(self) -> None:
-        self._call_on_close_once()
-
-    def __getattr__(self, name: str) -> Any:
-        """Delegate all other attributes to the wrapped iterator."""
-        if name in [
-            "_iterator",
-            "_on_yield",
-            "_on_error",
-            "_on_close",
-            "_on_finished_called",
-            "_call_on_error_once",
-        ]:
-            return object.__getattribute__(self, name)
-        return getattr(self._iterator, name)
-
-    def __enter__(self) -> "_IteratorWrapper":
-        if hasattr(self._iterator, "__enter__"): # let's enter the context manager
-            self._iterator = self._iterator.__enter__()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: Optional[Exception],
-        exc_value: Optional[BaseException],
-        traceback: Optional[Any],
-    ) -> None:
-        if exc_type and isinstance(exc_value, Exception):
-            self._call_on_error_once(exc_value)
-        if hasattr(self._iterator, "__exit__"): #case where is a context mngr
-            self._iterator.__exit__(exc_type, exc_value, traceback)
-        self._call_on_close_once()
-
-    async def __aenter__(self) -> "_IteratorWrapper":
-        if hasattr(self._iterator, "__aenter__"): # let's enter the context manager
-            self._iterator = await self._iterator.__aenter__()
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: Optional[Exception],
-        exc_value: Optional[BaseException],
-        traceback: Optional[Any],
-    ) -> None:
-        if exc_type and isinstance(exc_value, Exception):
-            self._call_on_error_once(exc_value)
-        self._call_on_close_once()
