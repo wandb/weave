@@ -4,7 +4,7 @@ import dataclasses
 import json
 import typing
 
-from weave import api as weave
+from weave import query_api as weave
 from weave import engine_trace, errors, types
 from weave.legacy import artifact_fs, file_base
 from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context

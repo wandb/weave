@@ -17,7 +17,7 @@ This LangChain integration patching differs from other integrations in how traci
 
 3. Respecting User Settings:
    The patcher respects any existing WEAVE_TRACE_LANGCHAIN environment variable set by the user:
-   - If not set, it's set to "true" and global patchin is enabled.
+   - If not set, it's set to "true" and global patching is enabled.
    - If already set, its value is preserved
 
 4. Context Manager:
@@ -36,7 +36,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
-from weave import call_context, client_context
+from weave import call_context
+from weave.client_context import weave_client as weave_client_context
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
 
@@ -60,7 +61,7 @@ if not import_failed:
     def make_valid_run_name(name: str) -> str:
         name = name.replace("<", "_").replace(">", "")
 
-        valid_run_name = re.sub(r"[^a-zA-Z0-9 .-_]", "_", name)
+        valid_run_name = re.sub(r"[^a-zA-Z0-9 .\\-_]", "_", name)
         return valid_run_name
 
     def _run_to_dict(run: Run, as_input: bool = False) -> dict:
@@ -97,7 +98,7 @@ if not import_failed:
         def __init__(self, **kwargs: Any) -> None:
             self._call_map: Dict[str, Call] = {}
             self.latest_run: Optional[Run] = None
-            self.gc = client_context.weave_client.require_weave_client()
+            self.gc = weave_client_context.require_weave_client()
             super().__init__()
 
         def _persist_run(self, run: Run) -> None:

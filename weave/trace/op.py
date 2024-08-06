@@ -17,9 +17,10 @@ from typing import (
     runtime_checkable,
 )
 
-from weave import call_context, client_context
+from weave import call_context
+from weave.client_context import weave_client as weave_client_context
 from weave.legacy import context_state
-from weave.trace import box
+from weave.trace import box, settings
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -46,7 +47,8 @@ except ImportError:
 
 
 def print_call_link(call: "Call") -> None:
-    print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
+    if settings.should_print_call_link():
+        print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
@@ -138,7 +140,7 @@ def _is_unbound_method(func: Callable) -> bool:
 
 
 def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
-    client = client_context.weave_client.require_weave_client()
+    client = weave_client_context.require_weave_client()
 
     try:
         inputs = func.signature.bind(*args, **kwargs).arguments
@@ -172,7 +174,7 @@ def _execute_call(
     **kwargs: Any,
 ) -> Any:
     func = __op.resolve_fn
-    client = client_context.weave_client.require_weave_client()
+    client = weave_client_context.require_weave_client()
     has_finished = False
 
     def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
@@ -237,7 +239,7 @@ def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
 
 
 def calls(op: Op) -> "CallsIter":
-    client = client_context.weave_client.require_weave_client()
+    client = weave_client_context.require_weave_client()
     return client._op_calls(op)
 
 
@@ -322,7 +324,9 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
                 @wraps(func)
                 async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    if client_context.weave_client.get_weave_client() is None:
+                    if settings.should_disable_weave():
+                        return await func(*args, **kwargs)
+                    if weave_client_context.get_weave_client() is None:
                         return await func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
@@ -331,7 +335,9 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
                 @wraps(func)
                 def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    if client_context.weave_client.get_weave_client() is None:
+                    if settings.should_disable_weave():
+                        return func(*args, **kwargs)
+                    if weave_client_context.get_weave_client() is None:
                         return func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore

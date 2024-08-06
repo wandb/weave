@@ -358,7 +358,7 @@ class OpDef:
             tracer = engine_trace.tracer()  # type: ignore
             with tracer.trace("refine.%s" % _self.uri):
                 # api's use auto-creates client. TODO: Fix inline import
-                from weave import api
+                from weave import query_api as api
 
                 final_output_type = api.use(called_refine_output_type)  # type: ignore
             if final_output_type == None:

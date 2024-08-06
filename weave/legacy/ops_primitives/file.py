@@ -4,7 +4,7 @@ import typing
 from weave import environment as weave_env
 from weave import errors
 from weave import weave_types as types
-from weave.api import op
+from weave.query_api import op
 from weave.legacy import file_base, wandb_file_manager
 from weave.legacy.artifact_fs import FilesystemArtifactDir, FilesystemArtifactFile
 from weave.legacy.artifact_wandb import WandbArtifact, WandbArtifactManifest
