@@ -31,10 +31,10 @@ from weave.trace_server.refs_internal import (
 )
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
-    generate_id,
 )
 
 from . import trace_server_interface as tsi
+from .ids import generate_id
 from .interface import query as tsi_query
 from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
