@@ -8,7 +8,7 @@ hide_table_of_contents: true
 
 The [BIG-bench (Beyond the Imitation Game Benchmark)](https://github.com/google/BIG-bench) is a collaborative benchmark intended to probe large language models and extrapolate their future capabilities consisting of more than 200 tasks. The [BIG-Bench Hard (BBH)](https://github.com/suzgunmirac/BIG-Bench-Hard) is a suite of 23 most challenging BIG-Bench tasks that can be quite difficult to be solved using the current generation of language models.
 
-This tutorial demonstrates how we can improve the performance of our LLM workflow implemented  on the **causal judgement task** from the BIG-bench Hard benchmark and evaluate our prompting strategies. We will use [DSPy](https://dspy-docs.vercel.app/) for implementing our LLM workflow and optimizing our prompting strategy. We would also use [Weave](../introduction.md) to track our LLM workflow and evaluate our prompting strategies.
+This tutorial demonstrates how we can improve the performance of our LLM workflow implemented  on the **causal judgement task** from the BIG-bench Hard benchmark and evaluate our prompting strategies. We will use [DSPy](https://dspy-docs.vercel.app/) for implementing our LLM workflow and optimizing our prompting strategy. We will also use [Weave](../introduction.md) to track our LLM workflow and evaluate our prompting strategies.
 
 ## Installing the Dependencies
 
@@ -64,7 +64,7 @@ metadata = Metadata()
 
 ## Load the BIG-Bench Hard Dataset
 
-We're gonna load this dataset from HuggingFace Hub, split into training and validation sets, and [publish](./../guides/core-types/datasets.md) them on Weave, this would let us version the datasets, and also use [`weave.Evaluation`](./../guides/core-types/evaluations.md) to evaluate our prompting strategy.
+We will load this dataset from HuggingFace Hub, split into training and validation sets, and [publish](./../guides/core-types/datasets.md) them on Weave, this will let us version the datasets, and also use [`weave.Evaluation`](./../guides/core-types/evaluations.md) to evaluate our prompting strategy.
 
 ```python
 import dspy
@@ -85,7 +85,7 @@ def get_dataset(metadata: Metadata):
     dspy_train_examples = [dspy.Example(row).with_inputs("question") for row in train_rows]
     dspy_val_examples = [dspy.Example(row).with_inputs("question") for row in val_rows]
 
-    # publish the datasets to the Weave, this would let us version the data and use for evaluation
+    # publish the datasets to the Weave, this will let us version the data and use for evaluation
     weave.publish(weave.Dataset(name=f"bigbenchhard_{metadata.big_bench_hard_task}_train", rows=train_rows))
     weave.publish(weave.Dataset(name=f"bigbenchhard_{metadata.big_bench_hard_task}_val", rows=val_rows))
 
@@ -103,7 +103,7 @@ dspy_train_examples, dspy_val_examples = get_dataset(metadata)
 
 [DSPy](https://dspy-docs.vercel.app) is a framework that pushes building new LM pipelines away from manipulating free-form strings and closer to programming (composing modular operators to build text transformation graphs) where a compiler automatically generates optimized LM invocation strategies and prompts from a program.
 
-We're gonna use the [`dspy.OpenAI`](https://dspy-docs.vercel.app/api/language_model_clients/OpenAI) abstraction to make LLM calls to [GPT3.5 Turbo](https://platform.openai.com/docs/models/gpt-3-5-turbo).
+We will use the [`dspy.OpenAI`](https://dspy-docs.vercel.app/api/language_model_clients/OpenAI) abstraction to make LLM calls to [GPT3.5 Turbo](https://platform.openai.com/docs/models/gpt-3-5-turbo).
 
 ```python
 system_prompt = """
