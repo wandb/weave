@@ -152,14 +152,19 @@ export type ExpandedRefWithValue<T = any> = {
   [EXPANDED_REF_VAL_KEY]: T;
 };
 
-export const makeRefExpandedPayload = <T = any>(originalRef: string, refData: T): ExpandedRefWithValue<T> => {
+export const makeRefExpandedPayload = <T = any>(
+  originalRef: string,
+  refData: T
+): ExpandedRefWithValue<T> => {
   return {
     [EXPANDED_REF_REF_KEY]: originalRef,
     [EXPANDED_REF_VAL_KEY]: refData,
   };
-}
+};
 
-export const isExpandedRefWithValue = (ref: any): ref is ExpandedRefWithValue => {
+export const isExpandedRefWithValue = (
+  ref: any
+): ref is ExpandedRefWithValue => {
   return (
     typeof ref === 'object' &&
     ref !== null &&

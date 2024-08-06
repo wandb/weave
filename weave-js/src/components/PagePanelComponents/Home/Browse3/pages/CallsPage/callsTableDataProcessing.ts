@@ -45,7 +45,7 @@ export function prepareFlattenedCallDataForTable(
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
 }
 
-export function prepareFlattenedDataForTable<T,>(
+export function prepareFlattenedDataForTable<T>(
   data: T[]
 ): Array<T & {[key: string]: string}> {
   return data.map(r => {
@@ -138,9 +138,11 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
                 lookupPath.pop();
               }
               if (parentRef) {
-                const newVal: ExpandedRefWithValueAsTableRef = makeRefExpandedPayload(
-                  parentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/' + attr, val,
-                )
+                const newVal: ExpandedRefWithValueAsTableRef =
+                  makeRefExpandedPayload(
+                    parentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/' + attr,
+                    val
+                  );
                 return [key, newVal];
               }
             }

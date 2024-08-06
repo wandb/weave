@@ -304,6 +304,7 @@ function buildCallsTableColumns(
 
   const {cols: newCols, groupingModel} = buildDynamicColumns<TraceCallSchema>(
     filteredDynamicColumnNames,
+    (row, key) => (row as any)[key],
     key => expandedRefCols.has(key),
     key => columnsWithRefs.has(key),
     onCollapse,
@@ -311,8 +312,7 @@ function buildCallsTableColumns(
     // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
     key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
     // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-    (row, key) => (row as any)[key]
+    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key)
   );
   cols.push(...newCols);
 
@@ -513,13 +513,13 @@ const isExpandedRefWithValueAsTableRef = (
 
 export const buildDynamicColumns = <T extends GridValidRowModel>(
   filteredDynamicColumnNames: string[],
-  columnIsExpanded: (col: string) => boolean,
-  columnCanBeExpanded: (col: string) => boolean,
-  onCollapse: (col: string) => void,
-  onExpand: (col: string) => void,
-  columnIsFilterable: (col: string) => boolean,
-  columnIsSortable: (col: string) => boolean,
-  valueForKey: (row: T, key: string) => any
+  valueForKey: (row: T, key: string) => any,
+  columnIsExpanded?: (col: string) => boolean,
+  columnCanBeExpanded?: (col: string) => boolean,
+  onCollapse?: (col: string) => void,
+  onExpand?: (col: string) => void,
+  columnIsFilterable?: (col: string) => boolean,
+  columnIsSortable?: (col: string) => boolean
 ) => {
   const cols: Array<GridColDef<T>> = [];
 
@@ -545,7 +545,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
     if ('groupId' in node) {
       const key = node.groupId;
       groupIds.add(key);
-      if (columnIsExpanded(key)) {
+      if (columnIsExpanded && onCollapse && columnIsExpanded(key)) {
         node.renderHeaderGroup = () => {
           return (
             <CollapseHeader
@@ -555,7 +555,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
             />
           );
         };
-      } else if (columnCanBeExpanded(key)) {
+      } else if (columnCanBeExpanded && onExpand && columnCanBeExpanded(key)) {
         node.renderHeaderGroup = () => {
           return (
             <ExpandHeader
@@ -576,8 +576,8 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       flex: 1,
       minWidth: 150,
       field: key,
-      filterable: columnIsFilterable(key),
-      sortable: columnIsSortable(key),
+      filterable: columnIsFilterable && columnIsFilterable(key),
+      sortable: columnIsSortable && columnIsSortable(key),
       filterOperators: allOperators,
       headerName: key,
       renderHeader: () => {
@@ -626,7 +626,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       col.renderHeader = () => {
         return <></>;
       };
-    } else if (columnIsExpanded(key)) {
+    } else if (columnIsExpanded && onCollapse && columnIsExpanded(key)) {
       col.renderHeader = () => {
         return (
           <CollapseHeader
@@ -636,7 +636,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
           />
         );
       };
-    } else if (columnCanBeExpanded(key)) {
+    } else if (columnCanBeExpanded && onExpand && columnCanBeExpanded(key)) {
       col.renderHeader = () => {
         return (
           <ExpandHeader

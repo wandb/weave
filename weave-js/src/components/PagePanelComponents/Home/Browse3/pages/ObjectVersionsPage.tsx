@@ -7,7 +7,6 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {ObjectRef, refUri} from '../../../../../react';
 import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
@@ -226,34 +225,23 @@ const ObjectVersionsTable: React.FC<{
         });
       });
 
-      console.log(rows);
-
       const {cols: newCols, groupingModel} =
-        buildDynamicColumns<ObjectVersionSchema>(
-          dynamicFields,
-          col => false,
-          col => false,
-          col => false,
-          col => false,
-          col => false,
-          col => false,
-          (row, key) => {
-            const obj: ObjectVersionSchema = (row as any).obj;
-            const res = obj.val?.[key];
-            if (isTableRef(res)) {
-              // This whole block is a hack to make the table ref clickable
-              const selfRefUri = objectVersionKeyToRefUri(obj);
-              const targetRefUri =
-                selfRefUri +
-                ('/' +
-                  OBJECT_ATTR_EDGE_NAME +
-                  '/' +
-                  key.split('.').join(OBJECT_ATTR_EDGE_NAME + '/'));
-              return makeRefExpandedPayload(targetRefUri, res);
-            }
-            return res;
+        buildDynamicColumns<ObjectVersionSchema>(dynamicFields, (row, key) => {
+          const obj: ObjectVersionSchema = (row as any).obj;
+          const res = obj.val?.[key];
+          if (isTableRef(res)) {
+            // This whole block is a hack to make the table ref clickable
+            const selfRefUri = objectVersionKeyToRefUri(obj);
+            const targetRefUri =
+              selfRefUri +
+              ('/' +
+                OBJECT_ATTR_EDGE_NAME +
+                '/' +
+                key.split('.').join(OBJECT_ATTR_EDGE_NAME + '/'));
+            return makeRefExpandedPayload(targetRefUri, res);
           }
-        );
+          return res;
+        });
       cols.push(...newCols);
       groups = groupingModel;
     }
