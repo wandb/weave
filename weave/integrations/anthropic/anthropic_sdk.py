@@ -119,6 +119,7 @@ def create_wrapper_async(
 ## This code handles both cases by patching the _IteratorWrapper
 ## and adding a text_stream property to it.
 
+
 def anthropic_stream_accumulator(
     acc: typing.Optional["Message"],
     value: "MessageStream",
@@ -130,8 +131,6 @@ def anthropic_stream_accumulator(
     if isinstance(value, MessageStopEvent):
         acc = value.message
     return acc
-
-
 
 
 class AnthropicIteratorWrapper(_IteratorWrapper):
@@ -155,12 +154,12 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
         else:
             return self.__sync_stream_text__()
 
-    def __sync_stream_text__(self) -> Iterator[str]:
+    def __sync_stream_text__(self) -> Iterator[str]:  # type: ignore[attr-defined]
         for chunk in self:
-            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
+            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore[attr-defined]
                 yield chunk.delta.text
 
-    async def __async_stream_text__(self) -> AsyncIterator[str]:
+    async def __async_stream_text__(self) -> AsyncIterator[str]:  # type: ignore[attr-defined]
         async for chunk in self:
             if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
                 yield chunk.delta.text

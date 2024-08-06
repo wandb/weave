@@ -157,7 +157,7 @@ def add_accumulator(
     *,
     should_accumulate: Optional[Callable[[Dict], bool]] = None,
     on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
-    iterator_wrapper: Type[_IteratorWrapper[Any]] = _IteratorWrapper,
+    iterator_wrapper: Type[_IteratorWrapper] = _IteratorWrapper,
 ) -> Op:
     """This is to be used internally only - specifically designed for integrations with streaming libraries.
 
@@ -214,7 +214,7 @@ def _build_iterator_from_accumulator_for_op(
     value: Iterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
-    iterator_wrapper: "_IteratorWrapper" = _IteratorWrapper,
+    iterator_wrapper: Type["_IteratorWrapper"] = _IteratorWrapper,
 ) -> "_IteratorWrapper":
     acc: _Accumulator = _Accumulator(accumulator)
 
