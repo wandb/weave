@@ -1545,8 +1545,7 @@ def test_unknown_attribute(client):
 
 
 # Note: this test only works with the `trace_init_client` fixture
-def test_ref_get_no_client(trace_init_client):
-    trace_client = trace_init_client.client
+def test_ref_get_no_client(client):
     data = weave.publish(42)
     data_got = weave.ref(data.uri()).get()
     assert data_got == 42
@@ -1554,7 +1553,7 @@ def test_ref_get_no_client(trace_init_client):
     # clear the graph client effectively "de-initializing it"
     with _no_graph_client():
         # This patching is required just to make the test path work
-        with _patched_default_initializer(trace_client):
+        with _patched_default_initializer(client):
             # Now we will try to get the data again
             data_got = weave.ref(data.uri()).get()
             assert data_got == 42
