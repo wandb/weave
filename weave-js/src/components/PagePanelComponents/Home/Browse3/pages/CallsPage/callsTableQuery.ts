@@ -12,6 +12,9 @@ import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
+// These operators do not require a value for the filter to be complete.
+const NO_VALUE_OPERATORS = ['(any): isEmpty', '(any): isNotEmpty'];
+
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
  * component and the underlying data hooks. In particular, it takes a high level
@@ -51,9 +54,12 @@ export const useCallsForQuery = (
   );
 
   const filterByRaw = useMemo(() => {
-    const setItems = gridFilter.items.filter(item => item.value !== undefined);
+    const completeItems = gridFilter.items.filter(
+      item =>
+        item.value !== undefined || NO_VALUE_OPERATORS.includes(item.operator)
+    );
 
-    const convertedItems = setItems
+    const convertedItems = completeItems
       .map(operationConverter)
       .filter(item => item !== null) as Array<Query['$expr']>;
 
