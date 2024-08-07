@@ -1,0 +1,1653 @@
+components:
+  schemas:
+    Body_file_create_files_create_post:
+      properties:
+        file:
+          format: binary
+          title: File
+          type: string
+        project_id:
+          title: Project Id
+          type: string
+      required:
+      - project_id
+      - file
+      title: Body_file_create_files_create_post
+      type: object
+    CallBatchEndMode:
+      properties:
+        mode:
+          default: end
+          title: Mode
+          type: string
+        req:
+          $ref: '#/components/schemas/CallEndReq'
+      required:
+      - req
+      title: CallBatchEndMode
+      type: object
+    CallBatchStartMode:
+      properties:
+        mode:
+          default: start
+          title: Mode
+          type: string
+        req:
+          $ref: '#/components/schemas/CallStartReq'
+      required:
+      - req
+      title: CallBatchStartMode
+      type: object
+    CallCreateBatchReq:
+      properties:
+        batch:
+          items:
+            anyOf:
+            - $ref: '#/components/schemas/CallBatchStartMode'
+            - $ref: '#/components/schemas/CallBatchEndMode'
+          title: Batch
+          type: array
+      required:
+      - batch
+      title: CallCreateBatchReq
+      type: object
+    CallCreateBatchRes:
+      properties:
+        res:
+          items:
+            anyOf:
+            - $ref: '#/components/schemas/CallStartRes'
+            - $ref: '#/components/schemas/CallEndRes'
+          title: Res
+          type: array
+      required:
+      - res
+      title: CallCreateBatchRes
+      type: object
+    CallEndReq:
+      properties:
+        end:
+          $ref: '#/components/schemas/EndedCallSchemaForInsert'
+      required:
+      - end
+      title: CallEndReq
+      type: object
+    CallEndRes:
+      properties: {}
+      title: CallEndRes
+      type: object
+    CallReadReq:
+      properties:
+        id:
+          title: Id
+          type: string
+        project_id:
+          title: Project Id
+          type: string
+      required:
+      - project_id
+      - id
+      title: CallReadReq
+      type: object
+    CallReadRes:
+      properties:
+        call:
+          anyOf:
+          - $ref: '#/components/schemas/CallSchema'
+          - type: 'null'
+      required:
+      - call
+      title: CallReadRes
+      type: object
+    CallSchema:
+      properties:
+        attributes:
+          title: Attributes
+          type: object
+        deleted_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Deleted At
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+        ended_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Ended At
+        exception:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Exception
+        id:
+          title: Id
+          type: string
+        inputs:
+          title: Inputs
+          type: object
+        op_name:
+          title: Op Name
+          type: string
+        output:
+          anyOf:
+          - {}
+          - type: 'null'
+          title: Output
+        parent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Parent Id
+        project_id:
+          title: Project Id
+          type: string
+        started_at:
+          format: date-time
+          title: Started At
+          type: string
+        summary:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Summary
+        trace_id:
+          title: Trace Id
+          type: string
+        wb_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Wb Run Id
+        wb_user_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Wb User Id
+      required:
+      - id
+      - project_id
+      - op_name
+      - trace_id
+      - started_at
+      - attributes
+      - inputs
+      title: CallSchema
+      type: object
+    CallStartReq:
+      properties:
+        start:
+          $ref: '#/components/schemas/StartedCallSchemaForInsert'
+      required:
+      - start
+      title: CallStartReq
+      type: object
+    CallStartRes:
+      properties:
+        id:
+          title: Id
+          type: string
+        trace_id:
+          title: Trace Id
+          type: string
+      required:
+      - id
+      - trace_id
+      title: CallStartRes
+      type: object
+    CallUpdateReq:
+      properties:
+        call_id:
+          title: Call Id
+          type: string
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+        project_id:
+          title: Project Id
+          type: string
+        wb_user_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Do not set directly. Server will automatically populate this
+            field.
+          title: Wb User Id
+      required:
+      - project_id
+      - call_id
+      title: CallUpdateReq
+      type: object
+    CallUpdateRes:
+      properties: {}
+      title: CallUpdateRes
+      type: object
+    CallsDeleteReq:
+      properties:
+        call_ids:
+          items:
+            type: string
+          title: Call Ids
+          type: array
+        project_id:
+          title: Project Id
+          type: string
+        wb_user_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Do not set directly. Server will automatically populate this
+            field.
+          title: Wb User Id
+      required:
+      - project_id
+      - call_ids
+      title: CallsDeleteReq
+      type: object
+    CallsDeleteRes:
+      properties: {}
+      title: CallsDeleteRes
+      type: object
+    CallsQueryReq:
+      properties:
+        columns:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Columns
+        filter:
+          anyOf:
+          - $ref: '#/components/schemas/_CallsFilter'
+          - type: 'null'
+        limit:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Limit
+        offset:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Offset
+        project_id:
+          title: Project Id
+          type: string
+        query:
+          anyOf:
+          - $ref: '#/components/schemas/Query'
+          - type: 'null'
+        sort_by:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/_SortBy'
+            type: array
+          - type: 'null'
+          title: Sort By
+      required:
+      - project_id
+      title: CallsQueryReq
+      type: object
+    CallsQueryRes:
+      properties:
+        calls:
+          items:
+            $ref: '#/components/schemas/CallSchema'
+          title: Calls
+          type: array
+      required:
+      - calls
+      title: CallsQueryRes
+      type: object
+    CallsQueryStatsReq:
+      properties:
+        filter:
+          anyOf:
+          - $ref: '#/components/schemas/_CallsFilter'
+          - type: 'null'
+        project_id:
+          title: Project Id
+          type: string
+        query:
+          anyOf:
+          - $ref: '#/components/schemas/Query'
+          - type: 'null'
+      required:
+      - project_id
+      title: CallsQueryStatsReq
+      type: object
+    CallsQueryStatsRes:
+      properties:
+        count:
+          title: Count
+          type: integer
+      required:
+      - count
+      title: CallsQueryStatsRes
+      type: object
+    EndedCallSchemaForInsert:
+      properties:
+        ended_at:
+          format: date-time
+          title: Ended At
+          type: string
+        exception:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Exception
+        id:
+          title: Id
+          type: string
+        output:
+          anyOf:
+          - {}
+          - type: 'null'
+          title: Output
+        project_id:
+          title: Project Id
+          type: string
+        summary:
+          title: Summary
+          type: object
+      required:
+      - project_id
+      - id
+      - ended_at
+      - summary
+      title: EndedCallSchemaForInsert
+      type: object
+    FeedbackCreateReq:
+      properties:
+        creator:
+          anyOf:
+          - type: string
+          - type: 'null'
+          examples:
+          - Jane Smith
+          title: Creator
+        feedback_type:
+          examples:
+          - custom
+          title: Feedback Type
+          type: string
+        payload:
+          examples:
+          - key: value
+          title: Payload
+          type: object
+        project_id:
+          examples:
+          - entity/project
+          title: Project Id
+          type: string
+        wb_user_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Do not set directly. Server will automatically populate this
+            field.
+          title: Wb User Id
+        weave_ref:
+          examples:
+          - weave:///entity/project/object/name:digest
+          title: Weave Ref
+          type: string
+      required:
+      - project_id
+      - weave_ref
+      - feedback_type
+      - payload
+      title: FeedbackCreateReq
+      type: object
+    FeedbackCreateRes:
+      properties:
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        id:
+          title: Id
+          type: string
+        payload:
+          title: Payload
+          type: object
+        wb_user_id:
+          title: Wb User Id
+          type: string
+      required:
+      - id
+      - created_at
+      - wb_user_id
+      - payload
+      title: FeedbackCreateRes
+      type: object
+    FeedbackPurgeReq:
+      properties:
+        project_id:
+          examples:
+          - entity/project
+          title: Project Id
+          type: string
+        query:
+          $ref: '#/components/schemas/Query'
+      required:
+      - project_id
+      - query
+      title: FeedbackPurgeReq
+      type: object
+    FeedbackPurgeRes:
+      properties: {}
+      title: FeedbackPurgeRes
+      type: object
+    FeedbackQueryReq:
+      properties:
+        fields:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          examples:
+          - - id
+            - feedback_type
+            - payload.note
+          title: Fields
+        limit:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          examples:
+          - 10
+          title: Limit
+        offset:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          examples:
+          - 0
+          title: Offset
+        project_id:
+          examples:
+          - entity/project
+          title: Project Id
+          type: string
+        query:
+          anyOf:
+          - $ref: '#/components/schemas/Query'
+          - type: 'null'
+        sort_by:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/_SortBy'
+            type: array
+          - type: 'null'
+          title: Sort By
+      required:
+      - project_id
+      title: FeedbackQueryReq
+      type: object
+    FeedbackQueryRes:
+      properties:
+        result:
+          items:
+            type: object
+          title: Result
+          type: array
+      required:
+      - result
+      title: FeedbackQueryRes
+      type: object
+    FileContentReadReq:
+      properties:
+        digest:
+          title: Digest
+          type: string
+        project_id:
+          title: Project Id
+          type: string
+      required:
+      - project_id
+      - digest
+      title: FileContentReadReq
+      type: object
+    FileCreateRes:
+      properties:
+        digest:
+          title: Digest
+          type: string
+      required:
+      - digest
+      title: FileCreateRes
+      type: object
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          title: Detail
+          type: array
+      title: HTTPValidationError
+      type: object
+    ObjCreateReq:
+      properties:
+        obj:
+          $ref: '#/components/schemas/ObjSchemaForInsert'
+      required:
+      - obj
+      title: ObjCreateReq
+      type: object
+    ObjCreateRes:
+      properties:
+        digest:
+          title: Digest
+          type: string
+      required:
+      - digest
+      title: ObjCreateRes
+      type: object
+    ObjQueryReq:
+      properties:
+        filter:
+          anyOf:
+          - $ref: '#/components/schemas/_ObjectVersionFilter'
+          - type: 'null'
+        project_id:
+          title: Project Id
+          type: string
+      required:
+      - project_id
+      title: ObjQueryReq
+      type: object
+    ObjQueryRes:
+      properties:
+        objs:
+          items:
+            $ref: '#/components/schemas/ObjSchema'
+          title: Objs
+          type: array
+      required:
+      - objs
+      title: ObjQueryRes
+      type: object
+    ObjReadReq:
+      properties:
+        digest:
+          title: Digest
+          type: string
+        object_id:
+          title: Object Id
+          type: string
+        project_id:
+          title: Project Id
+          type: string
+      required:
+      - project_id
+      - object_id
+      - digest
+      title: ObjReadReq
+      type: object
+    ObjReadRes:
+      properties:
+        obj:
+          $ref: '#/components/schemas/ObjSchema'
+      required:
+      - obj
+      title: ObjReadRes
+      type: object
+    ObjSchema:
+      properties:
+        base_object_class:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Object Class
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        deleted_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Deleted At
+        digest:
+          title: Digest
+          type: string
+        is_latest:
+          title: Is Latest
+          type: integer
+        kind:
+          title: Kind
+          type: string
+        object_id:
+          title: Object Id
+          type: string
+        project_id:
+          title: Project Id
+          type: string
+        val:
+          title: Val
+        version_index:
+          title: Version Index
+          type: integer
+      required:
+      - project_id
+      - object_id
+      - created_at
+      - digest
+      - version_index
+      - is_latest
+      - kind
+      - base_object_class
+      - val
+      title: ObjSchema
+      type: object
+    ObjSchemaForInsert:
+      properties:
+        object_id:
+          title: Object Id
+          type: string
+        project_id:
+          title: Project Id
+          type: string
+        val:
+          title: Val
+      required:
+      - project_id
+      - object_id
+      - val
+      title: ObjSchemaForInsert
+      type: object
+    Query:
+      properties:
+        $expr:
+          title: $Expr
+          type: object
+      required:
+      - $expr
+      title: Query
+      type: object
+    RefsReadBatchReq:
+      properties:
+        refs:
+          items:
+            type: string
+          title: Refs
+          type: array
+      required:
+      - refs
+      title: RefsReadBatchReq
+      type: object
+    RefsReadBatchRes:
+      properties:
+        vals:
+          items: {}
+          title: Vals
+          type: array
+      required:
+      - vals
+      title: RefsReadBatchRes
+      type: object
+    ServerInfoRes:
+      properties:
+        min_required_weave_python_version:
+          title: Min Required Weave Python Version
+          type: string
+      required:
+      - min_required_weave_python_version
+      title: ServerInfoRes
+      type: object
+    StartedCallSchemaForInsert:
+      properties:
+        attributes:
+          title: Attributes
+          type: object
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
+        inputs:
+          title: Inputs
+          type: object
+        op_name:
+          title: Op Name
+          type: string
+        parent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Parent Id
+        project_id:
+          title: Project Id
+          type: string
+        started_at:
+          format: date-time
+          title: Started At
+          type: string
+        trace_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Trace Id
+        wb_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Wb Run Id
+        wb_user_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Do not set directly. Server will automatically populate this
+            field.
+          title: Wb User Id
+      required:
+      - project_id
+      - op_name
+      - started_at
+      - attributes
+      - inputs
+      title: StartedCallSchemaForInsert
+      type: object
+    TableAppendSpec:
+      properties:
+        append:
+          $ref: '#/components/schemas/TableAppendSpecPayload'
+      required:
+      - append
+      title: TableAppendSpec
+      type: object
+    TableAppendSpecPayload:
+      properties:
+        row:
+          title: Row
+          type: object
+      required:
+      - row
+      title: TableAppendSpecPayload
+      type: object
+    TableCreateReq:
+      properties:
+        table:
+          $ref: '#/components/schemas/TableSchemaForInsert'
+      required:
+      - table
+      title: TableCreateReq
+      type: object
+    TableCreateRes:
+      properties:
+        digest:
+          title: Digest
+          type: string
+      required:
+      - digest
+      title: TableCreateRes
+      type: object
+    TableInsertSpec:
+      properties:
+        insert:
+          $ref: '#/components/schemas/TableInsertSpecPayload'
+      required:
+      - insert
+      title: TableInsertSpec
+      type: object
+    TableInsertSpecPayload:
+      properties:
+        index:
+          title: Index
+          type: integer
+        row:
+          title: Row
+          type: object
+      required:
+      - index
+      - row
+      title: TableInsertSpecPayload
+      type: object
+    TablePopSpec:
+      properties:
+        pop:
+          $ref: '#/components/schemas/TablePopSpecPayload'
+      required:
+      - pop
+      title: TablePopSpec
+      type: object
+    TablePopSpecPayload:
+      properties:
+        index:
+          title: Index
+          type: integer
+      required:
+      - index
+      title: TablePopSpecPayload
+      type: object
+    TableQueryReq:
+      properties:
+        digest:
+          title: Digest
+          type: string
+        filter:
+          anyOf:
+          - $ref: '#/components/schemas/_TableRowFilter'
+          - type: 'null'
+        limit:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Limit
+        offset:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Offset
+        project_id:
+          title: Project Id
+          type: string
+      required:
+      - project_id
+      - digest
+      title: TableQueryReq
+      type: object
+    TableQueryRes:
+      properties:
+        rows:
+          items:
+            $ref: '#/components/schemas/TableRowSchema'
+          title: Rows
+          type: array
+      required:
+      - rows
+      title: TableQueryRes
+      type: object
+    TableRowSchema:
+      properties:
+        digest:
+          title: Digest
+          type: string
+        val:
+          title: Val
+      required:
+      - digest
+      - val
+      title: TableRowSchema
+      type: object
+    TableSchemaForInsert:
+      properties:
+        project_id:
+          title: Project Id
+          type: string
+        rows:
+          items:
+            type: object
+          title: Rows
+          type: array
+      required:
+      - project_id
+      - rows
+      title: TableSchemaForInsert
+      type: object
+    TableUpdateReq:
+      properties:
+        base_digest:
+          title: Base Digest
+          type: string
+        project_id:
+          title: Project Id
+          type: string
+        updates:
+          items:
+            anyOf:
+            - $ref: '#/components/schemas/TableAppendSpec'
+            - $ref: '#/components/schemas/TablePopSpec'
+            - $ref: '#/components/schemas/TableInsertSpec'
+          title: Updates
+          type: array
+      required:
+      - project_id
+      - base_digest
+      - updates
+      title: TableUpdateReq
+      type: object
+    TableUpdateRes:
+      properties:
+        digest:
+          title: Digest
+          type: string
+      required:
+      - digest
+      title: TableUpdateRes
+      type: object
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          title: Location
+          type: array
+        msg:
+          title: Message
+          type: string
+        type:
+          title: Error Type
+          type: string
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+      type: object
+    _CallsFilter:
+      properties:
+        call_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Call Ids
+        input_refs:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Input Refs
+        op_names:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Op Names
+        output_refs:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Output Refs
+        parent_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Parent Ids
+        trace_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Trace Ids
+        trace_roots_only:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Trace Roots Only
+        wb_run_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Wb Run Ids
+        wb_user_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Wb User Ids
+      title: _CallsFilter
+      type: object
+    _ObjectVersionFilter:
+      properties:
+        base_object_classes:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Base Object Classes
+        is_op:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Op
+        latest_only:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Latest Only
+        object_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Object Ids
+      title: _ObjectVersionFilter
+      type: object
+    _SortBy:
+      properties:
+        direction:
+          enum:
+          - asc
+          - desc
+          title: Direction
+          type: string
+        field:
+          title: Field
+          type: string
+      required:
+      - field
+      - direction
+      title: _SortBy
+      type: object
+    _TableRowFilter:
+      properties:
+        row_digests:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Row Digests
+      title: _TableRowFilter
+      type: object
+  securitySchemes:
+    HTTPBasic:
+      scheme: basic
+      type: http
+info:
+  title: FastAPI
+  version: 0.1.0
+openapi: 3.1.0
+paths:
+  /:
+    get:
+      description: Simple index page with links to the API documentation.
+      operationId: index_page__get
+      responses:
+        '200':
+          content:
+            text/html:
+              schema:
+                type: string
+          description: Successful Response
+      summary: Index Page
+  /call/end:
+    post:
+      operationId: call_end_call_end_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallEndReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallEndRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Call End
+  /call/read:
+    post:
+      operationId: call_read_call_read_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallReadReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallReadRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Call Read
+  /call/start:
+    post:
+      operationId: call_start_call_start_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallStartReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallStartRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Call Start
+  /call/update:
+    post:
+      operationId: call_update_call_update_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallUpdateReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallUpdateRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Call Update
+  /call/upsert_batch:
+    post:
+      operationId: call_start_batch_call_upsert_batch_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallCreateBatchReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallCreateBatchRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Call Start Batch
+  /calls/delete:
+    post:
+      operationId: calls_delete_calls_delete_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallsDeleteReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallsDeleteRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Calls Delete
+  /calls/query:
+    post:
+      operationId: calls_query_calls_query_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallsQueryReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallsQueryRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Calls Query
+  /calls/query_stats:
+    post:
+      operationId: calls_query_stats_calls_query_stats_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallsQueryStatsReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallsQueryStatsRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Calls Query Stats
+  /calls/stream_query:
+    post:
+      operationId: calls_query_stream_calls_stream_query_post
+      parameters:
+      - in: header
+        name: accept
+        required: false
+        schema:
+          default: application/jsonl
+          title: Accept
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallsQueryReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Calls Query Stream
+  /feedback/create:
+    post:
+      description: Add feedback to a call or object.
+      operationId: feedback_create_feedback_create_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreateReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackCreateRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Feedback Create
+  /feedback/purge:
+    post:
+      description: Permanently delete feedback.
+      operationId: feedback_purge_feedback_purge_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackPurgeReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackPurgeRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Feedback Purge
+  /feedback/query:
+    post:
+      description: Query for feedback.
+      operationId: feedback_query_feedback_query_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackQueryReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackQueryRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Feedback Query
+  /files/content:
+    post:
+      operationId: file_content_files_content_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileContentReadReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: File Content
+  /files/create:
+    post:
+      operationId: file_create_files_create_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_file_create_files_create_post'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileCreateRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: File Create
+  /health:
+    get:
+      operationId: read_root_health_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Read Root
+  /obj/create:
+    post:
+      operationId: obj_create_obj_create_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObjCreateReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjCreateRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Obj Create
+  /obj/read:
+    post:
+      operationId: obj_read_obj_read_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObjReadReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjReadRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Obj Read
+  /objs/query:
+    post:
+      operationId: objs_query_objs_query_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObjQueryReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjQueryRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Objs Query
+  /refs/read_batch:
+    post:
+      operationId: refs_read_batch_refs_read_batch_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefsReadBatchReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefsReadBatchRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Refs Read Batch
+  /server_info:
+    get:
+      operationId: server_info_server_info_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerInfoRes'
+          description: Successful Response
+      summary: Server Info
+  /table/create:
+    post:
+      operationId: table_create_table_create_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableCreateReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableCreateRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Table Create
+  /table/query:
+    post:
+      operationId: table_query_table_query_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableQueryReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableQueryRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Table Query
+  /table/update:
+    post:
+      operationId: table_update_table_update_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableUpdateReq'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableUpdateRes'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBasic: []
+      summary: Table Update

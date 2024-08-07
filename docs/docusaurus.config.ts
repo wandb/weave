@@ -1,6 +1,7 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
 
 const config: Config = {
   title: "W&B Weave",
@@ -41,6 +42,7 @@ const config: Config = {
           // Remove this to remove the "edit this page" links.
           editUrl: "https://github.com/wandb/weave/blob/master/docs/",
           routeBasePath: "/",
+          docItemComponent: "@theme/ApiItem", // Derived from docusaurus-theme-openapi
         },
         theme: {
           customCss: "./src/css/custom.css",
@@ -64,13 +66,37 @@ const config: Config = {
           ],
         ]
       : []),
+      [
+        'docusaurus-plugin-openapi-docs',
+        {
+          id: "api", // plugin id
+          docsPluginId: "classic", // configured for preset-classic
+          config: {
+            weave: {
+              // specPath: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/api-with-examples.yaml",
+              // specPath: "https://trace.wandb.ai/openapi.json",
+              specPath: "./openapi_docs.json",
+              outputDir: "docs/service-api",
+              baseUrl: "https://trace.wandb.ai/", // not working
+              proxy: "https://trace.wandb.ai/", // not working
+              hideSendButton: false,
+              markdownGenerators: {
+                createInfoPageMD: (pageData) => {
+                  return `TODO`
+                }
+              }
+            } satisfies OpenApiPlugin.Options,
+          }
+        },
+      ]
   ],
 
   themes: [
     [require.resolve("@easyops-cn/docusaurus-search-local"), ({
       // https://github.com/easyops-cn/docusaurus-search-local?tab=readme-ov-file
       docsRouteBasePath: "/",
-    })]
+    })],
+    "docusaurus-theme-openapi-docs", 
   ],
 
   themeConfig: {
@@ -94,6 +120,12 @@ const config: Config = {
           sidebarId: "apiReferenceSidebar",
           position: "left",
           label: "API Reference",
+        },
+        {
+          type: "docSidebar",
+          sidebarId: "serviceApiReferenceSidebar",
+          position: "left",
+          label: "Service API Reference",
         },
         {
           href: "https://github.com/wandb/weave",
