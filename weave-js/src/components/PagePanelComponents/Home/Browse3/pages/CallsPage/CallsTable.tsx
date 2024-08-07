@@ -54,6 +54,7 @@ import {
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
+import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
 import {
   truncateID,
   useControllableState,
@@ -64,6 +65,7 @@ import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {
+  CallSchema,
   OpVersionKey,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
@@ -82,7 +84,6 @@ import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {ManageColumnsButton} from './ManageColumnsButton';
-import { prepareFlattenedDataForTable } from '../common/tabularListViews/columnBuilder';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
