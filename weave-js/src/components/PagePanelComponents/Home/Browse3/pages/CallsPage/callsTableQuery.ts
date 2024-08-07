@@ -6,7 +6,10 @@ import {
 import {useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {operationConverter} from '../common/tabularListViews/operators';
+import {
+  isValuelessOperator,
+  operationConverter,
+} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -51,9 +54,11 @@ export const useCallsForQuery = (
   );
 
   const filterByRaw = useMemo(() => {
-    const setItems = gridFilter.items.filter(item => item.value !== undefined);
+    const completeItems = gridFilter.items.filter(
+      item => item.value !== undefined || isValuelessOperator(item.operator)
+    );
 
-    const convertedItems = setItems
+    const convertedItems = completeItems
       .map(operationConverter)
       .filter(item => item !== null) as Array<Query['$expr']>;
 
