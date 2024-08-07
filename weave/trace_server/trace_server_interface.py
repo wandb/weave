@@ -20,29 +20,29 @@ class CallSchema(BaseModel):
     # Optional display name of the call
     display_name: typing.Optional[str] = None
 
-    ## Trace ID
+    # Trace ID
     trace_id: str
-    ## Parent ID is optional because the call may be a root
+    # Parent ID is optional because the call may be a root
     parent_id: typing.Optional[str] = None
 
-    ## Start time is required
+    # Start time is required
     started_at: datetime.datetime
-    ## Attributes: properties of the call
+    # Attributes: properties of the call
     attributes: typing.Dict[str, typing.Any]
 
-    ## Inputs
+    # Inputs
     inputs: typing.Dict[str, typing.Any]
 
-    ## End time is required if finished
+    # End time is required if finished
     ended_at: typing.Optional[datetime.datetime] = None
 
-    ## Exception is present if the call failed
+    # Exception is present if the call failed
     exception: typing.Optional[str] = None
 
-    ## Outputs
+    # Outputs
     output: typing.Optional[typing.Any] = None
 
-    ## Summary: a summary of the call
+    # Summary: a summary of the call
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     # WB Metadata
@@ -64,17 +64,17 @@ class StartedCallSchemaForInsert(BaseModel):
     # Optional display name of the call
     display_name: typing.Optional[str] = None
 
-    ## Trace ID
+    # Trace ID
     trace_id: typing.Optional[str] = None  # Will be generated if not provided
-    ## Parent ID is optional because the call may be a root
+    # Parent ID is optional because the call may be a root
     parent_id: typing.Optional[str] = None
 
-    ## Start time is required
+    # Start time is required
     started_at: datetime.datetime
-    ## Attributes: properties of the call
+    # Attributes: properties of the call
     attributes: typing.Dict[str, typing.Any]
 
-    ## Inputs
+    # Inputs
     inputs: typing.Dict[str, typing.Any]
 
     # WB Metadata
@@ -86,16 +86,16 @@ class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
 
-    ## End time is required
+    # End time is required
     ended_at: datetime.datetime
 
-    ## Exception is present if the call failed
+    # Exception is present if the call failed
     exception: typing.Optional[str] = None
 
-    ## Outputs
+    # Outputs
     output: typing.Optional[typing.Any] = None
 
-    ## Summary: a summary of the call
+    # Summary: a summary of the call
     summary: typing.Dict[str, typing.Any]
 
 

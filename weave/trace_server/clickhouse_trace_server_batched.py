@@ -212,9 +212,9 @@ all_call_insert_columns = list(
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 all_call_json_columns = ("inputs", "output", "attributes", "summary")
 
-
-# Let's just make everything required for now ... can optimize when we implement column selection
-required_call_columns = list(set(all_call_select_columns) - set([]))
+required_call_columns = [
+    name for name, field in tsi.CallSchema.model_fields.items() if field.is_required()
+]
 
 
 # Columns in the calls_merged table with special aggregation functions:
@@ -381,13 +381,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(project_id=req.project_id)
-
-        # TODO (Perf): By allowing a sub-selection of columns
-        # we will gain increased performance by not having to
-        # fetch all columns from the database. Currently all use
-        # cases call for every column to be fetched, so we have not
-        # implemented this yet.
         columns = all_call_select_columns
+        if req.columns:
+            columns = list(set(required_call_columns + req.columns))
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -1450,8 +1446,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         op_name=ch_call.op_name,
         started_at=_ensure_datetimes_have_tz(ch_call.started_at),
         ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
-        attributes=_dict_dump_to_dict(ch_call.attributes_dump),
-        inputs=_dict_dump_to_dict(ch_call.inputs_dump),
+        attributes=_nullable_any_dump_to_any(ch_call.attributes_dump),
+        inputs=_nullable_any_dump_to_any(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
@@ -1471,8 +1467,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         op_name=ch_call_dict.get("op_name"),
         started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
         ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-        attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
-        inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
+        attributes=_nullable_any_dump_to_any(ch_call_dict.get("attributes_dump")),
+        inputs=_nullable_any_dump_to_any(ch_call_dict.get("inputs_dump")),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),

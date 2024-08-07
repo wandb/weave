@@ -379,7 +379,37 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             conds.append(filter_cond)
 
-        query = f"SELECT * FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
+        required_columns = [
+            name
+            for name, field in tsi.CallSchema.model_fields.items()
+            if field.is_required()
+        ]
+        select_columns = []
+        if req.columns:
+            cols = required_columns + [
+                c for c in req.columns if c not in required_columns
+            ]
+            for field in cols:
+                json_path: Optional[str] = None
+                if field.startswith("inputs"):
+                    field = "inputs" + field[len("inputs") :]
+                    if field.startswith("inputs."):
+                        json_path = field[len("inputs.") :]
+                        field = "inputs"
+                elif field.startswith("output"):
+                    field = "output" + field[len("output") :]
+                    if field.startswith("output."):
+                        json_path = field[len("output.") :]
+                        field = "output"
+                if json_path:
+                    field = f"json_extract({field}, '{quote_json_path(json_path)}')"
+                select_columns.append(field)
+
+        select_str = ", ".join(select_columns) if select_columns else "*"
+
+        print("SELECT", select_str)
+
+        query = f"SELECT {select_str} FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
 
@@ -403,11 +433,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     if field.startswith("output."):
                         json_path = field[len("output.") :]
                         field = "output"
-                elif field.startswith("attributes"):
-                    field = "attributes_dump" + field[len("attributes") :]
-                elif field.startswith("summary"):
-                    field = "summary_dump" + field[len("summary") :]
-
                 assert direction in [
                     "ASC",
                     "DESC",
@@ -431,29 +456,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         cursor.execute(query)
 
         query_result = cursor.fetchall()
-        return tsi.CallsQueryRes(
-            calls=[
-                tsi.CallSchema(
-                    project_id=row[0],
-                    id=row[1],
-                    trace_id=row[2],
-                    parent_id=row[3],
-                    op_name=row[4],
-                    started_at=row[5],
-                    ended_at=row[6],
-                    exception=row[7],
-                    attributes=json.loads(row[8]),
-                    inputs=json.loads(row[9]),
-                    output=None if row[11] is None else json.loads(row[11]),
-                    output_refs=None if row[12] is None else json.loads(row[12]),
-                    summary=json.loads(row[13]) if row[13] else None,
-                    wb_user_id=row[14],
-                    wb_run_id=row[15],
-                    display_name=row[17] if row[17] != "" else None,
-                )
-                for row in query_result
-            ]
-        )
+        calls = []
+        for row in query_result:
+            call_dict = {k: v for k, v in zip(select_columns, row)}
+            for json_field in ["attributes", "summary", "inputs", "outputs"]:
+                if call_dict.get(json_field):
+                    call_dict[json_field] = json.loads(call_dict[json_field])
+            calls.append(tsi.CallSchema(**call_dict))
+        return tsi.CallsQueryRes(calls=calls)
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
@@ -491,7 +501,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(", ".join("?" * len(req.call_ids)))
+            """.format(
+                ", ".join("?" * len(req.call_ids))
+            )
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -503,7 +515,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(", ".join("?" * len(all_ids)))
+            """.format(
+                ", ".join("?" * len(all_ids))
+            )
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()
