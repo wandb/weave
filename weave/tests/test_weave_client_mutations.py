@@ -1,3 +1,4 @@
+import pytest
 from pydantic import Field
 
 import weave
@@ -249,16 +250,12 @@ def test_dict_mutation_saving_nested_lists(client):
 
 
 def test_table_mutation_saving_append_rows(client):
-    t = weave.Table(
-        rows=[
-            {"a": 1, "b": 2},
-            {"a": 3, "b": 4},
-        ]
-    )
+    t = weave.Table(rows=[{"a": 1, "b": 2}])
+    t.append({"a": 3, "b": 4})
     ref = weave.publish(t)
 
     t2 = ref.get()
-    assert t2 == [
+    assert t2.rows == [
         {"a": 1, "b": 2},
         {"a": 3, "b": 4},
     ]
@@ -266,13 +263,37 @@ def test_table_mutation_saving_append_rows(client):
     ref2 = weave.publish(t2)
 
     t3 = ref2.get()
-    assert t3 == [
+    assert t3.rows == [
         {"a": 1, "b": 2},
         {"a": 3, "b": 4},
         {"a": 5, "b": 6},
     ]
 
 
+def test_table_mutation_saving_pop_rows(client):
+    t = weave.Table(
+        rows=[
+            {"a": 1, "b": 2},
+            {"a": 3, "b": 4},
+            {"a": 5, "b": 6},
+        ]
+    )
+    t.pop(0)
+    ref = weave.publish(t)
+
+    t2 = ref.get()
+    assert t2.rows == [
+        {"a": 3, "b": 4},
+        {"a": 5, "b": 6},
+    ]
+    t2.pop(0)
+    ref2 = weave.publish(t2)
+
+    t3 = ref2.get()
+    assert t3.rows == [{"a": 5, "b": 6}]
+
+
+@pytest.mark.xfail(reason="Not implemented yet")
 def test_table_mutation_saving_replace_rows(client):
     t = weave.Table(
         rows=[

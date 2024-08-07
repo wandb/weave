@@ -162,6 +162,8 @@ def attribute_access_result(
     root = getattr(self, "root", None)
     new_ref = ref.with_attr(attr_name)
 
+    print(f"Accessing attribute {val_attr_val=}, {attr_name=}")
+
     return make_trace_obj(
         val_attr_val,
         new_ref,
@@ -250,6 +252,8 @@ class WeaveTable(Traceable):
         self.root = root or self
         self.parent = parent
         self._loaded_rows: typing.Optional[typing.List[typing.Dict]] = None
+        self._loaded_rows = list(self._remote_iter())
+        self.rows = self._loaded_rows
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -258,22 +262,9 @@ class WeaveTable(Traceable):
         return self.rows == other
 
     def _mark_dirty(self) -> None:
+        # THIS IS THE PROBLEM
         self.table_ref = None
         super()._mark_dirty()
-
-    @property
-    def rows(self) -> typing.List[typing.Dict]:
-        # TODO: This is not an efficient way to do this - we essentially
-        # load the entire set of rows the first time we need anything. However
-        # the previous implementation loaded the entire set of rows for every action
-        # so this is still better.
-        self._load_rows_if_not_exists()
-        return typing.cast(typing.List[typing.Dict], self._loaded_rows)
-
-    @rows.setter
-    def rows(self, rows: typing.List[typing.Dict]) -> None:
-        self._loaded_rows = rows
-        self._mark_dirty()
 
     def _load_rows_if_not_exists(self) -> None:
         if self._loaded_rows is None:
@@ -329,6 +320,14 @@ class WeaveTable(Traceable):
     def append(self, val: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
             raise ValueError("Can only append to object refs")
+        self._load_rows_if_not_exists()
+        self._mark_dirty()
+        self._loaded_rows.append(val)
+
+    def pop(self, index: int) -> None:
+        self._load_rows_if_not_exists()
+        self._mark_dirty()
+        self._loaded_rows.pop(index)
 
 
 class WeaveList(Traceable, list):
@@ -467,6 +466,8 @@ def make_trace_obj(
     root: Optional[Traceable],
     parent: Any = None,
 ) -> Any:
+    print(f"Top of make trace obj {new_ref=}")
+    # print(f"Making a trace object... {val=}, {root=}, {parent=}")
     if isinstance(val, Traceable):
         # If val is a WeaveTable, we want to refer to it via the outer object
         # that it is within, rather than via the TableRef. For example we
@@ -483,6 +484,7 @@ def make_trace_obj(
     extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
         new_ref = val
+        print(f"ObjectRef: {new_ref=}")
         extra = val.extra
         read_res = server.obj_read(
             ObjReadReq(
@@ -502,9 +504,24 @@ def make_trace_obj(
                     "Expected Table.ref or Table.table_ref to be TableRef"
                 )
             val_ref = val_table_ref
-        val = WeaveTable(val_ref, new_ref, server, _TableRowFilter(), root)
+
+        val = WeaveTable(
+            table_ref=val_ref,
+            ref=new_ref,
+            server=server,
+            filter=_TableRowFilter(),
+            root=root,
+            parent=parent,
+        )
     if isinstance(val, TableRef):
-        val = WeaveTable(val, new_ref, server, _TableRowFilter(), root)
+        val = WeaveTable(
+            table_ref=val,
+            ref=new_ref,
+            server=server,
+            filter=_TableRowFilter(),
+            root=root,
+            parent=parent,
+        )
 
     if extra:
         # This is where extra resolution happens?
@@ -523,11 +540,20 @@ def make_trace_obj(
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
-                val = WeaveTable(val, new_ref, server, _TableRowFilter(), root)
+                val = WeaveTable(
+                    table_ref=val,
+                    ref=new_ref,
+                    server=server,
+                    filter=_TableRowFilter(),
+                    root=root,
+                    parent=parent,
+                )
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return WeaveObject(val, new_ref, server, root, parent)
+            return WeaveObject(
+                val, ref=new_ref, server=server, root=root, parent=parent
+            )
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):

@@ -155,7 +155,7 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     # If/When we do memoization, this would be a good spot
 
     parent_call = call_context.get_current_call()
-    client._save_nested_objects(inputs_with_defaults)
+    # client._save_nested_objects(inputs_with_defaults)  # Is this necessary?
     attributes = call_attributes.get()
 
     return client.create_call(
@@ -339,8 +339,11 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         return func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
                         return func(*args, **kwargs)
+                    print("Before call")
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
+                    print("After call")
                     res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
+                    print("After execute")
                     return res
 
             # Tack these helpers on to our wrapper

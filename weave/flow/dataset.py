@@ -40,6 +40,10 @@ class Dataset(Object):
 
     rows: weave.Table
 
+    def model_post_init(self, __context: Any) -> None:
+        super().model_post_init(__context)
+        self.rows.parent = self
+
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
         if not isinstance(rows, weave.Table):
@@ -65,12 +69,14 @@ class Dataset(Object):
                 )
         return rows
 
-    @weave.op
-    def add(self, row: dict) -> None:
+    # @weave.op
+    def append(self, row: dict) -> None:
+        print("Calling append!")
         """Add a row to the dataset."""
-        self.rows.add(row)
+        self.rows.append(row)
+        print("Appended row!")
 
-    @weave.op
-    def remove(self, index: int) -> None:
+    # @weave.op
+    def pop(self, index: int) -> None:
         """Remove a row from the dataset."""
-        self.rows.remove(index)
+        self.rows.pop(index)

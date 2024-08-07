@@ -32,10 +32,10 @@ class Table:
     def __eq__(self, other: Any) -> bool:
         return self.rows == other
 
-    def add(self, row: dict) -> None:
+    def append(self, row: dict) -> None:
         """Add a row to the table."""
         self.rows.append(row)
 
-    def remove(self, index: int) -> None:
+    def pop(self, index: int) -> None:
         """Remove a row at the given index from the table."""
         self.rows.pop(index)
