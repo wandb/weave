@@ -3,7 +3,7 @@ import os
 import pathlib
 import typing
 
-from weave.api import op
+from weave.query_api import op
 from weave import ref_base, types
 from weave.legacy import artifact_fs
 from weave.legacy.artifact_local import WORKING_DIR_PREFIX, LocalArtifact

@@ -63,7 +63,10 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallSchema,
+  OpVersionKey,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {
@@ -72,7 +75,6 @@ import {
   ExportSelector,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
-import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
 import {useOpVersionOptions} from './callsTableFilter';
@@ -81,6 +83,7 @@ import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import { prepareFlattenedDataForTable } from '../common/tabularListViews/columnBuilder';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 const MAX_EVAL_COMPARISONS = 5;
@@ -258,7 +261,7 @@ export const CallsTable: FC<{
 
   // Construct Flattened Table Data
   const tableData: TraceCallSchema[] = useMemo(
-    () => prepareFlattenedCallDataForTable(callsResult),
+    () => prepareFlattenedDataForTable(callsResult),
     [callsResult]
   );
 
