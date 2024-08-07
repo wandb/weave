@@ -231,8 +231,30 @@ class WeaveObject(Traceable):
         return self._val == other
 
 
+class WeaveTableLazyRows:
+    """Descriptor for lazily getting rows on WeaveTable"""
+
+    def __init__(self) -> None:
+        self.loaded_rows_name = "_loaded_rows"
+
+    def __get__(
+        self,
+        obj: "WeaveTable",
+        objtype: Union[type["WeaveTable"], None] = None,
+    ) -> list[dict]:
+        if obj is None:
+            return self
+        if getattr(obj, self.loaded_rows_name) is None:
+            setattr(obj, self.loaded_rows_name, list(obj._remote_iter()))
+        return getattr(obj, self.loaded_rows_name)
+
+    def __set__(self, obj: "WeaveTable", value: list[dict]) -> None:
+        setattr(obj, self.loaded_rows_name, value)
+
+
 class WeaveTable(Traceable):
     filter: _TableRowFilter
+    rows = WeaveTableLazyRows()
 
     def __init__(
         self,
@@ -250,8 +272,6 @@ class WeaveTable(Traceable):
         self.root = root or self
         self.parent = parent
         self._loaded_rows: typing.Optional[typing.List[typing.Dict]] = None
-        self._loaded_rows = list(self._remote_iter())
-        self.rows = self._loaded_rows
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -319,12 +339,12 @@ class WeaveTable(Traceable):
             raise ValueError("Can only append to object refs")
         self._load_rows_if_not_exists()
         self._mark_dirty()
-        self._loaded_rows.append(val)
+        self.rows.append(val)
 
     def pop(self, index: int) -> None:
         self._load_rows_if_not_exists()
         self._mark_dirty()
-        self._loaded_rows.pop(index)
+        self.rows.pop(index)
 
 
 class WeaveList(Traceable, list):
