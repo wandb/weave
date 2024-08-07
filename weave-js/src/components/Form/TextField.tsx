@@ -11,6 +11,7 @@ import classNames from 'classnames';
 import React from 'react';
 
 export const TextFieldSizes = {
+  Small: 'small',
   Medium: 'medium',
   Large: 'large',
 } as const;
@@ -80,7 +81,11 @@ export const TextField = ({
       <div
         className={classNames(
           'relative rounded-sm',
-          textFieldSize === 'medium' ? 'h-32' : 'h-40',
+          textFieldSize === 'small'
+            ? 'h-26'
+            : textFieldSize === 'medium'
+            ? 'h-32'
+            : 'h-40',
           'outline outline-1 outline-moon-250',
           {
             'hover:outline-2 [&:hover:not(:focus-within)]:outline-[#83E4EB]':
@@ -108,7 +113,8 @@ export const TextField = ({
               'placeholder-moon-500',
               {
                 [leftPaddingForIcon]: icon && !prefix,
-                'pl-8': !icon && !prefix,
+                'pl-8': !icon && !prefix && textFieldSize !== 'small',
+                'pl-4': !icon && !prefix && textFieldSize === 'small',
               }
             )}
             placeholder={placeholder}

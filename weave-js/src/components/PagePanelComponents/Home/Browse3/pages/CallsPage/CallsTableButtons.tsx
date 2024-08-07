@@ -21,13 +21,13 @@ import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
 const MAX_EXPORT = 10_000;
+const DEFAULT_LIMIT = 1000;
 
-type SelectionState = {
-  allChecked?: boolean;
-  selectedChecked?: boolean;
-  limitChecked?: boolean;
-  limit?: string | null;
-};
+enum SelectionState {
+  ALL_CHECKED,
+  SELECTED_CHECKED,
+  LIMIT_CHECKED,
+}
 
 export const ExportSelector = ({
   selectedCalls,
@@ -50,9 +50,10 @@ export const ExportSelector = ({
   disabled: boolean;
   rightmostButton?: boolean;
 }) => {
-  const [selectionState, setSelectionState] = useState<SelectionState>({
-    allChecked: true,
-  });
+  const [selectionState, setSelectionState] = useState<SelectionState>(
+    SelectionState.ALL_CHECKED
+  );
+  const [limitInput, setLimitInput] = useState<number>(DEFAULT_LIMIT);
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -73,14 +74,16 @@ export const ExportSelector = ({
   );
 
   const onClickDownload = (contentType: ContentType) => {
-    lowLevelFilter.callIds = selectionState.selectedChecked
-      ? selectedCalls
-      : undefined;
-    // TODO(gst): allow user to specify offset?
+    lowLevelFilter.callIds =
+      selectionState === SelectionState.SELECTED_CHECKED
+        ? selectedCalls
+        : undefined;
+    // TODO(gst): allow specifying offset?
     const offset = 0;
-    const limit = selectionState.limitChecked
-      ? Math.min(MAX_EXPORT, parseInt(selectionState.limit ?? '100', 10))
-      : MAX_EXPORT;
+    const limit =
+      selectionState === SelectionState.LIMIT_CHECKED
+        ? Math.min(MAX_EXPORT, limitInput ?? 1000)
+        : MAX_EXPORT;
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -98,7 +101,7 @@ export const ExportSelector = ({
       initiateDownloadFromBlob(blob, fileName);
       setAnchorEl(null);
     });
-    setSelectionState({allChecked: true});
+    setSelectionState(SelectionState.ALL_CHECKED);
   };
 
   return (
@@ -120,9 +123,16 @@ export const ExportSelector = ({
           vertical: 'bottom',
           horizontal: 'center',
         }}
+        slotProps={{
+          paper: {
+            sx: {
+              overflow: 'visible',
+            },
+          },
+        }}
         onClose={() => {
           setAnchorEl(null);
-          setSelectionState({allChecked: true});
+          setSelectionState(SelectionState.ALL_CHECKED);
         }}
         TransitionComponent={DraggableGrow}>
         <Tailwind>
@@ -139,6 +149,8 @@ export const ExportSelector = ({
                 numTotalCalls={numTotalCalls}
                 selectionState={selectionState}
                 setSelectionState={setSelectionState}
+                limitInput={limitInput}
+                setLimitInput={setLimitInput}
               />
               <DownloadGrid onClickDownload={onClickDownload} />
             </DraggableHandle>
@@ -152,54 +164,80 @@ export const ExportSelector = ({
 const SelectionCheckboxes: FC<{
   numSelectedCalls: number;
   numTotalCalls: number;
+  limitInput: number;
+  setLimitInput: Dispatch<SetStateAction<number>>;
   selectionState: SelectionState;
   setSelectionState: Dispatch<SetStateAction<SelectionState>>;
-}> = ({numSelectedCalls, numTotalCalls, selectionState, setSelectionState}) => {
+}> = ({
+  numSelectedCalls,
+  numTotalCalls,
+  limitInput,
+  setLimitInput,
+  selectionState,
+  setSelectionState,
+}) => {
   return (
     <div className="flex items-center">
       <div className="ml-2" />
       <label className="flex items-center">
         <Checkbox
-          checked={selectionState.allChecked ?? false}
-          onCheckedChange={() => setSelectionState(s => ({allChecked: true}))}
+          checked={selectionState === SelectionState.ALL_CHECKED}
+          onCheckedChange={() => setSelectionState(SelectionState.ALL_CHECKED)}
         />
         <span className="ml-6 mr-24">all rows ({numTotalCalls})</span>
       </label>
       <label className="flex items-center">
         <Checkbox
-          checked={selectionState.selectedChecked ?? false}
+          checked={selectionState === SelectionState.LIMIT_CHECKED}
           onCheckedChange={() =>
-            setSelectionState(s => ({
-              selectedChecked: !s.selectedChecked,
-              allChecked: s.selectedChecked,
-            }))
+            setSelectionState(s =>
+              s === SelectionState.LIMIT_CHECKED
+                ? SelectionState.ALL_CHECKED
+                : SelectionState.LIMIT_CHECKED
+            )
           }
         />
         <div className="ml-8 mr-6">first</div>
-        <div className="w-auto min-w-[50px]">
-          <TextField
-            type="number"
-            placeholder="1000"
-            value={selectionState.limit ?? ''}
-            onChange={value =>
-              setSelectionState(s => ({
-                selectedChecked: s.selectedChecked,
-                limit: value,
-              }))
+      </label>
+      <div
+        className="w-auto min-w-[44px]"
+        style={{width: `${limitInput.toString().length + 1}ch`}}>
+        <TextField
+          type="number"
+          size="small"
+          placeholder={DEFAULT_LIMIT.toString()}
+          value={limitInput.toString()}
+          onChange={value => {
+            setLimitInput(parseInt(value, 10));
+            if (selectionState !== SelectionState.LIMIT_CHECKED) {
+              setSelectionState(SelectionState.LIMIT_CHECKED);
             }
-          />
+          }}
+        />
+      </div>
+      <label className="flex items-center">
+        <div
+          className="ml-4 mr-16"
+          onClick={() =>
+            setSelectionState(s =>
+              s === SelectionState.LIMIT_CHECKED
+                ? SelectionState.ALL_CHECKED
+                : SelectionState.LIMIT_CHECKED
+            )
+          }>
+          rows
         </div>
-        <div className="ml-4 mr-16">rows</div>
       </label>
       {numSelectedCalls > 0 && numSelectedCalls !== numTotalCalls && (
         <label className="flex items-center">
           <Checkbox
-            checked={selectionState.limitChecked ?? false}
+            checked={selectionState === SelectionState.SELECTED_CHECKED}
             onCheckedChange={() =>
-              setSelectionState(s => ({
-                limitChecked: !s.limitChecked,
-                allChecked: s.limitChecked,
-              }))
+              setSelectionState(s =>
+                s === SelectionState.SELECTED_CHECKED
+                  ? SelectionState.ALL_CHECKED
+                  : SelectionState.SELECTED_CHECKED
+              )
             }
           />
           <div className="ml-4">selected rows ({numSelectedCalls})</div>
