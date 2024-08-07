@@ -6,14 +6,14 @@ import {
 import {useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {operationConverter} from '../common/tabularListViews/operators';
+import {
+  isValuelessOperator,
+  operationConverter,
+} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-
-// These operators do not require a value for the filter to be complete.
-const NO_VALUE_OPERATORS = ['(any): isEmpty', '(any): isNotEmpty'];
 
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
@@ -55,8 +55,7 @@ export const useCallsForQuery = (
 
   const filterByRaw = useMemo(() => {
     const completeItems = gridFilter.items.filter(
-      item =>
-        item.value !== undefined || NO_VALUE_OPERATORS.includes(item.operator)
+      item => item.value !== undefined || isValuelessOperator(item.operator)
     );
 
     const convertedItems = completeItems

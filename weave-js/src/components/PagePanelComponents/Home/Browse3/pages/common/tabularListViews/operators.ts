@@ -55,6 +55,13 @@ export const allOperators = Object.entries(allGeneralPurposeOperators).flatMap(
       };
     })
 );
+
+const VALUELESS_OPERATORS = new Set(['(any): isEmpty', '(any): isNotEmpty']);
+
+export const isValuelessOperator = (operator: string) => {
+  return VALUELESS_OPERATORS.has(operator);
+};
+
 export const operationConverter = (
   item: GridFilterItem
 ): null | Query['$expr'] => {
