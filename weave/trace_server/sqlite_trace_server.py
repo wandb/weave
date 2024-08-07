@@ -391,30 +391,32 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 c for c in req.columns if c not in required_columns
             ]
             for field in cols:
-                json_path: Optional[str] = None
+                json_select_path: Optional[str] = None
                 if field.startswith("inputs"):
                     field = "inputs" + field[len("inputs") :]
                     if field.startswith("inputs."):
-                        json_path = field[len("inputs.") :]
+                        json_select_path = field[len("inputs.") :]
                         field = "inputs"
                 elif field.startswith("output"):
                     field = "output" + field[len("output") :]
                     if field.startswith("output."):
-                        json_path = field[len("output.") :]
+                        json_select_path = field[len("output.") :]
                         field = "output"
                 elif field.startswith("attributes"):
                     field = "attributes" + field[len("attributes") :]
                     if field.startswith("attributes."):
-                        json_path = field[len("attributes.") :]
+                        json_select_path = field[len("attributes.") :]
                         field = "attributes"
                 elif field.startswith("summary"):
                     field = "summary" + field[len("summary") :]
                     if field.startswith("summary."):
-                        json_path = field[len("summary.") :]
+                        json_select_path = field[len("summary.") :]
                         field = "summary"
                 select_columns_aliases.append(field)
-                if json_path:
-                    field = f"json_extract({field}, '{quote_json_path(json_path)}')"
+                if json_select_path:
+                    field = (
+                        f"json_extract({field}, '{quote_json_path(json_select_path)}')"
+                    )
                 select_columns.append(field)
 
         if not select_columns:
