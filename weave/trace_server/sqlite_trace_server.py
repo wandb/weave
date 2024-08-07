@@ -385,6 +385,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if field.is_required()
         ]
         select_columns = []
+        select_columns_aliases = []
         if req.columns:
             cols = required_columns + [
                 c for c in req.columns if c not in required_columns
@@ -401,15 +402,28 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     if field.startswith("output."):
                         json_path = field[len("output.") :]
                         field = "output"
+                elif field.startswith("attributes"):
+                    field = "attributes" + field[len("attributes") :]
+                    if field.startswith("attributes."):
+                        json_path = field[len("attributes.") :]
+                        field = "attributes"
+                elif field.startswith("summary"):
+                    field = "summary" + field[len("summary") :]
+                    if field.startswith("summary."):
+                        json_path = field[len("summary.") :]
+                        field = "summary"
+                select_columns_aliases.append(field)
                 if json_path:
                     field = f"json_extract({field}, '{quote_json_path(json_path)}')"
                 select_columns.append(field)
 
-        select_str = ", ".join(select_columns) if select_columns else "*"
+        if not select_columns:
+            select_columns = list(
+                set(tsi.CallSchema.model_fields.keys()) - set(["deleted_at"])
+            )
+            select_columns_aliases = select_columns
 
-        print("SELECT", select_str)
-
-        query = f"SELECT {select_str} FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
+        query = f"SELECT {', '.join(select_columns)} FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
 
@@ -433,6 +447,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     if field.startswith("output."):
                         json_path = field[len("output.") :]
                         field = "output"
+                elif field.startswith("attributes"):
+                    field = "attributes" + field[len("attributes") :]
+                    if field.startswith("attributes."):
+                        json_path = field[len("attributes.") :]
+                        field = "attributes"
+                elif field.startswith("summary"):
+                    field = "summary" + field[len("summary") :]
+                    if field.startswith("summary."):
+                        json_path = field[len("summary.") :]
+                        field = "summary"
                 assert direction in [
                     "ASC",
                     "DESC",
@@ -456,10 +480,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         cursor.execute(query)
 
         query_result = cursor.fetchall()
+        print("QUERY RESULT", query_result)
         calls = []
         for row in query_result:
-            call_dict = {k: v for k, v in zip(select_columns, row)}
-            for json_field in ["attributes", "summary", "inputs", "outputs"]:
+            call_dict = {k: v for k, v in zip(select_columns_aliases, row)}
+            for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):
                     call_dict[json_field] = json.loads(call_dict[json_field])
             calls.append(tsi.CallSchema(**call_dict))

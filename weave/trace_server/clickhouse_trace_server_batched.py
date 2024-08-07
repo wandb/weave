@@ -384,6 +384,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         columns = all_call_select_columns
         if req.columns:
             columns = list(set(required_call_columns + req.columns))
+            # TODO: add support for json extract fields
+            columns = [col.split(".")[0] for col in columns]
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
