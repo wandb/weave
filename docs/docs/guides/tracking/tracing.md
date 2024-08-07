@@ -1,8 +1,3 @@
----
-sidebar_position: 2
-hide_table_of_contents: true
----
-
 # Tracing
 
 Tracing is a powerful feature in Weave that allows you to track the inputs and outputs of functions seamlessly. Follow these steps to get started:
