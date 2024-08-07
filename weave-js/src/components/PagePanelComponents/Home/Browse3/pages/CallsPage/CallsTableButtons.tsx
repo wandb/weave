@@ -2,9 +2,12 @@ import {Box, Popover} from '@mui/material';
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {
+  DraggableGrow,
+  DraggableHandle,
+} from '@wandb/weave/components/DraggablePopups';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
-import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralize} from '@wandb/weave/core/util/string';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
@@ -120,28 +123,25 @@ export const ExportSelector = ({
         onClose={() => {
           setAnchorEl(null);
           setSelectionState({allChecked: true});
-        }}>
+        }}
+        TransitionComponent={DraggableGrow}>
         <Tailwind>
           <div className="min-w-[460px] p-12">
-            <div className="flex items-center pb-8">
-              <div className="flex-auto text-xl font-semibold">Export</div>
-              <div className="ml-16 text-moon-500">
-                {maybePluralize(visibleColumns.length, 'column', 's')}
+            <DraggableHandle>
+              <div className="flex items-center pb-8">
+                <div className="flex-auto text-xl font-semibold">Export</div>
+                <div className="ml-16 text-moon-500">
+                  {maybePluralize(visibleColumns.length, 'column', 's')}
+                </div>
               </div>
-            </div>
-            <SelectionCheckboxes
-              selectedCalls={selectedCalls}
-              numTotalCalls={numTotalCalls}
-              selectionState={selectionState}
-              setSelectionState={setSelectionState}
-            />
-            <DownloadGrid onClickDownload={onClickDownload} />
-            <div className="mt-12 flex items-center text-moon-500">
-              <IconOnlyPill color="moon" icon="warning" />
-              <div className="ml-6">
-                This export experience is in beta and subject to change.
-              </div>
-            </div>
+              <SelectionCheckboxes
+                numSelectedCalls={selectedCalls.length}
+                numTotalCalls={numTotalCalls}
+                selectionState={selectionState}
+                setSelectionState={setSelectionState}
+              />
+              <DownloadGrid onClickDownload={onClickDownload} />
+            </DraggableHandle>
           </div>
         </Tailwind>
       </Popover>
@@ -150,45 +150,49 @@ export const ExportSelector = ({
 };
 
 const SelectionCheckboxes: FC<{
-  selectedCalls: string[];
+  numSelectedCalls: number;
   numTotalCalls: number;
   selectionState: SelectionState;
   setSelectionState: Dispatch<SetStateAction<SelectionState>>;
-}> = ({selectedCalls, numTotalCalls, selectionState, setSelectionState}) => {
+}> = ({numSelectedCalls, numTotalCalls, selectionState, setSelectionState}) => {
   return (
     <div className="flex items-center">
       <div className="ml-2" />
-      <Checkbox
-        checked={selectionState.allChecked ?? false}
-        onCheckedChange={() => setSelectionState(s => ({allChecked: true}))}
-      />
-      <div className="ml-6 mr-24">all rows ({numTotalCalls})</div>
-      <Checkbox
-        checked={selectionState.selectedChecked ?? false}
-        onCheckedChange={() =>
-          setSelectionState(s => ({
-            selectedChecked: !s.selectedChecked,
-            allChecked: s.selectedChecked,
-          }))
-        }
-      />
-      <div className="ml-8 mr-6">first</div>
-      <div className="w-auto min-w-[50px]">
-        <TextField
-          type="number"
-          placeholder="1000"
-          value={selectionState.limit ?? ''}
-          onChange={value =>
+      <label className="flex items-center">
+        <Checkbox
+          checked={selectionState.allChecked ?? false}
+          onCheckedChange={() => setSelectionState(s => ({allChecked: true}))}
+        />
+        <span className="ml-6 mr-24">all rows ({numTotalCalls})</span>
+      </label>
+      <label className="flex items-center">
+        <Checkbox
+          checked={selectionState.selectedChecked ?? false}
+          onCheckedChange={() =>
             setSelectionState(s => ({
-              selectedChecked: s.selectedChecked,
-              limit: value,
+              selectedChecked: !s.selectedChecked,
+              allChecked: s.selectedChecked,
             }))
           }
         />
-      </div>
-      <div className="ml-4 mr-16">rows</div>
-      {selectedCalls.length > 0 && selectedCalls.length !== numTotalCalls && (
-        <>
+        <div className="ml-8 mr-6">first</div>
+        <div className="w-auto min-w-[50px]">
+          <TextField
+            type="number"
+            placeholder="1000"
+            value={selectionState.limit ?? ''}
+            onChange={value =>
+              setSelectionState(s => ({
+                selectedChecked: s.selectedChecked,
+                limit: value,
+              }))
+            }
+          />
+        </div>
+        <div className="ml-4 mr-16">rows</div>
+      </label>
+      {numSelectedCalls > 0 && numSelectedCalls !== numTotalCalls && (
+        <label className="flex items-center">
           <Checkbox
             checked={selectionState.limitChecked ?? false}
             onCheckedChange={() =>
@@ -198,8 +202,8 @@ const SelectionCheckboxes: FC<{
               }))
             }
           />
-          <div className="ml-4">selected rows ({selectedCalls.length})</div>
-        </>
+          <div className="ml-4">selected rows ({numSelectedCalls})</div>
+        </label>
       )}
     </div>
   );
@@ -210,7 +214,7 @@ const ClickableOutlinedCardWithIcon: FC<{
   onClick: () => void;
 }> = ({iconName, children, onClick}) => (
   <div
-    className="flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16"
+    className="flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16 hover:bg-moon-100"
     onClick={onClick}>
     <div className="mr-4 rounded-2xl bg-moon-200 p-4">
       <Icon size="xlarge" color="moon" name={iconName} />
