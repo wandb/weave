@@ -49,10 +49,18 @@ def quote_select(s: str, quote_chars: tuple[str, ...] = ("/", ":", "%")) -> str:
 
 
 def validate_extra(extra: list[str]) -> None:
+    """The `extra` path is always a series of `edge_name`/`edge_value` pairs.
+    For example: `attr/attr_name/index/0`. The `edge_name` is one of the
+    following: `key`, `index`, `attr`, `id`. The `edge_value` is a string
+    that corresponds to the edge name. In the case of `attr` and `key`, the
+    edge value is purely user-defined and can be any string.
+    """
     if len(extra) % 2 != 0:
         raise InvalidInternalRef("Extra fields must be key-value pairs.")
+
     for i, e in enumerate(extra):
         if i % 2 == 0:
+            # Here we are in the edge name position
             if e not in (
                 DICT_KEY_EDGE_NAME,
                 LIST_INDEX_EDGE_NAME,
@@ -63,6 +71,7 @@ def validate_extra(extra: list[str]) -> None:
                     f"Invalid extra edge name at index {i}: {extra}"
                 )
         else:
+            # Here we are in the edge value position
             # There is only a single rule here:
             if extra[i - 1] == LIST_INDEX_EDGE_NAME:
                 try:
@@ -84,7 +93,7 @@ def validate_no_colons(s: str, field_name: str) -> None:
         raise InvalidInternalRef(f"{field_name} cannot contain ':'")
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class InternalTableRef:
     project_id: str
     digest: str
@@ -97,7 +106,7 @@ class InternalTableRef:
         return f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/table/{self.digest}"
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class InternalObjectRef:
     project_id: str
     name: str
@@ -117,7 +126,7 @@ class InternalObjectRef:
         return u
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class InternalOpRef(InternalObjectRef):
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/op/{quote_select(self.name)}:{self.version}"
@@ -126,7 +135,7 @@ class InternalOpRef(InternalObjectRef):
         return u
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class InternalCallRef:
     project_id: str
     id: str
