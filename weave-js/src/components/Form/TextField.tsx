@@ -111,11 +111,12 @@ export const TextField = ({
           )}
           <input
             className={classNames(
-              'h-full w-full flex-1 rounded-sm bg-inherit pr-8',
+              'h-full w-full flex-1 rounded-sm bg-inherit',
               'appearance-none border-none',
               'focus:outline-none',
               'placeholder-moon-500',
               'dark:selection:bg-moon-650 dark:selection:text-moon-200',
+              textFieldSize === 'small' ? 'pr-4' : 'pr-8',
               {
                 [leftPaddingForIcon]: icon && !prefix,
                 'pl-8': !icon && !prefix && textFieldSize !== 'small',

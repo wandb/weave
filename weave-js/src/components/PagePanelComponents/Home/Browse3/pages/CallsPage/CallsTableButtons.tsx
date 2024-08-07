@@ -217,7 +217,7 @@ const SelectionCheckboxes: FC<{
       </div>
       <label className="flex items-center">
         <div
-          className="ml-4 mr-16"
+          className="ml-6 mr-16"
           onClick={() =>
             setSelectionState(s =>
               s === SelectionState.LIMIT_CHECKED
