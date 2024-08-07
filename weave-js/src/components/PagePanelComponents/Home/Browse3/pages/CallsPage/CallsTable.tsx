@@ -64,7 +64,6 @@ import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {
-  CallSchema,
   OpVersionKey,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
@@ -261,7 +260,7 @@ export const CallsTable: FC<{
 
   // Construct Flattened Table Data
   const tableData: TraceCallSchema[] = useMemo(
-    () => prepareFlattenedDataForTable(callsResult),
+    () => prepareFlattenedCallDataForTable(callsResult),
     [callsResult]
   );
 
@@ -933,3 +932,9 @@ const getPeekId = (peekPath: string | null): string | null => {
   const {pathname} = url;
   return pathname.split('/').pop() ?? null;
 };
+
+function prepareFlattenedCallDataForTable(
+  callsResult: CallSchema[]
+): Array<TraceCallSchema & {[key: string]: string}> {
+  return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
+}
