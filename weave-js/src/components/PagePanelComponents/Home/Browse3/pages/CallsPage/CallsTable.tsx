@@ -56,6 +56,7 @@ import {
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
+import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
 import {
   truncateID,
   useControllableState,
@@ -65,11 +66,13 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallSchema,
+  OpVersionKey,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {useCallsTableColumns} from './callsTableColumns';
-import {prepareFlattenedCallDataForTable} from './callsTableDataProcessing';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
 import {useOpVersionOptions} from './callsTableFilter';
@@ -965,3 +968,9 @@ const BulkDeleteButton: FC<{
     </Box>
   );
 };
+
+function prepareFlattenedCallDataForTable(
+  callsResult: CallSchema[]
+): Array<TraceCallSchema & {[key: string]: string}> {
+  return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
+}

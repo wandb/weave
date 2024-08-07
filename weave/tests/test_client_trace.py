@@ -1,7 +1,5 @@
-import asyncio
 import dataclasses
 import datetime
-import os
 import platform
 import sys
 import time
@@ -16,17 +14,15 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor, weave_client
-from weave.legacy import context_state
-from weave.trace.vals import MissingSelfInstanceError, WeaveObject
+from weave.trace.vals import MissingSelfInstanceError
+from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-from weave.weave_client import Call
 
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
-    generate_id,
 )
 
 pytestmark = pytest.mark.trace
@@ -102,12 +98,14 @@ def test_dataset(client):
 
 def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
+    trace_id = generate_id()
+    parent_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
         project_id=client._project_id(),
         id=call_id,
         op_name="test_name",
-        trace_id="test_trace_id",
-        parent_id="test_parent_id",
+        trace_id=trace_id,
+        parent_id=parent_id,
         started_at=datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
         attributes={"a": 5},
@@ -147,8 +145,8 @@ def test_trace_server_call_start_and_end(client):
         "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
-        "trace_id": "test_trace_id",
-        "parent_id": "test_parent_id",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": None,
         "exception": None,
@@ -186,8 +184,8 @@ def test_trace_server_call_start_and_end(client):
         "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
-        "trace_id": "test_trace_id",
-        "parent_id": "test_parent_id",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": FuzzyDateTimeMatcher(end.ended_at),
         "exception": None,
