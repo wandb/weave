@@ -162,8 +162,6 @@ def attribute_access_result(
     root = getattr(self, "root", None)
     new_ref = ref.with_attr(attr_name)
 
-    print(f"Accessing attribute {val_attr_val=}, {attr_name=}")
-
     return make_trace_obj(
         val_attr_val,
         new_ref,
@@ -262,7 +260,6 @@ class WeaveTable(Traceable):
         return self.rows == other
 
     def _mark_dirty(self) -> None:
-        # THIS IS THE PROBLEM
         self.table_ref = None
         super()._mark_dirty()
 
@@ -466,8 +463,6 @@ def make_trace_obj(
     root: Optional[Traceable],
     parent: Any = None,
 ) -> Any:
-    print(f"Top of make trace obj {new_ref=}")
-    # print(f"Making a trace object... {val=}, {root=}, {parent=}")
     if isinstance(val, Traceable):
         # If val is a WeaveTable, we want to refer to it via the outer object
         # that it is within, rather than via the TableRef. For example we
@@ -484,7 +479,6 @@ def make_trace_obj(
     extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
         new_ref = val
-        print(f"ObjectRef: {new_ref=}")
         extra = val.extra
         read_res = server.obj_read(
             ObjReadReq(

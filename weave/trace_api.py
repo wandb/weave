@@ -8,7 +8,6 @@ from typing import Any, Callable, Iterator, Optional, Union
 
 from weave.call_context import get_current_call
 from weave.client_context import weave_client as weave_client_context
-from weave.trace.vals import WeaveObject
 
 from . import urls, util, weave_client, weave_init
 from .table import Table
@@ -103,7 +102,6 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
         A weave Ref to the saved object.
     """
     client = weave_client_context.require_weave_client()
-    print(f"Publishing {obj=}")
 
     save_name: str
     if name:
@@ -112,9 +110,6 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
         save_name = n
     else:
         save_name = obj.__class__.__name__
-
-    if isinstance(obj, WeaveObject):
-        print(f"{obj.ref=}")
 
     ref = client._save_object(obj, save_name, "latest")
     print(f"Done saving, now {ref=}")

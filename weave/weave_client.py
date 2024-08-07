@@ -422,7 +422,6 @@ class WeaveClient:
                     digest=ref.digest,
                 )
             )
-            print(f"Hello, {read_res=}")
         except HTTPError as e:
             if e.response is not None and e.response.status_code == 404:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -738,14 +737,12 @@ class WeaveClient:
     # is nicer for clients I think?
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        print(f"_save_object {val=}, {name=}, {branch=}")
         self._save_nested_objects(val, name=name)
         return self._save_object_basic(val, name, branch)
 
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
-        print(f"_save_object_basic {val=}, {name=}, {branch=}")
         # The WeaveTable case is special because object saving happens inside
         # _save_object_nested and it has a special table_ref -- skip it here.
         if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
@@ -776,7 +773,6 @@ class WeaveClient:
         return ref
 
     def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
-        print(f"_save_nested_objects {obj=}, {name=}")
         if (ref := get_ref(obj)) is not None:
             if ALLOW_MIXED_PROJECT_REFS:
                 return
@@ -803,7 +799,6 @@ class WeaveClient:
             table_ref = self._save_table(obj)
             obj.ref = table_ref
         elif isinstance(obj, WeaveTable):
-            print(f"The table being saved is {obj=}")
             table_ref = self._save_table(obj)
             obj.ref = table_ref
             obj.table_ref = table_ref
@@ -818,15 +813,12 @@ class WeaveClient:
                 self._save_nested_objects(v)
         elif isinstance(obj, Op):
             self._save_op(obj)
-        # TODO: seems hacky
+        # TODO: Kinda hacky way to dispatching Dataset with rows: Table
         elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
             self._save_nested_objects(obj.rows)
-        else:
-            print(f"GOT DOWN HERE {obj=}")
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
-        print(f"Going down _save_table, {table=}")
         response = self.server.table_create(
             TableCreateReq(
                 table=TableSchemaForInsert(
@@ -834,8 +826,6 @@ class WeaveClient:
                 )
             )
         )
-        print(f"{table.rows=}")
-        print(f"{response=}")
         return TableRef(
             entity=self.entity, project=self.project, digest=response.digest
         )
