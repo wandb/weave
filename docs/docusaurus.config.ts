@@ -66,6 +66,13 @@ const config: Config = {
       : []),
   ],
 
+  themes: [
+    [require.resolve("@easyops-cn/docusaurus-search-local"), ({
+      // https://github.com/easyops-cn/docusaurus-search-local?tab=readme-ov-file
+      docsRouteBasePath: "/",
+    })]
+  ],
+
   themeConfig: {
     // Replace with your project's social card
     image: "img/logo-large-padded.png",
