@@ -32,6 +32,14 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: "category",
+      label: "Weave Cookbooks",
+      collapsed: false,
+      items: [
+        "cookbooks/dspy_prompt_optimization",
+      ],
+    },
+    {
+      type: "category",
       label: "Using Weave",
       items: [
         {
