@@ -552,22 +552,16 @@ def make_trace_obj(
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            res = WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
+            # TODO: This may evolve into a registry of classes that can be
+            # instantiated from ObjectRecords.
             if getattr(val, "_class_name", None) == "Dataset":
-                # This line is strangely required when assigning res = WeaveObject(...),
-                # and it must come before any attribute access, otherwise our custom
-                # attribute access does not work.  This seems to be because of an unwanted
-                # optimization by python.  Strange!
-                getattr(res, "rows")
+                from weave.flow.dataset import Dataset
 
-                # This is a way of adding back the required append and pop methods
-                # without explicitly making them ops, which would cause verbose
-                # logging and versioning.  We need to use object.__setattr__ to avoid
-                # dirtying the object by assigning these methods to it
-                object.__setattr__(res, "append", maybe_bind_method(_table_append, res))
-                object.__setattr__(res, "pop", maybe_bind_method(_table_pop, res))
+                return Dataset(rows=val.rows)
 
-            return res
+            return WeaveObject(
+                val, ref=new_ref, server=server, root=root, parent=parent
+            )
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
