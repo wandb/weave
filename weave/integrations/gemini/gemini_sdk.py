@@ -1,16 +1,21 @@
 import importlib
 from typing import Callable, Dict
 
+import rich
 from google.ai.generativelanguage_v1beta.types.safety import SafetyRating
 from google.generativeai.types.generation_types import GenerateContentResponse
 
 import weave
+from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
 def gemini_accumulator(
     acc: GenerateContentResponse, value: GenerateContentResponse
 ) -> GenerateContentResponse:
+    rich.print("gemini_accumulator\n\n\n\n\n\n\n")
+    if not acc._done:
+        acc = value
     for candidate_idx in range(len(value.candidates)):
         candidate = value.candidates[candidate_idx]
         for part_idx in range(len(candidate.content.parts)):
@@ -36,7 +41,11 @@ def gemini_wrapper(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
-        return op
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: gemini_accumulator,
+            should_accumulate=should_use_accumulator,
+        )
 
     return wrapper
 
