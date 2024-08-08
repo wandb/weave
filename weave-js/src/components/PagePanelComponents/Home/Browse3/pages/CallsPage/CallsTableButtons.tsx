@@ -1,7 +1,7 @@
 import {Box, Popover} from '@mui/material';
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {Radio} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
-import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {
   DraggableGrow,
   DraggableHandle,
@@ -23,11 +23,7 @@ import {useFilterSortby} from './callsTableQuery';
 const MAX_EXPORT = 10_000;
 const DEFAULT_LIMIT = 1000;
 
-enum SelectionState {
-  ALL_CHECKED,
-  SELECTED_CHECKED,
-  LIMIT_CHECKED,
-}
+type SelectionState = 'all' | 'selected' | 'limit';
 
 export const ExportSelector = ({
   selectedCalls,
@@ -50,9 +46,7 @@ export const ExportSelector = ({
   disabled: boolean;
   rightmostButton?: boolean;
 }) => {
-  const [selectionState, setSelectionState] = useState<SelectionState>(
-    SelectionState.ALL_CHECKED
-  );
+  const [selectionState, setSelectionState] = useState<SelectionState>('all');
   const [limitInput, setLimitInput] = useState<number>(DEFAULT_LIMIT);
 
   // Popover management
@@ -75,14 +69,12 @@ export const ExportSelector = ({
 
   const onClickDownload = (contentType: ContentType) => {
     lowLevelFilter.callIds =
-      selectionState === SelectionState.SELECTED_CHECKED
-        ? selectedCalls
-        : undefined;
+      selectionState === 'selected' ? selectedCalls : undefined;
     // TODO(gst): allow specifying offset?
     const offset = 0;
     const limit =
-      selectionState === SelectionState.LIMIT_CHECKED
-        ? Math.min(MAX_EXPORT, limitInput ?? 1000)
+      selectionState === 'limit'
+        ? Math.min(MAX_EXPORT, limitInput)
         : MAX_EXPORT;
     download(
       callQueryParams.entity,
@@ -101,7 +93,8 @@ export const ExportSelector = ({
       initiateDownloadFromBlob(blob, fileName);
       setAnchorEl(null);
     });
-    setSelectionState(SelectionState.ALL_CHECKED);
+    setSelectionState('all');
+    setLimitInput(DEFAULT_LIMIT);
   };
 
   return (
@@ -132,26 +125,35 @@ export const ExportSelector = ({
         }}
         onClose={() => {
           setAnchorEl(null);
-          setSelectionState(SelectionState.ALL_CHECKED);
+          setSelectionState('all');
+          setLimitInput(DEFAULT_LIMIT);
         }}
         TransitionComponent={DraggableGrow}>
         <Tailwind>
           <div className="min-w-[460px] p-12">
             <DraggableHandle>
               <div className="flex items-center pb-8">
-                <div className="flex-auto text-xl font-semibold">Export</div>
+                {selectedCalls.length === 0 ? (
+                  <div className="flex-auto text-xl font-semibold">
+                    Export ({numTotalCalls})
+                  </div>
+                ) : (
+                  <div className="flex-auto text-xl font-semibold">Export</div>
+                )}
                 <div className="ml-16 text-moon-500">
                   {maybePluralize(visibleColumns.length, 'column', 's')}
                 </div>
               </div>
-              <SelectionCheckboxes
-                numSelectedCalls={selectedCalls.length}
-                numTotalCalls={numTotalCalls}
-                selectionState={selectionState}
-                setSelectionState={setSelectionState}
-                limitInput={limitInput}
-                setLimitInput={setLimitInput}
-              />
+              {selectedCalls.length > 0 && (
+                <SelectionCheckboxes
+                  numSelectedCalls={selectedCalls.length}
+                  numTotalCalls={numTotalCalls}
+                  selectionState={selectionState}
+                  setSelectionState={setSelectionState}
+                  limitInput={limitInput}
+                  setLimitInput={setLimitInput}
+                />
+              )}
               <DownloadGrid onClickDownload={onClickDownload} />
             </DraggableHandle>
           </div>
@@ -177,73 +179,67 @@ const SelectionCheckboxes: FC<{
   setSelectionState,
 }) => {
   return (
-    <div className="flex items-center">
+    <>
       <div className="ml-2" />
-      <label className="flex items-center">
-        <Checkbox
-          checked={selectionState === SelectionState.ALL_CHECKED}
-          onCheckedChange={() => setSelectionState(SelectionState.ALL_CHECKED)}
-        />
-        <span className="ml-6 mr-24">all rows ({numTotalCalls})</span>
-      </label>
-      <label className="flex items-center">
-        <Checkbox
-          checked={selectionState === SelectionState.LIMIT_CHECKED}
-          onCheckedChange={() =>
-            setSelectionState(s =>
-              s === SelectionState.LIMIT_CHECKED
-                ? SelectionState.ALL_CHECKED
-                : SelectionState.LIMIT_CHECKED
-            )
-          }
-        />
-        <div className="ml-8 mr-6">first</div>
-      </label>
-      <div
-        className="w-auto min-w-[44px]"
-        style={{width: `${limitInput.toString().length + 1}ch`}}>
-        <TextField
-          type="number"
-          size="small"
-          placeholder={DEFAULT_LIMIT.toString()}
-          value={limitInput.toString()}
-          onChange={value => {
-            setLimitInput(parseInt(value, 10));
-            if (selectionState !== SelectionState.LIMIT_CHECKED) {
-              setSelectionState(SelectionState.LIMIT_CHECKED);
-            }
-          }}
-        />
-      </div>
-      <label className="flex items-center">
-        <div
-          className="ml-6 mr-16"
-          onClick={() =>
-            setSelectionState(s =>
-              s === SelectionState.LIMIT_CHECKED
-                ? SelectionState.ALL_CHECKED
-                : SelectionState.LIMIT_CHECKED
-            )
-          }>
-          rows
-        </div>
-      </label>
-      {numSelectedCalls > 0 && numSelectedCalls !== numTotalCalls && (
+      <Radio.Root
+        className="flex items-center"
+        aria-label="All checked"
+        name="all checked"
+        onValueChange={(value: SelectionState) => setSelectionState(value)}
+        value={selectionState}>
+        <Radio.Item id="all-rows" value="all">
+          <Radio.Indicator />
+        </Radio.Item>
         <label className="flex items-center">
-          <Checkbox
-            checked={selectionState === SelectionState.SELECTED_CHECKED}
-            onCheckedChange={() =>
-              setSelectionState(s =>
-                s === SelectionState.SELECTED_CHECKED
-                  ? SelectionState.ALL_CHECKED
-                  : SelectionState.SELECTED_CHECKED
-              )
-            }
-          />
-          <div className="ml-4">selected rows ({numSelectedCalls})</div>
+          <span onClick={() => setSelectionState('all')} className="ml-6 mr-12">
+            All rows ({numTotalCalls})
+          </span>
         </label>
-      )}
-    </div>
+        <label className="flex items-center">
+          <Radio.Item id="selected-rows" value="selected">
+            <Radio.Indicator />
+          </Radio.Item>
+          <span
+            className="ml-6 mr-12"
+            onClick={() => setSelectionState('selected')}>
+            Selected rows ({numSelectedCalls})
+          </span>
+        </label>
+        {numTotalCalls > DEFAULT_LIMIT && (
+          <>
+            <label className="flex items-center">
+              <Radio.Item id="limit-rows" value="limit">
+                <Radio.Indicator />
+              </Radio.Item>
+              <div className="ml-4 mr-8">First</div>
+            </label>
+            <div
+              className="w-auto min-w-[44px]"
+              style={{width: `${limitInput.toString().length + 1}ch`}}>
+              <TextField
+                type="number"
+                size="small"
+                placeholder={DEFAULT_LIMIT.toString()}
+                value={limitInput.toString()}
+                onChange={value => {
+                  setLimitInput(parseInt(value, 10));
+                  if (selectionState !== 'limit') {
+                    setSelectionState('limit');
+                  }
+                }}
+              />
+            </div>
+            <label className="flex items-center">
+              <div
+                className="ml-6 mr-16"
+                onClick={() => setSelectionState('limit')}>
+                rows
+              </div>
+            </label>
+          </>
+        )}
+      </Radio.Root>
+    </>
   );
 };
 
