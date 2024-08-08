@@ -2,15 +2,7 @@ import dataclasses
 import inspect
 import operator
 import typing
-from typing import (
-    Any,
-    Generator,
-    Iterator,
-    Literal,
-    Optional,
-    SupportsIndex,
-    Union,
-)
+from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
@@ -236,39 +228,52 @@ class WeaveTable(Traceable):
 
     def __init__(
         self,
-        table_ref: TableRef,
+        table_ref: Optional[TableRef],
         ref: Optional[RefWithExtra],
         server: TraceServerInterface,
         filter: _TableRowFilter,
-        root: typing.Optional[Traceable],
+        root: Optional[Traceable],
+        parent: Optional[Traceable] = None,
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
         self.ref = ref  # type: ignore
-        self.server: TraceServerInterface = server
-        if root is None:
-            root = self
-        self.root = root
-        self._loaded_rows: typing.Optional[typing.List[typing.Dict]] = None
+        self.server = server
+        self.root = root or self
+        self.parent = parent
+        self._rows: Optional[list[dict]] = None
+
+    @property
+    def rows(self) -> list[dict]:
+        if self._rows is None:
+            self._rows = list(self._remote_iter())
+        return self._rows
+
+    @rows.setter
+    def rows(self, value: list[dict]) -> None:
+        if not all(isinstance(row, dict) for row in value):
+            raise ValueError("All table rows must be dicts")
+
+        self._rows = value
+        self._mark_dirty()
 
     def __len__(self) -> int:
-        return len(self._all_rows())
+        return len(self.rows)
 
-    def _all_rows(self) -> typing.List[typing.Dict]:
-        # TODO: This is not an efficient way to do this - we essentially
-        # load the entire set of rows the first time we need anything. However
-        # the previous implementation loaded the entire set of rows for every action
-        # so this is still better.
-        if self._loaded_rows is None:
-            self._loaded_rows = [row for row in self._remote_iter()]
+    def __eq__(self, other: Any) -> bool:
+        return self.rows == other
 
-        return typing.cast(typing.List[typing.Dict], self._loaded_rows)
+    def _mark_dirty(self) -> None:
+        self.table_ref = None
+        super()._mark_dirty()
 
-    def _remote_iter(self) -> Generator[typing.Dict, None, None]:
+    def _remote_iter(self) -> Generator[dict, None, None]:
         page_index = 0
         page_size = 1000
-        i = 0
         while True:
+            if self.table_ref is None:
+                break
+
             response = self.server.table_query(
                 TableQueryReq(
                     project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
@@ -278,39 +283,39 @@ class WeaveTable(Traceable):
                     # filter=self.filter,
                 )
             )
+
             for item in response.rows:
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
-                yield make_trace_obj(
-                    item.val,
-                    new_ref,
-                    self.server,
-                    self.root,
-                )
-                i += 1
+                yield make_trace_obj(item.val, new_ref, self.server, self.root)
+
             if len(response.rows) < page_size:
                 break
+
             page_index += 1
 
     def __getitem__(self, key: Union[int, slice, str]) -> Any:
-        rows = self._all_rows()
-        if isinstance(key, slice):
+        rows = self.rows
+        if isinstance(key, (int, slice)):
             return rows[key]
-        elif isinstance(key, int):
-            return rows[key]
-        else:
-            for row in rows:
-                if row.ref.extra[-1] == key:  # type: ignore
-                    return row
-            else:
-                raise KeyError(f"Row ID not found: {key}")
 
-    def __iter__(self) -> Generator[Any, None, None]:
-        for row in self._all_rows():
-            yield row
+        for row in rows:
+            if row.ref.extra[-1] == key:  # type: ignore
+                return row
 
-    def append(self, val: Any) -> None:
-        if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only append to object refs")
+        raise KeyError(f"Row ID not found: {key}")
+
+    def __iter__(self) -> Iterator[dict]:
+        return iter(self.rows)
+
+    def append(self, val: dict) -> None:
+        if not isinstance(val, dict):
+            raise ValueError("Can only append dicts to tables")
+        self._mark_dirty()
+        self.rows.append(val)
+
+    def pop(self, index: int) -> None:
+        self._mark_dirty()
+        self.rows.pop(index)
 
 
 class WeaveList(Traceable, list):
@@ -484,9 +489,24 @@ def make_trace_obj(
                     "Expected Table.ref or Table.table_ref to be TableRef"
                 )
             val_ref = val_table_ref
-        val = WeaveTable(val_ref, new_ref, server, _TableRowFilter(), root)
+
+        val = WeaveTable(
+            table_ref=val_ref,
+            ref=new_ref,
+            server=server,
+            filter=_TableRowFilter(),
+            root=root,
+            parent=parent,
+        )
     if isinstance(val, TableRef):
-        val = WeaveTable(val, new_ref, server, _TableRowFilter(), root)
+        val = WeaveTable(
+            table_ref=val,
+            ref=new_ref,
+            server=server,
+            filter=_TableRowFilter(),
+            root=root,
+            parent=parent,
+        )
 
     if extra:
         # This is where extra resolution happens?
@@ -505,11 +525,20 @@ def make_trace_obj(
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
-                val = WeaveTable(val, new_ref, server, _TableRowFilter(), root)
+                val = WeaveTable(
+                    table_ref=val,
+                    ref=new_ref,
+                    server=server,
+                    filter=_TableRowFilter(),
+                    root=root,
+                    parent=parent,
+                )
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return WeaveObject(val, new_ref, server, root, parent)
+            return WeaveObject(
+                val, ref=new_ref, server=server, root=root, parent=parent
+            )
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
