@@ -89,6 +89,7 @@ ColumnType = typing.Literal[
     "string",
     "datetime",
     "json",  # Represented as string in ClickHouse
+    "float",
 ]
 
 
@@ -198,9 +199,21 @@ class PreparedSelect(BaseModel):
     fields: list[str]
 
 
+class Join:
+    join_type: str
+    table: Table
+    query: tsi.Query
+
+    def __init__(self, join_type: str, table: Table, query: tsi.Query):
+        self.join_type = join_type
+        self.table = table
+        self.query = query
+
+
 class Select:
     table: Table
     all_columns: list[str]
+    joins: list[Join]
 
     action: Action
 
@@ -210,11 +223,13 @@ class Select:
     _order_by: typing.Optional[typing.List[tsi._SortBy]]
     _limit: typing.Optional[int]
     _offset: typing.Optional[int]
+    _group_by: typing.Optional[list[str]]
 
     def __init__(self, table: Table, action: Action = "SELECT"):
         self.table = table
         self.action = action
         self.all_columns = [c.dbname() for c in table.cols]
+        self.joins = []
 
         self._project_id = None
         self._fields = []
@@ -222,6 +237,13 @@ class Select:
         self._order_by = None
         self._limit = None
         self._offset = None
+        self._group_by = None
+
+    def join(self, join_type: str, table: Table, query: tsi.Query) -> "Select":
+        self.joins.append(Join(join_type, table, query))
+        for col in table.cols:
+            self.all_columns.append(col.dbname())
+        return self
 
     def project_id(self, project_id: typing.Optional[str]) -> "Select":
         self._project_id = project_id
@@ -259,6 +281,10 @@ class Select:
         self._offset = offset
         return self
 
+    def group_by(self, fields: typing.Optional[list[str]]) -> "Select":
+        self._group_by = fields
+        return self
+
     def prepare(
         self,
         database_type: DatabaseType,
@@ -286,6 +312,15 @@ class Select:
             sql = "DELETE "
 
         sql += f"FROM {self.table.name}"
+
+        # Handle joins
+        # Returns {join type} JOIN {table name} ON {join condition}
+        for j in self.joins:
+            query_conds, fields_used = _process_query_to_conditions(
+                j.query, self.all_columns, self.table.json_cols, param_builder
+            )
+            joined = combine_conditions(query_conds, "AND")
+            sql += f"\n{j.join_type + ' ' if j.join_type != '' else ''}JOIN {j.table.name} ON {joined}"
 
         conditions = []
         if self._project_id:
@@ -347,6 +382,18 @@ class Select:
         if self._offset is not None:
             param_offset = param_builder.add(self._offset, "offset", "UInt64")
             sql += f"\nOFFSET {param_offset}"
+        if self._group_by is not None:
+            internal_fields = [
+                _transform_external_field_to_internal_field(
+                    f,
+                    self.all_columns,
+                    self.table.json_cols,
+                    param_builder=param_builder,
+                )[0]
+                for f in self._group_by
+            ]
+            joined_fields = ", ".join(internal_fields)
+            sql += f"\nGROUP BY {joined_fields}"
 
         parameters = param_builder.get_params()
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)

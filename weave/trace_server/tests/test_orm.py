@@ -1,5 +1,6 @@
 import pytest
 
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.orm import (
     Column,
     ParamBuilder,
@@ -173,3 +174,117 @@ FROM users"""
     )
     assert prepared.parameters == {"pb_0": '$."address"'}
     assert prepared.fields == ["id", "payload.address"]
+
+
+def test_join():
+    table1 = Table(
+        "users",
+        [
+            Column("id", "string"),
+            Column("creator", "string", nullable=True),
+            Column("payload", "json", db_name="payload_dump"),
+        ],
+    )
+    table2 = Table(
+        "roles",
+        [
+            Column("id", "string"),
+            Column("name", "string"),
+        ],
+    )
+
+    select = (
+        table1.select()
+        .fields(["id", "name"])
+        .join(
+            "",
+            table2,
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "table1.id"},
+                            {"$getField": "table2.id"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+
+    prepared = select.prepare(database_type="clickhouse")
+
+    assert (
+        prepared.sql
+        == """SELECT id, name
+FROM users
+JOIN roles ON (table1.id = table2.id)"""
+    )
+
+
+def test_special_join():
+    table1 = Table(
+        "users",
+        [
+            Column("id", "string"),
+            Column("creator", "string", nullable=True),
+            Column("payload", "json", db_name="payload_dump"),
+        ],
+    )
+    table2 = Table(
+        "roles",
+        [
+            Column("id", "string"),
+            Column("name", "string"),
+        ],
+    )
+
+    select = (
+        table1.select()
+        .fields(["id", "name"])
+        .join(
+            "inner",
+            table2,
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "table1.id"},
+                            {"$getField": "table2.id"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+
+    prepared = select.prepare(database_type="clickhouse")
+
+    assert (
+        prepared.sql
+        == """SELECT id, name
+FROM users
+inner JOIN roles ON (table1.id = table2.id)"""
+    )
+
+
+def test_group_by():
+    table = Table(
+        "users",
+        [
+            Column("id", "string"),
+            Column("creator", "string", nullable=True),
+            Column("payload", "json", db_name="payload_dump"),
+        ],
+    )
+
+    select = table.select().fields(["id", "creator"]).group_by(["id", "creator"])
+
+    prepared = select.prepare(database_type="clickhouse")
+
+    assert (
+        prepared.sql
+        == """SELECT id, creator
+FROM users
+GROUP BY id, creator"""
+    )
