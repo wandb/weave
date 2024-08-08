@@ -225,7 +225,6 @@ class WeaveObject(Traceable):
 
 class WeaveTable(Traceable):
     filter: _TableRowFilter
-    # rows = WeaveTableLazyRows()
 
     def __init__(
         self,
@@ -233,7 +232,7 @@ class WeaveTable(Traceable):
         ref: Optional[RefWithExtra],
         server: TraceServerInterface,
         filter: _TableRowFilter,
-        root: typing.Optional[Traceable],
+        root: Optional[Traceable],
         parent: Optional[Traceable] = None,
     ) -> None:
         self.table_ref = table_ref
@@ -242,7 +241,7 @@ class WeaveTable(Traceable):
         self.server = server
         self.root = root or self
         self.parent = parent
-        self._rows: typing.Optional[typing.List[typing.Dict]] = None
+        self._rows: Optional[list[dict]] = None
 
     @property
     def rows(self) -> list[dict]:
@@ -268,50 +267,48 @@ class WeaveTable(Traceable):
         self.table_ref = None
         super()._mark_dirty()
 
-    def _remote_iter(self) -> Generator[typing.Dict, None, None]:
+    def _remote_iter(self) -> Generator[dict, None, None]:
         page_index = 0
         page_size = 1000
-        i = 0
         while True:
-            if self.table_ref is not None:
-                response = self.server.table_query(
-                    TableQueryReq(
-                        project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
-                        digest=self.table_ref.digest,
-                        offset=page_index * page_size,
-                        limit=page_size,
-                        # filter=self.filter,
-                    )
+            if self.table_ref is None:
+                break
+
+            response = self.server.table_query(
+                TableQueryReq(
+                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
+                    digest=self.table_ref.digest,
+                    offset=page_index * page_size,
+                    limit=page_size,
+                    # filter=self.filter,
                 )
+            )
+
             for item in response.rows:
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
-                yield make_trace_obj(
-                    item.val,
-                    new_ref,
-                    self.server,
-                    self.root,
-                )
-                i += 1
+                yield make_trace_obj(item.val, new_ref, self.server, self.root)
+
             if len(response.rows) < page_size:
                 break
+
             page_index += 1
 
     def __getitem__(self, key: Union[int, slice, str]) -> Any:
         rows = self.rows
-        if isinstance(key, slice):
+        if isinstance(key, (int, slice)):
             return rows[key]
-        elif isinstance(key, int):
-            return rows[key]
-        else:
-            for row in rows:
-                if row.ref.extra[-1] == key:  # type: ignore
-                    return row
-            else:
-                raise KeyError(f"Row ID not found: {key}")
+
+        for row in rows:
+            if row.ref.extra[-1] == key:  # type: ignore
+                return row
+
+        raise KeyError(f"Row ID not found: {key}")
+
+    def __iter__(self):
+        return iter(self.rows)
 
     def __iter__(self) -> Generator[Any, None, None]:
-        for row in self.rows:
-            yield row
+        yield from self.rows
 
     def append(self, val: dict) -> None:
         if not isinstance(val, dict):
