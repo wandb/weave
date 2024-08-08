@@ -7,30 +7,32 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
     from mistralai.models import (
-        ChatCompletionResponse,
+        CompletionResponseStreamChoice,
         CompletionEvent,
+        CompletionChunk
     )
 
 
 def mistral_accumulator(
-    acc: typing.Optional["ChatCompletionResponse"],
+    acc: typing.Optional["CompletionChunk"],
     value: "CompletionEvent",
-) -> "ChatCompletionResponse":
+) -> "CompletionChunk":
     # This import should be safe at this point
     from mistralai.models import (
-        ChatCompletionResponse,
-        ChatCompletionChoice,
-        AssistantMessage,
+        CompletionChunk,
+        CompletionResponseStreamChoice,
+        DeltaMessage,
         UsageInfo
     )
+    value = value.data
     if acc is None:
-        acc = ChatCompletionResponse(
+        acc = CompletionChunk(
             id=value.id,
             object=value.object,
             created=value.created,
             model=value.model,
             choices=[],
-            usage=UsageInfo(prompt_tokens=0, total_tokens=0, completion_tokens=None),
+            usage=UsageInfo(prompt_tokens=0, total_tokens=0, completion_tokens=0),
         )
 
     # Merge in the usage info
@@ -46,35 +48,39 @@ def mistral_accumulator(
     for delta_choice in value.choices:
         while delta_choice.index >= len(acc.choices):
             acc.choices.append(
-                ChatCompletionChoice(
+                CompletionResponseStreamChoice(
                     index=len(acc.choices),
-                    message=AssistantMessage(role="", content=""),
+                    delta=DeltaMessage(content=""),
                     finish_reason=None,
                 )
             )
-        acc.choices[delta_choice.index].message.role = (
-            delta_choice.delta.role or acc.choices[delta_choice.index].message.role
-        )
-        acc.choices[delta_choice.index].message.content += (
-            delta_choice.delta.content or ""
-        )
-        if delta_choice.delta.tool_calls:
-            if acc.choices[delta_choice.index].message.tool_calls is None:
-                acc.choices[delta_choice.index].message.tool_calls = []
-            acc.choices[
-                delta_choice.index
-            ].message.tool_calls += delta_choice.delta.tool_calls
         acc.choices[delta_choice.index].finish_reason = (
             delta_choice.finish_reason or acc.choices[delta_choice.index].finish_reason
         )
 
+        acc.choices[delta_choice.index].delta.role = (
+            delta_choice.delta.role or acc.choices[delta_choice.index].delta.role
+        )
+        acc.choices[delta_choice.index].delta.content += (
+            delta_choice.delta.content or ""
+        )
+        if delta_choice.delta.tool_calls:
+            if acc.choices[delta_choice.index].delta.tool_calls is None:
+                acc.choices[delta_choice.index].delta.tool_calls = []
+            acc.choices[
+                delta_choice.index
+            ].delta.tool_calls += delta_choice.delta.tool_calls
+
     return acc
 
 
-def mistral_stream_wrapper(fn: typing.Callable) -> typing.Callable:
-    op = weave.op()(fn)
-    acc_op = add_accumulator(op, lambda inputs: mistral_accumulator)  # type: ignore
-    return acc_op
+def mistral_stream_wrapper(name: str) -> typing.Callable:
+    def wrapper(fn: typing.Callable) -> typing.Callable:
+        op = weave.op()(fn)
+        acc_op = add_accumulator(op, lambda inputs: mistral_accumulator)  # type: ignore
+        acc_op.name = name  # type: ignore
+        return acc_op
+    return wrapper
 
 def mistral_wrapper(name: str) -> typing.Callable:
     def wrapper(fn: typing.Callable) -> typing.Callable:
@@ -96,7 +102,7 @@ mistral_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("mistralai.chat"),
             "Chat.stream",
-            mistral_stream_wrapper,
+            mistral_stream_wrapper(name="Mistral.chat.stream"),
         ),
         # Patch the async, non-streaming chat method
         SymbolPatcher(
@@ -108,7 +114,7 @@ mistral_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("mistralai.chat"),
             "Chat.stream_async",
-            mistral_stream_wrapper,
+            mistral_stream_wrapper(name="Mistral.chat.stream_async"),
         ),
     ]
 )

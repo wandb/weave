@@ -2,8 +2,7 @@ import os
 from typing import Any
 
 import pytest
-from mistralai.async_client import MistralAsyncClient
-from mistralai.client import MistralClient
+from mistralai import Mistral
 
 import weave
 from weave.trace_server import trace_server_interface as tsi
@@ -29,34 +28,44 @@ def test_mistral_quickstart(client: weave.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
 
-    mistral_client = MistralClient(api_key=api_key)
+    mistral_client = Mistral(api_key=api_key)
 
-    chat_response = mistral_client.chat(
+    chat_response = mistral_client.chat.complete(
         model=model,
-        messages=[dict(role="user", content="What is the best French cheese?")],
+        messages=[{"role": "user", "content": "What is the best French cheese?"}],
     )
 
     all_content = chat_response.choices[0].message.content
-    exp = """The "best" French cheese can vary greatly depending on personal preferences, as there are hundreds of different types of French cheeses, each with its unique flavor, texture, and aroma. However, some French cheeses are particularly popular and renowned:
+    exp = """Choosing the "best" French cheese can be subjective, as it largely depends on personal taste. France is renowned for its wide variety of cheeses, with over 400 different types. Here are a few highly regarded French cheeses across various categories:
 
-1. Brie de Meaux: Often simply called Brie, this is a soft cheese with a white rind and a creamy, rich interior. It's one of the most well-known French cheeses internationally.
+1. **Soft Cheeses**:
+   - **Brie de Meaux**: Known for its creamy texture and rich, buttery flavor.
+   - **Camembert de Normandie**: Soft, creamy, and has a distinctive earthy aroma.
 
-2. Camembert: Similar to Brie, Camembert is a soft, surface-ripened cheese. It has a stronger flavor and aroma compared to Brie.
+2. **Semi-Soft Cheeses**:
+   - **Morbier**: Recognizable by the layer of ash in the middle, it has a fruity and slightly nutty taste.
+   - **Reblochon**: A savory cheese from the Alps, often used in tartiflette, a traditional dish.
 
-3. Roquefort: This is a blue cheese made from sheep's milk. It's tangy, sharp, and slightly salty.
+3. **Hard Cheeses**:
+   - **Comté**: A nutty and slightly sweet cheese, similar to Gruyère.
+   - **Beaufort**: Known for its firm texture and complex, nutty flavor.
 
-4. Comté: A hard cheese made from unpasteurized cow's milk, Comté has a nutty, slightly sweet flavor.
+4. **Blue Cheeses**:
+   - **Roquefort**: A tangy and pungent blue cheese made from sheep's milk.
+   - **Bleu d'Auvergne**: A creamy and strong-flavored blue cheese.
 
-5. Reblochon: This is a soft, rind-washed cheese with a nutty and fruity taste. It's often used in tartiflette, a classic French dish from the Savoie region.
+5. **Goat Cheeses**:
+   - **Chèvre**: Available in many forms, from fresh and creamy to aged and crumbly.
+   - **Crottin de Chavignol**: A small, round goat cheese with a nutty flavor.
 
-6. Époisses: Known for its pungent smell, Époisses is a soft, washed-rind cheese with a rich and creamy flavor."""
-
+Each of these cheeses has its unique characteristics, so the "best" one depends on your preferences. It's always fun to try several and decide which you like the most!"""
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
+    print(output)
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chat_response.id
@@ -67,9 +76,9 @@ def test_mistral_quickstart(client: weave.weave_client.WeaveClient) -> None:
     assert summary is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
-    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 299
+    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 406
     assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    assert output.usage.total_tokens == model_usage["total_tokens"] == 309
+    assert output.usage.total_tokens == model_usage["total_tokens"] == 416
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -82,23 +91,30 @@ async def test_mistral_quickstart_async(client: weave.weave_client.WeaveClient) 
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
 
-    mistral_client = MistralAsyncClient(api_key=api_key)
+    mistral_client = Mistral(api_key=api_key)
 
-    chat_response = await mistral_client.chat(
+    chat_response = await mistral_client.chat.complete_async(
         model=model,
-        messages=[dict(role="user", content="What is the best French cheese?")],
+        messages=[{"role": "user", "content": "What is the best French cheese?"}],
     )
 
     all_content = chat_response.choices[0].message.content
-    exp = """There are many excellent French cheeses, and the "best" one often depends on personal preference. However, some of the most popular and highly regarded French cheeses include:
+    exp = """Choosing the "best" French cheese is quite subjective and depends on personal taste, as France has a wide variety of excellent cheeses. Here are a few renowned ones that are often considered among the best:
 
-* Comté: A hard cheese made from unpasteurized cow's milk in the Franche-Comté region of eastern France. It has a rich, nutty flavor and a firm, slightly granular texture.
-* Camembert: A soft, surface-ripened cheese made from cow's milk in Normandy. It has a bloomy white rind and a creamy, earthy flavor.
-* Roquefort: A blue cheese made from sheep's milk in the south of France. It has a tangy, slightly salty flavor and a crumbly texture.
-* Brie: A soft cheese made from cow's milk in the Île-de-France region around Paris. It has a white, edible rind and a creamy, buttery flavor.
-* Reblochon: A soft, washed-rind cheese made from cow's milk in the Savoie region of the French Alps. It has a nutty, fruity flavor and a soft, supple texture.
+1. **Roquefort**: This is a sheep milk blue cheese from the south of France. It's known for its tangy and salty flavor, and distinctive veins of blue mold.
 
-Ultimately, the best French cheese is a matter of personal taste. I would recommend trying a variety of cheeses and seeing which ones you enjoy the most."""
+2. **Camembert de Normandie**: A soft, creamy, surface-ripened cow's milk cheese. It has a rich, buttery flavor and is often enjoyed when fully ripe and gooey.
+
+3. **Brie de Meaux**: Another soft cow's milk cheese, similar to Camembert but slightly milder in flavor. It's known for its edible white rind and creamy interior.
+
+4. **Comté**: A French cheese made from unpasteurized cow's milk in the Franche-Comté region. It has a complex, nutty flavor and a firm, springy texture.
+
+5. **Reblochon**: A soft, washed-rind and smear-ripened cheese made in the Alpine region of Savoy from raw cow's milk. It has a nutty taste and a strong aroma.
+
+6. **Époisses de Bourgogne**: A pungent, washed-rind cheese made from cow's milk. It has a strong, somewhat salty flavor and a sticky, orange exterior.
+
+Each of these cheeses offers a unique taste and texture, so the "best" one is a matter of personal preference."""
+    print(all_content)
 
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
@@ -116,9 +132,9 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
     assert summary is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
-    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 297
+    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 363
     assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    assert output.usage.total_tokens == model_usage["total_tokens"] == 307
+    assert output.usage.total_tokens == model_usage["total_tokens"] == 373
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -130,31 +146,32 @@ def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) 
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
 
-    mistral_client = MistralClient(api_key=api_key)
+    mistral_client = Mistral(api_key=api_key)
 
-    chat_response = mistral_client.chat_stream(
+    chat_response = mistral_client.chat.stream(
         model=model,
-        messages=[dict(role="user", content="What is the best French cheese?")],
+        messages=[{"role": "user", "content": "What is the best French cheese?"}],
     )
 
     all_content = ""
     for chunk in chat_response:
-        all_content += chunk.choices[0].delta.content
+        all_content += chunk.data.choices[0].delta.content
 
-    exp = """France is known for its diverse and high-quality cheeses, so the "best" French cheese can depend on personal preference. However, some of the most renowned French cheeses include:
+    exp = """Choosing the "best" French cheese can be subjective as it depends on personal taste, but France is renowned for its wide variety of high-quality cheeses. Here are a few that are often highly regarded:
 
-1. Comté: A hard cheese made from unpasteurized cow's milk in the Franche-Comté region. It has a nutty, slightly sweet flavor.
+1. **Roquefort**: A sheep milk blue cheese from the south of France, known for its tangy, salty flavor and distinctive veins of blue mold.
 
-2. Brie de Meaux: Often simply called Brie, this is a soft cheese with a white rind. It's known for its creamy texture and mild, slightly tangy flavor.
+2. **Brie de Meaux**: A soft, creamy cow's milk cheese from the Île-de-France region. It has a rich, buttery flavor and is often considered one of the finest cheeses in the world.
 
-3. Roquefort: This is a blue cheese made from sheep's milk. It has a strong, tangy flavor and a crumbly texture.
+3. **Camembert de Normandie**: A soft, creamy cow's milk cheese from Normandy, similar to Brie but with a slightly stronger flavor.
 
-4. Camembert: Similar to Brie, Camembert is a soft cheese with a white rind. However, it has a stronger, more earthy flavor.
+4. **Comté**: A hard, unpasteurized cow's milk cheese from the Jura Massif region. It has a complex, nutty flavor that varies depending on its age.
 
-5. Reblochon: A soft cheese from the Savoie region, it's known for its fruity and nutty taste with a slight bitterness.
+5. **Époisses de Bourgogne**: A pungent, soft cow's milk cheese from Burgundy, often served with a spoon due to its runny texture.
 
-6. Époisses: This is a pungent soft cheese with a distinctive orange rind. It's known for its strong flavor and creamy texture."""
+6. **Morbier**: A semi-soft cow's milk cheese with a distinctive layer of ash in the middle. It has a rich, creamy flavor with a slight bitterness.
 
+Each of these cheeses offers a unique taste and texture, so the "best" one depends on your personal preference. It's always fun to try a variety to see which you like best!"""
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
@@ -163,17 +180,17 @@ def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) 
     output = _get_call_output(call)
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
-    assert output.id == chunk.id
-    assert output.model == chunk.model
-    assert output.object == chunk.object
-    assert output.created == chunk.created
+    assert output.id == chunk.data.id
+    assert output.model == chunk.data.model
+    assert output.object == chunk.data.object
+    assert output.created == chunk.data.created
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
-    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 274
+    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 350
     assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    assert output.usage.total_tokens == model_usage["total_tokens"] == 284
+    assert output.usage.total_tokens == model_usage["total_tokens"] == 360
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -188,29 +205,40 @@ async def test_mistral_quickstart_with_stream_async(
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
 
-    mistral_client = MistralAsyncClient(api_key=api_key)
+    mistral_client = Mistral(api_key=api_key)
 
-    chat_response = mistral_client.chat_stream(
+    chat_response = await mistral_client.chat.stream_async(
         model=model,
-        messages=[dict(role="user", content="What is the best French cheese?")],
+        messages=[{"role": "user", "content": "What is the best French cheese?"}],
     )
 
     all_content = ""
     async for chunk in chat_response:
-        all_content += chunk.choices[0].delta.content
+        all_content += chunk.data.choices[0].delta.content
 
-    exp = """The "best" French cheese can depend on personal preferences, but here are a few popular ones:
+    exp = """Choosing the "best" French cheese can be subjective as it largely depends on personal taste. France is renowned for its wide variety of cheeses, with over 400 different types. Here are a few highly regarded French cheeses across various categories:
 
-1. Brie: Often referred to as "The Queen of Cheeses," Brie is a soft cheese named after the French region Brie. It has a mild, slightly sweet flavor with a creamy texture.
+1. **Soft Cheeses**:
+   - **Brie de Meaux**: Known for its rich, creamy texture and earthy, mushroom-like flavor.
+   - **Camembert de Normandie**: Soft, creamy, and has a strong, distinctive smell.
 
-2. Camembert: This is another soft cheese from Normandy, France. It has a stronger flavor than Brie, with a hint of mushroom taste.
+2. **Semi-Soft Cheeses**:
+   - **Morbier**: Recognizable by its layer of ash in the middle, it has a fruity and slightly nutty taste.
+   - **Reblochon**: A savory cheese from the Alps with a nutty aftertaste and a soft, washed rind.
 
-3. Roquefort: This is a blue cheese made from sheep's milk. It's aged in the natural Combalou caves of Roquefort-sur-Soulzon, which gives it a unique, tangy flavor.
+3. **Hard Cheeses**:
+   - **Comté**: A fruity and nutty cheese made from unpasteurized cow's milk, often aged for many months.
+   - **Beaufort**: Similar to Gruyère, it has a firm texture and a sweet, nutty flavor.
 
-4. Comté: This is a hard cheese made from unpasteurized cow's milk in the Franche-Comté region of eastern France. It has a complex, nutty flavor.
+4. **Blue Cheeses**:
+   - **Roquefort**: A sheep milk cheese with distinctive veins of blue mold, offering a tangy and salty taste.
+   - **Bleu d'Auvergne**: A cow's milk blue cheese with a strong, pungent aroma and a creamy texture.
 
-5. Chèvre: This is a general term for goat cheese in French. It can come in many forms and flavors, from fresh and mild to aged and tangy."""
+5. **Goat Cheeses**:
+   - **Chèvre**: Available in many forms, from fresh and creamy to aged and crumbly, often with a tangy, earthy flavor.
+   - **Crottin de Chavignol**: A small, round goat cheese with a nutty flavor and a texture that varies with age.
 
+Each of these cheeses has its unique characteristics, so the "best" one depends on your preferences. It's always fun to try several types to discover your favorite!"""
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
@@ -219,14 +247,14 @@ async def test_mistral_quickstart_with_stream_async(
     output = _get_call_output(call)
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
-    assert output.id == chunk.id
-    assert output.model == chunk.model
-    assert output.object == chunk.object
-    assert output.created == chunk.created
+    assert output.id == chunk.data.id
+    assert output.model == chunk.data.model
+    assert output.object == chunk.data.object
+    assert output.created == chunk.data.created
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
-    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 242
+    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 459
     assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    assert output.usage.total_tokens == model_usage["total_tokens"] == 252
+    assert output.usage.total_tokens == model_usage["total_tokens"] == 469
