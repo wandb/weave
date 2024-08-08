@@ -506,10 +506,10 @@ export const CallsTable: FC<{
 
   // Register Export Button
   useEffect(() => {
-    // We really want to use columns here, but because visibileColumns
+    // We really want to use columns here, but because visibleColumns
     // is a prop to ExportSelector, and that gets mounted in the table (?)
     // we have a circular dependency causing infinite reloads
-    const visibileColumns =
+    const visibleColumns =
       tableData.length > 0
         ? Object.keys(tableData[0]).filter(
             col => columnVisibilityModel?.[col] !== false
@@ -521,7 +521,7 @@ export const CallsTable: FC<{
           selectedCalls={selectedCalls}
           numTotalCalls={callsTotal}
           disabled={callsTotal === 0}
-          visibleColumns={visibileColumns}
+          visibleColumns={visibleColumns}
           callQueryParams={{
             entity,
             project,
