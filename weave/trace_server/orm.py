@@ -541,11 +541,26 @@ def _transform_external_field_to_internal_field(
             json_path = quote_json_path(field[len(prefix + ".") :])
             field = prefix + "_dump"
 
+    # pops of table_prefix
+    # necessary for joins, allows table1.field1 and table2.field2
+    table_prefix = None
+    unprefixed_field = field
+    if "." in field:
+        table_prefix, field = field.split(".", 1)
+
     # validate field
-    if field not in all_columns and field.lower() != "count(*)":
+    if (
+        field not in all_columns
+        and field.lower() != "count(*)"
+        and not any(
+            # Checks that a column is in the field, allows prefixed columns to be used
+            substr in unprefixed_field.lower()
+            for substr in all_columns
+        )
+    ):
         raise ValueError(f"Unknown field: {field}")
 
-    raw_fields_used.add(field)
+    raw_fields_used.add(unprefixed_field)
     if json_path is not None:
         json_path_param = param_builder.add(json_path, None, "String")
         if cast == "exists":
@@ -556,6 +571,9 @@ def _transform_external_field_to_internal_field(
             field = json_func + field + ", " + json_path_param + ")"
             if not is_sqlite:
                 field = clickhouse_cast(field, cast or "string")  # type: ignore
+
+    if table_prefix:
+        field = f"{table_prefix}.{field}"
 
     return field, param_builder, raw_fields_used
 
