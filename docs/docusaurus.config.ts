@@ -35,8 +35,8 @@ const config: Config = {
       {
         docs: {
           sidebarPath: "./sidebars.ts",
-          sidebarCollapsible: false,
-          breadcrumbs: false,
+          sidebarCollapsible: true,
+          breadcrumbs: true,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl: "https://github.com/wandb/weave/blob/master/docs/",
@@ -64,6 +64,13 @@ const config: Config = {
           ],
         ]
       : []),
+  ],
+
+  themes: [
+    [require.resolve("@easyops-cn/docusaurus-search-local"), ({
+      // https://github.com/easyops-cn/docusaurus-search-local?tab=readme-ov-file
+      docsRouteBasePath: "/",
+    })]
   ],
 
   themeConfig: {

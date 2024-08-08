@@ -39,6 +39,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
@@ -70,10 +71,6 @@ if typing.TYPE_CHECKING:
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
-
-
-def generate_id() -> str:
-    return str(uuid.uuid4())
 
 
 class ValueFilter(TypedDict, total=False):

@@ -1,8 +1,3 @@
----
-sidebar_position: 0
-hide_table_of_contents: true
----
-
 # LlamaIndex
 
 Weave is designed to simplify the tracking and logging of all calls made through the [LlamaIndex Python library](https://github.com/run-llama/llama_index).
