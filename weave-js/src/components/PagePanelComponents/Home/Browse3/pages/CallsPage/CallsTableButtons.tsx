@@ -66,9 +66,13 @@ export const ExportSelector = ({
   const onClickDownload = (contentType: ContentType) => {
     lowLevelFilter.callIds =
       selectionState === 'selected' ? selectedCalls : undefined;
-    // TODO(gst): allow specifying offset?
+    // TODO(gst): allow specifying offset
     const offset = 0;
     const limit = MAX_EXPORT;
+    // TODO(gst): add support for JSONL and JSON column selection
+    const columns = [ContentType.csv, ContentType.tsv].includes(contentType)
+      ? visibleColumns
+      : undefined;
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -78,7 +82,7 @@ export const ExportSelector = ({
       offset,
       sortBy,
       filterBy,
-      visibleColumns
+      columns
     ).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];
