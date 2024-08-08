@@ -6,10 +6,8 @@ import {
   DraggableGrow,
   DraggableHandle,
 } from '@wandb/weave/components/DraggablePopups';
-import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {maybePluralize} from '@wandb/weave/core/util/string';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
@@ -21,7 +19,6 @@ import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
 const MAX_EXPORT = 10_000;
-const DEFAULT_LIMIT = 1000;
 
 type SelectionState = 'all' | 'selected' | 'limit';
 
@@ -47,7 +44,6 @@ export const ExportSelector = ({
   rightmostButton?: boolean;
 }) => {
   const [selectionState, setSelectionState] = useState<SelectionState>('all');
-  const [limitInput, setLimitInput] = useState<number>(DEFAULT_LIMIT);
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -72,10 +68,7 @@ export const ExportSelector = ({
       selectionState === 'selected' ? selectedCalls : undefined;
     // TODO(gst): allow specifying offset?
     const offset = 0;
-    const limit =
-      selectionState === 'limit'
-        ? Math.min(MAX_EXPORT, limitInput)
-        : MAX_EXPORT;
+    const limit = MAX_EXPORT;
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -94,7 +87,6 @@ export const ExportSelector = ({
       setAnchorEl(null);
     });
     setSelectionState('all');
-    setLimitInput(DEFAULT_LIMIT);
   };
 
   return (
@@ -126,7 +118,6 @@ export const ExportSelector = ({
         onClose={() => {
           setAnchorEl(null);
           setSelectionState('all');
-          setLimitInput(DEFAULT_LIMIT);
         }}
         TransitionComponent={DraggableGrow}>
         <Tailwind>
@@ -140,9 +131,6 @@ export const ExportSelector = ({
                 ) : (
                   <div className="flex-auto text-xl font-semibold">Export</div>
                 )}
-                <div className="ml-16 text-moon-500">
-                  {maybePluralize(visibleColumns.length, 'column', 's')}
-                </div>
               </div>
               {selectedCalls.length > 0 && (
                 <SelectionCheckboxes
@@ -150,8 +138,6 @@ export const ExportSelector = ({
                   numTotalCalls={numTotalCalls}
                   selectionState={selectionState}
                   setSelectionState={setSelectionState}
-                  limitInput={limitInput}
-                  setLimitInput={setLimitInput}
                 />
               )}
               <DownloadGrid onClickDownload={onClickDownload} />
@@ -166,18 +152,9 @@ export const ExportSelector = ({
 const SelectionCheckboxes: FC<{
   numSelectedCalls: number;
   numTotalCalls: number;
-  limitInput: number;
-  setLimitInput: Dispatch<SetStateAction<number>>;
   selectionState: SelectionState;
   setSelectionState: Dispatch<SetStateAction<SelectionState>>;
-}> = ({
-  numSelectedCalls,
-  numTotalCalls,
-  limitInput,
-  setLimitInput,
-  selectionState,
-  setSelectionState,
-}) => {
+}> = ({numSelectedCalls, numTotalCalls, selectionState, setSelectionState}) => {
   return (
     <>
       <div className="ml-2" />
@@ -205,39 +182,6 @@ const SelectionCheckboxes: FC<{
             Selected rows ({numSelectedCalls})
           </span>
         </label>
-        {numTotalCalls > DEFAULT_LIMIT && (
-          <>
-            <label className="flex items-center">
-              <Radio.Item id="limit-rows" value="limit">
-                <Radio.Indicator />
-              </Radio.Item>
-              <div className="ml-4 mr-8">First</div>
-            </label>
-            <div
-              className="w-auto min-w-[44px]"
-              style={{width: `${limitInput.toString().length + 1}ch`}}>
-              <TextField
-                type="number"
-                size="small"
-                placeholder={DEFAULT_LIMIT.toString()}
-                value={limitInput.toString()}
-                onChange={value => {
-                  setLimitInput(parseInt(value, 10));
-                  if (selectionState !== 'limit') {
-                    setSelectionState('limit');
-                  }
-                }}
-              />
-            </div>
-            <label className="flex items-center">
-              <div
-                className="ml-6 mr-16"
-                onClick={() => setSelectionState('limit')}>
-                rows
-              </div>
-            </label>
-          </>
-        )}
       </Radio.Root>
     </>
   );
