@@ -661,6 +661,7 @@ class WeaveClient:
         """Query project for feedback.
 
         Examples:
+            ```python
             # Fetch a specific feedback object.
             # Note that this still returns a collection, which is expected
             # to contain zero or one item(s).
@@ -668,6 +669,7 @@ class WeaveClient:
 
             # Find all feedback objects with a specific reaction.
             client.feedback(reaction="👍", limit=10)
+            ```
 
         Args:
             query: A mongo-style query expression. For convenience, also accepts a feedback UUID string.
@@ -973,3 +975,6 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
         return tuple(tuple_res)
 
     return obj
+
+
+__docspec__ = [WeaveClient, Call, CallsIter]

@@ -1,5 +1,23 @@
----
-hide_table_of_contents: true
+
+
+# API Overview
+
+## Modules
+
+- No modules
+
+## Classes
+
+- No classes
+
+## Functions
+
+- [`trace_api.init`](./weave.trace_api.md#function-init): Initialize weave tracking, logging to a wandb project.
+- [`trace_api.publish`](./weave.trace_api.md#function-publish): Save and version a python object.
+- [`trace_api.ref`](./weave.trace_api.md#function-ref): Construct a Ref to a Weave object.
+- [`call_context.get_current_call`](./weave.call_context.md#function-get_current_call): Get the Call object for the currently executing Op, within that Op.
+- [`trace_api.finish`](./weave.trace_api.md#function-finish): Stops logging to weave.
+
 ---
 The top-level functions for Weave Trace API.
 ---
