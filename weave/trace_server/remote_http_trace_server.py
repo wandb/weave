@@ -67,11 +67,11 @@ def _is_retryable_exception(e: Exception) -> bool:
 
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
-    logger.warn(
-        "retry_attempt",
+    logger.warning(
+        "Retry attempt %d for function '%s'",
+        retry_state.attempt_number,
+        retry_state.fn.__name__,
         extra={
-            "fn": retry_state.fn,
-            "attempt_number": retry_state.attempt_number,
             "exception": str(retry_state.outcome.exception()),
         },
     )
@@ -79,11 +79,17 @@ def _log_retry(retry_state: tenacity.RetryCallState) -> None:
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
     logger.error(
-        "retry_failed",
+        "Function '%s' failed after %d attempts with arguments %s due to exception: %s",
+        retry_state.fn.__name__,
+        retry_state.attempt_number,
+        retry_state.args,
+        str(retry_state.outcome.exception()),
         extra={
-            "fn": retry_state.fn,
+            "function": retry_state.fn.__name__,
             "attempt_number": retry_state.attempt_number,
             "exception": str(retry_state.outcome.exception()),
+            "args": retry_state.args,
+            "kwargs": retry_state.kwargs,
         },
     )
     return retry_state.outcome.result()
