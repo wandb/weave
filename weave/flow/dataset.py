@@ -64,3 +64,21 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+
+    def __eq__(self, other: Any) -> bool:
+        return self.rows == other
+
+    def __iadd__(self, rows: list[dict]) -> "Dataset":
+        if not all(isinstance(row, dict) for row in rows):
+            raise ValueError("Can only append dicts to Dataset")
+        for row in rows:
+            self.rows.append(row)
+        return self
+
+    def append(self, row: dict) -> None:
+        if not isinstance(row, dict):
+            raise ValueError("Can only append dicts to Dataset")
+        self.rows.append(row)
+
+    def pop(self, index: int) -> None:
+        self.rows.pop(index)

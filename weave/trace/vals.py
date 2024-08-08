@@ -220,7 +220,23 @@ class WeaveObject(Traceable):
         return f"WeaveObject({self._val})"
 
     def __eq__(self, other: Any) -> bool:
+        if getattr(self._val, "_class_name", None) == "Dataset":
+            return self._val.rows == other
         return self._val == other
+
+    def __iadd__(self, other: Any) -> Any:
+        if getattr(self._val, "_class_name", None) == "Dataset":
+            rows = other
+            if not all(isinstance(row, dict) for row in rows):
+                raise ValueError("Can only append dicts to Dataset")
+            for row in rows:
+                self._val.rows.append(row)
+            return self
+
+        val_type = type(self._val)
+        raise NotImplementedError(
+            f"__iadd__ not implemented for WeaveObject({val_type})"
+        )
 
 
 class WeaveTable(Traceable):
@@ -536,9 +552,14 @@ def make_trace_obj(
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return WeaveObject(
-                val, ref=new_ref, server=server, root=root, parent=parent
-            )
+            # TODO: This may evolve into a registry of classes that can be
+            # instantiated from ObjectRecords.
+            res = WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
+            if getattr(val, "_class_name", None) == "Dataset":
+                from weave.flow.dataset import Dataset
+
+                return Dataset(rows=res.rows)
+            return res
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
@@ -585,3 +606,14 @@ def make_trace_obj(
 
 class MissingSelfInstanceError(ValueError):
     pass
+
+
+# These methods exist to be bound to a Dataset WeaveObject to make it feel like
+# an actual Dataset without needing to use ops which would be verbose.  See usage
+# inside `make_trace_obj`
+def _table_append(self: WeaveTable, row: dict) -> None:
+    self.rows.append(row)
+
+
+def _table_pop(self: WeaveTable, index: int) -> None:
+    self.rows.pop(index)
