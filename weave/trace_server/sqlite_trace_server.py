@@ -379,16 +379,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             conds.append(filter_cond)
 
-        select_columns = []
+        select_columns = list(tsi.CallSchema.model_fields.keys())
         if req.columns:
-            required_columns = [
-                name
-                for name, field in tsi.CallSchema.model_fields.items()
-                if field.is_required()
-            ]
-            select_columns = list(set(req.columns + required_columns))
-        if not select_columns:
-            select_columns = list(tsi.CallSchema.model_fields.keys())
+            select_columns = [x for x in req.columns if x in select_columns]
 
         # TODO(gst): allow json fields to be selected
         select_columns = [col.split(".")[0] for col in select_columns]
@@ -403,18 +396,24 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         order_by = (
             None if not req.sort_by else [(s.field, s.direction) for s in req.sort_by]
         )
-        json_fields = ["attributes", "summary", "inputs", "output"]
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
                 json_path: Optional[str] = None
-                for json_field in json_fields:
-                    if field.startswith(json_field):
-                        field = json_field + field[len(json_field) :]
-                        if field.startswith(f"{json_field}."):
-                            json_path = field[len(f"{json_field}.") :]
-                            field = json_field
-                        break
+                if field.startswith("inputs"):
+                    field = "inputs" + field[len("inputs") :]
+                    if field.startswith("inputs."):
+                        json_path = field[len("inputs.") :]
+                        field = "inputs"
+                elif field.startswith("output"):
+                    field = "output" + field[len("output") :]
+                    if field.startswith("output."):
+                        json_path = field[len("output.") :]
+                        field = "output"
+                elif field.startswith("attributes"):
+                    field = "attributes_dump" + field[len("attributes") :]
+                elif field.startswith("summary"):
+                    field = "summary_dump" + field[len("summary") :]
                 assert direction in [
                     "ASC",
                     "DESC",
@@ -425,8 +424,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     field = f"json_extract({field}, '{quote_json_path(json_path)}')"
                 order_parts.append(f"{field} {direction}")
 
-            order_by_part = ", ".join(order_parts)
-            query += f" ORDER BY {order_by_part}"
+        order_by_part = ", ".join(order_parts)
+        query += f" ORDER BY {order_by_part}"
 
         limit = req.limit or -1
         if limit:
@@ -442,7 +441,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         calls = []
         for row in query_result:
             call_dict = {k: v for k, v in zip(select_columns, row)}
-            for json_field in json_fields:
+            for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):
                     call_dict[json_field] = json.loads(call_dict[json_field])
             calls.append(tsi.CallSchema(**call_dict))
@@ -484,7 +483,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(", ".join("?" * len(req.call_ids)))
+            """.format(
+                ", ".join("?" * len(req.call_ids))
+            )
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -496,7 +497,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(", ".join("?" * len(all_ids)))
+            """.format(
+                ", ".join("?" * len(all_ids))
+            )
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()
