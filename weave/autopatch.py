@@ -13,7 +13,7 @@ def autopatch() -> None:
     from .integrations.langchain.langchain import langchain_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
-    from .integrations.mistral.mistral import mistral_patcher
+    from .integrations.mistral import mistral_patcher
     from .integrations.openai.openai_sdk import openai_patcher
 
     openai_patcher.attempt_patch()
@@ -35,7 +35,7 @@ def reset_autopatch() -> None:
     from .integrations.langchain.langchain import langchain_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
-    from .integrations.mistral.mistral import mistral_patcher
+    from .integrations.mistral import mistral_patcher
     from .integrations.openai.openai_sdk import openai_patcher
 
     openai_patcher.undo_patch()
