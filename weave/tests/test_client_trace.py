@@ -2162,6 +2162,8 @@ def test_call_query_stream_columns(client):
     # assert non-required fields we didn't query for are None
     assert len(calls.calls) == 2
     assert len(calls.calls[0].inputs) == 2
+
+    # NO output returned because not required and not requested
     assert calls.calls[0].output is None
     assert calls.calls[0].ended_at is None
 
@@ -2173,7 +2175,7 @@ def test_call_query_stream_columns(client):
         )
     )
     assert len(calls.calls) == 2
-    assert calls.calls[0].output["a + b"] == 0
+    assert calls.calls[0].output["result"]["a + b"] == 0
 
 
 @pytest.mark.skip("Not implemented: filter / sort through refs")

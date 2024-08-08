@@ -213,7 +213,9 @@ all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 all_call_json_columns = ("inputs", "output", "attributes", "summary")
 
 required_call_columns = [
-    name for name, field in tsi.CallSchema.model_fields.items() if field.is_required()
+    name
+    for name, field in SelectableCHCallSchema.model_fields.items()
+    if field.is_required()
 ]
 
 
@@ -410,9 +412,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             pb.get_params(),
         )
 
+        select_columns = [c.field for c in cq.select_fields]
         for row in raw_res:
             yield tsi.CallSchema.model_validate(
-                _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
+                _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
             )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
