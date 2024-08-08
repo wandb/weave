@@ -317,15 +317,17 @@ class WeaveList(Traceable, list):
     def __init__(
         self,
         *args: Any,
-        **kwargs: Any,
-    ):
-        self.ref: RefWithExtra = kwargs.pop("ref")
-        self.server: TraceServerInterface = kwargs.pop("server")
-        root: Optional[Traceable] = kwargs.pop("root", None)
-        if root is None:
-            root = self
-        self.root = root
-        super().__init__(*args, **kwargs)
+        server: TraceServerInterface,
+        ref: Optional[RefWithExtra] = None,
+        root: Optional[Traceable] = None,
+        parent: Optional[Traceable] = None,
+    ) -> None:
+        self.server = server
+
+        self.ref = ref
+        self.root = root or self
+        self.parent = parent
+        super().__init__(*args)
 
     def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
         if isinstance(i, slice):
@@ -379,14 +381,17 @@ class WeaveDict(Traceable, dict):
     def __init__(
         self,
         *args: Any,
+        server: TraceServerInterface,
+        ref: Optional[RefWithExtra] = None,
+        root: Optional[Traceable] = None,
+        parent: Optional[Traceable] = None,
         **kwargs: Any,
-    ):
-        self.ref: Optional[RefWithExtra] = kwargs.pop("ref")
-        self.server: TraceServerInterface = kwargs.pop("server")
-        root: Optional[Traceable] = kwargs.pop("root", None)
-        if root is None:
-            root = self
-        self.root = root
+    ) -> None:
+        self.server = server
+
+        self.ref = ref
+        self.root = root or self
+        self.parent = parent
         super().__init__(*args, **kwargs)
 
     def __getitem__(self, key: str) -> Any:
