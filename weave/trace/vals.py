@@ -304,11 +304,8 @@ class WeaveTable(Traceable):
 
         raise KeyError(f"Row ID not found: {key}")
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)
-
-    def __iter__(self) -> Generator[Any, None, None]:
-        yield from self.rows
 
     def append(self, val: dict) -> None:
         if not isinstance(val, dict):
