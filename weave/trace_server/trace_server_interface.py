@@ -61,9 +61,9 @@ class CallSchema(BaseModel):
     id: str
     project_id: str
 
-    ## Name of the calling function (op)
+    # Name of the calling function (op)
     op_name: str
-    ## Optional display name of the call
+    # Optional display name of the call
     display_name: typing.Optional[str] = None
 
     ## Trace ID
@@ -138,16 +138,16 @@ class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
 
-    # End time is required
+    ## End time is required
     ended_at: datetime.datetime
 
-    # Exception is present if the call failed
+    ## Exception is present if the call failed
     exception: typing.Optional[str] = None
 
-    # Outputs
+    ## Outputs
     output: typing.Optional[typing.Any] = None
 
-    # Summary: a summary of the call
+    ## Summary: a summary of the call
     summary: SummaryInsertMap
 
     @field_serializer("summary")
@@ -250,10 +250,6 @@ class CallsQueryReq(BaseModel):
     sort_by: typing.Optional[typing.List[_SortBy]] = None
     query: typing.Optional[Query] = None
     include_costs: typing.Optional[bool] = False
-
-    # TODO: type this with call schema columns, following the same rules as
-    # _SortBy and thus GetFieldOperator.get_field_ (without direction)
-    columns: typing.Optional[typing.List[str]] = None
 
     # TODO: type this with call schema columns, following the same rules as
     # _SortBy and thus GetFieldOperator.get_field_ (without direction)
