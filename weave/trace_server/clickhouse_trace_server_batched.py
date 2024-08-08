@@ -118,6 +118,7 @@ call_select_arrays_columns = ["input_refs", "output_refs"]  # array_concat_agg
 call_select_argmax_columns = ["display_name"]  # argMaxMerge
 # all others use `any`
 
+
 all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
 all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 
