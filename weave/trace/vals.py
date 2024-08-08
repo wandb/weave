@@ -98,7 +98,12 @@ class Traceable:
         """Recursively mark this object and its ancestors as dirty and removes their refs."""
         self._is_dirty = True
         self.ref = None
-        if self.parent not in (self, None) and hasattr(self.parent, "_mark_dirty"):
+        if (
+            # Written this way to satisfy mypy
+            self.parent is not self
+            and self.parent is not None
+            and hasattr(self.parent, "_mark_dirty")
+        ):
             self.parent._mark_dirty()
 
     def add_mutation(
