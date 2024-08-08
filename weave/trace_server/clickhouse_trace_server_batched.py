@@ -38,7 +38,6 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from pydantic import BaseModel, field_validator
 
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
@@ -49,8 +48,17 @@ from weave.trace_server.ids import generate_id
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
-from . import refs_internal, validation
+from . import refs_internal
 from . import trace_server_interface as tsi
+from .clickhouse_schema import (
+    CallDeleteCHInsertable,
+    CallEndCHInsertable,
+    CallStartCHInsertable,
+    CallUpdateCHInsertable,
+    ObjCHInsertable,
+    SelectableCHCallSchema,
+    SelectableCHObjSchema,
+)
 from .emoji_util import detone_emojis
 from .errors import InvalidRequest, RequestTooLarge
 from .feedback import (
@@ -81,125 +89,12 @@ class NotFoundError(Exception):
     pass
 
 
-class CallStartCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    trace_id: str
-    parent_id: typing.Optional[str] = None
-    op_name: str
-    started_at: datetime.datetime
-    attributes_dump: str
-    inputs_dump: str
-    input_refs: typing.List[str]
-    output_refs: typing.List[str] = []  # sadly, this is required
-    display_name: typing.Optional[str] = None
-
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
-    _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
-    _op_name_v = field_validator("op_name")(validation.op_name_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
-    _display_name_v = field_validator("display_name")(validation.display_name_validator)
-    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
-    _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
-
-
-class CallEndCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    ended_at: datetime.datetime
-    exception: typing.Optional[str] = None
-    summary_dump: str
-    output_dump: str
-    input_refs: typing.List[str] = []  # sadly, this is required
-    output_refs: typing.List[str]
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
-
-
-class CallDeleteCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    wb_user_id: str
-
-    deleted_at: datetime.datetime
-
-    # required types
-    input_refs: typing.List[str] = []
-    output_refs: typing.List[str] = []
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
-
-
-class CallUpdateCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    wb_user_id: str
-
-    # update types
-    display_name: typing.Optional[str] = None
-
-    # required types
-    input_refs: typing.List[str] = []
-    output_refs: typing.List[str] = []
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
-    _display_name_v = field_validator("display_name")(validation.display_name_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
-
-
 CallCHInsertable = typing.Union[
     CallStartCHInsertable,
     CallEndCHInsertable,
     CallDeleteCHInsertable,
     CallUpdateCHInsertable,
 ]
-
-
-# Very critical that this matches the calls table schema! This should
-# essentially be the DB version of CallSchema with the addition of the
-# created_at and updated_at fields
-class SelectableCHCallSchema(BaseModel):
-    project_id: str
-    id: str
-
-    op_name: str
-    display_name: typing.Optional[str] = None
-
-    trace_id: str
-    parent_id: typing.Optional[str] = None
-
-    started_at: datetime.datetime
-    ended_at: typing.Optional[datetime.datetime] = None
-    exception: typing.Optional[str] = None
-
-    attributes_dump: str
-    inputs_dump: str
-    output_dump: typing.Optional[str] = None
-    summary_dump: typing.Optional[str] = None
-
-    input_refs: typing.List[str]
-    output_refs: typing.List[str]
-
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
-
-    deleted_at: typing.Optional[datetime.datetime] = None
 
 
 all_call_insert_columns = list(
@@ -222,33 +117,6 @@ call_select_raw_columns = ["id", "project_id"]  # no aggregation
 call_select_arrays_columns = ["input_refs", "output_refs"]  # array_concat_agg
 call_select_argmax_columns = ["display_name"]  # argMaxMerge
 # all others use `any`
-
-
-class ObjCHInsertable(BaseModel):
-    project_id: str
-    kind: str
-    base_object_class: typing.Optional[str]
-    object_id: str
-    refs: typing.List[str]
-    val_dump: str
-    digest: str
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _object_id_v = field_validator("object_id")(validation.object_id_validator)
-    _refs = field_validator("refs")(validation.refs_list_validator)
-
-
-class SelectableCHObjSchema(BaseModel):
-    project_id: str
-    object_id: str
-    created_at: datetime.datetime
-    refs: typing.List[str]
-    val_dump: str
-    kind: str
-    base_object_class: typing.Optional[str]
-    digest: str
-    version_index: int
-    is_latest: int
 
 
 all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())

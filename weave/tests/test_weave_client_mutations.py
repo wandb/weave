@@ -1,3 +1,4 @@
+import pytest
 from pydantic import Field
 
 import weave
@@ -246,3 +247,94 @@ def test_dict_mutation_saving_nested_lists(client):
     assert d3["a"] == [1, 2]
     assert d3["b"] == [3, 4]
     assert d3["c"] == [5, 6]
+
+
+def test_table_mutation_saving_append_rows(client):
+    t = weave.Table(rows=[{"a": 1, "b": 2}])
+    t.append({"a": 3, "b": 4})
+    ref = weave.publish(t)
+
+    t2 = ref.get()
+    assert t2.rows == [
+        {"a": 1, "b": 2},
+        {"a": 3, "b": 4},
+    ]
+    t2.append({"a": 5, "b": 6})
+    ref2 = weave.publish(t2)
+
+    t3 = ref2.get()
+    assert t3.rows == [
+        {"a": 1, "b": 2},
+        {"a": 3, "b": 4},
+        {"a": 5, "b": 6},
+    ]
+
+
+def test_table_mutation_saving_pop_rows(client):
+    t = weave.Table(
+        rows=[
+            {"a": 1, "b": 2},
+            {"a": 3, "b": 4},
+            {"a": 5, "b": 6},
+        ]
+    )
+    t.pop(0)
+    ref = weave.publish(t)
+
+    t2 = ref.get()
+    assert t2.rows == [
+        {"a": 3, "b": 4},
+        {"a": 5, "b": 6},
+    ]
+    t2.pop(0)
+    ref2 = weave.publish(t2)
+
+    t3 = ref2.get()
+    assert t3.rows == [{"a": 5, "b": 6}]
+
+
+def test_table_mutation_saving_replace_rows(client):
+    t = weave.Table(
+        rows=[
+            {"a": 1, "b": 2},
+            {"a": 3, "b": 4},
+        ]
+    )
+    ref = weave.publish(t)
+
+    t2 = ref.get()
+    t2.rows = [{"a": 5, "b": 6}]
+    ref2 = weave.publish(t2)
+
+    t3 = ref2.get()
+    assert t3.rows == [{"a": 5, "b": 6}]
+
+
+def test_table_cant_append_bad_data(client):
+    t = weave.Table(rows=[{"a": 1, "b": 2}])
+    with pytest.raises(ValueError):
+        t.append(1)
+    with pytest.raises(ValueError):
+        t.append([1, 2, 3])
+
+    ref = weave.publish(t)
+    t2 = ref.get()
+    with pytest.raises(ValueError):
+        t2.append(1)
+    with pytest.raises(ValueError):
+        t2.append([1, 2, 3])
+
+
+def test_table_cant_set_bad_data(client):
+    t = weave.Table(rows=[{"a": 1, "b": 2}])
+    with pytest.raises(ValueError):
+        t.rows = [1, 2, 3]
+    with pytest.raises(ValueError):
+        t.rows = [{"a": 1, "b": 2}, 3]
+
+    ref = weave.publish(t)
+    t2 = ref.get()
+    with pytest.raises(ValueError):
+        t2.rows = [1, 2, 3]
+    with pytest.raises(ValueError):
+        t2.rows = [{"a": 1, "b": 2}, 3]

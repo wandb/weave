@@ -504,16 +504,22 @@ export const CallsTable: FC<{
     history,
   ]);
 
+  // We really want to use columns here, but because visibleColumns
+  // is a prop to ExportSelector, it causes infinite reloads.
+  // memoize key computation, then filter out hidden columns
+  const allRowKeys = useMemo(() => {
+    const keysSet = new Set<string>();
+    tableData.forEach(row => {
+      Object.keys(row).forEach(key => keysSet.add(key));
+    });
+    return Array.from(keysSet);
+  }, [tableData]);
+
   // Register Export Button
   useEffect(() => {
-    // We really want to use columns here, but because visibleColumns
-    // is a prop to ExportSelector, and that gets mounted in the table (?)
-    // we have a circular dependency causing infinite reloads
     const visibleColumns =
       tableData.length > 0
-        ? Object.keys(tableData[0]).filter(
-            col => columnVisibilityModel?.[col] !== false
-          )
+        ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
         : [];
     addExtra('exportButton', {
       node: (
@@ -540,6 +546,7 @@ export const CallsTable: FC<{
     selectedCalls,
     callsTotal,
     tableData,
+    allRowKeys,
     columnVisibilityModel,
     entity,
     project,
