@@ -325,7 +325,7 @@ class WeaveList(Traceable, list):
         self.server = server
 
         self.ref = ref
-        self.root = root or self
+        self.root = root if root is not None else self
         self.parent = parent
         super().__init__(*args)
 
@@ -390,7 +390,7 @@ class WeaveDict(Traceable, dict):
         self.server = server
 
         self.ref = ref
-        self.root = root or self
+        self.root = root if root is not None else self
         self.parent = parent
         super().__init__(*args, **kwargs)
 
