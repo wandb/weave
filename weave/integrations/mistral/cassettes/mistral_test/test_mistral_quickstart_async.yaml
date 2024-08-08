@@ -1,54 +1,55 @@
 interactions:
 - request:
-    body: '{"messages": [{"role": "user", "content": "What is the best French cheese?"}],
-      "safe_prompt": false, "model": "mistral-large-latest", "stream": false}'
+    body: '{"messages":[{"content":"What is the best French cheese?","role":"user"}],"model":"mistral-large-latest","safe_prompt":false,"stream":false,"temperature":0.7,"tool_choice":"auto","top_p":1.0}'
     headers:
       accept:
       - application/json
       accept-encoding:
-      - gzip, deflate
+      - gzip, deflate, br
       connection:
       - keep-alive
       content-length:
-      - '150'
+      - '191'
       content-type:
       - application/json
       host:
       - api.mistral.ai
       user-agent:
-      - mistral-client-python/0.1.8
+      - mistral-client-python/1.0.0
     method: POST
     uri: https://api.mistral.ai/v1/chat/completions
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA4yUTW7kNhCFr1LgJkCgbnR7/IPWbhJgkNkEQX5WcWCUxKcmZ0iWUqTcVgxfIffI
-        OeZiAdVpp+0ZINlKrFdfPb7io/HWtMZeXXXX2921veKLyze82fUbdODtsLsYLO9gGiPdB/TFtKZ3
-        XNa9xDGgeEmmMb2CC6xptzfby+31Zne5bUwUi2BaE30uymEVWPdYBS7IpdY48T2yaX99ND5ZPJh2
-        05iInHkP0z4alQDTGs7Z58JpqZFUkCrDzw4KYgVFTjPhoUcISIXeKVLvqHdARm6Ik6XiQLemQy63
-        hiSBZChIZDEi2UySaIRmSRxoVAyoEljTd3LAPbShLLHWLDpRcqFRximwLuLO712YSbFntbCvAMin
-        PkwW7W26TV/TtxLLp79aekuO1f5ziCJb0KASaUoj54JJ/R+w1Mvhq0zRh4/k09L9nXLqHVZHndrU
-        S6poqGWajgewpveFHGdiUt+7htJUykxD4Hs5UjMNXmNDOfi9K2GmvXJaZip4KJNiveByROygpRJn
-        GUpDedKBe6zUj0j4wggvob8XjZzsfEbUBZE408H5AlJfYRagGqI4NwTW4k6wC8aP8vuEQY4YXZjw
-        edfsgPGVWVmm4qo5n5lSOO3ns+Ezh9f29DrFLswv7PhGPU5O/NfgFeDTnwEri9Wx/+m2WGVKln5g
-        9fmMafGjIVjfhS/60k2lQF8agy5I7yT9ez8Hzg52tdT/D8Sf+F48zoJ0TNkS4bdhPAdcMtTQoJN/
-        bdYpGuMYcObYbfolFB+5IMzNolx38OWGkK/aketstf/zJpaa6DW9p4NMwZKilxhRt1lnn/bEdM/q
-        UeZaddq2ipOB+v/gfO/qtmeaZSKkDzI/b/DaNKaIhLueQ8imTVMIT40ZfPLZ3Sk4SzKtyUVG05gg
-        +1GlO537rTHT6ZEaVeJY7op8RMqm3W6qbuHw/OXN5qa+W6fH8vn7xe7m6elvAAAA//8DAB/AcdR9
-        BQAA
+        MRwZACBbamnVYqBg+2b/PmR2jrlUBEmQhH4J8AHwgsL0rko3tYYu5x/acrpljblsLwwfH8Mvi79o
+        T7CAv+izxzhVVZ9eDdBrmqQk54pGXvYBpccGL+7ba7o6H+7vrq+vuuHy/ub65vLyuhvOz86vr+ga
+        C1r7jrvEBruJcntRQZqYYsFE5T/nHpvz24vL87Obq6v7grP1XLHBWSKd6sn0+JWVkiOxYBJ8lsDm
+        xQecbT+JzVnBKyy2weYDulXGBilCIkl/J9w0WRMb/HYyC9FxSMefvcSWI18i/OCs3QTdxBwMEvC4
+        SjLkaafLjudAJMnskwGm4JFiQlIkF6CAH5y0Y5gGi9x/Lz3Djlw4j2AD8KHjWllzHd6xhZ/YGcgZ
+        bm3Al85qe+UeTDmg8DCDnKFp1TmdaUjPzj3QbAyeaDmyeakv9XwLm80/9rjyYJ6bTROU8wliYl5g
+        lvoAbV0Zggr8ESe9d4ANxxVb+Dm/CHhQ2ysM5iAZkKTjUYXxQTWPMFTamRdd4hIpqlPRjkUDbFhN
+        0Gy1377Ul3qxhc3mW2pK9Q8k9Ax/mM+kvfBm08DXEDZkgc6Z5mOB6hszTlwWVu6hs/0XwQISIO3D
+        QqlDLt3Udq0z2bGBh0FCvQrWd3bkHnpcLR7WWo/gstg0NprxESZ1yf2NC0PP8DvTekCn0m5awasB
+        FFOBKpMMSAOKwXZNCOIJMEvt2UEUX2OJp3MvbWXYT5IMLtqLCyVRQup+m5irKbmK25yf/1evju+S
+        k9FHYNWFInl1ea9idVe3wOD2iU/+jx2cRzHVFgbq4EMBXTOPbQkG8blALC46HiH5kKuzsanrUf9w
+        W62bTO2buaeYuD8h2Bczk1u5mgICmfJ1XUQZXDHYAP/Szo4E6U57WtXIIWAQlejJGemmI5DbTP5I
+        3Uh//m8xieBQ+MZWH23UoZZVR1bYNSABjMYQ4IJvFgibeT9RRgwBxSbdw7GA9QiMSypgC9u+py4a
+        gzlxBKvwABsG9gCCVeVxZYpI/t4Cc2lW72g6032MD8FMmexgw55VdYo4dIsF06y+6ajWwEbXWj8V
+        LDLZ9aah38XYYKQtWLDauLi13w2+KrjuuWIsbvOSb9IeWAOb87OCN1uBvBu/vL0s6FaMFNPPvDeX
+        nz4ZAw==
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 87a917f8fbfa1028-LAX
+      - 8afe342d5c3a11a5-MRS
       Connection:
       - keep-alive
       Content-Encoding:
-      - gzip
+      - br
       Content-Type:
       - application/json
       Date:
-      - Fri, 26 Apr 2024 19:49:11 GMT
+      - Thu, 08 Aug 2024 08:40:57 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -57,12 +58,30 @@ interactions:
       - '*'
       alt-svc:
       - h3=":443"; ma=86400
+      ratelimitbysize-limit:
+      - '20000000'
+      ratelimitbysize-query-cost:
+      - '32008'
+      ratelimitbysize-remaining:
+      - '19935984'
+      ratelimitbysize-reset:
+      - '11'
+      x-envoy-upstream-service-time:
+      - '8433'
       x-kong-proxy-latency:
-      - '5'
+      - '2'
       x-kong-request-id:
-      - 1b17130a7651e30aee05ee19f55c3f5b
+      - 9e878475a74f83234245fc18becec170
       x-kong-upstream-latency:
-      - '9637'
+      - '8434'
+      x-ratelimitbysize-limit-minute:
+      - '20000000'
+      x-ratelimitbysize-limit-month:
+      - '200000000000'
+      x-ratelimitbysize-remaining-minute:
+      - '19935984'
+      x-ratelimitbysize-remaining-month:
+      - '199958683436'
     status:
       code: 200
       message: OK
