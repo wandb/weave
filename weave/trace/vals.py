@@ -556,9 +556,10 @@ def make_trace_obj(
 
                 # This is a way of adding back the required append and pop methods
                 # without explicitly making them ops, which would cause verbose
-                # logging and versioning
-                res.append = _table_append
-                res.pop = _table_pop
+                # logging and versioning.  We need to use object.__setattr__ to avoid
+                # dirtying the object by assigning these methods to it
+                object.__setattr__(res, "append", maybe_bind_method(_table_append, res))
+                object.__setattr__(res, "pop", maybe_bind_method(_table_pop, res))
 
             return res
         elif isinstance(val, list):
