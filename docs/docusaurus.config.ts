@@ -150,6 +150,16 @@ const config: Config = {
             },
           ]
         },
+        {
+          type: 'search',
+          position: 'right',
+        },
+        {
+          to: 'https://wandb.ai/home',
+          label: 'Open App',
+          position: 'right',
+          className: 'button button--secondary button--med margin-right--sm',
+        },
       ],
     },
     footer: {
