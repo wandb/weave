@@ -73,18 +73,8 @@ const config: Config = {
           docsPluginId: "classic", // configured for preset-classic
           config: {
             weave: {
-              // specPath: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/api-with-examples.yaml",
-              // specPath: "https://trace.wandb.ai/openapi.json",
               specPath: "./openapi_docs.json",
-              outputDir: "docs/service-api",
-              baseUrl: "https://trace.wandb.ai/", // not working
-              proxy: "https://trace.wandb.ai/", // not working
-              hideSendButton: false,
-              markdownGenerators: {
-                createInfoPageMD: (pageData) => {
-                  return `TODO`
-                }
-              }
+              outputDir: "docs/reference/service-api",
             } satisfies OpenApiPlugin.Options,
           }
         },
@@ -116,16 +106,22 @@ const config: Config = {
           label: "Documentation",
         },
         {
-          type: "docSidebar",
-          sidebarId: "apiReferenceSidebar",
           position: "left",
-          label: "API Reference",
-        },
-        {
-          type: "docSidebar",
-          sidebarId: "serviceApiReferenceSidebar",
-          position: "left",
-          label: "Service API Reference",
+          label: "Reference",
+          type: "dropdown",
+          items: [
+            {
+              type: "docSidebar",
+              sidebarId: "pythonSdkSidebar",
+              label: "Python SDK",
+            },
+            // Keeping this hidden until we want to "release" the service API
+            // {
+            //   type: "docSidebar",
+            //   sidebarId: "serviceApiSidebar",
+            //   label: "Service API",
+            // },
+          ]
         },
         {
           href: "https://github.com/wandb/weave",

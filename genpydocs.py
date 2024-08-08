@@ -22,10 +22,10 @@ def doc_module(module):
 
 
 def main():
-    from weave import query_api as api
+    from weave import trace_api as api
 
     api_docs = doc_module(api)
-    with open("docs/docs/api-reference/python/weave.md", "w") as f:
+    with open("docs/docs/reference/python-sdk/weave.md", "w") as f:
         f.write(api_docs)
 
 
