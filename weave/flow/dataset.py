@@ -68,7 +68,7 @@ class Dataset(Object):
     def __eq__(self, other: Any) -> bool:
         return self.rows == other
 
-    def __iadd__(self, rows: list[dict]) -> None:
+    def __iadd__(self, rows: list[dict]) -> "Dataset":
         if not all(isinstance(row, dict) for row in rows):
             raise ValueError("Can only append dicts to Dataset")
         for row in rows:
