@@ -70,6 +70,11 @@ const sidebars: SidebarsConfig = {
           ],
         },
         {
+          type: 'html',
+          value: '<div class="sidebar-section-title">Section Title<div>', // The HTML to be rendered
+          defaultStyle: true, // Use the default menu item styling
+        },
+        {
           type: "category",
           collapsible: true,
           collapsed: true,
