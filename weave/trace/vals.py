@@ -220,6 +220,8 @@ class WeaveObject(Traceable):
         return f"WeaveObject({self._val})"
 
     def __eq__(self, other: Any) -> bool:
+        if self._val._class_name == "Dataset":
+            return self._val.rows == other
         return self._val == other
 
 
@@ -447,6 +449,14 @@ class WeaveDict(Traceable, dict):
         return True
 
 
+def _table_append(self: WeaveTable, row: dict) -> None:
+    self.rows.append(row)
+
+
+def _table_pop(self: WeaveTable, index: int) -> None:
+    self.rows.pop(index)
+
+
 def make_trace_obj(
     val: Any,
     new_ref: Optional[RefWithExtra],  # Can this actually be None?
@@ -536,9 +546,21 @@ def make_trace_obj(
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return WeaveObject(
-                val, ref=new_ref, server=server, root=root, parent=parent
-            )
+            res = WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
+            if val._class_name == "Dataset":
+                # This line is strangely required when assigning res = WeaveObject(...),
+                # and it must come before any attribute access, otherwise our custom
+                # attribute access does not work.  This seems to be because of an unwanted
+                # optimization by python.  Strange!
+                getattr(res, "rows")
+
+                # This is a way of adding back the required append and pop methods
+                # without explicitly making them ops, which would cause verbose
+                # logging and versioning
+                res.append = _table_append
+                res.pop = _table_pop
+
+            return res
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):

@@ -64,3 +64,12 @@ class Dataset(Object):
                     "Attempted to construct a Dataset row with an empty dict."
                 )
         return rows
+
+    def __eq__(self, other: Any) -> bool:
+        return self.rows == other
+
+    def append(self, row: dict) -> None:
+        self.rows.append(row)
+
+    def pop(self, index: int) -> None:
+        self.rows.pop(index)
