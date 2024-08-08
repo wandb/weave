@@ -155,7 +155,6 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     # If/When we do memoization, this would be a good spot
 
     parent_call = call_context.get_current_call()
-    client._save_nested_objects(inputs_with_defaults)
     attributes = call_attributes.get()
 
     return client.create_call(
