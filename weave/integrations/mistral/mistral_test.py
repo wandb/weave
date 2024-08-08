@@ -65,7 +65,6 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    print(output)
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chat_response.id
@@ -114,7 +113,6 @@ async def test_mistral_quickstart_async(client: weave.weave_client.WeaveClient) 
 6. **Époisses de Bourgogne**: A pungent, washed-rind cheese made from cow's milk. It has a strong, somewhat salty flavor and a sticky, orange exterior.
 
 Each of these cheeses offers a unique taste and texture, so the "best" one is a matter of personal preference."""
-    print(all_content)
 
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
