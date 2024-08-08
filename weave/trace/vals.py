@@ -224,6 +224,29 @@ class WeaveObject(Traceable):
             return self._val.rows == other
         return self._val == other
 
+    def __add__(self, other: Any) -> Any:
+        if getattr(self._val, "_class_name", None) == "Dataset":
+            return self._val.rows + other
+
+        val_type = type(self._val)
+        raise NotImplementedError(
+            f"__add__ not implemented for WeaveObject({val_type})"
+        )
+
+    def __iadd__(self, other: Any) -> Any:
+        if getattr(self._val, "_class_name", None) == "Dataset":
+            rows = other
+            if not all(isinstance(row, dict) for row in rows):
+                raise ValueError("Can only append dicts to Dataset")
+            for row in rows:
+                self._val.rows.append(row)
+            return self
+
+        val_type = type(self._val)
+        raise NotImplementedError(
+            f"__iadd__ not implemented for WeaveObject({val_type})"
+        )
+
 
 class WeaveTable(Traceable):
     filter: _TableRowFilter

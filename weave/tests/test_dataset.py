@@ -108,3 +108,18 @@ def test_dataset_assignment(client):
 
     ds3 = ref2.get()
     assert ds3 == [{"a": 5, "b": 6}]
+
+
+def test_dataset_iadd(client):
+    ds = weave.Dataset(rows=[{"a": 1, "b": 2}])
+    ds += [{"a": 3, "b": 4}]
+    ref = weave.publish(ds)
+
+    ds2 = ref.get()
+    assert ds2 == [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+
+    ds2 += [{"a": 5, "b": 6}]
+    ref2 = weave.publish(ds2)
+
+    ds3 = ref2.get()
+    assert ds3 == [{"a": 1, "b": 2}, {"a": 3, "b": 4}, {"a": 5, "b": 6}]
