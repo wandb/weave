@@ -154,15 +154,15 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
         else:
             return self.__sync_stream_text__()
 
-    def __sync_stream_text__(self) -> Iterator[str]:  # type: ignore[attr-defined]
-        for chunk in self:
-            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore[attr-defined]
-                yield chunk.delta.text
+    def __sync_stream_text__(self) -> Iterator[str]:  # type: ignore
+        for chunk in self:  # type: ignore
+            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
+                yield chunk.delta.text  # type: ignore
 
-    async def __async_stream_text__(self) -> AsyncIterator[str]:  # type: ignore[attr-defined]
-        async for chunk in self:
-            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
-                yield chunk.delta.text
+    async def __async_stream_text__(self) -> AsyncIterator[str]:  # type: ignore
+        async for chunk in self:  # type: ignore
+            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
+                yield chunk.delta.text  # type: ignore
 
     @property
     def text_stream(self) -> Union[Iterator[str], AsyncIterator[str]]:
