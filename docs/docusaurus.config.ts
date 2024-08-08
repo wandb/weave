@@ -73,7 +73,7 @@ const config: Config = {
           docsPluginId: "classic", // configured for preset-classic
           config: {
             weave: {
-              specPath: "./openapi_docs.json",
+              specPath: "./scripts/.cache/service_api_openapi_docs.json",
               outputDir: "docs/reference/service-api",
             } satisfies OpenApiPlugin.Options,
           }
@@ -116,11 +116,11 @@ const config: Config = {
               label: "Python SDK",
             },
             // Keeping this hidden until we want to "release" the service API
-            // {
-            //   type: "docSidebar",
-            //   sidebarId: "serviceApiSidebar",
-            //   label: "Service API",
-            // },
+            {
+              type: "docSidebar",
+              sidebarId: "serviceApiSidebar",
+              label: "Service API",
+            },
           ]
         },
         {
