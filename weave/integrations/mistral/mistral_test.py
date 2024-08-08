@@ -65,6 +65,7 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
+    print(f"{output.choices[0]=}")
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chat_response.id
@@ -176,7 +177,8 @@ Each of these cheeses offers a unique taste and texture, so the "best" one depen
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    assert output.choices[0].message.content == exp
+    print(f"{output=}")
+    assert output.choices[0].delta.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chunk.data.id
     assert output.model == chunk.data.model
@@ -243,7 +245,7 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    assert output.choices[0].message.content == exp
+    assert output.choices[0].delta.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chunk.data.id
     assert output.model == chunk.data.model
