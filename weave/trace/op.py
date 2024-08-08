@@ -45,6 +45,11 @@ try:
 except ImportError:
     ANTHROPIC_NOT_GIVEN = None
 
+try:
+    from mistralai.types.basemodel import UNSET as MISTRAL_NOT_GIVEN
+except ImportError:
+    ANTHROPIC_NOT_GIVEN = None
+
 
 def print_call_link(call: "Call") -> None:
     if settings.should_print_call_link():
@@ -61,6 +66,7 @@ def value_is_sentinel(param: Any) -> bool:
         or param.default is OPENAI_NOT_GIVEN
         or param.default is COHERE_NOT_GIVEN
         or param.default is ANTHROPIC_NOT_GIVEN
+        or param.default is MISTRAL_NOT_GIVEN
     )
 
 
