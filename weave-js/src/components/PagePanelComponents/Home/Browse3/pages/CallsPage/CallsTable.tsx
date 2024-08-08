@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
-  GridApiPro,
   GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
@@ -24,7 +23,6 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import React, {
   FC,
@@ -72,6 +70,11 @@ import {
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
+import {
+  BulkDeleteButton,
+  CompareEvaluationsTableButton,
+  ExportSelector,
+} from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
@@ -155,18 +158,6 @@ export const CallsTable: FC<{
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
-
-  // Register Export Button
-  useEffect(() => {
-    addExtra('exportRunsTableButton', {
-      node: (
-        <ExportRunsTableButton tableRef={apiRef} rightmostButton={isReadonly} />
-      ),
-      order: 2,
-    });
-
-    return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, isReadonly, addExtra, removeExtra]);
 
   // Table State consists of:
   // 1. Filter (Structured Filter)
@@ -402,6 +393,7 @@ export const CallsTable: FC<{
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
+        disableExport: true,
         renderHeader: (params: any) => {
           return (
             <Checkbox
@@ -510,6 +502,53 @@ export const CallsTable: FC<{
     entity,
     project,
     history,
+  ]);
+
+  // Register Export Button
+  useEffect(() => {
+    // We really want to use columns here, but because visibleColumns
+    // is a prop to ExportSelector, and that gets mounted in the table (?)
+    // we have a circular dependency causing infinite reloads
+    const visibleColumns =
+      tableData.length > 0
+        ? Object.keys(tableData[0]).filter(
+            col => columnVisibilityModel?.[col] !== false
+          )
+        : [];
+    addExtra('exportButton', {
+      node: (
+        <ExportSelector
+          selectedCalls={selectedCalls}
+          numTotalCalls={callsTotal}
+          disabled={callsTotal === 0}
+          visibleColumns={visibleColumns}
+          callQueryParams={{
+            entity,
+            project,
+            filter: effectiveFilter,
+            gridFilter: filterModel,
+            gridSort: sortModel,
+          }}
+          rightmostButton={isReadonly}
+        />
+      ),
+      order: 2,
+    });
+
+    return () => removeExtra('exportButton');
+  }, [
+    selectedCalls,
+    callsTotal,
+    tableData,
+    columnVisibilityModel,
+    entity,
+    project,
+    isReadonly,
+    effectiveFilter,
+    filterModel,
+    sortModel,
+    addExtra,
+    removeExtra,
   ]);
 
   // Register Delete Button
@@ -893,80 +932,6 @@ const getPeekId = (peekPath: string | null): string | null => {
   const url = new URL(peekPath, baseUrl);
   const {pathname} = url;
   return pathname.split('/').pop() ?? null;
-};
-
-const ExportRunsTableButton = ({
-  tableRef,
-  rightmostButton = false,
-}: {
-  tableRef: React.MutableRefObject<GridApiPro>;
-  rightmostButton?: boolean;
-}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className={rightmostButton ? 'mr-16' : 'ml-4'}
-      size="medium"
-      variant="ghost"
-      icon="export-share-upload"
-      tooltip="Export to CSV"
-      onClick={() =>
-        tableRef.current?.exportDataAsCsv({includeColumnGroupsHeaders: false})
-      }
-    />
-  </Box>
-);
-
-const CompareEvaluationsTableButton: FC<{
-  onClick: () => void;
-  disabled?: boolean;
-  tooltipText?: string;
-}> = ({onClick, disabled, tooltipText}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className="mx-4"
-      size="medium"
-      variant="primary"
-      disabled={disabled}
-      onClick={onClick}
-      icon="chart-scatterplot"
-      tooltip={tooltipText}>
-      Compare
-    </Button>
-  </Box>
-);
-
-const BulkDeleteButton: FC<{
-  disabled?: boolean;
-  onClick: () => void;
-}> = ({disabled, onClick}) => {
-  return (
-    <Box
-      sx={{
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-      }}>
-      <Button
-        className="ml-4 mr-16"
-        variant="ghost"
-        size="medium"
-        disabled={disabled}
-        onClick={onClick}
-        tooltip="Select rows with the checkbox to delete"
-        icon="delete"
-      />
-    </Box>
-  );
 };
 
 function prepareFlattenedCallDataForTable(
