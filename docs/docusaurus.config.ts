@@ -45,7 +45,7 @@ const config: Config = {
           docItemComponent: "@theme/ApiItem", // Derived from docusaurus-theme-openapi
         },
         theme: {
-          customCss: "./src/css/custom.css",
+          customCss: "./src/css/custom.scss",
         },
       } satisfies Preset.Options,
     ],
@@ -83,7 +83,8 @@ const config: Config = {
             } satisfies OpenApiPlugin.Options,
           }
         },
-      ]
+      ],
+      'docusaurus-plugin-sass',
   ],
 
   themes: [

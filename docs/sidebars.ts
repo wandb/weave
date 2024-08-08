@@ -138,7 +138,18 @@ const sidebars: SidebarsConfig = {
     }
 
     return true;
-  }),
+  }).map((row) => {
+    // This makes each section nicely formatted.
+    // Totally up for debate if we want to keep this or not.
+    if (row.type === "category") {
+      return {
+        ...row,
+        ...CATEGORY_SECTION_HEADER_MIXIN,
+      };
+    }
+
+    return row;
+  })
 };
 
 export default sidebars;
