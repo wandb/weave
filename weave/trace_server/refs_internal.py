@@ -178,31 +178,39 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
     if kind == "table":
         return InternalTableRef(project_id=project_id, digest=remaining[0])
     elif kind == "object":
-        name_encoded, version = remaining[0].split(":")
-        name = urllib.parse.unquote_plus(name_encoded)
-        extra = remaining[1:]
-        if len(extra) == 1 and extra[0] == "":
-            extra = []
+        name, version, extra = _parse_remaining(remaining)
         return InternalObjectRef(
             project_id=project_id,
             name=name,
             version=version,
-            extra=[urllib.parse.unquote_plus(r) for r in extra],
+            extra=extra,
         )
     elif kind == "op":
-        name_encoded, version = remaining[0].split(":")
-        name = urllib.parse.unquote_plus(name_encoded)
-        extra = remaining[1:]
-        if len(extra) == 1 and extra[0] == "":
-            extra = []
+        name, version, extra = _parse_remaining(remaining)
         return InternalOpRef(
             project_id=project_id,
             name=name,
             version=version,
-            extra=[urllib.parse.unquote_plus(r) for r in extra],
+            extra=extra,
         )
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
+
+
+def _parse_remaining(remaining: list[str]) -> tuple[str, str, list[str]]:
+    """`remaining` refers to everything after `object` or `op` in the ref.
+    It is expected to be pre-split by slashes into parts. The return
+    is a tuple of name, version, and extra parts, properly unquoted.
+    """
+    name_encoded, version = remaining[0].split(":")
+    name = urllib.parse.unquote_plus(name_encoded)
+    extra = remaining[1:]
+    if len(extra) == 1 and extra[0] == "":
+        extra = []
+    else:
+        extra = [urllib.parse.unquote_plus(r) for r in extra]
+
+    return name, version, extra
 
 
 def string_will_be_interpreted_as_ref(s: str) -> bool:
