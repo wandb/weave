@@ -68,12 +68,13 @@ def doc_module_to_file(module, output_path):
 
 
 def main():
-    from weave import trace_api as api
+    import weave
     from weave import weave_client as client
     from weave.trace_server import remote_http_trace_server, trace_server_interface
     from weave.trace_server.interface import query
 
-    doc_module_to_file(api, "trace_api.md")
+    # TODO: It would be nice to just walk the module hierarchy and generate docs for all modules
+    doc_module_to_file(weave, "weave.md")
     doc_module_to_file(client, "client.md")
     doc_module_to_file(remote_http_trace_server, "remote_http_trace_server.md")
     doc_module_to_file(trace_server_interface, "trace_server_interface.md")

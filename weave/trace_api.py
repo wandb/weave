@@ -249,11 +249,8 @@ def finish() -> None:
 
 
 __docspec__ = [
-    init,
-    publish,
-    ref,
-    get_current_call,
-    finish,
+    # As of this writing, most important symbols are
+    # re-exported in __init__.py.
 ]
 
 
