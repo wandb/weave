@@ -1175,37 +1175,37 @@ def test_summary_tokens_cost(client):
         return
 
     @weave.op()
-    def model_a(text):
+    def gpt4(text):
         result = "a: " + text
         return {
             "result": result,
-            "model": "model_a",
+            "model": "gpt-4",
             "usage": {
-                "prompt_tokens": len(text),
-                "completion_tokens": len(result),
+                "prompt_tokens": 1000000,
+                "completion_tokens": 2000000,
             },
         }
 
     @weave.op()
-    def model_b(text):
+    def gpt4o(text):
         result = "bbbb: " + text
         return {
             "result": result,
-            "model": "model_b",
+            "model": "gpt-4o",
             "usage": {
-                "prompt_tokens": len(text),
-                "completion_tokens": len(result),
+                "prompt_tokens": 3000000,
+                "completion_tokens": 5000000,
             },
         }
 
     @weave.op()
     def models(text):
         return (
-            model_a(text)["result"]
+            gpt4(text)["result"]
             + " "
-            + model_a(text)["result"]
+            + gpt4(text)["result"]
             + " "
-            + model_b(text)["result"]
+            + gpt4o(text)["result"]
         )
 
     res = models("hello")
@@ -1214,21 +1214,92 @@ def test_summary_tokens_cost(client):
     call = list(models.calls())[0]
 
     assert call.summary["usage"] == {
-        "model_a": {"requests": 2, "prompt_tokens": 10, "completion_tokens": 16},
-        "model_b": {"requests": 1, "prompt_tokens": 5, "completion_tokens": 11},
+        "gpt-4": {
+            "requests": 2,
+            "prompt_tokens": 2000000,
+            "completion_tokens": 4000000,
+        },
+        "gpt-4o": {
+            "requests": 1,
+            "prompt_tokens": 3000000,
+            "completion_tokens": 5000000,
+        },
     }
 
-    callsWithCost = list(client.calls(include_costs=True))
-    callsNoCost = list(client.calls(include_costs=False))
+    callsWithCost = list(
+        client.calls(
+            weave_client._CallsFilter(op_names=[call.op_name]),
+            include_costs=True,
+        )
+    )
+    callsNoCost = list(
+        client.calls(
+            weave_client._CallsFilter(op_names=[call.op_name]),
+            include_costs=False,
+        )
+    )
 
     assert len(callsWithCost) == len(callsNoCost)
-    assert len(callsWithCost) == 4
+    assert len(callsWithCost) == 1
 
     noCostCallSummary = callsNoCost[0].summary
     withCostCallSummary = callsWithCost[0].summary
 
     assert withCostCallSummary.get("weave", "bah") != "bah"
-    assert len(withCostCallSummary["weave"]["costs"]) > 0
+    assert len(withCostCallSummary["weave"]["costs"]) == 2
+
+    gpt4cost = withCostCallSummary["weave"]["costs"]["gpt-4"]
+    gpt4ocost = withCostCallSummary["weave"]["costs"]["gpt-4o"]
+
+    # rounds to nearest integer avoids .999999992345234
+    gpt4cost["prompt_tokens_cost"] = round(gpt4cost["prompt_tokens_cost"])
+    gpt4cost["completion_tokens_cost"] = round(gpt4cost["completion_tokens_cost"])
+    gpt4ocost["prompt_tokens_cost"] = round(gpt4ocost["prompt_tokens_cost"])
+    gpt4ocost["completion_tokens_cost"] = round(gpt4ocost["completion_tokens_cost"])
+
+    # delete the effective_date and created_at fields, as they will be different each start up
+    del gpt4cost["effective_date"]
+    del gpt4ocost["effective_date"]
+    del gpt4cost["created_at"]
+    del gpt4ocost["created_at"]
+
+    assert gpt4cost == (
+        {
+            "prompt_tokens": 2000000,
+            "completion_tokens": 4000000,
+            "requests": 2,
+            "total_tokens": 0,
+            "prompt_tokens_cost": 60,
+            "completion_tokens_cost": 240,
+            "prompt_token_cost": 3e-05,
+            "completion_token_cost": 6e-05,
+            "prompt_token_cost_unit": "USD",
+            "completion_token_cost_unit": "USD",
+            "provider_id": "openai",
+            "pricing_level": "default",
+            "pricing_level_id": "default",
+            "created_by": "system",
+        }
+    )
+
+    assert gpt4ocost == (
+        {
+            "prompt_tokens": 3000000,
+            "completion_tokens": 5000000,
+            "requests": 1,
+            "total_tokens": 0,
+            "prompt_tokens_cost": 15,
+            "completion_tokens_cost": 75,
+            "prompt_token_cost": 5e-06,
+            "completion_token_cost": 1.5e-05,
+            "prompt_token_cost_unit": "USD",
+            "completion_token_cost_unit": "USD",
+            "provider_id": "openai",
+            "pricing_level": "default",
+            "pricing_level_id": "default",
+            "created_by": "system",
+        }
+    )
 
     # for no cost call, there should be no cost information
     # currently that means no weave object in the summary

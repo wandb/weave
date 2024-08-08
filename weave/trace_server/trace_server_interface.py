@@ -40,6 +40,8 @@ class LLMCostSchema(LLMUsageSchema):
     provider_id: typing.Optional[str]
     pricing_level: typing.Optional[str]
     pricing_level_id: typing.Optional[str]
+    created_at: typing.Optional[str]
+    created_by: typing.Optional[str]
 
 
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
