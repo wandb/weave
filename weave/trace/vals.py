@@ -224,15 +224,6 @@ class WeaveObject(Traceable):
             return self._val.rows == other
         return self._val == other
 
-    def __add__(self, other: Any) -> Any:
-        if getattr(self._val, "_class_name", None) == "Dataset":
-            return self._val.rows + other
-
-        val_type = type(self._val)
-        raise NotImplementedError(
-            f"__add__ not implemented for WeaveObject({val_type})"
-        )
-
     def __iadd__(self, other: Any) -> Any:
         if getattr(self._val, "_class_name", None) == "Dataset":
             rows = other
@@ -472,14 +463,6 @@ class WeaveDict(Traceable, dict):
         return True
 
 
-def _table_append(self: WeaveTable, row: dict) -> None:
-    self.rows.append(row)
-
-
-def _table_pop(self: WeaveTable, index: int) -> None:
-    self.rows.pop(index)
-
-
 def make_trace_obj(
     val: Any,
     new_ref: Optional[RefWithExtra],  # Can this actually be None?
@@ -631,3 +614,14 @@ def make_trace_obj(
 
 class MissingSelfInstanceError(ValueError):
     pass
+
+
+# These methods exist to be bound to a Dataset WeaveObject to make it feel like
+# an actual Dataset without needing to use ops which would be verbose.  See usage
+# inside `make_trace_obj`
+def _table_append(self: WeaveTable, row: dict) -> None:
+    self.rows.append(row)
+
+
+def _table_pop(self: WeaveTable, index: int) -> None:
+    self.rows.pop(index)
