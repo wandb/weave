@@ -200,11 +200,13 @@ class PreparedSelect(BaseModel):
 
 
 class Join:
-    join_type: str
+    join_type: typing.Optional[str]
     table: Table
     query: tsi.Query
 
-    def __init__(self, join_type: str, table: Table, query: tsi.Query):
+    def __init__(
+        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
+    ):
         self.join_type = join_type
         self.table = table
         self.query = query
@@ -239,8 +241,10 @@ class Select:
         self._offset = None
         self._group_by = None
 
-    def join(self, join_type: str, table: Table, query: tsi.Query) -> "Select":
-        self.joins.append(Join(join_type, table, query))
+    def join(
+        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
+    ) -> "Select":
+        self.joins.append(Join(table, query, join_type))
         for col in table.cols:
             self.all_columns.append(col.dbname())
         return self
@@ -320,7 +324,7 @@ class Select:
                 j.query, self.all_columns, self.table.json_cols, param_builder
             )
             joined = combine_conditions(query_conds, "AND")
-            sql += f"\n{j.join_type + ' ' if j.join_type != '' else ''}JOIN {j.table.name} ON {joined}"
+            sql += f"\n{j.join_type + ' ' if j.join_type else ''}JOIN {j.table.name} ON {joined}"
 
         conditions = []
         if self._project_id:
