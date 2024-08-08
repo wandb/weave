@@ -112,7 +112,6 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
         save_name = obj.__class__.__name__
 
     ref = client._save_object(obj, save_name, "latest")
-    print(f"Done saving, now {ref=}")
 
     if isinstance(ref, weave_client.ObjectRef):
         if isinstance(ref, weave_client.OpRef):
