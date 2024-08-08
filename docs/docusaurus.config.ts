@@ -1,6 +1,7 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
 
 const config: Config = {
   title: "W&B Weave",
@@ -35,12 +36,13 @@ const config: Config = {
       {
         docs: {
           sidebarPath: "./sidebars.ts",
-          sidebarCollapsible: false,
-          breadcrumbs: false,
+          sidebarCollapsible: true,
+          breadcrumbs: true,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl: "https://github.com/wandb/weave/blob/master/docs/",
           routeBasePath: "/",
+          docItemComponent: "@theme/ApiItem", // Derived from docusaurus-theme-openapi
         },
         theme: {
           customCss: "./src/css/custom.css",
@@ -64,6 +66,32 @@ const config: Config = {
           ],
         ]
       : []),
+      [
+        // See https://github.com/PaloAltoNetworks/docusaurus-openapi-docs
+        'docusaurus-plugin-openapi-docs',
+        {
+          id: "api", // plugin id
+          docsPluginId: "classic", // configured for preset-classic
+          config: {
+            weave: {
+              specPath: "./scripts/.cache/service_api_openapi_docs.json",
+              outputDir: "docs/reference/service-api",
+              sidebarOptions: {
+                groupPathsBy: 'tag',
+                sidebarCollapsed: false,
+              }
+            } satisfies OpenApiPlugin.Options,
+          }
+        },
+      ]
+  ],
+
+  themes: [
+    [require.resolve("@easyops-cn/docusaurus-search-local"), ({
+      // https://github.com/easyops-cn/docusaurus-search-local?tab=readme-ov-file
+      docsRouteBasePath: "/",
+    })],
+    "docusaurus-theme-openapi-docs", 
   ],
 
   themeConfig: {
@@ -83,15 +111,43 @@ const config: Config = {
           label: "Documentation",
         },
         {
-          type: "docSidebar",
-          sidebarId: "apiReferenceSidebar",
           position: "left",
-          label: "API Reference",
+          label: "Reference",
+          type: "dropdown",
+          items: [
+            {
+              type: "docSidebar",
+              sidebarId: "pythonSdkSidebar",
+              label: "Python SDK",
+            },
+            // Keeping this hidden until we want to "release" the service API
+            // TODOs before release:
+            // 1. Fix auth to be more standard
+            // 2. Correct HTTP Methods
+            // 3. Put behind a "v1" endpoint
+            // 4. Fix the URL in the request (seems to use the hosting URL)
+            //
+            // {
+            //   type: "docSidebar",
+            //   sidebarId: "serviceApiSidebar",
+            //   label: "Service API",
+            // },
+          ]
         },
         {
-          href: "https://github.com/wandb/weave",
-          label: "GitHub",
-          position: "right",
+          position: "left",
+          label: "Open Source",
+          type: "dropdown",
+          items: [
+            {
+              href: "https://github.com/wandb/weave",
+              label: "GitHub",
+            },
+            {
+              href: "https://github.com/wandb/weave/releases",
+              label: "Release Changelog",
+            },
+          ]
         },
       ],
     },
