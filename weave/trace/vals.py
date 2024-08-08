@@ -223,28 +223,6 @@ class WeaveObject(Traceable):
         return self._val == other
 
 
-class WeaveTableLazyRows:
-    """Descriptor for lazily getting rows on WeaveTable"""
-
-    def __init__(self) -> None:
-        self.loaded_rows_name = "_loaded_rows"
-
-    def __get__(
-        self,
-        obj: "WeaveTable",
-        objtype: Union[type["WeaveTable"], None] = None,
-    ) -> list[dict]:
-        if obj is None:
-            return self
-        if getattr(obj, self.loaded_rows_name) is None:
-            setattr(obj, self.loaded_rows_name, list(obj._remote_iter()))
-        return getattr(obj, self.loaded_rows_name)
-
-    def __set__(self, obj: "WeaveTable", value: list[dict]) -> None:
-        obj._mark_dirty()
-        setattr(obj, self.loaded_rows_name, value)
-
-
 class WeaveTable(Traceable):
     filter: _TableRowFilter
     # rows = WeaveTableLazyRows()
