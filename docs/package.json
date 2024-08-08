@@ -20,7 +20,6 @@
     "@easyops-cn/docusaurus-search-local": "^0.44.4",
     "@laxels/docusaurus-plugin-segment": "^1.0.6",
     "@mdx-js/react": "^3.0.0",
-    "@redocly/redoc": "^0.92.3",
     "clsx": "^2.0.0",
     "docusaurus-plugin-openapi-docs": "^3.0.1",
     "docusaurus-theme-openapi-docs": "^3.0.1",
