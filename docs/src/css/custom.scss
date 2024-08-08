@@ -22,9 +22,11 @@
   --ifm-color-primary-lighter: #359962;
   --ifm-color-primary-lightest: #3cad6e;
   --ifm-code-font-size: 85%;
-  --ifm-container-width: 800px;
-  --ifm-container-width-xl: 800px;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.07);
+
+  /* Defaults to 0/0. This makes the expansion toggles rotate cleanly */
+  --ifm-transition-fast: 100ms;
+  --ifm-transition-slow: 100ms;
 
 }
 
@@ -67,4 +69,44 @@ kbd {
 .vertical-align-colab-button {
   vertical-align: middle;
   line-height: 16px;
+}
+
+/* This customizes "section headers". */
+li.sidebar-section-title {
+  > div.menu__list-item-collapsible {
+      font-weight: bold; 
+      color: var(--ifm-color-primary-contrast-foreground);
+
+      /* We don't want any click interaction effects here */
+      &:hover {
+        background-color: transparent;
+      }
+  }
+  &:first-child > div.menu__list-item-collapsible {
+    margin-top: 0.5em;
+  }
+  &:not(:first-child) > div.menu__list-item-collapsible {
+    margin-top: 1em;
+  }
+}
+
+nav.menu {
+  /* Adds equal padding on all sides (right side missing in default) */
+  padding: 0.5em;
+}
+
+.clean-btn.menu__caret {
+  &:hover {
+    /* eliminates the double hover effect causing ugly carets */
+    background-color: transparent;
+  }
+  &:before {
+    /* reduces the default caret size to be less invasive */
+    background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
+  }
+}
+
+.menu__link--sublist-caret:after {
+  /* reduces the default caret size to be less invasive */
+  background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
 }

@@ -6,7 +6,10 @@ import {
 import {useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {operationConverter} from '../common/tabularListViews/operators';
+import {
+  isValuelessOperator,
+  operationConverter,
+} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -32,52 +35,13 @@ export const useCallsForQuery = (
   expandedColumns: Set<string>
 ) => {
   const {useCalls, useCallsStats} = useWFHooks();
-  const lowLevelFilter: CallFilter = useMemo(() => {
-    return convertHighLevelFilterToLowLevelFilter(filter);
-  }, [filter]);
-
   const offset = gridPage.page * gridPage.pageSize;
   const limit = gridPage.pageSize;
-
-  const sortBy = useDeepMemo(
-    useMemo(() => {
-      return gridSort.map(sort => {
-        return {
-          field: sort.field,
-          direction: sort.sort ?? 'asc',
-        };
-      });
-    }, [gridSort])
+  const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
+    filter,
+    gridFilter,
+    gridSort
   );
-
-  const filterByRaw = useMemo(() => {
-    const setItems = gridFilter.items.filter(item => item.value !== undefined);
-
-    const convertedItems = setItems
-      .map(operationConverter)
-      .filter(item => item !== null) as Array<Query['$expr']>;
-
-    if (convertedItems.length === 0) {
-      return undefined;
-    }
-
-    if (convertedItems.length === 1) {
-      return convertedItems[0];
-    }
-
-    const operation = gridFilter.logicOperator === 'or' ? '$or' : '$and'; // and is default
-
-    return {
-      [operation]: convertedItems,
-    };
-  }, [gridFilter]);
-
-  const filterBy: Query | undefined = useMemo(() => {
-    if (filterByRaw === undefined) {
-      return undefined;
-    }
-    return {$expr: filterByRaw} as Query;
-  }, [filterByRaw]);
 
   const calls = useCalls(
     entity,
@@ -116,6 +80,74 @@ export const useCallsForQuery = (
       total,
     };
   }, [callResults, calls.loading, total]);
+};
+
+export const useFilterSortby = (
+  filter: WFHighLevelCallFilter,
+  gridFilter: GridFilterModel,
+  gridSort: GridSortModel | undefined
+) => {
+  const sortBy = useDeepMemo(
+    useMemo(() => (gridSort ? getSortBy(gridSort) : []), [gridSort])
+  );
+  const lowLevelFilter: CallFilter = useMemo(() => {
+    return convertHighLevelFilterToLowLevelFilter(filter);
+  }, [filter]);
+  const filterByRaw = useMemo(() => getFilterByRaw(gridFilter), [gridFilter]);
+  const filterBy: Query | undefined = useMemo(
+    () => getFilterBy(filterByRaw),
+    [filterByRaw]
+  );
+
+  return {
+    sortBy,
+    lowLevelFilter,
+    filterBy,
+  };
+};
+
+const getFilterByRaw = (
+  gridFilter: GridFilterModel
+): Query['$expr'] | undefined => {
+  const completeItems = gridFilter.items.filter(
+    item => item.value !== undefined || isValuelessOperator(item.operator)
+  );
+
+  const convertedItems = completeItems
+    .map(operationConverter)
+    .filter(item => item !== null) as Array<Query['$expr']>;
+
+  if (convertedItems.length === 0) {
+    return undefined;
+  }
+
+  if (convertedItems.length === 1) {
+    return convertedItems[0];
+  }
+
+  const operation = gridFilter.logicOperator === 'or' ? '$or' : '$and'; // and is default
+
+  return {
+    [operation]: convertedItems,
+  } as Query['$expr'];
+};
+
+const getSortBy = (gridSort: GridSortModel) => {
+  return gridSort.map(sort => {
+    return {
+      field: sort.field,
+      direction: sort.sort ?? 'asc',
+    };
+  });
+};
+
+const getFilterBy = (
+  filterByRaw: Query['$expr'] | undefined
+): Query | undefined => {
+  if (filterByRaw === undefined) {
+    return undefined;
+  }
+  return {$expr: filterByRaw} as Query;
 };
 
 const convertHighLevelFilterToLowLevelFilter = (
