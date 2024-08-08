@@ -2144,6 +2144,40 @@ def test_call_query_stream_equality(client):
     assert i == len(calls.calls)
 
 
+def test_call_query_stream_columns(client):
+    @weave.op
+    def calculate(a: int, b: int) -> int:
+        return {"result": {"a + b": a + b}}
+
+    for i in range(2):
+        calculate(i, i * i)
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "inputs"],
+        )
+    )
+
+    # assert non-required fields we didn't query for are None
+    assert len(calls.calls) == 2
+    assert len(calls.calls[0].inputs) == 2
+
+    # NO output returned because not required and not requested
+    assert calls.calls[0].output is None
+    assert calls.calls[0].ended_at is None
+
+    # now explicitly get output
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "inputs", "output.result"],
+        )
+    )
+    assert len(calls.calls) == 2
+    assert calls.calls[0].output["result"]["a + b"] == 0
+
+
 @pytest.mark.skip("Not implemented: filter / sort through refs")
 def test_sort_and_filter_through_refs(client):
     @weave.op()

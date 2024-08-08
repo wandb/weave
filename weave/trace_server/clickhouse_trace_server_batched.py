@@ -107,9 +107,11 @@ all_call_insert_columns = list(
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 all_call_json_columns = ("inputs", "output", "attributes", "summary")
 
-
-# Let's just make everything required for now ... can optimize when we implement column selection
-required_call_columns = list(set(all_call_select_columns) - set([]))
+required_call_columns = [
+    name
+    for name, field in SelectableCHCallSchema.model_fields.items()
+    if field.is_required()
+]
 
 
 # Columns in the calls_merged table with special aggregation functions:
@@ -249,13 +251,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(project_id=req.project_id)
-
-        # TODO (Perf): By allowing a sub-selection of columns
-        # we will gain increased performance by not having to
-        # fetch all columns from the database. Currently all use
-        # cases call for every column to be fetched, so we have not
-        # implemented this yet.
         columns = all_call_select_columns
+        if req.columns:
+            columns = list(set(required_call_columns + req.columns))
+            # TODO: add support for json extract fields
+            columns = [col.split(".")[0] for col in columns]
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -280,9 +280,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             pb.get_params(),
         )
 
+        select_columns = [c.field for c in cq.select_fields]
         for row in raw_res:
             yield tsi.CallSchema.model_validate(
-                _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
+                _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
             )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
