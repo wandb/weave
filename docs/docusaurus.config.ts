@@ -67,6 +67,7 @@ const config: Config = {
         ]
       : []),
       [
+        // See https://github.com/PaloAltoNetworks/docusaurus-openapi-docs
         'docusaurus-plugin-openapi-docs',
         {
           id: "api", // plugin id
@@ -75,6 +76,10 @@ const config: Config = {
             weave: {
               specPath: "./scripts/.cache/service_api_openapi_docs.json",
               outputDir: "docs/reference/service-api",
+              sidebarOptions: {
+                groupPathsBy: 'tag',
+                sidebarCollapsed: false,
+              }
             } satisfies OpenApiPlugin.Options,
           }
         },

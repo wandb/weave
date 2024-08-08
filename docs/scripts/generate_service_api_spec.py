@@ -1,9 +1,12 @@
 import json
+
 import requests
 
 
 def get_raw_json():
     response = requests.get("https://trace.wandb.ai/openapi.json")
+    # Used for Dev
+    # response = requests.get("http://trace_server.wandb.test/openapi.json")
     response.raise_for_status()
     return response.json()
 
