@@ -220,7 +220,7 @@ class WeaveObject(Traceable):
         return f"WeaveObject({self._val})"
 
     def __eq__(self, other: Any) -> bool:
-        if self._val._class_name == "Dataset":
+        if getattr(self._val, "_class_name", None) == "Dataset":
             return self._val.rows == other
         return self._val == other
 
@@ -547,7 +547,7 @@ def make_trace_obj(
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
             res = WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
-            if val._class_name == "Dataset":
+            if getattr(val, "_class_name", None) == "Dataset":
                 # This line is strangely required when assigning res = WeaveObject(...),
                 # and it must come before any attribute access, otherwise our custom
                 # attribute access does not work.  This seems to be because of an unwanted

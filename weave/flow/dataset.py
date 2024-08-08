@@ -69,6 +69,8 @@ class Dataset(Object):
         return self.rows == other
 
     def append(self, row: dict) -> None:
+        if not isinstance(row, dict):
+            raise ValueError("Can only append dicts to Dataset")
         self.rows.append(row)
 
     def pop(self, index: int) -> None:
