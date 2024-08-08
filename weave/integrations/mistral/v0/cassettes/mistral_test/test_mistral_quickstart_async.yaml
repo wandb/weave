@@ -1,0 +1,69 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "user", "content": "What is the best French cheese?"}],
+      "safe_prompt": false, "model": "mistral-large-latest", "stream": false}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '150'
+      content-type:
+      - application/json
+      host:
+      - api.mistral.ai
+      user-agent:
+      - mistral-client-python/0.1.8
+    method: POST
+    uri: https://api.mistral.ai/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA4yUTW7kNhCFr1LgJkCgbnR7/IPWbhJgkNkEQX5WcWCUxKcmZ0iWUqTcVgxfIffI
+        OeZiAdVpp+0ZINlKrFdfPb7io/HWtMZeXXXX2921veKLyze82fUbdODtsLsYLO9gGiPdB/TFtKZ3
+        XNa9xDGgeEmmMb2CC6xptzfby+31Zne5bUwUi2BaE30uymEVWPdYBS7IpdY48T2yaX99ND5ZPJh2
+        05iInHkP0z4alQDTGs7Z58JpqZFUkCrDzw4KYgVFTjPhoUcISIXeKVLvqHdARm6Ik6XiQLemQy63
+        hiSBZChIZDEi2UySaIRmSRxoVAyoEljTd3LAPbShLLHWLDpRcqFRximwLuLO712YSbFntbCvAMin
+        PkwW7W26TV/TtxLLp79aekuO1f5ziCJb0KASaUoj54JJ/R+w1Mvhq0zRh4/k09L9nXLqHVZHndrU
+        S6poqGWajgewpveFHGdiUt+7htJUykxD4Hs5UjMNXmNDOfi9K2GmvXJaZip4KJNiveByROygpRJn
+        GUpDedKBe6zUj0j4wggvob8XjZzsfEbUBZE408H5AlJfYRagGqI4NwTW4k6wC8aP8vuEQY4YXZjw
+        edfsgPGVWVmm4qo5n5lSOO3ns+Ezh9f29DrFLswv7PhGPU5O/NfgFeDTnwEri9Wx/+m2WGVKln5g
+        9fmMafGjIVjfhS/60k2lQF8agy5I7yT9ez8Hzg52tdT/D8Sf+F48zoJ0TNkS4bdhPAdcMtTQoJN/
+        bdYpGuMYcObYbfolFB+5IMzNolx38OWGkK/aketstf/zJpaa6DW9p4NMwZKilxhRt1lnn/bEdM/q
+        UeZaddq2ipOB+v/gfO/qtmeaZSKkDzI/b/DaNKaIhLueQ8imTVMIT40ZfPLZ3Sk4SzKtyUVG05gg
+        +1GlO537rTHT6ZEaVeJY7op8RMqm3W6qbuHw/OXN5qa+W6fH8vn7xe7m6elvAAAA//8DAB/AcdR9
+        BQAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 87a917f8fbfa1028-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 26 Apr 2024 19:49:11 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      access-control-allow-origin:
+      - '*'
+      alt-svc:
+      - h3=":443"; ma=86400
+      x-kong-proxy-latency:
+      - '5'
+      x-kong-request-id:
+      - 1b17130a7651e30aee05ee19f55c3f5b
+      x-kong-upstream-latency:
+      - '9637'
+    status:
+      code: 200
+      message: OK
+version: 1
