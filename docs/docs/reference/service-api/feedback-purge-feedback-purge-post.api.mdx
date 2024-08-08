@@ -1,15 +1,14 @@
 ---
-id: file-content-files-content-post
-title: "File Content"
-description: "File Content"
-sidebar_label: "File Content"
+id: feedback-purge-feedback-purge-post
+title: "Feedback Purge"
+description: "Permanently delete feedback."
+sidebar_label: "Feedback Purge"
 hide_title: true
 hide_table_of_contents: true
-api: eJyVVN9v2jAQ/leQn1lhaE+80bXVKm0qAroXhJBJjsRdEru20xYh/++7s00SYLDtJbHPn+/H9915z6QCza2Q1WPKxmwrClgnsrJQ2TVtTLNT0ljWZxpeazD2VqY7Nt6zeEpLrlQhEu9r8GJkRTaT5FByWilNkawAE3cvkNi1SGlndwowuLFaVBnGsMIWZJgGVA9Tc32WigwDX8PfBYRDcITIDTmIaQsNGG7ZDd54XbVeHrDsr6GsGfB0Bq/o0XVdWF2DNxglKxMqGg2H9EvBJFooIgFdzeskAWO2ddGbRTCG/FfOnA/7ZTQ6d/yTFyL113r3Wkv9H15PlEjBclHQSlgozTmgkMnRKa92T1uk8VQG128sAjPJQDO3apXgWvNdR6vvMiRIypYmuybrD6SQZ8AaZ5ehnozegk7/1gVUVwgdcZ0WaOkN7F4u4y7Q96dgB8i3xWJ65jBoayCptbA7TyfhbrkRSPdy5TCbY8mpLXuxLylxsLmkkY1zqbjNcTfwQztIGtwhxJz0D4p2AjVM5tYqQnsU7jf+nHKkBpq1Q3//wUtVwOkQt1IcxrTtC+yHrfSxDhPGjZ1MHxH8BtqE8oY3n2+GBKZ6Su57tuIlnFd+REtTgIUPO1AFF76jau1bOpCy9M+a6cwIkpsTbXi032Op8KwL58iMdWqSA5dvXAu+oYSX1Mc5vgXY06TUL0AIixl98t1G8KL2HXI6fDQY4cYEXwNlr2JXHWWnT/MFgjfxqS1lSnc0f6dOxu+Y4UJ6Iryu3oYDy6uspnkZs+CTVOQ1MdGwFeTtx39nmHG6O/l5ckQywcvPBjTpgTT1Yzl1NHVH/+L9KTfmXeq0c19FE70Tzv0G1d1AOA==
+api: eJydVU1v4jAQ/SuR1WO2sNWeuNFtq620q2YL3QtClUkGcJvEru20RCj/fWdsAy6UIvUC9vjN1/PzZM0KMLkWygpZswHLQFe8htqWbVJACRaSOUAx4/nzOUuZVKA5QW8LBG9OHlWjF/C4t1XSWHTR8NKAsZeyaNlgzXJZWwxPS65UKXIXrvdkKP2amXwJFaeV0pTMCjBh9wS5fRQF7WyrAPMbq0W9wBxW2JIMmUclWF3KYMUrVZL7hGFGYdteiMKmXcqwKt0eJjqDldIuR4h5dk2GdJNTzlyErtu3+E6FhoIS+jDTXWl/XbpTblGbmwqjGDeB4Iz4vYcXDNfF/lY34AxGydr4fi76ffp7f8ujJs/BmHlTJvcBjPm+djUfdHSkXkP1IvzHxcVhSf94KQqXMLnWWuov14NxLRclrYSFyhwCSpm/O+V1ezdH9vd11aVbi8BKFqBZN921y7XmbdTtb+kLRD9WmcVnOv2D5PMFsG2w41BHRjKm01Piob586oCLpLOj17N7vI0rT99HyTaQX+NxdhDQ362BvNH41BydhLvkRiDdk2mH1VRgl5ImR5gNitsl7nqbydFzk4Ptwozojv2tRcG2bC2tVYR2KNzP3DnVQSK5302eaz8L9ifJju7tNNi8f9eNqOcyngU33Nhhdov4V9DGC7d//v28T3xSTzg7CV/zKtZ/koW23kk+moWnxm5o18LK9lTJhdNYo53IPYeT7TAmWl065HtJNOPZeo3MwIMuu47ModkJLl+5FnxGzU1I2kvgBcqcLu8ZEMJ++hK/OQESvGycaPbfI70V7zHE0aLsp9hYCdndaIzgWfg8VLIgH83fSNz4O2Dus0PeTgbOhm+Y14uGntCA+Zh0XbwhKrbq8GpIw3/0vvHBR/U5ckQ+ROcHA5ruDmlKQztNMMXT4Kh/xo15k7qI/FUw0ejouv9+Lo8r
 sidebar_class_name: "post api-method"
-info_path: service-api/fastapi
+info_path: reference/service-api/fastapi
 custom_edit_url: null
-proxy: https://trace.wandb.ai/
 ---
 
 import ApiTabs from "@theme/ApiTabs";
@@ -29,20 +28,20 @@ import TabItem from "@theme/TabItem";
 <Heading
   as={"h1"}
   className={"openapi__heading"}
-  children={"File Content"}
+  children={"Feedback Purge"}
 >
 </Heading>
 
 <MethodEndpoint
   method={"post"}
-  path={"/files/content"}
+  path={"/feedback/purge"}
 >
   
 </MethodEndpoint>
 
 
 
-File Content
+Permanently delete feedback.
 
 <Heading
   id={"request"}
@@ -91,18 +90,56 @@ File Content
           required={true}
           schemaName={"Project Id (string)"}
           qualifierMessage={undefined}
-          schema={{"type":"string","title":"Project Id"}}
+          schema={{"type":"string","title":"Project Id","examples":["entity/project"]}}
         >
           
         </SchemaItem><SchemaItem
-          collapsible={false}
-          name={"digest"}
-          required={true}
-          schemaName={"Digest (string)"}
-          qualifierMessage={undefined}
-          schema={{"type":"string","title":"Digest"}}
+          collapsible={true}
+          className={"schemaItem"}
         >
-          
+          <details
+            style={{}}
+            className={"openapi-markdown__details"}
+          >
+            <summary
+              style={{}}
+            >
+              <span
+                className={"openapi-schema__container"}
+              >
+                <strong
+                  className={"openapi-schema__property"}
+                >
+                  query
+                </strong><span
+                  className={"openapi-schema__name"}
+                >
+                   object
+                </span><span
+                  className={"openapi-schema__divider"}
+                >
+                  
+                </span><span
+                  className={"openapi-schema__required"}
+                >
+                  required
+                </span>
+              </span>
+            </summary><div
+              style={{"marginLeft":"1rem"}}
+            >
+              <SchemaItem
+                collapsible={false}
+                name={"$expr"}
+                required={true}
+                schemaName={"object"}
+                qualifierMessage={undefined}
+                schema={{"title":"$Expr","type":"object"}}
+              >
+                
+              </SchemaItem>
+            </div>
+          </details>
         </SchemaItem>
       </ul>
     </details>
@@ -159,9 +196,28 @@ File Content
                     </div><ul
                       style={{"marginLeft":"1rem"}}
                     >
-                      any
+                      <SchemaItem
+                        collapsible={false}
+                        name={""}
+                        required={false}
+                        schemaName={"object"}
+                        qualifierMessage={undefined}
+                        schema={{}}
+                      >
+                        
+                      </SchemaItem>
                     </ul>
                   </details>
+                </TabItem><TabItem
+                  label={"Example (from schema)"}
+                  value={"Example (from schema)"}
+                >
+                  <ResponseSamples
+                    responseExample={"{}"}
+                    language={"json"}
+                  >
+                    
+                  </ResponseSamples>
                 </TabItem>
               </SchemaTabs>
             </TabItem>

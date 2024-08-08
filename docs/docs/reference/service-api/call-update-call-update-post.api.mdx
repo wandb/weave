@@ -1,15 +1,14 @@
 ---
-id: refs-read-batch-refs-read-batch-post
-title: "Refs Read Batch"
-description: "Refs Read Batch"
-sidebar_label: "Refs Read Batch"
+id: call-update-call-update-post
+title: "Call Update"
+description: "Call Update"
+sidebar_label: "Call Update"
 hide_title: true
 hide_table_of_contents: true
-api: eJydVN1v2jAQ/1eQn1lhaE+8wdZqlTYVAd0LQuhIDuIuiV3boUUo//vu7ECS0qxSXxL7fF+/332chNJowEmV38diLAzu7MYgxJstuCjZvL1rZZ3ok9pzgdZNVXwU45OIVO4wd3wErVMZeYeDJ6tyltkowQz4pA2HcxIt39g5/6XDzB/cUSMlYZ2R+V6U/bMAjIEjhXXSpXyfs2FZv6vtE0bnvKRBQrIK3tdtozkhmTKQOT6Tg7Jp4UyBXmC1ym3IcDQc8i9GGxmpGRQ5WhRRhNbuirQ3r5Qp9Cc5OEDa4qAb9B/W/Ai0d9cNmh2wi2+j0TUuCiBjn3Xv1hhlPg8qRgcybZW2rZCqqPUK+fFhR/lft8BFIimTPRpRrrsp+qVCgtw6md1ft1St+psqCHusm6xb1ZPRW/LrR/QzrhC60lu36lfRG9jthvEj0PdesLPKz+VyduUw1NZiVBjpjp5O1puClUT3al1SNu2Sc3v0uD96vkE4d3SJ4k1QTboGl9BtwNM0qBeBqOMsuAlCWRvRLnQmzmnW9lp03/p3TpS7aF4vkttXyHSK9WJYnUvBFZf5TnmvFQF3YN1kdk+eD2hsQDO8+XozZF459wx8i+aQ4btAW0RcsnX46gY6Bel7qDC+iQMH1Ubhgl9YIEIT5okeTydCho8mLUsWEyzDJaDjAYyELWe9YiQJmVMfc3X+IqmI72HIvvgOY/W08F3xduB4GILFhBaQdv/VXTdKOXtYLEl5W23rTMVsY+CFwdB3LOigPBVhL7OMhhTyfcEzMhbBJxcNCubiwleoZr/6NwaYJrqRnydHRhMyfrRouChEU7+CU1Si5rh32s/A2hdl4oa9rkS8G8ryH6jhVrw=
+api: eJydVd9v2jAQ/leiPDNg1Z54a9dWq7StqNDtASFkEkPcObFrn0sjlP99d7ZLkha6qS/gXO7Hd999vuxTpblhIFR1k6eTNGNSrpzOGfBV96yVhXSQGv7ouIULldfpZJ9mqgJeAR2Z1lJkPtHowaqKbDYreMnopA2VAcFtfHrgGaxETk9Qa46VLRhRbbEGCJBkmAavBHE1gwDs/YCv6BK9c2G1ZPWqYiX36Kr6dpNOFq+Dm8HBUjkp02bZprsMOZKflANz7tYrZ7mJID6S8fc6uccMhBEhcpsZoYkwKqaSSkFiOSS5MNi2rIfJjJsndN8J7Is5UCXSSzzUiVbaSZxLAoWwyUZwmQ/TBkHG0mpN1MWBYT6EvOjS3vK57PN378d9xx8xW9MNB+O4N1itKhvmeDYe01+/k5nLMm7txsnkLjpTuQ8p5UhDx8BaAou+X87O3uL5xaTIfbXkyhhlPgwG8wITkk4CeGnfOkiV9d7+h0YEItlygzJpe2XGsLrT6ncVAJIIS7t97wr8QObZ1ss1uJx29WQkc3r7L+FQX6F09OuIpqU3sHu6jctA37FiLy7f5vPpm4RhtpZnzgioPZ3kd8GsQLoXS7ph/ZH7RRDEQbg5FIp2W9xhmkGBTyO6ASP34vWSf0bDD+PsVDnQWABo8vZe+Lz27wkgqeeuXY9Xz6zUkr9ed+0cDgutNfW3Vmvvbp5WQ6idjfLQInvXzML59AYDcGvYQMV4+Hk4JmdqvmRe3zF9n6Ueg4d2gT/DCDEJLz5nvPoDgQvfAUZGCnEKBRGML/Z7pIXfG9k0ZEZODM0Nj0/MCLYmtAsSfMFZjuKnkf7hNWEKN/OTlyW5S+el9PqW0g0KEee4bTS867vsaGB6O5uj8zp+wEqVU4xhO5I8/k5SPChPg9eAt+HNZtXW0cWapCEnTRxXctHhKkhhEP87tx7XQAefJ0dk5xhMHwMaBtI0iO24aOruiJPxU2btTpm8E6+jiRZK0/wFdzGz/Q==
 sidebar_class_name: "post api-method"
-info_path: service-api/fastapi
+info_path: reference/service-api/fastapi
 custom_edit_url: null
-proxy: https://trace.wandb.ai/
 ---
 
 import ApiTabs from "@theme/ApiTabs";
@@ -29,20 +28,20 @@ import TabItem from "@theme/TabItem";
 <Heading
   as={"h1"}
   className={"openapi__heading"}
-  children={"Refs Read Batch"}
+  children={"Call Update"}
 >
 </Heading>
 
 <MethodEndpoint
   method={"post"}
-  path={"/refs/read_batch"}
+  path={"/call/update"}
 >
   
 </MethodEndpoint>
 
 
 
-Refs Read Batch
+Call Update
 
 <Heading
   id={"request"}
@@ -87,13 +86,120 @@ Refs Read Batch
       >
         <SchemaItem
           collapsible={false}
-          name={"refs"}
+          name={"project_id"}
           required={true}
-          schemaName={"string[]"}
+          schemaName={"Project Id (string)"}
           qualifierMessage={undefined}
-          schema={{"items":{"type":"string"},"type":"array","title":"Refs"}}
+          schema={{"type":"string","title":"Project Id"}}
         >
           
+        </SchemaItem><SchemaItem
+          collapsible={false}
+          name={"call_id"}
+          required={true}
+          schemaName={"Call Id (string)"}
+          qualifierMessage={undefined}
+          schema={{"type":"string","title":"Call Id"}}
+        >
+          
+        </SchemaItem><SchemaItem
+          collapsible={true}
+          className={"schemaItem"}
+        >
+          <details
+            style={{}}
+            className={"openapi-markdown__details"}
+          >
+            <summary
+              style={{}}
+            >
+              <strong>
+                display_name
+              </strong><span
+                style={{"opacity":"0.6"}}
+              >
+                 object
+              </span>
+            </summary><div
+              style={{"marginLeft":"1rem"}}
+            >
+              
+            </div><div>
+              <span
+                className={"badge badge--info"}
+              >
+                anyOf
+              </span><SchemaTabs>
+                <TabItem
+                  label={"MOD1"}
+                  value={"0-item-properties"}
+                >
+                  <div
+                    style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                  >
+                    
+                    
+                    string
+                    
+                    
+                  </div>
+                </TabItem>
+              </SchemaTabs>
+            </div>
+          </details>
+        </SchemaItem><SchemaItem
+          collapsible={true}
+          className={"schemaItem"}
+        >
+          <details
+            style={{}}
+            className={"openapi-markdown__details"}
+          >
+            <summary
+              style={{}}
+            >
+              <strong>
+                wb_user_id
+              </strong><span
+                style={{"opacity":"0.6"}}
+              >
+                 object
+              </span>
+            </summary><div
+              style={{"marginLeft":"1rem"}}
+            >
+              <div
+                style={{"marginTop":".5rem","marginBottom":".5rem"}}
+              >
+                
+                
+                Do not set directly. Server will automatically populate this field.
+                
+                
+              </div>
+            </div><div>
+              <span
+                className={"badge badge--info"}
+              >
+                anyOf
+              </span><SchemaTabs>
+                <TabItem
+                  label={"MOD1"}
+                  value={"0-item-properties"}
+                >
+                  <div
+                    style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                  >
+                    
+                    
+                    string
+                    
+                    
+                  </div>
+                </TabItem>
+              </SchemaTabs>
+            </div>
+          </details>
         </SchemaItem>
       </ul>
     </details>
@@ -152,11 +258,11 @@ Refs Read Batch
                     >
                       <SchemaItem
                         collapsible={false}
-                        name={"vals"}
-                        required={true}
-                        schemaName={"undefined[]"}
+                        name={""}
+                        required={false}
+                        schemaName={"object"}
                         qualifierMessage={undefined}
-                        schema={{"items":{},"type":"array","title":"Vals"}}
+                        schema={{}}
                       >
                         
                       </SchemaItem>
@@ -167,7 +273,7 @@ Refs Read Batch
                   value={"Example (from schema)"}
                 >
                   <ResponseSamples
-                    responseExample={"{\n  \"vals\": [\n    null\n  ]\n}"}
+                    responseExample={"{}"}
                     language={"json"}
                   >
                     
