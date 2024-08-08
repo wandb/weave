@@ -16,6 +16,7 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 
 import {
+  ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
@@ -156,6 +157,85 @@ export class DirectTraceServerClient {
     });
   }
 
+  /*
+  This implementation of the calls stream query is a convenience in order
+  to explicitly handle large streams of data. It should be kept in close
+  sync with makeRequest.
+  */
+
+  public callsStreamDownload(
+    req: TraceCallsQueryReq,
+    contentType: ContentType = ContentType.any
+  ): Promise<Blob> {
+    const url = `${this.baseUrl}/calls/stream_query`;
+    const reqBody = JSON.stringify(req);
+
+    const headers: {[key: string]: string} = {
+      'Content-Type': 'application/json',
+      // This is a dummy auth header, the trace server requires
+      // that we send a basic auth header, but it uses cookies for
+      // authentication.
+      Authorization: 'Basic ' + btoa(':'),
+      Accept: contentType,
+    };
+    const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
+    if (useAdminPrivileges) {
+      headers['use-admin-privileges'] = 'true';
+    }
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Fetch the text data using streams
+        // eslint-disable-next-line wandb/no-unprefixed-urls
+        const response = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: reqBody,
+        });
+
+        // Check if the response is OK
+        if (!response.ok) {
+          try {
+            const error = await response.text();
+            console.error(error);
+          } catch (err) {
+            console.error(err);
+          }
+          reject(new Error(`Error fetching data: ${response.status}`));
+          return;
+        }
+
+        // Create a ReadableStream reader
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        const chunks: string[] = [];
+
+        while (true) {
+          // Read each chunk
+          const {done, value} = (await reader?.read()) ?? {
+            done: true,
+            value: new Uint8Array(),
+          };
+          if (done) {
+            break;
+          }
+
+          // Decode the chunk and add to the chunks array
+          const chunk = decoder.decode(value, {stream: true});
+          chunks.push(chunk);
+        }
+
+        // Combine all chunks into a single string
+        const textData = chunks.join('');
+        const blob = new Blob([textData], {type: contentType});
+        resolve(blob);
+      } catch (error) {
+        reject(new Error(`Error downloading data: ${error}`));
+      }
+    });
+  }
+
   public callRead(req: TraceCallReadReq): Promise<TraceCallReadRes> {
     return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
       '/call/read',
@@ -231,7 +311,8 @@ export class DirectTraceServerClient {
   private makeRequest = async <QT, ST>(
     endpoint: string,
     req: QT,
-    returnText?: boolean
+    returnText?: boolean,
+    contentType?: ContentType
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
     const reqBody = JSON.stringify(req);
