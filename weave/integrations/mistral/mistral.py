@@ -7,9 +7,8 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
     from mistralai.models import (
-        CompletionResponseStreamChoice,
+        CompletionChunk,
         CompletionEvent,
-        CompletionChunk
     )
 
 
@@ -22,8 +21,9 @@ def mistral_accumulator(
         CompletionChunk,
         CompletionResponseStreamChoice,
         DeltaMessage,
-        UsageInfo
+        UsageInfo,
     )
+
     value = value.data
     if acc is None:
         acc = CompletionChunk(
@@ -80,13 +80,16 @@ def mistral_stream_wrapper(name: str) -> typing.Callable:
         acc_op = add_accumulator(op, lambda inputs: mistral_accumulator)  # type: ignore
         acc_op.name = name  # type: ignore
         return acc_op
+
     return wrapper
+
 
 def mistral_wrapper(name: str) -> typing.Callable:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return op
+
     return wrapper
 
 
