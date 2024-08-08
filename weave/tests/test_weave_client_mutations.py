@@ -293,7 +293,6 @@ def test_table_mutation_saving_pop_rows(client):
     assert t3.rows == [{"a": 5, "b": 6}]
 
 
-@pytest.mark.xfail(reason="Not implemented yet")
 def test_table_mutation_saving_replace_rows(client):
     t = weave.Table(
         rows=[
@@ -309,3 +308,33 @@ def test_table_mutation_saving_replace_rows(client):
 
     t3 = ref2.get()
     assert t3.rows == [{"a": 5, "b": 6}]
+
+
+def test_table_cant_append_bad_data(client):
+    t = weave.Table(rows=[{"a": 1, "b": 2}])
+    with pytest.raises(ValueError):
+        t.append(1)
+    with pytest.raises(ValueError):
+        t.append([1, 2, 3])
+
+    ref = weave.publish(t)
+    t2 = ref.get()
+    with pytest.raises(ValueError):
+        t2.append(1)
+    with pytest.raises(ValueError):
+        t2.append([1, 2, 3])
+
+
+def test_table_cant_set_bad_data(client):
+    t = weave.Table(rows=[{"a": 1, "b": 2}])
+    with pytest.raises(ValueError):
+        t.rows = [1, 2, 3]
+    with pytest.raises(ValueError):
+        t.rows = [{"a": 1, "b": 2}, 3]
+
+    ref = weave.publish(t)
+    t2 = ref.get()
+    with pytest.raises(ValueError):
+        t2.rows = [1, 2, 3]
+    with pytest.raises(ValueError):
+        t2.rows = [{"a": 1, "b": 2}, 3]

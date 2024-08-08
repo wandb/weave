@@ -2,15 +2,7 @@ import dataclasses
 import inspect
 import operator
 import typing
-from typing import (
-    Any,
-    Generator,
-    Iterator,
-    Literal,
-    Optional,
-    SupportsIndex,
-    Union,
-)
+from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
@@ -249,12 +241,13 @@ class WeaveTableLazyRows:
         return getattr(obj, self.loaded_rows_name)
 
     def __set__(self, obj: "WeaveTable", value: list[dict]) -> None:
+        obj._mark_dirty()
         setattr(obj, self.loaded_rows_name, value)
 
 
 class WeaveTable(Traceable):
     filter: _TableRowFilter
-    rows = WeaveTableLazyRows()
+    # rows = WeaveTableLazyRows()
 
     def __init__(
         self,
@@ -271,7 +264,21 @@ class WeaveTable(Traceable):
         self.server = server
         self.root = root or self
         self.parent = parent
-        self._loaded_rows: typing.Optional[typing.List[typing.Dict]] = None
+        self._rows: typing.Optional[typing.List[typing.Dict]] = None
+
+    @property
+    def rows(self) -> list[dict]:
+        if self._rows is None:
+            self._rows = list(self._remote_iter())
+        return self._rows
+
+    @rows.setter
+    def rows(self, value: list[dict]) -> None:
+        if not all(isinstance(row, dict) for row in value):
+            raise ValueError("All table rows must be dicts")
+
+        self._rows = value
+        self._mark_dirty()
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -282,12 +289,6 @@ class WeaveTable(Traceable):
     def _mark_dirty(self) -> None:
         self.table_ref = None
         super()._mark_dirty()
-
-    def _load_rows_if_not_exists(self) -> None:
-        if self._loaded_rows is None:
-            self._loaded_rows = typing.cast(
-                typing.List[typing.Dict], [row for row in self._remote_iter()]
-            )
 
     def _remote_iter(self) -> Generator[typing.Dict, None, None]:
         page_index = 0
@@ -334,15 +335,13 @@ class WeaveTable(Traceable):
         for row in self.rows:
             yield row
 
-    def append(self, val: Any) -> None:
-        if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only append to object refs")
-        self._load_rows_if_not_exists()
+    def append(self, val: dict) -> None:
+        if not isinstance(val, dict):
+            raise ValueError("Can only append dicts to tables")
         self._mark_dirty()
         self.rows.append(val)
 
     def pop(self, index: int) -> None:
-        self._load_rows_if_not_exists()
         self._mark_dirty()
         self.rows.pop(index)
 
