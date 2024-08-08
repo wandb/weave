@@ -2,6 +2,7 @@ import {Box, Popover} from '@mui/material';
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
 import {Radio} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
+import {CodeEditor} from '@wandb/weave/components/CodeEditor';
 import {
   DraggableGrow,
   DraggableHandle,
@@ -15,6 +16,7 @@ import {
   ContentType,
   fileExtensions,
 } from '../wfReactInterface/traceServerClientTypes';
+import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
@@ -89,6 +91,21 @@ export const ExportSelector = ({
     setSelectionState('all');
   };
 
+  const pythonText = useMakeCodeText(
+    callQueryParams.entity,
+    callQueryParams.project,
+    selectedCalls,
+    lowLevelFilter,
+    sortBy
+  );
+  const curlText = useMakeCurlText(
+    callQueryParams.entity,
+    callQueryParams.project,
+    selectedCalls,
+    lowLevelFilter,
+    sortBy
+  );
+
   return (
     <>
       <span ref={ref}>
@@ -121,7 +138,7 @@ export const ExportSelector = ({
         }}
         TransitionComponent={DraggableGrow}>
         <Tailwind>
-          <div className="min-w-[460px] p-12">
+          <div className="min-w-[560px] max-w-[660px] p-12">
             <DraggableHandle>
               <div className="flex items-center pb-8">
                 {selectedCalls.length === 0 ? (
@@ -140,8 +157,12 @@ export const ExportSelector = ({
                   setSelectionState={setSelectionState}
                 />
               )}
-              <DownloadGrid onClickDownload={onClickDownload} />
             </DraggableHandle>
+            <DownloadGrid
+              pythonText={pythonText}
+              curlText={curlText}
+              onClickDownload={onClickDownload}
+            />
           </div>
         </Tailwind>
       </Popover>
@@ -189,7 +210,7 @@ const SelectionCheckboxes: FC<{
 
 const ClickableOutlinedCardWithIcon: FC<{
   iconName: IconName;
-  onClick: () => void;
+  onClick?: () => void;
 }> = ({iconName, children, onClick}) => (
   <div
     className="flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16 hover:bg-moon-100"
@@ -202,8 +223,11 @@ const ClickableOutlinedCardWithIcon: FC<{
 );
 
 const DownloadGrid: FC<{
+  pythonText: string;
+  curlText: string;
   onClickDownload: (contentType: ContentType) => void;
-}> = ({onClickDownload}) => {
+}> = ({pythonText, curlText, onClickDownload}) => {
+  const [codeMode, setCodeMode] = useState<'python' | 'curl' | null>(null);
   return (
     <>
       <div className="mt-12 flex items-center">
@@ -232,6 +256,30 @@ const DownloadGrid: FC<{
           Export to JSON
         </ClickableOutlinedCardWithIcon>
       </div>
+      <div className="mt-8 flex items-center">
+        <ClickableOutlinedCardWithIcon
+          iconName="python-logo"
+          onClick={() => setCodeMode('python')}>
+          Use Python
+        </ClickableOutlinedCardWithIcon>
+        <div className="ml-8" />
+        <ClickableOutlinedCardWithIcon
+          iconName="code-alt"
+          onClick={() => setCodeMode('curl')}>
+          Use CURL
+        </ClickableOutlinedCardWithIcon>
+      </div>
+      {codeMode && (
+        <div className="mt-8 flex max-w-full items-center">
+          <CodeEditor
+            value={codeMode === 'python' ? pythonText : curlText}
+            readOnly={true}
+            language={codeMode === 'python' ? 'python' : 'shell'}
+            handleMouseWheel={true}
+            alwaysConsumeMouseWheel={false}
+          />
+        </div>
+      )}
     </>
   );
 };
@@ -294,4 +342,91 @@ function initiateDownloadFromBlob(blob: Blob, fileName: string) {
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(downloadUrl);
+}
+
+function useMakeCodeText(
+  entity: string,
+  project: string,
+  callIds: string[],
+  filter: CallFilter,
+  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
+) {
+  console.log(filter);
+  let codeStr = `import weave\nfrom weave.weave_client import _CallsFilter\nclient = weave.init("${entity}/${project}")`;
+
+  const filteredCallIds = callIds ?? filter.callIds;
+  if (filteredCallIds.length > 0) {
+    // specifying call_ids ignores other filters
+    codeStr += `\ncalls = client.calls(_CallsFilter(\n\tcall_ids=["${filteredCallIds.join(
+      '", "'
+    )}"],\n))`;
+    return codeStr;
+  }
+
+  codeStr += `\ncalls = client.calls(_CallsFilter(\n`;
+  if (filter.opVersionRefs) {
+    codeStr += `\top_names=["${filter.opVersionRefs.join('", "')}"],\n`;
+  }
+  if (filter.runIds) {
+    codeStr += `\trun_ids=["${filter.runIds.join('", "')}"],\n`;
+  }
+  if (filter.userIds) {
+    codeStr += `\tuser_ids=["${filter.userIds.join('", "')}"],\n`;
+  }
+  if (filter.traceId) {
+    codeStr += `\ttrace_id="${filter.traceId}",\n`;
+  }
+  if (filter.traceRootsOnly) {
+    codeStr += `\ttrace_roots_only=True,\n`;
+  }
+  if (filter.parentIds) {
+    codeStr += `\tparent_ids=["${filter.parentIds.join('", "')}"],\n`;
+  }
+
+  if (sortBy.length > 0) {
+    codeStr += `\tsort_by=${JSON.stringify(sortBy, null, 0)},\n`;
+  }
+
+  codeStr += `))`;
+
+  return codeStr;
+}
+
+function useMakeCurlText(
+  entity: string,
+  project: string,
+  callIds: string[],
+  filter: CallFilter,
+  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
+) {
+  const baseUrl = 'https://trace.wandb.ai';
+  const authHeader = '';
+
+  const filterStr = JSON.stringify(
+    {
+      op_names: filter.opVersionRefs,
+      input_refs: filter.inputObjectVersionRefs,
+      output_refs: filter.outputObjectVersionRefs,
+      parent_ids: filter.parentIds,
+      trace_ids: filter.traceId ? [filter.traceId] : undefined,
+      call_ids: filter.callIds,
+      trace_roots_only: filter.traceRootsOnly,
+      wb_run_ids: filter.runIds,
+      wb_user_ids: filter.userIds,
+    },
+    null,
+    0
+  );
+  const sortByStr = JSON.stringify(sortBy, null, 0);
+
+  return `curl '${baseUrl}/calls/stream_query' \
+  -H '${authHeader}' \
+  -H 'content-type: application/json' \
+  --data-raw '{
+    "project_id":"${entity}/${project}",
+    "filter":${filterStr},
+    "limit":${MAX_EXPORT},
+    "offset":0,
+    "sort_by":${sortByStr}
+ }'`;
 }
