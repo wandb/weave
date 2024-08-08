@@ -135,9 +135,19 @@ const config: Config = {
           ]
         },
         {
-          href: "https://github.com/wandb/weave",
-          label: "GitHub",
-          position: "right",
+          position: "left",
+          label: "Open Source",
+          type: "dropdown",
+          items: [
+            {
+              href: "https://github.com/wandb/weave",
+              label: "GitHub",
+            },
+            {
+              href: "https://github.com/wandb/weave/releases",
+              label: "Release Changelog",
+            },
+          ]
         },
       ],
     },
