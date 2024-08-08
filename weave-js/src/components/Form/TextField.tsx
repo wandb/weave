@@ -11,7 +11,6 @@ import classNames from 'classnames';
 import React from 'react';
 
 export const TextFieldSizes = {
-  Small: 'small',
   Medium: 'medium',
   Large: 'large',
 } as const;
@@ -82,11 +81,7 @@ export const TextField = ({
         className={classNames(
           'night-aware',
           'relative rounded-sm',
-          textFieldSize === 'small'
-            ? 'h-26'
-            : textFieldSize === 'medium'
-            ? 'h-32'
-            : 'h-40',
+          textFieldSize === 'medium' ? 'h-32' : 'h-40',
           'bg-white dark:bg-moon-900',
           'text-moon-800 dark:text-moon-200',
           'outline outline-1 outline-moon-250 dark:outline-moon-700',
@@ -111,16 +106,14 @@ export const TextField = ({
           )}
           <input
             className={classNames(
-              'h-full w-full flex-1 rounded-sm bg-inherit',
+              'h-full w-full flex-1 rounded-sm bg-inherit pr-8',
               'appearance-none border-none',
               'focus:outline-none',
               'placeholder-moon-500',
               'dark:selection:bg-moon-650 dark:selection:text-moon-200',
-              textFieldSize === 'small' ? 'pr-4' : 'pr-8',
               {
                 [leftPaddingForIcon]: icon && !prefix,
-                'pl-8': !icon && !prefix && textFieldSize !== 'small',
-                'pl-4': !icon && !prefix && textFieldSize === 'small',
+                'pl-8': !icon && !prefix,
               }
             )}
             placeholder={placeholder}
