@@ -554,14 +554,12 @@ def make_trace_obj(
         if isinstance(val, ObjectRecord):
             # TODO: This may evolve into a registry of classes that can be
             # instantiated from ObjectRecords.
+            res = WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
             if getattr(val, "_class_name", None) == "Dataset":
                 from weave.flow.dataset import Dataset
 
-                return Dataset(rows=val.rows)
-
-            return WeaveObject(
-                val, ref=new_ref, server=server, root=root, parent=parent
-            )
+                return Dataset(rows=res.rows)
+            return res
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
