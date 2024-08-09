@@ -11,6 +11,8 @@ cost_string_fields = [
     "provider_id",
     "pricing_level",
     "pricing_level_id",
+    "created_by",
+    "created_at",
 ]
 
 cost_numeric_fields = [
@@ -34,7 +36,10 @@ LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="completion_token_cost", type="float"),
     Column(name="prompt_token_cost_unit", type="string"),
     Column(name="completion_token_cost_unit", type="string"),
+    Column(name="created_by", type="string"),
+    Column(name="created_at", type="datetime"),
 ]
+
 LLM_TOKEN_PRICES_TABLE_NAME = "llm_token_prices"
 LLM_TOKEN_PRICES_TABLE = Table(
     name=LLM_TOKEN_PRICES_TABLE_NAME, cols=LLM_TOKEN_PRICES_COLUMNS
@@ -206,7 +211,6 @@ def get_ranked_prices(
         llm_usage_table.select()
         .fields([*lu_fields, *ltp_fields, row_number_clause])
         .join(
-            "LEFT",
             LLM_TOKEN_PRICES_TABLE,
             tsi.Query(
                 **{
@@ -218,6 +222,7 @@ def get_ranked_prices(
                     }
                 }
             ),
+            "LEFT",
         )
         .where(
             tsi.Query(
@@ -341,7 +346,7 @@ def join_usage_with_costs(
                 "completion_tokens * completion_token_cost AS completion_tokens_cost",
             ]
         )
-        .join("LEFT", price_table, join_condition)
+        .join(price_table, join_condition, "LEFT")
     )
 
     prepared_select = select_query.prepare(
@@ -375,7 +380,7 @@ def final_call_select_with_cost(
     )
 
     cost_snippet = f"""
-    ',"_weave":{{',
+    ',"weave":{{',
         '"costs":',
         concat(
             '{{',
@@ -415,7 +420,6 @@ def final_call_select_with_cost(
         all_calls_table.select()
         .fields([*select_fields, summary_dump_snippet])
         .join(
-            "",
             usage_with_costs_table,
             tsi.Query(
                 **{

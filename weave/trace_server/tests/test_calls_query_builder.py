@@ -345,6 +345,8 @@ def test_query_light_column_with_costs() -> None:
                         llm_token_prices.completion_token_cost,
                         llm_token_prices.prompt_token_cost_unit,
                         llm_token_prices.completion_token_cost_unit,
+                        llm_token_prices.created_by,
+                        llm_token_prices.created_at,
                         ROW_NUMBER() OVER (PARTITION BY llm_usage.id, llm_usage.llm_id
                             ORDER BY CASE -- Order by pricing level then by effective_date
                                 -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_NAME THEN 1
@@ -367,7 +369,9 @@ def test_query_light_column_with_costs() -> None:
                         prompt_token_cost,
                         completion_token_cost,
                         prompt_token_cost_unit,
-                        completion_token_cost_unit
+                        completion_token_cost_unit,
+                        created_by,
+                        created_at
                 FROM ranked_prices
                 WHERE (rank = {pb_4:UInt64})), -- Join with the top-ranked prices to get the token costs
             usage_with_costs AS
@@ -386,6 +390,8 @@ def test_query_light_column_with_costs() -> None:
                         top_ranked_prices.completion_token_cost,
                         top_ranked_prices.prompt_token_cost_unit,
                         top_ranked_prices.completion_token_cost_unit,
+                        top_ranked_prices.created_by,
+                        top_ranked_prices.created_at,
                         prompt_tokens * prompt_token_cost AS prompt_tokens_cost,
                         completion_tokens * completion_token_cost AS completion_tokens_cost
                 FROM llm_usage
@@ -393,7 +399,7 @@ def test_query_light_column_with_costs() -> None:
         -- Final Select, which just pulls all the data from all_calls, and adds a costs object
         SELECT all_calls.id,
             all_calls.started_at,
-            concat(left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1), ',"_weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',', '"completion_tokens_cost":', toString(completion_tokens_cost), ',', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '"}')), ','), '} }'), '}') AS summary_dump
+            concat(left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',', '"completion_tokens_cost":', toString(completion_tokens_cost), ',', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}') AS summary_dump
         FROM all_calls
         JOIN usage_with_costs ON (all_calls.id = usage_with_costs.id)
         GROUP BY all_calls.id,

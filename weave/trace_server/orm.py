@@ -200,11 +200,13 @@ class PreparedSelect(BaseModel):
 
 
 class Join:
-    join_type: str
+    join_type: typing.Optional[str]
     table: Table
     query: tsi.Query
 
-    def __init__(self, join_type: str, table: Table, query: tsi.Query):
+    def __init__(
+        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
+    ):
         self.join_type = join_type
         self.table = table
         self.query = query
@@ -239,8 +241,10 @@ class Select:
         self._offset = None
         self._group_by = None
 
-    def join(self, join_type: str, table: Table, query: tsi.Query) -> "Select":
-        self.joins.append(Join(join_type, table, query))
+    def join(
+        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
+    ) -> "Select":
+        self.joins.append(Join(table, query, join_type))
         for col in table.cols:
             self.all_columns.append(col.dbname())
         return self
@@ -314,12 +318,13 @@ class Select:
         sql += f"FROM {self.table.name}"
 
         # Handle joins
+        # Returns {join type} JOIN {table name} ON {join condition}
         for j in self.joins:
             query_conds, fields_used = _process_query_to_conditions(
                 j.query, self.all_columns, self.table.json_cols, param_builder
             )
             joined = combine_conditions(query_conds, "AND")
-            sql += f"\n{j.join_type + ' ' if j.join_type != '' else ''}JOIN {j.table.name} ON {joined}"
+            sql += f"\n{j.join_type + ' ' if j.join_type else ''}JOIN {j.table.name} ON {joined}"
 
         conditions = []
         if self._project_id:
@@ -543,6 +548,7 @@ def _transform_external_field_to_internal_field(
             field = prefix + "_dump"
 
     # pops of table_prefix
+    # necessary for joins, allows table1.field1 and table2.field2
     table_prefix = None
     unprefixed_field = field
     if "." in field:
@@ -553,7 +559,7 @@ def _transform_external_field_to_internal_field(
         field not in all_columns
         and field.lower() != "count(*)"
         and not any(
-            # Checks that a column is in the field, allows derrived fields from the columns to be used
+            # Checks that a column is in the field, allows prefixed columns to be used
             substr in unprefixed_field.lower()
             for substr in all_columns
         )

@@ -1,4 +1,8 @@
 CREATE TABLE llm_token_prices (
+     /*
+    `id`: The unique identifier for the call. This is typically a UUID.
+    */
+    id String,
     /*
     `pricing_level`: The level at which the token pricing applies. It can be 'default' for global pricing,
     'project' for project-specific pricing, or 'org' for organization-specific pricing.
@@ -46,14 +50,14 @@ CREATE TABLE llm_token_prices (
     completion_token_cost_unit String,
 
     /*
-    `inserted_by`: User ID of the user who inserted the record, or the system if the record was inserted by the system.
+    `created_by`: User ID of the user who created the record, or the system if the record was created by the system.
     */
-    inserted_by String,
+    created_by String,
 
     /*
-    `inserted_at`: When the record was inserted.
+    `created_at`: When the record was created.
     */
-    inserted_at DateTime64(3) DEFAULT now64(3),
+    created_at DateTime64(3) DEFAULT now64(3),
 
-) ENGINE = ReplacingMergeTree()
+) ENGINE = MergeTree()
 ORDER BY (pricing_level, pricing_level_id, provider_id, llm_id, effective_date);

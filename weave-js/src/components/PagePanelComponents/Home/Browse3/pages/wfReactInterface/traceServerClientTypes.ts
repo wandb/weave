@@ -119,6 +119,7 @@ export type TraceCallsQueryReq = {
   sort_by?: SortBy[];
   query?: Query;
   include_costs?: boolean;
+  columns?: string[];
 };
 
 export type TraceCallsQueryRes = {
@@ -263,4 +264,20 @@ export type TraceFileContentReadReq = {
 
 export type TraceFileContentReadRes = {
   content: string;
+};
+
+export enum ContentType {
+  csv = 'text/csv',
+  tsv = 'text/tab-separated-values',
+  any = '*/*',
+  jsonl = 'application/jsonl',
+  json = 'application/json',
+}
+
+export const fileExtensions = {
+  [ContentType.csv]: 'csv',
+  [ContentType.tsv]: 'tsv',
+  [ContentType.jsonl]: 'jsonl',
+  [ContentType.any]: 'jsonl',
+  [ContentType.json]: 'json',
 };

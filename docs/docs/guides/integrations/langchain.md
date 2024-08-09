@@ -1,8 +1,3 @@
----
-sidebar_position: 2
-hide_table_of_contents: true
----
-
 # LangChain
 
 Weave is designed to make tracking and logging all calls made through the [LangChain Python library](https://github.com/langchain-ai/langchain) effortless.

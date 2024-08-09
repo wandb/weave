@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
-
 # Track data flows and app metadata
 
 In the [Track LLM inputs & outputs](/quickstart) tutorial, the basics of tracking the inputs and outputs of your LLMs was covered.

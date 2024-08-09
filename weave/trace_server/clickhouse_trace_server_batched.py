@@ -44,6 +44,7 @@ from weave.trace_server.calls_query_builder import (
     HardCodedFilter,
     combine_conditions,
 )
+from weave.trace_server.ids import generate_id
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
@@ -70,7 +71,6 @@ from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
     extract_refs_from_values,
-    generate_id,
     str_digest,
 )
 

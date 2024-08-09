@@ -39,6 +39,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
@@ -70,10 +71,6 @@ if typing.TYPE_CHECKING:
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
-
-
-def generate_id() -> str:
-    return str(uuid.uuid4())
 
 
 class ValueFilter(TypedDict, total=False):
@@ -138,6 +135,8 @@ def map_to_refs(obj: Any) -> Any:
         obj_record = dataclass_object_record(obj)
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
+        return obj.ref
+    elif isinstance(obj, WeaveTable):
         return obj.ref
     elif isinstance(obj, list):
         return [map_to_refs(v) for v in obj]
@@ -317,7 +316,7 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        summary=dict(server_call.summary if server_call.summary else {}),
+        summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,
     )
@@ -678,6 +677,7 @@ class WeaveClient:
         """Query project for feedback.
 
         Examples:
+            ```python
             # Fetch a specific feedback object.
             # Note that this still returns a collection, which is expected
             # to contain zero or one item(s).
@@ -685,6 +685,7 @@ class WeaveClient:
 
             # Find all feedback objects with a specific reaction.
             client.feedback(reaction="👍", limit=10)
+            ```
 
         Args:
             query: A mongo-style query expression. For convenience, also accepts a feedback UUID string.
@@ -758,7 +759,9 @@ class WeaveClient:
     def _save_object_basic(
         self, val: Any, name: str, branch: str = "latest"
     ) -> ObjectRef:
-        if getattr(val, "_is_dirty", False):
+        # The WeaveTable case is special because object saving happens inside
+        # _save_object_nested and it has a special table_ref -- skip it here.
+        if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
             val.ref = None
 
         is_opdef = isinstance(val, Op)
@@ -811,6 +814,10 @@ class WeaveClient:
         elif isinstance(obj, Table):
             table_ref = self._save_table(obj)
             obj.ref = table_ref
+        elif isinstance(obj, WeaveTable):
+            table_ref = self._save_table(obj)
+            obj.ref = table_ref
+            obj.table_ref = table_ref
         elif isinstance_namedtuple(obj):
             for v in obj._asdict().values():
                 self._save_nested_objects(v)
@@ -822,6 +829,9 @@ class WeaveClient:
                 self._save_nested_objects(v)
         elif isinstance(obj, Op):
             self._save_op(obj)
+        # TODO: Kinda hacky way to dispatching Dataset with rows: Table
+        elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
+            self._save_nested_objects(obj.rows)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
@@ -990,3 +1000,6 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
         return tuple(tuple_res)
 
     return obj
+
+
+__docspec__ = [WeaveClient, Call, CallsIter]

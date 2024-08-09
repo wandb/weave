@@ -248,13 +248,9 @@ def finish() -> None:
     weave_init.finish()
 
 
-__docspec__ = [
-    init,
-    publish,
-    ref,
-    get_current_call,
-    finish,
-]
+# As of this writing, most important symbols are
+# re-exported in __init__.py.
+# __docspec__ = []
 
 
 __all__ = [

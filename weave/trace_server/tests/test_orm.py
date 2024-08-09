@@ -197,7 +197,6 @@ def test_join():
         table1.select()
         .fields(["id", "name"])
         .join(
-            "",
             table2,
             tsi.Query(
                 **{
@@ -222,7 +221,7 @@ JOIN roles ON (table1.id = table2.id)"""
     )
 
 
-def test_special_join():
+def test_join_with_join_type():
     table1 = Table(
         "users",
         [
@@ -243,7 +242,6 @@ def test_special_join():
         table1.select()
         .fields(["id", "name"])
         .join(
-            "inner",
             table2,
             tsi.Query(
                 **{
@@ -255,6 +253,7 @@ def test_special_join():
                     }
                 }
             ),
+            "inner",
         )
     )
 

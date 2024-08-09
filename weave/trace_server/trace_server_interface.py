@@ -40,9 +40,11 @@ class LLMCostSchema(LLMUsageSchema):
     provider_id: typing.Optional[str]
     pricing_level: typing.Optional[str]
     pricing_level_id: typing.Optional[str]
+    created_at: typing.Optional[str]
+    created_by: typing.Optional[str]
 
 
-class WeaveSummarySchema(ExtraKeysTypedDict):
+class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
     status: typing.Optional[typing.Literal["success", "error", "running"]]
     nice_trace_name: typing.Optional[str]
     latency: typing.Optional[int]
@@ -55,15 +57,6 @@ class SummaryInsertMap(ExtraKeysTypedDict, total=False):
 
 class SummaryMap(SummaryInsertMap, total=False):
     weave: typing.Optional[WeaveSummarySchema]
-
-
-class WeaveAttributeSchema(TypedDict):
-    client_version: typing.Optional[str]
-    source: typing.Optional[str]
-    os_name: typing.Optional[str]
-    os_version: typing.Optional[str]
-    os_release: typing.Optional[str]
-    sys_version: typing.Optional[str]
 
 
 class CallSchema(BaseModel):
@@ -156,7 +149,7 @@ class EndedCallSchemaForInsert(BaseModel):
     # Outputs
     output: typing.Optional[typing.Any] = None
 
-    # Summary: a summary of the call
+    ## Summary: a summary of the call
     summary: SummaryInsertMap
 
     @field_serializer("summary")

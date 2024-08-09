@@ -48,6 +48,10 @@ def async_call(
     return asyncio.to_thread(func, *args, **kwargs)
 
 
+class EvaluationResults(weave.Object):
+    rows: weave.Table
+
+
 class Evaluation(Object):
     """
     Sets up an evaluation which includes a set of scorers and a dataset.
@@ -62,7 +66,7 @@ class Evaluation(Object):
 
     Examples:
 
-    ```
+    ```python
     # Collect your examples
     examples = [
         {"question": "What is the capital of France?", "expected": "Paris"},
@@ -249,8 +253,9 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: list) -> dict:
-        cols = transpose(eval_table)
+    async def summarize(self, eval_table: EvaluationResults) -> dict:
+        eval_table_rows = list(eval_table.rows)
+        cols = transpose(eval_table_rows)
         summary = {}
 
         for name, vals in cols.items():
@@ -312,7 +317,18 @@ class Evaluation(Object):
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
 
-        summary = await self.summarize(eval_rows)
+        # The need for this pattern is quite unfortunate and highlights a gap in our
+        # data model. As a user, I just want to pass a list of data `eval_rows` to
+        # summarize. Under the hood, Weave should choose the appropriate storage
+        # format (in this case `Table`) and serialize it that way. Right now, it is
+        # just a huge list of dicts. The fact that "as a user" I need to construct
+        # `weave.Table` at all is a leaky abstraction. Moreover, the need to
+        # construct `EvaluationResults` just so that tracing and the UI works is
+        # also bad. In the near-term, this will at least solve the problem of
+        # breaking summarization with big datasets, but this is not the correct
+        # long-term solution.
+        eval_results = EvaluationResults(rows=weave.Table(eval_rows))
+        summary = await self.summarize(eval_results)
 
         print("Evaluation summary", summary)
 
