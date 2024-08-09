@@ -32,7 +32,7 @@ def export_notebook(notebook_path, output_path):
         start = output.index(meta_mark_start)
         end = output.index(meta_mark_end)
         extract_meta = output[start + len(meta_mark_start) : end]
-        output = output[:start] + output[end:]
+        output = output[:start] + output[end + len(meta_mark_end) :]
 
     output = extract_meta + make_header(notebook_path) + output
 

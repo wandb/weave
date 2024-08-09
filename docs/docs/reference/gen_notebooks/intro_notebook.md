@@ -12,7 +12,6 @@ title: Introduction Notebook
 :::
 
 
-docusaurus_head_meta::end -->
 
 <img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 <!--- @wandbcode{intro-colab} -->
