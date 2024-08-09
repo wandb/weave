@@ -24,6 +24,16 @@ from weave.legacy.context_state import WandbApiContext, _wandb_api_context
 tracer = engine_trace.tracer()  # type: ignore
 
 
+class CustomRequestsHTTPTransport(RequestsHTTPTransport):
+    # See https://github.com/graphql-python/gql/blob/master/gql/transport/requests.py#L107
+    def connect(self) -> None:
+        if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
+            from weave.trace_server.requests import session as logging_session
+            self.session = logging_session
+        else:
+            super().connect()
+
+
 def set_wandb_api_context(
     user_id: typing.Optional[str],
     api_key: typing.Optional[str],
@@ -293,7 +303,7 @@ class WandbApi:
             if wandb_context.api_key is not None:
                 auth = HTTPBasicAuth("api", wandb_context.api_key)
         url_base = weave_env.wandb_base_url()
-        transport = RequestsHTTPTransport(
+        transport = CustomRequestsHTTPTransport(
             url=url_base + "/graphql", headers=headers, cookies=cookies, auth=auth
         )
         # Warning: we do not use the recommended context manager pattern, because we're
