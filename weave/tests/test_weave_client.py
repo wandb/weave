@@ -1251,12 +1251,6 @@ def test_summary_tokens_cost(client):
     gpt4cost = withCostCallSummary["weave"]["costs"]["gpt-4"]
     gpt4ocost = withCostCallSummary["weave"]["costs"]["gpt-4o"]
 
-    # rounds to nearest integer avoids .999999992345234
-    gpt4cost["prompt_tokens_cost"] = round(gpt4cost["prompt_tokens_cost"])
-    gpt4cost["completion_tokens_cost"] = round(gpt4cost["completion_tokens_cost"])
-    gpt4ocost["prompt_tokens_cost"] = round(gpt4ocost["prompt_tokens_cost"])
-    gpt4ocost["completion_tokens_cost"] = round(gpt4ocost["completion_tokens_cost"])
-
     # delete the effective_date and created_at fields, as they will be different each start up
     del gpt4cost["effective_date"]
     del gpt4ocost["effective_date"]
@@ -1269,8 +1263,8 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 4000000,
             "requests": 2,
             "total_tokens": 0,
-            "prompt_tokens_cost": 60,
-            "completion_tokens_cost": 240,
+            "prompt_tokens_cost": pytest.approx(60),
+            "completion_tokens_cost": pytest.approx(240),
             "prompt_token_cost": 3e-05,
             "completion_token_cost": 6e-05,
             "prompt_token_cost_unit": "USD",
@@ -1288,8 +1282,8 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 5000000,
             "requests": 1,
             "total_tokens": 0,
-            "prompt_tokens_cost": 15,
-            "completion_tokens_cost": 75,
+            "prompt_tokens_cost": pytest.approx(15),
+            "completion_tokens_cost": pytest.approx(75),
             "prompt_token_cost": 5e-06,
             "completion_token_cost": 1.5e-05,
             "prompt_token_cost_unit": "USD",
