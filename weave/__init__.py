@@ -1,3 +1,5 @@
+"""The top-level functions and classes for working with Weave."""
+
 import sys
 
 # We track what modules were loaded before importing weave, so we can ensure

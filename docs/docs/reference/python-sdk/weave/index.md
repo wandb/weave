@@ -1,3 +1,14 @@
+---
+sidebar_position: 0
+sidebar_label: weave
+---
+    
+
+# weave
+
+The top-level functions and classes for working with Weave.
+
+---
 
 
 # API Overview
@@ -23,16 +34,16 @@
 - [`trace_api.finish`](./weave.trace_api.md#function-finish): Stops logging to weave.
 - [`op.op`](./weave.trace.op.md#function-op): A decorator to weave op-ify a function or method.  Works for both sync and async.
 
----
 
 ---
+
 
 ### <kbd>function</kbd> `init`
 
 ```python
 init(
     project_name: str,
-    settings: Optional[weave.trace.settings.UserSettings, dict[str, Any]] = None
+    settings: Optional[UserSettings, dict[str, Any]] = None
 ) → WeaveClient
 ```
 
@@ -166,10 +177,7 @@ Following finish, calls of weave.op() decorated functions will no longer be logg
 ### <kbd>function</kbd> `op`
 
 ```python
-op(
-    *args: Any,
-    **kwargs: Any
-) → Union[Callable[[Any], weave.trace.op.Op], weave.trace.op.Op]
+op(*args: Any, **kwargs: Any) → Union[Callable[[Any], Op], Op]
 ```
 
 A decorator to weave op-ify a function or method.  Works for both sync and async. 
@@ -303,7 +311,7 @@ example_label = dataset_ref.rows[2]['sentence']
 
 ---
 
-#### <kbd>property</kbd> Dataset.model_extra
+#### <kbd>property</kbd> model_extra
 
 Get extra fields set during validation. 
 
@@ -314,7 +322,7 @@ Get extra fields set during validation.
 
 ---
 
-#### <kbd>property</kbd> Dataset.model_fields_set
+#### <kbd>property</kbd> model_fields_set
 
 Returns the set of fields that have been explicitly set on this model instance. 
 
@@ -327,7 +335,7 @@ Returns the set of fields that have been explicitly set on this model instance.
 
 ---
 
-### <kbd>classmethod</kbd> `Dataset.convert_to_table`
+### <kbd>classmethod</kbd> `convert_to_table`
 
 ```python
 convert_to_table(rows: Any) → Table
@@ -365,7 +373,7 @@ class YourModel(Model):
 
 ---
 
-#### <kbd>property</kbd> Model.model_extra
+#### <kbd>property</kbd> model_extra
 
 Get extra fields set during validation. 
 
@@ -376,7 +384,7 @@ Get extra fields set during validation.
 
 ---
 
-#### <kbd>property</kbd> Model.model_fields_set
+#### <kbd>property</kbd> model_fields_set
 
 Returns the set of fields that have been explicitly set on this model instance. 
 
@@ -389,7 +397,7 @@ Returns the set of fields that have been explicitly set on this model instance.
 
 ---
 
-### <kbd>method</kbd> `Model.get_infer_method`
+### <kbd>method</kbd> `get_infer_method`
 
 ```python
 get_infer_method() → Callable
@@ -449,7 +457,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 
 ---
 
-#### <kbd>property</kbd> Evaluation.model_extra
+#### <kbd>property</kbd> model_extra
 
 Get extra fields set during validation. 
 
@@ -460,7 +468,7 @@ Get extra fields set during validation.
 
 ---
 
-#### <kbd>property</kbd> Evaluation.model_fields_set
+#### <kbd>property</kbd> model_fields_set
 
 Returns the set of fields that have been explicitly set on this model instance. 
 
@@ -473,10 +481,10 @@ Returns the set of fields that have been explicitly set on this model instance.
 
 ---
 
-### <kbd>method</kbd> `Evaluation.evaluate`
+### <kbd>method</kbd> `evaluate`
 
 ```python
-evaluate(model: Union[Callable, weave.flow.model.Model]) → dict
+evaluate(model: Union[Callable, Model]) → dict
 ```
 
 
@@ -485,7 +493,7 @@ evaluate(model: Union[Callable, weave.flow.model.Model]) → dict
 
 ---
 
-### <kbd>method</kbd> `Evaluation.model_post_init`
+### <kbd>method</kbd> `model_post_init`
 
 ```python
 model_post_init(_Evaluation__context: Any) → None
@@ -497,13 +505,10 @@ model_post_init(_Evaluation__context: Any) → None
 
 ---
 
-### <kbd>method</kbd> `Evaluation.predict_and_score`
+### <kbd>method</kbd> `predict_and_score`
 
 ```python
-predict_and_score(
-    model: Union[Callable, weave.flow.model.Model],
-    example: dict
-) → dict
+predict_and_score(model: Union[Callable, Model], example: dict) → dict
 ```
 
 
@@ -512,10 +517,10 @@ predict_and_score(
 
 ---
 
-### <kbd>method</kbd> `Evaluation.summarize`
+### <kbd>method</kbd> `summarize`
 
 ```python
-summarize(eval_table: weave.flow.eval.EvaluationResults) → dict
+summarize(eval_table: EvaluationResults) → dict
 ```
 
 
@@ -533,7 +538,7 @@ summarize(eval_table: weave.flow.eval.EvaluationResults) → dict
 
 ---
 
-#### <kbd>property</kbd> Scorer.model_extra
+#### <kbd>property</kbd> model_extra
 
 Get extra fields set during validation. 
 
@@ -544,7 +549,7 @@ Get extra fields set during validation.
 
 ---
 
-#### <kbd>property</kbd> Scorer.model_fields_set
+#### <kbd>property</kbd> model_fields_set
 
 Returns the set of fields that have been explicitly set on this model instance. 
 
@@ -557,7 +562,7 @@ Returns the set of fields that have been explicitly set on this model instance.
 
 ---
 
-### <kbd>method</kbd> `Scorer.score`
+### <kbd>method</kbd> `score`
 
 ```python
 score(target: Any, model_output: Any) → Any
@@ -569,7 +574,7 @@ score(target: Any, model_output: Any) → Any
 
 ---
 
-### <kbd>method</kbd> `Scorer.summarize`
+### <kbd>method</kbd> `summarize`
 
 ```python
 summarize(score_rows: list) → Optional[dict]

@@ -1,3 +1,14 @@
+---
+sidebar_position: 0
+sidebar_label: trace_server_interface
+---
+    
+
+# weave.trace_server.trace_server_interface
+
+
+
+---
 
 
 # API Overview
@@ -77,9 +88,9 @@
 
 - No functions
 
----
 
 ---
+
 ## <kbd>class</kbd> `CallEndReq`
             
 ```python
@@ -339,7 +350,7 @@ class EndedCallSchemaForInsert(BaseModel):
 
 ---
 
-#### <kbd>property</kbd> Feedback.model_extra
+#### <kbd>property</kbd> model_extra
 
 Get extra fields set during validation. 
 
@@ -350,7 +361,7 @@ Get extra fields set during validation.
 
 ---
 
-#### <kbd>property</kbd> Feedback.model_fields_set
+#### <kbd>property</kbd> model_fields_set
 
 Returns the set of fields that have been explicitly set on this model instance. 
 
@@ -863,10 +874,10 @@ class TableUpdateRes(BaseModel):
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.call_end`
+### <kbd>method</kbd> `call_end`
 
 ```python
-call_end(req: weave.trace_server.trace_server_interface.CallEndReq) → CallEndRes
+call_end(req: CallEndReq) → CallEndRes
 ```
 
 
@@ -875,12 +886,10 @@ call_end(req: weave.trace_server.trace_server_interface.CallEndReq) → CallEndR
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.call_read`
+### <kbd>method</kbd> `call_read`
 
 ```python
-call_read(
-    req: weave.trace_server.trace_server_interface.CallReadReq
-) → CallReadRes
+call_read(req: CallReadReq) → CallReadRes
 ```
 
 
@@ -889,12 +898,10 @@ call_read(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.call_start`
+### <kbd>method</kbd> `call_start`
 
 ```python
-call_start(
-    req: weave.trace_server.trace_server_interface.CallStartReq
-) → CallStartRes
+call_start(req: CallStartReq) → CallStartRes
 ```
 
 
@@ -903,12 +910,10 @@ call_start(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.call_update`
+### <kbd>method</kbd> `call_update`
 
 ```python
-call_update(
-    req: weave.trace_server.trace_server_interface.CallUpdateReq
-) → CallUpdateRes
+call_update(req: CallUpdateReq) → CallUpdateRes
 ```
 
 
@@ -917,12 +922,10 @@ call_update(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.calls_delete`
+### <kbd>method</kbd> `calls_delete`
 
 ```python
-calls_delete(
-    req: weave.trace_server.trace_server_interface.CallsDeleteReq
-) → CallsDeleteRes
+calls_delete(req: CallsDeleteReq) → CallsDeleteRes
 ```
 
 
@@ -931,12 +934,10 @@ calls_delete(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.calls_query`
+### <kbd>method</kbd> `calls_query`
 
 ```python
-calls_query(
-    req: weave.trace_server.trace_server_interface.CallsQueryReq
-) → CallsQueryRes
+calls_query(req: CallsQueryReq) → CallsQueryRes
 ```
 
 
@@ -945,12 +946,10 @@ calls_query(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.calls_query_stats`
+### <kbd>method</kbd> `calls_query_stats`
 
 ```python
-calls_query_stats(
-    req: weave.trace_server.trace_server_interface.CallsQueryStatsReq
-) → CallsQueryStatsRes
+calls_query_stats(req: CallsQueryStatsReq) → CallsQueryStatsRes
 ```
 
 
@@ -959,12 +958,10 @@ calls_query_stats(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.calls_query_stream`
+### <kbd>method</kbd> `calls_query_stream`
 
 ```python
-calls_query_stream(
-    req: weave.trace_server.trace_server_interface.CallsQueryReq
-) → Iterator[weave.trace_server.trace_server_interface.CallSchema]
+calls_query_stream(req: CallsQueryReq) → Iterator[CallSchema]
 ```
 
 
@@ -973,7 +970,7 @@ calls_query_stream(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.ensure_project_exists`
+### <kbd>method</kbd> `ensure_project_exists`
 
 ```python
 ensure_project_exists(entity: str, project: str) → None
@@ -985,12 +982,10 @@ ensure_project_exists(entity: str, project: str) → None
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.feedback_create`
+### <kbd>method</kbd> `feedback_create`
 
 ```python
-feedback_create(
-    req: weave.trace_server.trace_server_interface.FeedbackCreateReq
-) → FeedbackCreateRes
+feedback_create(req: FeedbackCreateReq) → FeedbackCreateRes
 ```
 
 
@@ -999,12 +994,10 @@ feedback_create(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.feedback_purge`
+### <kbd>method</kbd> `feedback_purge`
 
 ```python
-feedback_purge(
-    req: weave.trace_server.trace_server_interface.FeedbackPurgeReq
-) → FeedbackPurgeRes
+feedback_purge(req: FeedbackPurgeReq) → FeedbackPurgeRes
 ```
 
 
@@ -1013,12 +1006,10 @@ feedback_purge(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.feedback_query`
+### <kbd>method</kbd> `feedback_query`
 
 ```python
-feedback_query(
-    req: weave.trace_server.trace_server_interface.FeedbackQueryReq
-) → FeedbackQueryRes
+feedback_query(req: FeedbackQueryReq) → FeedbackQueryRes
 ```
 
 
@@ -1027,12 +1018,10 @@ feedback_query(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.file_content_read`
+### <kbd>method</kbd> `file_content_read`
 
 ```python
-file_content_read(
-    req: weave.trace_server.trace_server_interface.FileContentReadReq
-) → FileContentReadRes
+file_content_read(req: FileContentReadReq) → FileContentReadRes
 ```
 
 
@@ -1041,12 +1030,10 @@ file_content_read(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.file_create`
+### <kbd>method</kbd> `file_create`
 
 ```python
-file_create(
-    req: weave.trace_server.trace_server_interface.FileCreateReq
-) → FileCreateRes
+file_create(req: FileCreateReq) → FileCreateRes
 ```
 
 
@@ -1055,12 +1042,10 @@ file_create(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.obj_create`
+### <kbd>method</kbd> `obj_create`
 
 ```python
-obj_create(
-    req: weave.trace_server.trace_server_interface.ObjCreateReq
-) → ObjCreateRes
+obj_create(req: ObjCreateReq) → ObjCreateRes
 ```
 
 
@@ -1069,10 +1054,10 @@ obj_create(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.obj_read`
+### <kbd>method</kbd> `obj_read`
 
 ```python
-obj_read(req: weave.trace_server.trace_server_interface.ObjReadReq) → ObjReadRes
+obj_read(req: ObjReadReq) → ObjReadRes
 ```
 
 
@@ -1081,12 +1066,10 @@ obj_read(req: weave.trace_server.trace_server_interface.ObjReadReq) → ObjReadR
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.objs_query`
+### <kbd>method</kbd> `objs_query`
 
 ```python
-objs_query(
-    req: weave.trace_server.trace_server_interface.ObjQueryReq
-) → ObjQueryRes
+objs_query(req: ObjQueryReq) → ObjQueryRes
 ```
 
 
@@ -1095,12 +1078,10 @@ objs_query(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.op_create`
+### <kbd>method</kbd> `op_create`
 
 ```python
-op_create(
-    req: weave.trace_server.trace_server_interface.OpCreateReq
-) → OpCreateRes
+op_create(req: OpCreateReq) → OpCreateRes
 ```
 
 
@@ -1109,10 +1090,10 @@ op_create(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.op_read`
+### <kbd>method</kbd> `op_read`
 
 ```python
-op_read(req: weave.trace_server.trace_server_interface.OpReadReq) → OpReadRes
+op_read(req: OpReadReq) → OpReadRes
 ```
 
 
@@ -1121,12 +1102,10 @@ op_read(req: weave.trace_server.trace_server_interface.OpReadReq) → OpReadRes
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.ops_query`
+### <kbd>method</kbd> `ops_query`
 
 ```python
-ops_query(
-    req: weave.trace_server.trace_server_interface.OpQueryReq
-) → OpQueryRes
+ops_query(req: OpQueryReq) → OpQueryRes
 ```
 
 
@@ -1135,12 +1114,10 @@ ops_query(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.refs_read_batch`
+### <kbd>method</kbd> `refs_read_batch`
 
 ```python
-refs_read_batch(
-    req: weave.trace_server.trace_server_interface.RefsReadBatchReq
-) → RefsReadBatchRes
+refs_read_batch(req: RefsReadBatchReq) → RefsReadBatchRes
 ```
 
 
@@ -1149,12 +1126,10 @@ refs_read_batch(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.table_create`
+### <kbd>method</kbd> `table_create`
 
 ```python
-table_create(
-    req: weave.trace_server.trace_server_interface.TableCreateReq
-) → TableCreateRes
+table_create(req: TableCreateReq) → TableCreateRes
 ```
 
 
@@ -1163,12 +1138,10 @@ table_create(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.table_query`
+### <kbd>method</kbd> `table_query`
 
 ```python
-table_query(
-    req: weave.trace_server.trace_server_interface.TableQueryReq
-) → TableQueryRes
+table_query(req: TableQueryReq) → TableQueryRes
 ```
 
 
@@ -1177,12 +1150,10 @@ table_query(
 
 ---
 
-### <kbd>method</kbd> `TraceServerInterface.table_update`
+### <kbd>method</kbd> `table_update`
 
 ```python
-table_update(
-    req: weave.trace_server.trace_server_interface.TableUpdateReq
-) → TableUpdateRes
+table_update(req: TableUpdateReq) → TableUpdateRes
 ```
 
 

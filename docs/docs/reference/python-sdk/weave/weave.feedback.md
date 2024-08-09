@@ -1,3 +1,14 @@
+---
+sidebar_position: 0
+sidebar_label: feedback
+---
+    
+
+# weave.feedback
+
+Classes for working with feedback on a project or ref level.
+
+---
 
 
 # API Overview
@@ -16,20 +27,17 @@
 
 - No functions
 
+
 ---
-Classes for working with feedback on a project or ref level.
----
+
 
 ## <kbd>class</kbd> `Feedbacks`
 A collection of Feedback objects with utilities. 
 
-### <kbd>method</kbd> `Feedbacks.__init__`
+### <kbd>method</kbd> `__init__`
 
 ```python
-__init__(
-    show_refs: bool,
-    feedbacks: Optional[Iterable[weave.trace_server.trace_server_interface.Feedback]] = None
-) → None
+__init__(show_refs: bool, feedbacks: Optional[Iterable[Feedback]] = None) → None
 ```
 
 
@@ -41,7 +49,7 @@ __init__(
 
 ---
 
-### <kbd>method</kbd> `Feedbacks.refs`
+### <kbd>method</kbd> `refs`
 
 ```python
 refs() → Refs
@@ -55,13 +63,13 @@ Return the unique refs associated with these feedbacks.
 ## <kbd>class</kbd> `FeedbackQuery`
 Lazy-loading object for fetching feedback from the server. 
 
-### <kbd>method</kbd> `FeedbackQuery.__init__`
+### <kbd>method</kbd> `__init__`
 
 ```python
 __init__(
     entity: str,
     project: str,
-    query: weave.trace_server.interface.query.Query,
+    query: Query,
     offset: Optional[int] = None,
     limit: Optional[int] = None,
     show_refs: bool = False
@@ -77,7 +85,7 @@ __init__(
 
 ---
 
-### <kbd>method</kbd> `FeedbackQuery.execute`
+### <kbd>method</kbd> `execute`
 
 ```python
 execute() → Feedbacks
@@ -89,7 +97,7 @@ execute() → Feedbacks
 
 ---
 
-### <kbd>method</kbd> `FeedbackQuery.refresh`
+### <kbd>method</kbd> `refresh`
 
 ```python
 refresh() → Feedbacks
@@ -101,7 +109,7 @@ refresh() → Feedbacks
 
 ---
 
-### <kbd>method</kbd> `FeedbackQuery.refs`
+### <kbd>method</kbd> `refs`
 
 ```python
 refs() → Refs
@@ -117,7 +125,7 @@ refs() → Refs
 ## <kbd>class</kbd> `RefFeedbackQuery`
 Object for interacting with feedback associated with a particular ref. 
 
-### <kbd>method</kbd> `RefFeedbackQuery.__init__`
+### <kbd>method</kbd> `__init__`
 
 ```python
 __init__(ref: str) → None
@@ -132,14 +140,14 @@ __init__(ref: str) → None
 
 ---
 
-### <kbd>method</kbd> `RefFeedbackQuery.add`
+### <kbd>method</kbd> `add`
 
 ```python
 add(
     feedback_type: str,
     payload: Optional[dict[str, Any]] = None,
     creator: Optional[str] = None,
-    **kwargs: dict[str, typing.Any]
+    **kwargs: dict[str, Any]
 ) → str
 ```
 
@@ -149,7 +157,7 @@ feedback_type: A string identifying the type of feedback. The "wandb." prefix is
 
 ---
 
-### <kbd>method</kbd> `RefFeedbackQuery.add_note`
+### <kbd>method</kbd> `add_note`
 
 ```python
 add_note(note: str, creator: Optional[str] = None) → str
@@ -161,7 +169,7 @@ add_note(note: str, creator: Optional[str] = None) → str
 
 ---
 
-### <kbd>method</kbd> `RefFeedbackQuery.add_reaction`
+### <kbd>method</kbd> `add_reaction`
 
 ```python
 add_reaction(emoji: str, creator: Optional[str] = None) → str
@@ -173,7 +181,7 @@ add_reaction(emoji: str, creator: Optional[str] = None) → str
 
 ---
 
-### <kbd>method</kbd> `RefFeedbackQuery.execute`
+### <kbd>method</kbd> `execute`
 
 ```python
 execute() → Feedbacks
@@ -185,7 +193,7 @@ execute() → Feedbacks
 
 ---
 
-### <kbd>method</kbd> `RefFeedbackQuery.purge`
+### <kbd>method</kbd> `purge`
 
 ```python
 purge(feedback_id: str) → None
@@ -197,7 +205,7 @@ purge(feedback_id: str) → None
 
 ---
 
-### <kbd>method</kbd> `RefFeedbackQuery.refresh`
+### <kbd>method</kbd> `refresh`
 
 ```python
 refresh() → Feedbacks
@@ -209,7 +217,7 @@ refresh() → Feedbacks
 
 ---
 
-### <kbd>method</kbd> `RefFeedbackQuery.refs`
+### <kbd>method</kbd> `refs`
 
 ```python
 refs() → Refs
