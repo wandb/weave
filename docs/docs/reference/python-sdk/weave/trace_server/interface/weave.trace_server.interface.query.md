@@ -35,9 +35,7 @@ simplifications:
 
 # API Overview
 
-## Modules
 
-- No modules
 
 ## Classes
 
@@ -55,9 +53,7 @@ simplifications:
 - [`query.OrOperation`](./weave.trace_server.interface.query.md#class-oroperation)
 - [`query.Query`](./weave.trace_server.interface.query.md#class-query)
 
-## Functions
 
-- No functions
 
 
 ---

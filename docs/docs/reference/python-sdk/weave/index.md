@@ -13,9 +13,7 @@ The top-level functions and classes for working with Weave.
 
 # API Overview
 
-## Modules
 
-- No modules
 
 ## Classes
 

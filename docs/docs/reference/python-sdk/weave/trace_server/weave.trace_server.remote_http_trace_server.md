@@ -13,9 +13,7 @@ sidebar_label: remote_http_trace_server
 
 # API Overview
 
-## Modules
 
-- No modules
 
 ## Classes
 
@@ -25,9 +23,7 @@ sidebar_label: remote_http_trace_server
 - [`remote_http_trace_server.EndBatchItem`](./weave.trace_server.remote_http_trace_server.md#class-endbatchitem)
 - [`remote_http_trace_server.Batch`](./weave.trace_server.remote_http_trace_server.md#class-batch)
 
-## Functions
 
-- No functions
 
 
 ---

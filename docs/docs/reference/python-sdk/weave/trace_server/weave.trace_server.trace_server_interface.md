@@ -13,9 +13,7 @@ sidebar_label: trace_server_interface
 
 # API Overview
 
-## Modules
 
-- No modules
 
 ## Classes
 
@@ -84,9 +82,7 @@ sidebar_label: trace_server_interface
 - [`trace_server_interface.TableUpdateRes`](./weave.trace_server.trace_server_interface.md#class-tableupdateres)
 - [`trace_server_interface.TraceServerInterface`](./weave.trace_server.trace_server_interface.md#class-traceserverinterface)
 
-## Functions
 
-- No functions
 
 
 ---

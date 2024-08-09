@@ -33,6 +33,28 @@ def sanitize_markdown(text):
     return text.replace("<factory>", "&lt;factory&gt;")
 
 
+def clean_overview(overview):
+    overview = overview.replace(
+        """## Functions
+
+- No functions""",
+        "",
+    )
+    overview = overview.replace(
+        """## Modules
+
+- No modules""",
+        "",
+    )
+    overview = overview.replace(
+        """## Classes
+
+- No classes""",
+        "",
+    )
+    return overview
+
+
 def generate_module_doc_string(module, order):
     generator = lazydocs.MarkdownGenerator(remove_package_prefix=True)
     markdown_paragraphs = []
@@ -80,7 +102,7 @@ def generate_module_doc_string(module, order):
 
             process_item(obj)
 
-    overview = sanitize_markdown(generator.overview2md())
+    overview = clean_overview(sanitize_markdown(generator.overview2md()))
     sections = [sanitize_markdown(par) for par in markdown_paragraphs]
     final = "\n\n".join(
         [

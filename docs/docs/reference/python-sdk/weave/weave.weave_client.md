@@ -13,9 +13,7 @@ sidebar_label: weave_client
 
 # API Overview
 
-## Modules
 
-- No modules
 
 ## Classes
 
@@ -23,9 +21,7 @@ sidebar_label: weave_client
 - [`weave_client.Call`](./weave.weave_client.md#class-call): Call(op_name: str, trace_id: str, project_id: str, parent_id: Optional[str], inputs: dict, id: Optional[str] = None, output: Any = None, exception: Optional[str] = None, summary: Optional[dict] = None, display_name: Optional[str] = None, attributes: Optional[dict] = None, _children: list['Call'] = &lt;factory&gt;, _feedback: Optional[weave.feedback.RefFeedbackQuery] = None)
 - [`weave_client.CallsIter`](./weave.weave_client.md#class-callsiter)
 
-## Functions
 
-- No functions
 
 
 ---

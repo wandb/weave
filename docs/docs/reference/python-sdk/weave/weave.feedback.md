@@ -13,9 +13,7 @@ Classes for working with feedback on a project or ref level.
 
 # API Overview
 
-## Modules
 
-- No modules
 
 ## Classes
 
@@ -23,9 +21,7 @@ Classes for working with feedback on a project or ref level.
 - [`feedback.FeedbackQuery`](./weave.feedback.md#class-feedbackquery): Lazy-loading object for fetching feedback from the server.
 - [`feedback.RefFeedbackQuery`](./weave.feedback.md#class-reffeedbackquery): Object for interacting with feedback associated with a particular ref.
 
-## Functions
 
-- No functions
 
 
 ---
