@@ -1,10 +1,12 @@
-# Implement Chain of Density Summarization with Weave
+# Summarization using Chain of Density
 
 Summarizing complex technical documents while preserving crucial details is a challenging task. The Chain of Density (CoD) summarization technique offers a solution by iteratively refining summaries to be more concise and information-dense. This guide demonstrates how to implement CoD using Weave, a powerful framework for building, tracking, and evaluating LLM applications. By combining CoD's effectiveness with Weave's robust tooling, you'll learn to create a summarization pipeline that produces high-quality, entity-rich summaries of technical content while gaining insights into the summarization process.
 
 ![Final Evaluation](./media/eval_comparison.gif)
 
 ## What is Chain of Density Summarization?
+
+[![arXiv](https://img.shields.io/badge/arXiv-2309.04269-b31b1b.svg)](https://arxiv.org/abs/2309.04269)
 
 Chain of Density (CoD) is an iterative summarization technique that produces increasingly concise and information-dense summaries. It works by:
 
@@ -16,14 +18,14 @@ This approach is particularly useful for summarizing scientific papers or techni
 
 ## Why use Weave?
 
-Weave is a lightweight toolkit designed specifically for tracking and evaluating LLM applications. It offers several advantages for implementing and evaluating CoD summarization:
+In this tutorial, we'll use Weave to implement and evaluate a Chain of Density summarization pipeline for ArXiv papers. You'll learn how to:
 
-1. **Easy tracking**: Weave automatically logs inputs, outputs, and intermediate steps of your LLM pipeline.
-2. **Built-in evaluation**: Weave provides tools for creating rigorous, apples-to-apples evaluations of LLM outputs.
-3. **Composability**: Weave operations can be easily combined and reused across different parts of your pipeline.
-4. **Minimal overhead**: Weave is designed to integrate seamlessly with your existing Python code.
+1. **Track your LLM pipeline**: Use Weave to automatically log inputs, outputs, and intermediate steps of your summarization process.
+2. **Evaluate LLM outputs**: Create rigorous, apples-to-apples evaluations of your summaries using Weave's built-in tools.
+3. **Build composable operations**: Combine and reuse Weave operations across different parts of your summarization pipeline.
+4. **Integrate seamlessly**: Add Weave to your existing Python code with minimal overhead.
 
-In this example, we'll show how to create a CoD summarization pipeline for ArXiv papers, leveraging Weave's capabilities for model serving, evaluation, and result tracking.
+By the end of this tutorial, you'll have created a CoD summarization pipeline that leverages Weave's capabilities for model serving, evaluation, and result tracking.
 
 ## Set up the environment
 
@@ -43,6 +45,13 @@ from PyPDF2 import PdfReader
 load_dotenv()
 # Setup
 weave.init("summarization-chain-of-density-cookbook")
+
+# Initialize Anthropic client
+# To get an Anthropic API key:
+# 1. Sign up for an account at https://www.anthropic.com
+# 2. Navigate to the API section in your account settings
+# 3. Generate a new API key
+# 4. Store the API key securely in your .env file
 anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 ```
 
@@ -160,11 +169,6 @@ class ArxivChainOfDensityPipeline(weave.Model):
     model: str = "claude-3-sonnet-20240229"
     density_iterations: int = 3
 
-    def __init__(self, model: str = "claude-3-sonnet-20240229", density_iterations: int = 3):
-        super().__init__()
-        self.model = model
-        self.density_iterations = density_iterations
-
     @weave.op()
     def predict(self, paper: ArxivPaper, instruction: str) -> dict:
         text = load_pdf(paper["pdf_url"])
@@ -172,7 +176,13 @@ class ArxivChainOfDensityPipeline(weave.Model):
         return result
 ```
 
-This `ArxivChainOfDensityPipeline` class encapsulates our summarization logic as a Weave Model, making it easy to track and evaluate.
+This `ArxivChainOfDensityPipeline` class encapsulates our summarization logic as a Weave Model, providing several key benefits:
+
+1. Automatic experiment tracking: Weave captures inputs, outputs, and parameters for each run of the model.
+2. Versioning: Changes to the model's attributes or code are automatically versioned, creating a clear history of how your summarization pipeline evolves over time.
+3. Reproducibility: The versioning and tracking make it easy to reproduce any previous result or configuration of your summarization pipeline.
+4. Hyperparameter management: Model attributes (like `model` and `density_iterations`) are clearly defined and tracked across different runs, facilitating experimentation.
+5. Integration with Weave ecosystem: Using `weave.Model` allows seamless integration with other Weave tools, such as evaluations and serving capabilities.
 
 ![Arxiv Chain of Density Pipeline](./media/model.gif)
 
@@ -254,13 +264,16 @@ weave.publish(dataset)
 
 ![Dataset](./media/eval_dataset.gif)
 
+For our evaluation, we'll use an LLM-as-a-judge approach. This technique involves using a language model to assess the quality of outputs generated by another model or system. It leverages the LLM's understanding and reasoning capabilities to provide nuanced evaluations, especially for tasks where traditional metrics may fall short.
+
+[![arXiv](https://img.shields.io/badge/arXiv-2306.05685-b31b1b.svg)](https://arxiv.org/abs/2306.05685)
 
 ```python
 # Define the scorer function
 @weave.op()
 def quality_scorer(instruction: str, model_output: dict) -> dict:
-    evaluation = evaluate_summary(model_output["final_summary"], instruction)
-    return evaluation
+    result = evaluate_summary(model_output["final_summary"], instruction)
+    return result
 
 # Run evaluation
 evaluation = weave.Evaluation(dataset=dataset, scorers=[quality_scorer])
