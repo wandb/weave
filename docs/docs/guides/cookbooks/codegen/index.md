@@ -11,7 +11,7 @@ Our pipeline will:
 3. Produce comprehensive unit tests
 4. Evaluate the quality of the generated code
 
-![Code Generation Pipeline](./media/code_generation_pipeline.gif)
+![Evaluation](./media/eval_dash.png)
 
 ## Video Demonstration
 
@@ -112,6 +112,8 @@ This `CodeFormatter` class provides several Weave operations to clean and format
 
 
 ## Define the CodeGenerationPipeline
+
+![Code Generation Pipeline](./media/codegen_trace.png)
 
 Now, let's implement the core code generation logic using Weave operations:
 
@@ -251,8 +253,6 @@ This `CodeGenerationPipeline` class encapsulates our code generation logic as a 
 4. Hyperparameter management: Model attributes (like `model_name`) are clearly defined and tracked across different runs, facilitating experimentation.
 5. Integration with Weave ecosystem: Using `weave.Model` allows seamless integration with other Weave tools, such as evaluations and serving capabilities.
 
-![Code Generation Model](./media/code_generation_model.gif)
-
 ## Implement evaluation metrics
 
 To assess the quality of our generated code, we'll implement simple evaluation metrics:
@@ -343,7 +343,7 @@ class TestResultScorer(weave.Scorer):
 
 These evaluation functions assess the quality of the generated code based on factors such as docstring presence, type hints, naming conventions, and test coverage.
 
-![Evaluation](./media/code_evaluation.gif)
+![Evaluation](./media/eval_trace.png)
 
 ## Create a Weave Dataset and run evaluation
 
@@ -374,7 +374,7 @@ print(results)
 
 This code creates a dataset with our sample prompts, defines a quality scorer, and runs an evaluation of our code generation pipeline.
 
-![Final Evaluation](./media/final_evaluation.gif)
+![Final Evaluation](./media/eval_dash.png)
 
 ## Conclusion
 
