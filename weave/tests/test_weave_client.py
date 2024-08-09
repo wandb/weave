@@ -24,6 +24,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
+from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -1165,3 +1166,161 @@ def test_table_partitioning(network_proxy_client):
         + 1  # the second  create
         + NUM_ROWS / 2  # updates - 2 per batch
     )
+
+
+def test_summary_tokens_cost(client):
+    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
+    if is_sqlite:
+        # SQLite does not support costs
+        return
+
+    @weave.op()
+    def gpt4(text):
+        result = "a: " + text
+        return {
+            "result": result,
+            "model": "gpt-4",
+            "usage": {
+                "prompt_tokens": 1000000,
+                "completion_tokens": 2000000,
+            },
+        }
+
+    @weave.op()
+    def gpt4o(text):
+        result = "bbbb: " + text
+        return {
+            "result": result,
+            "model": "gpt-4o",
+            "usage": {
+                "prompt_tokens": 3000000,
+                "completion_tokens": 5000000,
+            },
+        }
+
+    @weave.op()
+    def models(text):
+        return (
+            gpt4(text)["result"]
+            + " "
+            + gpt4(text)["result"]
+            + " "
+            + gpt4o(text)["result"]
+        )
+
+    res = models("hello")
+    assert res == "a: hello a: hello bbbb: hello"
+
+    call = list(models.calls())[0]
+
+    assert call.summary["usage"] == {
+        "gpt-4": {
+            "requests": 2,
+            "prompt_tokens": 2000000,
+            "completion_tokens": 4000000,
+        },
+        "gpt-4o": {
+            "requests": 1,
+            "prompt_tokens": 3000000,
+            "completion_tokens": 5000000,
+        },
+    }
+
+    callsWithCost = list(
+        client.calls(
+            weave_client._CallsFilter(op_names=[call.op_name]),
+            include_costs=True,
+        )
+    )
+    callsNoCost = list(
+        client.calls(
+            weave_client._CallsFilter(op_names=[call.op_name]),
+            include_costs=False,
+        )
+    )
+
+    assert len(callsWithCost) == len(callsNoCost)
+    assert len(callsWithCost) == 1
+
+    noCostCallSummary = callsNoCost[0].summary
+    withCostCallSummary = callsWithCost[0].summary
+
+    assert withCostCallSummary.get("weave", "bah") != "bah"
+    assert len(withCostCallSummary["weave"]["costs"]) == 2
+
+    gpt4cost = withCostCallSummary["weave"]["costs"]["gpt-4"]
+    gpt4ocost = withCostCallSummary["weave"]["costs"]["gpt-4o"]
+
+    # delete the effective_date and created_at fields, as they will be different each start up
+    del gpt4cost["effective_date"]
+    del gpt4ocost["effective_date"]
+    del gpt4cost["created_at"]
+    del gpt4ocost["created_at"]
+
+    assert gpt4cost == (
+        {
+            "prompt_tokens": 2000000,
+            "completion_tokens": 4000000,
+            "requests": 2,
+            "total_tokens": 0,
+            "prompt_tokens_cost": pytest.approx(60),
+            "completion_tokens_cost": pytest.approx(240),
+            "prompt_token_cost": 3e-05,
+            "completion_token_cost": 6e-05,
+            "prompt_token_cost_unit": "USD",
+            "completion_token_cost_unit": "USD",
+            "provider_id": "openai",
+            "pricing_level": "default",
+            "pricing_level_id": "default",
+            "created_by": "system",
+        }
+    )
+
+    assert gpt4ocost == (
+        {
+            "prompt_tokens": 3000000,
+            "completion_tokens": 5000000,
+            "requests": 1,
+            "total_tokens": 0,
+            "prompt_tokens_cost": pytest.approx(15),
+            "completion_tokens_cost": pytest.approx(75),
+            "prompt_token_cost": 5e-06,
+            "completion_token_cost": 1.5e-05,
+            "prompt_token_cost_unit": "USD",
+            "completion_token_cost_unit": "USD",
+            "provider_id": "openai",
+            "pricing_level": "default",
+            "pricing_level_id": "default",
+            "created_by": "system",
+        }
+    )
+
+    # for no cost call, there should be no cost information
+    # currently that means no weave object in the summary
+    assert noCostCallSummary.get("weave", "bah") == "bah"
+
+
+@pytest.mark.skip_clickhouse_client
+def test_summary_tokens_cost_sqlite(client):
+    is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
+    if not is_sqlite:
+        # only run this test for sqlite
+        return
+
+    # ensure that include_costs is a no-op for sqlite
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
+    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
+    call1 = client.create_call("y", {"a": 6, "b": 11})
+
+    callsWithCost = list(client.calls(include_costs=True))
+    callsNoCost = list(client.calls(include_costs=False))
+
+    assert len(callsWithCost) == len(callsNoCost)
+    assert len(callsWithCost) == 4
+
+    noCostCallSummary = callsNoCost[0].summary
+    withCostCallSummary = callsWithCost[0].summary
+
+    assert noCostCallSummary is None
+    assert withCostCallSummary is None

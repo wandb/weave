@@ -208,6 +208,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     call_ids=[req.id],
                 ),
                 limit=1,
+                include_costs=req.include_costs,
             )
         )
         try:
@@ -248,7 +249,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        cq = CallsQuery(project_id=req.project_id)
+        cq = CallsQuery(
+            project_id=req.project_id, include_costs=req.include_costs or False
+        )
 
         # TODO (Perf): By allowing a sub-selection of columns
         # we will gain increased performance by not having to
@@ -256,6 +259,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # cases call for every column to be fetched, so we have not
         # implemented this yet.
         columns = all_call_select_columns
+        # We put summary_dump last so that when we compute the costs and summary its in the right place
+        if req.include_costs:
+            columns = [
+                *[col for col in all_call_select_columns if col != "summary_dump"],
+                "summary_dump",
+            ]
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -1397,7 +1406,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
-        summary_dump=_dict_value_to_dump(end_call.summary),
+        summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(end_call.output),
     )
