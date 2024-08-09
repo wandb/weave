@@ -57,146 +57,186 @@ simplifications:
 
 ---
 
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L95"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `AndOperation`
-            
-```python
-class AndOperation(BaseModel):
-    and_: typing.List["Operand"] = Field(alias="$and")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$and`: `typing.List[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L128"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `ContainsOperation`
-            
-```python
-class ContainsOperation(BaseModel):
-    contains_: "ContainsSpec" = Field(alias="$contains")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$contains`: `<class 'ContainsSpec'>`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L132"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `ContainsSpec`
-            
-```python
-class ContainsSpec(BaseModel):
-    input: "Operand"
-    substr: "Operand"
-    case_insensitive: typing.Optional[bool] = False
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]`
+- `substr`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]`
+- `case_insensitive`: `typing.Optional[bool]`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L81"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `ConvertOperation`
-            
-```python
-class ConvertOperation(BaseModel):
-    convert_: "ConvertSpec" = Field(alias="$convert")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$convert`: `<class 'ConvertSpec'>`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L88"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `ConvertSpec`
-            
-```python
-class ConvertSpec(BaseModel):
-    input: "Operand"
-    # Subset of https://www.mongodb.com/docs/manual/reference/bson-types/#std-label-bson-types
-    to: CastTo
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]`
+- `to`: `typing.Literal['double', 'string', 'int', 'bool', 'exists']`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L110"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `EqOperation`
-            
-```python
-class EqOperation(BaseModel):
-    eq_: typing.Tuple["Operand", "Operand"] = Field(alias="$eq")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$eq`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L66"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `GetFieldOperator`
-            
-```python
-class GetFieldOperator(BaseModel):
-    # Tim: We will likely want to revisit this before making it public. Here are some concerns:
-    # 1. Mongo explicitly says that `getField` is used to access fields without dot notation - this
-    #    is not how we are handling it here - we are using dot notation - this could be resolved by
-    #    supporting the `$field.with.path` shorthand.
-    # 2. As Jamie pointed out, the parsing of this field is not very robust and susceptible to issues when:
-    #    - The field part name contains a dot
-    #    - The field part name is a valid integer (currently interpreted as a list index)
-    #    - The field part name contains a double quote (will result in failed lookup - see `_quote_json_path` in `clickhouse_trace_server_batched.py`)
-    #    These issues could be resolved by using an alternative syntax (perhaps backticks, square brackets, etc.). However
-    #    this would diverge from the current Mongo syntax.
-    get_field_: str = Field(alias="$getField")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$getField`: `<class 'str'>`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L115"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `GtOperation`
-            
-```python
-class GtOperation(BaseModel):
-    gt_: typing.Tuple["Operand", "Operand"] = Field(alias="$gt")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$gt`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L120"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `GteOperation`
-            
-```python
-class GteOperation(BaseModel):
-    gte_: typing.Tuple["Operand", "Operand"] = Field(alias="$gte")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$gte`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation], typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L48"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `LiteralOperation`
-            
-```python
-class LiteralOperation(BaseModel):
-    literal_: typing.Union[
-        str,
-        int,
-        float,
-        bool,
-        dict[str, "LiteralOperation"],
-        list["LiteralOperation"],
-        None,
-    ] = Field(alias="$literal")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$literal`: `typing.Union[str, int, float, bool, dict[str, 'LiteralOperation'], list['LiteralOperation'], NoneType]`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L105"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `NotOperation`
-            
-```python
-class NotOperation(BaseModel):
-    not_: typing.Tuple["Operand"] = Field(alias="$not")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$not`: `typing.Tuple[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L100"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `OrOperation`
-            
-```python
-class OrOperation(BaseModel):
-    or_: typing.List["Operand"] = Field(alias="$or")
 
-```
-            
+
+
+
+
+**Pydantic Fields:**
+
+- `$or`: `typing.List[typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]]`
+
 ---
-## <kbd>class</kbd> `Query`
-            
-```python
-class Query(BaseModel):
-    # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
-    # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
-    # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr
-    expr_: "Operation" = Field(alias="$expr")
-    # In the future, we could have other top-level Query Operators as described here:
-    # https://www.mongodb.com/docs/manual/reference/operator/query/
 
-```
-            
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L30"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+## <kbd>class</kbd> `Query`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$expr`: `typing.Union[AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, ContainsOperation]`
