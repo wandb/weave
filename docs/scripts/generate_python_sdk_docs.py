@@ -1,8 +1,6 @@
 # Run this to re-generate Weave API docs from code.
 
 
-import inspect
-import json
 import os
 import re
 
