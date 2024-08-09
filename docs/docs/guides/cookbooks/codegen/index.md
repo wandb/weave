@@ -1,5 +1,7 @@
 # Code Generation using Weave and OpenAI
 
+
+
 Generating high-quality code with proper structure, documentation, and tests is a challenging task. This guide demonstrates how to implement a code generation pipeline using Weave, a powerful framework for building, tracking, and evaluating LLM applications. By combining OpenAI's language models with Weave's robust tooling, you'll learn to create a code generation pipeline that produces high-quality Python functions, complete with main program runners and unit tests, while gaining insights into the generation process.
 
 Our pipeline will:
@@ -10,6 +12,14 @@ Our pipeline will:
 4. Evaluate the quality of the generated code
 
 ![Code Generation Pipeline](./media/code_generation_pipeline.gif)
+
+## Video Demonstration
+
+For a visual demonstration of the code generation pipeline using Weave, Groq, and E2B check out this video:
+
+[![Code Generation Pipeline Demo](https://img.youtube.com/vi/B70jJYPVAzE/0.jpg)](https://www.youtube.com/watch?v=B70jJYPVAzE&t=1561s)
+
+This video provides a step-by-step walkthrough of the process, showcasing how Weave integrates with Groq to create a powerful code generation tool and then running the code in E2B, to validate the code.
 
 ## Why use Weave?
 
