@@ -2,7 +2,7 @@ from nbconvert import MarkdownExporter
 
 
 def make_header(notebook_path):
-    github_uri = "wandb/weave/blob/master"
+    github_uri = "wandb/weave/blob/master/docs"
     colab_root = f"https://colab.research.google.com/github/{github_uri}"
     colab_path = f"{colab_root}/{notebook_path}"
     github_path = f"https://github.com/{github_uri}/{notebook_path}"
