@@ -248,10 +248,9 @@ def finish() -> None:
     weave_init.finish()
 
 
-__docspec__ = [
-    # As of this writing, most important symbols are
-    # re-exported in __init__.py.
-]
+# As of this writing, most important symbols are
+# re-exported in __init__.py.
+# __docspec__ = []
 
 
 __all__ = [

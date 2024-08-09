@@ -66,7 +66,7 @@ class Evaluation(Object):
 
     Examples:
 
-    ```
+    ```python
     # Collect your examples
     examples = [
         {"question": "What is the capital of France?", "expected": "Paris"},

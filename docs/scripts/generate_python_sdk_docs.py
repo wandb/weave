@@ -2,9 +2,9 @@
 
 
 import inspect
+
 import lazydocs
 import pydantic
-
 
 MARKDOWN_HEADER = """
 """
@@ -22,7 +22,11 @@ def doc_module(module):
     def process_item(obj):
         # Very special / hacky handling of pydantic models
         # since the lazydocs library doesn't handle them well.
-        if isinstance(obj, type) and issubclass(obj, pydantic.BaseModel):
+        if (
+            isinstance(obj, type)
+            and issubclass(obj, pydantic.BaseModel)
+            and obj.__mro__[1] == pydantic.BaseModel
+        ):
             _ = generator.class2md(obj)
             text = f"""## <kbd>class</kbd> `{obj.__name__}`
             
@@ -69,8 +73,12 @@ def doc_module_to_file(module, output_path):
 
 def main():
     import weave
+    from weave import feedback
     from weave import weave_client as client
-    from weave.trace_server import remote_http_trace_server, trace_server_interface
+    from weave.trace_server import (
+        remote_http_trace_server,
+        trace_server_interface,
+    )
     from weave.trace_server.interface import query
 
     # TODO: It would be nice to just walk the module hierarchy and generate docs for all modules
@@ -79,6 +87,7 @@ def main():
     doc_module_to_file(remote_http_trace_server, "remote_http_trace_server.md")
     doc_module_to_file(trace_server_interface, "trace_server_interface.md")
     doc_module_to_file(query, "query.md")
+    doc_module_to_file(feedback, "feedback.md")
 
 
 if __name__ == "__main__":

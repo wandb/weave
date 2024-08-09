@@ -292,7 +292,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
 
     Example usage:
-    ```
+
+    ```python
     import weave
     weave.init("my-project")
 
