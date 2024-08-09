@@ -4,7 +4,7 @@ import React, {useMemo} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from './context';
-import {useEvaluationsFilter} from './pages/CallsPage/CallsPage';
+import {useEvaluationsFilter} from './pages/CallsPage/evaluationsFilter';
 import {useURLSearchParamsDict} from './pages/util';
 import {Sidebar, SidebarItem} from './Sidebar';
 

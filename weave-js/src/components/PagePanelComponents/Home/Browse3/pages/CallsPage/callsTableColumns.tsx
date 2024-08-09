@@ -33,7 +33,6 @@ import {
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
-import {OpVersionIndexText} from './CallsTable';
 import {
   insertPath,
   isDynamicCallColumn,
@@ -41,6 +40,7 @@ import {
   stringToPath,
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
+import {OpVersionIndexText} from './OpVersionIndexText';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
 

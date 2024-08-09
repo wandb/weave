@@ -4,23 +4,19 @@ import {
   GridPinnedColumns,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import _ from 'lodash';
 import React, {FC, useMemo} from 'react';
 
 import {
   WeaveHeaderExtrasContext,
   WeaveHeaderExtrasProvider,
 } from '../../context';
-import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {opNiceName} from '../common/Links';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {useControllableState} from '../util';
-import {
-  opVersionKeyToRefUri,
-  opVersionRefOpName,
-} from '../wfReactInterface/utilities';
+import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {CallsTable} from './CallsTable';
 import {WFHighLevelCallFilter} from './callsTableFilter';
+import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 
 const HeaderExtras = () => {
   const {renderExtras} = React.useContext(WeaveHeaderExtrasContext);
@@ -106,32 +102,4 @@ export const CallsPage: FC<{
       />
     </WeaveHeaderExtrasProvider>
   );
-};
-
-export const useEvaluationsFilter = (
-  entity: string,
-  project: string
-): WFHighLevelCallFilter => {
-  return useMemo(() => {
-    return {
-      frozen: true,
-      opVersionRefs: [
-        opVersionKeyToRefUri({
-          entity,
-          project,
-          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
-          versionHash: '*',
-        }),
-      ],
-    };
-  }, [entity, project]);
-};
-
-export const useCurrentFilterIsEvaluationsFilter = (
-  currentFilter: WFHighLevelCallFilter,
-  entity: string,
-  project: string
-) => {
-  const evaluationsFilter = useEvaluationsFilter(entity, project);
-  return _.isEqual(currentFilter, evaluationsFilter);
 };
