@@ -106,3 +106,13 @@ nav.menu {
   /* reduces the default caret size to be less invasive */
   background: var(--ifm-menu-link-sublist-icon) 50% / 1.6rem 1.6rem
 }
+
+.notebook-cta-button {
+  text-decoration: none;
+
+  > div {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+  }
+}

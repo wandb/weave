@@ -136,6 +136,12 @@ const config: Config = {
           ]
         },
         {
+          type: "docSidebar",
+          sidebarId: "notebookSidebar",
+          position: "left",
+          label: "Cookbooks",
+        },
+        {
           position: "left",
           label: "Open Source",
           type: "dropdown",
