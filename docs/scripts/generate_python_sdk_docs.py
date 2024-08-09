@@ -3,6 +3,7 @@
 
 import inspect
 import os
+import re
 
 import lazydocs
 import pydantic
@@ -11,11 +12,10 @@ MARKDOWN_HEADER = """"""
 SECTION_SEPARATOR = "---"
 
 
-def markdown_header(module, order, title=None):
+def markdown_header(module, title=None):
     if title is None:
         title = module.__name__
     return f"""---
-sidebar_position: {order}
 sidebar_label: {title}
 ---
     """
@@ -33,7 +33,7 @@ def sanitize_markdown(text):
     return text.replace("<factory>", "&lt;factory&gt;")
 
 
-def clean_overview(overview):
+def remove_empty_overview_sections(overview):
     overview = overview.replace(
         """## Functions
 
@@ -55,7 +55,27 @@ def clean_overview(overview):
     return overview
 
 
-def generate_module_doc_string(module, order):
+def make_links_relative(text):
+    """In our docgen setup, we don't necessarily document the symbol where
+    it is defined. Sometimes we are documenting it where it is re-exported.
+
+    The result is that the default links are broken. This function fixes
+    that by making all links relative! How sick.
+    """
+    # Your regex pattern adjusted for Python. Thanks GPT (:
+    pattern = r"^- \[.*\]\((.\/.*)#(.*)\)"
+
+    # Function to replace the first match group with an empty string
+    def replace_with_empty(match):
+        # match.group(1) corresponds to the first capture group (file part)
+        # match.group(0) corresponds to the entire matched string
+        return match.group(0).replace(match.group(1), "")
+
+    # Replace all occurrences of match[0] (the file part) with an empty string
+    return re.sub(pattern, replace_with_empty, text, flags=re.MULTILINE)
+
+
+def generate_module_doc_string(module):
     generator = lazydocs.MarkdownGenerator(remove_package_prefix=True)
     markdown_paragraphs = []
 
@@ -102,11 +122,14 @@ def generate_module_doc_string(module, order):
 
             process_item(obj)
 
-    overview = clean_overview(sanitize_markdown(generator.overview2md()))
+    overview = remove_empty_overview_sections(
+        sanitize_markdown(generator.overview2md())
+    )
+    overview = make_links_relative(overview)
     sections = [sanitize_markdown(par) for par in markdown_paragraphs]
     final = "\n\n".join(
         [
-            markdown_header(module, order, module.__name__.split(".")[-1]),
+            markdown_header(module, module.__name__.split(".")[-1]),
             markdown_title(module),
             markdown_description(module),
             SECTION_SEPARATOR,
@@ -119,13 +142,13 @@ def generate_module_doc_string(module, order):
     return final
 
 
-def doc_module_to_file(module, order, output_path):
-    api_docs = generate_module_doc_string(module, order)
+def doc_module_to_file(module, output_path):
+    api_docs = generate_module_doc_string(module)
     with open(output_path, "w") as f:
         f.write(api_docs)
 
 
-def doc_module(module, order=0, root_path="./docs/reference/python-sdk"):
+def doc_module(module, root_path="./docs/reference/python-sdk"):
     module_path = module.__name__
     path_parts = module_path.split(".")
     file_name = module_path + ".md"
@@ -140,7 +163,7 @@ def doc_module(module, order=0, root_path="./docs/reference/python-sdk"):
     target_path = target_dir + "/" + file_name
 
     os.makedirs(target_dir, exist_ok=True)
-    doc_module_to_file(module, order, target_path)
+    doc_module_to_file(module, target_path)
 
 
 def main():

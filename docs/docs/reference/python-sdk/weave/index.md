@@ -1,5 +1,4 @@
 ---
-sidebar_position: 0
 sidebar_label: weave
 ---
     
@@ -17,20 +16,20 @@ The top-level functions and classes for working with Weave.
 
 ## Classes
 
-- [`obj.Object`](./weave.flow.obj.md#class-object)
-- [`dataset.Dataset`](./weave.flow.dataset.md#class-dataset): Dataset object with easy saving and automatic versioning
-- [`model.Model`](./weave.flow.model.md#class-model): Intended to capture a combination of code and data the operates on an input.
-- [`eval.Evaluation`](./weave.flow.eval.md#class-evaluation): Sets up an evaluation which includes a set of scorers and a dataset.
-- [`scorer.Scorer`](./weave.flow.scorer.md#class-scorer)
+- [`obj.Object`](#class-object)
+- [`dataset.Dataset`](#class-dataset): Dataset object with easy saving and automatic versioning
+- [`model.Model`](#class-model): Intended to capture a combination of code and data the operates on an input.
+- [`eval.Evaluation`](#class-evaluation): Sets up an evaluation which includes a set of scorers and a dataset.
+- [`scorer.Scorer`](#class-scorer)
 
 ## Functions
 
-- [`trace_api.init`](./weave.trace_api.md#function-init): Initialize weave tracking, logging to a wandb project.
-- [`trace_api.publish`](./weave.trace_api.md#function-publish): Save and version a python object.
-- [`trace_api.ref`](./weave.trace_api.md#function-ref): Construct a Ref to a Weave object.
-- [`call_context.get_current_call`](./weave.call_context.md#function-get_current_call): Get the Call object for the currently executing Op, within that Op.
-- [`trace_api.finish`](./weave.trace_api.md#function-finish): Stops logging to weave.
-- [`op.op`](./weave.trace.op.md#function-op): A decorator to weave op-ify a function or method.  Works for both sync and async.
+- [`trace_api.init`](#function-init): Initialize weave tracking, logging to a wandb project.
+- [`trace_api.publish`](#function-publish): Save and version a python object.
+- [`trace_api.ref`](#function-ref): Construct a Ref to a Weave object.
+- [`call_context.get_current_call`](#function-get_current_call): Get the Call object for the currently executing Op, within that Op.
+- [`trace_api.finish`](#function-finish): Stops logging to weave.
+- [`op.op`](#function-op): A decorator to weave op-ify a function or method.  Works for both sync and async.
 
 
 ---

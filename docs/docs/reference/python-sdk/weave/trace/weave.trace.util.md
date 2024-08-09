@@ -1,5 +1,4 @@
 ---
-sidebar_position: 0
 sidebar_label: util
 ---
     
@@ -29,8 +28,8 @@ Note: The ContextAwareThreadPoolExecutor and ContextAwareThread classes are desi
 
 ## Classes
 
-- [`util.ContextAwareThreadPoolExecutor`](./weave.trace.util.md#class-contextawarethreadpoolexecutor): A ThreadPoolExecutor that runs functions with the context of the caller.
-- [`util.ContextAwareThread`](./weave.trace.util.md#class-contextawarethread): A Thread that runs functions with the context of the caller.
+- [`util.ContextAwareThreadPoolExecutor`](#class-contextawarethreadpoolexecutor): A ThreadPoolExecutor that runs functions with the context of the caller.
+- [`util.ContextAwareThread`](#class-contextawarethread): A Thread that runs functions with the context of the caller.
 
 
 

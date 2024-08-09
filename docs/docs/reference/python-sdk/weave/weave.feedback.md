@@ -1,5 +1,4 @@
 ---
-sidebar_position: 0
 sidebar_label: feedback
 ---
     
@@ -17,9 +16,9 @@ Classes for working with feedback on a project or ref level.
 
 ## Classes
 
-- [`feedback.Feedbacks`](./weave.feedback.md#class-feedbacks): A collection of Feedback objects with utilities.
-- [`feedback.FeedbackQuery`](./weave.feedback.md#class-feedbackquery): Lazy-loading object for fetching feedback from the server.
-- [`feedback.RefFeedbackQuery`](./weave.feedback.md#class-reffeedbackquery): Object for interacting with feedback associated with a particular ref.
+- [`feedback.Feedbacks`](#class-feedbacks): A collection of Feedback objects with utilities.
+- [`feedback.FeedbackQuery`](#class-feedbackquery): Lazy-loading object for fetching feedback from the server.
+- [`feedback.RefFeedbackQuery`](#class-reffeedbackquery): Object for interacting with feedback associated with a particular ref.
 
 
 

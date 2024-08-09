@@ -1,5 +1,4 @@
 ---
-sidebar_position: 0
 sidebar_label: remote_http_trace_server
 ---
     
@@ -17,11 +16,11 @@ sidebar_label: remote_http_trace_server
 
 ## Classes
 
-- [`remote_http_trace_server.RemoteHTTPTraceServer`](./weave.trace_server.remote_http_trace_server.md#class-remotehttptraceserver)
-- [`remote_http_trace_server.ServerInfoRes`](./weave.trace_server.remote_http_trace_server.md#class-serverinfores)
-- [`remote_http_trace_server.StartBatchItem`](./weave.trace_server.remote_http_trace_server.md#class-startbatchitem)
-- [`remote_http_trace_server.EndBatchItem`](./weave.trace_server.remote_http_trace_server.md#class-endbatchitem)
-- [`remote_http_trace_server.Batch`](./weave.trace_server.remote_http_trace_server.md#class-batch)
+- [`remote_http_trace_server.RemoteHTTPTraceServer`](#class-remotehttptraceserver)
+- [`remote_http_trace_server.ServerInfoRes`](#class-serverinfores)
+- [`remote_http_trace_server.StartBatchItem`](#class-startbatchitem)
+- [`remote_http_trace_server.EndBatchItem`](#class-endbatchitem)
+- [`remote_http_trace_server.Batch`](#class-batch)
 
 
 

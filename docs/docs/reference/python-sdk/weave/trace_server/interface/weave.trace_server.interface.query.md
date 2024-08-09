@@ -1,5 +1,4 @@
 ---
-sidebar_position: 0
 sidebar_label: query
 ---
     
@@ -39,19 +38,19 @@ simplifications:
 
 ## Classes
 
-- [`query.AndOperation`](./weave.trace_server.interface.query.md#class-andoperation)
-- [`query.ContainsOperation`](./weave.trace_server.interface.query.md#class-containsoperation)
-- [`query.ContainsSpec`](./weave.trace_server.interface.query.md#class-containsspec)
-- [`query.ConvertOperation`](./weave.trace_server.interface.query.md#class-convertoperation)
-- [`query.ConvertSpec`](./weave.trace_server.interface.query.md#class-convertspec)
-- [`query.EqOperation`](./weave.trace_server.interface.query.md#class-eqoperation)
-- [`query.GetFieldOperator`](./weave.trace_server.interface.query.md#class-getfieldoperator)
-- [`query.GtOperation`](./weave.trace_server.interface.query.md#class-gtoperation)
-- [`query.GteOperation`](./weave.trace_server.interface.query.md#class-gteoperation)
-- [`query.LiteralOperation`](./weave.trace_server.interface.query.md#class-literaloperation)
-- [`query.NotOperation`](./weave.trace_server.interface.query.md#class-notoperation)
-- [`query.OrOperation`](./weave.trace_server.interface.query.md#class-oroperation)
-- [`query.Query`](./weave.trace_server.interface.query.md#class-query)
+- [`query.AndOperation`](#class-andoperation)
+- [`query.ContainsOperation`](#class-containsoperation)
+- [`query.ContainsSpec`](#class-containsspec)
+- [`query.ConvertOperation`](#class-convertoperation)
+- [`query.ConvertSpec`](#class-convertspec)
+- [`query.EqOperation`](#class-eqoperation)
+- [`query.GetFieldOperator`](#class-getfieldoperator)
+- [`query.GtOperation`](#class-gtoperation)
+- [`query.GteOperation`](#class-gteoperation)
+- [`query.LiteralOperation`](#class-literaloperation)
+- [`query.NotOperation`](#class-notoperation)
+- [`query.OrOperation`](#class-oroperation)
+- [`query.Query`](#class-query)
 
 
 
