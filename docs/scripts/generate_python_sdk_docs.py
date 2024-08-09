@@ -169,6 +169,7 @@ def main():
     import weave
     from weave import feedback
     from weave import weave_client as client
+    from weave.trace import util
     from weave.trace_server import (
         remote_http_trace_server,
         trace_server_interface,
@@ -182,6 +183,7 @@ def main():
     doc_module(trace_server_interface)
     doc_module(query)
     doc_module(feedback)
+    doc_module(util)
 
 
 if __name__ == "__main__":
