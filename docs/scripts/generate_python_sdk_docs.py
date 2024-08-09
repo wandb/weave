@@ -153,10 +153,9 @@ def doc_module(module, root_path="./docs/reference/python-sdk"):
     path_parts = module_path.split(".")
     file_name = module_path + ".md"
 
-    # target_dir = root_path
-    # Only used if nesting folders (not as nice for now)
     target_dir = root_path + "/" + "/".join(path_parts[:-1])
-    # Special case for __init__ modules:
+    # Special case for __init__ modules. This allows
+    # the sidebar header to also be the index page.
     if module.__file__.endswith("__init__.py"):
         target_dir = target_dir + "/" + path_parts[-1]
         file_name = "index.md"

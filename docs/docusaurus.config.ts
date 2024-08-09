@@ -52,27 +52,6 @@ const config: Config = {
   ],
 
   plugins: [
-    // [
-    //   '@docusaurus/plugin-content-docs',
-    //   {
-    //     async sidebarItemsGenerator({
-    //       ...args,
-    //       isCategoryIndex: defaultCategoryIndexMatcher, // The default matcher implementation, given below
-    //       defaultSidebarItemsGenerator,
-    //     }) {
-    //       return defaultSidebarItemsGenerator({
-    //         ...args,
-    //         isCategoryIndex(doc) {
-    //           return (
-    //             // Also pick __init.md in addition to the default ones
-    //             doc.fileName.toLowerCase() === '__init' ||
-    //             defaultCategoryIndexMatcher(doc)
-    //           );
-    //         },
-    //       });
-    //     },
-    //   },
-    // ],
     ...(process.env.DOCS_SEGMENT_API_KEY
       ? [
           [
