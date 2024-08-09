@@ -29,11 +29,13 @@ sidebar_label: trace_server_interface
 - [`trace_server_interface.CallsDeleteReq`](#class-callsdeletereq)
 - [`trace_server_interface.CallsDeleteReq`](#class-callsdeletereq)
 - [`trace_server_interface.CallsDeleteRes`](#class-callsdeleteres)
+- [`trace_server_interface.CallsFilter`](#class-callsfilter)
 - [`trace_server_interface.CallsQueryReq`](#class-callsqueryreq)
 - [`trace_server_interface.CallsQueryRes`](#class-callsqueryres)
 - [`trace_server_interface.CallsQueryStatsReq`](#class-callsquerystatsreq)
 - [`trace_server_interface.CallsQueryStatsRes`](#class-callsquerystatsres)
 - [`trace_server_interface.EndedCallSchemaForInsert`](#class-endedcallschemaforinsert)
+- [`trace_server_interface.ExtraKeysTypedDict`](#class-extrakeystypeddict)
 - [`trace_server_interface.Feedback`](#class-feedback)
 - [`trace_server_interface.FeedbackCreateReq`](#class-feedbackcreatereq)
 - [`trace_server_interface.FeedbackCreateReq`](#class-feedbackcreatereq)
@@ -48,6 +50,8 @@ sidebar_label: trace_server_interface
 - [`trace_server_interface.FileContentReadRes`](#class-filecontentreadres)
 - [`trace_server_interface.FileCreateReq`](#class-filecreatereq)
 - [`trace_server_interface.FileCreateRes`](#class-filecreateres)
+- [`trace_server_interface.LLMCostSchema`](#class-llmcostschema)
+- [`trace_server_interface.LLMUsageSchema`](#class-llmusageschema)
 - [`trace_server_interface.ObjCreateReq`](#class-objcreatereq)
 - [`trace_server_interface.ObjCreateRes`](#class-objcreateres)
 - [`trace_server_interface.ObjQueryReq`](#class-objqueryreq)
@@ -56,15 +60,20 @@ sidebar_label: trace_server_interface
 - [`trace_server_interface.ObjReadRes`](#class-objreadres)
 - [`trace_server_interface.ObjSchema`](#class-objschema)
 - [`trace_server_interface.ObjSchemaForInsert`](#class-objschemaforinsert)
+- [`trace_server_interface.ObjectVersionFilter`](#class-objectversionfilter)
 - [`trace_server_interface.OpCreateReq`](#class-opcreatereq)
 - [`trace_server_interface.OpCreateRes`](#class-opcreateres)
 - [`trace_server_interface.OpQueryReq`](#class-opqueryreq)
 - [`trace_server_interface.OpQueryRes`](#class-opqueryres)
 - [`trace_server_interface.OpReadReq`](#class-opreadreq)
 - [`trace_server_interface.OpReadRes`](#class-opreadres)
+- [`trace_server_interface.OpVersionFilter`](#class-opversionfilter)
 - [`trace_server_interface.RefsReadBatchReq`](#class-refsreadbatchreq)
 - [`trace_server_interface.RefsReadBatchRes`](#class-refsreadbatchres)
+- [`trace_server_interface.SortBy`](#class-sortby)
 - [`trace_server_interface.StartedCallSchemaForInsert`](#class-startedcallschemaforinsert)
+- [`trace_server_interface.SummaryInsertMap`](#class-summaryinsertmap)
+- [`trace_server_interface.SummaryMap`](#class-summarymap)
 - [`trace_server_interface.TableAppendSpec`](#class-tableappendspec)
 - [`trace_server_interface.TableAppendSpecPayload`](#class-tableappendspecpayload)
 - [`trace_server_interface.TableCreateReq`](#class-tablecreatereq)
@@ -75,11 +84,13 @@ sidebar_label: trace_server_interface
 - [`trace_server_interface.TablePopSpecPayload`](#class-tablepopspecpayload)
 - [`trace_server_interface.TableQueryReq`](#class-tablequeryreq)
 - [`trace_server_interface.TableQueryRes`](#class-tablequeryres)
+- [`trace_server_interface.TableRowFilter`](#class-tablerowfilter)
 - [`trace_server_interface.TableRowSchema`](#class-tablerowschema)
 - [`trace_server_interface.TableSchemaForInsert`](#class-tableschemaforinsert)
 - [`trace_server_interface.TableUpdateReq`](#class-tableupdatereq)
 - [`trace_server_interface.TableUpdateRes`](#class-tableupdateres)
 - [`trace_server_interface.TraceServerInterface`](#class-traceserverinterface)
+- [`trace_server_interface.WeaveSummarySchema`](#class-weavesummaryschema)
 
 
 
@@ -110,6 +121,7 @@ class CallEndRes(BaseModel):
 class CallReadReq(BaseModel):
     project_id: str
     id: str
+    include_costs: typing.Optional[bool] = False
 
 ```
             
@@ -158,13 +170,19 @@ class CallSchema(BaseModel):
     output: typing.Optional[typing.Any] = None
 
     ## Summary: a summary of the call
-    summary: typing.Optional[typing.Dict[str, typing.Any]] = None
+    summary: typing.Optional[SummaryMap] = None
 
     # WB Metadata
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
+
+    @field_serializer("attributes", "summary", when_used="unless-none")
+    def serialize_typed_dicts(
+        self, v: typing.Dict[str, typing.Any]
+    ) -> typing.Dict[str, typing.Any]:
+        return dict(v)
 
 ```
             
@@ -266,6 +284,23 @@ class CallsDeleteRes(BaseModel):
 ```
             
 ---
+## <kbd>class</kbd> `CallsFilter`
+            
+```python
+class CallsFilter(BaseModel):
+    op_names: typing.Optional[typing.List[str]] = None
+    input_refs: typing.Optional[typing.List[str]] = None
+    output_refs: typing.Optional[typing.List[str]] = None
+    parent_ids: typing.Optional[typing.List[str]] = None
+    trace_ids: typing.Optional[typing.List[str]] = None
+    call_ids: typing.Optional[typing.List[str]] = None
+    trace_roots_only: typing.Optional[bool] = None
+    wb_user_ids: typing.Optional[typing.List[str]] = None
+    wb_run_ids: typing.Optional[typing.List[str]] = None
+
+```
+            
+---
 ## <kbd>class</kbd> `CallsQueryReq`
             
 ```python
@@ -277,6 +312,7 @@ class CallsQueryReq(BaseModel):
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[SortBy]] = None
     query: typing.Optional[Query] = None
+    include_costs: typing.Optional[bool] = False
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
@@ -331,10 +367,27 @@ class EndedCallSchemaForInsert(BaseModel):
     output: typing.Optional[typing.Any] = None
 
     ## Summary: a summary of the call
-    summary: typing.Dict[str, typing.Any]
+    summary: SummaryInsertMap
+
+    @field_serializer("summary")
+    def serialize_typed_dicts(
+        self, v: typing.Dict[str, typing.Any]
+    ) -> typing.Dict[str, typing.Any]:
+        return dict(v)
 
 ```
             
+---
+
+## <kbd>class</kbd> `ExtraKeysTypedDict`
+
+
+
+
+
+
+
+
 ---
 
 ## <kbd>class</kbd> `Feedback`
@@ -473,7 +526,6 @@ class FeedbackQueryReq(BaseModel):
     query: typing.Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
-    # TODO: I think SortBy shouldn't have leading underscore
     sort_by: typing.Optional[typing.List[SortBy]] = None
     limit: typing.Optional[int] = Field(default=None, examples=[10])
     offset: typing.Optional[int] = Field(default=None, examples=[0])
@@ -529,6 +581,28 @@ class FileCreateRes(BaseModel):
 
 ```
             
+---
+
+## <kbd>class</kbd> `LLMCostSchema`
+
+
+
+
+
+
+
+
+---
+
+## <kbd>class</kbd> `LLMUsageSchema`
+
+
+
+
+
+
+
+
 ---
 ## <kbd>class</kbd> `ObjCreateReq`
             
@@ -616,6 +690,18 @@ class ObjSchemaForInsert(BaseModel):
 ```
             
 ---
+## <kbd>class</kbd> `ObjectVersionFilter`
+            
+```python
+class ObjectVersionFilter(BaseModel):
+    base_object_classes: typing.Optional[typing.List[str]] = None
+    object_ids: typing.Optional[typing.List[str]] = None
+    is_op: typing.Optional[bool] = None
+    latest_only: typing.Optional[bool] = None
+
+```
+            
+---
 ## <kbd>class</kbd> `OpCreateReq`
             
 ```python
@@ -673,6 +759,16 @@ class OpReadRes(BaseModel):
 ```
             
 ---
+## <kbd>class</kbd> `OpVersionFilter`
+            
+```python
+class OpVersionFilter(BaseModel):
+    op_names: typing.Optional[typing.List[str]] = None
+    latest_only: typing.Optional[bool] = None
+
+```
+            
+---
 ## <kbd>class</kbd> `RefsReadBatchReq`
             
 ```python
@@ -687,6 +783,20 @@ class RefsReadBatchReq(BaseModel):
 ```python
 class RefsReadBatchRes(BaseModel):
     vals: typing.List[typing.Any]
+
+```
+            
+---
+## <kbd>class</kbd> `SortBy`
+            
+```python
+class SortBy(BaseModel):
+    # Field should be a key of `CallSchema`. For dictionary fields
+    # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
+    # dot-separated.
+    field: str  # Consider changing this to _FieldSelect
+    # Direction should be either 'asc' or 'desc'
+    direction: typing.Literal["asc", "desc"]
 
 ```
             
@@ -722,6 +832,28 @@ class StartedCallSchemaForInsert(BaseModel):
 
 ```
             
+---
+
+## <kbd>class</kbd> `SummaryInsertMap`
+
+
+
+
+
+
+
+
+---
+
+## <kbd>class</kbd> `SummaryMap`
+
+
+
+
+
+
+
+
 ---
 ## <kbd>class</kbd> `TableAppendSpec`
             
@@ -814,6 +946,15 @@ class TableQueryReq(BaseModel):
 ```python
 class TableQueryRes(BaseModel):
     rows: typing.List[TableRowSchema]
+
+```
+            
+---
+## <kbd>class</kbd> `TableRowFilter`
+            
+```python
+class TableRowFilter(BaseModel):
+    row_digests: typing.Optional[typing.List[str]] = None
 
 ```
             
@@ -1150,6 +1291,17 @@ table_query(req: TableQueryReq) → TableQueryRes
 ```python
 table_update(req: TableUpdateReq) → TableUpdateRes
 ```
+
+
+
+
+
+
+---
+
+## <kbd>class</kbd> `WeaveSummarySchema`
+
+
 
 
 

@@ -54,7 +54,7 @@ __init__(
 ### <kbd>method</kbd> `call`
 
 ```python
-call(call_id: str) → WeaveObject
+call(call_id: str, include_costs: Optional[bool] = False) → WeaveObject
 ```
 
 
@@ -66,7 +66,10 @@ call(call_id: str) → WeaveObject
 ### <kbd>method</kbd> `calls`
 
 ```python
-calls(filter: Optional[CallsFilter] = None) → CallsIter
+calls(
+    filter: Optional[CallsFilter] = None,
+    include_costs: Optional[bool] = False
+) → CallsIter
 ```
 
 
@@ -321,7 +324,8 @@ set_display_name(name: Optional[str]) → None
 __init__(
     server: TraceServerInterface,
     project_id: str,
-    filter: CallsFilter
+    filter: CallsFilter,
+    include_costs: bool = False
 ) → None
 ```
 
