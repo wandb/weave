@@ -69,7 +69,6 @@ import {
   OpVersionKey,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
-import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
@@ -83,6 +82,7 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
+import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
@@ -179,6 +179,8 @@ export const CallsTable: FC<{
     () => getEffectiveFilter(filter, frozenFilter),
     [filter, frozenFilter]
   );
+
+  console.log('jamie');
 
   // 2. Filter (Unstructured Filter)
   const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
