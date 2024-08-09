@@ -176,13 +176,10 @@ def fix_pydantic_model(text, obj, module_name):
     return text
 
 
-def generate_module_doc_string(
-    module,
-    src_root_path="/Users/timothysweeney/Workspace/github/wandb/core/services/weave-python/weave-public/",
-):
+def generate_module_doc_string(module, src_root_path):
     generator = lazydocs.MarkdownGenerator(
         src_base_url="https://github.com/wandb/weave/blob/master",
-        src_root_path="/Users/timothysweeney/Workspace/github/wandb/core/services/weave-python/weave-public/",
+        src_root_path=src_root_path,
         remove_package_prefix=True,
     )
     markdown_paragraphs = []
