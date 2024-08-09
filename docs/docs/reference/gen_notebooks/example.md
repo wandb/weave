@@ -1,5 +1,4 @@
----
----
+
 
 :::tip[This is a notebook]
 

@@ -7,8 +7,7 @@ def make_header(notebook_path):
     colab_path = f"{colab_root}/{notebook_path}"
     github_path = f"https://github.com/{github_uri}/{notebook_path}"
 
-    return f"""---
----
+    return f"""
 
 :::tip[This is a notebook]
 
@@ -26,15 +25,36 @@ def export_notebook(notebook_path, output_path):
     exporter = MarkdownExporter()
     output, resources = exporter.from_filename(notebook_path)
 
-    output = make_header(notebook_path) + output
+    extract_meta = ""
+    meta_mark_start = "<!-- docusaurus_head_meta::start\n"
+    meta_mark_end = "docusaurus_head_meta::end -->\n"
+    if meta_mark_start in output and meta_mark_end in output:
+        start = output.index(meta_mark_start)
+        end = output.index(meta_mark_end)
+        extract_meta = output[start + len(meta_mark_start) : end]
+        output = output[:start] + output[end:]
+
+    output = extract_meta + make_header(notebook_path) + output
 
     with open(output_path, "w") as f:
         f.write(output)
 
 
+def export_all_notebooks_in_primary_dir():
+    import os
+
+    for filename in os.listdir("./notebooks"):
+        if filename.endswith(".ipynb"):
+            export_notebook(
+                f"./notebooks/{filename}",
+                f"./docs/reference/gen_notebooks/{filename.replace('.ipynb', '.md')}",
+            )
+
+
 def main():
+    export_all_notebooks_in_primary_dir()
     export_notebook(
-        "./notebooks/example.ipynb", "./docs/reference/gen_notebooks/example.md"
+        "./intro_notebook.ipynb", "./docs/reference/gen_notebooks/intro_notebook.md"
     )
 
 
