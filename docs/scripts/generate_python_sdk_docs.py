@@ -156,19 +156,19 @@ def fix_pydantic_model(text, obj, module_name):
     end_idx = text.find("""---""", start_idx)
 
     field_summary = "**Pydantic Fields:**\n\n"
-    for k, v in obj.model_fields.items():
-        name = k
-        if hasattr(v, "alias") and v.alias != None:
-            name = v.alias
-        annotation = "Any"
-        if hasattr(v, "annotation") and v.annotation != None:
-            annotation = str(v.annotation)
-            annotation = annotation.replace(module_name + ".", "")
+    if obj.model_fields:
+        for k, v in obj.model_fields.items():
+            name = k
+            if hasattr(v, "alias") and v.alias != None:
+                name = v.alias
+            annotation = "Any"
+            if hasattr(v, "annotation") and v.annotation != None:
+                annotation = str(v.annotation)
+                annotation = annotation.replace(module_name + ".", "")
 
-        field_summary += f"- `{name}`: `{annotation}`\n"
+            field_summary += f"- `{name}`: `{annotation}`\n"
 
-    replace_with = field_summary
-    text = text[:end_idx] + replace_with + text[end_idx:]
+        text = text[:end_idx] + field_summary + text[end_idx:]
 
     if text.endswith("---"):
         text = text[:-3]

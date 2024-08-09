@@ -115,8 +115,6 @@ sidebar_label: trace_server_interface
 
 
 
-**Pydantic Fields:**
-
 
 ---
 
@@ -264,8 +262,6 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 
 
-**Pydantic Fields:**
-
 
 ---
 
@@ -308,8 +304,6 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 
 
-
-**Pydantic Fields:**
 
 
 ---
@@ -551,8 +545,6 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 
 
-
-**Pydantic Fields:**
 
 
 ---
