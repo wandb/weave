@@ -222,7 +222,7 @@ class CallsDeleteRes(BaseModel):
     pass
 
 
-class _CallsFilter(BaseModel):
+class CallsFilter(BaseModel):
     op_names: typing.Optional[typing.List[str]] = None
     input_refs: typing.Optional[typing.List[str]] = None
     output_refs: typing.Optional[typing.List[str]] = None
@@ -234,7 +234,7 @@ class _CallsFilter(BaseModel):
     wb_run_ids: typing.Optional[typing.List[str]] = None
 
 
-class _SortBy(BaseModel):
+class SortBy(BaseModel):
     # Field should be a key of `CallSchema`. For dictionary fields
     # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
     # dot-separated.
@@ -245,7 +245,7 @@ class _SortBy(BaseModel):
 
 class CallsQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_CallsFilter] = None
+    filter: typing.Optional[CallsFilter] = None
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
     # Sort by multiple fields
@@ -264,7 +264,7 @@ class CallsQueryRes(BaseModel):
 
 class CallsQueryStatsReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_CallsFilter] = None
+    filter: typing.Optional[CallsFilter] = None
     query: typing.Optional[Query] = None
 
 
@@ -306,7 +306,7 @@ class OpReadRes(BaseModel):
     op_obj: ObjSchema
 
 
-class _OpVersionFilter(BaseModel):
+class OpVersionFilter(BaseModel):
     op_names: typing.Optional[typing.List[str]] = None
     latest_only: typing.Optional[bool] = None
 
@@ -338,7 +338,7 @@ class ObjReadRes(BaseModel):
     obj: ObjSchema
 
 
-class _ObjectVersionFilter(BaseModel):
+class ObjectVersionFilter(BaseModel):
     base_object_classes: typing.Optional[typing.List[str]] = None
     object_ids: typing.Optional[typing.List[str]] = None
     is_op: typing.Optional[bool] = None
@@ -456,7 +456,7 @@ class TableCreateRes(BaseModel):
     digest: str
 
 
-class _TableRowFilter(BaseModel):
+class TableRowFilter(BaseModel):
     row_digests: typing.Optional[typing.List[str]] = None
 
 
@@ -674,3 +674,11 @@ class TraceServerInterface:
 CallsDeleteReqForInsert = CallsDeleteReq
 CallUpdateReqForInsert = CallUpdateReq
 FeedbackCreateReqForInsert = FeedbackCreateReq
+
+# Legacy Names (i think these might be used in a few growth examples, so keeping
+# around until we clean those up of them)
+_CallsFilter = CallsFilter
+_SortBy = SortBy
+_OpVersionFilter = OpVersionFilter
+_ObjectVersionFilter = ObjectVersionFilter
+_TableRowFilter = TableRowFilter
