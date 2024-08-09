@@ -1,0 +1,125 @@
+interactions:
+- request:
+    body: '{"messages":[{"content":"What is the best French cheese?","role":"user"}],"model":"mistral-large-latest","safe_prompt":false,"stream":false,"temperature":0.7,"tool_choice":"auto","top_p":1.0}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      content-length:
+      - '191'
+      content-type:
+      - application/json
+      host:
+      - api.mistral.ai
+      user-agent:
+      - mistral-client-python/1.0.0
+    method: POST
+    uri: https://api.mistral.ai/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        MYgaACB+r6ZWtT/InnywnmTf7GTteZSrfX5DYkhiA2KUwYAyc3R9tqk9cU1/UK2yv8dYZFgFFUXh
+        4wLTInE62oAj8W80f2q/XIyOupxaHt9OpdCLvXcxuNbdd9u74Y6uw8Db6xumh/7hgbe77dXdVUdd
+        T8476f7j3lzr+olss6jAI0p23iUq/zsH1+7uLq92u5vr+513swROrnVzLKaULrrHj05kXMx5lwRf
+        orj2n/eut32La7ferbDYxrXvnUpi1zoqJRaj/L/vJRtnc607TCIl5rFJx187uo6LHR2+U879hH5i
+        LowlxTFZ2sfFhT2oIBrQ8GlFVntLgWSY5hlgVIw3+E4p94xYoJzlnDlgEEW0gnMMjIU0sq2QgeLy
+        4nGONkEWVlxvt1De97D1xGWDH1gZpIwzEEBrMOVWJOsvwQF/YUFxqRELaZRasGZjl8ilPeZj3m3Q
+        NH/LYDggOEHTtMcM4AJN86iRERi/MtXnpmnxc5Zz5uHLXpnmFcbPVpU7Y9Rq7KeyZ+ca64oh0SK6
+        GbPgQIWo7msIjN9EZ8ohctO0+FsG88+YAmMTp34snUIsFrPctwGT2rSCVGbaHPMxX+Jvied4wYTs
+        v4p2kbVpWvzFvYw5vqMuMcqNvT7RygoZQGVCfbPItoJqj2gwnAat0VYOEV90Q65mq5ZRgof9xV2S
+        fpLcNC32KLSIrmaE+rvEPp2KR+gBaW9HanFIbMYeBFMK0eJHGWKZGAaumv5AGnh1OchsL/8/IHzx
+        kM3lzGwmxnnshXktTPC91vXlkzIywiNTHURN4/VD1PkFOS/77KmiCn/kMV9v0DSPqbJeLH/J28pk
+        XPYwyiPkmaeaR86GLlUWHTqdXo8yMZ++LJhjenONT1wRvtzXhXXM5sTsbRMUg4up5PECXxGH8UG0
+        wE3t74UsyOUwvXxadGDlQjG9y2NGX5Yug+hcPD7ToFwmucBu4SagkcPtnjp3acW910HFLGYExmGi
+        JY5ZktksmiklD5WaA0YhvUFBIQ0Ju/db6ieckQJTeCOL+wRFK6g5vmX5W1LqjTUWi33xaFszNuBV
+        SOYo1rNKVcwcfcsGP9qXBRUCXzPUDBOYrtiM9FrKAYH7GBhHsaBdpWI+OmaWYq+cdyaSnnpKqbg2
+        15Q+erd/ZcJTrcCLXeuKycl5l2Q8qXS/1fzrXQ3ncpxU5pM9mbzhXFy723p3jgvo3Z7r3a1300rM
+        d4rt7cePAw==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8aff10adaa9770e8-MRS
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - br
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 08 Aug 2024 11:11:29 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      access-control-allow-origin:
+      - '*'
+      alt-svc:
+      - h3=":443"; ma=86400
+      ratelimitbysize-limit:
+      - '20000000'
+      ratelimitbysize-query-cost:
+      - '32008'
+      ratelimitbysize-remaining:
+      - '19967992'
+      ratelimitbysize-reset:
+      - '39'
+      x-envoy-upstream-service-time:
+      - '8097'
+      x-kong-proxy-latency:
+      - '2'
+      x-kong-request-id:
+      - 88c6b03dde3d087eed8ac438215f9133
+      x-kong-upstream-latency:
+      - '8098'
+      x-ratelimitbysize-limit-minute:
+      - '20000000'
+      x-ratelimitbysize-limit-month:
+      - '200000000000'
+      x-ratelimitbysize-remaining-minute:
+      - '19967992'
+      x-ratelimitbysize-remaining-month:
+      - '199958167278'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"obj":{"project_id":"capecape/dev_testing","object_id":"UsageInfo","val":{"_type":"UsageInfo","prompt_tokens":10,"completion_tokens":406,"total_tokens":416,"_class_name":"UsageInfo","_bases":["BaseModel","BaseModel"]}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '220'
+      User-Agent:
+      - python-requests/2.32.3
+    method: POST
+    uri: https://trace.wandb.ai/obj/create
+  response:
+    body:
+      string: '{"digest":"eYDdUDY9EcOjii0jpBlengV4vSNVvIyEVbNkkCXn1r0"}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Length:
+      - '56'
+      content-type:
+      - application/json
+      date:
+      - Thu, 08 Aug 2024 11:11:29 GMT
+      server:
+      - Google Frontend
+      via:
+      - 1.1 google
+      x-cloud-trace-context:
+      - 4cac6d33db87462aca6978e67e60e65f
+    status:
+      code: 200
+      message: OK
+version: 1
