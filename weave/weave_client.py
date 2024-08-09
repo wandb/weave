@@ -44,11 +44,13 @@ from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
+    CallsFilter,
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
     EndedCallSchemaForInsert,
     ObjCreateReq,
+    ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
     ObjSchema,
@@ -59,8 +61,6 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
     TraceServerInterface,
-    CallsFilter,
-    ObjectVersionFilter,
 )
 
 if typing.TYPE_CHECKING:
