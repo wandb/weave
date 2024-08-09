@@ -59,8 +59,8 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
     TraceServerInterface,
-    _CallsFilter,
-    _ObjectVersionFilter,
+    CallsFilter,
+    ObjectVersionFilter,
 )
 
 if typing.TYPE_CHECKING:
@@ -206,7 +206,7 @@ class Call:
         return CallsIter(
             client.server,
             self.project_id,
-            _CallsFilter(parent_ids=[self.id]),
+            CallsFilter(parent_ids=[self.id]),
         )
 
     def delete(self) -> bool:
@@ -230,14 +230,14 @@ class Call:
 
 class CallsIter:
     server: TraceServerInterface
-    filter: _CallsFilter
+    filter: CallsFilter
     include_costs: bool
 
     def __init__(
         self,
         server: TraceServerInterface,
         project_id: str,
-        filter: _CallsFilter,
+        filter: CallsFilter,
         include_costs: bool = False,
     ) -> None:
         self.server = server
@@ -470,11 +470,11 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def calls(
         self,
-        filter: Optional[_CallsFilter] = None,
+        filter: Optional[CallsFilter] = None,
         include_costs: Optional[bool] = False,
     ) -> CallsIter:
         if filter is None:
-            filter = _CallsFilter()
+            filter = CallsFilter()
 
         return CallsIter(
             self.server, self._project_id(), filter, include_costs or False
@@ -485,7 +485,7 @@ class WeaveClient:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
-                filter=_CallsFilter(call_ids=[call_id]),
+                filter=CallsFilter(call_ids=[call_id]),
                 include_costs=include_costs,
             )
         )
@@ -851,17 +851,15 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
+        return self.calls(CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(
-        self, filter: Optional[_ObjectVersionFilter] = None
-    ) -> list[ObjSchema]:
+    def _objects(self, filter: Optional[ObjectVersionFilter] = None) -> list[ObjSchema]:
         if not filter:
-            filter = _ObjectVersionFilter()
+            filter = ObjectVersionFilter()
         else:
             filter = filter.model_copy()
-        filter = typing.cast(_ObjectVersionFilter, filter)
+        filter = typing.cast(ObjectVersionFilter, filter)
         filter.is_op = False
 
         response = self.server.objs_query(

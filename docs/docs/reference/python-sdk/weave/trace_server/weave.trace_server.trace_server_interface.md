@@ -271,15 +271,15 @@ class CallsDeleteRes(BaseModel):
 ```python
 class CallsQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_CallsFilter] = None
+    filter: typing.Optional[CallsFilter] = None
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
     # Sort by multiple fields
-    sort_by: typing.Optional[typing.List[_SortBy]] = None
+    sort_by: typing.Optional[typing.List[SortBy]] = None
     query: typing.Optional[Query] = None
 
     # TODO: type this with call schema columns, following the same rules as
-    # _SortBy and thus GetFieldOperator.get_field_ (without direction)
+    # SortBy and thus GetFieldOperator.get_field_ (without direction)
     columns: typing.Optional[typing.List[str]] = None
 
 ```
@@ -299,7 +299,7 @@ class CallsQueryRes(BaseModel):
 ```python
 class CallsQueryStatsReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_CallsFilter] = None
+    filter: typing.Optional[CallsFilter] = None
     query: typing.Optional[Query] = None
 
 ```
@@ -473,8 +473,8 @@ class FeedbackQueryReq(BaseModel):
     query: typing.Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
-    # TODO: I think _SortBy shouldn't have leading underscore
-    sort_by: typing.Optional[typing.List[_SortBy]] = None
+    # TODO: I think SortBy shouldn't have leading underscore
+    sort_by: typing.Optional[typing.List[SortBy]] = None
     limit: typing.Optional[int] = Field(default=None, examples=[10])
     offset: typing.Optional[int] = Field(default=None, examples=[0])
 
@@ -553,7 +553,7 @@ class ObjCreateRes(BaseModel):
 ```python
 class ObjQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_ObjectVersionFilter] = None
+    filter: typing.Optional[ObjectVersionFilter] = None
 
 ```
             
@@ -639,7 +639,7 @@ class OpCreateRes(BaseModel):
 ```python
 class OpQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_OpVersionFilter] = None
+    filter: typing.Optional[OpVersionFilter] = None
 
 ```
             
@@ -802,7 +802,7 @@ class TablePopSpecPayload(BaseModel):
 class TableQueryReq(BaseModel):
     project_id: str
     digest: str
-    filter: typing.Optional[_TableRowFilter] = None
+    filter: typing.Optional[TableRowFilter] = None
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
 
