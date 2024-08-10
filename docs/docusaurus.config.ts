@@ -112,6 +112,12 @@ const config: Config = {
           label: "Documentation",
         },
         {
+          type: "docSidebar",
+          sidebarId: "notebookSidebar",
+          position: "left",
+          label: "Cookbooks",
+        },
+        {
           position: "left",
           label: "Reference",
           type: "dropdown",
@@ -134,12 +140,6 @@ const config: Config = {
             //   label: "Service API",
             // },
           ]
-        },
-        {
-          type: "docSidebar",
-          sidebarId: "notebookSidebar",
-          position: "left",
-          label: "Cookbooks",
         },
         {
           position: "left",
