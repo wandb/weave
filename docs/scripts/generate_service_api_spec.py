@@ -83,7 +83,7 @@ def set_servers(raw_json):
     """I think technically we should be setting this from the server-side,
     but this is a lower-cost solution for now.
     """
-    raw_json["servers"] = [{"url": "https://trace.wandb.ai/"}]
+    raw_json["servers"] = [{"url": "https://trace.wandb.ai"}]
     return raw_json
 
 
