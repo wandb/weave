@@ -222,7 +222,7 @@ class CallsDeleteRes(BaseModel):
     pass
 
 
-class _CallsFilter(BaseModel):
+class CallsFilter(BaseModel):
     op_names: typing.Optional[typing.List[str]] = None
     input_refs: typing.Optional[typing.List[str]] = None
     output_refs: typing.Optional[typing.List[str]] = None
@@ -234,7 +234,7 @@ class _CallsFilter(BaseModel):
     wb_run_ids: typing.Optional[typing.List[str]] = None
 
 
-class _SortBy(BaseModel):
+class SortBy(BaseModel):
     # Field should be a key of `CallSchema`. For dictionary fields
     # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
     # dot-separated.
@@ -245,16 +245,16 @@ class _SortBy(BaseModel):
 
 class CallsQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_CallsFilter] = None
+    filter: typing.Optional[CallsFilter] = None
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
     # Sort by multiple fields
-    sort_by: typing.Optional[typing.List[_SortBy]] = None
+    sort_by: typing.Optional[typing.List[SortBy]] = None
     query: typing.Optional[Query] = None
     include_costs: typing.Optional[bool] = False
 
     # TODO: type this with call schema columns, following the same rules as
-    # _SortBy and thus GetFieldOperator.get_field_ (without direction)
+    # SortBy and thus GetFieldOperator.get_field_ (without direction)
     columns: typing.Optional[typing.List[str]] = None
 
 
@@ -264,7 +264,7 @@ class CallsQueryRes(BaseModel):
 
 class CallsQueryStatsReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_CallsFilter] = None
+    filter: typing.Optional[CallsFilter] = None
     query: typing.Optional[Query] = None
 
 
@@ -306,14 +306,14 @@ class OpReadRes(BaseModel):
     op_obj: ObjSchema
 
 
-class _OpVersionFilter(BaseModel):
+class OpVersionFilter(BaseModel):
     op_names: typing.Optional[typing.List[str]] = None
     latest_only: typing.Optional[bool] = None
 
 
 class OpQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_OpVersionFilter] = None
+    filter: typing.Optional[OpVersionFilter] = None
 
 
 class OpQueryRes(BaseModel):
@@ -338,7 +338,7 @@ class ObjReadRes(BaseModel):
     obj: ObjSchema
 
 
-class _ObjectVersionFilter(BaseModel):
+class ObjectVersionFilter(BaseModel):
     base_object_classes: typing.Optional[typing.List[str]] = None
     object_ids: typing.Optional[typing.List[str]] = None
     is_op: typing.Optional[bool] = None
@@ -347,7 +347,7 @@ class _ObjectVersionFilter(BaseModel):
 
 class ObjQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[_ObjectVersionFilter] = None
+    filter: typing.Optional[ObjectVersionFilter] = None
 
 
 class ObjQueryRes(BaseModel):
@@ -456,14 +456,14 @@ class TableCreateRes(BaseModel):
     digest: str
 
 
-class _TableRowFilter(BaseModel):
+class TableRowFilter(BaseModel):
     row_digests: typing.Optional[typing.List[str]] = None
 
 
 class TableQueryReq(BaseModel):
     project_id: str
     digest: str
-    filter: typing.Optional[_TableRowFilter] = None
+    filter: typing.Optional[TableRowFilter] = None
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
 
@@ -527,8 +527,7 @@ class FeedbackQueryReq(BaseModel):
     query: typing.Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
-    # TODO: I think _SortBy shouldn't have leading underscore
-    sort_by: typing.Optional[typing.List[_SortBy]] = None
+    sort_by: typing.Optional[typing.List[SortBy]] = None
     limit: typing.Optional[int] = Field(default=None, examples=[10])
     offset: typing.Optional[int] = Field(default=None, examples=[0])
 
@@ -674,3 +673,11 @@ class TraceServerInterface:
 CallsDeleteReqForInsert = CallsDeleteReq
 CallUpdateReqForInsert = CallUpdateReq
 FeedbackCreateReqForInsert = FeedbackCreateReq
+
+# Legacy Names (i think these might be used in a few growth examples, so keeping
+# around until we clean those up of them)
+_CallsFilter = CallsFilter
+_SortBy = SortBy
+_OpVersionFilter = OpVersionFilter
+_ObjectVersionFilter = ObjectVersionFilter
+_TableRowFilter = TableRowFilter
