@@ -193,6 +193,9 @@ export class DirectTraceServerClient {
           headers,
           body: reqBody,
         });
+        // TODO: support streaming data into a memory buffer, this .blob() method
+        // is incomplete, add paging/stream construction of this blob or string. More info here:
+        // https://stackoverflow.com/questions/28307789/is-there-any-limitation-on-javascript-max-blob-size
         const blob = await response.blob();
         resolve(blob);
       } catch (error) {
