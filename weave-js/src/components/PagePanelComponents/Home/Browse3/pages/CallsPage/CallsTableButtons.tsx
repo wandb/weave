@@ -9,6 +9,7 @@ import {
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import classNames from 'classnames';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
@@ -136,7 +137,8 @@ export const ExportSelector = ({
               <div className="flex items-center pb-8">
                 {selectedCalls.length === 0 ? (
                   <div className="flex-auto text-xl font-semibold">
-                    Export ({Math.min(numTotalCalls, MAX_EXPORT)})
+                    Export (
+                    {Math.min(numTotalCalls, MAX_EXPORT).toLocaleString()})
                   </div>
                 ) : (
                   <div className="flex-auto text-xl font-semibold">Export</div>
@@ -203,11 +205,15 @@ const SelectionCheckboxes: FC<{
 const ClickableOutlinedCardWithIcon: FC<{
   iconName: IconName;
   downloadLoading: boolean;
+  disabled: boolean;
   onClick: () => void;
-}> = ({iconName, children, downloadLoading, onClick}) => (
+}> = ({iconName, children, downloadLoading, disabled, onClick}) => (
   <div
-    className="flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16 hover:bg-moon-100"
-    onClick={onClick}>
+    className={classNames(
+      'flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16 hover:bg-moon-100',
+      disabled ? 'bg-moon-100 hover:cursor-default' : ''
+    )}
+    onClick={!disabled ? onClick : undefined}>
     {downloadLoading ? (
       <Loading size={28} className="mr-4" />
     ) : (
@@ -229,6 +235,9 @@ const DownloadGrid: FC<{
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
           downloadLoading={downloadLoading === ContentType.csv}
+          disabled={
+            downloadLoading ? downloadLoading !== ContentType.csv : false
+          }
           onClick={() => onClickDownload(ContentType.csv)}>
           Export to CSV
         </ClickableOutlinedCardWithIcon>
@@ -236,6 +245,9 @@ const DownloadGrid: FC<{
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
           downloadLoading={downloadLoading === ContentType.tsv}
+          disabled={
+            downloadLoading ? downloadLoading !== ContentType.tsv : false
+          }
           onClick={() => onClickDownload(ContentType.tsv)}>
           Export to TSV
         </ClickableOutlinedCardWithIcon>
@@ -244,6 +256,9 @@ const DownloadGrid: FC<{
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
           downloadLoading={downloadLoading === ContentType.jsonl}
+          disabled={
+            downloadLoading ? downloadLoading !== ContentType.jsonl : false
+          }
           onClick={() => onClickDownload(ContentType.jsonl)}>
           Export to JSONL
         </ClickableOutlinedCardWithIcon>
@@ -251,6 +266,9 @@ const DownloadGrid: FC<{
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
           downloadLoading={downloadLoading === ContentType.json}
+          disabled={
+            downloadLoading ? downloadLoading !== ContentType.json : false
+          }
           onClick={() => onClickDownload(ContentType.json)}>
           Export to JSON
         </ClickableOutlinedCardWithIcon>
