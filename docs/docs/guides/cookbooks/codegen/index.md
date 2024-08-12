@@ -15,6 +15,8 @@ Our pipeline will:
 3. Produce comprehensive unit tests
 4. Evaluate the quality of the generated code
 
+We'll use Weave for pipeline orchestration and tracking, and OpenAI's GPT models for code generation. This combination allows for powerful code generation with robust evaluation and logging capabilities.
+
 ![Evaluation](./media/eval_dash.png)
 
 ## Video Demonstration
