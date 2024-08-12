@@ -113,3 +113,21 @@ exclude = [
   "weave/legacy/**/*.py",
   "examples",
 ]
+
+[tool.bumpversion]
+current_version = "0.50.13"
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
+serialize = ["{major}.{minor}.{patch}"]
+search = "{current_version}"
+replace = "{new_version}"
+regex = false
+ignore_missing_version = false
+ignore_missing_files = false
+tag = true
+sign_tags = false
+tag_name = "v{new_version}"
+tag_message = "Release version: {current_version} → {new_version}"
+allow_dirty = false
+commit = false
+message = "Release version: {current_version} → {new_version}"
+commit_args = ""
