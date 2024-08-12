@@ -193,42 +193,7 @@ export class DirectTraceServerClient {
           headers,
           body: reqBody,
         });
-
-        // Check if the response is OK
-        if (!response.ok) {
-          try {
-            const error = await response.text();
-            console.error(error);
-          } catch (err) {
-            console.error(err);
-          }
-          reject(new Error(`Error fetching data: ${response.status}`));
-          return;
-        }
-
-        // Create a ReadableStream reader
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        const chunks: string[] = [];
-
-        while (true) {
-          // Read each chunk
-          const {done, value} = (await reader?.read()) ?? {
-            done: true,
-            value: new Uint8Array(),
-          };
-          if (done) {
-            break;
-          }
-
-          // Decode the chunk and add to the chunks array
-          const chunk = decoder.decode(value, {stream: true});
-          chunks.push(chunk);
-        }
-
-        // Combine all chunks into a single string
-        const textData = chunks.join('');
-        const blob = new Blob([textData], {type: contentType});
+        const blob = await response.blob();
         resolve(blob);
       } catch (error) {
         reject(new Error(`Error downloading data: ${error}`));
