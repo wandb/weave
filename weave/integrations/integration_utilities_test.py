@@ -1,4 +1,5 @@
 import pytest
+
 from weave.integrations.integration_utilities import truncate_op_name
 
 MAX_RUN_NAME_LENGTH = 128
