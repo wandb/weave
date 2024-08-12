@@ -7,8 +7,6 @@ import weave
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
 
-MAX_RUN_NAME_LENGTH = 128
-
 
 def filter_body(r: Any) -> Any:
     r.body = ""
@@ -41,7 +39,7 @@ def assert_ends_and_errors(calls: List[tsi.CallSchema]) -> None:
 
 
 def assert_correct_calls_for_chain_invoke(
-    calls: list[tsi.CallSchema], prompt_template_name_part="PromptTemplate"
+    calls: list[tsi.CallSchema], prompt_template_name_part: str = "PromptTemplate"
 ) -> None:
     assert len(calls) == 4
 
@@ -82,8 +80,7 @@ def test_simple_chain_invoke(
     name = long_str + long_str
     prompt.name = name
 
-    name_prefix = "langchain.Prompt."
-    exp_name = name[: -(len(name_prefix) - MAX_RUN_NAME_LENGTH)]
+    exp_name = "really_massive_name_that_is_longer_than_max_characte_9ad6_t_is_longer_than_max_characters_which_would_be_crazy_"
 
     llm_chain = prompt | llm
     _ = llm_chain.invoke({"number": 2})

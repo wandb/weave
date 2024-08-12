@@ -31,7 +31,6 @@ This approach allows for more flexible runtime configuration while still respect
 
 import datetime
 import json
-import re
 from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
