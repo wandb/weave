@@ -69,6 +69,9 @@ export const ExportSelector = ({
   );
 
   const onClickDownload = (contentType: ContentType) => {
+    if (downloadLoading) {
+      return;
+    }
     setDownloadLoading(contentType);
     lowLevelFilter.callIds =
       selectionState === 'selected' ? selectedCalls : undefined;
@@ -235,9 +238,7 @@ const DownloadGrid: FC<{
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
           downloadLoading={downloadLoading === ContentType.csv}
-          disabled={
-            downloadLoading ? downloadLoading !== ContentType.csv : false
-          }
+          disabled={downloadLoading !== null}
           onClick={() => onClickDownload(ContentType.csv)}>
           Export to CSV
         </ClickableOutlinedCardWithIcon>
@@ -245,9 +246,7 @@ const DownloadGrid: FC<{
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
           downloadLoading={downloadLoading === ContentType.tsv}
-          disabled={
-            downloadLoading ? downloadLoading !== ContentType.tsv : false
-          }
+          disabled={downloadLoading !== null}
           onClick={() => onClickDownload(ContentType.tsv)}>
           Export to TSV
         </ClickableOutlinedCardWithIcon>
@@ -256,9 +255,7 @@ const DownloadGrid: FC<{
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
           downloadLoading={downloadLoading === ContentType.jsonl}
-          disabled={
-            downloadLoading ? downloadLoading !== ContentType.jsonl : false
-          }
+          disabled={downloadLoading !== null}
           onClick={() => onClickDownload(ContentType.jsonl)}>
           Export to JSONL
         </ClickableOutlinedCardWithIcon>
@@ -266,9 +263,7 @@ const DownloadGrid: FC<{
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
           downloadLoading={downloadLoading === ContentType.json}
-          disabled={
-            downloadLoading ? downloadLoading !== ContentType.json : false
-          }
+          disabled={downloadLoading !== null}
           onClick={() => onClickDownload(ContentType.json)}>
           Export to JSON
         </ClickableOutlinedCardWithIcon>
