@@ -9,7 +9,10 @@ import React from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../../react';
 import {ErrorBoundary} from '../../../../../../ErrorBoundary';
-import {flattenObject} from '../../../../Browse2/browse2Util';
+import {
+  flattenObject,
+  flattenObjectTypeAware,
+} from '../../../../Browse2/browse2Util';
 import {CellValue} from '../../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
@@ -60,7 +63,8 @@ export function prepareFlattenedDataForTable<T>(
 ): Array<T & {[key: string]: string}> {
   return data.map(r => {
     // First, flatten the inner object
-    let flattened = flattenObject(r ?? {});
+    console.log(r);
+    let flattened = flattenObjectTypeAware(r ?? {});
 
     flattened = replaceTableRefsInFlattenedData(flattened);
 
@@ -275,6 +279,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         if (val === undefined) {
           return <NotApplicable />;
         }
+        // cellParams.row
         return (
           <ErrorBoundary>
             {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition

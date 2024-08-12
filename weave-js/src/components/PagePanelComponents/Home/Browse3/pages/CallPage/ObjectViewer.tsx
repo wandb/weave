@@ -200,6 +200,9 @@ export const ObjectViewer = ({
           // replace it with a patched version that can be rendered as a thumbnail.
           contexts.push(...getKnownImageDictContexts(context));
           return 'skip';
+        } else if (context.valueType === 'object') {
+          console.log(context);
+          contexts.push(context);
         } else {
           contexts.push(context);
         }

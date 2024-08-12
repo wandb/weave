@@ -6,6 +6,7 @@ import {parseRef} from '../../../../react';
 import {ValueViewNumber} from '../Browse3/pages/CallPage/ValueViewNumber';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
 import {isRef} from '../Browse3/pages/common/util';
+import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {CellValueBoolean} from './CellValueBoolean';
 import {CellValueImage} from './CellValueImage';
 import {CellValueString} from './CellValueString';
@@ -64,5 +65,59 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
       </Box>
     );
   }
+  if (isCustomWeaveObject(value)) {
+    return <CellValueCustomWeaveObject value={value} />;
+  }
   return <CellValueString value={JSON.stringify(value)} />;
+};
+
+type CustomWeaveObject = {
+  _type: 'CustomWeaveType';
+  weave_type: {
+    type: string;
+  };
+  files: {[filename: string]: string};
+  load_op?: string;
+};
+
+type CustomWeaveObjectImage = {
+  _type: 'CustomWeaveType';
+  weave_type: {
+    type: 'Image';
+  };
+  files: {'image.png': string};
+  load_op?: string;
+};
+
+const isCustomWeaveObject = (value: any): value is CustomWeaveObject => {
+  return typeof value === 'object' && value._type === 'CustomWeaveType';
+};
+
+const isCustomWeaveObjectImage = (
+  value: CustomWeaveObject
+): value is CustomWeaveObjectImage => {
+  return value.weave_type.type === 'Image';
+};
+
+const CellValueCustomWeaveObject: React.FC<{value: CustomWeaveObject}> = ({
+  value,
+}) => {
+  // TODO: Make this a bit more dynamic
+  const defaultTitle = 'Serialized Weave Object: ' + value.weave_type.type;
+
+  if (isCustomWeaveObjectImage(value)) {
+    return <CellValueCustomWeaveObjectImage value={value} />;
+  }
+
+  return <CellValueString value={defaultTitle} />;
+};
+
+const CellValueCustomWeaveObjectImage: React.FC<{
+  value: CustomWeaveObjectImage;
+}> = ({value}) => {
+  const {useFileContent} = useWFHooks();
+  const content = useFileContent(value.files['image.png']);
+
+  console.log(value);
+  return <div>Image!</div>;
 };

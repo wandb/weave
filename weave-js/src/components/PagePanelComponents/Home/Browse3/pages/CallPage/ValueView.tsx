@@ -77,5 +77,9 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     return <div>{JSON.stringify(data.value)}</div>;
   }
 
+  if (data.valueType === 'object') {
+    return <div>BLAH</div>;
+  }
+
   return <div>{data.value.toString()}</div>;
 };
