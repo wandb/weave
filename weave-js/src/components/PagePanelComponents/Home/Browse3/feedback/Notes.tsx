@@ -39,8 +39,8 @@ export const Notes = ({
       }
     : undefined;
   const onKeyDown = onNoteAdded
-    ? (key: string) => {
-        if (key === 'Enter') {
+    ? (key: string, e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (key === 'Enter' && !e.nativeEvent.isComposing) {
           onNoteAdded();
         }
       }
