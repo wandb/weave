@@ -6,23 +6,23 @@ MAX_RUN_NAME_LENGTH = 128
 NON_HASH_LIMIT = 5
 
 
-def _make_string_of_length(n):
+def _make_string_of_length(n: int) -> str:
     return "a" * n
 
 
-def test_truncate_op_name_less_than_limit():
+def test_truncate_op_name_less_than_limit() -> None:
     name = _make_string_of_length(MAX_RUN_NAME_LENGTH - 1)
     trunc = truncate_op_name(name)
     assert trunc == name
 
 
-def test_truncate_op_name_at_limit():
+def test_truncate_op_name_at_limit() -> None:
     name = _make_string_of_length(MAX_RUN_NAME_LENGTH)
     trunc = truncate_op_name(name)
     assert trunc == name
 
 
-def _truncated_str(tail_len, total_len):
+def _truncated_str(tail_len: int, total_len: int) -> tuple:
     name = (
         _make_string_of_length(total_len - tail_len - 1)
         + "."
@@ -31,7 +31,7 @@ def _truncated_str(tail_len, total_len):
     return name, truncate_op_name(name)
 
 
-def test_truncate_op_name_too_short_for_hash():
+def test_truncate_op_name_too_short_for_hash() -> None:
     # Remove 1 character for a range of tail lengths:
     chars_to_remove = 1
     for tail_len in range(NON_HASH_LIMIT + 1):
@@ -67,7 +67,7 @@ def test_truncate_op_name_too_short_for_hash():
             assert trunc == name[:MAX_RUN_NAME_LENGTH]
 
 
-def test_truncate_op_name_with_digest():
+def test_truncate_op_name_with_digest() -> None:
     name = _make_string_of_length(MAX_RUN_NAME_LENGTH + 1)
     trunc = truncate_op_name(name)
     assert (
