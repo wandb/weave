@@ -72,7 +72,7 @@ def test_query_heavy_column_simple_filter() -> None:
     cq.add_field("inputs")
     cq.set_hardcoded_filter(
         HardCodedFilter(
-            filter=tsi._CallsFilter(
+            filter=tsi.CallsFilter(
                 op_names=["a", "b"],
             )
         )
@@ -113,7 +113,7 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
     cq.add_order("started_at", "desc")
     cq.set_hardcoded_filter(
         HardCodedFilter(
-            filter=tsi._CallsFilter(
+            filter=tsi.CallsFilter(
                 op_names=["a", "b"],
             )
         )
@@ -156,7 +156,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
     cq.set_limit(10)
     cq.set_hardcoded_filter(
         HardCodedFilter(
-            filter=tsi._CallsFilter(
+            filter=tsi.CallsFilter(
                 op_names=["a", "b"],
             )
         )
@@ -203,7 +203,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
     cq.set_limit(10)
     cq.set_hardcoded_filter(
         HardCodedFilter(
-            filter=tsi._CallsFilter(
+            filter=tsi.CallsFilter(
                 op_names=["a", "b"],
             )
         )
@@ -287,7 +287,7 @@ def test_query_light_column_with_costs() -> None:
     cq.add_field("started_at")
     cq.set_hardcoded_filter(
         HardCodedFilter(
-            filter=tsi._CallsFilter(
+            filter=tsi.CallsFilter(
                 op_names=["a", "b"],
             )
         )

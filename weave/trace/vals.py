@@ -26,8 +26,8 @@ from weave.trace.serialize import from_json
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
+    TableRowFilter,
     TraceServerInterface,
-    _TableRowFilter,
 )
 
 
@@ -229,14 +229,14 @@ class WeaveObject(Traceable):
 
 
 class WeaveTable(Traceable):
-    filter: _TableRowFilter
+    filter: TableRowFilter
 
     def __init__(
         self,
         table_ref: Optional[TableRef],
         ref: Optional[RefWithExtra],
         server: TraceServerInterface,
-        filter: _TableRowFilter,
+        filter: TableRowFilter,
         root: Optional[Traceable],
         parent: Optional[Traceable] = None,
     ) -> None:
@@ -504,7 +504,7 @@ def make_trace_obj(
             table_ref=val_ref,
             ref=new_ref,
             server=server,
-            filter=_TableRowFilter(),
+            filter=TableRowFilter(),
             root=root,
             parent=parent,
         )
@@ -513,7 +513,7 @@ def make_trace_obj(
             table_ref=val,
             ref=new_ref,
             server=server,
-            filter=_TableRowFilter(),
+            filter=TableRowFilter(),
             root=root,
             parent=parent,
         )
@@ -539,7 +539,7 @@ def make_trace_obj(
                     table_ref=val,
                     ref=new_ref,
                     server=server,
-                    filter=_TableRowFilter(),
+                    filter=TableRowFilter(),
                     root=root,
                     parent=parent,
                 )
