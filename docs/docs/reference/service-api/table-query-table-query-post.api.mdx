@@ -29,17 +29,9 @@ import TabItem from "@theme/TabItem";
   as={"h1"}
   className={"openapi__heading"}
   children={"Table Query"}
->
-</Heading>
+></Heading>
 
-<MethodEndpoint
-  method={"post"}
-  path={"/table/query"}
->
-  
-</MethodEndpoint>
-
-
+<MethodEndpoint method={"post"} path={"/table/query"}></MethodEndpoint>
 
 Table Query
 
@@ -48,141 +40,89 @@ Table Query
   as={"h2"}
   className={"openapi-tabs__heading"}
   children={"Request"}
->
-</Heading>
+></Heading>
 
-<MimeTabs
-  className={"openapi-tabs__mime"}
->
-  <TabItem
-    label={"application/json"}
-    value={"application/json-schema"}
-  >
+<MimeTabs className={"openapi-tabs__mime"}>
+  <TabItem label={"application/json"} value={"application/json-schema"}>
     <details
       style={{}}
       className={"openapi-markdown__details mime"}
       data-collapsed={false}
       open={true}
     >
-      <summary
-        style={{}}
-        className={"openapi-markdown__details-summary-mime"}
-      >
-        <h3
-          className={"openapi-markdown__details-summary-header-body"}
-        >
+      <summary style={{}} className={"openapi-markdown__details-summary-mime"}>
+        <h3 className={"openapi-markdown__details-summary-header-body"}>
           Body
-        </h3><strong
-          className={"openapi-schema__required"}
-        >
-          required
-        </strong>
-      </summary><div
-        style={{"textAlign":"left","marginLeft":"1rem"}}
-      >
-        
-      </div><ul
-        style={{"marginLeft":"1rem"}}
-      >
+        </h3>
+        <strong className={"openapi-schema__required"}>required</strong>
+      </summary>
+      <div style={{ textAlign: "left", marginLeft: "1rem" }}></div>
+      <ul style={{ marginLeft: "1rem" }}>
         <SchemaItem
           collapsible={false}
           name={"project_id"}
           required={true}
           schemaName={"Project Id (string)"}
           qualifierMessage={undefined}
-          schema={{"type":"string","title":"Project Id"}}
-        >
-          
-        </SchemaItem><SchemaItem
+          schema={{ type: "string", title: "Project Id" }}
+        ></SchemaItem>
+        <SchemaItem
           collapsible={false}
           name={"digest"}
           required={true}
           schemaName={"Digest (string)"}
           qualifierMessage={undefined}
-          schema={{"type":"string","title":"Digest"}}
-        >
-          
-        </SchemaItem><SchemaItem
-          collapsible={true}
-          className={"schemaItem"}
-        >
-          <details
-            style={{}}
-            className={"openapi-markdown__details"}
-          >
-            <summary
-              style={{}}
-            >
-              <strong>
-                filter
-              </strong><span
-                style={{"opacity":"0.6"}}
-              >
-                 object
-              </span>
-            </summary><div
-              style={{"marginLeft":"1rem"}}
-            >
-              
-            </div><div>
-              <span
-                className={"badge badge--info"}
-              >
-                anyOf
-              </span><SchemaTabs>
-                <TabItem
-                  label={"_TableRowFilter"}
-                  value={"0-item-properties"}
-                >
-                  <SchemaItem
-                    collapsible={true}
-                    className={"schemaItem"}
-                  >
-                    <details
-                      style={{}}
-                      className={"openapi-markdown__details"}
-                    >
-                      <summary
-                        style={{}}
-                      >
-                        <strong>
-                          row_digests
-                        </strong><span
-                          style={{"opacity":"0.6"}}
-                        >
-                           object
-                        </span>
-                      </summary><div
-                        style={{"marginLeft":"1rem"}}
-                      >
-                        
-                      </div><div>
-                        <span
-                          className={"badge badge--info"}
-                        >
-                          anyOf
-                        </span><SchemaTabs>
-                          <TabItem
-                            label={"MOD1"}
-                            value={"0-item-properties"}
-                          >
+          schema={{ type: "string", title: "Digest" }}
+        ></SchemaItem>
+        <SchemaItem collapsible={true} className={"schemaItem"}>
+          <details style={{}} className={"openapi-markdown__details"}>
+            <summary style={{}}>
+              <strong>filter</strong>
+              <span style={{ opacity: "0.6" }}>object</span>
+            </summary>
+            <div style={{ marginLeft: "1rem" }}></div>
+            <div>
+              <span className={"badge badge--info"}>anyOf</span>
+              <SchemaTabs>
+                <TabItem label={"TableRowFilter"} value={"0-item-properties"}>
+                  <SchemaItem collapsible={true} className={"schemaItem"}>
+                    <details style={{}} className={"openapi-markdown__details"}>
+                      <summary style={{}}>
+                        <strong>row_digests</strong>
+                        <span style={{ opacity: "0.6" }}>object</span>
+                      </summary>
+                      <div style={{ marginLeft: "1rem" }}></div>
+                      <div>
+                        <span className={"badge badge--info"}>anyOf</span>
+                        <SchemaTabs>
+                          <TabItem label={"MOD1"} value={"0-item-properties"}>
                             <li>
                               <div
-                                style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem","paddingBottom":".5rem"}}
+                                style={{
+                                  fontSize: "var(--ifm-code-font-size)",
+                                  opacity: "0.6",
+                                  marginLeft: "-.5rem",
+                                  paddingBottom: ".5rem",
+                                }}
                               >
                                 Array [
                               </div>
-                            </li><div
-                              style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                            </li>
+                            <div
+                              style={{
+                                marginTop: ".5rem",
+                                marginBottom: ".5rem",
+                              }}
                             >
-                              
-                              
                               string
-                              
-                              
-                            </div><li>
+                            </div>
+                            <li>
                               <div
-                                style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem"}}
+                                style={{
+                                  fontSize: "var(--ifm-code-font-size)",
+                                  opacity: "0.6",
+                                  marginLeft: "-.5rem",
+                                }}
                               >
                                 ]
                               </div>
@@ -196,91 +136,39 @@ Table Query
               </SchemaTabs>
             </div>
           </details>
-        </SchemaItem><SchemaItem
-          collapsible={true}
-          className={"schemaItem"}
-        >
-          <details
-            style={{}}
-            className={"openapi-markdown__details"}
-          >
-            <summary
-              style={{}}
-            >
-              <strong>
-                limit
-              </strong><span
-                style={{"opacity":"0.6"}}
-              >
-                 object
-              </span>
-            </summary><div
-              style={{"marginLeft":"1rem"}}
-            >
-              
-            </div><div>
-              <span
-                className={"badge badge--info"}
-              >
-                anyOf
-              </span><SchemaTabs>
-                <TabItem
-                  label={"MOD1"}
-                  value={"0-item-properties"}
-                >
-                  <div
-                    style={{"marginTop":".5rem","marginBottom":".5rem"}}
-                  >
-                    
-                    
+        </SchemaItem>
+        <SchemaItem collapsible={true} className={"schemaItem"}>
+          <details style={{}} className={"openapi-markdown__details"}>
+            <summary style={{}}>
+              <strong>limit</strong>
+              <span style={{ opacity: "0.6" }}>object</span>
+            </summary>
+            <div style={{ marginLeft: "1rem" }}></div>
+            <div>
+              <span className={"badge badge--info"}>anyOf</span>
+              <SchemaTabs>
+                <TabItem label={"MOD1"} value={"0-item-properties"}>
+                  <div style={{ marginTop: ".5rem", marginBottom: ".5rem" }}>
                     integer
-                    
-                    
                   </div>
                 </TabItem>
               </SchemaTabs>
             </div>
           </details>
-        </SchemaItem><SchemaItem
-          collapsible={true}
-          className={"schemaItem"}
-        >
-          <details
-            style={{}}
-            className={"openapi-markdown__details"}
-          >
-            <summary
-              style={{}}
-            >
-              <strong>
-                offset
-              </strong><span
-                style={{"opacity":"0.6"}}
-              >
-                 object
-              </span>
-            </summary><div
-              style={{"marginLeft":"1rem"}}
-            >
-              
-            </div><div>
-              <span
-                className={"badge badge--info"}
-              >
-                anyOf
-              </span><SchemaTabs>
-                <TabItem
-                  label={"MOD1"}
-                  value={"0-item-properties"}
-                >
-                  <div
-                    style={{"marginTop":".5rem","marginBottom":".5rem"}}
-                  >
-                    
-                    
+        </SchemaItem>
+        <SchemaItem collapsible={true} className={"schemaItem"}>
+          <details style={{}} className={"openapi-markdown__details"}>
+            <summary style={{}}>
+              <strong>offset</strong>
+              <span style={{ opacity: "0.6" }}>object</span>
+            </summary>
+            <div style={{ marginLeft: "1rem" }}></div>
+            <div>
+              <span className={"badge badge--info"}>anyOf</span>
+              <SchemaTabs>
+                <TabItem label={"MOD1"} value={"0-item-properties"}>
+                  <div style={{ marginTop: ".5rem", marginBottom: ".5rem" }}>
                     integer
-                    
-                    
                   </div>
                 </TabItem>
               </SchemaTabs>
@@ -290,38 +178,17 @@ Table Query
       </ul>
     </details>
   </TabItem>
-</MimeTabs><div>
+</MimeTabs>
+<div>
   <div>
-    <ApiTabs
-      label={undefined}
-      id={undefined}
-    >
-      <TabItem
-        label={"200"}
-        value={"200"}
-      >
+    <ApiTabs label={undefined} id={undefined}>
+      <TabItem label={"200"} value={"200"}>
+        <div>Successful Response</div>
         <div>
-          
-          
-          Successful Response
-          
-          
-        </div><div>
-          <MimeTabs
-            className={"openapi-tabs__mime"}
-            schemaType={"response"}
-          >
-            <TabItem
-              label={"application/json"}
-              value={"application/json"}
-            >
-              <SchemaTabs
-                className={"openapi-tabs__schema"}
-              >
-                <TabItem
-                  label={"Schema"}
-                  value={"Schema"}
-                >
+          <MimeTabs className={"openapi-tabs__mime"} schemaType={"response"}>
+            <TabItem label={"application/json"} value={"application/json"}>
+              <SchemaTabs className={"openapi-tabs__schema"}>
+                <TabItem label={"Schema"} value={"Schema"}>
                   <details
                     style={{}}
                     className={"openapi-markdown__details response"}
@@ -332,78 +199,69 @@ Table Query
                       style={{}}
                       className={"openapi-markdown__details-summary-response"}
                     >
-                      <strong>
-                        Schema
-                      </strong>
-                    </summary><div
-                      style={{"textAlign":"left","marginLeft":"1rem"}}
-                    >
-                      
-                    </div><ul
-                      style={{"marginLeft":"1rem"}}
-                    >
-                      <SchemaItem
-                        collapsible={true}
-                        className={"schemaItem"}
-                      >
+                      <strong>Schema</strong>
+                    </summary>
+                    <div
+                      style={{ textAlign: "left", marginLeft: "1rem" }}
+                    ></div>
+                    <ul style={{ marginLeft: "1rem" }}>
+                      <SchemaItem collapsible={true} className={"schemaItem"}>
                         <details
                           style={{}}
                           className={"openapi-markdown__details"}
                         >
-                          <summary
-                            style={{}}
-                          >
-                            <span
-                              className={"openapi-schema__container"}
-                            >
-                              <strong
-                                className={"openapi-schema__property"}
-                              >
+                          <summary style={{}}>
+                            <span className={"openapi-schema__container"}>
+                              <strong className={"openapi-schema__property"}>
                                 rows
-                              </strong><span
-                                className={"openapi-schema__name"}
-                              >
-                                 object[]
-                              </span><span
+                              </strong>
+                              <span className={"openapi-schema__name"}>
+                                object[]
+                              </span>
+                              <span
                                 className={"openapi-schema__divider"}
-                              >
-                                
-                              </span><span
-                                className={"openapi-schema__required"}
-                              >
+                              ></span>
+                              <span className={"openapi-schema__required"}>
                                 required
                               </span>
                             </span>
-                          </summary><div
-                            style={{"marginLeft":"1rem"}}
-                          >
+                          </summary>
+                          <div style={{ marginLeft: "1rem" }}>
                             <li>
                               <div
-                                style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem","paddingBottom":".5rem"}}
+                                style={{
+                                  fontSize: "var(--ifm-code-font-size)",
+                                  opacity: "0.6",
+                                  marginLeft: "-.5rem",
+                                  paddingBottom: ".5rem",
+                                }}
                               >
                                 Array [
                               </div>
-                            </li><SchemaItem
+                            </li>
+                            <SchemaItem
                               collapsible={false}
                               name={"digest"}
                               required={true}
                               schemaName={"Digest (string)"}
                               qualifierMessage={undefined}
-                              schema={{"type":"string","title":"Digest"}}
-                            >
-                              
-                            </SchemaItem><SchemaItem
+                              schema={{ type: "string", title: "Digest" }}
+                            ></SchemaItem>
+                            <SchemaItem
                               collapsible={false}
                               name={"val"}
                               required={true}
                               schemaName={"Val"}
                               qualifierMessage={undefined}
-                              schema={{"title":"Val"}}
-                            >
-                              
-                            </SchemaItem><li>
+                              schema={{ title: "Val" }}
+                            ></SchemaItem>
+                            <li>
                               <div
-                                style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem"}}
+                                style={{
+                                  fontSize: "var(--ifm-code-font-size)",
+                                  opacity: "0.6",
+                                  marginLeft: "-.5rem",
+                                }}
                               >
                                 ]
                               </div>
@@ -413,47 +271,30 @@ Table Query
                       </SchemaItem>
                     </ul>
                   </details>
-                </TabItem><TabItem
+                </TabItem>
+                <TabItem
                   label={"Example (from schema)"}
                   value={"Example (from schema)"}
                 >
                   <ResponseSamples
-                    responseExample={"{\n  \"rows\": [\n    {\n      \"digest\": \"string\"\n    }\n  ]\n}"}
+                    responseExample={
+                      '{\n  "rows": [\n    {\n      "digest": "string"\n    }\n  ]\n}'
+                    }
                     language={"json"}
-                  >
-                    
-                  </ResponseSamples>
+                  ></ResponseSamples>
                 </TabItem>
               </SchemaTabs>
             </TabItem>
           </MimeTabs>
         </div>
-      </TabItem><TabItem
-        label={"422"}
-        value={"422"}
-      >
+      </TabItem>
+      <TabItem label={"422"} value={"422"}>
+        <div>Validation Error</div>
         <div>
-          
-          
-          Validation Error
-          
-          
-        </div><div>
-          <MimeTabs
-            className={"openapi-tabs__mime"}
-            schemaType={"response"}
-          >
-            <TabItem
-              label={"application/json"}
-              value={"application/json"}
-            >
-              <SchemaTabs
-                className={"openapi-tabs__schema"}
-              >
-                <TabItem
-                  label={"Schema"}
-                  value={"Schema"}
-                >
+          <MimeTabs className={"openapi-tabs__mime"} schemaType={"response"}>
+            <TabItem label={"application/json"} value={"application/json"}>
+              <SchemaTabs className={"openapi-tabs__schema"}>
+                <TabItem label={"Schema"} value={"Schema"}>
                   <details
                     style={{}}
                     className={"openapi-markdown__details response"}
@@ -464,50 +305,41 @@ Table Query
                       style={{}}
                       className={"openapi-markdown__details-summary-response"}
                     >
-                      <strong>
-                        Schema
-                      </strong>
-                    </summary><div
-                      style={{"textAlign":"left","marginLeft":"1rem"}}
-                    >
-                      
-                    </div><ul
-                      style={{"marginLeft":"1rem"}}
-                    >
-                      <SchemaItem
-                        collapsible={true}
-                        className={"schemaItem"}
-                      >
+                      <strong>Schema</strong>
+                    </summary>
+                    <div
+                      style={{ textAlign: "left", marginLeft: "1rem" }}
+                    ></div>
+                    <ul style={{ marginLeft: "1rem" }}>
+                      <SchemaItem collapsible={true} className={"schemaItem"}>
                         <details
                           style={{}}
                           className={"openapi-markdown__details"}
                         >
-                          <summary
-                            style={{}}
-                          >
-                            <span
-                              className={"openapi-schema__container"}
-                            >
-                              <strong
-                                className={"openapi-schema__property"}
-                              >
+                          <summary style={{}}>
+                            <span className={"openapi-schema__container"}>
+                              <strong className={"openapi-schema__property"}>
                                 detail
-                              </strong><span
-                                className={"openapi-schema__name"}
-                              >
-                                 object[]
+                              </strong>
+                              <span className={"openapi-schema__name"}>
+                                object[]
                               </span>
                             </span>
-                          </summary><div
-                            style={{"marginLeft":"1rem"}}
-                          >
+                          </summary>
+                          <div style={{ marginLeft: "1rem" }}>
                             <li>
                               <div
-                                style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem","paddingBottom":".5rem"}}
+                                style={{
+                                  fontSize: "var(--ifm-code-font-size)",
+                                  opacity: "0.6",
+                                  marginLeft: "-.5rem",
+                                  paddingBottom: ".5rem",
+                                }}
                               >
                                 Array [
                               </div>
-                            </li><SchemaItem
+                            </li>
+                            <SchemaItem
                               collapsible={true}
                               className={"schemaItem"}
                             >
@@ -515,103 +347,109 @@ Table Query
                                 style={{}}
                                 className={"openapi-markdown__details"}
                               >
-                                <summary
-                                  style={{}}
-                                >
-                                  <span
-                                    className={"openapi-schema__container"}
-                                  >
+                                <summary style={{}}>
+                                  <span className={"openapi-schema__container"}>
                                     <strong
                                       className={"openapi-schema__property"}
                                     >
                                       loc
-                                    </strong><span
-                                      className={"openapi-schema__name"}
-                                    >
-                                       object[]
-                                    </span><span
+                                    </strong>
+                                    <span className={"openapi-schema__name"}>
+                                      object[]
+                                    </span>
+                                    <span
                                       className={"openapi-schema__divider"}
-                                    >
-                                      
-                                    </span><span
+                                    ></span>
+                                    <span
                                       className={"openapi-schema__required"}
                                     >
                                       required
                                     </span>
                                   </span>
-                                </summary><div
-                                  style={{"marginLeft":"1rem"}}
-                                >
+                                </summary>
+                                <div style={{ marginLeft: "1rem" }}>
                                   <li>
                                     <div
-                                      style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem","paddingBottom":".5rem"}}
+                                      style={{
+                                        fontSize: "var(--ifm-code-font-size)",
+                                        opacity: "0.6",
+                                        marginLeft: "-.5rem",
+                                        paddingBottom: ".5rem",
+                                      }}
                                     >
                                       Array [
                                     </div>
-                                  </li><div>
-                                    <span
-                                      className={"badge badge--info"}
-                                    >
+                                  </li>
+                                  <div>
+                                    <span className={"badge badge--info"}>
                                       anyOf
-                                    </span><SchemaTabs>
+                                    </span>
+                                    <SchemaTabs>
                                       <TabItem
                                         label={"MOD1"}
                                         value={"0-item-properties"}
                                       >
                                         <div
-                                          style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                                          style={{
+                                            marginTop: ".5rem",
+                                            marginBottom: ".5rem",
+                                          }}
                                         >
-                                          
-                                          
                                           string
-                                          
-                                          
                                         </div>
-                                      </TabItem><TabItem
+                                      </TabItem>
+                                      <TabItem
                                         label={"MOD2"}
                                         value={"1-item-properties"}
                                       >
                                         <div
-                                          style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                                          style={{
+                                            marginTop: ".5rem",
+                                            marginBottom: ".5rem",
+                                          }}
                                         >
-                                          
-                                          
                                           integer
-                                          
-                                          
                                         </div>
                                       </TabItem>
                                     </SchemaTabs>
-                                  </div><li>
+                                  </div>
+                                  <li>
                                     <div
-                                      style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem"}}
+                                      style={{
+                                        fontSize: "var(--ifm-code-font-size)",
+                                        opacity: "0.6",
+                                        marginLeft: "-.5rem",
+                                      }}
                                     >
                                       ]
                                     </div>
                                   </li>
                                 </div>
                               </details>
-                            </SchemaItem><SchemaItem
+                            </SchemaItem>
+                            <SchemaItem
                               collapsible={false}
                               name={"msg"}
                               required={true}
                               schemaName={"Message (string)"}
                               qualifierMessage={undefined}
-                              schema={{"type":"string","title":"Message"}}
-                            >
-                              
-                            </SchemaItem><SchemaItem
+                              schema={{ type: "string", title: "Message" }}
+                            ></SchemaItem>
+                            <SchemaItem
                               collapsible={false}
                               name={"type"}
                               required={true}
                               schemaName={"Error Type (string)"}
                               qualifierMessage={undefined}
-                              schema={{"type":"string","title":"Error Type"}}
-                            >
-                              
-                            </SchemaItem><li>
+                              schema={{ type: "string", title: "Error Type" }}
+                            ></SchemaItem>
+                            <li>
                               <div
-                                style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem"}}
+                                style={{
+                                  fontSize: "var(--ifm-code-font-size)",
+                                  opacity: "0.6",
+                                  marginLeft: "-.5rem",
+                                }}
                               >
                                 ]
                               </div>
@@ -621,16 +459,17 @@ Table Query
                       </SchemaItem>
                     </ul>
                   </details>
-                </TabItem><TabItem
+                </TabItem>
+                <TabItem
                   label={"Example (from schema)"}
                   value={"Example (from schema)"}
                 >
                   <ResponseSamples
-                    responseExample={"{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\",\n        0\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\"\n    }\n  ]\n}"}
+                    responseExample={
+                      '{\n  "detail": [\n    {\n      "loc": [\n        "string",\n        0\n      ],\n      "msg": "string",\n      "type": "string"\n    }\n  ]\n}'
+                    }
                     language={"json"}
-                  >
-                    
-                  </ResponseSamples>
+                  ></ResponseSamples>
                 </TabItem>
               </SchemaTabs>
             </TabItem>
@@ -640,4 +479,3 @@ Table Query
     </ApiTabs>
   </div>
 </div>
-      

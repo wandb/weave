@@ -75,7 +75,7 @@ call(call_id: str, include_costs: Optional[bool] = False) → WeaveObject
 
 ```python
 calls(
-    filter: Optional[_CallsFilter] = None,
+    filter: Optional[CallsFilter] = None,
     include_costs: Optional[bool] = False
 ) → CallsIter
 ```
@@ -362,7 +362,7 @@ set_display_name(name: Optional[str]) → None
 __init__(
     server: TraceServerInterface,
     project_id: str,
-    filter: _CallsFilter,
+    filter: CallsFilter,
     include_costs: bool = False
 ) → None
 ```

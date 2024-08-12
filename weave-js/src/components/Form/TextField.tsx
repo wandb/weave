@@ -22,7 +22,7 @@ type TextFieldProps = {
   placeholder?: string;
   value?: string;
   onChange?: (value: string) => void;
-  onKeyDown?: (key: string) => void;
+  onKeyDown?: (key: string, e: React.KeyboardEvent<HTMLInputElement>) => void;
   onBlur?: (value: string) => void;
   autoFocus?: boolean;
   disabled?: boolean;
@@ -66,7 +66,7 @@ export const TextField = ({
     : undefined;
   const handleKeyDown = onKeyDown
     ? (e: React.KeyboardEvent<HTMLInputElement>) => {
-        onKeyDown(e.key);
+        onKeyDown(e.key, e);
       }
     : undefined;
   const handleBlur = onBlur

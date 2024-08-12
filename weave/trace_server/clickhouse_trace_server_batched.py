@@ -204,7 +204,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         res = self.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
-                filter=tsi._CallsFilter(
+                filter=tsi.CallsFilter(
                     call_ids=[req.id],
                 ),
                 limit=1,
@@ -310,7 +310,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=tsi._CallsFilter(
+                    filter=tsi.CallsFilter(
                         call_ids=req.call_ids,
                     ),
                 )
@@ -322,7 +322,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=tsi._CallsFilter(
+                    filter=tsi.CallsFilter(
                         trace_ids=[p.trace_id for p in parents],
                     ),
                 )
