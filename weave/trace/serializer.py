@@ -52,7 +52,7 @@ class Serializer:
             # "Op" in the database.
             if ser_id.endswith(".Op"):
                 return "Op"
-        return self.target_class.__name__
+        return ser_id
 
 
 SERIALIZERS = []

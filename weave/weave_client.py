@@ -38,6 +38,7 @@ from weave.trace.refs import (
     TableRef,
 )
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
+from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
@@ -757,7 +758,7 @@ class WeaveClient:
         return self._save_object_basic(val, name, branch)
 
     def _save_object_basic(
-        self, val: Any, name: str, branch: str = "latest"
+        self, val: Any, name: Optional[str] = None, branch: str = "latest"
     ) -> ObjectRef:
         # The WeaveTable case is special because object saving happens inside
         # _save_object_nested and it has a special table_ref -- skip it here.
@@ -769,6 +770,14 @@ class WeaveClient:
         if isinstance(val, ObjectRef):
             return val
         json_val = to_json(val, self._project_id(), self.server)
+
+        if name is None:
+            if json_val.get("_type") == "CustomWeaveType":
+                custom_name = json_val.get("weave_type", {}).get("type")
+                name = custom_name
+
+        if name is None:
+            raise ValueError("Name must be provided for object saving")
 
         response = self.server.obj_create(
             ObjCreateReq(
@@ -832,6 +841,8 @@ class WeaveClient:
         # TODO: Kinda hacky way to dispatching Dataset with rows: Table
         elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
             self._save_nested_objects(obj.rows)
+        elif get_serializer_for_obj(obj) is not None:
+            self._save_custom_obj(obj)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
@@ -873,8 +884,16 @@ class WeaveClient:
     def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
         if op.ref is not None:
             return op.ref
+
         if name is None:
             name = op.name
+
+        return self._save_custom_obj(op, name)
+
+    def _save_custom_obj(self, op: Op, name: Optional[str] = None) -> Ref:
+        if hasattr(op, "ref") and (ref := getattr(op, "ref")) is not None:
+            return ref
+
         op_def_ref = self._save_object_basic(op, name)
 
         # setattr(op, "ref", op_def_ref) fails here
