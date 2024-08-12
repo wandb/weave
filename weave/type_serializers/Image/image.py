@@ -13,13 +13,15 @@ except ImportError:
     pass
 
 
-def save(obj: "Image", artifact: MemTraceFilesArtifact, name: str) -> None:
-    pass
+def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:
+    with artifact.new_file("image.png") as f:
+        obj.save(f)  # type: ignore
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> "Image":
-    pass
+def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
+    path = artifact.path("image.png")
+    return Image.open(path)
 
 
 if dependencies_met:
-    serializer.register_serializer(Image, save, load)
+    serializer.register_serializer(Image.Image, save, load)
