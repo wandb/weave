@@ -1,5 +1,7 @@
 # Summarization using Chain of Density
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/anish/add-summarization-example/examples/cookbooks/summarization/chain_of_density.ipynb)
+
 Summarizing complex technical documents while preserving crucial details is a challenging task. The Chain of Density (CoD) summarization technique offers a solution by iteratively refining summaries to be more concise and information-dense. This guide demonstrates how to implement CoD using Weave, a powerful framework for building, tracking, and evaluating LLM applications. By combining CoD's effectiveness with Weave's robust tooling, you'll learn to create a summarization pipeline that produces high-quality, entity-rich summaries of technical content while gaining insights into the summarization process.
 
 ![Final Evaluation](./media/eval_comparison.gif)
