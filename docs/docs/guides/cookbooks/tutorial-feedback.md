@@ -13,22 +13,22 @@ hide_table_of_contents: true
 # Using Feedback with Weave: User and Expert Feedback to Improve Evaluation
 In order to successfully deploy LLM apps that correspond to the users' expectation it's important to have an evaluation pipeline that produces representative metrics for both the specific user group and the specific set of use-cases. In order to guarantee this we need to continously gather feedback from the user (user group) and domain experts (use-case).
 
-Here we'll do that using a custom chatbnot and argilla as sota tool - together with a best practice workflow that we've seen across users.
+In this tutorial we'll demonstrate a workflow that we've seen work well for many users. We'll use a custom chatbot as an example app and we'll use a custom annotation UI to gather feedback from the user and domain experts. To simplify the example we'll use Streamlit for both the chatbot app and the annotation UI.
 
-### Feedback Types
-We consider three different types of feedback that are useful to improve the evaluation pipeline:
+### The Process
+Before describing the end-to-end process it's important to consider the different types of feedback that can be gathered:
 
-1. **User Feedback:** The user gives direct feedback on the answer of the chatbot. This can be done by only giving a reaction (e.g. thumbs up or thumbs down) or by also writing a note.
+* **User Feedback:** The user gives direct feedback on the answer of the chatbot. This can be done by only giving a reaction (e.g. thumbs up or thumbs down) or by also writing a note.
 
     * **Pro**: This gives the most direct signal on the performance of the app since the question and the feedback are directly from the user from the app context.
     * **Con**: This also gives the noisiest signal since it's subject to the user's mood, the user's understanding of the question, and the user's understanding of the answer. Also it only gives a feedback for the final generation and not for the intermediate steps of the generation process which make it harder to improve specific components of the app (e.g. retrieval or generation of the RAG).
 
-2. **Expert Feedback:** An expert annotates the answer of the chatbot. This can be done by either requiring only a score or by also writing a note.
+* **Expert Feedback:** An expert annotates the answer of the chatbot. This can be done by either requiring only a score or by also writing a note.
 
     * **Pro**: This gives a more neutral and clear signal on the performance of the app since it's coming from an expert.
     * **Con**: This might give a less representative signal since it's not from the user actually using the app. Also it's more expensive to collect this feedback since it requires to hire experts/annotators to annotate the data.
     
-3. **Synthetic Feedback:** Using one or multiple LLM judges to evaluate the answer of the chatbot. This can also be done by only giving a score or by also requiring an explanation.
+* **Synthetic Feedback:** Using one or multiple LLM judges to evaluate the answer of the chatbot. This can also be done by only giving a score or by also requiring an explanation.
 
     * **Pro**: This is more cost-effective than annotators and can be done before deploying the app. Also it can be done for multiple LLMs at the same time which can be used to mitigate judge bias.
     * **Con**: This might give a less representative or hallucinated signal compared to the user or expert feedback.
@@ -45,6 +45,12 @@ Regardless of the type of feedback generating a synthetic evaluation dataset bas
 
 # Implementation
 In this tutorial we'll focus on setting up the user and expert feedback loop so we'll skip the synthetic datset generation step and LLM evaluation step and directly jump to the user and expert feedback steps.
+
+## 0. Setup
+To follow along this tutorial you'll need to install the following packages:
+```bash
+pip install weave openai streamlit
+```
 
 ## 1. Gathering User Feedback from Production
 
