@@ -7,6 +7,8 @@ import weave
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
 
+MAX_RUN_NAME_LENGTH = 128
+
 
 def filter_body(r: Any) -> Any:
     r.body = ""
@@ -38,7 +40,9 @@ def assert_ends_and_errors(calls: List[tsi.CallSchema]) -> None:
         assert call.exception is None
 
 
-def assert_correct_calls_for_chain_invoke(calls: list[tsi.CallSchema]) -> None:
+def assert_correct_calls_for_chain_invoke(
+    calls: list[tsi.CallSchema], prompt_template_name_part="PromptTemplate"
+) -> None:
     assert len(calls) == 4
 
     flattened = flatten_calls(calls)
@@ -47,7 +51,7 @@ def assert_correct_calls_for_chain_invoke(calls: list[tsi.CallSchema]) -> None:
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
     exp = [
         ("langchain.Chain.RunnableSequence", 0),
-        ("langchain.Prompt.PromptTemplate", 1),
+        ("langchain.Prompt." + prompt_template_name_part, 1),
         ("langchain.Llm.ChatOpenAI", 1),
         ("openai.chat.completions.create", 2),
     ]
@@ -72,12 +76,20 @@ def test_simple_chain_invoke(
         model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
     )
     prompt = PromptTemplate.from_template("1 + {number} = ")
+    long_str = (
+        "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy_"
+    )
+    name = long_str + long_str
+    prompt.name = name
+
+    name_prefix = "langchain.Prompt."
+    exp_name = name[: -(len(name_prefix) - MAX_RUN_NAME_LENGTH)]
 
     llm_chain = prompt | llm
     _ = llm_chain.invoke({"number": 2})
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_invoke(res.calls)
+    assert_correct_calls_for_chain_invoke(res.calls, exp_name)
 
 
 @pytest.mark.skip_clickhouse_client
