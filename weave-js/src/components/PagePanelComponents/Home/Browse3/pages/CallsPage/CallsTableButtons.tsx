@@ -7,7 +7,7 @@ import {
   DraggableHandle,
 } from '@wandb/weave/components/DraggablePopups';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
-import { Loading } from '@wandb/weave/components/Loading';
+import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
@@ -45,7 +45,9 @@ export const ExportSelector = ({
   rightmostButton?: boolean;
 }) => {
   const [selectionState, setSelectionState] = useState<SelectionState>('all');
-  const [downloadLoading, setDownloadLoading] = useState<ContentType | null>(null);
+  const [downloadLoading, setDownloadLoading] = useState<ContentType | null>(
+    null
+  );
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -140,17 +142,20 @@ export const ExportSelector = ({
                   <div className="flex-auto text-xl font-semibold">Export</div>
                 )}
               </div>
-                {selectedCalls.length > 0 && (
-                  <SelectionCheckboxes
-                    numSelectedCalls={selectedCalls.length}
-                    numTotalCalls={numTotalCalls}
-                    selectionState={selectionState}
-                    setSelectionState={setSelectionState}
-                  />
-                )}
-                <DownloadGrid onClickDownload={onClickDownload} downloadLoading={downloadLoading} />
-          </DraggableHandle>
-        </div>
+              {selectedCalls.length > 0 && (
+                <SelectionCheckboxes
+                  numSelectedCalls={selectedCalls.length}
+                  numTotalCalls={numTotalCalls}
+                  selectionState={selectionState}
+                  setSelectionState={setSelectionState}
+                />
+              )}
+              <DownloadGrid
+                onClickDownload={onClickDownload}
+                downloadLoading={downloadLoading}
+              />
+            </DraggableHandle>
+          </div>
         </Tailwind>
       </Popover>
     </>
@@ -200,21 +205,19 @@ const ClickableOutlinedCardWithIcon: FC<{
   downloadLoading: boolean;
   onClick: () => void;
 }> = ({iconName, children, downloadLoading, onClick}) => (
-    <div
-      className="flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16 hover:bg-moon-100"
-      onClick={onClick}>
-      {downloadLoading ? (
-          <Loading size={28} />
-      ) : (
-        <>
-          <div className="mr-4 rounded-2xl bg-moon-200 p-4">
-            <Icon size="xlarge" color="moon" name={iconName} />
-          </div>
-          <div className="ml-4">{children}</div>
-        </>
-      )}
-    </div>
-  );
+  <div
+    className="flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16 hover:bg-moon-100"
+    onClick={onClick}>
+    {downloadLoading ? (
+      <Loading size={28} className="mr-4" />
+    ) : (
+      <div className="mr-4 rounded-2xl bg-moon-200 p-4">
+        <Icon size="xlarge" color="moon" name={iconName} />
+      </div>
+    )}
+    <div className="ml-4">{children}</div>
+  </div>
+);
 
 const DownloadGrid: FC<{
   downloadLoading: ContentType | null;
