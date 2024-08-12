@@ -315,7 +315,7 @@ def make_client_call(
         parent_id=server_call.parent_id,
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
-        output=output,
+        output=from_json(output, server_call.project_id, server),
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,

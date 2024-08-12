@@ -14,8 +14,8 @@ except ImportError:
 
 
 def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:
-    with artifact.new_file("image.png") as f:
-        obj.save(f)  # type: ignore
+    with artifact.new_file("image.png", binary=True) as f:
+        obj.save(f, format="png")  # type: ignore
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
@@ -23,5 +23,6 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> "Image.Image":
     return Image.open(path)
 
 
-if dependencies_met:
-    serializer.register_serializer(Image.Image, save, load)
+def register() -> None:
+    if dependencies_met:
+        serializer.register_serializer(Image.Image, save, load)
