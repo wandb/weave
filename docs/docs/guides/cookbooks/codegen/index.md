@@ -1,6 +1,8 @@
+---
+hide_table_of_contents: true
+---
+
 # Code Generation using Weave and OpenAI
-
-
 
 Generating high-quality code with proper structure, documentation, and tests is a challenging task. This guide demonstrates how to implement a code generation pipeline using Weave, a powerful framework for building, tracking, and evaluating LLM applications. By combining OpenAI's language models with Weave's robust tooling, you'll learn to create a code generation pipeline that produces high-quality Python functions, complete with main program runners and unit tests, while gaining insights into the generation process.
 
@@ -17,7 +19,7 @@ Our pipeline will:
 
 For a visual demonstration of the code generation pipeline using Weave, Groq, and E2B check out this video:
 
-[![Code Generation Pipeline Demo](https://img.youtube.com/vi/B70jJYPVAzE/0.jpg)](https://www.youtube.com/watch?v=B70jJYPVAzE&t=1561s)
+<iframe width="560" height="315" src="https://www.youtube.com/embed/B70jJYPVAzE?si=75Z4Fg_DBxAiu9_6&amp" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 This video provides a step-by-step walkthrough of the process, showcasing how Weave integrates with Groq to create a powerful code generation tool and then running the code in E2B, to validate the code.
 
@@ -58,9 +60,9 @@ weave.init(WEAVE_PROJECT)
 client = OpenAI()
 ```
 
-
-> [!NOTE]
-> Weave automatically tracks OpenAI API calls, including inputs, outputs, and metadata. This means you don't need to add any additional logging code for your OpenAI interactions – Weave handles it seamlessly in the background.
+:::note
+Weave automatically tracks OpenAI API calls, including inputs, outputs, and metadata. This means you don't need to add any additional logging code for your OpenAI interactions – Weave handles it seamlessly in the background.
+:::
 
 ## Leveraging Structured Outputs and Pydantic Models
 
