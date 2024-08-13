@@ -272,6 +272,10 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         return val;
       },
       renderCell: cellParams => {
+        // TODO: get this typing more correct so this is known tp be a string.
+        // Hmmm how would this work with expanding refs of a dif project?!
+        const projectId = cellParams.row.project_id;
+        const [entity, project] = projectId.split('/');
         const val = valueForKey(cellParams.row, key);
         if (val === undefined) {
           return <NotApplicable />;
@@ -286,7 +290,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
             {isExpandedRefWithValueAsTableRef(val) ? (
               <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
             ) : (
-              <CellValue value={val} />
+              <CellValue value={val} entity={entity} project={project} />
             )}
           </ErrorBoundary>
         );

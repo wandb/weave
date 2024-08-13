@@ -21,6 +21,7 @@ import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {isCustomWeaveTypePayload} from '../../type_views/customWeaveType.types';
 import {isRef} from '../common/util';
 import {
   LIST_INDEX_EDGE_NAME,
@@ -162,6 +163,12 @@ export const ObjectViewer = ({
         isCode?: boolean;
       }
     > = [];
+    // if (isCustomWeaveTypePayload(data)) {
+    //   const customView = customWeaveTypeDispatch(entity, project, data);
+    //   if (customView) {
+    //     return customView;
+    //   }
+    // }
     traverse(resolvedData, context => {
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
@@ -201,8 +208,11 @@ export const ObjectViewer = ({
           contexts.push(...getKnownImageDictContexts(context));
           return 'skip';
         } else if (context.valueType === 'object') {
-          console.log(context);
-          contexts.push(context);
+          if (isCustomWeaveTypePayload(data)) {
+            contexts.push(context);
+            // console.log('Here', context);
+            // return 'skip';
+          }
         } else {
           contexts.push(context);
         }

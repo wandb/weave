@@ -1204,12 +1204,13 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
         loading: true,
         result: null,
       };
-      }
+    }
     return {
       loading: false,
-      result: new TextDecoder().decode(arrayBuffer.result ?? new ArrayBuffer(0))
+      result: new TextDecoder().decode(
+        arrayBuffer.result ?? new ArrayBuffer(0)
+      ),
     };
-
   }, [arrayBuffer.loading, arrayBuffer.result]);
 
   return text;

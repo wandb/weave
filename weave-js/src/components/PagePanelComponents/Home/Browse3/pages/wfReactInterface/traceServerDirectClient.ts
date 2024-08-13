@@ -260,7 +260,7 @@ export class DirectTraceServerClient {
   public fileContent(
     req: TraceFileContentReadReq
   ): Promise<TraceFileContentReadRes> {
-    const res = this.makeRequest<TraceFileContentReadReq, string>(
+    const res = this.makeRequest<TraceFileContentReadReq, ArrayBuffer>(
       '/files/content',
       req,
       false,

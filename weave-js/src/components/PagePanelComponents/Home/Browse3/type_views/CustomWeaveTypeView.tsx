@@ -18,6 +18,12 @@ export const customWeaveTypeDispatch = (
   return null;
 };
 
+// export const customWeaveTypeHasDispatch = (
+//   data: CustomWeaveTypePayload
+// ): boolean => {
+//   return isPILImageImageType(data);
+// };
+
 // export const CustomWeaveTypeView: React.FC<{
 //   data: CustomWeaveTypePayload;
 // }> = props => {
