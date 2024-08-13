@@ -33,7 +33,7 @@ jobs:
           git config --global user.email weave@wandb.com
       - id: "Drop Pre-Release"
         run: |
-          bump-my-version bump pre_l ./weave/version.py --commit
+          bump-my-version bump pre_l ./weave/version.py --tag --commit
           git push
       - id: "Bump the version"
         run: |
