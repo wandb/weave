@@ -1,5 +1,5 @@
 import importlib
-from typing import Callable, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Dict
 
 if TYPE_CHECKING:
     from google.generativeai.types.generation_types import GenerateContentResponse

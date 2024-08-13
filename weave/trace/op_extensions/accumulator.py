@@ -13,8 +13,6 @@ from typing import (
     Union,
 )
 
-import rich
-
 from weave.trace.op import FinishCallbackType, Op
 
 S = TypeVar("S")
