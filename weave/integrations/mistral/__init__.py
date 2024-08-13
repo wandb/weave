@@ -14,4 +14,4 @@ if version.parse(mistral_version) < version.parse("1.0.0"):
         f"Using MistralAI version {mistral_version}. Please consider upgrading to version 1.0.0 or later."
     )
 else:
-    from .v1.mistral import mistral_patcher
+    from .v1.mistral import mistral_patcher as mistral_patcher
