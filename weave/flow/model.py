@@ -15,16 +15,17 @@ class Model(Object):
     prompts or to try the latest LLM and compare predictions across different settings
 
     Examples:
-    ```
-        class YourModel(Model):
-            attribute1: str
-            attribute2: int
 
-            @weave.op()
-            def predict(self, input_data: str) -> dict:
-                # Model logic goes here
-                prediction = self.attribute1 + ' ' + input_data
-                return {'pred': prediction}
+    ```python
+    class YourModel(Model):
+        attribute1: str
+        attribute2: int
+
+        @weave.op()
+        def predict(self, input_data: str) -> dict:
+            # Model logic goes here
+            prediction = self.attribute1 + ' ' + input_data
+            return {'pred': prediction}
     ```
     """
 

@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
-  GridApiPro,
   GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
@@ -24,7 +23,6 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import React, {
   FC,
@@ -39,8 +37,6 @@ import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {parseRef} from '../../../../../../react';
-import {LoadingDots} from '../../../../../LoadingDots';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveHeaderExtrasContext,
@@ -66,12 +62,13 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {
-  CallSchema,
-  OpVersionKey,
-} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
-import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
+import {
+  BulkDeleteButton,
+  CompareEvaluationsTableButton,
+  ExportSelector,
+} from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
@@ -80,6 +77,7 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
+import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
@@ -155,18 +153,6 @@ export const CallsTable: FC<{
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
-
-  // Register Export Button
-  useEffect(() => {
-    addExtra('exportRunsTableButton', {
-      node: (
-        <ExportRunsTableButton tableRef={apiRef} rightmostButton={isReadonly} />
-      ),
-      order: 2,
-    });
-
-    return () => removeExtra('exportRunsTableButton');
-  }, [apiRef, isReadonly, addExtra, removeExtra]);
 
   // Table State consists of:
   // 1. Filter (Structured Filter)
@@ -402,6 +388,7 @@ export const CallsTable: FC<{
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
+        disableExport: true,
         renderHeader: (params: any) => {
           return (
             <Checkbox
@@ -510,6 +497,60 @@ export const CallsTable: FC<{
     entity,
     project,
     history,
+  ]);
+
+  // We really want to use columns here, but because visibleColumns
+  // is a prop to ExportSelector, it causes infinite reloads.
+  // memoize key computation, then filter out hidden columns
+  const allRowKeys = useMemo(() => {
+    const keysSet = new Set<string>();
+    tableData.forEach(row => {
+      Object.keys(row).forEach(key => keysSet.add(key));
+    });
+    return Array.from(keysSet);
+  }, [tableData]);
+
+  // Register Export Button
+  useEffect(() => {
+    const visibleColumns =
+      tableData.length > 0
+        ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
+        : [];
+    addExtra('exportButton', {
+      node: (
+        <ExportSelector
+          selectedCalls={selectedCalls}
+          numTotalCalls={callsTotal}
+          disabled={callsTotal === 0}
+          visibleColumns={visibleColumns}
+          callQueryParams={{
+            entity,
+            project,
+            filter: effectiveFilter,
+            gridFilter: filterModel,
+            gridSort: sortModel,
+          }}
+          rightmostButton={isReadonly}
+        />
+      ),
+      order: 2,
+    });
+
+    return () => removeExtra('exportButton');
+  }, [
+    selectedCalls,
+    callsTotal,
+    tableData,
+    allRowKeys,
+    columnVisibilityModel,
+    entity,
+    project,
+    isReadonly,
+    effectiveFilter,
+    filterModel,
+    sortModel,
+    addExtra,
+    removeExtra,
   ]);
 
   // Register Delete Button
@@ -859,31 +900,6 @@ const useParentIdOptions = (
   }, [parentCall.loading, parentCall.result]);
 };
 
-type OpVersionIndexTextProps = {
-  opVersionRef: string;
-};
-
-export const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
-  const {useOpVersion} = useWFHooks();
-  const ref = parseRef(opVersionRef);
-  let opVersionKey: OpVersionKey | null = null;
-  if ('weaveKind' in ref && ref.weaveKind === 'op') {
-    opVersionKey = {
-      entity: ref.entityName,
-      project: ref.projectName,
-      opId: ref.artifactName,
-      versionHash: ref.artifactVersion,
-    };
-  }
-  const opVersion = useOpVersion(opVersionKey);
-  if (opVersion.loading) {
-    return <LoadingDots />;
-  }
-  return opVersion.result ? (
-    <span>v{opVersion.result.versionIndex}</span>
-  ) : null;
-};
-
 // Get the tail of the peekPath (ignore query params)
 const getPeekId = (peekPath: string | null): string | null => {
   if (!peekPath) {
@@ -893,80 +909,6 @@ const getPeekId = (peekPath: string | null): string | null => {
   const url = new URL(peekPath, baseUrl);
   const {pathname} = url;
   return pathname.split('/').pop() ?? null;
-};
-
-const ExportRunsTableButton = ({
-  tableRef,
-  rightmostButton = false,
-}: {
-  tableRef: React.MutableRefObject<GridApiPro>;
-  rightmostButton?: boolean;
-}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className={rightmostButton ? 'mr-16' : 'ml-4'}
-      size="medium"
-      variant="ghost"
-      icon="export-share-upload"
-      tooltip="Export to CSV"
-      onClick={() =>
-        tableRef.current?.exportDataAsCsv({includeColumnGroupsHeaders: false})
-      }
-    />
-  </Box>
-);
-
-const CompareEvaluationsTableButton: FC<{
-  onClick: () => void;
-  disabled?: boolean;
-  tooltipText?: string;
-}> = ({onClick, disabled, tooltipText}) => (
-  <Box
-    sx={{
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-    <Button
-      className="mx-4"
-      size="medium"
-      variant="primary"
-      disabled={disabled}
-      onClick={onClick}
-      icon="chart-scatterplot"
-      tooltip={tooltipText}>
-      Compare
-    </Button>
-  </Box>
-);
-
-const BulkDeleteButton: FC<{
-  disabled?: boolean;
-  onClick: () => void;
-}> = ({disabled, onClick}) => {
-  return (
-    <Box
-      sx={{
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-      }}>
-      <Button
-        className="ml-4 mr-16"
-        variant="ghost"
-        size="medium"
-        disabled={disabled}
-        onClick={onClick}
-        tooltip="Select rows with the checkbox to delete"
-        icon="delete"
-      />
-    </Box>
-  );
 };
 
 function prepareFlattenedCallDataForTable(

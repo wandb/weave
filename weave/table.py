@@ -1,4 +1,4 @@
-from typing import Iterator, Optional
+from typing import Any, Iterator, Optional
 
 from weave.trace.refs import TableRef
 
@@ -6,7 +6,7 @@ from weave.trace.refs import TableRef
 class Table:
     ref: Optional[TableRef]
 
-    def __init__(self, rows: list) -> None:
+    def __init__(self, rows: list[dict]) -> None:
         if not isinstance(rows, list):
             try:
                 import pandas as pd
@@ -15,16 +15,38 @@ class Table:
                     rows = rows.to_dict(orient="records")
             except ImportError:
                 pass
-        if not isinstance(rows, list):
-            raise ValueError(
-                "Attempted to construct a Table with a non-list object. Found: "
-                + str(type(rows))
-            )
-        self.rows = rows
+        self._validate_rows(rows)
+        self._rows = rows
         self.ref = None
+
+    def _validate_rows(self, rows: Any) -> None:
+        if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+            raise ValueError("Rows must be a list of dicts")
+
+    @property
+    def rows(self) -> list[dict]:
+        return self._rows
+
+    @rows.setter
+    def rows(self, value: list[dict]) -> None:
+        self._validate_rows(value)
+        self._rows = value
 
     def __getitem__(self, key: int) -> dict:
         return self.rows[key]
 
     def __iter__(self) -> Iterator:
         return iter(self.rows)
+
+    def __eq__(self, other: Any) -> bool:
+        return self.rows == other
+
+    def append(self, row: dict) -> None:
+        """Add a row to the table."""
+        if not isinstance(row, dict):
+            raise ValueError("Can only append dicts to tables")
+        self.rows.append(row)
+
+    def pop(self, index: int) -> None:
+        """Remove a row at the given index from the table."""
+        self.rows.pop(index)
