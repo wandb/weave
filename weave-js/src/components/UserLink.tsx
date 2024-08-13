@@ -97,8 +97,9 @@ type UserContentProps = {
   user: UserInfo;
   mode: 'tooltip' | 'popover';
   onClose?: () => void;
+  hasPopover?: boolean;
 };
-const UserContent = ({user, mode, onClose}: UserContentProps) => {
+const UserContent = ({user, mode, onClose, hasPopover}: UserContentProps) => {
   const isPopover = mode === 'popover';
   const imgSize = isPopover ? 100 : 50;
   const username = isPopover ? (
@@ -138,7 +139,9 @@ const UserContent = ({user, mode, onClose}: UserContentProps) => {
           <div>{email}</div>
         </Grid>
       </UserContentBody>
-      {!isPopover && <TooltipHint>Click to open card</TooltipHint>}
+      {hasPopover && !isPopover && (
+        <TooltipHint>Click to open card</TooltipHint>
+      )}
     </>
   );
 };
@@ -147,13 +150,22 @@ type UserInnerProps = {
   user: UserInfo;
   includeName?: boolean;
   placement?: TooltipProps['placement'];
+  hasPopover?: boolean;
 };
-const UserInner = ({user, includeName, placement}: UserInnerProps) => {
+const UserInner = ({
+  user,
+  includeName,
+  placement,
+  hasPopover,
+}: UserInnerProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const onClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(anchorEl ? null : ref.current);
-  };
+  const showPopover = hasPopover ?? true;
+  const onClick = showPopover
+    ? (event: React.MouseEvent<HTMLElement>) => {
+        setAnchorEl(anchorEl ? null : ref.current);
+      }
+    : undefined;
   const onClose = () => setAnchorEl(null);
 
   const open = Boolean(anchorEl);
@@ -162,7 +174,7 @@ const UserInner = ({user, includeName, placement}: UserInnerProps) => {
   const title = open ? (
     '' // Suppress tooltip when popper is open.
   ) : (
-    <UserContent user={user} mode="tooltip" />
+    <UserContent user={user} mode="tooltip" hasPopover={hasPopover} />
   );
 
   // Unfortunate but necessary to get appear on top of peek drawer.
@@ -218,6 +230,7 @@ type UserLinkProps = {
   userId: string | null;
   includeName?: boolean; // Default is to show avatar image only.
   placement?: TooltipProps['placement'];
+  hasPopover?: boolean; // Can you click to open more a popup
 };
 
 const fetchUser = (userId: string) => {
@@ -266,7 +279,12 @@ export const useUsers = (userIds: string[]) => {
   return users;
 };
 
-export const UserLink = ({userId, includeName, placement}: UserLinkProps) => {
+export const UserLink = ({
+  userId,
+  includeName,
+  placement,
+  hasPopover,
+}: UserLinkProps) => {
   const users = useUsers(userId ? [userId] : []);
   if (userId == null) {
     return <NotApplicable />;
@@ -279,6 +297,11 @@ export const UserLink = ({userId, includeName, placement}: UserLinkProps) => {
   }
   const user = users[0];
   return (
-    <UserInner user={user} placement={placement} includeName={includeName} />
+    <UserInner
+      user={user}
+      placement={placement}
+      includeName={includeName}
+      hasPopover={hasPopover}
+    />
   );
 };

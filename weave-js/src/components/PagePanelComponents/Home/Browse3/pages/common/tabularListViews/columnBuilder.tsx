@@ -15,6 +15,7 @@ import {CollapseHeader} from '../../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../Browse2/SmallRef';
+import {CellFilterWrapper} from '../../../filters/CellFilterWrapper';
 import {
   OBJECT_ATTR_EDGE_NAME,
   WEAVE_PRIVATE_PREFIX,
@@ -30,7 +31,6 @@ import {
 } from '../../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {isRef} from '../util';
 import {buildTree} from './buildTree';
-import {allOperators} from './operators';
 
 /**
  * This function is responsible for taking the raw data and flattening it
@@ -187,8 +187,8 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
   columnCanBeExpanded?: (col: string) => boolean,
   onCollapse?: (col: string) => void,
   onExpand?: (col: string) => void,
-  columnIsFilterable?: (col: string) => boolean,
-  columnIsSortable?: (col: string) => boolean
+  columnIsSortable?: (col: string) => boolean,
+  onAddFilter?: (field: string, operator: string | null, value: any) => void
 ) => {
   const cols: Array<GridColDef<T>> = [];
 
@@ -245,9 +245,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       flex: 1,
       minWidth: 150,
       field: key,
-      filterable: columnIsFilterable && columnIsFilterable(key),
       sortable: columnIsSortable && columnIsSortable(key),
-      filterOperators: allOperators,
       headerName: key,
       renderHeader: () => {
         return (
@@ -273,19 +271,33 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       renderCell: cellParams => {
         const val = valueForKey(cellParams.row, key);
         if (val === undefined) {
-          return <NotApplicable />;
+          return (
+            <CellFilterWrapper
+              onAddFilter={onAddFilter}
+              field={key}
+              operation={'(any): isEmpty'}
+              value={undefined}>
+              <NotApplicable />
+            </CellFilterWrapper>
+          );
         }
         return (
           <ErrorBoundary>
-            {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
+            <CellFilterWrapper
+              onAddFilter={onAddFilter}
+              field={key}
+              operation={null}
+              value={val}>
+              {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
             into `CellValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
             Table-specific data structure and we might not want to leak that into the
             rest of the system*/}
-            {isExpandedRefWithValueAsTableRef(val) ? (
-              <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
-            ) : (
-              <CellValue value={val} />
-            )}
+              {isExpandedRefWithValueAsTableRef(val) ? (
+                <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
+              ) : (
+                <CellValue value={val} />
+              )}
+            </CellFilterWrapper>
           </ErrorBoundary>
         );
       },

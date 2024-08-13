@@ -253,6 +253,7 @@ export const FilterLayoutTemplate: React.FC<{
           sx={{
             flex: '0 0 auto',
             width: '100%',
+            maxWidth: '100%',
             transition: 'width 0.1s ease-in-out',
             display: 'flex',
             flexDirection: 'row',
