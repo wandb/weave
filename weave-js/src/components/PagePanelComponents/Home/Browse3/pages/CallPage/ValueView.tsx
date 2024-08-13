@@ -1,7 +1,9 @@
 import React, {useMemo} from 'react';
 
-import {parseRef} from '../../../../../../react';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {isCustomWeaveTypePayload} from '../../type_views/customWeaveType.types';
+import {customWeaveTypeDispatch} from '../../type_views/CustomWeaveTypeView';
 import {isRef} from '../common/util';
 import {
   DataTableView,
@@ -22,9 +24,16 @@ type ValueData = Record<string, any>;
 type ValueViewProps = {
   data: ValueData;
   isExpanded: boolean;
+  entity?: string;
+  project?: string;
 };
 
-export const ValueView = ({data, isExpanded}: ValueViewProps) => {
+export const ValueView = ({
+  data,
+  isExpanded,
+  entity,
+  project,
+}: ValueViewProps) => {
   const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
     if (data.valueType === 'object' && '_ref' in data.value) {
@@ -78,7 +87,28 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   }
 
   if (data.valueType === 'object') {
-    return <div>BLAH</div>;
+    if (isCustomWeaveTypePayload(data.value)) {
+      // UGG THIS IS REALLY UGGLY! - fix
+      let finalEntity = entity;
+      let finalProject = project;
+      if (data.value != null && (data.value as any)._ref != null) {
+        const parsedRef = parseRef((data.value as any)._ref);
+        if (isWeaveObjectRef(parsedRef)) {
+          finalEntity = parsedRef.entityName;
+          finalProject = parsedRef.projectName;
+        }
+      }
+      if (finalEntity != null && finalProject != null) {
+        const customView = customWeaveTypeDispatch(
+          finalEntity,
+          finalProject,
+          data.value
+        );
+        if (customView) {
+          return customView;
+        }
+      }
+    }
   }
 
   return <div>{data.value.toString()}</div>;

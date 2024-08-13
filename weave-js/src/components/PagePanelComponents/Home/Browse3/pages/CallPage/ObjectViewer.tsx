@@ -22,6 +22,7 @@ import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isCustomWeaveTypePayload} from '../../type_views/customWeaveType.types';
+import {isPILImageImageType} from '../../type_views/PIL.Image.Image/PILImageImage';
 import {isRef} from '../common/util';
 import {
   LIST_INDEX_EDGE_NAME,
@@ -163,12 +164,6 @@ export const ObjectViewer = ({
         isCode?: boolean;
       }
     > = [];
-    // if (isCustomWeaveTypePayload(data)) {
-    //   const customView = customWeaveTypeDispatch(entity, project, data);
-    //   if (customView) {
-    //     return customView;
-    //   }
-    // }
     traverse(resolvedData, context => {
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
@@ -207,12 +202,15 @@ export const ObjectViewer = ({
           // replace it with a patched version that can be rendered as a thumbnail.
           contexts.push(...getKnownImageDictContexts(context));
           return 'skip';
-        } else if (context.valueType === 'object') {
-          if (isCustomWeaveTypePayload(context.value)) {
-            // contexts.push(context);
-            // console.log('Here', context);
-            // return 'skip';
-          }
+        } else if (
+          context.valueType === 'object' &&
+          isCustomWeaveTypePayload(context.value)
+        ) {
+          // if (isCustomWeaveTypePayload(context.value)) {
+          contexts.push(context);
+          // console.log('Here', context);
+          // return 'skip';
+          // }
         } else {
           contexts.push(context);
         }
@@ -231,12 +229,25 @@ export const ObjectViewer = ({
         });
         return 'skip';
       }
+      if (
+        isCustomWeaveTypePayload(context.value) &&
+        isPILImageImageType(context.value)
+      ) {
+        contexts.push({
+          depth: context.depth + 1,
+          isLeaf: true,
+          path: context.path.plus('image'),
+          value: context.value,
+          valueType: context.valueType,
+        });
+        return 'skip';
+      }
       return true;
     });
     const rowsInner = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
     return {rows: rowsInner};
   }, [resolvedData]);
-  console.log({rows});
+
   // Next, we setup the columns. In our case, there is just one column: Value.
   // In most cases, we just render the generic `ValueView` component. However,
   // in the case that we have an expanded ref, then we want to set the base
@@ -266,7 +277,6 @@ export const ObjectViewer = ({
           }
           let baseRef: string | undefined;
           const path: ObjectPath = row.path;
-          console.log(row);
           if (currentRefContext) {
             baseRef = buildBaseRef(currentRefContext, path, path.length());
           }
@@ -305,7 +315,6 @@ export const ObjectViewer = ({
       hideDescendantCount: true,
       renderCell: params => {
         const refToExpand = params.row.value;
-        console.log(params);
         return (
           <ObjectViewerGroupingCell
             {...params}

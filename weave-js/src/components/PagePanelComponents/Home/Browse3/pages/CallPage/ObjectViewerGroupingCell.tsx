@@ -31,7 +31,7 @@ export const ObjectViewerGroupingCell: FC<
 
     event.stopPropagation();
   };
-  console.log(row);
+
   const tooltipContent = row.path.toString();
   const box = (
     <CursorBox

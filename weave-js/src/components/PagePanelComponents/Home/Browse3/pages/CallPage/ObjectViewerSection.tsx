@@ -269,7 +269,12 @@ export const ObjectViewerSection = ({
         <TitleRow>
           <Title>{title}</Title>
         </TitleRow>
-        <ValueView data={oneResultData} isExpanded={true} />
+        <ValueView
+          data={oneResultData}
+          isExpanded={true}
+          project={project}
+          entity={entity}
+        />
       </>
     );
   }
