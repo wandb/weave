@@ -86,40 +86,4 @@ interactions:
     status:
       code: 200
       message: OK
-- request:
-    body: '{"obj":{"project_id":"capecape/dev_testing","object_id":"UsageInfo","val":{"_type":"UsageInfo","prompt_tokens":10,"completion_tokens":406,"total_tokens":416,"_class_name":"UsageInfo","_bases":["BaseModel","BaseModel"]}}}'
-    headers:
-      Accept:
-      - '*/*'
-      Accept-Encoding:
-      - gzip, deflate, br, zstd
-      Connection:
-      - keep-alive
-      Content-Length:
-      - '220'
-      User-Agent:
-      - python-requests/2.32.3
-    method: POST
-    uri: https://trace.wandb.ai/obj/create
-  response:
-    body:
-      string: '{"digest":"eYDdUDY9EcOjii0jpBlengV4vSNVvIyEVbNkkCXn1r0"}'
-    headers:
-      Alt-Svc:
-      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
-      Content-Length:
-      - '56'
-      content-type:
-      - application/json
-      date:
-      - Thu, 08 Aug 2024 11:11:29 GMT
-      server:
-      - Google Frontend
-      via:
-      - 1.1 google
-      x-cloud-trace-context:
-      - 4cac6d33db87462aca6978e67e60e65f
-    status:
-      code: 200
-      message: OK
 version: 1
