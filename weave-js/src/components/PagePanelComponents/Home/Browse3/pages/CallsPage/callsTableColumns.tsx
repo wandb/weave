@@ -5,9 +5,7 @@
 
 import {
   GridColDef,
-  GridColumnGroup,
   GridColumnGroupingModel,
-  GridColumnNode,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
@@ -17,13 +15,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
-import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {Timestamp} from '../../../../../Timestamp';
-import {CellValue} from '../../../Browse2/CellValue';
-import {CollapseHeader} from '../../../Browse2/CollapseGroupHeader';
-import {ExpandHeader} from '../../../Browse2/ExpandHeader';
-import {NotApplicable} from '../../../Browse2/NotApplicable';
-import {SmallRef} from '../../../Browse2/SmallRef';
 import {Reactions} from '../../feedback/Reactions';
 import {
   getTokensAndCostFromUsage,
@@ -31,6 +23,8 @@ import {
 } from '../CallPage/TraceUsageStats';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
+import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
+import {allOperators} from '../common/tabularListViews/operators';
 import {isRef} from '../common/util';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
@@ -38,14 +32,7 @@ import {
   traceCallLatencyS,
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
-import {
-  EXPANDED_REF_REF_KEY,
-  EXPANDED_REF_VAL_KEY,
-  isTableRef,
-} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
-import {OpVersionIndexText} from './CallsTable';
-import {buildTree} from './callsTableBuildTree';
 import {
   insertPath,
   isDynamicCallColumn,
@@ -53,7 +40,7 @@ import {
   stringToPath,
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import {allOperators} from './callsTableQuery';
+import {OpVersionIndexText} from './OpVersionIndexText';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
 
@@ -274,7 +261,7 @@ function buildCallsTableColumns(
     //   },
     // },
     {
-      field: 'derived.status_code',
+      field: 'summary.weave.status',
       headerName: 'Status',
       headerAlign: 'center',
       sortable: false,
@@ -299,135 +286,19 @@ function buildCallsTableColumns(
     },
   ];
 
-  const tree = buildTree([...filteredDynamicColumnNames]);
-  let groupingModel: GridColumnGroupingModel = tree.children.filter(
-    c => 'groupId' in c
-  ) as GridColumnGroup[];
-
-  const walkGroupingModel = (
-    nodes: GridColumnNode[],
-    fn: (node: GridColumnNode) => GridColumnNode
-  ) => {
-    return nodes.map(node => {
-      node = fn(node);
-      if ('children' in node) {
-        node.children = walkGroupingModel(node.children, fn);
-      }
-      return node;
-    });
-  };
-  const groupIds = new Set<string>();
-  groupingModel = walkGroupingModel(groupingModel, node => {
-    if ('groupId' in node) {
-      const key = node.groupId;
-      groupIds.add(key);
-      if (expandedRefCols.has(key)) {
-        node.renderHeaderGroup = () => {
-          return (
-            <CollapseHeader
-              headerName={key.split('.').slice(-1)[0]}
-              field={key}
-              onCollapse={onCollapse}
-            />
-          );
-        };
-      } else if (columnsWithRefs.has(key)) {
-        node.renderHeaderGroup = () => {
-          return (
-            <ExpandHeader
-              headerName={key.split('.').slice(-1)[0]}
-              field={key}
-              hasExpand
-              onExpand={onExpand}
-            />
-          );
-        };
-      }
-    }
-    return node;
-  }) as GridColumnGroupingModel;
-
-  for (const key of filteredDynamicColumnNames) {
-    const col: GridColDef<TraceCallSchema> = {
-      flex: 1,
-      minWidth: 150,
-      field: key,
-      // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-      filterable: !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-      // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-      sortable: !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-      filterOperators: allOperators,
-      headerName: key,
-      renderHeader: () => {
-        return (
-          <div
-            style={{
-              fontWeight: 600,
-            }}>
-            {key.split('.').slice(-1)[0]}
-          </div>
-        );
-      },
-      valueGetter: cellParams => {
-        const val = (cellParams.row as any)[key];
-        if (Array.isArray(val) || typeof val === 'object') {
-          try {
-            return JSON.stringify(val);
-          } catch {
-            return val;
-          }
-        }
-        return val;
-      },
-      renderCell: cellParams => {
-        const val = (cellParams.row as any)[key];
-        if (val === undefined) {
-          return <NotApplicable />;
-        }
-        return (
-          <ErrorBoundary>
-            {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
-            into `CallValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
-            CallsTable-specific data structure and we might not want to leak that into the
-            rest of the system*/}
-            {isExpandedRefWithValueAsTableRef(val) ? (
-              <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
-            ) : (
-              <CellValue value={val} />
-            )}
-          </ErrorBoundary>
-        );
-      },
-    };
-
-    if (groupIds.has(key)) {
-      col.renderHeader = () => {
-        return <></>;
-      };
-    } else if (expandedRefCols.has(key)) {
-      col.renderHeader = () => {
-        return (
-          <CollapseHeader
-            headerName={key.split('.').slice(-1)[0]}
-            field={key}
-            onCollapse={onCollapse}
-          />
-        );
-      };
-    } else if (columnsWithRefs.has(key)) {
-      col.renderHeader = () => {
-        return (
-          <ExpandHeader
-            headerName={key.split('.').slice(-1)[0]}
-            field={key}
-            hasExpand
-            onExpand={onExpand}
-          />
-        );
-      };
-    }
-    cols.push(col);
-  }
+  const {cols: newCols, groupingModel} = buildDynamicColumns<TraceCallSchema>(
+    filteredDynamicColumnNames,
+    (row, key) => (row as any)[key],
+    key => expandedRefCols.has(key),
+    key => columnsWithRefs.has(key),
+    onCollapse,
+    onExpand,
+    // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
+    // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key)
+  );
+  cols.push(...newCols);
 
   cols.push({
     field: 'wb_user_id',
@@ -471,7 +342,7 @@ function buildCallsTableColumns(
   cols.push(startedAtCol);
 
   cols.push({
-    field: 'derived.tokens',
+    field: 'summary.weave.tokens',
     headerName: 'Tokens',
     width: 100,
     minWidth: 100,
@@ -492,7 +363,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'derived.cost',
+    field: 'summary.weave.cost',
     headerName: 'Cost',
     width: 100,
     minWidth: 100,
@@ -513,7 +384,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'derived.latency',
+    field: 'summary.weave.latency',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,
@@ -611,29 +482,4 @@ const refIsExpandable = (ref: string): boolean => {
     );
   }
   return false;
-};
-
-type ExpandedRefWithValue<T = any> = {
-  [EXPANDED_REF_REF_KEY]: string;
-  [EXPANDED_REF_VAL_KEY]: T;
-};
-
-export type ExpandedRefWithValueAsTableRef = ExpandedRefWithValue<string>;
-
-const isExpandedRefWithValue = (ref: any): ref is ExpandedRefWithValue => {
-  return (
-    typeof ref === 'object' &&
-    ref !== null &&
-    EXPANDED_REF_REF_KEY in ref &&
-    EXPANDED_REF_VAL_KEY in ref
-  );
-};
-
-const isExpandedRefWithValueAsTableRef = (
-  ref: any
-): ref is ExpandedRefWithValueAsTableRef => {
-  if (!isExpandedRefWithValue(ref)) {
-    return false;
-  }
-  return isTableRef(ref[EXPANDED_REF_VAL_KEY]);
 };

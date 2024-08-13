@@ -1,6 +1,7 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
 
 const config: Config = {
   title: "W&B Weave",
@@ -35,15 +36,16 @@ const config: Config = {
       {
         docs: {
           sidebarPath: "./sidebars.ts",
-          sidebarCollapsible: false,
-          breadcrumbs: false,
+          sidebarCollapsible: true,
+          breadcrumbs: true,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl: "https://github.com/wandb/weave/blob/master/docs/",
           routeBasePath: "/",
+          docItemComponent: "@theme/ApiItem", // Derived from docusaurus-theme-openapi
         },
         theme: {
-          customCss: "./src/css/custom.css",
+          customCss: "./src/css/custom.scss",
         },
       } satisfies Preset.Options,
     ],
@@ -64,6 +66,33 @@ const config: Config = {
           ],
         ]
       : []),
+      [
+        // See https://github.com/PaloAltoNetworks/docusaurus-openapi-docs
+        'docusaurus-plugin-openapi-docs',
+        {
+          id: "api", // plugin id
+          docsPluginId: "classic", // configured for preset-classic
+          config: {
+            weave: {
+              specPath: "./scripts/.cache/service_api_openapi_docs.json",
+              outputDir: "docs/reference/service-api",
+              sidebarOptions: {
+                groupPathsBy: 'tag',
+                sidebarCollapsed: false,
+              }
+            } satisfies OpenApiPlugin.Options,
+          }
+        },
+      ],
+      'docusaurus-plugin-sass',
+  ],
+
+  themes: [
+    [require.resolve("@easyops-cn/docusaurus-search-local"), ({
+      // https://github.com/easyops-cn/docusaurus-search-local?tab=readme-ov-file
+      docsRouteBasePath: "/",
+    })],
+    "docusaurus-theme-openapi-docs", 
   ],
 
   themeConfig: {
@@ -84,14 +113,55 @@ const config: Config = {
         },
         {
           type: "docSidebar",
-          sidebarId: "apiReferenceSidebar",
+          sidebarId: "notebookSidebar",
           position: "left",
-          label: "API Reference",
+          label: "Cookbooks",
         },
         {
-          href: "https://github.com/wandb/weave",
-          label: "GitHub",
-          position: "right",
+          position: "left",
+          label: "Reference",
+          type: "dropdown",
+          items: [
+            {
+              type: "docSidebar",
+              sidebarId: "pythonSdkSidebar",
+              label: "Python SDK",
+            },
+            // Keeping this hidden until we want to "release" the service API
+            // TODOs before release:
+            // 1. Put behind a "v1" endpoint - ??
+            //
+            // {
+            //   type: "docSidebar",
+            //   sidebarId: "serviceApiSidebar",
+            //   label: "Service API",
+            // },
+          ]
+        },
+        {
+          position: "left",
+          label: "Open Source",
+          type: "dropdown",
+          items: [
+            {
+              href: "https://github.com/wandb/weave",
+              label: "GitHub",
+            },
+            {
+              href: "https://github.com/wandb/weave/releases",
+              label: "Release Changelog",
+            },
+          ]
+        },
+        {
+          type: 'search',
+          position: 'right',
+        },
+        {
+          to: 'https://wandb.ai/home',
+          label: 'Open App',
+          position: 'right',
+          className: 'button button--secondary button--med margin-right--sm',
         },
       ],
     },

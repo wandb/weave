@@ -32,7 +32,7 @@ pytest-recording==0.13.1
 vcrpy==6.0.1
 
 # Integration Vendors
-mistralai>=0.1.8            # MistralAI
+mistralai>=0.1.8, <1.0.0    # MistralAI
 litellm>=1.36.1             # LiteLLM
 llama-index>=0.10.35        # LlamaIndex
 anthropic>=0.18.0           # Anthropic
