@@ -443,9 +443,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         calls = []
         for row in query_result:
             call_dict = {k: v for k, v in zip(select_columns, row)}
+            # convert json dump fields into json
             for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):
                     call_dict[json_field] = json.loads(call_dict[json_field])
+            # convert empty string display_names to None
+            if "display_name" in call_dict and call_dict["display_name"] == "":
+                call_dict["display_name"] = None
+            # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
                 if mfield.is_required() and col not in call_dict:
                     if isinstance(mfield.annotation, str):
