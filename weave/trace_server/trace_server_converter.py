@@ -51,6 +51,9 @@ def universal_ext_to_int_ref_converter(
             if obj.startswith(weave_prefix):
                 return typing.cast(B, replace_ref(obj))
             elif obj.startswith(weave_internal_prefix):
+                # It is important to raise here as this would be the result of
+                # an external client attempting to write internal refs directly.
+                # We want to maintain full control over the internal refs.
                 raise ValueError("Encountered internal ref in external data.")
         return obj
 
@@ -103,6 +106,12 @@ def universal_int_to_ext_ref_converter(
             if obj.startswith(weave_internal_prefix):
                 return typing.cast(D, replace_ref(obj))
             elif obj.startswith(weave_prefix):
+                # It is important to raise here as this would be the result of
+                # incorrectly storing an external ref at the database layer,
+                # rather than an internal ref. There is a possibility in the
+                # future that a programming error leads to this situation, in
+                # which case reading this object would consistently fail. We
+                # might want to instead return a private ref in this case.
                 raise ValueError("Encountered external ref in internal data.")
         return obj
 
