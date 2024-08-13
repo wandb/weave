@@ -302,6 +302,8 @@ const MainPeekingLayout: FC = () => {
 
   useMousetrap('esc', closePeek);
 
+  const widthPxl = (drawerWidthPct * windowSize.width) / 100;
+
   return (
     <WFDataModelAutoProvider
       entityName={params.entity!}
@@ -328,9 +330,7 @@ const MainPeekingLayout: FC = () => {
             marginRight: !isDrawerOpen
               ? 0
               : // subtract the sidebar width
-                `${
-                  (drawerWidthPct * (windowSize.width - SIDEBAR_WIDTH)) / 100
-                }px`,
+                `${widthPxl}px`,
           }}>
           <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
         </Box>
@@ -345,7 +345,7 @@ const MainPeekingLayout: FC = () => {
               overflow: 'hidden',
               display: isDrawerOpen ? 'flex' : 'none',
               zIndex: 1,
-              width: `${drawerWidthPct}%`,
+              width: `${widthPxl}px`,
               height: '100%',
               boxShadow: '0px 0px 40px 0px rgba(0, 0, 0, 0.16)',
               borderLeft: 0,
