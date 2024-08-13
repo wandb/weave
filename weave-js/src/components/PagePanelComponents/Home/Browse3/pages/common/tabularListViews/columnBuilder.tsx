@@ -9,10 +9,7 @@ import React from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../../react';
 import {ErrorBoundary} from '../../../../../../ErrorBoundary';
-import {
-  flattenObject,
-  flattenObjectTypeAware,
-} from '../../../../Browse2/browse2Util';
+import {flattenObjectTypeAware} from '../../../../Browse2/browse2Util';
 import {CellValue} from '../../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../../Browse2/ExpandHeader';

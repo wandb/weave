@@ -117,7 +117,12 @@ export const CallDetails: FC<{
             flex: '0 0 auto',
             p: 2,
           }}>
-          <ObjectViewerSection title="Inputs" data={inputs} />
+          <ObjectViewerSection
+            title="Inputs"
+            data={inputs}
+            entity={call.entity}
+            project={call.project}
+          />
         </Box>
         <Box
           sx={{
@@ -132,7 +137,12 @@ export const CallDetails: FC<{
               <ExceptionDetails exceptionInfo={excInfo} />
             </>
           ) : (
-            <ObjectViewerSection title="Outputs" data={output} />
+            <ObjectViewerSection
+              title="Outputs"
+              data={output}
+              entity={call.entity}
+              project={call.project}
+            />
           )}
         </Box>
         {multipleChildCallOpRefs.map(opVersionRef => {

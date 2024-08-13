@@ -222,6 +222,8 @@ const ObjectVersionPageInner: React.FC<{
                       data={viewerDataAsObject}
                       noHide
                       isExpanded
+                      entity={objectVersion.entity}
+                      project={objectVersion.project}
                     />
                   </WeaveCHTableSourceRefContext.Provider>
                 )}

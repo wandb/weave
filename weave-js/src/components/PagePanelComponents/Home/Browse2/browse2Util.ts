@@ -30,7 +30,7 @@ export const flattenObjectTypeAware = (
   result: {[key: string]: any} = {}
 ) => {
   return flattenObject(obj, parentKey, result, (key, value) => {
-    return typeof value !== 'object' || value == null || value['_type'] == null;
+    return typeof value !== 'object' || value == null || value._type == null;
   });
 };
 

@@ -14,6 +14,8 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
+import {isCustomWeaveTypePayload} from '../../type_views/customWeaveType.types';
+import {customWeaveTypeDispatch} from '../../type_views/CustomWeaveTypeView';
 import {isRef} from '../common/util';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
@@ -28,6 +30,8 @@ type ObjectViewerSectionProps = {
   data: Data;
   noHide?: boolean;
   isExpanded?: boolean;
+  entity: string;
+  project: string;
 };
 
 const TitleRow = styled.div`
@@ -214,10 +218,18 @@ export const ObjectViewerSection = ({
   data,
   noHide,
   isExpanded,
+  project,
+  entity,
 }: ObjectViewerSectionProps) => {
-  const numKeys = Object.keys(data).length;
   const currentRef = useContext(WeaveCHTableSourceRefContext);
+  if (isCustomWeaveTypePayload(data)) {
+    const customView = customWeaveTypeDispatch(entity, project, data);
+    if (customView) {
+      return customView;
+    }
+  }
 
+  const numKeys = Object.keys(data).length;
   if (numKeys === 0) {
     return (
       <>
@@ -242,6 +254,8 @@ export const ObjectViewerSection = ({
           data={{Value: value}}
           noHide={noHide}
           isExpanded={isExpanded}
+          project={project}
+          entity={entity}
         />
       );
     }
@@ -296,6 +310,8 @@ export const ObjectViewerSection = ({
       data={data}
       noHide={noHide}
       isExpanded={isExpanded}
+      project={project}
+      entity={entity}
     />
   );
 };
