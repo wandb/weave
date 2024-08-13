@@ -1,30 +1,33 @@
 import importlib
-from typing import Callable, Dict
+from typing import TYPE_CHECKING, Callable, Dict
 
-from google.ai.generativelanguage_v1beta.types.safety import SafetyRating
-from google.generativeai.types.generation_types import GenerateContentResponse
+if TYPE_CHECKING:
+    from google.generativeai.types.generation_types import GenerateContentResponse
 
 import weave
+from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 
 def gemini_accumulator(
-    acc: GenerateContentResponse, value: GenerateContentResponse
-) -> GenerateContentResponse:
+    acc: "GenerateContentResponse", value: "GenerateContentResponse"
+) -> "GenerateContentResponse":
+    if acc is None:
+        acc = value
+    if not acc._done:
+        return value
     for candidate_idx in range(len(value.candidates)):
-        candidate = value.candidates[candidate_idx]
-        for part_idx in range(len(candidate.content.parts)):
+        value_candidate = value.candidates[candidate_idx]
+        for part_idx in range(len(value_candidate.content.parts)):
+            value_part = value_candidate.content.parts[part_idx]
             acc.candidates[candidate_idx].content.parts[
                 part_idx
-            ].text += candidate.content.parts[part_idx].text
-        if isinstance(acc.candidates[candidate_idx].safety_ratings[0], SafetyRating):
-            acc.candidates[candidate_idx].safety_ratings = [
-                value.candidates[candidate_idx].safety_ratings
-            ]
-        else:
-            acc.candidates[candidate_idx].safety_ratings.append(
-                value.candidates[candidate_idx].safety_ratings
-            )
+            ].text += value_part.text
+    acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
+    acc.usage_metadata.candidates_token_count += (
+        value.usage_metadata.candidates_token_count
+    )
+    acc.usage_metadata.total_token_count += value.usage_metadata.total_token_count
     return acc
 
 
@@ -36,7 +39,11 @@ def gemini_wrapper(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
-        return op
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: gemini_accumulator,
+            should_accumulate=should_use_accumulator,
+        )
 
     return wrapper
 
