@@ -19,7 +19,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     return call_output
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -81,7 +81,7 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     assert output.usage.total_tokens == model_usage["total_tokens"] == 416
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -136,7 +136,7 @@ Each of these cheeses offers a unique taste and texture, so the "best" one is a 
     assert output.usage.total_tokens == model_usage["total_tokens"] == 373
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -193,7 +193,7 @@ Each of these cheeses offers a unique taste and texture, so the "best" one depen
     assert output.usage.total_tokens == model_usage["total_tokens"] == 360
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
