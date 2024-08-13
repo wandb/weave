@@ -106,12 +106,7 @@ all_call_insert_columns = list(
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 all_call_json_columns = ("inputs", "output", "attributes", "summary")
-
-required_call_columns = [
-    name
-    for name, field in SelectableCHCallSchema.model_fields.items()
-    if field.is_required()
-]
+required_call_columns = ["id", "project_id", "trace_id", "op_name", "started_at"]
 
 
 # Columns in the calls_merged table with special aggregation functions:
@@ -1330,8 +1325,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         op_name=ch_call.op_name,
         started_at=_ensure_datetimes_have_tz(ch_call.started_at),
         ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
-        attributes=_dict_dump_to_dict(ch_call.attributes_dump),
-        inputs=_dict_dump_to_dict(ch_call.inputs_dump),
+        attributes=_nullable_any_dump_to_any(ch_call.attributes_dump),
+        inputs=_nullable_any_dump_to_any(ch_call.inputs_dump),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
@@ -1351,8 +1346,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         op_name=ch_call_dict.get("op_name"),
         started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
         ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-        attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
-        inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
+        attributes=_nullable_any_dump_to_any(ch_call_dict.get("attributes_dump")),
+        inputs=_nullable_any_dump_to_any(ch_call_dict.get("inputs_dump")),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),

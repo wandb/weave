@@ -379,13 +379,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             conds.append(filter_cond)
 
+        required_columns = ["id", "trace_id", "project_id", "op_name", "started_at"]
         select_columns = list(tsi.CallSchema.model_fields.keys())
         if req.columns:
-            select_columns = [x for x in req.columns if x in select_columns]
-
-        # TODO(gst): allow json fields to be selected
-        select_columns = [col.split(".")[0] for col in select_columns]
-
+            # TODO(gst): allow json fields to be selected
+            simple_columns = [x.split(".")[0] for x in req.columns]
+            select_columns = [x for x in simple_columns if x in select_columns]
+            # add required columns, preserving requested column order
+            select_columns += [
+                rcol for rcol in required_columns if rcol not in select_columns
+            ]
         query = f"SELECT {', '.join(select_columns)} FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
@@ -423,9 +426,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if json_path:
                     field = f"json_extract({field}, '{quote_json_path(json_path)}')"
                 order_parts.append(f"{field} {direction}")
-
-        order_by_part = ", ".join(order_parts)
-        query += f" ORDER BY {order_by_part}"
+            order_by_part = ", ".join(order_parts)
+            query += f" ORDER BY {order_by_part}"
 
         limit = req.limit or -1
         if limit:
@@ -444,6 +446,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):
                     call_dict[json_field] = json.loads(call_dict[json_field])
+            for col, mfield in tsi.CallSchema.model_fields.items():
+                if mfield.is_required() and col not in call_dict:
+                    if isinstance(mfield.annotation, str):
+                        call_dict[col] = ""
+                    elif isinstance(
+                        mfield.annotation, (datetime.datetime, datetime.date)
+                    ):
+                        raise ValueError(f"Field '{col}' is required for selection")
+                    else:
+                        call_dict[col] = {}
             calls.append(tsi.CallSchema(**call_dict))
         return tsi.CallsQueryRes(calls=calls)
 
