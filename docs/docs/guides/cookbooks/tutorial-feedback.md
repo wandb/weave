@@ -10,6 +10,14 @@ hide_table_of_contents: true
 - Call to action
 - Optional: additional code needed to run the example
 
+TODOS: 
+- add specific links to example workspace book
+- shorten intro and movtivation
+- find a way to retrieve call when working with already hosted endpoints (probably most important way for people to use for prod feedb)
+- think about how an actual RagModel would be retrieved from Weave (with a huge vectorstore?)
+- add link to full code at FULL CODE places
+- fix comment adding functionality in bith code examples in cookbook and in test application
+
 # Using Feedback with Weave: User and Expert Feedback to Improve Evaluation
 In order to successfully deploy LLM apps that correspond to the users' expectation it's important to have an evaluation pipeline that produces representative metrics for both the specific user group and the specific set of use-cases. In order to guarantee this we need to continously gather feedback from the user (user group) and domain experts (use-case).
 
@@ -37,7 +45,7 @@ So far we have found that a combination of all three types of feedback is the mo
 
 1. **1st Evaluation (synthetic):**: We use LLM judges to evaluate our RAG chatbot on a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions. 
 2. **2nd Evaluation (user):** We deploy the RAG chatbot to a specific group of users and let them ask some questions and encourage them to give some direct feedback (reaction + notes). We track their reactions as positive and negative rates as live evaluation while it's running in production. 
-3. **3rd Evaluation (expert):** We pull all question-answer-pairs with a negative reaction into an annotation UI and let experts annotate the given answer with help of the given feedback from the user. We save back the new annotated samples as a new version of the existing evaluation dataset and run evaluations again.
+3. **3rd Evaluation (expert):** We pull all question-answer-pairs with a negative reaction into an annotation UI and let experts annotate the given answer with help of the given feedback from the user. We save back the new annotated samples as a new version of the existing evaluation dataset and run the evaluations again.
 
 :::note
 Regardless of the type of feedback generating a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions is a good manner to generate a first representative evaluation dataset (question-answer-sources-pairs) that can be used to evaluate the RAG chatbot before gathering enough production data.
@@ -53,86 +61,64 @@ pip install weave openai streamlit
 ```
 
 ## 1. Gathering User Feedback from Production
+The code discussed in this chapter can be found in `chatbot.py`.
 
 ### 1.1 Tracking Calls in Production
-Here we're going to set up a minimal Streamlit app to serve to our end users. As you can see we only need weave-specific code in two places: 
+There are many different ways to deploy your LLM model into production. In this tutorial we'll show both how to a) deploy our model directly using the Weave model reference (i.e. `weave:///...`) and b) how to work with specific endpoinsts of Weave models that have already been deployed (i.e. `http://...`). 
 
-```TODO: change chatbot and below code```
-
-* retrieving the newest model developed on Weave 
-* adding a decorator to the production function calls (might not even be necessary)
+For both cases we create a very simple chatbot interface using Streamlit that adds some generic functions and chatbot logic that is independant of Weave. The first thing to do in both cases is to initialize Weave (in a cached Streamlit function ideally):
 
 ```python
 import weave
-from openai import OpenAI
-import streamlit as st
-from uuid import uuid4
-
-st.title("Add feedback")
-
-@weave.op
-def chat_response(prompt):
-    stream = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "user", "content": prompt},
-            *[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
-        ],
-        stream=True,
-    )
-    response = st.write_stream(stream)
-    return response
-
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-def display_chat_messages():
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-def get_and_process_prompt():
-    if prompt := st.chat_input("What is up?"):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-    
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            with weave.attributes({'session': 12345}):
-                call = chat_response.call(prompt)
-                st.button(":thumbsup:",   on_click=lambda: call.feedback.add_reaction("👍"), key='up')
-                st.button(":thumbsdown:", on_click=lambda: call.feedback.add_reaction("👎"), key='down')
-                st.session_state.messages.append({"role": "assistant", "content": call.output})
-        
-def init_weave():
-    # highlight-next-line
-    client = weave.init('feedback-example')
-
-def init_chat_history():
-    if "messages" not in st.session_state:
-        st.session_state.messages = st.session_state.messages = []
-
-def main():
-    session_id = str(uuid4())
-    st.session_state['session_id'] = session_id
-    init_weave()
-    init_chat_history()
-    display_chat_messages()
-    get_and_process_prompt()
-
-if __name__ == "__main__":
-    main()
+client = weave.init('wandb-smle/weave-rag-experiments')
 ```
 
-Save this to a file called `chatbot.py`. We can run it with `streamlit run chatbot.py`. 
-Now, you can interact with this application and click the feedback buttons after each response. 
-Visit the Weave UI to see the attached feedback.
+Atfer that we use the model weave URL to retrieve the actual model and serve it as part of our application. In this case our RagModel expects a "query" and a "n_documents" parameter that specifies how mow many documemt chunks should be extracted and ingested into the prompt: 
 
+```python
+import asyncio
+import streamlit as st
 
-### 1.2 User Feedback Collection through App UI
-Again the Weave Feedback API faciliates this greatly. Feedback can be attached directly to the existing production trace using a single line of code. In this case we want to give the user the possibility to add a positive or negatve reaction along with an optional note.
+# download model from Weave - copy & paste from Weave UI
+RagModel = weave.ref("weave:///<your-model-url>").get()
 
-If we consider our decorated prediction function as:
+# generate answer based on prompt and custom input parameters
+data, call = asyncio.run(RagModel.predict.call(prompt, n_documents=2))   
+
+# output parsing, visualizing in streamlit, and add to message history
+response = data['result']['content']
+st.markdown(response)
+st.session_state.messages.append({"role": "assistant", "content": response})
+```
+
+Another option is to work with a given URL endpoint at which the model is already served and listening for requests. A very fast way of doing this is to use the `weave serve <model>` command which will automatically serve the model locally with FastAPI and Uvicorn (see under "Use" tab for every Model in the Weave UI). 
+
+```python
+import requests
+
+# a simple POST request to the predict route of our endpoint
+data = requests.post(
+    "http://<url-to-endpoint>/predict",
+    json={
+        "query": prompt,
+        "n_documents": 2,
+    },
+).json()
+
+# output parsing, visualizing in streamlit, and add to message history
+response = data['result']['result']['content']
+st.markdown(response)
+st.session_state.messages.append({"role": "assistant", "content": response})
+
+```
+
+After putting these function into our full streamlit code we can run the chatbot with `streamlit run chatbot.py`. Check here for the FULL CODE.
+
+### 1.2 User Feedback Collection through Chatbot UI
+Once we hav deployed our newest model and are tracking the live calls in production we can focus on gathering feedback on each of these calls. As mentioned in the introduction our first thought here is to gather feedback directly from the user using our Chatbot app. This can be done very easily with Weave - using the `call` object we already returned in our above tracking functions we can add any type of feedback to any traced function call:
+
+As the basis we consider any prediction function that is decorated with Weave - in this case either the `RagModel.predict` function when getting the Weave model directly or the underlying `predict` function that is called when the already deployed model is called.
+
 ```python
 # highlight-next-line
 @weave.op
@@ -141,47 +127,73 @@ def predict(input_data):
     return some_output
 ```
 
-We can use it as usal to deliver some model response to the user:
+When calling this function as is with `RagModel.predict("What is project Drawdown?")` the generation will be traced and a simple answer text is returned.
 
 ```python
-output = predict(input_data="your data here") # user question through the App UI
+output = predict(query="your data here") # user question through the App UI
 ```
 
-To attach feedback, you need the `call` object, which is obtained by using the `.call()` method:
+To attach feedback, you need the `call` object which is used to reference the specific trace of the generation process for this last question. One way of obtaining the call is by calling the `.call` object specifically instead of just the `predict` function:
 
 ```python
-call = predict.call(input_data="your data here")
+output, call = predict.call(input_data="your data here")
 ```
 
-This call object is needed for attaching feedback to the specific response.
-After making the call, you can access the output of the operation using:
+For the other case where we don't get and download the specific Weave model but assume a already hosted model we'll have to get the call object of the last generation using another function: 
 
 ```python
-output = call.output
+# when inside a decorated function itself
+call = weave.get_current_call() 
+
+# when just sending a POST request to a served Weave model
+# TDOO: <discuss with Scott>
 ```
 
+Once we retrieved the specific call object of the last response we can use it to attach any kind of feedback. In this case we'll limit the feedback to a thumbs-up and thumbs-down and written comments. See the FEEDBACK REF section for more info.
+
 ```python
-call.feedback.add_reaction("👍") # user reaction through the App UI
+# user reaction and comments through Chatbot UI
+
+# genereate response ad visualize assistant answer
+with st.chat_message("assistant"):
+    with weave.attributes({'session': st.session_state['session_id']}):
+        # our call to either of the above-mentioned tracked functions
+        response, call = production_chat_response(model_url, prompt)
+                
+        # add general text feedback field for users to give text feedback
+        st.markdown("Your feedback: ")
+        feedback_text = st.text_input("", placeholder="Type your thoughts...")
+        st.button(":thumbsup:",   on_click=lambda: call.feedback.add_reaction("👍"), key='up')
+        st.button(":thumbsdown:", on_click=lambda: call.feedback.add_reaction("👎"), key='down')
+        st.button("Submit Feedback", on_click=lambda: call.feedback.add_note(feedback_text), key='submit')
+        
+        # save assistant response in general flow of application
+        st.session_state.messages.append({"role": "assistant", "content": response})
 ```
 
 ## 2. Gathering Expert Feedback from Annotation UI
+The code discussed in this chapter can be found in `annotation.py`. 
 
 ### 2.1 Fetch Production Calls based on User Feedback
-To use the user feedback to improve our model, we need to fetch the production calls. However, since there are probably a lot of production calls we only want to retrieve the problematic calls that were rated as bad by the users (the 👎 ones).
+Now that we track our production calls together with specific user feedback we want to use these insights to improve our model. We could filter through all calls with a bad feedback and inspect them manually one-by-one using the Weave UI. Although, this a good manner for first debugging and getting a grasp of specific generations but it's not a scalable manner of continously evaluating our model perforamnces. Hence, in this chapter we'll show how to fetch all bad performing calls, have them annotated/corrected by experts, to then save them as a new version of golden evaluation dataset based on which we calculate quantitaive performance metrics with LLM judges (see introduction).
 
-This can be done very easily in Weave by defining feedback calls with a specific "reaction":
+In order to get all responses that were badly rated by the user we can specifiy a target "reaction":
 ```python
 import weave
-client = weave.init('feedback-example')
+
+# initialize same project as the production tracing project
+client = weave.init('<specific weave project>')
+
 # highlight-next-line
 thumbs_down = client.feedback(reaction="👎")
+# highlight-next-line
 calls = thumbs_down.refs().calls()
 ```
 
 ### 2.2 Expert Feedback through Annotation UI
-Now we only need to display these production calls in a annotation UI for experts to annotate them. This can be done with different specialized tools or in a simple Streamlit app.
+Now we only need to display these production calls in a annotation UI for experts to annotate them. This can be done with different specialized tools (e.g. Argilla) or in a simple Streamlit app.
 
-In the following we have created a simple Streamlite app that extracts the last emoji and comment attached to the trace and displays it along the user query, the model response, and the used source documents.
+In the following we have created a simple Streamlit app that extracts the last emoji and comment attached to the trace and displays it along the user query, the model response, and the used source documents.
 
 ```python 
 import weave
