@@ -1,11 +1,11 @@
 ---
-id: file-content-files-content-post
-title: "File Content"
-description: "File Content"
-sidebar_label: "File Content"
+id: file-create-file-create-post
+title: "File Create"
+description: "File Create"
+sidebar_label: "File Create"
 hide_title: true
 hide_table_of_contents: true
-api: eJyVVE1vGjEQ/SvIZwoU9cSNNIkaqVUQkF4QQsPusDjdXTu2NwSh/e+dsc2ygYa2F1iPn+fjvZk5CAeZFaOFuJc5WrHsCqXRgJOqfEjFSGzIvEpU6bB0Kz7Y5qSVdaIrDL5UaN2NSvdidBDxlj9B61wm3lf/2aqSbTbZYgH8pQ1HcpKihtMzJm4lUz65vUYKbp2RZUYxnHQ5GyYB1aHU6q5IZUaBr+FvA6ImcISoNTuIaUuDKdfeCt54XZ68MDVfQ1lThHSKL+SxbrtwpkJvsFqVNlQ0HAz4L0WbGKmZBHI1q5IErd1UeWcawRTyXzmrfdgvw+Gl45+Qy9Q/69wZo8x/eD1TIkUHMucv6bCwl4BcJe9uodw/bojGcxnqbmORlEmGRtTLkxJgDOxbWn1XIUFWtrDZNVl/EIWQoWicfQz1ZHTmfPu3LuC6QuiIa7XAid7A7sdl3Ab6/hTsCPk2n08uHAZtLSaVkW7v6WTcDVhJdC+WNWXzXnJuy07sS04c3VbxyMa51OC2dOr7oe0nDc6ieUVjfYTKkNBi65y2o37fGUiwt4MyXfdACo54zGfGzRLkb2XV0M4e2LVH0Xnt77kg7rbpaUPcvUGhczyf+JNux5k+NRE1z0b5WMdxBOvGkwcCcx2Bi0Hvc2/AYC6+AN/gJRR4SdM7DpsCHL65vs5B+vbztBwigwu/A21roIiXLXNMV4cDlYpPJq9rNlOdhrWjz1cwEtac8IKbfkuLgwaASf+FBBExo0++NRmeV76dzieVpyi8GNPq0O4qdtlqg8njbE7gddzLhUr5jYEdtz39joTgZc+vva7eRtMNZVbxcI1E8MkqQsVMNGwFebvxvzX5tApa+XlyZDKmx0/UdawH0dSN5VTR1N4TH76fgLU7ZdLWex1NvFTq+jfloVUF
+api: eJylVE2P2jAQ/SvI5yyhq564sR9VV2q1qMv2ghAakgG8TWLXnuwWofz3ztgBQlnYQ09x7Dcz770Ze6sIVl4Np+qLLtCrWaKMRQekTfWQq6Fa8vY8cwiE8+7aGk8qUQ5/1+jpxuQbNdyqzFSEFcmyrAvSFhylS+PKqxwIZNtnayzDyjqpRJqrxr8XzGiuc/mjjUUu7snpasVlSFMhG+OI6jG1Jgnc3kNLQWASaqErcJtOvIhUDYe2IWYh6Vod2mEuTnSotDVmhwyidH7RlEbyH/KRqzFseGsqH8VeDwbyydFnTlvxmjM/1VmG3i/rovejBXP9jqNgbaGz0Jr0xUvMeTtzveK2XLLyLiI+MqNNNDv28DboZZqiljN8vr4+FfQTCp0Hur1754z7DzVIoAtZacLSnwIKkx2dQrV5XDL9f+U3yX5HM5MVOtXMDg6Ac9Adl28mEpRhK/3qkp3fuXWwQrVPdh4azOhN5PQj90VXLN3iOn042BvdPS/jLtr3XrEd5OtkMj5JGHvrMaudpk2wU3A34DXbPZ01zOa45TIbvTgcwhtpbeQRaR8LC7Tmv1SuTJrtUB7dKzof0teOu6zWRNYP05QcZNh/gypf9EErKbcj8ySTEnvfobT3XDJI6oCShyCcixpdLU0A7qYZPI3GDwwWElHFoP+pPxA/hXcJYTQrKPFE4JH4fXHCP5TaAnSYmyBp22qfxveEL0JMwYrW4g0fbLdMEp9d0TSyzc+qE8t5+QpOw0LYTmVW1wg5z63Y9QsZom7jpboKEyXwohYa7z3AMv8xaMSPjaUO/OQ+it37Do4fnyYMXrTvfGlyiZHEIW9yWEaSUIvcvSXR/6T9du4lX9QOh+CBzkYc/MxjIZ6zG0lLuW63urf4bPwYvH8zLu/E23ZLrnzT/AWv92SC
 sidebar_class_name: "post api-method"
 info_path: reference/service-api/fastapi
 custom_edit_url: null
@@ -28,20 +28,20 @@ import TabItem from "@theme/TabItem";
 <Heading
   as={"h1"}
   className={"openapi__heading"}
-  children={"File Content"}
+  children={"File Create"}
 >
 </Heading>
 
 <MethodEndpoint
   method={"post"}
-  path={"/files/content"}
+  path={"/file/create"}
 >
   
 </MethodEndpoint>
 
 
 
-File Content
+File Create
 
 <Heading
   id={"request"}
@@ -55,8 +55,8 @@ File Content
   className={"openapi-tabs__mime"}
 >
   <TabItem
-    label={"application/json"}
-    value={"application/json-schema"}
+    label={"multipart/form-data"}
+    value={"multipart/form-data-schema"}
   >
     <details
       style={{}}
@@ -95,11 +95,11 @@ File Content
           
         </SchemaItem><SchemaItem
           collapsible={false}
-          name={"digest"}
+          name={"file"}
           required={true}
-          schemaName={"Digest (string)"}
+          schemaName={"binary"}
           qualifierMessage={undefined}
-          schema={{"type":"string","title":"Digest"}}
+          schema={{"type":"string","format":"binary","title":"File"}}
         >
           
         </SchemaItem>
@@ -158,9 +158,28 @@ File Content
                     </div><ul
                       style={{"marginLeft":"1rem"}}
                     >
-                      any
+                      <SchemaItem
+                        collapsible={false}
+                        name={"digest"}
+                        required={true}
+                        schemaName={"Digest (string)"}
+                        qualifierMessage={undefined}
+                        schema={{"type":"string","title":"Digest"}}
+                      >
+                        
+                      </SchemaItem>
                     </ul>
                   </details>
+                </TabItem><TabItem
+                  label={"Example (from schema)"}
+                  value={"Example (from schema)"}
+                >
+                  <ResponseSamples
+                    responseExample={"{\n  \"digest\": \"string\"\n}"}
+                    language={"json"}
+                  >
+                    
+                  </ResponseSamples>
                 </TabItem>
               </SchemaTabs>
             </TabItem>
