@@ -1,0 +1,41 @@
+name: upload-frontend-assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: "Version bump type (major, minor, patch)"
+        required: true
+        default: "patch"
+        options:
+          - "major"
+          - "minor"
+          - "patch"
+
+jobs:
+  build-assets:
+    name: Build frontend assets
+    runs-on: ubuntu-8core
+    timeout-minutes: 10
+    environment:
+      name: release
+    permissions:
+      contents: "write"
+      id-token: "write"
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.WANDBMACHINE_GITHUB_TOKEN }}
+          fetch-depth: 0
+      - id: "Setup Git"
+        run: |
+          git config --global user.name 'Weave Build Bot'
+          git config --global user.email weave@wandb.com
+      - id: "Drop Pre-Release"
+        run: |
+          bump-my-version bump pre_l ./weave/version.py --commit
+          git push
+      - id: "Bump the version"
+        run: |
+          bump-my-version bump ${{ github.event.inputs.bump_type }} ./weave/version.py --tag --commit
+          git push

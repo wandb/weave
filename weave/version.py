@@ -6,7 +6,7 @@ specifically the [tool.bumpversion] section:
 
 ```
 [tool.bumpversion]
-current_version = "0.50.14"
+current_version = "0.50.14-dev0"
 ```
 
 We use Semantic Versioning (https://semver.org/). The version number is in the format
@@ -27,13 +27,13 @@ When major, minor, and patch are equal, a pre-release version has lower preceden
 Example: 1.0.0-alpha < 1.0.0.
 ```
 
-The intention is to have a PRERELEASE version of the form of `dev1` for nearly every commit
+The intention is to have a PRERELEASE version of the form of `dev0` for nearly every commit
 on the main branch. However, the released commit will not have a PRERELEASE version. For example:
 
-* Development happens on X.Y.Z-dev1
+* Development happens on X.Y.Z-dev0
 * Release commit bumps the version to >=X.Y.Z, noted X'.Y'.Z', tagging such commit
-* Development continues on (>X.Y.Z)-dev1.
-    * Note: if X' == X, Y' == Y, and Z' == Z, then the version is bumped to X'.Y'.(Z'+1)-dev1. Else, the version is bumped to X'.Y'.Z'-dev1.
+* Development continues on (>X.Y.Z)-dev0.
+    * Note: if X' == X, Y' == Y, and Z' == Z, then the version is bumped to X'.Y'.(Z'+1)-dev0. Else, the version is bumped to X'.Y'.Z'-dev0.
 
 
 This is all facilitated using `make bumpversion` which is a wrapper around `bump-my-version`.
