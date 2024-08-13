@@ -48,12 +48,12 @@ def gemini_wrapper(name: str) -> Callable[[Callable], Callable]:
 gemini_patcher = MultiPatcher(
     [
         SymbolPatcher(
-            lambda: importlib.import_module("google.generativeai"),
+            lambda: importlib.import_module("google.generativeai.generative_models"),
             "GenerativeModel.generate_content",
             gemini_wrapper(name="google.generativeai.GenerativeModel.generate_content"),
         ),
         SymbolPatcher(
-            lambda: importlib.import_module("google.generativeai"),
+            lambda: importlib.import_module("google.generativeai.generative_models"),
             "GenerativeModel.generate_content_async",
             gemini_wrapper(
                 name="google.generativeai.GenerativeModel.generate_content_async"
@@ -69,6 +69,15 @@ gemini_patcher = MultiPatcher(
                 "google.generativeai.types.generation_types"
             ),
             "GenerateContentResponse.from_response",
+            gemini_wrapper(
+                name="google.generativeai.types.generation_types.GenerateContentResponse.from_response"
+            ),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module(
+                "google.generativeai.types.generation_types"
+            ),
+            "AsyncGenerateContentResponse.from_response",
             gemini_wrapper(
                 name="google.generativeai.types.generation_types.GenerateContentResponse.from_response"
             ),
