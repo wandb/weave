@@ -3,53 +3,30 @@ sidebar_position: 2
 hide_table_of_contents: true
 ---
 
-- Motivation
-- Setup
-- Core content explanation
-- One big commented example code
-- Call to action
-- Optional: additional code needed to run the example
-
 TODOS: 
 - add specific links to example workspace book
-- shorten intro and movtivation
 - find a way to retrieve call when working with already hosted endpoints (probably most important way for people to use for prod feedb)
 - think about how an actual RagModel would be retrieved from Weave (with a huge vectorstore?)
 - add link to full code at FULL CODE places
 - fix comment adding functionality in bith code examples in cookbook and in test application
+- add pictures to other sections too
 
 # Using Feedback with Weave: User and Expert Feedback to Improve Evaluation
 In order to successfully deploy LLM apps that correspond to the users' expectation it's important to have an evaluation pipeline that produces representative metrics for both the specific user group and the specific set of use-cases. In order to guarantee this we need to continously gather feedback from the user (user group) and domain experts (use-case).
 
-In this tutorial we'll demonstrate a workflow that we've seen work well for many users. We'll use a custom chatbot as an example app and we'll use a custom annotation UI to gather feedback from the user and domain experts. To simplify the example we'll use Streamlit for both the chatbot app and the annotation UI.
+In this tutorial we'll demonstrate a workflow that we've seen work well for many users. We'll use a custom RAG chatbot as an example app with which the users can interact and which allows us to collect user feedback. We will then expose the hardest questions (as measured by the worst feedback on our model'S answers) to expert annotators to gather corrected responses for these questions. To simplify the example we'll use Streamlit for both the chatbot app and the annotation UI.
 
-### The Process
-Before describing the end-to-end process it's important to consider the different types of feedback that can be gathered:
+# Introduction and Motivation
+Before diving into the specifics of gathering feedback it is first important to understand _why_ we want to gather feedback and _how_ we can use it once we gathered it. The evaluation of Generative AI Apps is difficult - especially if we think about how to evaluate the performance of a Expert RAG Chatbot. Check out the other parts of our Weave Cookbooks for Evaluation for more details but in summary it is hard to evaluate the correctness, relevance, helpfulness, or tone of specific generated answers. 
 
-* **User Feedback:** The user gives direct feedback on the answer of the chatbot. This can be done by only giving a reaction (e.g. thumbs up or thumbs down) or by also writing a note.
+**Direct User Feedback Only** - To circumenvent this problem typically companies first turn to gather direct user feedback and aggregate it as a key performance indicator - are most questions rated as "helpful" or not? This is a good general metrics since it comes from the users themselves and can also be tracked in Weave in live (see GOVERNANCE COOKBOOK) but it is hard to conclude _why_ the model is bad or _how_ it can be improved from just a generic user-rated helpfulness score. It is also hard to tell whether a new model improvement might have caused a spike in helpfulness or whether new, more positive users have joined the platform (or have started to also provide feedback).
 
-    * **Pro**: This gives the most direct signal on the performance of the app since the question and the feedback are directly from the user from the app context.
-    * **Con**: This also gives the noisiest signal since it's subject to the user's mood, the user's understanding of the question, and the user's understanding of the answer. Also it only gives a feedback for the final generation and not for the intermediate steps of the generation process which make it harder to improve specific components of the app (e.g. retrieval or generation of the RAG).
+**Systematic Benchmarking with Evalsets** - To establish a more systematic benchmarking a possible next step is to establish a standard, but evolving evaluation dataset which contains repredentative test cases on which the model should be evaluated. Regardless of how the evaluation dataset is used - we refer to OTHER COOKBOOK REFs for what metrics to calculate and how to align/ground LLLM judges that might be used to evaluate the model on the dataset - the question remains on how do we gather an evaluation dataset that is representative for our users and use-cases? 
 
-* **Expert Feedback:** An expert annotates the answer of the chatbot. This can be done by either requiring only a score or by also writing a note.
-
-    * **Pro**: This gives a more neutral and clear signal on the performance of the app since it's coming from an expert.
-    * **Con**: This might give a less representative signal since it's not from the user actually using the app. Also it's more expensive to collect this feedback since it requires to hire experts/annotators to annotate the data.
-    
-* **Synthetic Feedback:** Using one or multiple LLM judges to evaluate the answer of the chatbot. This can also be done by only giving a score or by also requiring an explanation.
-
-    * **Pro**: This is more cost-effective than annotators and can be done before deploying the app. Also it can be done for multiple LLMs at the same time which can be used to mitigate judge bias.
-    * **Con**: This might give a less representative or hallucinated signal compared to the user or expert feedback.
-
-So far we have found that a combination of all three types of feedback is the most effective way to improve the evaluation pipeline. The following tutorial will guide you through the creation of a systematic evaluation pipeline that uses all three types of feedback with Weave:
-
+In the following we'll discover how we can use user feedback together with expert feedback to continously build a representative evaluation dataset with Weave. In general, we followed these steps to set up our evaluation pipeline for our RAG chatbot:
 1. **1st Evaluation (synthetic):**: We use LLM judges to evaluate our RAG chatbot on a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions. 
 2. **2nd Evaluation (user):** We deploy the RAG chatbot to a specific group of users and let them ask some questions and encourage them to give some direct feedback (reaction + notes). We track their reactions as positive and negative rates as live evaluation while it's running in production. 
 3. **3rd Evaluation (expert):** We pull all question-answer-pairs with a negative reaction into an annotation UI and let experts annotate the given answer with help of the given feedback from the user. We save back the new annotated samples as a new version of the existing evaluation dataset and run the evaluations again.
-
-:::note
-Regardless of the type of feedback generating a synthetic evaluation dataset based on the documents the RAG chatbot is supposed to use as context to answer questions is a good manner to generate a first representative evaluation dataset (question-answer-sources-pairs) that can be used to evaluate the RAG chatbot before gathering enough production data.
-:::
 
 # Implementation
 In this tutorial we'll focus on setting up the user and expert feedback loop so we'll skip the synthetic datset generation step and LLM evaluation step and directly jump to the user and expert feedback steps.
@@ -59,6 +36,7 @@ To follow along this tutorial you'll need to install the following packages:
 ```bash
 pip install weave openai streamlit
 ```
+We'll also use `requests` and `asyncio`. We will refer to the following Weave workspace where we created a `RagModel` from scratch based on a `faiss` vectorstore. Check out THIS WORKSPACE REF and THIS CODEBASE REF for more details.
 
 ## 1. Gathering User Feedback from Production
 The code discussed in this chapter can be found in `chatbot.py`.
@@ -288,3 +266,8 @@ In the following you can a screenshot of the simple annotation UI and of the res
 After gathering new 👎 feedback and annotating it, we can now run our evaluation code again. This time we will use the new version of the evaluation dataset and use the comparison feature to understand how the impact of 👎 calls impacted the model performance. Of course it also makes sense to include positive annotated calls into the dataset to balance evaluation dataset. 
 
 For more information on the evaluation workflow see the [Evaluation](./tutorial-eval.md) tutorial for more details.
+
+# Conclusion
+In this cookbook we learned how to effectively collected feedback from users and experts to create a golden evaluation dataset. We explain how this dataset can be used together with manual human evaluation or automated evaluation with LLM judges to provide a more indication of your model's performance. 
+
+It is as important to continously iterate on your evaluation pipeline as it is to iterate on your actual LLM model - with Weave tracking calls in production, adding variuos types of feedback, and systematically improving the evaluation pipeline is much easier. Give it a try today and run the attached code to build your own RAG Chatbot! ADD URL REF.
