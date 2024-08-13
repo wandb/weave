@@ -1,3 +1,7 @@
+/**
+ * Shared type definitions and utility methods for filtering UI.
+ */
+
 import {
   GridColDef,
   GridColumnGroupingModel,
@@ -113,6 +117,12 @@ const operatorLabels: Record<string, string> = allOperators.reduce(
   },
   {} as Record<string, string>
 );
+
+const VALUELESS_OPERATORS = new Set(['(any): isEmpty', '(any): isNotEmpty']);
+
+export const isValuelessOperator = (operator: string) => {
+  return VALUELESS_OPERATORS.has(operator);
+};
 
 export type SelectOperatorOption = {
   value: string;

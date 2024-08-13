@@ -6,10 +6,10 @@ import {GridFilterItem} from '@mui/x-data-grid-pro';
 import React, {useMemo} from 'react';
 
 import {Button} from '../../../../Button';
+import {FilterId, getFieldType, getOperatorOptions, isWeaveRef} from './common';
 import {SelectField, SelectFieldOption} from './SelectField';
 import {SelectOperator} from './SelectOperator';
 import {SelectValue} from './SelectValue';
-import {FilterId, getFieldType, getOperatorOptions, isWeaveRef} from './types';
 
 type FilterRowProps = {
   item: GridFilterItem;

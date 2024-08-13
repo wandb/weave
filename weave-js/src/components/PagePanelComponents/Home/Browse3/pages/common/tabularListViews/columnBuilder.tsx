@@ -31,7 +31,6 @@ import {
 } from '../../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {isRef} from '../util';
 import {buildTree} from './buildTree';
-import {allOperators} from './operators';
 
 /**
  * This function is responsible for taking the raw data and flattening it
@@ -247,7 +246,6 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       minWidth: 150,
       field: key,
       sortable: columnIsSortable && columnIsSortable(key),
-      filterOperators: allOperators,
       headerName: key,
       renderHeader: () => {
         return (

@@ -10,9 +10,6 @@ import {parseRef} from '../../../../../react';
 import {Timestamp} from '../../../../Timestamp';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../../Browse2/SmallRef';
-import {isValuelessOperator} from '../pages/common/tabularListViews/operators';
-import {FilterTag} from './FilterTag';
-import {IdList} from './IdList';
 import {
   FilterId,
   getFieldLabel,
@@ -20,8 +17,11 @@ import {
   getOperatorLabel,
   getOperatorValueType,
   getStringList,
+  isValuelessOperator,
   isWeaveRef,
-} from './types';
+} from './common';
+import {FilterTag} from './FilterTag';
+import {IdList} from './IdList';
 
 type FilterTagItemProps = {
   item: GridFilterItem;

@@ -43,8 +43,8 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveHeaderExtrasContext,
 } from '../../context';
+import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
-import {getDefaultOperatorForValue} from '../../filters/types';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';

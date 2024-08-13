@@ -5,7 +5,7 @@ import {Select} from '@wandb/weave/components/Form/Select';
 import React from 'react';
 
 import {Tooltip} from '../../../../Tooltip';
-import {SelectOperatorOption} from './types';
+import {SelectOperatorOption} from './common';
 
 type SelectOperatorProps = {
   options: SelectOperatorOption[];

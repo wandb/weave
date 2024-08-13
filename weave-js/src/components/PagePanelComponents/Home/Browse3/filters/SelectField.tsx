@@ -7,7 +7,7 @@ import React from 'react';
 import {components, OptionProps, SingleValueProps} from 'react-select';
 
 import {Tooltip} from '../../../../Tooltip';
-import {getFieldLabel} from './types';
+import {getFieldLabel} from './common';
 
 type FieldOption = {
   readonly value: string;

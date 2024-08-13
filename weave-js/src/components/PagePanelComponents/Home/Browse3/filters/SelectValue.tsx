@@ -8,11 +8,15 @@ import React from 'react';
 import {parseRef} from '../../../../../react';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../../Browse2/SmallRef';
-import {isValuelessOperator} from '../pages/common/tabularListViews/operators';
 import {StyledDateTimePicker} from '../StyledDateTimePicker';
+import {
+  getFieldType,
+  getStringList,
+  isValuelessOperator,
+  isWeaveRef,
+} from './common';
 import {IdList} from './IdList';
 import {TextValue} from './TextValue';
-import {getFieldType, getStringList, isWeaveRef} from './types';
 import {ValueInputBoolean} from './ValueInputBoolean';
 
 type SelectValueProps = {

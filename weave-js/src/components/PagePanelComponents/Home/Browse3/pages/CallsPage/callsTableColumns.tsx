@@ -25,7 +25,6 @@ import {
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
-import {allOperators} from '../common/tabularListViews/operators';
 import {isRef} from '../common/util';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
@@ -326,8 +325,6 @@ function buildCallsTableColumns(
   const startedAtCol: GridColDef<TraceCallSchema> = {
     field: 'started_at',
     headerName: 'Called',
-    // Should have custom timestamp filter here.
-    filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
     sortable: true,
     sortingOrder: ['desc', 'asc'],
     width: 100,

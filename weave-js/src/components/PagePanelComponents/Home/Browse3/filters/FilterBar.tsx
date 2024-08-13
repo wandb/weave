@@ -10,18 +10,18 @@ import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
 import {IconFilterAlt} from '../../../../Icon';
 import {Tailwind} from '../../../../Tailwind';
-import {isValuelessOperator} from '../pages/common/tabularListViews/operators';
 import {ColumnInfo} from '../types';
-import {FilterRow} from './FilterRow';
-import {FilterTagItem} from './FilterTagItem';
-import {GroupedOption, SelectFieldOption} from './SelectField';
 import {
   FIELD_DESCRIPTIONS,
   FilterId,
   getOperatorOptions,
+  isValuelessOperator,
   UNFILTERABLE_FIELDS,
   upsertFilter,
-} from './types';
+} from './common';
+import {FilterRow} from './FilterRow';
+import {FilterTagItem} from './FilterTagItem';
+import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
 type FilterBarProps = {
