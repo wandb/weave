@@ -5,7 +5,7 @@ from weave.weave_client import WeaveClient, get_ref
 
 
 @weave.op
-def build_image(h: int = 100, w: int = 100) -> Image.Image:
+def build_image(h: int = 1024, w: int = 1024) -> Image.Image:
     return Image.new("RGB", (h, w), "purple")
 
 
@@ -38,7 +38,7 @@ def test_image_as_io(client: WeaveClient) -> None:
 
 
 def test_image_publish(client: WeaveClient) -> None:
-    img = Image.new("RGB", (100, 100), "purple")
+    img = Image.new("RGB", (1024, 1024), "purple")
     weave.publish(img)
 
     ref = get_ref(img)
