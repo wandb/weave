@@ -90,7 +90,6 @@ class Traceable:
     def _mark_dirty(self) -> None:
         """Recursively mark this object and its ancestors as dirty and removes their refs."""
         self._is_dirty = True
-        self.ref = None
         if (
             # Written this way to satisfy mypy
             self.parent is not self
