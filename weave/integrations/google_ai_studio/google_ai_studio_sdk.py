@@ -1,5 +1,6 @@
 import importlib
-from typing import TYPE_CHECKING, Callable, Dict
+from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from google.generativeai.types.generation_types import GenerateContentResponse
@@ -31,9 +32,31 @@ def gemini_accumulator(
     return acc
 
 
-def gemini_wrapper(name: str) -> Callable[[Callable], Callable]:
+def gemini_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
+        op.name = name  # type: ignore
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: gemini_accumulator,
+            should_accumulate=lambda inputs: isinstance(inputs, dict)
+            and bool(inputs.get("stream")),
+        )
+
+    return wrapper
+
+
+def gemini_wrapper_async(name: str) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        def _fn_wrapper(fn: Callable) -> Callable:
+            @wraps(fn)
+            async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                return await fn(*args, **kwargs)
+
+            return _async_wrapper
+
+        "We need to do this so we can check if `stream` is used"
+        op = weave.op()(_fn_wrapper(fn))
         op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
@@ -50,26 +73,28 @@ gemini_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("google.generativeai.generative_models"),
             "GenerativeModel.generate_content",
-            gemini_wrapper(name="google.generativeai.GenerativeModel.generate_content"),
+            gemini_wrapper_sync(
+                name="google.generativeai.GenerativeModel.generate_content"
+            ),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("google.generativeai.generative_models"),
             "GenerativeModel.generate_content_async",
-            gemini_wrapper(
+            gemini_wrapper_async(
                 name="google.generativeai.GenerativeModel.generate_content_async"
             ),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("google.generativeai"),
             "GenerativeModel.generate_content",
-            gemini_wrapper(name="google.generativeai.GenerativeModel.start_chat"),
+            gemini_wrapper_sync(name="google.generativeai.GenerativeModel.start_chat"),
         ),
         SymbolPatcher(
             lambda: importlib.import_module(
                 "google.generativeai.types.generation_types"
             ),
             "GenerateContentResponse.from_response",
-            gemini_wrapper(
+            gemini_wrapper_sync(
                 name="google.generativeai.types.generation_types.GenerateContentResponse.from_response"
             ),
         ),
@@ -78,8 +103,8 @@ gemini_patcher = MultiPatcher(
                 "google.generativeai.types.generation_types"
             ),
             "AsyncGenerateContentResponse.from_response",
-            gemini_wrapper(
-                name="google.generativeai.types.generation_types.GenerateContentResponse.from_response"
+            gemini_wrapper_sync(
+                name="google.generativeai.types.generation_types.AsyncGenerateContentResponse.from_response"
             ),
         ),
         SymbolPatcher(
@@ -87,7 +112,7 @@ gemini_patcher = MultiPatcher(
                 "google.ai.generativelanguage_v1beta.services.generative_service.client"
             ),
             "GenerativeServiceClient.generate_content",
-            gemini_wrapper(
+            gemini_wrapper_sync(
                 name="google.ai.generativelanguage_v1beta.services.generative_service.client.GenerativeServiceClient.generate_content"
             ),
         ),
