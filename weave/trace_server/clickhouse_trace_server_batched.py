@@ -760,8 +760,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     continue
 
                 if ref.project_id != project_id_scope:
-                    # This is a programmer error and should never come up, but adding
-                    # this check to be safe
+                    # At some point in the future, we may allow cross-project references.
+                    # However, until then, we disallow this feature. Practically, we
+                    # should never hit this code path since the `resolve_extra` function
+                    # handles this check. However, out of caution, we add this check here.
+                    # Hitting this would be a programming error, not a user error.
                     raise ValueError("Will not resolve cross-project refs.")
 
                 object_id_param_key = "object_id_" + str(ref_index)
@@ -807,8 +810,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 ):
                     parsed_ref = refs_internal.parse_internal_uri(val)
 
-                    # It is not allowed / safe to blindly traverse into a different project
                     if parsed_ref.project_id != project_id_scope:
+                        # This is the primary check to enforce that we do not
+                        # traverse into a different project. It is perfectly
+                        # reasonable to support this functionality in the
+                        # future. At such point in time, we will want to define
+                        # a "check read project" function that the client can
+                        # use to validate that the project is allowed to be
+                        # read. Once this is lifted, other parts of this
+                        # function will need to be updated as well, as they will
+                        # currently `raise ValueError("Will not resolve
+                        # cross-project refs.")` under such conditions.
                         return empty_result
 
                     if isinstance(parsed_ref, refs_internal.InternalObjectRef):
@@ -908,8 +920,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for (project_id, digest), index_digests in table_queries.items():
                 row_digests = [d for i, d in index_digests]
                 if project_id != project_id_scope:
-                    # This is a programmer error and should never come up, but adding
-                    # this check to be safe
+                    # At some point in the future, we may allow cross-project references.
+                    # However, until then, we disallow this feature. Practically, we
+                    # should never hit this code path since the `resolve_extra` function
+                    # handles this check. However, out of caution, we add this check here.
+                    # Hitting this would be a programming error, not a user error.
                     raise ValueError("Will not resolve cross-project refs.")
                 rows = self._table_query(
                     project_id=project_id_scope,
