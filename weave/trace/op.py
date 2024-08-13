@@ -48,7 +48,7 @@ except ImportError:
 try:
     from mistralai.types.basemodel import UNSET as MISTRAL_NOT_GIVEN
 except ImportError:
-    ANTHROPIC_NOT_GIVEN = None
+    MISTRAL_NOT_GIVEN = None
 
 
 def print_call_link(call: "Call") -> None:
