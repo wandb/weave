@@ -31,10 +31,6 @@ def gemini_accumulator(
     return acc
 
 
-def should_use_accumulator(inputs: Dict) -> bool:
-    return isinstance(inputs, dict) and bool(inputs.get("stream"))
-
-
 def gemini_wrapper(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
@@ -42,7 +38,8 @@ def gemini_wrapper(name: str) -> Callable[[Callable], Callable]:
         return add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: gemini_accumulator,
-            should_accumulate=should_use_accumulator,
+            should_accumulate=lambda inputs: isinstance(inputs, dict)
+            and bool(inputs.get("stream")),
         )
 
     return wrapper
