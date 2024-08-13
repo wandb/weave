@@ -1,4 +1,4 @@
-name: upload-frontend-assets
+name: bump-python-sdk-version
 
 on:
   workflow_dispatch:
