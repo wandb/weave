@@ -4,6 +4,10 @@ import weave
 from weave.weave_client import WeaveClient, get_ref
 
 
+class ImageWrapper(weave.Object):
+    img: Image.Image
+
+
 @weave.op
 def build_image(h: int = 1024, w: int = 1024) -> Image.Image:
     return Image.new("RGB", (h, w), "purple")
@@ -60,3 +64,17 @@ def test_image_as_dataset_cell(client: WeaveClient) -> None:
 
     gotten_dataset = weave.ref(ref.uri()).get()
     assert gotten_dataset.rows[0]["img"].tobytes() == img.tobytes()
+
+
+def test_image_as_property(client: WeaveClient) -> None:
+    img = Image.new("RGB", (1024, 1024), "purple")
+    img_wrapper = ImageWrapper(img=img)
+    assert img_wrapper.img == img
+
+    weave.publish(img_wrapper)
+
+    ref = get_ref(img_wrapper)
+    assert ref is not None
+
+    gotten_img_wrapper = weave.ref(ref.uri()).get()
+    assert gotten_img_wrapper.img.tobytes() == img.tobytes()

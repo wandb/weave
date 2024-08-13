@@ -274,8 +274,13 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       renderCell: cellParams => {
         // TODO: get this typing more correct so this is known tp be a string.
         // Hmmm how would this work with expanding refs of a dif project?!
+        // UG THIS IS BAD!
         const projectId = cellParams.row.project_id;
-        const [entity, project] = projectId.split('/');
+        let entity = cellParams.row.obj?.entity ?? '';
+        let project = cellParams.row.obj?.project ?? '';
+        if (projectId != null) {
+          [entity, project] = projectId.split('/');
+        }
         const val = valueForKey(cellParams.row, key);
         if (val === undefined) {
           return <NotApplicable />;
