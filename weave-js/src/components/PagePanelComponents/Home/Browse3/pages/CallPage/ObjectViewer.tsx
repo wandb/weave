@@ -208,8 +208,8 @@ export const ObjectViewer = ({
           contexts.push(...getKnownImageDictContexts(context));
           return 'skip';
         } else if (context.valueType === 'object') {
-          if (isCustomWeaveTypePayload(data)) {
-            contexts.push(context);
+          if (isCustomWeaveTypePayload(context.value)) {
+            // contexts.push(context);
             // console.log('Here', context);
             // return 'skip';
           }
@@ -236,7 +236,7 @@ export const ObjectViewer = ({
     const rowsInner = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
     return {rows: rowsInner};
   }, [resolvedData]);
-
+  console.log({rows});
   // Next, we setup the columns. In our case, there is just one column: Value.
   // In most cases, we just render the generic `ValueView` component. However,
   // in the case that we have an expanded ref, then we want to set the base
@@ -266,6 +266,7 @@ export const ObjectViewer = ({
           }
           let baseRef: string | undefined;
           const path: ObjectPath = row.path;
+          console.log(row);
           if (currentRefContext) {
             baseRef = buildBaseRef(currentRefContext, path, path.length());
           }
@@ -304,6 +305,7 @@ export const ObjectViewer = ({
       hideDescendantCount: true,
       renderCell: params => {
         const refToExpand = params.row.value;
+        console.log(params);
         return (
           <ObjectViewerGroupingCell
             {...params}
