@@ -46,3 +46,17 @@ def test_image_publish(client: WeaveClient) -> None:
     assert ref is not None
     gotten_img = weave.ref(ref.uri()).get()
     assert img.tobytes() == gotten_img.tobytes()
+
+
+def test_image_as_dataset_cell(client: WeaveClient) -> None:
+    img = Image.new("RGB", (1024, 1024), "purple")
+    dataset = weave.Dataset(rows=[{"img": img}])
+    assert dataset.rows[0]["img"] == img
+
+    weave.publish(dataset)
+
+    ref = get_ref(dataset)
+    assert ref is not None
+
+    gotten_dataset = weave.ref(ref.uri()).get()
+    assert gotten_dataset.rows[0]["img"].tobytes() == img.tobytes()

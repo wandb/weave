@@ -846,11 +846,13 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
+        self._save_nested_objects(table.rows)
+        rows = map_to_refs(table.rows)
+        rows = to_json(rows, self._project_id(), self.server)
+
         response = self.server.table_create(
             TableCreateReq(
-                table=TableSchemaForInsert(
-                    project_id=self._project_id(), rows=table.rows
-                )
+                table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             )
         )
         return TableRef(
