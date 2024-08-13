@@ -44,11 +44,13 @@ from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
+    CallsFilter,
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
     EndedCallSchemaForInsert,
     ObjCreateReq,
+    ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
     ObjSchema,
@@ -59,8 +61,6 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
     TraceServerInterface,
-    _CallsFilter,
-    _ObjectVersionFilter,
 )
 
 if typing.TYPE_CHECKING:
@@ -206,7 +206,7 @@ class Call:
         return CallsIter(
             client.server,
             self.project_id,
-            _CallsFilter(parent_ids=[self.id]),
+            CallsFilter(parent_ids=[self.id]),
         )
 
     def delete(self) -> bool:
@@ -230,15 +230,21 @@ class Call:
 
 class CallsIter:
     server: TraceServerInterface
-    filter: _CallsFilter
+    filter: CallsFilter
+    include_costs: bool
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: CallsFilter,
+        include_costs: bool = False,
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
         self._page_size = 1000
+        self.include_costs = include_costs
 
     # seems like this caching should be on the server, but it's here for now...
     @lru_cache
@@ -251,6 +257,7 @@ class CallsIter:
                 filter=self.filter,
                 offset=index * self._page_size,
                 limit=self._page_size,
+                include_costs=self.include_costs,
             )
         )
         return response.calls
@@ -309,7 +316,7 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        summary=server_call.summary,
+        summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,
     )
@@ -461,18 +468,25 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
+    def calls(
+        self,
+        filter: Optional[CallsFilter] = None,
+        include_costs: Optional[bool] = False,
+    ) -> CallsIter:
         if filter is None:
-            filter = _CallsFilter()
+            filter = CallsFilter()
 
-        return CallsIter(self.server, self._project_id(), filter)
+        return CallsIter(
+            self.server, self._project_id(), filter, include_costs or False
+        )
 
     @trace_sentry.global_trace_sentry.watch()
-    def call(self, call_id: str) -> WeaveObject:
+    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
-                filter=_CallsFilter(call_ids=[call_id]),
+                filter=CallsFilter(call_ids=[call_id]),
+                include_costs=include_costs,
             )
         )
         if not response.calls:
@@ -663,6 +677,7 @@ class WeaveClient:
         """Query project for feedback.
 
         Examples:
+            ```python
             # Fetch a specific feedback object.
             # Note that this still returns a collection, which is expected
             # to contain zero or one item(s).
@@ -670,6 +685,7 @@ class WeaveClient:
 
             # Find all feedback objects with a specific reaction.
             client.feedback(reaction="👍", limit=10)
+            ```
 
         Args:
             query: A mongo-style query expression. For convenience, also accepts a feedback UUID string.
@@ -835,17 +851,15 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
+        return self.calls(CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(
-        self, filter: Optional[_ObjectVersionFilter] = None
-    ) -> list[ObjSchema]:
+    def _objects(self, filter: Optional[ObjectVersionFilter] = None) -> list[ObjSchema]:
         if not filter:
-            filter = _ObjectVersionFilter()
+            filter = ObjectVersionFilter()
         else:
             filter = filter.model_copy()
-        filter = typing.cast(_ObjectVersionFilter, filter)
+        filter = typing.cast(ObjectVersionFilter, filter)
         filter.is_op = False
 
         response = self.server.objs_query(
@@ -984,3 +998,6 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
         return tuple(tuple_res)
 
     return obj
+
+
+__docspec__ = [WeaveClient, Call, CallsIter]

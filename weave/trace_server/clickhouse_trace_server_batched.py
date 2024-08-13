@@ -206,10 +206,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         res = self.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
-                filter=tsi._CallsFilter(
+                filter=tsi.CallsFilter(
                     call_ids=[req.id],
                 ),
                 limit=1,
+                include_costs=req.include_costs,
             )
         )
         try:
@@ -250,12 +251,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        cq = CallsQuery(project_id=req.project_id)
+        cq = CallsQuery(
+            project_id=req.project_id, include_costs=req.include_costs or False
+        )
         columns = all_call_select_columns
         if req.columns:
             columns = list(set(required_call_columns + req.columns))
             # TODO: add support for json extract fields
+            # Split out any nested column requests
             columns = [col.split(".")[0] for col in columns]
+
+        # We put summary_dump last so that when we compute the costs and summary its in the right place
+        if req.include_costs:
+            columns = [
+                *[col for col in columns if col != "summary_dump"],
+                "summary_dump",
+            ]
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -302,7 +313,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=tsi._CallsFilter(
+                    filter=tsi.CallsFilter(
                         call_ids=req.call_ids,
                     ),
                 )
@@ -314,7 +325,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=tsi._CallsFilter(
+                    filter=tsi.CallsFilter(
                         trace_ids=[p.trace_id for p in parents],
                     ),
                 )
@@ -714,9 +725,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
-                defaultdict(list)
-            )
+            refs_by_project_id: dict[
+                str, list[refs_internal.InternalObjectRef]
+            ] = defaultdict(list)
             for ref in refs:
                 refs_by_project_id[ref.project_id].append(ref)
             for project_id, project_refs in refs_by_project_id.items():
@@ -1398,7 +1409,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
-        summary_dump=_dict_value_to_dump(end_call.summary),
+        summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(end_call.output),
     )

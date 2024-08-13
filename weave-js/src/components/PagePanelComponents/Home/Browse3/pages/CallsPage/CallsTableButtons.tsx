@@ -7,7 +7,9 @@ import {
   DraggableHandle,
 } from '@wandb/weave/components/DraggablePopups';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
+import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import classNames from 'classnames';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
@@ -44,6 +46,9 @@ export const ExportSelector = ({
   rightmostButton?: boolean;
 }) => {
   const [selectionState, setSelectionState] = useState<SelectionState>('all');
+  const [downloadLoading, setDownloadLoading] = useState<ContentType | null>(
+    null
+  );
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -64,6 +69,10 @@ export const ExportSelector = ({
   );
 
   const onClickDownload = (contentType: ContentType) => {
+    if (downloadLoading) {
+      return;
+    }
+    setDownloadLoading(contentType);
     lowLevelFilter.callIds =
       selectionState === 'selected' ? selectedCalls : undefined;
     // TODO(gst): allow specifying offset
@@ -89,6 +98,7 @@ export const ExportSelector = ({
       const fileName = `weave_export_${callQueryParams.project}_${date}.${fileExtension}`;
       initiateDownloadFromBlob(blob, fileName);
       setAnchorEl(null);
+      setDownloadLoading(null);
     });
     setSelectionState('all');
   };
@@ -130,7 +140,8 @@ export const ExportSelector = ({
               <div className="flex items-center pb-8">
                 {selectedCalls.length === 0 ? (
                   <div className="flex-auto text-xl font-semibold">
-                    Export ({numTotalCalls})
+                    Export (
+                    {Math.min(numTotalCalls, MAX_EXPORT).toLocaleString()})
                   </div>
                 ) : (
                   <div className="flex-auto text-xl font-semibold">Export</div>
@@ -144,7 +155,10 @@ export const ExportSelector = ({
                   setSelectionState={setSelectionState}
                 />
               )}
-              <DownloadGrid onClickDownload={onClickDownload} />
+              <DownloadGrid
+                onClickDownload={onClickDownload}
+                downloadLoading={downloadLoading}
+              />
             </DraggableHandle>
           </div>
         </Tailwind>
@@ -193,32 +207,46 @@ const SelectionCheckboxes: FC<{
 
 const ClickableOutlinedCardWithIcon: FC<{
   iconName: IconName;
+  downloadLoading: boolean;
+  disabled: boolean;
   onClick: () => void;
-}> = ({iconName, children, onClick}) => (
+}> = ({iconName, children, downloadLoading, disabled, onClick}) => (
   <div
-    className="flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16 hover:bg-moon-100"
-    onClick={onClick}>
-    <div className="mr-4 rounded-2xl bg-moon-200 p-4">
-      <Icon size="xlarge" color="moon" name={iconName} />
-    </div>
+    className={classNames(
+      'flex w-full cursor-pointer items-center rounded-md border border-moon-200 p-16 hover:bg-moon-100',
+      disabled ? 'bg-moon-100 hover:cursor-default' : ''
+    )}
+    onClick={!disabled ? onClick : undefined}>
+    {downloadLoading ? (
+      <Loading size={28} className="mr-4" />
+    ) : (
+      <div className="mr-4 rounded-2xl bg-moon-200 p-4">
+        <Icon size="xlarge" color="moon" name={iconName} />
+      </div>
+    )}
     <div className="ml-4">{children}</div>
   </div>
 );
 
 const DownloadGrid: FC<{
+  downloadLoading: ContentType | null;
   onClickDownload: (contentType: ContentType) => void;
-}> = ({onClickDownload}) => {
+}> = ({downloadLoading, onClickDownload}) => {
   return (
     <>
       <div className="mt-12 flex items-center">
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
+          downloadLoading={downloadLoading === ContentType.csv}
+          disabled={downloadLoading !== null}
           onClick={() => onClickDownload(ContentType.csv)}>
           Export to CSV
         </ClickableOutlinedCardWithIcon>
         <div className="ml-8" />
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
+          downloadLoading={downloadLoading === ContentType.tsv}
+          disabled={downloadLoading !== null}
           onClick={() => onClickDownload(ContentType.tsv)}>
           Export to TSV
         </ClickableOutlinedCardWithIcon>
@@ -226,12 +254,16 @@ const DownloadGrid: FC<{
       <div className="mt-8 flex items-center">
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
+          downloadLoading={downloadLoading === ContentType.jsonl}
+          disabled={downloadLoading !== null}
           onClick={() => onClickDownload(ContentType.jsonl)}>
           Export to JSONL
         </ClickableOutlinedCardWithIcon>
         <div className="ml-8" />
         <ClickableOutlinedCardWithIcon
           iconName="export-share-upload"
+          downloadLoading={downloadLoading === ContentType.json}
+          disabled={downloadLoading !== null}
           onClick={() => onClickDownload(ContentType.json)}>
           Export to JSON
         </ClickableOutlinedCardWithIcon>

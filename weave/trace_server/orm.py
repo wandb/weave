@@ -222,7 +222,7 @@ class Select:
     _project_id: typing.Optional[str]
     _fields: typing.Optional[list[str]]
     _query: typing.Optional[tsi.Query]
-    _order_by: typing.Optional[typing.List[tsi._SortBy]]
+    _order_by: typing.Optional[typing.List[tsi.SortBy]]
     _limit: typing.Optional[int]
     _offset: typing.Optional[int]
     _group_by: typing.Optional[list[str]]
@@ -261,7 +261,7 @@ class Select:
         self._query = query
         return self
 
-    def order_by(self, order_by: typing.Optional[typing.List[tsi._SortBy]]) -> "Select":
+    def order_by(self, order_by: typing.Optional[typing.List[tsi.SortBy]]) -> "Select":
         if order_by:
             for o in order_by:
                 assert o.direction in (

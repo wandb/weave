@@ -37,8 +37,6 @@ import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
-import {parseRef} from '../../../../../../react';
-import {LoadingDots} from '../../../../../LoadingDots';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveHeaderExtrasContext,
@@ -64,12 +62,8 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {
-  CallSchema,
-  OpVersionKey,
-} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
-import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
@@ -83,6 +77,7 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
+import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
@@ -903,31 +898,6 @@ const useParentIdOptions = (
       )})`,
     };
   }, [parentCall.loading, parentCall.result]);
-};
-
-type OpVersionIndexTextProps = {
-  opVersionRef: string;
-};
-
-export const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
-  const {useOpVersion} = useWFHooks();
-  const ref = parseRef(opVersionRef);
-  let opVersionKey: OpVersionKey | null = null;
-  if ('weaveKind' in ref && ref.weaveKind === 'op') {
-    opVersionKey = {
-      entity: ref.entityName,
-      project: ref.projectName,
-      opId: ref.artifactName,
-      versionHash: ref.artifactVersion,
-    };
-  }
-  const opVersion = useOpVersion(opVersionKey);
-  if (opVersion.loading) {
-    return <LoadingDots />;
-  }
-  return opVersion.result ? (
-    <span>v{opVersion.result.versionIndex}</span>
-  ) : null;
 };
 
 // Get the tail of the peekPath (ignore query params)

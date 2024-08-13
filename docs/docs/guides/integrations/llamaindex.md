@@ -31,7 +31,7 @@ In the example above, we are creating a simple LlamaIndex chat engine which unde
 
 ## Tracing
 
-LlamaIndex is known for it's ease of connecting data with LLM. A simple RAG application requires an embedding step, retrieval step and a response synthesis step. With the increasing complexity, it becomes important to store traces of individual steps in a central database during both development and production. 
+LlamaIndex is known for its ease of connecting data with LLM. A simple RAG application requires an embedding step, retrieval step and a response synthesis step. With the increasing complexity, it becomes important to store traces of individual steps in a central database during both development and production.
 
 These traces are essential for debugging and improving your application. Weave automatically tracks all calls made through the LlamaIndex library, including prompt templates, LLM calls, tools, and agent steps. You can view the traces in the Weave web interface.
 
@@ -68,7 +68,7 @@ Our integration leverages this capability of LlamaIndex and automatically sets [
 
 Organizing and evaluating LLMs in applications for various use cases is challenging with multiple components, such as prompts, model configurations, and inference parameters. Using the [`weave.Model`](/guides/core-types/models), you can capture and organize experimental details like system prompts or the models you use, making it easier to compare different iterations.
 
-The following example demonstrates building a LlamaIndex query engine in a `WeaveModel`:
+The following example demonstrates building a LlamaIndex query engine in a `WeaveModel`, using data that can be found in the [weave/data](https://github.com/wandb/weave/tree/master/data) folder:
 
 ```python
 import weave
@@ -84,7 +84,7 @@ You are given with relevant information about Paul Graham. Answer the user query
 
 User Query: {query_str}
 Context: {context_str}
-Answer: 
+Answer:
 """
 
 # highlight-next-line
@@ -123,11 +123,12 @@ class SimpleRAGPipeline(weave.Model):
             llm=llm,
             text_qa_template=prompt_template,
         )
+
 # highlight-next-line
     @weave.op()
     def predict(self, query: str):
-        llm = self.get_llm()
         query_engine = self.get_query_engine(
+            # This data can be found in the weave repo under data/paul_graham
             "data/paul_graham",
         )
         response = query_engine.query(query)
@@ -144,7 +145,6 @@ print(response)
 This `SimpleRAGPipeline` class subclassed from `weave.Model` organizes the important parameters for this RAG pipeline. Decorating the `query` method with `weave.op()` allows for tracing.
 
 [![llamaindex_model.png](imgs/llamaindex_model.png)](https://wandb.ai/wandbot/test-llamaindex-weave/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fwandbot%2Ftest-llamaindex-weave%2Fcalls%2Fa82afbf4-29a5-43cd-8c51-603350abeafd%3Ftracetree%3D1)
-
 
 ## Doing Evaluation with `weave.Evaluation`
 
