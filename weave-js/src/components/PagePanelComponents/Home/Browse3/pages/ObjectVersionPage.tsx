@@ -207,7 +207,7 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Values',
           content: (
-            <ScrollableTabContent sx={{pb: 0}}>
+            <ScrollableTabContent>
               <Box
                 sx={{
                   flex: '0 0 auto',
