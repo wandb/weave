@@ -60,7 +60,6 @@ export function prepareFlattenedDataForTable<T>(
 ): Array<T & {[key: string]: string}> {
   return data.map(r => {
     // First, flatten the inner object
-    console.log(r);
     let flattened = flattenObjectTypeAware(r ?? {});
 
     flattened = replaceTableRefsInFlattenedData(flattened);
