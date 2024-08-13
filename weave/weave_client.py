@@ -5,15 +5,7 @@ import sys
 import typing
 import uuid
 from functools import lru_cache
-from typing import (
-    Any,
-    Dict,
-    Iterator,
-    Optional,
-    Sequence,
-    TypedDict,
-    Union,
-)
+from typing import Any, Dict, Iterator, Optional, Sequence, TypedDict, Union
 
 import pydantic
 from requests import HTTPError
@@ -23,20 +15,10 @@ from weave.client_context import weave_client as weave_client_context
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
-from weave.trace.object_record import (
-    ObjectRecord,
-    dataclass_object_record,
-    pydantic_object_record,
-)
+from weave.trace.object_record import ObjectRecord, make_object_record
 from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import (
-    CallRef,
-    ObjectRef,
-    OpRef,
-    Ref,
-    TableRef,
-)
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
@@ -128,12 +110,15 @@ def map_to_refs(obj: Any) -> Any:
 
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
-    elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
-        obj_record = pydantic_object_record(obj)
-        return obj_record.map_values(map_to_refs)
+    elif isinstance(obj, pydantic.BaseModel):
+        d = obj.model_dump()
+        return {k: map_to_refs(v) for k, v in d.items()}
+    elif isinstance(obj, pydantic.v1.BaseModel):
+        d = obj.dict()
+        return {k: map_to_refs(v) for k, v in d.items()}
     elif dataclasses.is_dataclass(obj):
-        obj_record = dataclass_object_record(obj)
-        return obj_record.map_values(map_to_refs)
+        d = dataclasses.asdict(obj)
+        return {k: map_to_refs(v) for k, v in d.items()}
     elif isinstance(obj, Table):
         return obj.ref
     elif isinstance(obj, WeaveTable):
@@ -799,14 +784,12 @@ class WeaveClient:
                 return
             remove_ref(obj)
 
-        if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
-            obj_rec = pydantic_object_record(obj)
-            for v in obj_rec.__dict__.values():
-                self._save_nested_objects(v)
-            ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
-            obj.__dict__["ref"] = ref
-        elif dataclasses.is_dataclass(obj):
-            obj_rec = dataclass_object_record(obj)
+        # TODO: This import here is awkward but necessary...
+        # may warrant refactor in future...
+        from weave.flow.obj import Object
+
+        if isinstance(obj, Object):
+            obj_rec = make_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
