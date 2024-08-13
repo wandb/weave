@@ -41,7 +41,7 @@ IconCell.displayName = 'S.IconCell';
 
 const Text = styled.code`
   font-size: 0.7em;
-  white-space: pre-line;
+  white-space: break-spaces;
   overflow: auto;
   text-overflow: ellipsis;
 `;

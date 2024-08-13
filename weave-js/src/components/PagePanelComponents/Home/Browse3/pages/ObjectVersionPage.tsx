@@ -26,6 +26,8 @@ import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
+import {TabUsePrompt} from './TabUsePrompt';
+import {KNOWN_BASE_OBJECT_CLASSES} from './wfReactInterface/constants';
 import {useWFHooks} from './wfReactInterface/context';
 import {
   objectVersionKeyToRefUri,
@@ -33,8 +35,10 @@ import {
 } from './wfReactInterface/utilities';
 import {
   CallSchema,
+  KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
+import {PromptPage} from './PromptPage/PromptPage';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
@@ -82,15 +86,14 @@ const ObjectVersionPageInner: React.FC<{
   });
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
-    if (objectVersion.baseObjectClass === 'Dataset') {
-      return 'Dataset';
-    }
-    if (objectVersion.baseObjectClass === 'Model') {
-      return 'Model';
-    }
-    return null;
+    const s = objectVersion.baseObjectClass;
+    return KNOWN_BASE_OBJECT_CLASSES.includes(s as KnownBaseObjectClassType)
+      ? (s as KnownBaseObjectClassType)
+      : null;
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
+
+  const showPromptTab = baseObjectClass === 'Prompt';
 
   const producingCalls = useCalls(entityName, projectName, {
     outputObjectVersionRefs: [refUri],
@@ -206,6 +209,27 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        ...(showPromptTab
+          ? [
+              {
+                label: 'Prompt',
+                content: (
+                  <Box sx={{p: 2}}>
+                    {data.loading ? (
+                      <CenteredAnimatedLoader />
+                    ) : (
+                      <PromptPage
+                        entity={entityName}
+                        project={projectName}
+                        data={viewerDataAsObject}
+                      />
+                    )}
+                  </Box>
+                ),
+              },
+            ]
+          : []),
+
         {
           label: 'Values',
           content: (
@@ -236,22 +260,31 @@ const ObjectVersionPageInner: React.FC<{
         },
         {
           label: 'Use',
-          content:
-            baseObjectClass === 'Dataset' ? (
-              <TabUseDataset
-                name={objectName}
-                uri={refUri}
-                versionIndex={objectVersionIndex}
-              />
-            ) : baseObjectClass === 'Model' ? (
-              <TabUseModel
-                name={objectName}
-                uri={refUri}
-                projectName={projectName}
-              />
-            ) : (
-              <TabUseObject name={objectName} uri={refUri} />
-            ),
+          content: (
+            <ScrollableTabContent>
+              {baseObjectClass === 'Prompt' ? (
+                <TabUsePrompt
+                  name={objectName}
+                  uri={refUri}
+                  projectName={projectName}
+                />
+              ) : baseObjectClass === 'Dataset' ? (
+                <TabUseDataset
+                  name={objectName}
+                  uri={refUri}
+                  versionIndex={objectVersionIndex}
+                />
+              ) : baseObjectClass === 'Model' ? (
+                <TabUseModel
+                  name={objectName}
+                  uri={refUri}
+                  projectName={projectName}
+                />
+              ) : (
+                <TabUseObject name={objectName} uri={refUri} />
+              )}
+            </ScrollableTabContent>
+          ),
         },
 
         // {

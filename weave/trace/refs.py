@@ -68,6 +68,15 @@ class ObjectRef(RefWithExtra):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
+    def objectify(self, obj: Any) -> Any:
+        """Convert back to higher level object."""
+        class_name = getattr(obj, "_class_name", None)
+        if "Prompt" == class_name:
+            from weave.flow.prompt import Prompt
+
+            return Prompt.from_obj(obj)
+        return obj
+
     def get(self) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
@@ -77,21 +86,20 @@ class ObjectRef(RefWithExtra):
 
         gc = get_weave_client()
         if gc is not None:
-            return gc.get(self)
+            return self.objectify(gc.get(self))
 
         # Special case: If the user is attempting to fetch an object but has not
         # yet initialized the client, we can initialize a client to
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
-        if gc is None:
-            init_client = init_weave(
-                f"{self.entity}/{self.project}", ensure_project_exists=False
-            )
-            try:
-                res = init_client.client.get(self)
-            finally:
-                init_client.reset()
-            return res
+        init_client = init_weave(
+            f"{self.entity}/{self.project}", ensure_project_exists=False
+        )
+        try:
+            res = init_client.client.get(self)
+        finally:
+            init_client.reset()
+        return self.objectify(res)
 
     def is_descended_from(self, potential_ancestor: "ObjectRef") -> bool:
         if self.entity != potential_ancestor.entity:
