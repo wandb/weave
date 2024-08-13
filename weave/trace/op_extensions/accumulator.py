@@ -13,6 +13,8 @@ from typing import (
     Union,
 )
 
+import rich
+
 from weave.trace.op import FinishCallbackType, Op
 
 S = TypeVar("S")
@@ -126,7 +128,8 @@ _OnCloseType = Callable[[], None]
 
 class _IteratorWrapper(Generic[V]):
     """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
-    that this class will be helpful in other contexts and might be moved to a more general location in the future."""
+    that this class will be helpful in other contexts and might be moved to a more general location in the future.
+    """
 
     def __init__(
         self,
@@ -157,6 +160,12 @@ class _IteratorWrapper(Generic[V]):
         return self
 
     def __next__(self) -> Generator[None, None, V]:
+        try:
+            self._iterator = iter(self._iterator)
+        except TypeError:
+            raise TypeError(
+                f"Cannot iterate over object of type {type(self._iterator)}"
+            )
         if not hasattr(self._iterator, "__next__"):
             raise TypeError(
                 f"Cannot call next on an iterator of type {type(self._iterator)}"
