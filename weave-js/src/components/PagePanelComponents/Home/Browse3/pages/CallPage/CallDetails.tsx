@@ -82,9 +82,14 @@ export const CallDetails: FC<{
     [call]
   );
 
-  const childCalls = useCalls(call.entity, call.project, {
-    parentIds: [call.callId],
-  });
+  const childCalls = useCalls(
+    call.entity,
+    call.project,
+    {
+      parentIds: [call.callId],
+    },
+    100
+  );
 
   const {singularChildCalls, multipleChildCallOpRefs} = useMemo(
     () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
