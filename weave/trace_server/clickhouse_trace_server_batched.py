@@ -128,14 +128,6 @@ required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 ObjRefListType = list[refs_internal.InternalObjectRef]
 
 
-def make_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
-    return f"{ref.project_id}/{ref.name}/{ref.version}"
-
-
-def make_obj_cache_key(obj: SelectableCHObjSchema) -> str:
-    return f"{obj.project_id}/{obj.object_id}/{obj.digest}"
-
-
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     def __init__(
         self,
@@ -727,6 +719,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Lookup data for each project, scoped to each project
         final_result_cache: typing.Dict[str, typing.Any] = {}
+
+        def make_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
+            return ref.uri()
+
         for project in refs_by_project_id:
             project_refs = refs_by_project_id[project]
             project_results = self._refs_read_batch_within_project(
@@ -744,6 +740,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> list[typing.Any]:
         root_val_cache: typing.Dict[str, typing.Any] = {}
 
+        def make_root_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
+            return f"{ref.project_id}/{ref.name}/{ref.version}"
+
+        def make_obj_cache_key(obj: SelectableCHObjSchema) -> str:
+            return f"{obj.project_id}/{obj.object_id}/{obj.digest}"
+
         def get_object_refs_root_val(
             refs: list[refs_internal.InternalObjectRef],
         ) -> typing.Any:
@@ -754,7 +756,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if ref.version == "latest":
                     raise ValueError("Reading refs with `latest` is not supported")
 
-                cache_key = make_ref_cache_key(ref)
+                cache_key = make_root_ref_cache_key(ref)
 
                 if cache_key in root_val_cache:
                     continue
@@ -785,7 +787,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 for obj in objs:
                     root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
-            return [root_val_cache.get(make_ref_cache_key(ref), None) for ref in refs]
+            return [
+                root_val_cache.get(make_root_ref_cache_key(ref), None) for ref in refs
+            ]
 
         # Represents work left to do for resolving a ref
         @dataclasses.dataclass
