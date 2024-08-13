@@ -38,6 +38,7 @@ class Dataset(Object):
         ```
     """
 
+    # rows: Union[weave.Table, WeaveTable]
     rows: weave.Table
 
     @field_validator("rows", mode="before")
@@ -66,6 +67,7 @@ class Dataset(Object):
         return rows
 
     def __eq__(self, other: Any) -> bool:
+        print(f"Doing comparison {self.rows=} {other=}")
         return self.rows == other
 
     def __iadd__(self, rows: list[dict]) -> "Dataset":

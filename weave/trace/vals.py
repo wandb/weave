@@ -90,7 +90,11 @@ class Traceable:
         """Recursively mark this object and its ancestors as dirty and removes their refs."""
         self._is_dirty = True
         self.ref = None
-        if self.parent is not self and self.parent is not None:
+        if (
+            self.parent is not self
+            and self.parent is not None
+            and hasattr(self.parent, "_mark_dirty")
+        ):
             self.parent._mark_dirty()
 
     def add_mutation(
@@ -500,6 +504,7 @@ def make_trace_obj(
         val_ref = val.ref
         if not isinstance(val_ref, TableRef):
             val_table_ref = getattr(val, "table_ref", None)
+            print(f"{val_table_ref=}")
             if not isinstance(val_table_ref, TableRef):
                 raise InternalError(
                     "Expected Table.ref or Table.table_ref to be TableRef"
@@ -555,10 +560,10 @@ def make_trace_obj(
             # TODO: This may evolve into a registry of classes that can be
             # instantiated from ObjectRecords.
             res = WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
-            if getattr(val, "_class_name", None) == "Dataset":
+            if traceable_is(res, cls_name="Dataset"):
                 from weave.flow.dataset import Dataset
 
-                return Dataset(rows=res.rows)
+                return Dataset(rows=res.rows, ref=new_ref, name=new_ref.name)
             return res
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
@@ -617,3 +622,7 @@ def _table_append(self: WeaveTable, row: dict) -> None:
 
 def _table_pop(self: WeaveTable, index: int) -> None:
     self.rows.pop(index)
+
+
+def traceable_is(val: Any, *, cls_name: str) -> bool:
+    return getattr(val, "_class_name", None) == cls_name

@@ -4,6 +4,8 @@ from typing import Any, Optional
 from pydantic import (
     BaseModel,
     ConfigDict,
+    Field,
+    PrivateAttr,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
     model_validator,
@@ -17,6 +19,9 @@ from weave.weave_client import get_ref
 class Object(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    ref: Optional[ObjectRef] = Field(None, init=False, exclude=True)
+    parent: Optional["Object"] = Field(None, init=False, exclude=True)
+    _is_dirty: bool = PrivateAttr(False)
 
     # Allow Op attributes
     model_config = ConfigDict(
@@ -81,6 +86,16 @@ class Object(BaseModel):
             if not k.startswith("__") and isinstance(getattr(self, k), Op):
                 op = getattr(self, k)
                 op.__dict__["call"] = partial(call, op, self)
+
+    def _mark_dirty(self) -> None:
+        self._is_dirty = True
+        self.ref = None
+        if (
+            self.parent is not self
+            and self.parent is not None
+            and hasattr(self.parent, "_mark_dirty")
+        ):
+            self.parent._mark_dirty()
 
 
 # Enable ref tracking for Weave.Object

@@ -721,6 +721,7 @@ def test_saved_nested_modellike(client):
     async def call_model(c, input):
         return await c.call(input)
 
+    print(f"{model2=}")
     c = C(b=model2, z=1)
     assert asyncio.run(call_model(c, 5)) == 4
 
@@ -728,6 +729,10 @@ def test_saved_nested_modellike(client):
 def test_dataset_rows_ref(client):
     dataset = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
     saved = client.save(dataset, "my-dataset")
+    print(f"{object.__getattribute__(saved, 'rows')=}")
+    print(f"{saved=}")
+    print(f"{saved.rows=}")
+    print(f"{saved.rows.ref=}")
     assert isinstance(saved.rows.ref, weave_client.ObjectRef)
     assert saved.rows.ref.name == "my-dataset"
     assert saved.rows.ref.extra == (OBJECT_ATTR_EDGE_NAME, "rows")
