@@ -18,7 +18,6 @@ import {
 } from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
-import {Loading} from '@wandb/weave/components/Loading';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import _ from 'lodash';
@@ -45,7 +44,6 @@ import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
-// import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
   baseContext,
   browse2Context,
@@ -95,7 +93,6 @@ import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
-  useProjectHasTraceServerData,
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
@@ -411,23 +408,8 @@ const MainPeekingLayout: FC = () => {
 const ProjectRedirect: FC = () => {
   const {entity, project} = useParams<Browse3ProjectMountedParams>();
   const {baseRouter} = useWeaveflowRouteContext();
-
-  const projectHasTraceServerData = useProjectHasTraceServerData(
-    entity,
-    project
-  );
-  if (projectHasTraceServerData.loading) {
-    return <Loading centered />;
-  }
-  // TODO: If we have no data, perhaps better to show a quickstart.
-  // const shouldRedirect = projectHasTraceServerData.result;
-  const shouldRedirect = true;
-  if (shouldRedirect) {
-    const url = baseRouter.tracesUIUrl(entity, project);
-    return <Redirect to={url} />;
-  }
-
-  return null;
+  const url = baseRouter.tracesUIUrl(entity, project);
+  return <Redirect to={url} />;
 };
 
 const Browse3ProjectRoot: FC<{
