@@ -290,7 +290,11 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
               onAddFilter={onAddFilter}
               field={key}
               operation={null}
-              value={val}>
+              value={val}
+              style={{
+                width: '100%',
+                height: '100%',
+              }}>
               {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
             into `CellValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
             Table-specific data structure and we might not want to leak that into the
