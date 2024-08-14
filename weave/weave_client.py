@@ -3,17 +3,8 @@ import datetime
 import platform
 import sys
 import typing
-import uuid
 from functools import lru_cache
-from typing import (
-    Any,
-    Dict,
-    Iterator,
-    Optional,
-    Sequence,
-    TypedDict,
-    Union,
-)
+from typing import Any, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
 from requests import HTTPError
@@ -30,13 +21,7 @@ from weave.trace.object_record import (
 )
 from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import (
-    CallRef,
-    ObjectRef,
-    OpRef,
-    Ref,
-    TableRef,
-)
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
@@ -71,13 +56,6 @@ if typing.TYPE_CHECKING:
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
-
-
-class ValueFilter(TypedDict, total=False):
-    id: uuid.UUID
-    ref: Ref
-    type: str
-    val: dict
 
 
 def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
@@ -150,11 +128,6 @@ def map_to_refs(obj: Any) -> Any:
         return map_to_refs(obj._val)
 
     return obj
-
-
-@dataclasses.dataclass
-class Dataset:
-    rows: list[Any]
 
 
 @dataclasses.dataclass
