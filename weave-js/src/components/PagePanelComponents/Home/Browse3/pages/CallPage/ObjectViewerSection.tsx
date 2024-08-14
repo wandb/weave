@@ -94,6 +94,8 @@ const ObjectViewerSectionNonEmpty = ({
   data,
   noHide,
   isExpanded,
+  entity,
+  project,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
   const [mode, setMode] = useState('collapsed');
@@ -103,6 +105,8 @@ const ObjectViewerSectionNonEmpty = ({
     if (mode === 'collapsed' || mode === 'expanded') {
       return (
         <ObjectViewer
+          entity={entity}
+          project={project}
           apiRef={apiRef}
           data={data}
           isExpanded={mode === 'expanded'}
@@ -123,7 +127,7 @@ const ObjectViewerSectionNonEmpty = ({
       );
     }
     return null;
-  }, [apiRef, mode, data, expandedIds]);
+  }, [mode, entity, project, apiRef, data, expandedIds]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {

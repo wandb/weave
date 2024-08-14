@@ -13,7 +13,11 @@ import _ from 'lodash';
 import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {
+  isWeaveObjectRef,
+  parseRef,
+  WeaveObjectRef,
+} from '../../../../../../react';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
 import {
@@ -52,6 +56,11 @@ export const WeaveCHTable: FC<{
   const fetchQuery = useValueOfRefUri(props.tableRefUri, {
     limit: MAX_ROWS + 1,
   });
+
+  const parsedRef = useMemo(
+    () => parseRef(props.tableRefUri) as WeaveObjectRef,
+    [props.tableRefUri]
+  );
 
   // Determines if the table itself is truncated
   const isTruncated = useMemo(() => {
@@ -105,6 +114,8 @@ export const WeaveCHTable: FC<{
       displayKey="val"
       onLinkClick={onClickEnabled ? onClick : undefined}
       fullHeight={props.fullHeight}
+      entity={parsedRef.entityName}
+      project={parsedRef.projectName}
     />
   );
 };
@@ -112,6 +123,8 @@ export const WeaveCHTable: FC<{
 // This is a general purpose table view that can be used to render any data.
 export const DataTableView: FC<{
   data: Array<{[key: string]: any}>;
+  entity: string;
+  project: string;
   fullHeight?: boolean;
   loading?: boolean;
   displayKey?: string;
@@ -248,8 +261,24 @@ export const DataTableView: FC<{
         ),
       });
     }
-    return [...res, ...typeToDataGridColumnSpec(objectType, isPeeking, true)];
-  }, [props.onLinkClick, props.data, objectType, isPeeking]);
+    return [
+      ...res,
+      ...typeToDataGridColumnSpec(
+        props.entity,
+        props.project,
+        objectType,
+        isPeeking,
+        true
+      ),
+    ];
+  }, [
+    props.onLinkClick,
+    props.entity,
+    props.project,
+    props.data,
+    objectType,
+    isPeeking,
+  ]);
 
   // Finally, we do some math to determine the height of the table.
   const isSingleColumn =
@@ -337,6 +366,8 @@ export const DataTableView: FC<{
 };
 
 export const typeToDataGridColumnSpec = (
+  entity: string,
+  project: string,
   type: Type,
   isPeeking?: boolean,
   disableEdits?: boolean,
@@ -348,6 +379,8 @@ export const typeToDataGridColumnSpec = (
     return Object.entries(propertyTypes).flatMap(([key, valueType]) => {
       const innerKey = parentKey ? `${parentKey}.${key}` : key;
       const valTypeCols = typeToDataGridColumnSpec(
+        entity,
+        project,
         valueType,
         undefined,
         undefined,
@@ -394,7 +427,13 @@ export const typeToDataGridColumnSpec = (
             headerName: innerKey,
             renderCell: params => {
               const data = params.row[innerKey];
-              return <CellValue value={data ?? ''} />;
+              return (
+                <CellValue
+                  value={data ?? ''}
+                  entity={entity}
+                  project={project}
+                />
+              );
             },
           },
         ];

@@ -24,8 +24,8 @@ type ValueData = Record<string, any>;
 type ValueViewProps = {
   data: ValueData;
   isExpanded: boolean;
-  entity?: string;
-  project?: string;
+  entity: string;
+  project: string;
 };
 
 export const ValueView = ({
@@ -40,7 +40,9 @@ export const ValueView = ({
       return <SmallRef objRef={parseRef(data.value._ref)} />;
     }
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
-      return <DataTableView data={data.value} />;
+      return (
+        <DataTableView data={data.value} entity={entity} project={project} />
+      );
     }
     return null;
   }

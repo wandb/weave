@@ -47,6 +47,8 @@ type Data = Record<string, any>;
 type ObjectViewerProps = {
   apiRef: React.MutableRefObject<GridApiPro>;
   data: Data;
+  entity: string;
+  project: string;
   isExpanded: boolean;
   expandedIds: GridRowId[];
   setExpandedIds: Dispatch<SetStateAction<GridRowId[]>>;
@@ -72,6 +74,8 @@ export const ObjectViewer = ({
   isExpanded,
   expandedIds,
   setExpandedIds,
+  entity,
+  project,
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
@@ -289,7 +293,14 @@ export const ObjectViewer = ({
             }
           }
 
-          const colInner = <ValueView data={row} isExpanded={isExpanded} />;
+          const colInner = (
+            <ValueView
+              data={row}
+              isExpanded={isExpanded}
+              entity={entity}
+              project={project}
+            />
+          );
           if (baseRef) {
             return (
               <WeaveCHTableSourceRefContext.Provider value={baseRef}>
@@ -301,7 +312,7 @@ export const ObjectViewer = ({
         },
       },
     ];
-  }, [currentRefContext, expandedRefs, isExpanded]);
+  }, [currentRefContext, entity, expandedRefs, isExpanded, project]);
 
   // Here, we setup the `Path` column which acts as a grouping column. This
   // column is responsible for showing the expand/collapse icons and handling
