@@ -30,6 +30,18 @@ const customWeaveTypeRegistry: {
   },
 };
 
+/**
+ * This context is used to provide the entity and project to the
+ * CustomWeaveTypeDispatcher. Importantly, what this does is allows the
+ * developer to inject an entity/project context around some component tree, and
+ * then any CustomWeaveTypeDispatchers within that tree will be assumed to be
+ * within that entity/project context. This is far cleaner than passing
+ * entity/project down through the tree. We just have to remember in the future
+ * case when we support multiple entities/projects in the same tree, we will
+ * need to update this context if you end up traversing into a different
+ * entity/project. This should already be accounted for in all the current
+ * use-cases.
+ */
 export const CustomWeaveTypeProjectContext = React.createContext<{
   entity: string;
   project: string;

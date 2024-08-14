@@ -284,7 +284,6 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
             </CellFilterWrapper>
           );
         }
-        // cellParams.row
         return (
           <ErrorBoundary>
             <CellFilterWrapper
