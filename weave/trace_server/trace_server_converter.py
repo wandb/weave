@@ -62,7 +62,7 @@ def universal_ext_to_int_ref_converter(
                 # It is important to raise here as this would be the result of
                 # an external client attempting to write internal refs directly.
                 # We want to maintain full control over the internal refs.
-                raise InvalidExternalRef("Invalid ref format.")
+                raise InvalidExternalRef("Encountered unexpected ref format.")
         return obj
 
     return _map_values(obj, mapper)
