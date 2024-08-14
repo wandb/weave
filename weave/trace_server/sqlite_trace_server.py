@@ -417,6 +417,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     field = "attributes_dump" + field[len("attributes") :]
                 elif field.startswith("summary"):
                     field = "summary_dump" + field[len("summary") :]
+
                 assert direction in [
                     "ASC",
                     "DESC",
@@ -426,6 +427,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if json_path:
                     field = f"json_extract({field}, '{quote_json_path(json_path)}')"
                 order_parts.append(f"{field} {direction}")
+
             order_by_part = ", ".join(order_parts)
             query += f" ORDER BY {order_by_part}"
 
@@ -439,7 +441,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         cursor.execute(query)
 
         query_result = cursor.fetchall()
-        print("QUERY RESULT", query_result)
         calls = []
         for row in query_result:
             call_dict = {k: v for k, v in zip(select_columns, row)}

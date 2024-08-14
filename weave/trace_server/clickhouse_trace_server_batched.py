@@ -251,6 +251,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         columns = all_call_select_columns
         if req.columns:
+            # Set columns to user-requested columns, w/ required columns
+            # These are all formatted by the CallsQuery, which prevents injection
+            # and other attack vectors.
             columns = list(set(required_call_columns + req.columns))
             # TODO: add support for json extract fields
             # Split out any nested column requests
@@ -1325,8 +1328,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         op_name=ch_call.op_name,
         started_at=_ensure_datetimes_have_tz(ch_call.started_at),
         ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
-        attributes=_nullable_any_dump_to_any(ch_call.attributes_dump or "{}"),
-        inputs=_nullable_any_dump_to_any(ch_call.inputs_dump or "{}"),
+        attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
+        inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
@@ -1346,8 +1349,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         op_name=ch_call_dict.get("op_name"),
         started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
         ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-        attributes=_nullable_any_dump_to_any(ch_call_dict.get("attributes_dump", "{}")),
-        inputs=_nullable_any_dump_to_any(ch_call_dict.get("inputs_dump", "{}")),
+        attributes=_dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
+        inputs=_dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),
