@@ -8,7 +8,7 @@ export type CustomWeaveTypePayload<
   };
   files: FP;
   load_op?: string | CustomWeaveTypePayload<'Op', {'obj.py': string}>;
-};
+} & {[extra: string]: any};
 
 export const isCustomWeaveTypePayload = (
   data: any

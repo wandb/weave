@@ -174,10 +174,21 @@ export const ObjectViewer = ({
          * weave type. In the event that a custom type has both properties AND
          * custom views, then we might need to extend / modify this part.
          */
+        const refBackingData = context.value?._ref;
+        let depth = context.depth;
+        let path = context.path;
+        if (refBackingData) {
+          contexts.push({
+            ...context,
+            isExpandableRef: true,
+          });
+          depth += 1;
+          path = context.path.plus('');
+        }
         contexts.push({
-          depth: context.depth,
+          depth,
           isLeaf: true,
-          path: context.path,
+          path,
           value: context.value,
           valueType: context.valueType,
         });
@@ -245,6 +256,7 @@ export const ObjectViewer = ({
     const rowsInner = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
     return {rows: rowsInner};
   }, [resolvedData]);
+  console.log({rows});
 
   // Next, we setup the columns. In our case, there is just one column: Value.
   // In most cases, we just render the generic `ValueView` component. However,

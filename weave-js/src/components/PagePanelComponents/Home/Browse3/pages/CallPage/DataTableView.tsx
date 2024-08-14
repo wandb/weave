@@ -18,7 +18,7 @@ import {
   parseRef,
   WeaveObjectRef,
 } from '../../../../../../react';
-import {flattenObject} from '../../../Browse2/browse2Util';
+import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
 import {
   useWeaveflowCurrentRouteContext,
@@ -146,7 +146,7 @@ export const DataTableView: FC<{
       if (val == null) {
         return {};
       } else if (typeof val === 'object' && !Array.isArray(val)) {
-        return flattenObject(val);
+        return flattenObjectPreservingWeaveTypes(val);
       }
       return {'': val};
     });
