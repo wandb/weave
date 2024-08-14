@@ -56,40 +56,25 @@ export const CustomWeaveTypeDispatcher: React.FC<
   CustomWeaveTypeDispatcherProps
 > = ({data, entity, project}) => {
   const projectContext = React.useContext(CustomWeaveTypeProjectContext);
-  const comp = maybeGetComponentForCustomWeaveTypeData(data);
+  const typeId = data.weave_type.type;
+  const comp = customWeaveTypeRegistry[typeId]?.component;
   const defaultReturn = <span>Custom Weave Type: {data.weave_type.type}</span>;
 
   if (comp) {
-    const useEntity = entity || projectContext?.entity;
-    const useProject = project || projectContext?.project;
-    if (useEntity == null || useProject == null) {
+    const applicableEntity = entity || projectContext?.entity;
+    const applicableProject = project || projectContext?.project;
+    if (applicableEntity == null || applicableProject == null) {
       console.warn(
         'CustomWeaveTypeDispatch: entity and project must be provided in context or as props'
       );
       return defaultReturn;
     }
     return React.createElement(comp, {
-      entity: useEntity,
-      project: useProject,
+      entity: applicableEntity,
+      project: applicableProject,
       data,
     });
   }
 
   return defaultReturn;
-};
-
-const maybeGetComponentForCustomWeaveTypeData = (
-  data: CustomWeaveTypePayload
-): React.FC<{
-  entity: string;
-  project: string;
-  data: any;
-}> | null => {
-  const typeId = data.weave_type.type;
-  const comp = customWeaveTypeRegistry[typeId];
-  if (comp) {
-    return comp.component;
-  }
-
-  return null;
 };

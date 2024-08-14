@@ -256,7 +256,6 @@ export const ObjectViewer = ({
     const rowsInner = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
     return {rows: rowsInner};
   }, [resolvedData]);
-  console.log({rows});
 
   // Next, we setup the columns. In our case, there is just one column: Value.
   // In most cases, we just render the generic `ValueView` component. However,
