@@ -90,7 +90,10 @@ def set_servers(raw_json):
 def main():
     raw_json = get_raw_json()
     safe_for_docs_json = apply_doc_fixes(raw_json)
-    safe_for_docs_json = set_servers(safe_for_docs_json)
+
+    # This will not work until we host on our own server.
+    # safe_for_docs_json = set_servers(safe_for_docs_json)
+
     with open("./scripts/.cache/service_api_openapi_docs.json", "w") as f:
         json.dump(safe_for_docs_json, f, indent=2)
 
