@@ -329,7 +329,9 @@ const MainPeekingLayout: FC = () => {
             overflow: 'hidden',
             display: 'flex',
             // This transition is from the mui drawer component, to keep the main content animation in similar
-            transition: 'width 225ms cubic-bezier(0, 0, 0.2, 1) 0ms',
+            transition: !isDrawerOpen
+              ? 'width 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
+              : 'none',
           }}>
           <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
         </Box>
