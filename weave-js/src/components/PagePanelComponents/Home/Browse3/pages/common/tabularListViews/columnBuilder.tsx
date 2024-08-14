@@ -16,6 +16,7 @@ import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../Browse2/SmallRef';
 import {CellFilterWrapper} from '../../../filters/CellFilterWrapper';
+import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '../../../typeViews/CustomWeaveTypeDispatcher';
 import {
   OBJECT_ATTR_EDGE_NAME,
@@ -32,7 +33,6 @@ import {
 } from '../../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {isRef} from '../util';
 import {buildTree} from './buildTree';
-import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
 
 /**
  * This function is responsible for taking the raw data and flattening it

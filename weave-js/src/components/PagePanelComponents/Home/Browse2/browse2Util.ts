@@ -11,14 +11,17 @@ export const flattenObjectPreservingWeaveTypes = (obj: {
   });
 };
 
-
 const flattenObject = (
   obj: {[key: string]: any},
   parentKey: string = '',
   result: {[key: string]: any} = {},
   shouldFlatten: (key: string, value: any) => boolean = () => true
 ) => {
-  if (typeof obj !== 'object' || obj === null || !shouldFlatten(parentKey, obj)) {
+  if (
+    typeof obj !== 'object' ||
+    obj === null ||
+    !shouldFlatten(parentKey, obj)
+  ) {
     return obj;
   }
   const keys = Object.keys(obj);
@@ -29,7 +32,10 @@ const flattenObject = (
     const newKey = parentKey ? `${parentKey}.${key}` : key;
     if (Array.isArray(obj[key])) {
       result[newKey] = obj[key];
-    } else if (typeof obj[key] === 'object' && shouldFlatten(newKey, obj[key])) {
+    } else if (
+      typeof obj[key] === 'object' &&
+      shouldFlatten(newKey, obj[key])
+    ) {
       flattenObject(obj[key], newKey, result, shouldFlatten);
     } else {
       result[newKey] = obj[key];
