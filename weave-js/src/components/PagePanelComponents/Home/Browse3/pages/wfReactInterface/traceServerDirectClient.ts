@@ -327,6 +327,7 @@ export class DirectTraceServerClient {
         } else if (responseReturnType === 'json') {
           return response.json();
         } else {
+          // Should never happen with correct type checking
           throw new Error('Invalid responseReturnType: ' + responseReturnType);
         }
       })
