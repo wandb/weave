@@ -122,6 +122,8 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 # Let's just make everything required for now ... can optimize when we implement column selection
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
+ObjRefListType = list[refs_internal.InternalObjectRef]
+
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     def __init__(
@@ -703,16 +705,43 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
+        # First, parse the refs
         parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
+
+        # Business logic to ensure that we don't have raw TableRefs (not allowed)
         if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
-        parsed_refs = typing.cast(
-            typing.List[refs_internal.InternalObjectRef], parsed_raw_refs
-        )
+        parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
 
-        root_val_cache: typing.Dict[str, typing.Any] = {}
+        # Next, group the refs by project_id
+        refs_by_project_id: dict[str, ObjRefListType] = defaultdict(list)
+        for ref in parsed_refs:
+            refs_by_project_id[ref.project_id].append(ref)
+
+        # Lookup data for each project, scoped to each project
+        final_result_cache: typing.Dict[str, typing.Any] = {}
 
         def make_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
+            return ref.uri()
+
+        for project in refs_by_project_id:
+            project_refs = refs_by_project_id[project]
+            project_results = self._refs_read_batch_within_project(
+                project, refs_by_project_id[project]
+            )
+            for ref, result in zip(project_refs, project_results):
+                final_result_cache[make_ref_cache_key(ref)] = result
+
+        # Return the final data payload
+        vals = [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
+        return tsi.RefsReadBatchRes(vals=vals)
+
+    def _refs_read_batch_within_project(
+        self, project_id_scope: str, parsed_refs: ObjRefListType
+    ) -> list[typing.Any]:
+        root_val_cache: typing.Dict[str, typing.Any] = {}
+
+        def make_root_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
             return f"{ref.project_id}/{ref.name}/{ref.version}"
 
         def make_obj_cache_key(obj: SelectableCHObjSchema) -> str:
@@ -723,40 +752,45 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) -> typing.Any:
             conds = []
             parameters = {}
-            refs_by_project_id: dict[str, list[refs_internal.InternalObjectRef]] = (
-                defaultdict(list)
-            )
-            for ref in refs:
-                refs_by_project_id[ref.project_id].append(ref)
-            for project_id, project_refs in refs_by_project_id.items():
-                for ref_index, ref in enumerate(project_refs):
-                    if ref.version == "latest":
-                        raise ValueError("Reading refs with `latest` is not supported")
 
-                    cache_key = make_ref_cache_key(ref)
+            for ref_index, ref in enumerate(refs):
+                if ref.version == "latest":
+                    raise ValueError("Reading refs with `latest` is not supported")
 
-                    if cache_key in root_val_cache:
-                        continue
+                cache_key = make_root_ref_cache_key(ref)
 
-                    object_id_param_key = "object_id_" + str(ref_index)
-                    version_param_key = "version_" + str(ref_index)
-                    conds.append(
-                        f"object_id = {{{object_id_param_key}: String}} AND digest = {{{version_param_key}: String}}"
-                    )
-                    parameters[object_id_param_key] = ref.name
-                    parameters[version_param_key] = ref.version
+                if cache_key in root_val_cache:
+                    continue
 
-                if len(conds) > 0:
-                    conditions = [combine_conditions(conds, "OR")]
-                    objs = self._select_objs_query(
-                        project_id, conditions=conditions, parameters=parameters
-                    )
-                    for obj in objs:
-                        root_val_cache[make_obj_cache_key(obj)] = json.loads(
-                            obj.val_dump
-                        )
+                if ref.project_id != project_id_scope:
+                    # At some point in the future, we may allow cross-project references.
+                    # However, until then, we disallow this feature. Practically, we
+                    # should never hit this code path since the `resolve_extra` function
+                    # handles this check. However, out of caution, we add this check here.
+                    # Hitting this would be a programming error, not a user error.
+                    raise ValueError("Will not resolve cross-project refs.")
 
-            return [root_val_cache[make_ref_cache_key(ref)] for ref in refs]
+                object_id_param_key = "object_id_" + str(ref_index)
+                version_param_key = "version_" + str(ref_index)
+                conds.append(
+                    f"object_id = {{{object_id_param_key}: String}} AND digest = {{{version_param_key}: String}}"
+                )
+                parameters[object_id_param_key] = ref.name
+                parameters[version_param_key] = ref.version
+
+            if len(conds) > 0:
+                conditions = [combine_conditions(conds, "OR")]
+                objs = self._select_objs_query(
+                    project_id=project_id_scope,
+                    conditions=conditions,
+                    parameters=parameters,
+                )
+                for obj in objs:
+                    root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
+
+            return [
+                root_val_cache.get(make_root_ref_cache_key(ref), None) for ref in refs
+            ]
 
         # Represents work left to do for resolving a ref
         @dataclasses.dataclass
@@ -767,13 +801,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             unresolved_table_ref: typing.Optional[refs_internal.InternalTableRef]
             val: typing.Any
 
-        def resolve_extra(extra: list[str], val: typing.Any) -> typing.Any:
+        def resolve_extra(extra: list[str], val: typing.Any) -> PartialRefResult:
             for extra_index in range(0, len(extra), 2):
+                empty_result = PartialRefResult(
+                    remaining_extra=[],
+                    unresolved_obj_ref=None,
+                    unresolved_table_ref=None,
+                    val=None,
+                )
                 op, arg = extra[extra_index], extra[extra_index + 1]
                 if isinstance(val, str) and val.startswith(
                     refs_internal.WEAVE_INTERNAL_SCHEME + "://"
                 ):
                     parsed_ref = refs_internal.parse_internal_uri(val)
+
+                    if parsed_ref.project_id != project_id_scope:
+                        # This is the primary check to enforce that we do not
+                        # traverse into a different project. It is perfectly
+                        # reasonable to support this functionality in the
+                        # future. At such point in time, we will want to define
+                        # a "check read project" function that the client can
+                        # use to validate that the project is allowed to be
+                        # read. Once this is lifted, other parts of this
+                        # function will need to be updated as well, as they will
+                        # currently `raise ValueError("Will not resolve
+                        # cross-project refs.")` under such conditions.
+                        return empty_result
+
                     if isinstance(parsed_ref, refs_internal.InternalObjectRef):
                         return PartialRefResult(
                             remaining_extra=extra[extra_index:],
@@ -789,12 +843,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             val=val,
                         )
                 if val is None:
-                    return PartialRefResult(
-                        remaining_extra=[],
-                        unresolved_obj_ref=None,
-                        unresolved_table_ref=None,
-                        val=None,
-                    )
+                    return empty_result
                 if op == refs_internal.DICT_KEY_EDGE_NAME:
                     val = val.get(arg)
                 elif op == refs_internal.OBJECT_ATTR_EDGE_NAME:
@@ -802,7 +851,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 elif op == refs_internal.LIST_INDEX_EDGE_NAME:
                     index = int(arg)
                     if index >= len(val):
-                        return None
+                        return empty_result
                     val = val[index]
                 else:
                     raise ValueError(f"Unknown ref type: {extra[extra_index]}")
@@ -875,8 +924,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Make the queries
             for (project_id, digest), index_digests in table_queries.items():
                 row_digests = [d for i, d in index_digests]
+                if project_id != project_id_scope:
+                    # At some point in the future, we may allow cross-project references.
+                    # However, until then, we disallow this feature. Practically, we
+                    # should never hit this code path since the `resolve_extra` function
+                    # handles this check. However, out of caution, we add this check here.
+                    # Hitting this would be a programming error, not a user error.
+                    raise ValueError("Will not resolve cross-project refs.")
                 rows = self._table_query(
-                    project_id=project_id,
+                    project_id=project_id_scope,
                     digest=digest,
                     conditions=["digest IN {digests: Array(String)}"],
                     parameters={"digests": row_digests},
@@ -898,7 +954,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         extra_result.remaining_extra, extra_result.val
                     )
 
-        return tsi.RefsReadBatchRes(vals=[r.val for r in extra_results])
+        return [r.val for r in extra_results]
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)

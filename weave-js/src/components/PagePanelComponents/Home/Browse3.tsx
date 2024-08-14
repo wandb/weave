@@ -11,13 +11,13 @@ import {
 } from '@mui/material';
 import {
   GridColumnVisibilityModel,
+  GridFilterModel,
   GridPaginationModel,
   GridPinnedColumns,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
-import {Loading} from '@wandb/weave/components/Loading';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import _ from 'lodash';
@@ -44,7 +44,6 @@ import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
-// import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
   baseContext,
   browse2Context,
@@ -58,6 +57,7 @@ import {
   WeaveflowPeekContext,
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
+import {getValidFilterModel} from './Browse3/grid/filters';
 import {
   DEFAULT_PAGE_SIZE,
   getValidPaginationModel,
@@ -71,6 +71,7 @@ import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
   DEFAULT_COLUMN_VISIBILITY_CALLS,
+  DEFAULT_FILTER_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
 } from './Browse3/pages/CallsPage/CallsTable';
@@ -92,7 +93,6 @@ import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
-  useProjectHasTraceServerData,
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
@@ -408,23 +408,8 @@ const MainPeekingLayout: FC = () => {
 const ProjectRedirect: FC = () => {
   const {entity, project} = useParams<Browse3ProjectMountedParams>();
   const {baseRouter} = useWeaveflowRouteContext();
-
-  const projectHasTraceServerData = useProjectHasTraceServerData(
-    entity,
-    project
-  );
-  if (projectHasTraceServerData.loading) {
-    return <Loading centered />;
-  }
-  // TODO: If we have no data, perhaps better to show a quickstart.
-  // const shouldRedirect = projectHasTraceServerData.result;
-  const shouldRedirect = true;
-  if (shouldRedirect) {
-    const url = baseRouter.tracesUIUrl(entity, project);
-    return <Redirect to={url} />;
-  }
-
-  return null;
+  const url = baseRouter.tracesUIUrl(entity, project);
+  return <Redirect to={url} />;
 };
 
 const Browse3ProjectRoot: FC<{
@@ -653,7 +638,7 @@ const CallPageBinding = () => {
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParams<Browse3TabParams>();
   const query = useURLSearchParamsDict();
-  const filters = useMemo(() => {
+  const initialFilter = useMemo(() => {
     if (tab === 'evaluations') {
       return {
         frozen: true,
@@ -713,6 +698,20 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  const filterModel = useMemo(
+    () => getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS),
+    [query.filters]
+  );
+  const setFilterModel = (newModel: GridFilterModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    if (newModel.items.length === 0) {
+      newQuery.delete('filters');
+    } else {
+      newQuery.set('filters', JSON.stringify(newModel));
+    }
+    history.push({search: newQuery.toString()});
+  };
+
   const sortModel = useMemo(
     () => getValidSortModel(query.sort, DEFAULT_SORT_CALLS),
     [query.sort]
@@ -752,12 +751,14 @@ const CallsPageBinding = () => {
     <CallsPage
       entity={entity}
       project={project}
-      initialFilter={filters}
+      initialFilter={initialFilter}
       onFilterUpdate={onFilterUpdate}
       columnVisibilityModel={columnVisibilityModel}
       setColumnVisibilityModel={setColumnVisibilityModel}
       pinModel={pinModel}
       setPinModel={setPinModel}
+      filterModel={filterModel}
+      setFilterModel={setFilterModel}
       sortModel={sortModel}
       setSortModel={setSortModel}
       paginationModel={paginationModel}
