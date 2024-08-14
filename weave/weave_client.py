@@ -755,6 +755,14 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
         self._save_nested_objects(val, name=name)
+
+        # typically, this condition would belong inside of the
+        # `_save_nested_objects` switch. However, we don't want to recursively
+        # publish all custom objects. Instead we only want to do this at the
+        # top-most level if requested
+        if get_serializer_for_obj(val) is not None:
+            self._save_and_attach_ref(val)
+
         return self._save_object_basic(val, name, branch)
 
     def _save_object_basic(
@@ -841,8 +849,6 @@ class WeaveClient:
         # TODO: Kinda hacky way to dispatching Dataset with rows: Table
         elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
             self._save_nested_objects(obj.rows)
-        elif get_serializer_for_obj(obj) is not None:
-            self._save_custom_obj(obj)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
@@ -852,7 +858,7 @@ class WeaveClient:
         # requires uncommenting the following lines
         # self._save_nested_objects(rows)
         # rows = map_to_refs(rows)
-        # rows = to_json(rows, self._project_id(), self.server)
+        rows = to_json(rows, self._project_id(), self.server)
 
         response = self.server.table_create(
             TableCreateReq(
@@ -894,9 +900,9 @@ class WeaveClient:
         if name is None:
             name = op.name
 
-        return self._save_custom_obj(op, name)
+        return self._save_and_attach_ref(op, name)
 
-    def _save_custom_obj(self, op: Op, name: Optional[str] = None) -> Ref:
+    def _save_and_attach_ref(self, op: Any, name: Optional[str] = None) -> Ref:
         if hasattr(op, "ref") and (ref := getattr(op, "ref")) is not None:
             return ref
 

@@ -7,7 +7,7 @@ export type CustomWeaveTypePayload<
     type: T;
   };
   files: FP;
-  load_op?: string;
+  load_op?: string | CustomWeaveTypePayload<'Op', {'obj.py': string}>;
 };
 
 export const isCustomWeaveTypePayload = (
@@ -29,8 +29,20 @@ export const isCustomWeaveTypePayload = (
   if (typeof data.files !== 'object' || data.files === null) {
     return false;
   }
-  if (data.load_op !== undefined && typeof data.load_op !== 'string') {
-    return false;
+  if (data.weave_type.type === 'Op') {
+    if (data.load_op !== undefined) {
+      return false;
+    }
+  } else {
+    if (data.load_op === undefined) {
+      return false;
+    }
+    if (
+      typeof data.load_op !== 'string' &&
+      !isCustomWeaveTypePayload(data.load_op)
+    ) {
+      return false;
+    }
   }
   return true;
 };

@@ -218,8 +218,16 @@ export const ObjectViewerSection = ({
   isExpanded,
 }: ObjectViewerSectionProps) => {
   const currentRef = useContext(WeaveCHTableSourceRefContext);
+
   if (isCustomWeaveTypePayload(data)) {
-    return <CustomWeaveTypeDispatcher data={data} />;
+    return (
+      <>
+        <TitleRow>
+          <Title>{title}</Title>
+        </TitleRow>
+        <CustomWeaveTypeDispatcher data={data} />
+      </>
+    );
   }
 
   const numKeys = Object.keys(data).length;

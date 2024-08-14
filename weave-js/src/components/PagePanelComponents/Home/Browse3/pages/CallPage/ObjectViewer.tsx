@@ -164,6 +164,26 @@ export const ObjectViewer = ({
       }
     > = [];
     traverse(resolvedData, context => {
+      // Ops should be migrated to the generic CustomWeaveType pattern, but for
+      // now they are custom handled.
+      const isOpPayload = context.value?.weave_type?.type === 'Op';
+
+      if (isCustomWeaveTypePayload(context.value) && !isOpPayload) {
+        /**
+         * This block adds an "empty" key that is used to render the custom
+         * weave type. In the event that a custom type has both properties AND
+         * custom views, then we might need to extend / modify this part.
+         */
+        contexts.push({
+          depth: context.depth,
+          isLeaf: true,
+          path: context.path,
+          value: context.value,
+          valueType: context.valueType,
+        });
+        return 'skip';
+      }
+
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
         const isNullDescription =
@@ -208,7 +228,8 @@ export const ObjectViewer = ({
       if (USE_TABLE_FOR_ARRAYS && context.valueType === 'array') {
         return 'skip';
       }
-      if (context.value?._ref && context.value?.weave_type?.type === 'Op') {
+      if (context.value?._ref && isOpPayload) {
+        // This should be moved to the CustomWeaveType pattern.
         contexts.push({
           depth: context.depth + 1,
           isLeaf: true,
@@ -216,20 +237,6 @@ export const ObjectViewer = ({
           isCode: true,
           value: context.value?._ref,
           valueType: 'undefined',
-        });
-        return 'skip';
-      } else if (isCustomWeaveTypePayload(context.value)) {
-        /**
-         * This block adds an "empty" key that is used to render the custom
-         * weave type. In the event that a custom type has both properties AND
-         * custom views, then we might need to extend / modify this part.
-         */
-        contexts.push({
-          depth: context.depth + 1,
-          isLeaf: true,
-          path: context.path.plus(''),
-          value: context.value,
-          valueType: context.valueType,
         });
         return 'skip';
       }

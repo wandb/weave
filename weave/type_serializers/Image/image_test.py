@@ -1,49 +1,23 @@
-import pytest
 from PIL import Image
 
 import weave
 from weave.weave_client import WeaveClient, get_ref
 
+"""When testing types, it is important to test:
+Objects:
+1. Publishing Directly
+2. Publishing as a property
+3. Using as a cell in a table
 
-class ImageWrapper(weave.Object):
-    img: Image.Image
+Calls:
+4. Using as inputs, output, and output component (raw)
+5. Using as inputs, output, and output component (refs)
 
-
-@weave.op
-def build_image(h: int = 1024, w: int = 1024) -> Image.Image:
-    return Image.new("RGB", (h, w), "purple")
-
-
-@weave.op
-def process_image(img: Image.Image) -> dict:
-    return {
-        "size": img.size,
-        "mode": img.mode,
-    }
-
-
-@weave.op
-def build_image_nested() -> dict:
-    img = build_image()
-    proc = process_image(img)
-    return {"img": img, "proc": proc}
-
-
-def test_image_as_io(client: WeaveClient) -> None:
-    res = build_image_nested()
-    assert isinstance(res["img"], Image.Image)
-
-    build_image_call = build_image.calls()[0]
-    build_image_nested_call = build_image_nested.calls()[0]
-    proc_image_call = process_image.calls()[0]
-
-    assert build_image_nested_call.output["img"].tobytes() == res["img"].tobytes()
-    assert build_image_call.output.tobytes() == res["img"].tobytes()
-    assert proc_image_call.inputs["img"].tobytes() == res["img"].tobytes()
+"""
 
 
 def test_image_publish(client: WeaveClient) -> None:
-    img = Image.new("RGB", (1024, 1024), "purple")
+    img = Image.new("RGB", (512, 512), "purple")
     weave.publish(img)
 
     ref = get_ref(img)
@@ -53,9 +27,26 @@ def test_image_publish(client: WeaveClient) -> None:
     assert img.tobytes() == gotten_img.tobytes()
 
 
-@pytest.skip("Datasets do not yet support objects in cells")
+class ImageWrapper(weave.Object):
+    img: Image.Image
+
+
+def test_image_as_property(client: WeaveClient) -> None:
+    img = Image.new("RGB", (512, 512), "purple")
+    img_wrapper = ImageWrapper(img=img)
+    assert img_wrapper.img == img
+
+    weave.publish(img_wrapper)
+
+    ref = get_ref(img_wrapper)
+    assert ref is not None
+
+    gotten_img_wrapper = weave.ref(ref.uri()).get()
+    assert gotten_img_wrapper.img.tobytes() == img.tobytes()
+
+
 def test_image_as_dataset_cell(client: WeaveClient) -> None:
-    img = Image.new("RGB", (1024, 1024), "purple")
+    img = Image.new("RGB", (512, 512), "purple")
     dataset = weave.Dataset(rows=[{"img": img}])
     assert dataset.rows[0]["img"] == img
 
@@ -68,15 +59,44 @@ def test_image_as_dataset_cell(client: WeaveClient) -> None:
     assert gotten_dataset.rows[0]["img"].tobytes() == img.tobytes()
 
 
-def test_image_as_property(client: WeaveClient) -> None:
-    img = Image.new("RGB", (1024, 1024), "purple")
-    img_wrapper = ImageWrapper(img=img)
-    assert img_wrapper.img == img
+@weave.op
+def image_as_solo_output(publish_first: bool) -> Image.Image:
+    img = Image.new("RGB", (512, 512), "purple")
+    if publish_first:
+        weave.publish(img)
+    return img
 
-    weave.publish(img_wrapper)
 
-    ref = get_ref(img_wrapper)
-    assert ref is not None
+@weave.op
+def image_as_input_and_output_part(in_img: Image.Image) -> dict:
+    return {"out_img": in_img}
 
-    gotten_img_wrapper = weave.ref(ref.uri()).get()
-    assert gotten_img_wrapper.img.tobytes() == img.tobytes()
+
+def test_image_as_call_io(client: WeaveClient) -> None:
+    non_published_img = image_as_solo_output(publish_first=False)
+    img_dict = image_as_input_and_output_part(non_published_img)
+
+    exp_bytes = non_published_img.tobytes()
+    assert img_dict["out_img"].tobytes() == exp_bytes
+
+    image_as_solo_output_call = image_as_solo_output.calls()[0]
+    image_as_input_and_output_part_call = image_as_input_and_output_part.calls()[0]
+
+    assert image_as_solo_output_call.output.tobytes() == exp_bytes
+    assert image_as_input_and_output_part_call.inputs["in_img"].tobytes() == exp_bytes
+    assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
+
+
+def test_image_as_call_io_refs(client: WeaveClient) -> None:
+    non_published_img = image_as_solo_output(publish_first=True)
+    img_dict = image_as_input_and_output_part(non_published_img)
+
+    exp_bytes = non_published_img.tobytes()
+    assert img_dict["out_img"].tobytes() == exp_bytes
+
+    image_as_solo_output_call = image_as_solo_output.calls()[0]
+    image_as_input_and_output_part_call = image_as_input_and_output_part.calls()[0]
+
+    assert image_as_solo_output_call.output.tobytes() == exp_bytes
+    assert image_as_input_and_output_part_call.inputs["in_img"].tobytes() == exp_bytes
+    assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
