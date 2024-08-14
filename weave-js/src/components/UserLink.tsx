@@ -283,7 +283,7 @@ export const UserLink = ({
   userId,
   includeName,
   placement,
-  hasPopover,
+  hasPopover = true,
 }: UserLinkProps) => {
   const users = useUsers(userId ? [userId] : []);
   if (userId == null) {
