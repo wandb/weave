@@ -256,6 +256,12 @@ class CallsQueryReq(BaseModel):
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
     columns: typing.Optional[typing.List[str]] = None
+    # columns to expand, i.e. refs to other objects, can be nested
+    expand_columns: typing.Optional[typing.List[str]] = Field(
+        default=None,
+        examples=[["inputs.self.message", "inputs.model.prompt"]],
+        description="Columns to expand, i.e. refs to other objects",
+    )
 
 
 class CallsQueryRes(BaseModel):
