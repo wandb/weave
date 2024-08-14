@@ -4,8 +4,6 @@ import {LoadingDots} from '../../../../../LoadingDots';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
-// TODO: Bring over the lightbox stuff from Jamie's implementation
-
 type PILImageImageTypePayload = CustomWeaveTypePayload<
   'PIL.Image.Image',
   {'image.png': string}
@@ -39,6 +37,9 @@ export const PILImageImage: React.FC<{
   const blob = new Blob([arrayBuffer], {type: 'image/png'});
   const url = URL.createObjectURL(blob);
 
+  // TODO: It would be nice to have a more general image render - similar to the
+  // ValueViewImage that does things like light box, general scaling,
+  // downloading, etc..
   return (
     <img
       src={url}
