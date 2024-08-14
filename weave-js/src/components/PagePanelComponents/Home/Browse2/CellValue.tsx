@@ -14,10 +14,10 @@ import {CellValueString} from './CellValueString';
 import {SmallRef} from './SmallRef';
 
 type CellValueProps = {
-  value: any;
-  isExpanded?: boolean;
   entity: string;
   project: string;
+  value: any;
+  isExpanded?: boolean;
 };
 
 const Collapsed = styled.div<{hasScrolling: boolean}>`
@@ -31,9 +31,9 @@ const Collapsed = styled.div<{hasScrolling: boolean}>`
 Collapsed.displayName = 'S.Collapsed';
 
 export const CellValue = ({
-  value,
   entity,
   project,
+  value,
   isExpanded = false,
 }: CellValueProps) => {
   if (value === undefined) {
