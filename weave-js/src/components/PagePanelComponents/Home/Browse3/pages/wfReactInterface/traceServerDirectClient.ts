@@ -260,9 +260,10 @@ export class DirectTraceServerClient {
   public fileContent(
     req: TraceFileContentReadReq
   ): Promise<TraceFileContentReadRes> {
-    const res = this.makeRequest<TraceFileContentReadReq, string>(
+    const res = this.makeRequest<TraceFileContentReadReq, ArrayBuffer>(
       '/files/content',
       req,
+      false,
       true
     );
     return new Promise((resolve, reject) => {
@@ -280,6 +281,7 @@ export class DirectTraceServerClient {
     endpoint: string,
     req: QT,
     returnText?: boolean,
+    returnArrayBuffer?: boolean,
     contentType?: ContentType
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
@@ -322,6 +324,8 @@ export class DirectTraceServerClient {
       .then(response => {
         if (returnText) {
           return response.text();
+        } else if (returnArrayBuffer) {
+          return response.arrayBuffer();
         }
         return response.json();
       })
