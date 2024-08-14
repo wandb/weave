@@ -403,11 +403,15 @@ export const ObjectViewer = ({
             isRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
           const {isCode} = params.model;
+          const isCustomWeaveType = isCustomWeaveTypePayload(
+            params.model.value
+          );
           if (
             isNonRefString ||
             (isArray && USE_TABLE_FOR_ARRAYS) ||
             isTableRef ||
-            isCode
+            isCode ||
+            isCustomWeaveType
           ) {
             return 'auto';
           }

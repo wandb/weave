@@ -294,6 +294,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
               style={{
                 width: '100%',
                 height: '100%',
+                alignContent: 'center',
               }}>
               {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
             into `CellValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
