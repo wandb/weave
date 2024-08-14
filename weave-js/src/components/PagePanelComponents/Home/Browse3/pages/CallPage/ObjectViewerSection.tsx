@@ -227,6 +227,7 @@ export const ObjectViewerSection = ({
 }: ObjectViewerSectionProps) => {
   const currentRef = useContext(WeaveCHTableSourceRefContext);
   if (isCustomWeaveTypePayload(data)) {
+    // If we have have a custom view for this weave type, use it.
     const customView = customWeaveTypeDispatch(entity, project, data);
     if (customView) {
       return customView;

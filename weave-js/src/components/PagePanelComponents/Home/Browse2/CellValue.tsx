@@ -74,6 +74,7 @@ export const CellValue = ({
     );
   }
   if (isCustomWeaveTypePayload(value)) {
+    // If we have have a custom view for this weave type, use it.
     const customView = customWeaveTypeDispatch(entity, project, value);
     if (customView) {
       return customView;

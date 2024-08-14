@@ -90,28 +90,35 @@ export const ValueView = ({
 
   if (data.valueType === 'object') {
     if (isCustomWeaveTypePayload(data.value)) {
-      // UGG THIS IS REALLY UGGLY! - fix
-      let finalEntity = entity;
-      let finalProject = project;
-      if (data.value != null && (data.value as any)._ref != null) {
+      let entityForWeaveType = entity;
+      let projectForWeaveType = project;
+
+      // This is a little ugly, but essentially if the data is coming from an
+      // expanded ref, then we want to use that ref to get the entity and project.
+      // Else we just use the current entity and project.
+      if (valueIsExpandedRef(data)) {
         const parsedRef = parseRef((data.value as any)._ref);
         if (isWeaveObjectRef(parsedRef)) {
-          finalEntity = parsedRef.entityName;
-          finalProject = parsedRef.projectName;
+          entityForWeaveType = parsedRef.entityName;
+          projectForWeaveType = parsedRef.projectName;
         }
       }
-      if (finalEntity != null && finalProject != null) {
-        const customView = customWeaveTypeDispatch(
-          finalEntity,
-          finalProject,
-          data.value
-        );
-        if (customView) {
-          return customView;
-        }
+
+      // If we have have a custom view for this weave type, use it.
+      const customView = customWeaveTypeDispatch(
+        entityForWeaveType,
+        projectForWeaveType,
+        data.value
+      );
+      if (customView) {
+        return customView;
       }
     }
   }
 
   return <div>{data.value.toString()}</div>;
+};
+
+const valueIsExpandedRef = (data: ValueData) => {
+  return data.value != null && (data.value as any)._ref != null;
 };
