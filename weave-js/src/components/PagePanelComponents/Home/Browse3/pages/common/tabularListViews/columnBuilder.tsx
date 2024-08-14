@@ -9,7 +9,7 @@ import React from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../../react';
 import {ErrorBoundary} from '../../../../../../ErrorBoundary';
-import {flattenObjectTypeAware} from '../../../../Browse2/browse2Util';
+import {flattenObjectPreservingWeaveTypes} from '../../../../Browse2/browse2Util';
 import {CellValue} from '../../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
@@ -60,7 +60,7 @@ export function prepareFlattenedDataForTable<T>(
 ): Array<T & {[key: string]: string}> {
   return data.map(r => {
     // First, flatten the inner object
-    let flattened = flattenObjectTypeAware(r ?? {});
+    let flattened = flattenObjectPreservingWeaveTypes(r ?? {});
 
     flattened = replaceTableRefsInFlattenedData(flattened);
 

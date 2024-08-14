@@ -24,12 +24,16 @@ export const flattenObject = (
   return result;
 };
 
-export const flattenObjectTypeAware = (
+
+/**
+ * Flatten an object, but preserve any object that has a `_type` field.
+ * This is critical for handling "Weave Types" - payloads that should be
+ * treated as holistic objects, rather than flattened.
+ */
+export const flattenObjectPreservingWeaveTypes = (
   obj: {[key: string]: any},
-  parentKey: string = '',
-  result: {[key: string]: any} = {}
 ) => {
-  return flattenObject(obj, parentKey, result, (key, value) => {
+  return flattenObject(obj, '', {}, (key, value) => {
     return typeof value !== 'object' || value == null || value._type == null;
   });
 };
