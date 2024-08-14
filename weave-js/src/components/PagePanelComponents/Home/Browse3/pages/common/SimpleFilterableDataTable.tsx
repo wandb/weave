@@ -254,6 +254,7 @@ export const FilterLayoutTemplate: React.FC<{
             flex: '0 0 auto',
             width: '100%',
             maxWidth: '100%',
+            minHeight: 50,
             transition: 'width 0.1s ease-in-out',
             display: 'flex',
             flexDirection: 'row',

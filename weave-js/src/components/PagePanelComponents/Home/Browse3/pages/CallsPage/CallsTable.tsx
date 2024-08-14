@@ -124,7 +124,9 @@ export const CallsTable: FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
-  hideControls?: boolean;
+
+  hideControls?: boolean; // Hide the entire filter and column bar
+  hideOpSelector?: boolean; // Hide the op selector control
 
   columnVisibilityModel?: GridColumnVisibilityModel;
   setColumnVisibilityModel?: (newModel: GridColumnVisibilityModel) => void;
@@ -147,6 +149,7 @@ export const CallsTable: FC<{
   onFilterUpdate,
   frozenFilter,
   hideControls,
+  hideOpSelector,
   columnVisibilityModel,
   setColumnVisibilityModel,
   pinModel,
@@ -696,51 +699,55 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <Tailwind style={{display: 'contents'}}>
-          <div style={{flex: '0 0 auto'}}>
-            <ListItem sx={{minWidth: 190, width: 320}}>
-              <FormControl fullWidth>
-                <Autocomplete
-                  PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-                  size="small"
-                  // Temp disable multiple for simplicity - may want to re-enable
-                  // multiple
-                  limitTags={1}
-                  disabled={Object.keys(frozenFilter ?? {}).includes(
-                    'opVersions'
-                  )}
-                  value={selectedOpVersionOption}
-                  onChange={(event, newValue) => {
-                    if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
-                      setFilter({
-                        ...filter,
-                        opVersionRefs: [],
-                      });
-                    } else {
-                      setFilter({
-                        ...filter,
-                        opVersionRefs: newValue ? [newValue] : [],
-                      });
+          {!hideOpSelector && (
+            <div style={{flex: '0 0 auto'}}>
+              <ListItem sx={{minWidth: 190, width: 320}}>
+                <FormControl fullWidth>
+                  <Autocomplete
+                    PaperComponent={paperProps => (
+                      <StyledPaper {...paperProps} />
+                    )}
+                    size="small"
+                    // Temp disable multiple for simplicity - may want to re-enable
+                    // multiple
+                    limitTags={1}
+                    disabled={Object.keys(frozenFilter ?? {}).includes(
+                      'opVersions'
+                    )}
+                    value={selectedOpVersionOption}
+                    onChange={(event, newValue) => {
+                      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
+                        setFilter({
+                          ...filter,
+                          opVersionRefs: [],
+                        });
+                      } else {
+                        setFilter({
+                          ...filter,
+                          opVersionRefs: newValue ? [newValue] : [],
+                        });
+                      }
+                    }}
+                    renderInput={renderParams => (
+                      <StyledTextField
+                        {...renderParams}
+                        label={OP_FILTER_GROUP_HEADER}
+                        sx={{maxWidth: '350px'}}
+                      />
+                    )}
+                    getOptionLabel={option => {
+                      return opVersionOptions[option]?.title ?? 'loading...';
+                    }}
+                    disableClearable={
+                      selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
                     }
-                  }}
-                  renderInput={renderParams => (
-                    <StyledTextField
-                      {...renderParams}
-                      label={OP_FILTER_GROUP_HEADER}
-                      sx={{maxWidth: '350px'}}
-                    />
-                  )}
-                  getOptionLabel={option => {
-                    return opVersionOptions[option]?.title ?? 'loading...';
-                  }}
-                  disableClearable={
-                    selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-                  }
-                  groupBy={option => opVersionOptions[option]?.group}
-                  options={Object.keys(opVersionOptions)}
-                />
-              </FormControl>
-            </ListItem>
-          </div>
+                    groupBy={option => opVersionOptions[option]?.group}
+                    options={Object.keys(opVersionOptions)}
+                  />
+                </FormControl>
+              </ListItem>
+            </div>
+          )}
           {filterModel && setFilterModel && (
             <FilterPanel
               filterModel={filterModel}
