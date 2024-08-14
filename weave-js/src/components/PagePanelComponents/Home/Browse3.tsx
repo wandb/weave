@@ -304,8 +304,9 @@ const MainPeekingLayout: FC = () => {
 
   const {handleMousedown, drawerWidthPxl} = useDrawerResize();
   const closePeek = useClosePeek();
-  const mainWidth =
-    windowSize.width - SIDEBAR_WIDTH - (isDrawerOpen ? drawerWidthPxl : 0);
+  const mainWidth = isDrawerOpen
+    ? `"${windowSize.width - SIDEBAR_WIDTH - drawerWidthPxl}px`
+    : '100%';
 
   useMousetrap('esc', closePeek);
 
@@ -325,13 +326,11 @@ const MainPeekingLayout: FC = () => {
         }}>
         <Box
           sx={{
-            width: `${mainWidth}px`,
+            width: mainWidth,
             overflow: 'hidden',
             display: 'flex',
             // This transition is from the mui drawer component, to keep the main content animation in similar
-            transition: !isDrawerOpen
-              ? 'width 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
-              : 'none',
+            transition: 'width 225ms cubic-bezier(0, 0, 0.2, 1) 0ms',
           }}>
           <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
         </Box>
