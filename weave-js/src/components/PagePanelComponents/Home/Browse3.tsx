@@ -100,7 +100,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
-import {SIDEBAR_WIDTH, useDrawerResize} from './useDrawerResize';
+import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -285,6 +285,8 @@ const Browse3Mounted: FC<{
   );
 };
 
+const SIDEBAR_WIDTH = 56;
+
 const MainPeekingLayout: FC = () => {
   const {baseRouter} = useWeaveflowRouteContext();
   const params = useParams<Browse3Params>();
@@ -300,8 +302,10 @@ const MainPeekingLayout: FC = () => {
   const isDrawerOpen = peekLocation != null;
   const windowSize = useWindowSize();
 
-  const {handleMousedown, drawerWidthPct} = useDrawerResize();
+  const {handleMousedown, drawerWidthPxl} = useDrawerResize();
   const closePeek = useClosePeek();
+  const mainWidth =
+    windowSize.width - SIDEBAR_WIDTH - (isDrawerOpen ? drawerWidthPxl : 0);
 
   useMousetrap('esc', closePeek);
 
@@ -321,19 +325,11 @@ const MainPeekingLayout: FC = () => {
         }}>
         <Box
           sx={{
-            flex: '1 1 40%',
+            width: `${mainWidth}px`,
             overflow: 'hidden',
             display: 'flex',
             // This transition is from the mui drawer component, to keep the main content animation in similar
-            transition: !isDrawerOpen
-              ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
-              : 'none',
-            marginRight: !isDrawerOpen
-              ? 0
-              : // subtract the sidebar width
-                `${
-                  (drawerWidthPct * (windowSize.width - SIDEBAR_WIDTH)) / 100
-                }px`,
+            transition: 'width 225ms cubic-bezier(0, 0, 0.2, 1) 0ms',
           }}>
           <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
         </Box>
@@ -348,7 +344,7 @@ const MainPeekingLayout: FC = () => {
               overflow: 'hidden',
               display: isDrawerOpen ? 'flex' : 'none',
               zIndex: 1,
-              width: `${drawerWidthPct}%`,
+              width: `${drawerWidthPxl}px`,
               height: '100%',
               boxShadow: '0px 0px 40px 0px rgba(0, 0, 0, 0.16)',
               borderLeft: 0,

@@ -1,10 +1,12 @@
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
-export const SIDEBAR_WIDTH = 56;
+const defaultSizePxl = 700;
+const minMainSizePxl = 200;
+const minDrawerSizePxl = 200;
 
-const setDrawerSize = (
+const setBounded = (
   newSize: number,
   setSize: (value: number) => void,
   min: number,
@@ -21,20 +23,14 @@ const setDrawerSize = (
 
 export const useDrawerResize = () => {
   const windowSize = useWindowSize();
-  const defaultSize = 60;
-  const maxWidth = 90;
+
+  const maxDrawerWidthPxl = windowSize.width - minMainSizePxl;
 
   //  We store the drawer width and height in local storage so that it persists
-  const [width, setWidth] = useLocalStorage(
-    'weaveflow-drawer-width-number',
-    defaultSize
+  const [storedWidth, setStoredWidth] = useLocalStorage(
+    'weave-drawer-width-pxl',
+    defaultSizePxl
   );
-
-  useEffect(() => {
-    if (width > maxWidth) {
-      setWidth(defaultSize);
-    }
-  }, [setWidth, width]);
 
   //  We store this in a ref so that we can access it in the mousemove handler, in a useEffect.
   const [isResizing, setIsResizing] = useState(false);
@@ -67,15 +63,18 @@ export const useDrawerResize = () => {
       if (!resizingRef.current) {
         return;
       }
-      const minWidth = (300 / windowSize.width) * 100;
       e.preventDefault();
 
       // subtract the sidebar width
-      const totalWidth = windowSize.width - SIDEBAR_WIDTH;
-      const newWidth = ((totalWidth - e.clientX) * 100) / totalWidth;
-      setDrawerSize(newWidth, setWidth, minWidth, maxWidth);
+      const targetWidth = windowSize.width - e.clientX;
+      setBounded(
+        targetWidth,
+        setStoredWidth,
+        minDrawerSizePxl,
+        maxDrawerWidthPxl
+      );
     },
-    [windowSize.width, setWidth]
+    [maxDrawerWidthPxl, setStoredWidth, windowSize.width]
   );
 
   useEffect(() => {
@@ -88,8 +87,12 @@ export const useDrawerResize = () => {
     };
   }, [isResizing, handleMousemove, handleMouseup]);
 
+  const finalWidthPxl = useMemo(() => {
+    return Math.min(Math.max(storedWidth, minDrawerSizePxl), maxDrawerWidthPxl);
+  }, [maxDrawerWidthPxl, storedWidth]);
+
   return {
     handleMousedown,
-    drawerWidthPct: width,
+    drawerWidthPxl: finalWidthPxl,
   };
 };
