@@ -261,14 +261,14 @@ export const DataTableView: FC<{
         ),
       });
     }
-    const columnSpec = typeToDataGridColumnSpec(
+    const dataColumnSpec = typeToDataGridColumnSpec(
       props.entity,
       props.project,
       objectType,
       isPeeking,
       true
     );
-    return [...res, ...columnSpec];
+    return [...res, ...dataColumnSpec];
   }, [
     props.onLinkClick,
     props.entity,
