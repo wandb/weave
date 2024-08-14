@@ -38,6 +38,7 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
+from pydantic.utils import deep_update
 
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
@@ -45,6 +46,7 @@ from weave.trace_server.calls_query_builder import (
     combine_conditions,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.trace_server_common import make_nested_dict
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
@@ -291,10 +293,146 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             pb.get_params(),
         )
 
-        for row in raw_res:
-            yield tsi.CallSchema.model_validate(
-                _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
+        if not req.expand_columns:
+            for row in raw_res:
+                yield tsi.CallSchema.model_validate(
+                    _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))  # type: ignore
+                )
+
+        else:
+            batch_size = 10
+            batch = []
+            ref_cache: typing.Dict[str, typing.Any] = {}
+            for row in raw_res:
+                call_dict = _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))  # type: ignore
+                batch.append(call_dict)
+
+                if len(batch) >= batch_size:
+                    hydrated_batch = self._hydrate_calls(
+                        batch, req.expand_columns, ref_cache
+                    )
+                    for call in hydrated_batch:
+                        yield tsi.CallSchema.model_validate(call)
+
+                    batch = []
+                    # Increase the batch size exponentially, but don't go over 1000
+                    batch_size = min(1000, batch_size * 2)
+
+            hydrated_batch = self._hydrate_calls(batch, req.expand_columns, ref_cache)
+            for call in hydrated_batch:
+                yield tsi.CallSchema.model_validate(call)
+
+    def _hydrate_calls(
+        self,
+        calls: list[dict[str, typing.Any]],
+        expand_columns: typing.List[str],
+        ref_cache: typing.Dict[str, typing.Any],
+    ) -> list[dict[str, typing.Any]]:
+        # TODO: Implement feedback hydration
+        # if "feedback" in expand_columns:
+        #     feedback = self._hydrate_calls_feedback(calls)
+
+        calls = self._expand_call_refs(calls, expand_columns, ref_cache)
+
+        return calls
+
+    @staticmethod
+    def _get_nested_ref_column_part(
+        column: str, call: dict[str, typing.Any]
+    ) -> typing.Tuple[typing.Optional[str], typing.Any]:
+        """
+        Given a column that is a nested ref, find the most nested column in the call that
+        matches the requested expanded column, and then return the column prefix and
+        nested column suffix parts as a list.
+        Example:
+            call = {"a": {"b": "weave:///..."}}
+            column = "a.b.c.d"
+            -> "a.b", "weave:///..."
+        """
+        cur = call
+        parts = []
+        for part in column.split("."):
+            if isinstance(cur, dict) and part in cur:
+                cur = cur[part]
+                parts.append(part)
+            else:
+                break
+
+        return ".".join(parts) or None, cur
+
+    def _expand_call_refs(
+        self,
+        calls: list[dict[str, typing.Any]],
+        expand_columns: typing.List[str],
+        ref_cache: typing.Dict[str, typing.Any],
+    ) -> list[dict[str, typing.Any]]:
+        # First get refs from call batch, store them where we can lookup them later
+        # format: (call_index, column_name, optional column_prefix) -> ref
+        refs_to_resolve: typing.Dict[tuple[int, str, typing.Optional[str]], str] = {}
+        for i, call in enumerate(calls):
+            for col in expand_columns:
+                val = call.get(col)
+                if val is None:
+                    col_prefix, val = self._get_nested_ref_column_part(col, call)
+                    if not col_prefix:
+                        continue
+                    if col_prefix == col:
+                        col_prefix = None
+
+                if isinstance(val, str) and val.startswith("weave://"):
+                    refs_to_resolve[(i, col, col_prefix)] = val
+
+        # parse the refs
+        refs = refs_to_resolve.values()
+        parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in refs]
+        parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
+
+        # Next, group the refs by project_id
+        refs_by_project_id: dict[str, ObjRefListType] = defaultdict(list)
+        for ref in parsed_refs:
+            refs_by_project_id[ref.project_id].append(ref)
+
+        # Lookup data for each project, scoped to each project
+        final_result_cache: typing.Dict[str, typing.Any] = {}
+
+        def make_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
+            return ref.uri()
+
+        for project in refs_by_project_id:
+            project_refs = refs_by_project_id[project]
+            project_results = self._refs_read_batch_within_project(
+                project, refs_by_project_id[project], ref_cache
             )
+            for ref, result in zip(project_refs, project_results):
+                final_result_cache[make_ref_cache_key(ref)] = result
+        vals = [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
+
+        # TODO: when is this not true?
+        assert len(vals) == len(refs_to_resolve)
+
+        for (i, col, col_prefix), val in zip(refs_to_resolve, vals):
+            if col_prefix is not None:
+                # nested ref case, ex:
+                # col: "a.b.c.d"
+                # call: {"a.b": "weave://..."}
+                # val: {"a.b": {"c": {"d": 1}}}
+                # result: {"a.b.c.d": 1}
+                next_part = col.replace(col_prefix, "")
+                if next_part.startswith("."):
+                    next_part = next_part[1:]
+                # next_part: "c.d"
+                for part in next_part.split("."):  # c, d
+                    if part not in val:
+                        raise ValueError(
+                            f"Missing part {part} in val {val} from column {col}"
+                        )
+                    val = val[part]
+
+            # make a nested dict from the column list, with val as the last element
+            payload = make_nested_dict(col.split("."), val)
+            calls[i] = deep_update(calls[i], payload)
+
+        return calls
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
@@ -736,10 +874,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.RefsReadBatchRes(vals=vals)
 
     def _refs_read_batch_within_project(
-        self, project_id_scope: str, parsed_refs: ObjRefListType
+        self,
+        project_id_scope: str,
+        parsed_refs: ObjRefListType,
+        root_val_cache: typing.Dict[str, typing.Any] = {},
     ) -> list[typing.Any]:
-        root_val_cache: typing.Dict[str, typing.Any] = {}
-
         def make_root_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
             return f"{ref.project_id}/{ref.name}/{ref.version}"
 
