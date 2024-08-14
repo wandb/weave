@@ -54,7 +54,7 @@ def universal_ext_to_int_ref_converter(
                 # It is important to raise here as this would be the result of
                 # an external client attempting to write internal refs directly.
                 # We want to maintain full control over the internal refs.
-                raise ValueError("Encountered internal ref in external data.")
+                raise ValueError("Invalid ref format.")
         return obj
 
     return _map_values(obj, mapper)
@@ -112,7 +112,7 @@ def universal_int_to_ext_ref_converter(
                 # future that a programming error leads to this situation, in
                 # which case reading this object would consistently fail. We
                 # might want to instead return a private ref in this case.
-                raise ValueError("Encountered external ref in internal data.")
+                raise ValueError("Encountered unexpected ref.")
         return obj
 
     return _map_values(obj, mapper)
