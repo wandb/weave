@@ -22,17 +22,17 @@ import {ValueViewString} from './ValueViewString';
 type ValueData = Record<string, any>;
 
 type ValueViewProps = {
-  data: ValueData;
-  isExpanded: boolean;
   entity: string;
   project: string;
+  data: ValueData;
+  isExpanded: boolean;
 };
 
 export const ValueView = ({
-  data,
-  isExpanded,
   entity,
   project,
+  data,
+  isExpanded,
 }: ValueViewProps) => {
   const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
@@ -41,7 +41,7 @@ export const ValueView = ({
     }
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
       return (
-        <DataTableView data={data.value} entity={entity} project={project} />
+        <DataTableView entity={entity} project={project} data={data.value} />
       );
     }
     return null;

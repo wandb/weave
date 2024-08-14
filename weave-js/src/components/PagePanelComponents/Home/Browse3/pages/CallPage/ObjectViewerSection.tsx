@@ -26,12 +26,12 @@ import {ValueView} from './ValueView';
 type Data = Record<string, any>;
 
 type ObjectViewerSectionProps = {
+  entity: string;
+  project: string;
   title: string;
   data: Data;
   noHide?: boolean;
   isExpanded?: boolean;
-  entity: string;
-  project: string;
 };
 
 const TitleRow = styled.div`
@@ -90,12 +90,12 @@ const ObjectViewerSectionNonEmptyMemoed = React.memo(
 );
 
 const ObjectViewerSectionNonEmpty = ({
+  entity,
+  project,
   title,
   data,
   noHide,
   isExpanded,
-  entity,
-  project,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
   const [mode, setMode] = useState('collapsed');
@@ -218,12 +218,12 @@ const ObjectViewerSectionNonEmpty = ({
 };
 
 export const ObjectViewerSection = ({
+  entity,
+  project,
   title,
   data,
   noHide,
   isExpanded,
-  project,
-  entity,
 }: ObjectViewerSectionProps) => {
   const currentRef = useContext(WeaveCHTableSourceRefContext);
   if (isCustomWeaveTypePayload(data)) {
@@ -254,12 +254,12 @@ export const ObjectViewerSection = ({
     ) {
       return (
         <ObjectViewerSectionNonEmptyMemoed
+          entity={entity}
+          project={project}
           title={title}
           data={{Value: value}}
           noHide={noHide}
           isExpanded={isExpanded}
-          project={project}
-          entity={entity}
         />
       );
     }
@@ -274,10 +274,10 @@ export const ObjectViewerSection = ({
           <Title>{title}</Title>
         </TitleRow>
         <ValueView
+          entity={entity}
+          project={project}
           data={oneResultData}
           isExpanded={true}
-          project={project}
-          entity={entity}
         />
       </>
     );
@@ -315,12 +315,12 @@ export const ObjectViewerSection = ({
   }
   return (
     <ObjectViewerSectionNonEmpty
+      entity={entity}
+      project={project}
       title={title}
       data={data}
       noHide={noHide}
       isExpanded={isExpanded}
-      project={project}
-      entity={entity}
     />
   );
 };

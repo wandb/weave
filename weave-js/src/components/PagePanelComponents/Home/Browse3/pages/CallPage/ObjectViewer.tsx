@@ -45,10 +45,10 @@ import {ValueView} from './ValueView';
 type Data = Record<string, any>;
 
 type ObjectViewerProps = {
-  apiRef: React.MutableRefObject<GridApiPro>;
-  data: Data;
   entity: string;
   project: string;
+  apiRef: React.MutableRefObject<GridApiPro>;
+  data: Data;
   isExpanded: boolean;
   expandedIds: GridRowId[];
   setExpandedIds: Dispatch<SetStateAction<GridRowId[]>>;
@@ -69,13 +69,13 @@ type RefValues = Record<string, any>; // ref URI to value
 
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({
+  entity,
+  project,
   apiRef,
   data,
   isExpanded,
   expandedIds,
   setExpandedIds,
-  entity,
-  project,
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
@@ -206,15 +206,6 @@ export const ObjectViewer = ({
           // replace it with a patched version that can be rendered as a thumbnail.
           contexts.push(...getKnownImageDictContexts(context));
           return 'skip';
-        } else if (
-          context.valueType === 'object' &&
-          isCustomWeaveTypePayload(context.value)
-        ) {
-          // if (isCustomWeaveTypePayload(context.value)) {
-          contexts.push(context);
-          // console.log('Here', context);
-          // return 'skip';
-          // }
         } else {
           contexts.push(context);
         }
@@ -232,15 +223,11 @@ export const ObjectViewer = ({
           valueType: 'undefined',
         });
         return 'skip';
-      }
-      if (
-        isCustomWeaveTypePayload(context.value) &&
-        isPILImageImageType(context.value)
-      ) {
+      } else if (isCustomWeaveTypePayload(context.value)) {
         contexts.push({
           depth: context.depth + 1,
           isLeaf: true,
-          path: context.path.plus('image'),
+          path: context.path.plus(''),
           value: context.value,
           valueType: context.valueType,
         });
@@ -295,10 +282,10 @@ export const ObjectViewer = ({
 
           const colInner = (
             <ValueView
-              data={row}
-              isExpanded={isExpanded}
               entity={entity}
               project={project}
+              data={row}
+              isExpanded={isExpanded}
             />
           );
           if (baseRef) {

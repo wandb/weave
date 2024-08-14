@@ -306,9 +306,9 @@ export const ScorecardSection: React.FC<{
                         overflow: 'auto',
                       }}>
                       <CellValue
-                        value={modelData[model]}
-                        project={props.state.data.project}
                         entity={props.state.data.entity}
+                        project={props.state.data.project}
+                        value={modelData[model]}
                       />
                     </GridCell>
                   );

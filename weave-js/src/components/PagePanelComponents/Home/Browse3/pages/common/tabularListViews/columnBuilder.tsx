@@ -305,7 +305,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
               {isExpandedRefWithValueAsTableRef(val) ? (
                 <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
               ) : (
-                <CellValue value={val} entity={entity} project={project} />
+                <CellValue entity={entity} project={project} value={val} />
               )}
             </CellFilterWrapper>
           </ErrorBoundary>

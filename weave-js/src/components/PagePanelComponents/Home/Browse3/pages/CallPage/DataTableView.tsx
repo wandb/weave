@@ -106,6 +106,8 @@ export const WeaveCHTable: FC<{
 
   return (
     <DataTableView
+      entity={parsedRef.entityName}
+      project={parsedRef.projectName}
       data={sourceRows ?? []}
       loading={fetchQuery.loading}
       isTruncated={isTruncated}
@@ -114,17 +116,15 @@ export const WeaveCHTable: FC<{
       displayKey="val"
       onLinkClick={onClickEnabled ? onClick : undefined}
       fullHeight={props.fullHeight}
-      entity={parsedRef.entityName}
-      project={parsedRef.projectName}
     />
   );
 };
 
 // This is a general purpose table view that can be used to render any data.
 export const DataTableView: FC<{
-  data: Array<{[key: string]: any}>;
   entity: string;
   project: string;
+  data: Array<{[key: string]: any}>;
   fullHeight?: boolean;
   loading?: boolean;
   displayKey?: string;
@@ -261,16 +261,14 @@ export const DataTableView: FC<{
         ),
       });
     }
-    return [
-      ...res,
-      ...typeToDataGridColumnSpec(
-        props.entity,
-        props.project,
-        objectType,
-        isPeeking,
-        true
-      ),
-    ];
+    const columnSpec = typeToDataGridColumnSpec(
+      props.entity,
+      props.project,
+      objectType,
+      isPeeking,
+      true
+    );
+    return [...res, ...columnSpec];
   }, [
     props.onLinkClick,
     props.entity,
@@ -429,9 +427,9 @@ export const typeToDataGridColumnSpec = (
               const data = params.row[innerKey];
               return (
                 <CellValue
-                  value={data ?? ''}
                   entity={entity}
                   project={project}
+                  value={data ?? ''}
                 />
               );
             },

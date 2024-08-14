@@ -587,9 +587,9 @@ export const ExampleCompareSection: React.FC<{
 
     return (
       <CellValue
-        value={metricValue}
         entity={props.state.data.entity}
         project={props.state.data.project}
+        value={metricValue}
       />
     );
   };

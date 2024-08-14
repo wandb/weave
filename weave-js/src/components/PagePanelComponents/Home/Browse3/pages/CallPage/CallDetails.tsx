@@ -118,10 +118,10 @@ export const CallDetails: FC<{
             p: 2,
           }}>
           <ObjectViewerSection
-            title="Inputs"
-            data={inputs}
             entity={call.entity}
             project={call.project}
+            title="Inputs"
+            data={inputs}
           />
         </Box>
         <Box
@@ -138,10 +138,10 @@ export const CallDetails: FC<{
             </>
           ) : (
             <ObjectViewerSection
-              title="Outputs"
-              data={output}
               entity={call.entity}
               project={call.project}
+              title="Outputs"
+              data={output}
             />
           )}
         </Box>
