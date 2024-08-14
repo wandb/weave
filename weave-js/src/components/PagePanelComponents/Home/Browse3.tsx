@@ -100,7 +100,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
-import {useDrawerResize} from './useDrawerResize';
+import {SIDEBAR_WIDTH, useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -305,8 +305,6 @@ const MainPeekingLayout: FC = () => {
 
   useMousetrap('esc', closePeek);
 
-  const widthPxl = (drawerWidthPct * windowSize.width) / 100;
-
   return (
     <WFDataModelAutoProvider
       entityName={params.entity!}
@@ -333,7 +331,9 @@ const MainPeekingLayout: FC = () => {
             marginRight: !isDrawerOpen
               ? 0
               : // subtract the sidebar width
-                `${widthPxl}px`,
+                `${
+                  (drawerWidthPct * (windowSize.width - SIDEBAR_WIDTH)) / 100
+                }px`,
           }}>
           <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
         </Box>
@@ -348,7 +348,7 @@ const MainPeekingLayout: FC = () => {
               overflow: 'hidden',
               display: isDrawerOpen ? 'flex' : 'none',
               zIndex: 1,
-              width: `${widthPxl}px`,
+              width: `${drawerWidthPct}%`,
               height: '100%',
               boxShadow: '0px 0px 40px 0px rgba(0, 0, 0, 0.16)',
               borderLeft: 0,
