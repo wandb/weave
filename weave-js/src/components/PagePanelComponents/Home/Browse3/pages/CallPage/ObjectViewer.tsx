@@ -22,7 +22,6 @@ import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
-import {isPILImageImageType} from '../../typeViews/PIL.Image.Image/PILImageImage';
 import {isRef} from '../common/util';
 import {
   LIST_INDEX_EDGE_NAME,
@@ -224,6 +223,11 @@ export const ObjectViewer = ({
         });
         return 'skip';
       } else if (isCustomWeaveTypePayload(context.value)) {
+        /**
+         * This block adds an "empty" key that is used to render the custom
+         * weave type. In the event that a custom type has both properties AND
+         * custom views, then we might need to extend / modify this part.
+         */
         contexts.push({
           depth: context.depth + 1,
           isLeaf: true,

@@ -182,6 +182,7 @@ const isExpandedRefWithValueAsTableRef = (
 
 export const buildDynamicColumns = <T extends GridValidRowModel>(
   filteredDynamicColumnNames: string[],
+  entityProjectFromRow: (row: T) => {entity: string; project: string},
   valueForKey: (row: T, key: string) => any,
   columnIsExpanded?: (col: string) => boolean,
   columnCanBeExpanded?: (col: string) => boolean,
@@ -269,15 +270,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         return val;
       },
       renderCell: cellParams => {
-        // TODO: get this typing more correct so this is known tp be a string.
-        // Hmmm how would this work with expanding refs of a dif project?!
-        // UG THIS IS BAD!
-        const projectId = cellParams.row.project_id;
-        let entity = cellParams.row.obj?.entity ?? '';
-        let project = cellParams.row.obj?.project ?? '';
-        if (projectId != null) {
-          [entity, project] = projectId.split('/');
-        }
+        const {entity, project} = entityProjectFromRow(cellParams.row);
         const val = valueForKey(cellParams.row, key);
         if (val === undefined) {
           return (

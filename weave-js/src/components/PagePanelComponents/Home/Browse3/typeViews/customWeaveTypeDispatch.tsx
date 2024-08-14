@@ -6,6 +6,11 @@ import {
   PILImageImage,
 } from './PIL.Image.Image/PILImageImage';
 
+/**
+ * This is the primary entry-point for dispatching custom weave types. Currently
+ * we just have 1, but as we add more, we might want to add a more robust
+ * "registry"
+ */
 export const customWeaveTypeDispatch = (
   entity: string,
   project: string,

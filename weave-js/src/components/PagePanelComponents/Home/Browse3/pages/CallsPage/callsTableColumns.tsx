@@ -284,6 +284,10 @@ function buildCallsTableColumns(
 
   const {cols: newCols, groupingModel} = buildDynamicColumns<TraceCallSchema>(
     filteredDynamicColumnNames,
+    row => {
+      const [entity, project] = row.project_id.split('/');
+      return {entity, project};
+    },
     (row, key) => (row as any)[key],
     key => expandedRefCols.has(key),
     key => columnsWithRefs.has(key),

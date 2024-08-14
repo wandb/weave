@@ -240,25 +240,32 @@ const ObjectVersionsTable: React.FC<{
       });
 
       const {cols: newCols, groupingModel} =
-        buildDynamicColumns<ObjectVersionSchema>(dynamicFields, (row, key) => {
-          const obj: ObjectVersionSchema = (row as any).obj;
-          const res = obj.val?.[key];
-          if (isTableRef(res)) {
-            // This whole block is a hack to make the table ref clickable. This
-            // is the same thing that the CallsTable does for expanded fields.
-            // Once we come up with a common pattern for ref expansion, this
-            // will go away.
-            const selfRefUri = objectVersionKeyToRefUri(obj);
-            const targetRefUri =
-              selfRefUri +
-              ('/' +
-                OBJECT_ATTR_EDGE_NAME +
-                '/' +
-                key.split('.').join(OBJECT_ATTR_EDGE_NAME + '/'));
-            return makeRefExpandedPayload(targetRefUri, res);
+        buildDynamicColumns<ObjectVersionSchema>(
+          dynamicFields,
+          row => ({
+            entity: row.entity,
+            project: row.project,
+          }),
+          (row, key) => {
+            const obj: ObjectVersionSchema = (row as any).obj;
+            const res = obj.val?.[key];
+            if (isTableRef(res)) {
+              // This whole block is a hack to make the table ref clickable. This
+              // is the same thing that the CallsTable does for expanded fields.
+              // Once we come up with a common pattern for ref expansion, this
+              // will go away.
+              const selfRefUri = objectVersionKeyToRefUri(obj);
+              const targetRefUri =
+                selfRefUri +
+                ('/' +
+                  OBJECT_ATTR_EDGE_NAME +
+                  '/' +
+                  key.split('.').join(OBJECT_ATTR_EDGE_NAME + '/'));
+              return makeRefExpandedPayload(targetRefUri, res);
+            }
+            return res;
           }
-          return res;
-        });
+        );
       cols.push(...newCols);
       groups = groupingModel;
     }
