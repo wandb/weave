@@ -92,7 +92,7 @@ export class DirectTraceServerClient {
     const res = this.makeRequest<TraceCallsQueryReq, string>(
       '/calls/stream_query',
       req,
-      true
+      'text'
     );
     return new Promise((resolve, reject) => {
       res
@@ -263,8 +263,7 @@ export class DirectTraceServerClient {
     const res = this.makeRequest<TraceFileContentReadReq, ArrayBuffer>(
       '/files/content',
       req,
-      false,
-      true
+      'arrayBuffer'
     );
     return new Promise((resolve, reject) => {
       res
@@ -280,8 +279,7 @@ export class DirectTraceServerClient {
   private makeRequest = async <QT, ST>(
     endpoint: string,
     req: QT,
-    returnText?: boolean,
-    returnArrayBuffer?: boolean,
+    responseReturnType: 'json' | 'text' | 'arrayBuffer' = 'json',
     contentType?: ContentType
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
@@ -322,12 +320,16 @@ export class DirectTraceServerClient {
       body: reqBody,
     })
       .then(response => {
-        if (returnText) {
+        if (responseReturnType === 'text') {
           return response.text();
-        } else if (returnArrayBuffer) {
+        } else if (responseReturnType === 'arrayBuffer') {
           return response.arrayBuffer();
+        } else if (responseReturnType === 'json') {
+          return response.json();
+        } else {
+          // Should never happen with correct type checking
+          throw new Error('Invalid responseReturnType: ' + responseReturnType);
         }
-        return response.json();
       })
       .then(res => {
         try {
