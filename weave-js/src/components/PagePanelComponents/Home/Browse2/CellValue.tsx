@@ -16,6 +16,7 @@ import {SmallRef} from './SmallRef';
 type CellValueProps = {
   value: any;
   isExpanded?: boolean;
+  align?: 'left' | 'center' | 'right';
 };
 
 const Collapsed = styled.div<{hasScrolling: boolean}>`
@@ -28,7 +29,11 @@ const Collapsed = styled.div<{hasScrolling: boolean}>`
 `;
 Collapsed.displayName = 'S.Collapsed';
 
-export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
+export const CellValue = ({
+  value,
+  isExpanded = false,
+  align,
+}: CellValueProps) => {
   if (value === undefined) {
     return null;
   }
@@ -39,10 +44,11 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
     return <SmallRef objRef={parseRef(value)} iconOnly={isExpanded} />;
   }
   if (typeof value === 'boolean') {
+    const textAlign = align ?? 'center';
     return (
       <Box
         sx={{
-          textAlign: 'center',
+          textAlign,
           width: '100%',
         }}>
         <CellValueBoolean value={value} />
@@ -56,10 +62,11 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
     return <CellValueString value={value} />;
   }
   if (typeof value === 'number') {
+    const textAlign = align ?? 'right';
     return (
       <Box
         sx={{
-          textAlign: 'right',
+          textAlign,
           width: '100%',
         }}>
         <ValueViewNumber value={value} fractionDigits={4} />

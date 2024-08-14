@@ -24,6 +24,7 @@ import {
   DICT_KEY_EDGE_NAME,
   OBJECT_ATTR_EDGE_NAME,
 } from './pages/wfReactInterface/constants';
+import {paramsFromDict} from './urlQueryUtil';
 
 const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
   if (!filter) {
@@ -189,6 +190,13 @@ export const browse2Context = {
     entityName: string,
     projectName: string,
     evaluationCallIds: string[]
+  ) => {
+    throw new Error('Not implemented');
+  },
+  diffUrl: (
+    entityName: string,
+    projectName: string,
+    params: Record<string, any>
   ) => {
     throw new Error('Not implemented');
   },
@@ -416,6 +424,14 @@ export const browse3ContextGen = (
       )}/compare-evaluations?evaluationCallIds=${encodeURIComponent(
         JSON.stringify(evaluationCallIds)
       )}`;
+    },
+    diffUrl: (
+      entityName: string,
+      projectName: string,
+      params: Record<string, any>
+    ) => {
+      const paramStr = paramsFromDict(params);
+      return `${projectRoot(entityName, projectName)}/diff?${paramStr}`;
     },
   };
   return browse3Context;

@@ -56,6 +56,7 @@ import {
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
 } from './Browse3/context';
+import {DiffPage} from './Browse3/diff/DiffPage';
 import {FullPageButton} from './Browse3/FullPageButton';
 import {getValidFilterModel} from './Browse3/grid/filters';
 import {
@@ -97,6 +98,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {getParamArray, queryGetDict} from './Browse3/urlQueryUtil';
 import {SIDEBAR_WIDTH, useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
@@ -489,6 +491,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/diff`}>
+          <DiffPageBinding />
         </Route>
       </Switch>
     </Box>
@@ -917,6 +922,41 @@ const TablesPageBinding = () => {
   const params = useParams<Browse3TabItemParams>();
 
   return <TablesPage entity={params.entity} project={params.project} />;
+};
+
+const DiffPageBinding = () => {
+  const PARAM_DIFF_MODE = 'diffMode';
+  const DEFAULT_MODE = 'tree';
+  const history = useHistory();
+  const params = useParams<Browse3TabItemParams>();
+  const {search} = useLocation();
+  const d = queryGetDict(history);
+  const calls = getParamArray(d, 'call');
+  const objects = getParamArray(d, 'object');
+  const versions = getParamArray(d, 'version');
+  const diffMode = d[PARAM_DIFF_MODE] ?? DEFAULT_MODE;
+
+  const setDiffMode = (newMode: string) => {
+    const newQuery = new URLSearchParams(search);
+    if (newMode === DEFAULT_MODE) {
+      newQuery.delete(PARAM_DIFF_MODE);
+    } else {
+      newQuery.set(PARAM_DIFF_MODE, newMode);
+    }
+    history.push({search: newQuery.toString()});
+  };
+
+  return (
+    <DiffPage
+      entity={params.entity}
+      project={params.project}
+      diffMode={diffMode}
+      setDiffMode={setDiffMode}
+      calls={calls}
+      objects={objects}
+      versions={versions}
+    />
+  );
 };
 
 const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (

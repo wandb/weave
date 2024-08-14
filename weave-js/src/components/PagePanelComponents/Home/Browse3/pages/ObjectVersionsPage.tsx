@@ -23,6 +23,7 @@ import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
+import {DiffButton} from '../diff/DiffButton';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
@@ -208,6 +209,22 @@ const ObjectVersionsTable: React.FC<{
   const {cols: columns, groups: columnGroupingModel} = useMemo(() => {
     let groups: GridColumnGroupingModel = [];
     const cols: GridColDef[] = [
+      basicField('diff', 'Diff', {
+        width: 50,
+        hideable: false,
+        sortable: false,
+        renderCell: cellParams => {
+          const {entity, project, objectId, versionHash} = cellParams.row.obj;
+          return (
+            <DiffButton
+              entity={entity}
+              project={project}
+              objectIds={[objectId]}
+              versions={[versionHash]}
+            />
+          );
+        },
+      }),
       basicField('object', 'Object', {
         hideable: false,
         renderCell: cellParams => {

@@ -3,16 +3,23 @@ import {GridRenderCellParams, useGridApiContext} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {FC, MouseEvent} from 'react';
 
-import {Button} from '../../../../../Button';
-import {Tooltip} from '../../../../../Tooltip';
-import {CursorBox} from './CursorBox';
+import {Button} from '../../../../Button';
+import {Tooltip} from '../../../../Tooltip';
+import {CursorBox} from '../pages/CallPage/CursorBox';
+import {ADDED, CHANGED, DELETED, UNCHANGED} from './diff';
 
 const INSET_SPACING = 40;
+
+const TYPE_COLORS: Record<number, string> = {
+  [ADDED]: 'green',
+  [CHANGED]: 'orange',
+  [DELETED]: 'red',
+};
 
 /**
  * Utility component for the ObjectViewer to allow expanding/collapsing of keys.
  */
-export const ObjectViewerGroupingCell: FC<
+export const DiffViewerGroupingCell: FC<
   GridRenderCellParams & {onClick?: (event: MouseEvent) => void}
 > = props => {
   const {id, field, rowNode, row} = props;
@@ -32,10 +39,7 @@ export const ObjectViewerGroupingCell: FC<
     event.stopPropagation();
   };
 
-  if (!row.path) {
-    return null;
-  }
-  const tooltipContent = row.path.toString();
+  const tooltipContent = row.path ? row.path.toString() : undefined;
   const box = (
     <CursorBox
       $isClickable={isGroup || isExpandableRef}
@@ -112,6 +116,8 @@ export const ObjectViewerGroupingCell: FC<
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               flex: '1 1 auto',
+              color: TYPE_COLORS[row.type],
+              fontWeight: row.type !== UNCHANGED ? 'bold' : 'normal',
             }}>
             {props.value}
           </Box>

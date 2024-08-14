@@ -80,7 +80,7 @@ const isSimpleData = (data: Data): boolean => {
 };
 
 // Use a deep comparison to avoid re-rendering when the data object hasn't really changed.
-const ObjectViewerSectionNonEmptyMemoed = React.memo(
+export const ObjectViewerSectionNonEmptyMemoed = React.memo(
   (props: ObjectViewerSectionProps) => (
     <ObjectViewerSectionNonEmpty {...props} />
   ),

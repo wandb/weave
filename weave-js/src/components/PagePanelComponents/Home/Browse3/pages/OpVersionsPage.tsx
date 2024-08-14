@@ -10,6 +10,7 @@ import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
+import {DiffButton} from '../diff/DiffButton';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
@@ -102,6 +103,22 @@ export const FilterableOpVersionsTable: React.FC<{
     });
   }, [filteredOpVersions.result]);
   const columns: GridColDef[] = [
+    basicField('diff', 'Diff', {
+      width: 50,
+      hideable: false,
+      sortable: false,
+      renderCell: cellParams => {
+        const {entity, project, opId, versionHash} = cellParams.row.obj;
+        return (
+          <DiffButton
+            entity={entity}
+            project={project}
+            objectIds={[opId]}
+            versions={[versionHash]}
+          />
+        );
+      },
+    }),
     basicField('op', 'Op', {
       hideable: false,
       renderCell: cellParams => {

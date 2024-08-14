@@ -43,6 +43,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveHeaderExtrasContext,
 } from '../../context';
+import {DiffButton} from '../../diff/DiffButton';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -674,6 +675,7 @@ export const CallsTable: FC<{
               clearSelectedCalls={clearSelectedCalls}
             />
           )}
+          <DiffButton entity={entity} project={project} calls={rowIds} />
           {selectedInputObjectVersion && (
             <Chip
               label={`Input: ${objectVersionNiceString(
