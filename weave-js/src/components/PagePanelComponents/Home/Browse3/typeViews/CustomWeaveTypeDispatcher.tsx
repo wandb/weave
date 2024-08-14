@@ -3,6 +3,19 @@ import React from 'react';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
+type CustomWeaveTypeDispatcherProps = {
+  data: CustomWeaveTypePayload;
+  // Entity and Project can be optionally provided as props, but if they are not
+  // provided, they must be provided in context. Failure to provide them will
+  // result in a console warning and a fallback to a default component.
+  //
+  // This pattern is used because in many cases we are rendering data from
+  // hierarchical data structures, and we want to avoid passing entity and project
+  // down through the tree.
+  entity?: string;
+  project?: string;
+};
+
 const customWeaveTypeRegistry: {
   [typeId: string]: {
     component: React.FC<{
@@ -27,11 +40,9 @@ export const CustomWeaveTypeProjectContext = React.createContext<{
  * we just have 1, but as we add more, we might want to add a more robust
  * "registry"
  */
-export const CustomWeaveTypeDispatch: React.FC<{
-  data: CustomWeaveTypePayload;
-  entity?: string;
-  project?: string;
-}> = ({data, entity, project}) => {
+export const CustomWeaveTypeDispatcher: React.FC<
+  CustomWeaveTypeDispatcherProps
+> = ({data, entity, project}) => {
   const projectContext = React.useContext(CustomWeaveTypeProjectContext);
   const comp = maybeGetComponentForCustomWeaveTypeData(data);
   const defaultReturn = <span>Custom Weave Type: {data.weave_type.type}</span>;
@@ -55,7 +66,7 @@ export const CustomWeaveTypeDispatch: React.FC<{
   return defaultReturn;
 };
 
-export const maybeGetComponentForCustomWeaveTypeData = (
+const maybeGetComponentForCustomWeaveTypeData = (
   data: CustomWeaveTypePayload
 ): React.FC<{
   entity: string;

@@ -3,7 +3,7 @@ import React, {useMemo} from 'react';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
-import {CustomWeaveTypeDispatch} from '../../typeViews/customWeaveTypeDispatch';
+import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {isRef} from '../common/util';
 import {
   DataTableView,
@@ -106,7 +106,7 @@ export const ValueView = ({
 
       // If we have have a custom view for this weave type, use it.
       return (
-        <CustomWeaveTypeDispatch
+        <CustomWeaveTypeDispatcher
           data={data.value}
           entity={entityForWeaveType}
           project={projectForWeaveType}

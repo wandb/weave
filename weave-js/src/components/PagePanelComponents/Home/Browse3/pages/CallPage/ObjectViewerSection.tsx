@@ -15,7 +15,7 @@ import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
-import {CustomWeaveTypeDispatch} from '../../typeViews/customWeaveTypeDispatch';
+import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {isRef} from '../common/util';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
@@ -228,7 +228,11 @@ export const ObjectViewerSection = ({
   const currentRef = useContext(WeaveCHTableSourceRefContext);
   if (isCustomWeaveTypePayload(data)) {
     return (
-      <CustomWeaveTypeDispatch data={data} entity={entity} project={project} />
+      <CustomWeaveTypeDispatcher
+        data={data}
+        entity={entity}
+        project={project}
+      />
     );
   }
 
