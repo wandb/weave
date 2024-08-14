@@ -385,27 +385,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # parse the refs
         refs = refs_to_resolve.values()
         parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in refs]
-        parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
-
-        # Next, group the refs by project_id
-        refs_by_project_id: dict[str, ObjRefListType] = defaultdict(list)
-        for ref in parsed_refs:
-            refs_by_project_id[ref.project_id].append(ref)
-
-        # Lookup data for each project, scoped to each project
-        final_result_cache: typing.Dict[str, typing.Any] = {}
-
-        def make_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
-            return ref.uri()
-
-        for project in refs_by_project_id:
-            project_refs = refs_by_project_id[project]
-            project_results = self._refs_read_batch_within_project(
-                project, refs_by_project_id[project], ref_cache
-            )
-            for ref, result in zip(project_refs, project_results):
-                final_result_cache[make_ref_cache_key(ref)] = result
-        vals = [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
+        vals = self._refs_read_batch(parsed_raw_refs, ref_cache)
 
         # TODO: when is this not true?
         assert len(vals) == len(refs_to_resolve)
@@ -845,6 +825,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # First, parse the refs
         parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
 
+        vals = self._refs_read_batch(parsed_raw_refs)
+        return tsi.RefsReadBatchRes(vals=vals)
+
+    def _refs_read_batch(
+        self,
+        parsed_raw_refs: typing.List[
+            refs_internal.InternalObjectRef, refs_internal.InternalTableRef
+        ],
+        root_val_cache: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> list[typing.Any]:
         # Business logic to ensure that we don't have raw TableRefs (not allowed)
         if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
@@ -864,21 +854,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for project in refs_by_project_id:
             project_refs = refs_by_project_id[project]
             project_results = self._refs_read_batch_within_project(
-                project, refs_by_project_id[project]
+                project,
+                refs_by_project_id[project],
+                root_val_cache,
             )
             for ref, result in zip(project_refs, project_results):
                 final_result_cache[make_ref_cache_key(ref)] = result
 
         # Return the final data payload
-        vals = [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
-        return tsi.RefsReadBatchRes(vals=vals)
+        return [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
 
     def _refs_read_batch_within_project(
         self,
         project_id_scope: str,
         parsed_refs: ObjRefListType,
-        root_val_cache: typing.Dict[str, typing.Any] = {},
+        root_val_cache: typing.Optional[typing.Dict[str, typing.Any]],
     ) -> list[typing.Any]:
+        if root_val_cache is None:
+            root_val_cache = {}
+
         def make_root_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
             return f"{ref.project_id}/{ref.name}/{ref.version}"
 
