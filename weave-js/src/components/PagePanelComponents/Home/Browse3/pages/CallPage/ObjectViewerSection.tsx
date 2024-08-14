@@ -15,7 +15,7 @@ import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
-import {customWeaveTypeDispatch} from '../../typeViews/customWeaveTypeDispatch';
+import {CustomWeaveTypeDispatch} from '../../typeViews/customWeaveTypeDispatch';
 import {isRef} from '../common/util';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
@@ -227,11 +227,9 @@ export const ObjectViewerSection = ({
 }: ObjectViewerSectionProps) => {
   const currentRef = useContext(WeaveCHTableSourceRefContext);
   if (isCustomWeaveTypePayload(data)) {
-    // If we have have a custom view for this weave type, use it.
-    const customView = customWeaveTypeDispatch(entity, project, data);
-    if (customView) {
-      return customView;
-    }
+    return (
+      <CustomWeaveTypeDispatch data={data} entity={entity} project={project} />
+    );
   }
 
   const numKeys = Object.keys(data).length;

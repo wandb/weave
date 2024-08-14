@@ -7,7 +7,7 @@ import {ValueViewNumber} from '../Browse3/pages/CallPage/ValueViewNumber';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
 import {isRef} from '../Browse3/pages/common/util';
 import {isCustomWeaveTypePayload} from '../Browse3/typeViews/customWeaveType.types';
-import {customWeaveTypeDispatch} from '../Browse3/typeViews/customWeaveTypeDispatch';
+import {CustomWeaveTypeDispatch} from '../Browse3/typeViews/customWeaveTypeDispatch';
 import {CellValueBoolean} from './CellValueBoolean';
 import {CellValueImage} from './CellValueImage';
 import {CellValueString} from './CellValueString';
@@ -74,11 +74,9 @@ export const CellValue = ({
     );
   }
   if (isCustomWeaveTypePayload(value)) {
-    // If we have have a custom view for this weave type, use it.
-    const customView = customWeaveTypeDispatch(entity, project, value);
-    if (customView) {
-      return customView;
-    }
+    return (
+      <CustomWeaveTypeDispatch data={value} entity={entity} project={project} />
+    );
   }
   return <CellValueString value={JSON.stringify(value)} />;
 };
