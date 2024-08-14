@@ -46,9 +46,10 @@ except ImportError:
     ANTHROPIC_NOT_GIVEN = None
 
 try:
-    from mistralai.types.basemodel import UNSET
+    # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
+    from mistralai.types.basemodel import UNSET # type: ignore
 
-    MISTRAL_NOT_GIVEN = UNSET
+    MISTRAL_NOT_GIVEN = UNSET # type: ignore
 except ImportError:
     MISTRAL_NOT_GIVEN = None
 
