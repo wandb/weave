@@ -2,8 +2,8 @@ import React, {useMemo} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {isCustomWeaveTypePayload} from '../../type_views/customWeaveType.types';
-import {customWeaveTypeDispatch} from '../../type_views/CustomWeaveTypeView';
+import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {customWeaveTypeDispatch} from '../../typeViews/customWeaveTypeDispatch';
 import {isRef} from '../common/util';
 import {
   DataTableView,

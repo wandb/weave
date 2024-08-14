@@ -21,8 +21,8 @@ import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {isCustomWeaveTypePayload} from '../../type_views/customWeaveType.types';
-import {isPILImageImageType} from '../../type_views/PIL.Image.Image/PILImageImage';
+import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {isPILImageImageType} from '../../typeViews/PIL.Image.Image/PILImageImage';
 import {isRef} from '../common/util';
 import {
   LIST_INDEX_EDGE_NAME,
