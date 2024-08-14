@@ -32,6 +32,7 @@ import {
 } from '../../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {isRef} from '../util';
 import {buildTree} from './buildTree';
+import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
 
 /**
  * This function is responsible for taking the raw data and flattening it
@@ -62,6 +63,14 @@ export function prepareFlattenedDataForTable<T>(
   return data.map(r => {
     // First, flatten the inner object
     let flattened = flattenObjectPreservingWeaveTypes(r ?? {});
+
+    // In the rare case that we have custom objects in the root (this only occurs if you directly)
+    // publish a custom object. Then we want to instead nest it under an empty key!
+    if (isCustomWeaveTypePayload(flattened)) {
+      flattened = {
+        ' ': flattened,
+      };
+    }
 
     flattened = replaceTableRefsInFlattenedData(flattened);
 
