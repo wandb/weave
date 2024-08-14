@@ -585,13 +585,7 @@ export const ExampleCompareSection: React.FC<{
       return <NotApplicable />;
     }
 
-    return (
-      <CellValue
-        entity={props.state.data.entity}
-        project={props.state.data.project}
-        value={metricValue}
-      />
-    );
+    return <CellValue value={metricValue} />;
   };
 
   const evalTrialScorerMetricOnClick = (

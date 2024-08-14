@@ -22,27 +22,18 @@ import {ValueViewString} from './ValueViewString';
 type ValueData = Record<string, any>;
 
 type ValueViewProps = {
-  entity: string;
-  project: string;
   data: ValueData;
   isExpanded: boolean;
 };
 
-export const ValueView = ({
-  entity,
-  project,
-  data,
-  isExpanded,
-}: ValueViewProps) => {
+export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
     if (data.valueType === 'object' && '_ref' in data.value) {
       return <SmallRef objRef={parseRef(data.value._ref)} />;
     }
     if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
-      return (
-        <DataTableView entity={entity} project={project} data={data.value} />
-      );
+      return <DataTableView data={data.value} />;
     }
     return null;
   }
@@ -90,12 +81,12 @@ export const ValueView = ({
 
   if (data.valueType === 'object') {
     if (isCustomWeaveTypePayload(data.value)) {
-      let entityForWeaveType = entity;
-      let projectForWeaveType = project;
-
       // This is a little ugly, but essentially if the data is coming from an
       // expanded ref, then we want to use that ref to get the entity and project.
       // Else we just use the current entity and project.
+      let entityForWeaveType: string | undefined;
+      let projectForWeaveType: string | undefined;
+
       if (valueIsExpandedRef(data)) {
         const parsedRef = parseRef((data.value as any)._ref);
         if (isWeaveObjectRef(parsedRef)) {

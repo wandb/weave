@@ -81,15 +81,3 @@ const maybeGetComponentForCustomWeaveTypeData = (
 
   return null;
 };
-
-// export const customWeaveTypeDataHasComponent = (
-//   data: CustomWeaveTypePayload
-// ): boolean => {
-//   const typeId = data.weave_type.type;
-//   const comp = customWeaveTypeRegistry[typeId];
-//   if (comp) {
-//     return true;
-//   }
-
-//   return false;
-// };

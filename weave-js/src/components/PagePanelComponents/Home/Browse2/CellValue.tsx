@@ -14,8 +14,6 @@ import {CellValueString} from './CellValueString';
 import {SmallRef} from './SmallRef';
 
 type CellValueProps = {
-  entity: string;
-  project: string;
   value: any;
   isExpanded?: boolean;
 };
@@ -30,12 +28,7 @@ const Collapsed = styled.div<{hasScrolling: boolean}>`
 `;
 Collapsed.displayName = 'S.Collapsed';
 
-export const CellValue = ({
-  entity,
-  project,
-  value,
-  isExpanded = false,
-}: CellValueProps) => {
+export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
   if (value === undefined) {
     return null;
   }
@@ -74,13 +67,7 @@ export const CellValue = ({
     );
   }
   if (isCustomWeaveTypePayload(value)) {
-    return (
-      <CustomWeaveTypeDispatcher
-        data={value}
-        entity={entity}
-        project={project}
-      />
-    );
+    return <CustomWeaveTypeDispatcher data={value} />;
   }
   return <CellValueString value={JSON.stringify(value)} />;
 };

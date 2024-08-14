@@ -16,6 +16,7 @@ import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../Browse2/SmallRef';
 import {CellFilterWrapper} from '../../../filters/CellFilterWrapper';
+import {CustomWeaveTypeProjectContext} from '../../../typeViews/CustomWeaveTypeDispatcher';
 import {
   OBJECT_ATTR_EDGE_NAME,
   WEAVE_PRIVATE_PREFIX,
@@ -303,7 +304,10 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
               {isExpandedRefWithValueAsTableRef(val) ? (
                 <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
               ) : (
-                <CellValue entity={entity} project={project} value={val} />
+                <CustomWeaveTypeProjectContext.Provider
+                  value={{entity, project}}>
+                  <CellValue value={val} />
+                </CustomWeaveTypeProjectContext.Provider>
               )}
             </CellFilterWrapper>
           </ErrorBoundary>

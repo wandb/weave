@@ -4,6 +4,7 @@ import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {LoadingDots} from '../../../../LoadingDots';
+import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
@@ -217,14 +218,15 @@ const ObjectVersionPageInner: React.FC<{
                   <CenteredAnimatedLoader />
                 ) : (
                   <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <ObjectViewerSection
-                      entity={objectVersion.entity}
-                      project={objectVersion.project}
-                      title=""
-                      data={viewerDataAsObject}
-                      noHide
-                      isExpanded
-                    />
+                    <CustomWeaveTypeProjectContext.Provider
+                      value={{entity: entityName, project: projectName}}>
+                      <ObjectViewerSection
+                        title=""
+                        data={viewerDataAsObject}
+                        noHide
+                        isExpanded
+                      />
+                    </CustomWeaveTypeProjectContext.Provider>
                   </WeaveCHTableSourceRefContext.Provider>
                 )}
               </Box>

@@ -26,8 +26,6 @@ import {ValueView} from './ValueView';
 type Data = Record<string, any>;
 
 type ObjectViewerSectionProps = {
-  entity: string;
-  project: string;
   title: string;
   data: Data;
   noHide?: boolean;
@@ -90,8 +88,6 @@ const ObjectViewerSectionNonEmptyMemoed = React.memo(
 );
 
 const ObjectViewerSectionNonEmpty = ({
-  entity,
-  project,
   title,
   data,
   noHide,
@@ -105,8 +101,6 @@ const ObjectViewerSectionNonEmpty = ({
     if (mode === 'collapsed' || mode === 'expanded') {
       return (
         <ObjectViewer
-          entity={entity}
-          project={project}
           apiRef={apiRef}
           data={data}
           isExpanded={mode === 'expanded'}
@@ -127,7 +121,7 @@ const ObjectViewerSectionNonEmpty = ({
       );
     }
     return null;
-  }, [mode, entity, project, apiRef, data, expandedIds]);
+  }, [mode, apiRef, data, expandedIds]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
@@ -218,8 +212,6 @@ const ObjectViewerSectionNonEmpty = ({
 };
 
 export const ObjectViewerSection = ({
-  entity,
-  project,
   title,
   data,
   noHide,
@@ -227,13 +219,7 @@ export const ObjectViewerSection = ({
 }: ObjectViewerSectionProps) => {
   const currentRef = useContext(WeaveCHTableSourceRefContext);
   if (isCustomWeaveTypePayload(data)) {
-    return (
-      <CustomWeaveTypeDispatcher
-        data={data}
-        entity={entity}
-        project={project}
-      />
-    );
+    return <CustomWeaveTypeDispatcher data={data} />;
   }
 
   const numKeys = Object.keys(data).length;
@@ -257,8 +243,6 @@ export const ObjectViewerSection = ({
     ) {
       return (
         <ObjectViewerSectionNonEmptyMemoed
-          entity={entity}
-          project={project}
           title={title}
           data={{Value: value}}
           noHide={noHide}
@@ -276,12 +260,7 @@ export const ObjectViewerSection = ({
         <TitleRow>
           <Title>{title}</Title>
         </TitleRow>
-        <ValueView
-          entity={entity}
-          project={project}
-          data={oneResultData}
-          isExpanded={true}
-        />
+        <ValueView data={oneResultData} isExpanded={true} />
       </>
     );
   }
@@ -318,8 +297,6 @@ export const ObjectViewerSection = ({
   }
   return (
     <ObjectViewerSectionNonEmpty
-      entity={entity}
-      project={project}
       title={title}
       data={data}
       noHide={noHide}

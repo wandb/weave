@@ -44,8 +44,6 @@ import {ValueView} from './ValueView';
 type Data = Record<string, any>;
 
 type ObjectViewerProps = {
-  entity: string;
-  project: string;
   apiRef: React.MutableRefObject<GridApiPro>;
   data: Data;
   isExpanded: boolean;
@@ -68,8 +66,6 @@ type RefValues = Record<string, any>; // ref URI to value
 
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({
-  entity,
-  project,
   apiRef,
   data,
   isExpanded,
@@ -284,14 +280,7 @@ export const ObjectViewer = ({
             }
           }
 
-          const colInner = (
-            <ValueView
-              entity={entity}
-              project={project}
-              data={row}
-              isExpanded={isExpanded}
-            />
-          );
+          const colInner = <ValueView data={row} isExpanded={isExpanded} />;
           if (baseRef) {
             return (
               <WeaveCHTableSourceRefContext.Provider value={baseRef}>
@@ -303,7 +292,7 @@ export const ObjectViewer = ({
         },
       },
     ];
-  }, [currentRefContext, entity, expandedRefs, isExpanded, project]);
+  }, [currentRefContext, expandedRefs, isExpanded]);
 
   // Here, we setup the `Path` column which acts as a grouping column. This
   // column is responsible for showing the expand/collapse icons and handling

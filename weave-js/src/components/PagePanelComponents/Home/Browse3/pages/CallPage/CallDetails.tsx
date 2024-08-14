@@ -8,6 +8,7 @@ import styled from 'styled-components';
 import {MOON_800} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {CallsTable} from '../CallsPage/CallsTable';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
@@ -117,12 +118,10 @@ export const CallDetails: FC<{
             flex: '0 0 auto',
             p: 2,
           }}>
-          <ObjectViewerSection
-            entity={call.entity}
-            project={call.project}
-            title="Inputs"
-            data={inputs}
-          />
+          <CustomWeaveTypeProjectContext.Provider
+            value={{entity: call.entity, project: call.project}}>
+            <ObjectViewerSection title="Inputs" data={inputs} />
+          </CustomWeaveTypeProjectContext.Provider>
         </Box>
         <Box
           sx={{
@@ -137,12 +136,10 @@ export const CallDetails: FC<{
               <ExceptionDetails exceptionInfo={excInfo} />
             </>
           ) : (
-            <ObjectViewerSection
-              entity={call.entity}
-              project={call.project}
-              title="Outputs"
-              data={output}
-            />
+            <CustomWeaveTypeProjectContext.Provider
+              value={{entity: call.entity, project: call.project}}>
+              <ObjectViewerSection title="Outputs" data={output} />
+            </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
         {multipleChildCallOpRefs.map(opVersionRef => {
