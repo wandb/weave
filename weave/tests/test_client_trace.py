@@ -2147,38 +2147,39 @@ def test_call_query_stream_equality(client):
 def test_call_query_stream_columns(client):
     @weave.op
     def calculate(a: int, b: int) -> int:
-        return {"result": {"a + b": a + b}}
+        return {"result": {"a + b": a + b}, "not result": 123}
 
     for i in range(2):
         calculate(i, i * i)
 
-    calls = client.server.calls_query(
+    calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
             columns=["id", "inputs"],
         )
     )
-
-    assert len(calls.calls) == 2
-    assert len(calls.calls[0].inputs) == 2
+    calls = list(calls)
+    assert len(calls) == 2
+    assert len(calls[0].inputs) == 2
 
     # NO output returned because not required and not requested
-    assert calls.calls[0].output is None
-    assert calls.calls[0].ended_at is None
-    assert calls.calls[0].attributes == {}
-    assert calls.calls[0].inputs == {"a": 0, "b": 0}
+    assert calls[0].output is None
+    assert calls[0].ended_at is None
+    assert calls[0].attributes == {}
+    assert calls[0].inputs == {"a": 0, "b": 0}
 
     # now explicitly get output
-    calls = client.server.calls_query(
+    calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
             columns=["id", "inputs", "output.result"],
         )
     )
-    assert len(calls.calls) == 2
-    assert calls.calls[0].output["result"]["a + b"] == 0
-    assert calls.calls[0].attributes == {}
-    assert calls.calls[0].inputs == {"a": 0, "b": 0}
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].output["result"]["a + b"] == 0
+    assert calls[0].attributes == {}
+    assert calls[0].inputs == {"a": 0, "b": 0}
 
 
 @pytest.mark.skip("Not implemented: filter / sort through refs")
