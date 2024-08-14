@@ -11,6 +11,14 @@ weave_prefix = ri.WEAVE_SCHEME + ":///"
 weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
 
 
+class InvalidExternalRef(ValueError):
+    pass
+
+
+class InvalidInternalRef(ValueError):
+    pass
+
+
 def universal_ext_to_int_ref_converter(
     obj: A, convert_ext_to_int_project_id: typing.Callable[[str], str]
 ) -> A:
@@ -36,7 +44,7 @@ def universal_ext_to_int_ref_converter(
         rest = ref_str[len(weave_prefix) :]
         parts = rest.split("/", 2)
         if len(parts) != 3:
-            raise ValueError(f"Invalid URI: {ref_str}")
+            raise InvalidExternalRef(f"Invalid URI: {ref_str}")
         entity, project, tail = parts
         project_key = f"{entity}/{project}"
         if project_key not in ext_to_int_project_cache:
@@ -54,7 +62,7 @@ def universal_ext_to_int_ref_converter(
                 # It is important to raise here as this would be the result of
                 # an external client attempting to write internal refs directly.
                 # We want to maintain full control over the internal refs.
-                raise ValueError("Invalid ref format.")
+                raise InvalidExternalRef("Invalid ref format.")
         return obj
 
     return _map_values(obj, mapper)
@@ -90,7 +98,7 @@ def universal_int_to_ext_ref_converter(
         rest = ref_str[len(weave_internal_prefix) :]
         parts = rest.split("/", 1)
         if len(parts) != 2:
-            raise ValueError(f"Invalid URI: {ref_str}")
+            raise InvalidInternalRef(f"Invalid URI: {ref_str}")
         project_id, tail = parts
         if project_id not in int_to_ext_project_cache:
             int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
@@ -112,7 +120,7 @@ def universal_int_to_ext_ref_converter(
                 # future that a programming error leads to this situation, in
                 # which case reading this object would consistently fail. We
                 # might want to instead return a private ref in this case.
-                raise ValueError("Encountered unexpected ref.")
+                raise InvalidInternalRef("Encountered unexpected ref format.")
         return obj
 
     return _map_values(obj, mapper)
