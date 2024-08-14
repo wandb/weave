@@ -1,3 +1,4 @@
+import pytest
 from PIL import Image
 
 import weave
@@ -52,6 +53,7 @@ def test_image_publish(client: WeaveClient) -> None:
     assert img.tobytes() == gotten_img.tobytes()
 
 
+@pytest.skip("Datasets do not yet support objects in cells")
 def test_image_as_dataset_cell(client: WeaveClient) -> None:
     img = Image.new("RGB", (1024, 1024), "purple")
     dataset = weave.Dataset(rows=[{"img": img}])

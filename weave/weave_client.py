@@ -846,9 +846,13 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
-        self._save_nested_objects(table.rows)
-        rows = map_to_refs(table.rows)
-        rows = to_json(rows, self._project_id(), self.server)
+        rows = table.rows
+
+        # TODO: Possible implementation of objects-in-cells support
+        # requires uncommenting the following lines
+        # self._save_nested_objects(rows)
+        # rows = map_to_refs(rows)
+        # rows = to_json(rows, self._project_id(), self.server)
 
         response = self.server.table_create(
             TableCreateReq(
