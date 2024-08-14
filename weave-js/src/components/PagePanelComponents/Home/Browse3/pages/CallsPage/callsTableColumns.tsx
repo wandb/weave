@@ -17,6 +17,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
+import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
 import {
   getTokensAndCostFromUsage,
   getUsageFromCellParams,
@@ -24,7 +25,6 @@ import {
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
-import {allOperators} from '../common/tabularListViews/operators';
 import {isRef} from '../common/util';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
@@ -52,7 +52,8 @@ export const useCallsTableColumns = (
   expandedRefCols: Set<string>,
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
-  columnIsRefExpanded: (col: string) => boolean
+  columnIsRefExpanded: (col: string) => boolean,
+  onAddFilter?: (field: string, operator: string | null, value: any) => void
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -126,7 +127,8 @@ export const useCallsTableColumns = (
         columnsWithRefs,
         onExpand,
         columnIsRefExpanded,
-        userDefinedColumnWidths
+        userDefinedColumnWidths,
+        onAddFilter
       ),
     [
       entity,
@@ -141,6 +143,7 @@ export const useCallsTableColumns = (
       onExpand,
       columnIsRefExpanded,
       userDefinedColumnWidths,
+      onAddFilter,
     ]
   );
 
@@ -163,7 +166,8 @@ function buildCallsTableColumns(
   columnsWithRefs: Set<string>,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  userDefinedColumnWidths: Record<string, number>
+  userDefinedColumnWidths: Record<string, number>,
+  onAddFilter?: (field: string, operator: string | null, value: any) => void
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -178,9 +182,6 @@ function buildCallsTableColumns(
       field: 'op_name',
       headerName: 'Trace',
       minWidth: 100,
-      // This filter should be controlled by the custom filter
-      // in the header
-      filterable: false,
       width: 250,
       hideable: false,
       valueGetter: rowParams => {
@@ -265,13 +266,8 @@ function buildCallsTableColumns(
       headerName: 'Status',
       headerAlign: 'center',
       sortable: false,
-      disableColumnMenu: true,
+      // disableColumnMenu: true,
       resizable: false,
-      // Again, the underlying value is not obvious to the user,
-      // so the default free-form filter is likely more confusing than helpful.
-      filterable: false,
-      // type: 'singleSelect',
-      // valueOptions: ['SUCCESS', 'ERROR', 'PENDING'],
       width: 59,
       valueGetter: cellParams => {
         return traceCallStatusCode(cellParams.row);
@@ -295,8 +291,9 @@ function buildCallsTableColumns(
     onExpand,
     // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
     key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
-    // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key)
+    (key, operator, value) => {
+      onAddFilter?.(key, operator, value);
+    }
   );
   cols.push(...newCols);
 
@@ -305,9 +302,6 @@ function buildCallsTableColumns(
     headerName: 'User',
     headerAlign: 'center',
     width: 50,
-    // Might be confusing to enable as-is, because the user sees name /
-    // email but the underlying data is userId.
-    filterable: false,
     align: 'center',
     sortable: false,
     resizable: false,
@@ -316,26 +310,41 @@ function buildCallsTableColumns(
       if (userId == null) {
         return null;
       }
-      return <UserLink userId={userId} />;
+      return (
+        <CellFilterWrapper
+          onAddFilter={onAddFilter}
+          field="wb_user_id"
+          operation="(string): equals"
+          value={userId}>
+          <UserLink userId={userId} />
+        </CellFilterWrapper>
+      );
     },
   });
 
   const startedAtCol: GridColDef<TraceCallSchema> = {
     field: 'started_at',
     headerName: 'Called',
-    // Should have custom timestamp filter here.
-    filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
     sortable: true,
     sortingOrder: ['desc', 'asc'],
     width: 100,
     minWidth: 100,
     maxWidth: 100,
     renderCell: cellParams => {
+      // TODO: A better filter might be to be on the same day?
+      const date = convertISOToDate(cellParams.row.started_at);
+      const filterDate = new Date(date);
+      filterDate.setSeconds(0, 0);
+      const filterValue = filterDate.toISOString();
+      const value = date.getTime() / 1000;
       return (
-        <Timestamp
-          value={convertISOToDate(cellParams.row.started_at).getTime() / 1000}
-          format="relative"
-        />
+        <CellFilterWrapper
+          onAddFilter={onAddFilter}
+          field="started_at"
+          operation="(date): after"
+          value={filterValue}>
+          <Timestamp value={value} format="relative" />
+        </CellFilterWrapper>
       );
     },
   };

@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import {
   GridColumnVisibilityModel,
+  GridFilterModel,
   GridPaginationModel,
   GridPinnedColumns,
   GridSortModel,
@@ -58,6 +59,7 @@ import {
   WeaveflowPeekContext,
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
+import {getValidFilterModel} from './Browse3/grid/filters';
 import {
   DEFAULT_PAGE_SIZE,
   getValidPaginationModel,
@@ -71,6 +73,7 @@ import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {
   ALWAYS_PIN_LEFT_CALLS,
   DEFAULT_COLUMN_VISIBILITY_CALLS,
+  DEFAULT_FILTER_CALLS,
   DEFAULT_PIN_CALLS,
   DEFAULT_SORT_CALLS,
 } from './Browse3/pages/CallsPage/CallsTable';
@@ -653,7 +656,7 @@ const CallPageBinding = () => {
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParams<Browse3TabParams>();
   const query = useURLSearchParamsDict();
-  const filters = useMemo(() => {
+  const initialFilter = useMemo(() => {
     if (tab === 'evaluations') {
       return {
         frozen: true,
@@ -713,6 +716,20 @@ const CallsPageBinding = () => {
     history.push({search: newQuery.toString()});
   };
 
+  const filterModel = useMemo(
+    () => getValidFilterModel(query.filters, DEFAULT_FILTER_CALLS),
+    [query.filters]
+  );
+  const setFilterModel = (newModel: GridFilterModel) => {
+    const newQuery = new URLSearchParams(location.search);
+    if (newModel.items.length === 0) {
+      newQuery.delete('filters');
+    } else {
+      newQuery.set('filters', JSON.stringify(newModel));
+    }
+    history.push({search: newQuery.toString()});
+  };
+
   const sortModel = useMemo(
     () => getValidSortModel(query.sort, DEFAULT_SORT_CALLS),
     [query.sort]
@@ -752,12 +769,14 @@ const CallsPageBinding = () => {
     <CallsPage
       entity={entity}
       project={project}
-      initialFilter={filters}
+      initialFilter={initialFilter}
       onFilterUpdate={onFilterUpdate}
       columnVisibilityModel={columnVisibilityModel}
       setColumnVisibilityModel={setColumnVisibilityModel}
       pinModel={pinModel}
       setPinModel={setPinModel}
+      filterModel={filterModel}
+      setFilterModel={setFilterModel}
       sortModel={sortModel}
       setSortModel={setSortModel}
       paginationModel={paginationModel}
