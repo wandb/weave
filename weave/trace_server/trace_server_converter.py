@@ -7,6 +7,9 @@ from . import refs_internal as ri
 A = typing.TypeVar("A")
 B = typing.TypeVar("B")
 
+weave_prefix = ri.WEAVE_SCHEME + ":///"
+weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
+
 
 def universal_ext_to_int_ref_converter(
     obj: A, convert_ext_to_int_project_id: typing.Callable[[str], str]
@@ -26,7 +29,6 @@ def universal_ext_to_int_ref_converter(
         references.
     """
     ext_to_int_project_cache: typing.Dict[str, str] = {}
-    weave_prefix = ri.WEAVE_SCHEME + ":///"
 
     def replace_ref(ref_str: str) -> str:
         if not ref_str.startswith(weave_prefix):
@@ -45,8 +47,14 @@ def universal_ext_to_int_ref_converter(
         return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
 
     def mapper(obj: B) -> B:
-        if isinstance(obj, str) and obj.startswith(weave_prefix):
-            return typing.cast(B, replace_ref(obj))
+        if isinstance(obj, str):
+            if obj.startswith(weave_prefix):
+                return typing.cast(B, replace_ref(obj))
+            elif obj.startswith(weave_internal_prefix):
+                # It is important to raise here as this would be the result of
+                # an external client attempting to write internal refs directly.
+                # We want to maintain full control over the internal refs.
+                raise ValueError("Invalid ref format.")
         return obj
 
     return _map_values(obj, mapper)
@@ -76,8 +84,6 @@ def universal_int_to_ext_ref_converter(
     """
     int_to_ext_project_cache: dict[str, typing.Optional[str]] = {}
 
-    weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
-
     def replace_ref(ref_str: str) -> str:
         if not ref_str.startswith(weave_internal_prefix):
             raise ValueError(f"Invalid URI: {ref_str}")
@@ -96,8 +102,17 @@ def universal_int_to_ext_ref_converter(
         return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
 
     def mapper(obj: D) -> D:
-        if isinstance(obj, str) and obj.startswith(weave_internal_prefix):
-            return typing.cast(D, replace_ref(obj))
+        if isinstance(obj, str):
+            if obj.startswith(weave_internal_prefix):
+                return typing.cast(D, replace_ref(obj))
+            elif obj.startswith(weave_prefix):
+                # It is important to raise here as this would be the result of
+                # incorrectly storing an external ref at the database layer,
+                # rather than an internal ref. There is a possibility in the
+                # future that a programming error leads to this situation, in
+                # which case reading this object would consistently fail. We
+                # might want to instead return a private ref in this case.
+                raise ValueError("Encountered unexpected ref.")
         return obj
 
     return _map_values(obj, mapper)
