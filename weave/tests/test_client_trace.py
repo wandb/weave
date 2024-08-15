@@ -16,6 +16,7 @@ import weave
 from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace_server.ids import generate_id
+from weave.trace_server.refs_internal import quote_select
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 from ..trace_server import trace_server_interface as tsi
@@ -2423,11 +2424,6 @@ def test_model_save(client):
     )
 
 
-def quote_ref_part(name):
-    # TODO: IMPLEMENT ME - this is incorrect
-    return name
-
-
 def test_objects_and_keys_with_special_characters(client):
     name_with_special_characters = "name: /!@#$%^&*()_+"  # make sure to include ":", "/", and "%" which are URI-related
     dict_payload = {name_with_special_characters: "hello world"}
@@ -2442,7 +2438,7 @@ def test_objects_and_keys_with_special_characters(client):
 
     project_id = client._project_id()
     ref_base = f"weave:///{project_id}/object"
-    exp_name = quote_ref_part(name_with_special_characters)
+    exp_name = quote_select(name_with_special_characters)
     exp_digest = "rUA8vNX3RqX6rPAVmdeNyJrMtmx3h8qOPxnlulaeB78"
 
     exp_obj_ref = f"{ref_base}/{exp_name}:{exp_digest}"

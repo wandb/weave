@@ -29,7 +29,7 @@ class InvalidInternalRef(ValueError):
     pass
 
 
-def quote_select(s: str, quote_chars: tuple[str, ...] = ("/", ":", "%")) -> str:
+def quote_select(s: str, quote_chars: tuple[str, ...] = ("%", "/", ":")) -> str:
     """We don't need to quote every single character, rather
     we just need to quote the characters that are used as
     delimiters in the URI. Right now, we only use "/", ":", and "%". Moreover,
@@ -39,11 +39,11 @@ def quote_select(s: str, quote_chars: tuple[str, ...] = ("/", ":", "%")) -> str:
     """
     # We have to be careful here since quoting creates new "%" characters.
     # We don't want to double-quote characters.
-    if "%" in quote_chars and quote_chars[-1] != "%":
-        raise ValueError("Quoting '%' must be the last character in the list.")
+    if "%" in quote_chars and quote_chars[0] != "%":
+        raise ValueError("Quoting '%' must be the first character in the list.")
 
     for c in quote_chars:
-        s = s.replace(c, urllib.parse.quote(c))
+        s = s.replace(c, urllib.parse.quote_plus(c))
 
     return s
 
