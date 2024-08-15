@@ -8,6 +8,8 @@ LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
 OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
 TABLE_ROW_ID_EDGE_NAME = refs_internal.TABLE_ROW_ID_EDGE_NAME
 
+quote = refs_internal.quote_select
+
 
 @dataclasses.dataclass(frozen=True)
 class Ref:
@@ -54,9 +56,9 @@ class ObjectRef(RefWithExtra):
     extra: tuple[str, ...] = ()
 
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
+        u = f"weave:///{self.entity}/{self.project}/object/{quote(self.name)}:{self.digest}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join(quote(e) for e in self.extra)
         return u
 
     def get(self) -> Any:
@@ -104,9 +106,9 @@ class ObjectRef(RefWithExtra):
 @dataclasses.dataclass(frozen=True)
 class OpRef(ObjectRef):
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
+        u = f"weave:///{self.entity}/{self.project}/op/{quote(self.name)}:{self.digest}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join(quote(e) for e in self.extra)
         return u
 
 
@@ -120,7 +122,7 @@ class CallRef(RefWithExtra):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join(quote(e) for e in self.extra)
         return u
 
 
@@ -143,22 +145,22 @@ def parse_uri(uri: str) -> AnyRef:
             entity=entity, project=project, id=remaining[0], extra=remaining[1:]
         )
     elif kind == "object":
-        name, version = remaining[0].split(":")
+        name, version, extra = refs_internal._parse_remaining(remaining)
         return ObjectRef(
             entity=entity,
             project=project,
             name=name,
             digest=version,
-            extra=remaining[1:],
+            extra=extra,
         )
     elif kind == "op":
-        name, version = remaining[0].split(":")
+        name, version, extra = refs_internal._parse_remaining(remaining)
         return OpRef(
             entity=entity,
             project=project,
             name=name,
             digest=version,
-            extra=remaining[1:],
+            extra=extra,
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
