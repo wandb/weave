@@ -2421,3 +2421,42 @@ def test_model_save(client):
     assert isinstance(expected_predict_op, str) and expected_predict_op.startswith(
         "weave:///"
     )
+
+
+def quote_ref_part(name):
+    # TODO: IMPLEMENT ME - this is incorrect
+    return name
+
+
+def test_objects_and_keys_with_special_characters(client):
+    name_with_special_characters = "name: /!@#$%^&*()_+"  # make sure to include ":", "/", and "%" which are URI-related
+    dict_payload = {name_with_special_characters: "hello world"}
+
+    class Custom(weave.Object):
+        val: dict
+
+    obj = Custom(name=name_with_special_characters, val=dict_payload)
+
+    weave.publish(obj)
+    assert obj.ref is not None
+
+    project_id = client._project_id()
+    ref_base = f"weave:///{project_id}/object"
+    exp_name = quote_ref_part(name_with_special_characters)
+    exp_digest = "rUA8vNX3RqX6rPAVmdeNyJrMtmx3h8qOPxnlulaeB78"
+
+    exp_obj_ref = f"{ref_base}/{exp_name}:{exp_digest}"
+    assert obj.ref.uri() == exp_obj_ref
+
+    @weave.op
+    def test(obj: Custom):
+        return obj.val[name_with_special_characters]
+
+    res = test(obj)
+
+    exp_res_ref = f"{exp_obj_ref}/attr/val/key/{exp_name}"
+    assert res == "hello world"
+    assert res.ref.uri() == exp_res_ref
+
+    gotten_res = weave.ref(exp_res_ref).get()
+    assert gotten_res == "hello world"
