@@ -336,7 +336,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # if "feedback" in expand_columns:
         #     feedback = self._hydrate_calls_feedback(calls)
 
+        from pprint import pprint
+
+        pprint(calls)
         calls = self._expand_call_refs(calls, expand_columns, ref_cache)
+
+        pprint(calls)
+        calls = self._expand_call_refs(calls, expand_columns, ref_cache)
+
+        pprint(calls)
+        calls = self._expand_call_refs(calls, expand_columns, ref_cache)
+
+        pprint(calls)
 
         return calls
 
@@ -413,23 +424,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     if isinstance(
                         val, str
                     ) and refs_internal.string_will_be_interpreted_as_ref(val):
-                        print("val is a ref!", val)
+                        print("found a nested ref! ", col, col_prefix, val)
                         continue
-                    print(
-                        "i",
-                        i,
-                        "col",
-                        col,
-                        "col_prefix",
-                        col_prefix,
-                        "part",
-                        part,
-                        "val",
-                        val,
-                    )
                     if part not in val:
                         raise ValueError(
-                            f"Missing part {part} in val {val} from column {col}"
+                            f"Missing part '{part}' in val '{val}' from column '{col}'"
                         )
                     val = val[part]
 
@@ -1036,14 +1035,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             or any(r.unresolved_table_ref is not None for r in extra_results)
             or any(r.remaining_extra for r in extra_results)
         ):
-            print(
-                "parsed_refs",
-                parsed_refs,
-                "cache",
-                root_val_cache,
-                "\nResolving refs, ",
-                extra_results,
-            )
             # Resolve any unresolved object refs
             needed_extra_results: list[typing.Tuple[int, PartialRefResult]] = []
             for i, extra_result in enumerate(extra_results):
