@@ -296,7 +296,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not req.expand_columns:
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(
-                    _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))  # type: ignore
+                    _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
                 )
 
         else:
@@ -304,7 +304,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             batch = []
             ref_cache: typing.Dict[str, typing.Any] = {}
             for row in raw_res:
-                call_dict = _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))  # type: ignore
+                call_dict = _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
                 batch.append(call_dict)
 
                 if len(batch) >= batch_size:
@@ -315,7 +315,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         yield tsi.CallSchema.model_validate(call)
 
                     batch = []
-                    # Increase the batch size exponentially, but don't go over 1000
+                    # dynamically increase the batch size
                     batch_size = min(1000, batch_size * 2)
 
             hydrated_batch = self._hydrate_calls(batch, req.expand_columns, ref_cache)
