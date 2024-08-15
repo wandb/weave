@@ -265,10 +265,8 @@ def main():
     from weave import feedback
     from weave import weave_client as client
     from weave.trace import util
-    from weave.trace_server import (
-        remote_http_trace_server,
-        trace_server_interface,
-    )
+    from weave.trace.trace_server_bindings import remote_http_trace_server
+    from weave.trace_server import trace_server_interface
     from weave.trace_server.interface import query
 
     module_root_path = weave.__file__.split("/weave/__init__.py")[0]

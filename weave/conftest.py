@@ -17,14 +17,9 @@ from weave import weave_init
 from weave.legacy import client as client_legacy
 from weave.legacy import context_state, io_service, serialize
 from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context
-from weave.trace_server import (
-    clickhouse_trace_server_batched,
-    remote_http_trace_server,
-    sqlite_trace_server,
-)
-from weave.trace_server import (
-    trace_server_interface as tsi,
-)
+from weave.trace.trace_server_bindings import remote_http_trace_server
+from weave.trace_server import clickhouse_trace_server_batched, sqlite_trace_server
+from weave.trace_server import trace_server_interface as tsi
 
 from . import autopatch, environment, logs
 from .tests import fixture_fakewandb
