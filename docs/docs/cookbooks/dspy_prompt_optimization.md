@@ -1,6 +1,5 @@
 ---
 title: Optimizing LLM Workflows Using DSPy and Weave
-hide_table_of_contents: true
 ---
 
 
