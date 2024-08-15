@@ -39,16 +39,6 @@ const sidebars: SidebarsConfig = {
       ],
     },
     {
-      label: "Cookbooks",
-      ...CATEGORY_SECTION_HEADER_MIXIN,
-      items: [
-        {
-          type: 'doc',
-          id: "cookbooks/dspy_prompt_optimization"
-        },
-      ],
-    },
-    {
       label: "Product Walkthrough",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
