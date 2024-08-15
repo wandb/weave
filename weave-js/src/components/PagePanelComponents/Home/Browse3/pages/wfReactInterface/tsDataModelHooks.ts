@@ -11,6 +11,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import { privateRefToSimpleName } from '../../../../../../util/refs';
 import {
   callCache,
   objectVersionCache,
@@ -1402,15 +1403,6 @@ const projectIdToParts = (projectId: string) => {
 // Hack - underlying client should be updated to handle deleted projects better.
 const isValidTraceCall = (callRes: traceServerTypes.TraceCallSchema) => {
   return !('detail' in callRes);
-};
-
-export const privateRefToSimpleName = (ref: string) => {
-  const trimmed = ref.replace(`${WEAVE_PRIVATE_PREFIX}//`, '');
-  try {
-    return decodeURIComponent(trimmed.split('/')[1].split(':')[0]);
-  } catch (e) {
-    return trimmed;
-  }
 };
 
 export const traceCallToUICallSchema = (

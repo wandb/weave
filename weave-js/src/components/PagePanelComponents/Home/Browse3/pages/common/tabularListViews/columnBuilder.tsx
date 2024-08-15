@@ -20,7 +20,7 @@ import {
   OBJECT_ATTR_EDGE_NAME,
   WEAVE_PRIVATE_PREFIX,
 } from '../../wfReactInterface/constants';
-import {privateRefToSimpleName} from '../../wfReactInterface/tsDataModelHooks';
+import {privateRefToSimpleName} from '@wandb/weave/util/refs';
 import {
   EXPANDED_REF_REF_KEY,
   EXPANDED_REF_VAL_KEY,
