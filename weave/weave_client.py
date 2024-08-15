@@ -381,9 +381,8 @@ class WeaveClient:
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
-            if resp.project_name:
-                # Set Client project name, which may have been formatted
-                self.project = resp.project_name
+            # Set Client project name with updated project name
+            self.project = resp.project_name
 
     ################ High Level Convenience Methods ################
 

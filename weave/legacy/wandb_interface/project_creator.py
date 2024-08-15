@@ -39,16 +39,14 @@ def wandb_logging_disabled() -> typing.Iterator[None]:
     wandb.termerror = original_termerror
 
 
-def ensure_project_exists(
-    entity_name: str, project_name: str
-) -> typing.Dict[str, typing.Optional[str]]:
+def ensure_project_exists(entity_name: str, project_name: str) -> typing.Dict[str, str]:
     with wandb_logging_disabled():
         return _ensure_project_exists(entity_name, project_name)
 
 
 def _ensure_project_exists(
     entity_name: str, project_name: str
-) -> typing.Dict[str, typing.Optional[str]]:
+) -> typing.Dict[str, str]:
     """
     Ensures that a W&B project exists by trying to access it, returns the project_name,
     which is not guaranteed to be the same if the provided project_name contains invalid
@@ -81,5 +79,4 @@ def _ensure_project_exists(
                 raise UnableToCreateProject(
                     f"Failed to create project {entity_name}/{project_name}"
                 )
-    project_name_maybe: typing.Optional[str] = None if not project else project["name"]
-    return {"project_name": project_name_maybe}
+    return {"project_name": project["name"]}
