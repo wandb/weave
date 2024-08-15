@@ -9,9 +9,9 @@ from pydantic import BaseModel, ValidationError
 from weave.environment import weave_trace_server_url
 from weave.legacy.wandb_interface import project_creator
 
-from ..trace_server import requests
-from ..trace_server import trace_server_interface as tsi
-from ..trace_server.async_batch_processor import AsyncBatchProcessor
+from ...trace_server import requests
+from ...trace_server import trace_server_interface as tsi
+from ...trace_server.async_batch_processor import AsyncBatchProcessor
 
 logger = logging.getLogger(__name__)
 
