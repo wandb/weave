@@ -520,7 +520,7 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     ':',
     '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
     '/?', // Ref extra portion is optional
-    '(*)', // Optional ref extra, capture everything
+    '(.*)?', // Optional ref extra, capture everything
     '$', // End of the string
   ].join('')
 );
