@@ -26,11 +26,14 @@ export const makeRefObject = (
   objectVersion: string,
   refExtra: string | undefined = undefined
 ): string => {
+  let objNameAndVersion = `${encodeSelect(objectId)}:${objectVersion}`;
+  if (objectType === 'table') {
+    objNameAndVersion = objectVersion
+  }
+
   let ref = `${WEAVE_REF_PREFIX}${entity}/${
     project
-  }/${objectType}/${
-    encodeSelect(objectId
-  )}:${objectVersion}`;
+  }/${objectType}/${objNameAndVersion}`;
   if (refExtra && refExtra !== '') {
     ref += `/${refExtra.split('/').map(encodeSelect).join('/')}`;
   }

@@ -64,10 +64,10 @@ import {
   getChainRootVar,
   isConstructor,
 } from './core/mutate';
-import {trimStartChar} from './core/util/string';
 import {UseNodeValueServerExecutionError} from './errors';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
+import {makeRefObject} from './util/refs';
 // import {useTraceUpdate} from './common/util/hooks';
 
 /**
@@ -575,8 +575,8 @@ export const parseRef = (ref: string): ObjectRef => {
 
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
-  const decodedUri = decodeURIComponent(url.pathname);
-  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
+  const trimmed = url.pathname.replace(/^\/+/, '');
+  const splitUri = trimmed.split('/', splitLimit);
 
   if (splitUri.length !== splitLimit) {
     throw new Error(`Invalid Artifact URI: ${url}`);
@@ -607,7 +607,6 @@ export const parseRef = (ref: string): ObjectRef => {
   }
 
   if (isWeaveRef) {
-    const trimmed = trimStartChar(decodedUri, '/');
     const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
     if (tableMatch !== null) {
       const [entity, project, digest] = tableMatch.slice(1);
@@ -651,9 +650,11 @@ export const parseRef = (ref: string): ObjectRef => {
       entityName,
       projectName,
       weaveKind: weaveKind as WeaveKind,
-      artifactName,
+      artifactName: decodeURIComponent(artifactName),
       artifactVersion,
-      artifactRefExtra: artifactRefExtra ?? '',
+      artifactRefExtra: (
+        artifactRefExtra.split('/').map(decodeURIComponent) as any
+      ).join('/'),
     };
   }
   throw new Error(`Unknown protocol: ${url.protocol}`);
@@ -685,23 +686,26 @@ export const refUri = (ref: ObjectRef): string => {
     }
     return uri;
   } else if (isWeaveObjectRef(ref)) {
-    let name = `${ref.artifactName}:${ref.artifactVersion}`;
-    if (ref.artifactName === '' && ref.weaveKind === 'table') {
-      name = ref.artifactVersion;
+    let extra: string | undefined = ref.artifactRefExtra;
+    // UGG Why does this happen???
+    if (extra?.startsWith('/')) {
+      extra = extra.slice(1);
     }
-    let uri = `weave:///${ref.entityName}/${ref.projectName}/${ref.weaveKind}/${name}`;
-    if (ref.artifactRefExtra != null && ref.artifactRefExtra !== '') {
-      if (ref.artifactRefExtra.startsWith('/')) {
-        // UGG Why does this happen???
-        uri = `${uri}${ref.artifactRefExtra}`;
-      } else {
-        uri = `${uri}/${ref.artifactRefExtra}`;
-      }
+    if (extra?.endsWith('/')) {
+      extra = extra.slice(0, -1);
     }
-    if (uri.endsWith('/')) {
-      uri = uri.slice(0, -1);
+    if (extra === '') {
+      extra = undefined;
     }
-    return uri;
+
+    return makeRefObject(
+      ref.entityName,
+      ref.projectName,
+      ref.weaveKind,
+      ref.artifactName,
+      ref.artifactVersion,
+      extra
+    );
   } else {
     return `local-artifact:///${ref.artifactName}/${ref.artifactPath}`;
   }
