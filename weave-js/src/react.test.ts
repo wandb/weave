@@ -126,7 +126,7 @@ describe('parseRef', () => {
       allChars.push(String.fromCharCode(i));
     }
 
-    const allCharsNoSlashOrColon = allChars.filter((c) => c !== '/' && c !== ':');
+    const allCharsNoSlashOrColon = allChars.filter(c => c !== '/' && c !== ':');
 
     const ref: WeaveObjectRef = {
       scheme: 'weave',
@@ -143,10 +143,8 @@ describe('parseRef', () => {
       ref.entityName,
       ref.projectName,
       ref.weaveKind,
-      encodeURIComponent(ref.artifactName) +
-        ':' +
-        ref.artifactVersion,
-      ref.artifactRefExtra?.split("/").map(encodeURIComponent).join('/'),
+      encodeURIComponent(ref.artifactName) + ':' + ref.artifactVersion,
+      ref.artifactRefExtra?.split('/').map(encodeURIComponent).join('/'),
     ].join('/');
     const genUrl = refUri(ref);
     expect(genUrl).toEqual(checkUrl);

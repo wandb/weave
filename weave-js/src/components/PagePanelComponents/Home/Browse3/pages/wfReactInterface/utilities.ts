@@ -6,7 +6,7 @@
  */
 
 import {parseRef, WeaveKind} from '../../../../../../react';
-import { makeRefObject } from '../../../../../../util/refs';
+import {makeRefObject} from '../../../../../../util/refs';
 import {WANDB_ARTIFACT_SCHEME} from '../../../common';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
@@ -54,7 +54,7 @@ export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
     key.project,
     'op',
     key.opId,
-    key.versionHash,
+    key.versionHash
   );
 };
 
@@ -107,8 +107,8 @@ export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
       key.weaveKind,
       key.objectId,
       key.versionHash,
-      key.refExtra,
-    )
+      key.refExtra
+    );
   }
   throw new Error('Invalid scheme: ' + key);
 };
