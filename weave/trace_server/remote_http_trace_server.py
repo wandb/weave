@@ -108,11 +108,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self._auth: t.Optional[t.Tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
-    def ensure_project_exists(self, entity: str, project: str) -> t.Optional[str]:
+    def ensure_project_exists(
+        self, entity_name: str, project_name: str
+    ) -> tsi.EnsureProjectExistsRes:
         # TODO: This should happen in the wandb backend, not here, and it's slow
         # (hundreds of ms)
-        project_name = project_creator.ensure_project_exists(entity, project)
-        return project_name
+        res = project_creator.ensure_project_exists(entity_name, project_name)
+        return tsi.EnsureProjectExistsRes(project_name=res["project_name"])
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
