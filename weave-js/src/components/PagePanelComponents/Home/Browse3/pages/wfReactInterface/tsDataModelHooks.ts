@@ -232,6 +232,7 @@ const useCallsNoExpansion = (
   offset?: number,
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
+  columns?: string[],
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -263,6 +264,7 @@ const useCallsNoExpansion = (
       offset,
       sort_by: sortBy,
       query,
+      columns,
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -284,6 +286,7 @@ const useCallsNoExpansion = (
     offset,
     sortBy,
     query,
+    columns,
   ]);
 
   // register doFetch as a callback after deletion
@@ -351,6 +354,7 @@ const useCalls = (
   offset?: number,
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
+  columns?: string[],
   expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> => {
@@ -362,6 +366,7 @@ const useCalls = (
     offset,
     sortBy,
     query,
+    columns,
     opts
   );
 
@@ -965,6 +970,7 @@ const useChildCallsForCompare = (
     undefined,
     undefined,
     undefined,
+    ['id', 'parent_id', 'started_at', 'ended_at'],
     undefined,
     {skip: skipParent}
   );
@@ -987,6 +993,7 @@ const useChildCallsForCompare = (
     undefined,
     undefined,
     undefined,
+    ['id', 'parent_id', 'started_at', 'ended_at'],
     undefined,
     {skip: skipChild}
   );
