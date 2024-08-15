@@ -364,12 +364,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return ".".join(parts) or None, cur
 
-    def _expand_call_refs(
-        self,
-        calls: list[dict[str, typing.Any]],
-        expand_columns: typing.List[str],
-        ref_cache: typing.Dict[str, typing.Any],
-    ) -> list[dict[str, typing.Any]]:
+    def _get_refs_to_resolve(
+        self, calls: list[dict[str, typing.Any]], expand_columns: typing.List[str]
+    ) -> typing.Dict[tuple[int, str, typing.Optional[str]], str]:
         # First get refs from call batch, store them where we can lookup them later
         # format: (call_index, column_name, optional column_prefix) -> ref
         refs_to_resolve: typing.Dict[tuple[int, str, typing.Optional[str]], str] = {}
@@ -383,9 +380,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     if col_prefix == col:
                         col_prefix = None
 
-                if isinstance(val, str) and val.startswith("weave://"):
+                if not isinstance(val, str):
+                    continue
+
+                if refs_internal.string_will_be_interpreted_as_ref(val):
                     refs_to_resolve[(i, col, col_prefix)] = val
 
+        return refs_to_resolve
+
+    def _expand_call_refs(
+        self,
+        calls: list[dict[str, typing.Any]],
+        expand_columns: typing.List[str],
+        ref_cache: typing.Dict[str, typing.Any],
+    ) -> list[dict[str, typing.Any]]:
+        # Find refs in the call batch
+        refs_to_resolve = self._get_refs_to_resolve(calls, expand_columns)
         # parse the refs
         refs = refs_to_resolve.values()
         parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in refs]
@@ -396,16 +406,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for (i, col, col_prefix), val in zip(refs_to_resolve, vals):
             if col_prefix is not None:
-                # nested ref case, ex:
-                # col: "a.b.c.d"
-                # call: {"a.b": "weave://..."}
-                # val: {"a.b": {"c": {"d": 1}}}
-                # result: {"a.b.c.d": 1}
                 next_part = col.replace(col_prefix, "")
                 if next_part.startswith("."):
                     next_part = next_part[1:]
-                # next_part: "c.d"
-                for part in next_part.split("."):  # c, d
+                for part in next_part.split("."):
+                    if isinstance(
+                        val, str
+                    ) and refs_internal.string_will_be_interpreted_as_ref(val):
+                        print("val is a ref!", val)
+                        continue
+                    print(
+                        "i",
+                        i,
+                        "col",
+                        col,
+                        "col_prefix",
+                        col_prefix,
+                        "part",
+                        part,
+                        "val",
+                        val,
+                    )
                     if part not in val:
                         raise ValueError(
                             f"Missing part {part} in val {val} from column {col}"
@@ -835,7 +856,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _refs_read_batch(
         self,
         parsed_raw_refs: typing.List[
-            refs_internal.InternalObjectRef, refs_internal.InternalTableRef
+            refs_internal.InternalObjectRef | refs_internal.InternalTableRef
         ],
         root_val_cache: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> list[typing.Any]:
@@ -1015,6 +1036,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             or any(r.unresolved_table_ref is not None for r in extra_results)
             or any(r.remaining_extra for r in extra_results)
         ):
+            print(
+                "parsed_refs",
+                parsed_refs,
+                "cache",
+                root_val_cache,
+                "\nResolving refs, ",
+                extra_results,
+            )
             # Resolve any unresolved object refs
             needed_extra_results: list[typing.Tuple[int, PartialRefResult]] = []
             for i, extra_result in enumerate(extra_results):
