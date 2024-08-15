@@ -566,7 +566,7 @@ class FileContentReadRes(BaseModel):
 
 
 class EnsureProjectExistsRes(BaseModel):
-    project_name: str
+    project_name: typing.Optional[str]
 
 
 class TraceServerInterface:

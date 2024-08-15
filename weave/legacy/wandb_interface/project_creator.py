@@ -81,4 +81,5 @@ def _ensure_project_exists(
                 raise UnableToCreateProject(
                     f"Failed to create project {entity_name}/{project_name}"
                 )
-    return {"project_name": None if not project else project["name"]}
+    project_name = None if not project else project["name"]
+    return {"project_name": project_name}
