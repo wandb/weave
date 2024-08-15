@@ -117,6 +117,20 @@ describe('parseRef', () => {
       });
     });
   });
+  it('parses a ref with special chars in name and project name', () => {
+    const parsed = parseRef(
+      'weave:///entity/_-:::::/object/a __&/b/c:artifactversion/attr/row version///__::--'
+    );
+    expect(parsed).toEqual({
+      scheme: 'weave',
+      artifactName: 'a/b/c',
+      artifactRefExtra: 'attr/row version///__::--',
+      artifactVersion: 'artifactversion',
+      entityName: 'entity',
+      projectName: '_-:::::',
+      weaveKind: 'object',
+    });
+  });
   it('parses a weave table ref', () => {
     const parsed = parseRef(
       'weave:///entity/project/table/b8dfcb84974c481fd98fd9878e56be02ebef3e2da44becb59d1863cd643b83fe'

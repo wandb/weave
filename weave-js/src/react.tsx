@@ -504,7 +504,8 @@ export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
 // Entity name should be lowercase, digits, dash, underscore
 // Unfortunately many teams have been created that violate this.
 const PATTERN_ENTITY = '([^/]+)';
-const PATTERN_PROJECT = '([^\\#?%:]{1,128})'; // Project name
+const PATTERN_PROJECT = '([^:]{1,128})'; // any non / char is valid in project_name
+
 const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
   [
     '^', // Start of the string
@@ -514,11 +515,12 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     '/',
     '(object|op)', // Weave kind
     '/',
-    '([a-zA-Z0-9-_/. ]{1,128})', // Artifact name
+    // TODO: make artifact name more constraining, disallow "/"
+    '([^:]{1,128})', // Artifact name, allows any character except :
     ':',
     '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
     '/?', // Ref extra portion is optional
-    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    '(*)', // Optional ref extra, capture everything
     '$', // End of the string
   ].join('')
 );
