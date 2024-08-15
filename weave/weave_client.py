@@ -23,6 +23,7 @@ from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
 from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
+from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
@@ -288,7 +289,7 @@ def make_client_call(
         parent_id=server_call.parent_id,
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
-        output=output,
+        output=from_json(output, server_call.project_id, server),
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,
@@ -729,10 +730,18 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
         self._save_nested_objects(val, name=name)
+
+        # typically, this condition would belong inside of the
+        # `_save_nested_objects` switch. However, we don't want to recursively
+        # publish all custom objects. Instead we only want to do this at the
+        # top-most level if requested
+        if get_serializer_for_obj(val) is not None:
+            self._save_and_attach_ref(val)
+
         return self._save_object_basic(val, name, branch)
 
     def _save_object_basic(
-        self, val: Any, name: str, branch: str = "latest"
+        self, val: Any, name: Optional[str] = None, branch: str = "latest"
     ) -> ObjectRef:
         # The WeaveTable case is special because object saving happens inside
         # _save_object_nested and it has a special table_ref -- skip it here.
@@ -744,6 +753,14 @@ class WeaveClient:
         if isinstance(val, ObjectRef):
             return val
         json_val = to_json(val, self._project_id(), self.server)
+
+        if name is None:
+            if json_val.get("_type") == "CustomWeaveType":
+                custom_name = json_val.get("weave_type", {}).get("type")
+                name = custom_name
+
+        if name is None:
+            raise ValueError("Name must be provided for object saving")
 
         response = self.server.obj_create(
             ObjCreateReq(
@@ -810,11 +827,10 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
+        rows = to_json(table.rows, self._project_id(), self.server)
         response = self.server.table_create(
             TableCreateReq(
-                table=TableSchemaForInsert(
-                    project_id=self._project_id(), rows=table.rows
-                )
+                table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             )
         )
         return TableRef(
@@ -848,8 +864,16 @@ class WeaveClient:
     def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
         if op.ref is not None:
             return op.ref
+
         if name is None:
             name = op.name
+
+        return self._save_and_attach_ref(op, name)
+
+    def _save_and_attach_ref(self, op: Any, name: Optional[str] = None) -> Ref:
+        if (ref := getattr(op, "ref", None)) is not None:
+            return ref
+
         op_def_ref = self._save_object_basic(op, name)
 
         # setattr(op, "ref", op_def_ref) fails here
