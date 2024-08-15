@@ -970,7 +970,7 @@ const useChildCallsForCompare = (
     undefined,
     undefined,
     undefined,
-    ['id', 'parent_id', 'started_at', 'ended_at'],
+    undefined,
     undefined,
     {skip: skipParent}
   );
@@ -993,7 +993,7 @@ const useChildCallsForCompare = (
     undefined,
     undefined,
     undefined,
-    ['id', 'parent_id', 'started_at', 'ended_at'],
+    undefined,
     undefined,
     {skip: skipChild}
   );
