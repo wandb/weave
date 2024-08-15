@@ -173,3 +173,7 @@ class WeaveOpSerializeError(WeaveBaseError):
 
 class WeaveInitError(WeaveBaseError):
     pass
+
+
+class WeaveInvalidStringError(WeaveBaseError):
+    pass

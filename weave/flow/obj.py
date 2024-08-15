@@ -10,12 +10,13 @@ from pydantic import (
 )
 
 from weave.trace.op import ObjectRef, Op, call
+from weave.trace.validators import BackendString
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 from weave.weave_client import get_ref
 
 
 class Object(BaseModel):
-    name: Optional[str] = None
+    name: Optional[BackendString] = None
     description: Optional[str] = None
 
     # Allow Op attributes
