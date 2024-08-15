@@ -336,18 +336,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # if "feedback" in expand_columns:
         #     feedback = self._hydrate_calls_feedback(calls)
 
-        from pprint import pprint
-
-        pprint(calls)
         calls = self._expand_call_refs(calls, expand_columns, ref_cache)
-
-        pprint(calls)
-        calls = self._expand_call_refs(calls, expand_columns, ref_cache)
-
-        pprint(calls)
-        calls = self._expand_call_refs(calls, expand_columns, ref_cache)
-
-        pprint(calls)
 
         return calls
 
