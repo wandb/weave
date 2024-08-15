@@ -1,13 +1,21 @@
-const PROTOCOL = 'weave://';
+import { WEAVE_REF_PREFIX } from "../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/constants";
+
+const encodeSelect = (part: string): string => {
+  const symbols: string[] = ['%', '/', ':']
+  for (const symbol of symbols) {
+    part = part.replace(new RegExp(symbol, 'g'), encodeURIComponent(symbol));
+  }
+  return part;
+}
 
 export const makeRefCall = (
   entity: string,
   project: string,
   callId: string
 ): string => {
-  return `${PROTOCOL}/${encodeURIComponent(entity)}/${encodeURIComponent(
+  return `${WEAVE_REF_PREFIX}${entity}/${
     project
-  )}/call/${encodeURIComponent(callId)}`;
+  }/call/${callId}`;
 };
 
 export const makeRefObject = (
@@ -16,19 +24,19 @@ export const makeRefObject = (
   objectType: string,
   objectId: string,
   objectVersion: string,
-  refExtra: string | undefined
+  refExtra: string | undefined = undefined
 ): string => {
-  let ref = `${PROTOCOL}/${encodeURIComponent(entity)}/${encodeURIComponent(
+  let ref = `${WEAVE_REF_PREFIX}${entity}/${
     project
-  )}/${encodeURIComponent(objectType)}/${encodeURIComponent(
-    objectId
-  )}:${encodeURIComponent(objectVersion)}`;
-  if (refExtra) {
-    ref += `/${refExtra}`;
+  }/${objectType}/${
+    encodeSelect(objectId
+  )}:${objectVersion}`;
+  if (refExtra && refExtra !== '') {
+    ref += `/${refExtra.split('/').map(encodeSelect).join('/')}`;
   }
   return ref;
 };
 
 export const abbreviateRef = (ref: string): string => {
-  return PROTOCOL + '/...' + ref.slice(-6);
+  return WEAVE_REF_PREFIX + '/...' + ref.slice(-6);
 };

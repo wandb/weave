@@ -6,6 +6,7 @@
  */
 
 import {parseRef, WeaveKind} from '../../../../../../react';
+import { makeRefObject } from '../../../../../../util/refs';
 import {WANDB_ARTIFACT_SCHEME} from '../../../common';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
@@ -48,8 +49,13 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
 };
 
 export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
-  return `${WEAVE_REF_PREFIX}${key.entity}/${key.project}/op/${key.opId}:${key.versionHash}`;
-  // return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
+  return makeRefObject(
+    key.entity,
+    key.project,
+    'op',
+    key.opId,
+    key.versionHash,
+  );
 };
 
 export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
