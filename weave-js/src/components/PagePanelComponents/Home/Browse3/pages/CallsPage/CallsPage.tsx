@@ -87,7 +87,8 @@ export const CallsPage: FC<{
                 // to the frozenFilter prop. Furthermore, "frozen" is only used when showing the
                 // evaluations table. So, in this case, I think we should really just remove the
                 // `frozen` property completely and have a top-level evaluations tab that hides controls.
-                hideControls={filter.frozen}
+                hideControls={filter.frozen && !isEvaluationTable}
+                hideOpSelector={isEvaluationTable}
                 initialFilter={filter}
                 onFilterUpdate={setFilter}
                 columnVisibilityModel={props.columnVisibilityModel}

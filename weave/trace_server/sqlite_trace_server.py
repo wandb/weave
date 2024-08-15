@@ -379,7 +379,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             conds.append(filter_cond)
 
-        query = f"SELECT * FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
+        required_columns = ["id", "trace_id", "project_id", "op_name", "started_at"]
+        select_columns = list(tsi.CallSchema.model_fields.keys())
+        if req.columns:
+            # TODO(gst): allow json fields to be selected
+            simple_columns = [x.split(".")[0] for x in req.columns]
+            select_columns = [x for x in simple_columns if x in select_columns]
+            # add required columns, preserving requested column order
+            select_columns += [
+                rcol for rcol in required_columns if rcol not in select_columns
+            ]
+        query = f"SELECT {', '.join(select_columns)} FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
 
@@ -431,29 +441,29 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         cursor.execute(query)
 
         query_result = cursor.fetchall()
-        return tsi.CallsQueryRes(
-            calls=[
-                tsi.CallSchema(
-                    project_id=row[0],
-                    id=row[1],
-                    trace_id=row[2],
-                    parent_id=row[3],
-                    op_name=row[4],
-                    started_at=row[5],
-                    ended_at=row[6],
-                    exception=row[7],
-                    attributes=json.loads(row[8]),
-                    inputs=json.loads(row[9]),
-                    output=None if row[11] is None else json.loads(row[11]),
-                    output_refs=None if row[12] is None else json.loads(row[12]),
-                    summary=json.loads(row[13]) if row[13] else None,
-                    wb_user_id=row[14],
-                    wb_run_id=row[15],
-                    display_name=row[17] if row[17] != "" else None,
-                )
-                for row in query_result
-            ]
-        )
+        calls = []
+        for row in query_result:
+            call_dict = {k: v for k, v in zip(select_columns, row)}
+            # convert json dump fields into json
+            for json_field in ["attributes", "summary", "inputs", "output"]:
+                if call_dict.get(json_field):
+                    call_dict[json_field] = json.loads(call_dict[json_field])
+            # convert empty string display_names to None
+            if "display_name" in call_dict and call_dict["display_name"] == "":
+                call_dict["display_name"] = None
+            # fill in missing required fields with defaults
+            for col, mfield in tsi.CallSchema.model_fields.items():
+                if mfield.is_required() and col not in call_dict:
+                    if isinstance(mfield.annotation, str):
+                        call_dict[col] = ""
+                    elif isinstance(
+                        mfield.annotation, (datetime.datetime, datetime.date)
+                    ):
+                        raise ValueError(f"Field '{col}' is required for selection")
+                    else:
+                        call_dict[col] = {}
+            calls.append(tsi.CallSchema(**call_dict))
+        return tsi.CallsQueryRes(calls=calls)
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
