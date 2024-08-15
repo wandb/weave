@@ -95,11 +95,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
     # Standard API Below:
     def ensure_project_exists(
-        self, entity_name: str, project_name: str
+        self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes:
-        return self._internal_trace_server.ensure_project_exists(
-            entity_name, project_name
-        )
+        return self._internal_trace_server.ensure_project_exists(entity, project)
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)

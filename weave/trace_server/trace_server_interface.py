@@ -571,7 +571,7 @@ class EnsureProjectExistsRes(BaseModel):
 
 class TraceServerInterface:
     def ensure_project_exists(
-        self, entity_name: str, project_name: str
+        self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         pass
 
