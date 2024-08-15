@@ -50,6 +50,8 @@ from weave.trace_server.trace_server_interface import (
 )
 
 if typing.TYPE_CHECKING:
+    import pandas as pd
+
     from . import ref_base
 
 
@@ -201,6 +203,9 @@ class Call:
     def remove_display_name(self) -> None:
         self.set_display_name(None)
 
+    def to_dict(self) -> dict:
+        return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+
 
 class CallsIter:
     server: TraceServerInterface
@@ -276,6 +281,18 @@ class CallsIter:
 
     def __iter__(self) -> typing.Iterator[WeaveObject]:
         return self._get_slice(slice(0, None, 1))
+
+    def to_pandas(self, *, flatten: bool = False) -> "pd.DataFrame":
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError("pandas is not installed!")
+
+        rows = list(self)
+        df = pd.DataFrame([row.to_dict() for row in rows])
+        if flatten:
+            df = pd.json_normalize(df.to_dict(orient="records"))
+        return df
 
 
 def make_client_call(
