@@ -16,7 +16,8 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
     this executor "just works" as the user probably expects.
 
     You can achieve the same effect without this class by instead writing:
-    ```
+
+    ```python
     with concurrent.futures.ThreadPoolExecutor() as executor:
         contexts = [copy_context() for _ in range(len(vals))]
 
@@ -72,7 +73,8 @@ class ContextAwareThread(_Thread):
     user probaly expects.
 
     You can achieve the same effect without this class by instead writing:
-    ```
+
+    ```python
     def run_with_context(func, *args, **kwargs):
         context = copy_context()
         def wrapper():
@@ -95,3 +97,5 @@ class ContextAwareThread(_Thread):
 # rename for cleaner export
 ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread
+
+__docspec__ = [ThreadPoolExecutor, Thread]

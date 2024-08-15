@@ -239,7 +239,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 limit=1,
-                filter=tsi._CallsFilter(call_ids=[req.id]),
+                filter=tsi.CallsFilter(call_ids=[req.id]),
             )
         ).calls
         return tsi.CallReadRes(call=calls[0] if calls else None)

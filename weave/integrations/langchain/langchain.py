@@ -31,13 +31,16 @@ This approach allows for more flexible runtime configuration while still respect
 
 import datetime
 import json
-import re
 from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
 from weave import call_context
 from weave.client_context import weave_client as weave_client_context
+from weave.integrations.integration_utilities import (
+    make_pythonic_function_name,
+    truncate_op_name,
+)
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
 
@@ -57,12 +60,6 @@ from typing import Any, Dict, Generator, List, Optional
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
 if not import_failed:
-
-    def make_valid_run_name(name: str) -> str:
-        name = name.replace("<", "_").replace(">", "")
-
-        valid_run_name = re.sub(r"[^a-zA-Z0-9 .\\-_]", "_", name)
-        return valid_run_name
 
     def _run_to_dict(run: Run, as_input: bool = False) -> dict:
         run_dict = run.json(
@@ -108,7 +105,6 @@ if not import_failed:
         def _persist_run_single(self, run: Run) -> None:
             """Persist a run."""
             run_dict = _run_to_dict(run, as_input=True)
-            run_name = make_valid_run_name(run.name)
 
             """Now we must determine the parent_run to associate this call with.
             In most cases, it is very straight forward - we just look up the
@@ -188,9 +184,12 @@ if not import_failed:
                             # of an entire Parent object.
                             parent_run = self.gc.call(wv_current_run.parent_id)
 
+            fn_name = make_pythonic_function_name(run.name)
+            complete_op_name = f"langchain.{run.run_type.capitalize()}.{fn_name}"
+            complete_op_name = truncate_op_name(complete_op_name)
             call = self.gc.create_call(
                 # Make sure to add the run name once the UI issue is figured out
-                f"langchain.{run.run_type.capitalize()}.{run_name}",
+                complete_op_name,
                 inputs=run_dict["inputs"],
                 parent=parent_run,
                 attributes={

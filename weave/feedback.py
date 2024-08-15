@@ -254,3 +254,10 @@ class RefFeedbackQuery(FeedbackQuery):
         )
         self.client.server.feedback_purge(req)
         self.feedbacks = None  # Clear cache
+
+
+__docspec__ = [
+    Feedbacks,
+    FeedbackQuery,
+    RefFeedbackQuery,
+]

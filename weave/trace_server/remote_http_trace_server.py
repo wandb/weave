@@ -505,3 +505,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
         )
+
+
+__docspec__ = [
+    RemoteHTTPTraceServer,
+    ServerInfoRes,
+    StartBatchItem,
+    EndBatchItem,
+    Batch,
+]
