@@ -113,8 +113,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EnsureProjectExistsRes:
         # TODO: This should happen in the wandb backend, not here, and it's slow
         # (hundreds of ms)
-        res = project_creator.ensure_project_exists(entity, project)
-        return tsi.EnsureProjectExistsRes(project_name=res["project_name"])
+        return tsi.EnsureProjectExistsRes.model_validate(
+            project_creator.ensure_project_exists(entity, project)
+        )
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
