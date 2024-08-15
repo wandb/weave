@@ -13,7 +13,7 @@ export type CustomWeaveTypePayload<
 export const isCustomWeaveTypePayload = (
   data: any
 ): data is CustomWeaveTypePayload => {
-  if (typeof data !== 'object' || data === null) {
+  if (typeof data !== 'object' || data == null) {
     return false;
   }
   if (data._type !== 'CustomWeaveType') {
@@ -21,20 +21,20 @@ export const isCustomWeaveTypePayload = (
   }
   if (
     typeof data.weave_type !== 'object' ||
-    data.weave_type === null ||
+    data.weave_type == null ||
     typeof data.weave_type.type !== 'string'
   ) {
     return false;
   }
-  if (typeof data.files !== 'object' || data.files === null) {
+  if (typeof data.files !== 'object' || data.files == null) {
     return false;
   }
   if (data.weave_type.type === 'Op') {
-    if (data.load_op !== undefined) {
+    if (data.load_op != null) {
       return false;
     }
   } else {
-    if (data.load_op === undefined) {
+    if (data.load_op == null) {
       return false;
     }
     if (

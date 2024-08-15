@@ -896,7 +896,7 @@ class WeaveClient:
         return self._save_and_attach_ref(op, name)
 
     def _save_and_attach_ref(self, op: Any, name: Optional[str] = None) -> Ref:
-        if hasattr(op, "ref") and (ref := getattr(op, "ref")) is not None:
+        if (ref := getattr(op, "ref", None)) is not None:
             return ref
 
         op_def_ref = self._save_object_basic(op, name)
