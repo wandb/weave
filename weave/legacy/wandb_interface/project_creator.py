@@ -39,12 +39,17 @@ def wandb_logging_disabled() -> typing.Iterator[None]:
     wandb.termerror = original_termerror
 
 
-def ensure_project_exists(entity_name: str, project_name: str) -> None:
+def ensure_project_exists(entity_name: str, project_name: str) -> typing.Optional[str]:
     with wandb_logging_disabled():
         return _ensure_project_exists(entity_name, project_name)
 
 
-def _ensure_project_exists(entity_name: str, project_name: str) -> None:
+def _ensure_project_exists(entity_name: str, project_name: str) -> typing.Optional[str]:
+    """
+    Ensures that a W&B project exists by trying to access it, returns the project_name,
+    which is not guaranteed to be the same if the provided project_name contains invalid
+    characters.
+    """
     wandb_logging_disabled()
     api = InternalApi({"entity": entity_name, "project": project_name})
     # Since `UpsertProject` will fail if the user does not have permission to create a project
@@ -72,4 +77,6 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> None:
                 raise UnableToCreateProject(
                     f"Failed to create project {entity_name}/{project_name}"
                 )
-    return
+    if project:
+        return project["name"]
+    return None

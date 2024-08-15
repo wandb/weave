@@ -380,7 +380,11 @@ class WeaveClient:
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
-            self.server.ensure_project_exists(entity, project)
+            project_name = self.server.ensure_project_exists(entity, project)
+            if project_name:
+                # Set Client project to the project name, which may have been formatted
+                # during upsert.
+                self.project = project_name
 
     ################ High Level Convenience Methods ################
 

@@ -566,7 +566,7 @@ class FileContentReadRes(BaseModel):
 
 
 class TraceServerInterface:
-    def ensure_project_exists(self, entity: str, project: str) -> None:
+    def ensure_project_exists(self, entity: str, project: str) -> typing.Optional[str]:
         pass
 
     # Call API
