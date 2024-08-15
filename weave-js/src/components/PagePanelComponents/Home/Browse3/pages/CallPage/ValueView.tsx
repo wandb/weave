@@ -1,7 +1,9 @@
 import React, {useMemo} from 'react';
 
-import {parseRef} from '../../../../../../react';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {isRef} from '../common/util';
 import {
   DataTableView,
@@ -77,5 +79,36 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     return <div>{JSON.stringify(data.value)}</div>;
   }
 
+  if (data.valueType === 'object') {
+    if (isCustomWeaveTypePayload(data.value)) {
+      // This is a little ugly, but essentially if the data is coming from an
+      // expanded ref, then we want to use that ref to get the entity and project.
+      // Else we just use the current entity and project.
+      let entityForWeaveType: string | undefined;
+      let projectForWeaveType: string | undefined;
+
+      if (valueIsExpandedRef(data)) {
+        const parsedRef = parseRef((data.value as any)._ref);
+        if (isWeaveObjectRef(parsedRef)) {
+          entityForWeaveType = parsedRef.entityName;
+          projectForWeaveType = parsedRef.projectName;
+        }
+      }
+
+      // If we have have a custom view for this weave type, use it.
+      return (
+        <CustomWeaveTypeDispatcher
+          data={data.value}
+          entity={entityForWeaveType}
+          project={projectForWeaveType}
+        />
+      );
+    }
+  }
+
   return <div>{data.value.toString()}</div>;
+};
+
+const valueIsExpandedRef = (data: ValueData) => {
+  return data.value != null && (data.value as any)._ref != null;
 };

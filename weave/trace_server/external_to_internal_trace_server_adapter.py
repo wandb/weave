@@ -94,8 +94,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             yield universal_int_to_ext_ref_converter(item, cached_int_to_ext_project_id)
 
     # Standard API Below:
-    def ensure_project_exists(self, entity: str, project: str) -> None:
-        self._internal_trace_server.ensure_project_exists(entity, project)
+    def ensure_project_exists(
+        self, entity: str, project: str
+    ) -> tsi.EnsureProjectExistsRes:
+        return self._internal_trace_server.ensure_project_exists(entity, project)
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
