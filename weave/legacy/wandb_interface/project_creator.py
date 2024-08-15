@@ -81,5 +81,5 @@ def _ensure_project_exists(
                 raise UnableToCreateProject(
                     f"Failed to create project {entity_name}/{project_name}"
                 )
-    project_name: typing.Optional[str] = None if not project else project["name"]
-    return {"project_name": project_name}
+    project_name_maybe: typing.Optional[str] = None if not project else project["name"]
+    return {"project_name": project_name_maybe}
