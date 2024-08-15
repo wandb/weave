@@ -573,7 +573,7 @@ class TraceServerInterface:
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
-        pass
+        return EnsureProjectExistsRes(project_name=None)
 
     # Call API
     @abc.abstractmethod
