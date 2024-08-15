@@ -1,4 +1,7 @@
-import {WEAVE_PRIVATE_PREFIX, WEAVE_REF_PREFIX} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/constants';
+import {
+  WEAVE_PRIVATE_PREFIX,
+  WEAVE_REF_PREFIX,
+} from './pages/wfReactInterface/constants';
 
 const encodeSelect = (part: string): string => {
   const symbols: string[] = ['%', '/', ':'];
@@ -42,7 +45,7 @@ export const abbreviateRef = (ref: string): string => {
 
 export const privateRefToSimpleName = (ref: string) => {
   if (!ref.startsWith(WEAVE_PRIVATE_PREFIX)) {
-     throw new Error('Not a private ref');
+    throw new Error('Not a private ref');
   }
   const trimmed = ref.replace(`${WEAVE_PRIVATE_PREFIX}//`, '');
   try {
@@ -51,4 +54,3 @@ export const privateRefToSimpleName = (ref: string) => {
     return trimmed;
   }
 };
-

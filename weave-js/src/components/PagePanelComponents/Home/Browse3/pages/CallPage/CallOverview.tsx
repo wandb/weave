@@ -2,8 +2,8 @@ import React, {SyntheticEvent} from 'react';
 import styled from 'styled-components';
 
 import EditableField from '../../../../../../common/components/EditableField';
-import {makeRefCall} from '../../../../../../util/refs';
 import {Reactions} from '../../feedback/Reactions';
+import {makeRefCall} from '../../refs';
 import {EditableCallName} from '../common/EditableCallName';
 import {CopyableId} from '../common/Id';
 import {StatusChip} from '../common/StatusChip';

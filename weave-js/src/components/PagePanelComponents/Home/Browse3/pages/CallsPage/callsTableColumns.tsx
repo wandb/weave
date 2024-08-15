@@ -14,10 +14,10 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
+import {makeRefCall} from '../../refs';
 import {
   getTokensAndCostFromUsage,
   getUsageFromCellParams,

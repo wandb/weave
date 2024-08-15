@@ -11,7 +11,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import { privateRefToSimpleName } from '../../../../../../util/refs';
+import {privateRefToSimpleName} from '../../refs';
 import {
   callCache,
   objectVersionCache,

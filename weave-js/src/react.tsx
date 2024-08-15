@@ -47,6 +47,7 @@ import {
   useState,
 } from 'react';
 
+import {makeRefObject} from './components/PagePanelComponents/Home/Browse3/refs';
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
 import {toWeaveType} from './components/Panel2/toWeaveType';
@@ -67,7 +68,6 @@ import {
 import {UseNodeValueServerExecutionError} from './errors';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
-import {makeRefObject} from './util/refs';
 // import {useTraceUpdate} from './common/util/hooks';
 
 /**

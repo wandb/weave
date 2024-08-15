@@ -6,8 +6,8 @@
  */
 
 import {parseRef, WeaveKind} from '../../../../../../react';
-import {makeRefObject} from '../../../../../../util/refs';
 import {WANDB_ARTIFACT_SCHEME} from '../../../common';
+import {makeRefObject} from '../../refs';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
   OP_CATEGORIES,

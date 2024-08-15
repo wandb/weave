@@ -3,9 +3,9 @@ import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
 import {parseRef} from '../../../../../react';
-import {abbreviateRef} from '../../../../../util/refs';
 import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
+import {abbreviateRef} from '../refs';
 import {DocLink} from './common/Links';
 import {
   OBJECT_ATTR_EDGE_NAME,

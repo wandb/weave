@@ -2,9 +2,9 @@ import {Box} from '@mui/material';
 import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
-import {abbreviateRef} from '../../../../../util/refs';
 import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
+import {abbreviateRef} from '../refs';
 import {DocLink} from './common/Links';
 
 type TabUseOpProps = {

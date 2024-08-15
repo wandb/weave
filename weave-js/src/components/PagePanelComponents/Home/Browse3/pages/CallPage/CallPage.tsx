@@ -5,7 +5,6 @@ import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEven
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
 import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
@@ -15,6 +14,7 @@ import {
   useWeaveflowCurrentRouteContext,
 } from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {makeRefCall} from '../../refs';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';

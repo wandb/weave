@@ -16,11 +16,11 @@ import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../Browse2/SmallRef';
 import {CellFilterWrapper} from '../../../filters/CellFilterWrapper';
+import {privateRefToSimpleName} from '../../../refs';
 import {
   OBJECT_ATTR_EDGE_NAME,
   WEAVE_PRIVATE_PREFIX,
 } from '../../wfReactInterface/constants';
-import {privateRefToSimpleName} from '@wandb/weave/util/refs';
 import {
   EXPANDED_REF_REF_KEY,
   EXPANDED_REF_VAL_KEY,
