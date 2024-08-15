@@ -5,7 +5,9 @@ export const makeRefCall = (
   project: string,
   callId: string
 ): string => {
-  return `${PROTOCOL}/${entity}/${project}/call/${callId}`;
+  return `${PROTOCOL}/${encodeURIComponent(entity)}/${encodeURIComponent(
+    project
+  )}/call/${encodeURIComponent(callId)}`;
 };
 
 export const makeRefObject = (
@@ -16,7 +18,11 @@ export const makeRefObject = (
   objectVersion: string,
   refExtra: string | undefined
 ): string => {
-  let ref = `${PROTOCOL}/${entity}/${project}/${objectType}/${objectId}:${objectVersion}`;
+  let ref = `${PROTOCOL}/${encodeURIComponent(entity)}/${encodeURIComponent(
+    project
+  )}/${encodeURIComponent(objectType)}/${encodeURIComponent(
+    objectId
+  )}:${encodeURIComponent(objectVersion)}`;
   if (refExtra) {
     ref += `/${refExtra}`;
   }

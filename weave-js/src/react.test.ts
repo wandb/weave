@@ -1,4 +1,6 @@
-import {parseRef} from './react';
+import _ from 'lodash';
+
+import {parseRef, refUri, WeaveObjectRef} from './react';
 
 describe('parseRef', () => {
   describe('parsing weave ref', () => {
@@ -130,6 +132,38 @@ describe('parseRef', () => {
       projectName: '_-:::::',
       weaveKind: 'object',
     });
+  });
+  it('handles any character', () => {
+    const chars = [];
+
+    for (let i = 0; i < 256; i++) {
+      chars.push(String.fromCharCode(i));
+    }
+
+    const ref: WeaveObjectRef = {
+      scheme: 'weave',
+      entityName: _.shuffle(chars).join(''),
+      projectName: _.shuffle(chars).join(''),
+      weaveKind: 'object',
+      artifactName: _.shuffle(chars).join(''),
+      artifactVersion: _.shuffle(chars).join(''),
+      artifactRefExtra: [_.shuffle(chars).join(''), _.shuffle(chars).join('')].join('/'),
+    };
+
+    const checkUrl = [
+      'weave://',
+      encodeURIComponent(ref.entityName),
+      encodeURIComponent(ref.projectName),
+      ref.weaveKind,
+      encodeURIComponent(ref.artifactName) +
+        ':' +
+        encodeURIComponent(ref.artifactVersion),
+      ref.artifactRefExtra?.split("/").map(encodeURIComponent).join('/'),
+    ].join('/');
+    const genUrl = refUri(ref);
+    expect(genUrl).toEqual(checkUrl);
+    const parsed = parseRef(genUrl);
+    expect(parsed).toEqual(ref);
   });
   it('parses a weave table ref', () => {
     const parsed = parseRef(
