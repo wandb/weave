@@ -105,8 +105,11 @@ class SelectableCHCallSchema(BaseModel):
     ended_at: typing.Optional[datetime.datetime] = None
     exception: typing.Optional[str] = None
 
-    attributes_dump: str
-    inputs_dump: str
+    # attributes and inputs are required on call schema, but can be
+    # optionally selected when querying
+    attributes_dump: typing.Optional[str] = None
+    inputs_dump: typing.Optional[str] = None
+
     output_dump: typing.Optional[str] = None
     summary_dump: typing.Optional[str] = None
 
