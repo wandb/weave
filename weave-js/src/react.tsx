@@ -504,7 +504,13 @@ export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
 // Entity name should be lowercase, digits, dash, underscore
 // Unfortunately many teams have been created that violate this.
 const PATTERN_ENTITY = '([^/]+)';
-const PATTERN_PROJECT = '([^\\#?%:]{1,128})'; // Project name
+const PATTERN_PROJECT = '([^/]{1,128})'; // any non / char is valid in project_name
+const PATTERN_OBJ_NAME = '([^:]{1,128})'; // Artifact name, allows any character except :
+const PATTERN_DIGEST = '([*]|[a-zA-Z0-9]+)';
+const PATTERN_EXTRA = '(.*)'; // Optional ref extra
+const PATTERN_CALL_ID =
+  '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})'; // Call UUID
+
 const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
   [
     '^', // Start of the string
@@ -514,11 +520,12 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     '/',
     '(object|op)', // Weave kind
     '/',
-    '([a-zA-Z0-9-_/. ]{1,128})', // Artifact name
+    // TODO: make artifact name more constraining, disallow "/"
+    PATTERN_OBJ_NAME, // Artifact name, allows any character except :
     ':',
-    '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
+    PATTERN_DIGEST, // Artifact version, allowing '*' for any version
     '/?', // Ref extra portion is optional
-    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    PATTERN_EXTRA, // Optional ref extra, capture everything
     '$', // End of the string
   ].join('')
 );
@@ -529,9 +536,9 @@ const RE_WEAVE_TABLE_REF_PATHNAME = new RegExp(
     '/',
     PATTERN_PROJECT,
     '/table/',
-    '([a-f0-9]+)', // Digest
+    PATTERN_DIGEST, // Digest
     '/?', // Ref extra portion is optional
-    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    PATTERN_EXTRA, // Optional ref extra
     '$', // End of the string
   ].join('')
 );
@@ -542,9 +549,9 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
     '/',
     PATTERN_PROJECT,
     '/call/',
-    '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', // Call UUID
+    PATTERN_CALL_ID, // Call UUID
     '/?', // Ref extra portion is optional
-    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    PATTERN_EXTRA, // Optional ref extra
     '$', // End of the string
   ].join('')
 );
