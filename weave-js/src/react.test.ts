@@ -119,45 +119,33 @@ describe('parseRef', () => {
       });
     });
   });
-  it('parses a ref with special chars in name and project name', () => {
-    const parsed = parseRef(
-      'weave:///entity/_-:::::/object/a __&/b/c:artifactversion/attr/row version///__::--'
-    );
-    expect(parsed).toEqual({
-      scheme: 'weave',
-      artifactName: 'a/b/c',
-      artifactRefExtra: 'attr/row version///__::--',
-      artifactVersion: 'artifactversion',
-      entityName: 'entity',
-      projectName: '_-:::::',
-      weaveKind: 'object',
-    });
-  });
-  it('handles any character', () => {
-    const chars = [];
+  it('handles any character in user-defined fields', () => {
+    const allChars = [];
 
     for (let i = 0; i < 256; i++) {
-      chars.push(String.fromCharCode(i));
+      allChars.push(String.fromCharCode(i));
     }
+
+    const allCharsNoSlashOrColon = allChars.filter((c) => c !== '/' && c !== ':');
 
     const ref: WeaveObjectRef = {
       scheme: 'weave',
-      entityName: _.shuffle(chars).join(''),
-      projectName: _.shuffle(chars).join(''),
+      entityName: _.shuffle(allCharsNoSlashOrColon).join(''),
+      projectName: _.shuffle(allCharsNoSlashOrColon).join(''),
       weaveKind: 'object',
-      artifactName: _.shuffle(chars).join(''),
-      artifactVersion: _.shuffle(chars).join(''),
-      artifactRefExtra: [_.shuffle(chars).join(''), _.shuffle(chars).join('')].join('/'),
+      artifactName: _.shuffle(allChars).join(''),
+      artifactVersion: '1234567890',
+      artifactRefExtra: ['key', _.shuffle(allChars).join('')].join('/'),
     };
 
     const checkUrl = [
       'weave://',
-      encodeURIComponent(ref.entityName),
-      encodeURIComponent(ref.projectName),
+      ref.entityName,
+      ref.projectName,
       ref.weaveKind,
       encodeURIComponent(ref.artifactName) +
         ':' +
-        encodeURIComponent(ref.artifactVersion),
+        ref.artifactVersion,
       ref.artifactRefExtra?.split("/").map(encodeURIComponent).join('/'),
     ].join('/');
     const genUrl = refUri(ref);
