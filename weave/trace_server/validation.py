@@ -60,7 +60,7 @@ def wb_run_id_validator(s: typing.Optional[str]) -> typing.Optional[str]:
 
 def _validate_object_name_charset(name: str) -> None:
     # Object names must be alphanumeric with dashes
-    invalid_chars = re.findall(r"[^\w-]", name)
+    invalid_chars = re.findall(r"[^\w._-]", name)
     if invalid_chars:
         raise ValueError(
             f"Invalid object name: {name}. Contains invalid characters: {invalid_chars}"
