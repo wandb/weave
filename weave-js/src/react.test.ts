@@ -134,7 +134,7 @@ describe('parseRef', () => {
       weaveKind: 'object',
     });
   });
-});
+
   it('handles any character in user-defined fields', () => {
     const allChars = [];
 
