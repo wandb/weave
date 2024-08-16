@@ -288,7 +288,9 @@ export const browse3ContextGen = (
       return `${projectRoot(
         entityName,
         projectName
-      )}/objects/${objectName}/versions/${objectVersionHash}?${path}&${extra}`;
+      )}/objects/${encodeURIComponent(
+        objectName
+      )}/versions/${objectVersionHash}?${path}&${extra}`;
     },
     opVersionsUIUrl: (
       entityName: string,

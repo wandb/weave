@@ -502,21 +502,18 @@ const ObjectVersionRoutePageBinding = () => {
 
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
+  const itemName = decodeURIComponent(params.itemName);
   useEffect(() => {
     if (!params.version) {
       history.replace(
-        routerContext.objectUIUrl(
-          params.entity,
-          params.project,
-          params.itemName
-        )
+        routerContext.objectUIUrl(params.entity, params.project, itemName)
       );
     }
   }, [
     history,
     params.version,
     params.entity,
-    params.itemName,
+    itemName,
     params.project,
     routerContext,
   ]);
@@ -528,7 +525,7 @@ const ObjectVersionRoutePageBinding = () => {
     <ObjectVersionPage
       entity={params.entity}
       project={params.project}
-      objectName={params.itemName}
+      objectName={itemName}
       version={params.version}
       filePath={query.path ?? 'obj'} // Default to obj
       refExtra={query.extra}

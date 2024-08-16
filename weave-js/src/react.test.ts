@@ -119,6 +119,22 @@ describe('parseRef', () => {
       });
     });
   });
+  it('parses a specific hard ref from python tests', () => {
+    const parsed = parseRef(
+      'weave:///timssweeney/dev_testing_images_3/object/name%3A %2F!@#$%25^&*()_+:rUA8vNX3RqX6rPAVmdeNyJrMtmx3h8qOPxnlulaeB78/key/name%3A %2F!@#$%25^&*()_+'
+    );
+    expect(parsed).toEqual({
+      artifactName: 'name: /!@#$%^&*()_+',
+      // Unless we make `artifactRefExtra` a list, we have to keep this encoded
+      artifactRefExtra: 'key/name%3A %2F!@#$%25^&*()_+',
+      artifactVersion: 'rUA8vNX3RqX6rPAVmdeNyJrMtmx3h8qOPxnlulaeB78',
+      entityName: 'timssweeney',
+      projectName: 'dev_testing_images_3',
+      scheme: 'weave',
+      weaveKind: 'object',
+    });
+  });
+});
   it('handles any character in user-defined fields', () => {
     const allChars = [];
 

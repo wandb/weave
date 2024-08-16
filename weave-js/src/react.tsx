@@ -47,6 +47,7 @@ import {
   useState,
 } from 'react';
 
+import {WEAVE_REF_PREFIX} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/constants';
 import {makeRefObject} from './components/PagePanelComponents/Home/Browse3/refs';
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
@@ -501,13 +502,26 @@ export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
   return ref.scheme === 'weave';
 };
 
+const trimExtra = (extra: string | undefined) => {
+  if (extra?.startsWith('/')) {
+    extra = extra.slice(1);
+  }
+  if (extra?.endsWith('/')) {
+    extra = extra.slice(0, -1);
+  }
+  if (extra === '') {
+    extra = undefined;
+  }
+  return extra;
+};
+
 // Entity name should be lowercase, digits, dash, underscore
 // Unfortunately many teams have been created that violate this.
 const PATTERN_ENTITY = '([^/]+)';
 const PATTERN_PROJECT = '([^/]{1,128})'; // any non / char is valid in project_name
 const PATTERN_OBJ_NAME = '([^:]{1,128})'; // Artifact name, allows any character except :
 const PATTERN_DIGEST = '([*]|[a-zA-Z0-9]+)';
-const PATTERN_EXTRA = '(.*)'; // Optional ref extra
+const PATTERN_EXTRA = '(/(.*))?'; // Optional ref extra
 const PATTERN_CALL_ID =
   '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})'; // Call UUID
 
@@ -524,7 +538,6 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     PATTERN_OBJ_NAME, // Artifact name, allows any character except :
     ':',
     PATTERN_DIGEST, // Artifact version, allowing '*' for any version
-    '/?', // Ref extra portion is optional
     PATTERN_EXTRA, // Optional ref extra, capture everything
     '$', // End of the string
   ].join('')
@@ -537,7 +550,6 @@ const RE_WEAVE_TABLE_REF_PATHNAME = new RegExp(
     PATTERN_PROJECT,
     '/table/',
     PATTERN_DIGEST, // Digest
-    '/?', // Ref extra portion is optional
     PATTERN_EXTRA, // Optional ref extra
     '$', // End of the string
   ].join('')
@@ -550,7 +562,6 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
     PATTERN_PROJECT,
     '/call/',
     PATTERN_CALL_ID, // Call UUID
-    '/?', // Ref extra portion is optional
     PATTERN_EXTRA, // Optional ref extra
     '$', // End of the string
   ].join('')
@@ -575,8 +586,8 @@ export const parseRef = (ref: string): ObjectRef => {
 
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
-  const trimmed = url.pathname.replace(/^\/+/, '');
-  const splitUri = trimmed.split('/', splitLimit);
+  const decodedUri = decodeURIComponent(url.pathname);
+  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
 
   if (splitUri.length !== splitLimit) {
     throw new Error(`Invalid Artifact URI: ${url}`);
@@ -607,7 +618,8 @@ export const parseRef = (ref: string): ObjectRef => {
   }
 
   if (isWeaveRef) {
-    const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
+    const refWithoutScheme = ref.slice(WEAVE_REF_PREFIX.length);
+    const tableMatch = refWithoutScheme.match(RE_WEAVE_TABLE_REF_PATHNAME);
     if (tableMatch !== null) {
       const [entity, project, digest] = tableMatch.slice(1);
       return {
@@ -620,7 +632,7 @@ export const parseRef = (ref: string): ObjectRef => {
         artifactRefExtra: '',
       };
     }
-    const callMatch = trimmed.match(RE_WEAVE_CALL_REF_PATHNAME);
+    const callMatch = refWithoutScheme.match(RE_WEAVE_CALL_REF_PATHNAME);
     if (callMatch !== null) {
       const [entity, project, callId] = callMatch.slice(1);
       return {
@@ -633,7 +645,7 @@ export const parseRef = (ref: string): ObjectRef => {
         artifactRefExtra: '',
       };
     }
-    const match = trimmed.match(RE_WEAVE_OBJECT_REF_PATHNAME);
+    const match = refWithoutScheme.match(RE_WEAVE_OBJECT_REF_PATHNAME);
     if (match === null) {
       throw new Error('Invalid weave ref uri: ' + ref);
     }
@@ -645,6 +657,7 @@ export const parseRef = (ref: string): ObjectRef => {
       artifactVersion,
       artifactRefExtra,
     ] = match.slice(1);
+
     return {
       scheme: 'weave',
       entityName,
@@ -652,9 +665,10 @@ export const parseRef = (ref: string): ObjectRef => {
       weaveKind: weaveKind as WeaveKind,
       artifactName: decodeURIComponent(artifactName),
       artifactVersion,
-      artifactRefExtra: (
-        artifactRefExtra.split('/').map(decodeURIComponent) as any
-      ).join('/'),
+      artifactRefExtra: trimExtra(artifactRefExtra),
+      // ?.split('/')
+      // ?.map(decodeURIComponent)
+      // ?.join('/'),
     };
   }
   throw new Error(`Unknown protocol: ${url.protocol}`);
@@ -686,25 +700,13 @@ export const refUri = (ref: ObjectRef): string => {
     }
     return uri;
   } else if (isWeaveObjectRef(ref)) {
-    let extra: string | undefined = ref.artifactRefExtra;
-    // UGG Why does this happen???
-    if (extra?.startsWith('/')) {
-      extra = extra.slice(1);
-    }
-    if (extra?.endsWith('/')) {
-      extra = extra.slice(0, -1);
-    }
-    if (extra === '') {
-      extra = undefined;
-    }
-
     return makeRefObject(
       ref.entityName,
       ref.projectName,
       ref.weaveKind,
       ref.artifactName,
       ref.artifactVersion,
-      extra
+      trimExtra(ref.artifactRefExtra)
     );
   } else {
     return `local-artifact:///${ref.artifactName}/${ref.artifactPath}`;
