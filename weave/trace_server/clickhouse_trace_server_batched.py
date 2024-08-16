@@ -364,6 +364,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return ".".join(parts) or None, cur
 
+    @staticmethod
+    def _is_ref(val: typing.Any) -> bool:
+        return isinstance(val, str) and refs_internal.string_will_be_interpreted_as_ref(
+            val
+        )
+
     def _get_refs_to_resolve(
         self, calls: list[dict[str, typing.Any]], expand_columns: typing.List[str]
     ) -> typing.Dict[tuple[int, str, typing.Optional[str]], str]:
@@ -374,16 +380,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for col in expand_columns:
                 val = call.get(col)
                 if val is None:
+                    # requested column not present, could be a nested ref
                     col_prefix, val = self._get_nested_ref_column_part(col, call)
                     if not col_prefix:
                         continue
-                    if col_prefix == col:
-                        col_prefix = None
 
-                if not isinstance(val, str):
-                    continue
-
-                if refs_internal.string_will_be_interpreted_as_ref(val):
+                if self._is_ref(val):
                     refs_to_resolve[(i, col, col_prefix)] = val
 
         return refs_to_resolve
@@ -393,38 +395,48 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
         ref_cache: typing.Dict[str, typing.Any],
+        refs_to_resolve: typing.Optional[
+            typing.Dict[tuple[int, str, typing.Optional[str]], str]
+        ] = None,
     ) -> list[dict[str, typing.Any]]:
-        # Find refs in the call batch
-        refs_to_resolve = self._get_refs_to_resolve(calls, expand_columns)
-        # parse the refs
-        refs = refs_to_resolve.values()
-        parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in refs]
-        vals = self._refs_read_batch(parsed_raw_refs, ref_cache)
+        # Find refs in the call batch, or skip when provided (if recursing)
+        refs_to_resolve = refs_to_resolve or self._get_refs_to_resolve(
+            calls, expand_columns
+        )
+        if not refs_to_resolve:
+            return calls
 
-        # TODO: when is this not true?
-        assert len(vals) == len(refs_to_resolve)
+        vals = self._refs_read_batch(list(refs_to_resolve.values()), ref_cache)
+        if len(vals) != len(refs_to_resolve):
+            raise ValueError(f"Expected {len(refs_to_resolve)} refs, got {len(vals)}")
 
+        unresolved_refs = {}
         for (i, col, col_prefix), val in zip(refs_to_resolve, vals):
-            if col_prefix is not None:
+            if col_prefix != col:
                 next_part = col.replace(col_prefix, "")
                 if next_part.startswith("."):
                     next_part = next_part[1:]
                 for part in next_part.split("."):
-                    if isinstance(
-                        val, str
-                    ) and refs_internal.string_will_be_interpreted_as_ref(val):
-                        print("found a nested ref! ", col, col_prefix, val)
-                        continue
                     if part not in val:
                         raise ValueError(
                             f"Missing part '{part}' in val '{val}' from column '{col}'"
                         )
                     val = val[part]
+                    col_prefix += "." + part
+
+                    if self._is_ref(val):
+                        unresolved_refs[(i, col, col_prefix)] = val
+                        break
 
             # make a nested dict from the column list, with val as the last element
+            # if the val is a dict with a ref, it will stay as an internal ref (!)
             payload = make_nested_dict(col.split("."), val)
             calls[i] = deep_update(calls[i], payload)
 
+        if unresolved_refs:
+            return self._expand_call_refs(
+                calls, expand_columns, ref_cache, unresolved_refs
+            )
         return calls
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -835,22 +847,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        # First, parse the refs
-        parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
-
-        vals = self._refs_read_batch(parsed_raw_refs)
+        vals = self._refs_read_batch(req.refs)
         return tsi.RefsReadBatchRes(vals=vals)
 
     def _refs_read_batch(
         self,
-        parsed_raw_refs: typing.List[
-            refs_internal.InternalObjectRef | refs_internal.InternalTableRef
-        ],
+        refs: typing.List[str],
         root_val_cache: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> list[typing.Any]:
+        # First, parse the refs
+        parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in refs]
+
         # Business logic to ensure that we don't have raw TableRefs (not allowed)
         if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
+
         parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
 
         # Next, group the refs by project_id
