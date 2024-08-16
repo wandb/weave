@@ -670,6 +670,15 @@ const useOpVersion = (
       };
     }
 
+    if (
+      opVersionRes.obj == null 
+    ) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+
     const returnedResult = convertTraceServerObjectVersionToOpSchema(
       opVersionRes.obj
     );
@@ -813,8 +822,17 @@ const useObjectVersion = (
       };
     }
 
-    const returnedResult: ObjectVersionSchema =
-      convertTraceServerObjectVersionToSchema(objectVersionRes.obj);
+    if (
+      objectVersionRes.obj == null 
+    ) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+
+    const returnedResult: ObjectVersionSchema =convertTraceServerObjectVersionToSchema(objectVersionRes.obj) ;
+
 
     if (
       key.entity !== returnedResult.entity ||

@@ -34,6 +34,7 @@ import {
   CallSchema,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
+import {NotFoundPanel} from '../NotFoundPanel';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
@@ -59,7 +60,7 @@ export const ObjectVersionPage: React.FC<{
   if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
-    return <div>Object not found</div>;
+    return <NotFoundPanel title="Object not found" />;
   }
   return (
     <ObjectVersionPageInner {...props} objectVersion={objectVersion.result} />

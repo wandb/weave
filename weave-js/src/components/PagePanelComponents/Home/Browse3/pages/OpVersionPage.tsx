@@ -17,6 +17,7 @@ import {TabUseOp} from './TabUseOp';
 import {useWFHooks} from './wfReactInterface/context';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
+import {NotFoundPanel} from '../NotFoundPanel';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -35,7 +36,7 @@ export const OpVersionPage: React.FC<{
   if (opVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (opVersion.result == null) {
-    return <div>Op version not found</div>;
+    return <NotFoundPanel title="Op not found" />;
   }
   return <OpVersionPageInner opVersion={opVersion.result} />;
 };
