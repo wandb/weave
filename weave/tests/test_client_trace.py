@@ -17,6 +17,7 @@ from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave.weave_client import sanitize_object_name
 
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
@@ -2421,3 +2422,77 @@ def test_model_save(client):
     assert isinstance(expected_predict_op, str) and expected_predict_op.startswith(
         "weave:///"
     )
+
+
+class Custom(weave.Object):
+    val: dict
+
+
+def test_object_with_disallowed_keys(client):
+    name = "%"
+    obj = Custom(name=name, val={"1": 1})
+
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == "_"
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
+    with pytest.raises(Exception):
+        client.server.obj_create(create_req)
+
+
+chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
+
+
+def test_objects_and_keys_with_special_characters(client):
+    # make sure to include ":", "/" which are URI-related
+
+    name_with_special_characters = "name: /" + chars
+    dict_payload = {name_with_special_characters: "hello world"}
+
+    obj = Custom(name=name_with_special_characters, val=dict_payload)
+
+    weave.publish(obj)
+    assert obj.ref is not None
+
+    entity, project = client._project_id().split("/")
+    project_id = f"{entity}/{project_id}"
+    ref_base = f"weave:///{project}"
+    exp_name = sanitize_object_name(name_with_special_characters)
+    # exp_digest = "2bnzTXFjtlwrtXWNLhAyvYq0XbRFfr633kKL2IkBOlI"
+
+    # exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
+    # assert obj.ref.uri() == exp_obj_ref
+
+    @weave.op
+    def test(obj: Custom):
+        return obj.val[name_with_special_characters]
+
+    test.name = name_with_special_characters
+
+    res = test(obj)
+
+    # exp_res_ref = f"{exp_obj_ref}/attr/val/key/{exp_name}"
+    found_ref = res.ref.uri()
+    assert res == "hello world"
+    # assert found_ref == exp_res_ref
+
+    gotten_res = weave.ref(found_ref).get()
+    assert gotten_res == "hello world"
+
+    # exp_op_digest = "WZAc2HA5GyWPr7YzHiSBncbHKMywXN3hk8onqRy2KkA"
+    # exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
+
+    found_ref = test.ref.uri()
+    # assert found_ref == exp_op_ref
+    gotten_fn = weave.ref(found_ref).get()
+    assert gotten_fn(obj) == "hello world"
