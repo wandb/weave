@@ -314,10 +314,9 @@ export const browse3ContextGen = (
       opName: string,
       opVersionHash: string
     ) => {
-      return `${projectRoot(
-        entityName,
-        projectName
-      )}/ops/${opName}/versions/${opVersionHash}`;
+      return `${projectRoot(entityName, projectName)}/ops/${encodeURIComponent(
+        opName
+      )}/versions/${opVersionHash}`;
     },
     callUIUrl: (
       entityName: string,
