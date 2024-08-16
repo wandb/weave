@@ -762,6 +762,9 @@ class WeaveClient:
         if name is None:
             raise ValueError("Name must be provided for object saving")
 
+        # Sanitize Name - the only restriction is `%` as of now
+        name = name.replace("%", "_")
+
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(

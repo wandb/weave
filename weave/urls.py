@@ -10,8 +10,12 @@ BROWSE3_PATH = "browse3"
 WEAVE_SLUG = "weave"
 
 
+def slash_safe_quote(s: str) -> str:
+    return quote(s, safe="")
+
+
 def remote_project_root_url(entity_name: str, project_name: str) -> str:
-    return f"{wb_util.app_url(environment.wandb_base_url())}/{entity_name}/{quote(project_name)}"
+    return f"{wb_util.app_url(environment.wandb_base_url())}/{slash_safe_quote(entity_name)}/{slash_safe_quote(project_name)}"
 
 
 def remote_project_weave_root_url(entity_name: str, project_name: str) -> str:
@@ -32,13 +36,13 @@ def project_weave_root_url(entity_name: str, project_name: str) -> str:
 def op_version_path(
     entity_name: str, project_name: str, op_name: str, op_version: str
 ) -> str:
-    return f"{project_weave_root_url(entity_name, project_name)}/ops/{op_name}/versions/{op_version}"
+    return f"{project_weave_root_url(entity_name, project_name)}/ops/{slash_safe_quote(op_name)}/versions/{op_version}"
 
 
 def object_version_path(
     entity_name: str, project_name: str, object_name: str, obj_version: str
 ) -> str:
-    return f"{project_weave_root_url(entity_name, project_name)}/objects/{quote(object_name)}/versions/{obj_version}"
+    return f"{project_weave_root_url(entity_name, project_name)}/objects/{slash_safe_quote(object_name)}/versions/{obj_version}"
 
 
 def call_path(entity_name: str, project_name: str, call_id: str) -> str:
