@@ -203,12 +203,12 @@ def _parse_remaining(remaining: list[str]) -> tuple[str, str, list[str]]:
     is a tuple of name, version, and extra parts, properly unquoted.
     """
     name_encoded, version = remaining[0].split(":")
-    name = urllib.parse.unquote_plus(name_encoded)
+    name = urllib.parse.unquote(name_encoded)
     extra = remaining[1:]
     if len(extra) == 1 and extra[0] == "":
         extra = []
     else:
-        extra = [urllib.parse.unquote_plus(r) for r in extra]
+        extra = [urllib.parse.unquote(r) for r in extra]
 
     return name, version, extra
 

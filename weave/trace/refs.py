@@ -146,7 +146,7 @@ def parse_uri(uri: str) -> AnyRef:
             entity=entity,
             project=project,
             id=remaining[0],
-            extra=tuple([urllib.parse.unquote_plus(r) for r in remaining[1:]]),
+            extra=tuple([urllib.parse.unquote(r) for r in remaining[1:]]),
         )
     elif kind == "object":
         name, version, extra = refs_internal._parse_remaining(remaining)
