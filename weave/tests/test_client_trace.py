@@ -14,6 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor, weave_client
+from weave.trace.object_record import ObjectRecord
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -1405,25 +1406,12 @@ def test_dataclass_support(client):
 
     assert len(res.calls) == 1
     assert res.calls[0].inputs == {
-        "a": {
-            "_bases": [],
-            "_class_name": "MyDataclass",
-            "_type": "MyDataclass",
-            "val": 1,
-        },
-        "b": {
-            "_bases": [],
-            "_class_name": "MyDataclass",
-            "_type": "MyDataclass",
-            "val": 2,
-        },
+        "a": ObjectRecord({"val": 1, "_class_name": "MyDataclass", "_bases": []}),
+        "b": ObjectRecord({"val": 2, "_class_name": "MyDataclass", "_bases": []}),
     }
-    assert res.calls[0].output == {
-        "_bases": [],
-        "_class_name": "MyDataclass",
-        "_type": "MyDataclass",
-        "val": 3,
-    }
+    assert res.calls[0].output == ObjectRecord(
+        {"val": 3, "_class_name": "MyDataclass", "_bases": []}
+    )
 
 
 def test_op_retrieval(client):

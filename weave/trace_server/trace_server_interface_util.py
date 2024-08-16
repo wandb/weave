@@ -2,6 +2,8 @@ import base64
 import hashlib
 import typing
 
+from weave.trace.refs import Ref
+
 from . import refs_internal
 
 TRACE_REF_SCHEME = "weave"
@@ -71,6 +73,8 @@ def extract_refs_from_values(
             val.startswith(scheme + "://") for scheme in valid_schemes
         ):
             refs.append(val)
+        elif isinstance(val, Ref):
+            refs.append(val.uri())
 
     _visit(vals)
     return refs
