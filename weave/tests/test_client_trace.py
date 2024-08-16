@@ -243,7 +243,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     # class Number:
     #     value: int
 
-    class Number(BaseModel):
+    class Number(weave.Object):
         value: int
 
     @weave.op()
@@ -1313,13 +1313,25 @@ def test_dataclass_support(client):
 
     assert len(res.calls) == 1
     assert res.calls[0].inputs == {
-        "a": "weave:///shawn/test-project/object/MyDataclass:qDo5jHFme5xIM1LwgeiXXVxYoGnp4LQ9hulqkX5zunY",
-        "b": "weave:///shawn/test-project/object/MyDataclass:We1slmdrWzi2NYSWObBsLybTTNSP4M9zfQbCMf8rQMc",
+        "a": {
+            "_bases": [],
+            "_class_name": "MyDataclass",
+            "_type": "MyDataclass",
+            "val": 1,
+        },
+        "b": {
+            "_bases": [],
+            "_class_name": "MyDataclass",
+            "_type": "MyDataclass",
+            "val": 2,
+        },
     }
-    assert (
-        res.calls[0].output
-        == "weave:///shawn/test-project/object/MyDataclass:2exnZIHkq8DyHTbJzhL0m5Ew1XrqIBCstZWilQS6Lpo"
-    )
+    assert res.calls[0].output == {
+        "_bases": [],
+        "_class_name": "MyDataclass",
+        "_type": "MyDataclass",
+        "val": 3,
+    }
 
 
 def test_op_retrieval(client):
