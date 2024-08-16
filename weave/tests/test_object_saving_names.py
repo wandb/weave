@@ -12,7 +12,7 @@ def test_publish_weave_object_instantiated_with_invalid_name(client):
     ref = weave.publish(a)
     a2 = ref.get()
     assert a2.name == "must:be/quoted"  # should be unquoted as normal
-    assert a2.ref.name == quote_select("must:be/quoted")
+    assert a2.ref.name == quote_select("must:be/quoted")  # ref should be quoted
 
 
 def test_publish_weave_object_updated_with_invalid_name(client):
@@ -22,7 +22,7 @@ def test_publish_weave_object_updated_with_invalid_name(client):
     ref = weave.publish(a)
     a2 = ref.get()
     assert a2.name == "must:be/quoted"  # should be unquoted as normal
-    assert a2.ref.name == quote_select("must:be/quoted")
+    assert a2.ref.name == quote_select("must:be/quoted")  # ref should be quoted
 
 
 def test_publish_weave_object_published_with_invalid_name(client):
@@ -30,4 +30,5 @@ def test_publish_weave_object_published_with_invalid_name(client):
 
     ref = weave.publish(a, "must:be/quoted")
     a2 = ref.get()
+    assert a2.name is None
     assert a2.ref.name == quote_select("must:be/quoted")  # ref should be quoted
