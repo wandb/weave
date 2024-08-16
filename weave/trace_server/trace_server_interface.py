@@ -7,7 +7,6 @@ from pydantic import (
     ConfigDict,
     Field,
     field_serializer,
-    field_validator,
 )
 from typing_extensions import TypedDict
 
@@ -111,19 +110,20 @@ class CallSchema(BaseModel):
     ) -> typing.Dict[str, typing.Any]:
         return v
 
-    @field_validator("output")
-    @classmethod
-    def validate_output(cls, v):
-        from weave.trace.serialize import from_json_special
+    # TODO: How do I get project, server here?
+    # @field_validator("output")
+    # @classmethod
+    # def validate_output(cls, v):
+    #     from weave.trace.serialize import from_json_special
 
-        return from_json_special(v)
+    #     return from_json_special(v)
 
-    @field_validator("inputs")
-    @classmethod
-    def validate_inputs(cls, v):
-        from weave.trace.serialize import from_json_special
+    # @field_validator("inputs")
+    # @classmethod
+    # def validate_inputs(cls, v):
+    #     from weave.trace.serialize import from_json_special
 
-        return from_json_special(v)
+    #     return from_json_special(v)
 
 
 # Essentially a partial of StartedCallSchema. Mods:
