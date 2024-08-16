@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import {useMemo} from 'react';
 
-import {flattenObject} from '../../../../../Browse2/browse2Util';
+import {flattenObjectPreservingWeaveTypes} from '../../../../../Browse2/browse2Util';
 import {
   buildCompositeMetricsMap,
   CompositeScoreMetrics,
@@ -138,8 +138,10 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                   evaluationCallId: predictAndScoreRes.evaluationCallId,
                   inputDigest: datasetRow.digest,
                   inputRef: predictAndScoreRes.exampleRef,
-                  input: flattenObject({input: datasetRow.val}),
-                  output: flattenObject({output}),
+                  input: flattenObjectPreservingWeaveTypes({
+                    input: datasetRow.val,
+                  }),
+                  output: flattenObjectPreservingWeaveTypes({output}),
                   scores: Object.fromEntries(
                     [...Object.entries(state.data.scoreMetrics)].map(
                       ([scoreKey, scoreVal]) => {

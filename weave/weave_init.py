@@ -104,6 +104,8 @@ def init_weave(
     client = weave_client.WeaveClient(
         entity_name, project_name, remote_server, ensure_project_exists
     )
+    # If the project name was formatted by init, update the project name
+    project_name = client.project
 
     _current_inited_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
