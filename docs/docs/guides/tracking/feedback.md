@@ -89,7 +89,8 @@ def simple_operation(input_value):
     call_id = current_call.id
     return output, call_id
 ```    
-    
+Additionally, you can use call() method to execute the operation and retrieve the result and call ID: 
+
 ```python    
 import weave
 weave.init("uuid")
