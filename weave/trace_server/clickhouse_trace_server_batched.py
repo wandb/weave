@@ -373,7 +373,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for i, call in enumerate(calls):
             for col in expand_columns:
                 val = call.get(col)
-                col_prefix = col
+                col_prefix = None
                 if val is None:
                     # requested column not present, could be a nested ref
                     col_prefix, val = self._get_nested_ref_column_part(col, call)
@@ -381,7 +381,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         continue
 
                 if refs_internal.is_ref_str(val):
-                    refs_to_resolve[(i, col, col_prefix)] = val
+                    refs_to_resolve[(i, col, col_prefix or col)] = val
 
         return refs_to_resolve
 
