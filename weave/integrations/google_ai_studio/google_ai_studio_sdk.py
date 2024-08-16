@@ -85,29 +85,6 @@ gemini_patcher = MultiPatcher(
             ),
         ),
         SymbolPatcher(
-            lambda: importlib.import_module("google.generativeai"),
-            "GenerativeModel.generate_content",
-            gemini_wrapper_sync(name="google.generativeai.GenerativeModel.start_chat"),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module(
-                "google.generativeai.types.generation_types"
-            ),
-            "GenerateContentResponse.from_response",
-            gemini_wrapper_sync(
-                name="google.generativeai.types.generation_types.GenerateContentResponse.from_response"
-            ),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module(
-                "google.generativeai.types.generation_types"
-            ),
-            "AsyncGenerateContentResponse.from_response",
-            gemini_wrapper_sync(
-                name="google.generativeai.types.generation_types.AsyncGenerateContentResponse.from_response"
-            ),
-        ),
-        SymbolPatcher(
             lambda: importlib.import_module(
                 "google.ai.generativelanguage_v1beta.services.generative_service.client"
             ),
