@@ -236,7 +236,7 @@ export type WFDataModelHooksInterface = {
     project: string,
     digest: string,
     opts?: {skip?: boolean}
-  ) => Loadable<string>;
+  ) => Loadable<ArrayBuffer>;
   useFeedback: (
     key: FeedbackKey | null,
     sortBy?: traceServerClientTypes.SortBy[]

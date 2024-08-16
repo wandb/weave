@@ -239,9 +239,16 @@ const ObjectVersionsTable: React.FC<{
         });
       });
 
-      const {cols: newCols, groupingModel} =
-        buildDynamicColumns<ObjectVersionSchema>(dynamicFields, (row, key) => {
-          const obj: ObjectVersionSchema = (row as any).obj;
+      const {cols: newCols, groupingModel} = buildDynamicColumns<{
+        obj: ObjectVersionSchema;
+      }>(
+        dynamicFields,
+        row => ({
+          entity: row.obj.entity,
+          project: row.obj.project,
+        }),
+        (row, key) => {
+          const obj: ObjectVersionSchema = row.obj;
           const res = obj.val?.[key];
           if (isTableRef(res)) {
             // This whole block is a hack to make the table ref clickable. This
@@ -258,7 +265,8 @@ const ObjectVersionsTable: React.FC<{
             return makeRefExpandedPayload(targetRefUri, res);
           }
           return res;
-        });
+        }
+      );
       cols.push(...newCols);
       groups = groupingModel;
     }

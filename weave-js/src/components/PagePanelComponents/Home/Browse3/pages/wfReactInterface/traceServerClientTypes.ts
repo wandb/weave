@@ -202,7 +202,7 @@ export type TraceFileContentReadReq = {
 };
 
 export type TraceFileContentReadRes = {
-  content: string;
+  content: ArrayBuffer;
 };
 
 export enum ContentType {

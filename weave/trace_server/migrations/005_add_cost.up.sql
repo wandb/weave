@@ -1,4 +1,8 @@
 CREATE TABLE llm_token_prices (
+     /*
+    `id`: The unique identifier for the call. This is typically a UUID.
+    */
+    id String,
     /*
     `pricing_level`: The level at which the token pricing applies. It can be 'default' for global pricing,
     'project' for project-specific pricing, or 'org' for organization-specific pricing.

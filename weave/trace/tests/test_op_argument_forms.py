@@ -420,7 +420,7 @@ def test_general_arg_variations(client, fn, arg_variations):
         res = client.server.calls_query(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi._CallsFilter(op_names=[wrapped_fn.ref.uri()]),
+                filter=tsi.CallsFilter(op_names=[wrapped_fn.ref.uri()]),
             )
         )
 

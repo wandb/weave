@@ -45,7 +45,7 @@ const config: Config = {
           docItemComponent: "@theme/ApiItem", // Derived from docusaurus-theme-openapi
         },
         theme: {
-          customCss: "./src/css/custom.css",
+          customCss: "./src/css/custom.scss",
         },
       } satisfies Preset.Options,
     ],
@@ -83,7 +83,8 @@ const config: Config = {
             } satisfies OpenApiPlugin.Options,
           }
         },
-      ]
+      ],
+      'docusaurus-plugin-sass',
   ],
 
   themes: [
@@ -111,6 +112,12 @@ const config: Config = {
           label: "Documentation",
         },
         {
+          type: "docSidebar",
+          sidebarId: "notebookSidebar",
+          position: "left",
+          label: "Cookbooks",
+        },
+        {
           position: "left",
           label: "Reference",
           type: "dropdown",
@@ -120,18 +127,11 @@ const config: Config = {
               sidebarId: "pythonSdkSidebar",
               label: "Python SDK",
             },
-            // Keeping this hidden until we want to "release" the service API
-            // TODOs before release:
-            // 1. Fix auth to be more standard
-            // 2. Correct HTTP Methods
-            // 3. Put behind a "v1" endpoint
-            // 4. Fix the URL in the request (seems to use the hosting URL)
-            //
-            // {
-            //   type: "docSidebar",
-            //   sidebarId: "serviceApiSidebar",
-            //   label: "Service API",
-            // },
+            {
+              type: "docSidebar",
+              sidebarId: "serviceApiSidebar",
+              label: "Service API",
+            },
           ]
         },
         {
@@ -148,6 +148,16 @@ const config: Config = {
               label: "Release Changelog",
             },
           ]
+        },
+        {
+          type: 'search',
+          position: 'right',
+        },
+        {
+          to: 'https://wandb.ai/home',
+          label: 'Open App',
+          position: 'right',
+          className: 'button button--secondary button--med margin-right--sm',
         },
       ],
     },

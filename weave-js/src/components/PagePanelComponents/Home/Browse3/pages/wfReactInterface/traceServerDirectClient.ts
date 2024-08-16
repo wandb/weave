@@ -92,7 +92,7 @@ export class DirectTraceServerClient {
     const res = this.makeRequest<TraceCallsQueryReq, string>(
       '/calls/stream_query',
       req,
-      true
+      'text'
     );
     return new Promise((resolve, reject) => {
       res
@@ -193,42 +193,10 @@ export class DirectTraceServerClient {
           headers,
           body: reqBody,
         });
-
-        // Check if the response is OK
-        if (!response.ok) {
-          try {
-            const error = await response.text();
-            console.error(error);
-          } catch (err) {
-            console.error(err);
-          }
-          reject(new Error(`Error fetching data: ${response.status}`));
-          return;
-        }
-
-        // Create a ReadableStream reader
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        const chunks: string[] = [];
-
-        while (true) {
-          // Read each chunk
-          const {done, value} = (await reader?.read()) ?? {
-            done: true,
-            value: new Uint8Array(),
-          };
-          if (done) {
-            break;
-          }
-
-          // Decode the chunk and add to the chunks array
-          const chunk = decoder.decode(value, {stream: true});
-          chunks.push(chunk);
-        }
-
-        // Combine all chunks into a single string
-        const textData = chunks.join('');
-        const blob = new Blob([textData], {type: contentType});
+        // TODO: support streaming data into a memory buffer, this .blob() method
+        // is incomplete, add paging/stream construction of this blob or string. More info here:
+        // https://stackoverflow.com/questions/28307789/is-there-any-limitation-on-javascript-max-blob-size
+        const blob = await response.blob();
         resolve(blob);
       } catch (error) {
         reject(new Error(`Error downloading data: ${error}`));
@@ -292,10 +260,10 @@ export class DirectTraceServerClient {
   public fileContent(
     req: TraceFileContentReadReq
   ): Promise<TraceFileContentReadRes> {
-    const res = this.makeRequest<TraceFileContentReadReq, string>(
+    const res = this.makeRequest<TraceFileContentReadReq, ArrayBuffer>(
       '/files/content',
       req,
-      true
+      'arrayBuffer'
     );
     return new Promise((resolve, reject) => {
       res
@@ -311,7 +279,7 @@ export class DirectTraceServerClient {
   private makeRequest = async <QT, ST>(
     endpoint: string,
     req: QT,
-    returnText?: boolean,
+    responseReturnType: 'json' | 'text' | 'arrayBuffer' = 'json',
     contentType?: ContentType
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
@@ -352,10 +320,16 @@ export class DirectTraceServerClient {
       body: reqBody,
     })
       .then(response => {
-        if (returnText) {
+        if (responseReturnType === 'text') {
           return response.text();
+        } else if (responseReturnType === 'arrayBuffer') {
+          return response.arrayBuffer();
+        } else if (responseReturnType === 'json') {
+          return response.json();
+        } else {
+          // Should never happen with correct type checking
+          throw new Error('Invalid responseReturnType: ' + responseReturnType);
         }
-        return response.json();
       })
       .then(res => {
         try {
