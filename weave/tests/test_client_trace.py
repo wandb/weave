@@ -16,6 +16,7 @@ import weave
 from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace_server.ids import generate_id
+from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.weave_client import sanitize_object_name
 
@@ -2465,13 +2466,17 @@ def test_objects_and_keys_with_special_characters(client):
     assert obj.ref is not None
 
     entity, project = client._project_id().split("/")
-    project_id = f"{entity}/{project_id}"
-    ref_base = f"weave:///{project}"
+    project_id = f"{entity}/{project}"
+    ref_base = f"weave:///{project_id}"
     exp_name = sanitize_object_name(name_with_special_characters)
-    # exp_digest = "2bnzTXFjtlwrtXWNLhAyvYq0XbRFfr633kKL2IkBOlI"
+    assert exp_name == "name"
+    exp_key = extra_value_quoter(name_with_special_characters)
+    # If we decide to quote everything, this would change
+    assert exp_key == "name: %2F+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
+    exp_digest = "2bnzTXFjtlwrtXWNLhAyvYq0XbRFfr633kKL2IkBOlI"
 
-    # exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
-    # assert obj.ref.uri() == exp_obj_ref
+    exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
+    assert obj.ref.uri() == exp_obj_ref
 
     @weave.op
     def test(obj: Custom):
@@ -2481,18 +2486,18 @@ def test_objects_and_keys_with_special_characters(client):
 
     res = test(obj)
 
-    # exp_res_ref = f"{exp_obj_ref}/attr/val/key/{exp_name}"
+    exp_res_ref = f"{exp_obj_ref}/attr/val/key/{exp_key}"
     found_ref = res.ref.uri()
     assert res == "hello world"
-    # assert found_ref == exp_res_ref
+    assert found_ref == exp_res_ref
 
     gotten_res = weave.ref(found_ref).get()
     assert gotten_res == "hello world"
 
-    # exp_op_digest = "WZAc2HA5GyWPr7YzHiSBncbHKMywXN3hk8onqRy2KkA"
-    # exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
+    exp_op_digest = "WZAc2HA5GyWPr7YzHiSBncbHKMywXN3hk8onqRy2KkA"
+    exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
 
     found_ref = test.ref.uri()
-    # assert found_ref == exp_op_ref
+    assert found_ref == exp_op_ref
     gotten_fn = weave.ref(found_ref).get()
     assert gotten_fn(obj) == "hello world"
