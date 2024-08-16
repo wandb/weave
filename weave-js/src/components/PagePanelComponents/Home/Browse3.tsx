@@ -502,7 +502,8 @@ const ObjectVersionRoutePageBinding = () => {
 
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
-  const itemName = decodeURIComponent(params.itemName);
+  // const itemName = decodeURIComponent(params.itemName);
+  const itemName = params.itemName;
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -538,7 +539,8 @@ const OpVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
-  const itemName = decodeURIComponent(params.itemName);
+  // const itemName = decodeURIComponent(params.itemName);
+  const itemName = params.itemName;
   useEffect(() => {
     if (!params.version) {
       history.replace(

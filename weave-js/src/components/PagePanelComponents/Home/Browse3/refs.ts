@@ -14,7 +14,9 @@ export const makeRefCall = (
   project: string,
   callId: string
 ): string => {
-  return `${WEAVE_REF_PREFIX}${encodeURIComponent(entity)}/${encodeURIComponent(project)}/call/${callId}`;
+  return `${WEAVE_REF_PREFIX}${encodeURIComponent(entity)}/${encodeURIComponent(
+    project
+  )}/call/${callId}`;
 };
 
 export const makeRefObject = (
@@ -30,7 +32,9 @@ export const makeRefObject = (
     objNameAndVersion = objectVersion;
   }
 
-  let ref = `${WEAVE_REF_PREFIX}${encodeURIComponent(entity)}/${encodeURIComponent(project)}/${objectType}/${objNameAndVersion}`;
+  let ref = `${WEAVE_REF_PREFIX}${encodeURIComponent(
+    entity
+  )}/${encodeURIComponent(project)}/${objectType}/${objNameAndVersion}`;
   if (alreadyEncodedRefExtra && alreadyEncodedRefExtra !== '') {
     ref += `/${alreadyEncodedRefExtra}`;
   }
