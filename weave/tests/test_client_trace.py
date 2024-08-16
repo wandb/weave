@@ -2437,8 +2437,9 @@ def test_objects_and_keys_with_special_characters(client):
     weave.publish(obj)
     assert obj.ref is not None
 
-    project_id = client._project_id()
-    ref_base = f"weave:///{project_id}"
+    entity, project = client._project_id().split("/")
+    project = f"{ref_part_quoter(entity)}/{ref_part_quoter(project)}"
+    ref_base = f"weave:///{project}"
     exp_name = ref_part_quoter(name_with_special_characters)
     exp_digest = "rUA8vNX3RqX6rPAVmdeNyJrMtmx3h8qOPxnlulaeB78"
 

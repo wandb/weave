@@ -22,7 +22,7 @@ class TableRef(Ref):
     digest: str
 
     def uri(self) -> str:
-        return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
+        return f"weave:///{ri.ref_part_quoter(self.entity)}/{ri.ref_part_quoter(self.project)}/table/{self.digest}"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -134,7 +134,9 @@ def parse_uri(uri: str) -> AnyRef:
     parts = path.split("/")
     if len(parts) < 3:
         raise ValueError(f"Invalid URI: {uri}")
-    entity, project, kind = parts[:3]
+    quoted_entity, quoted_project, kind = parts[:3]
+    entity = ri.ref_part_unquoter(quoted_entity)
+    project = ri.ref_part_unquoter(quoted_project)
     remaining = parts[3:]
     if kind == "table":
         return TableRef(entity=entity, project=project, digest=remaining[0])

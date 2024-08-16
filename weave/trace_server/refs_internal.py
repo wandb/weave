@@ -157,7 +157,9 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
         parts = path.split("/")
         if len(parts) < 3:
             raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 3 parts")
-        entity, project, kind = parts[:3]
+        quoted_entity, quoted_project, kind = parts[:3]
+        entity = ref_part_unquoter(quoted_entity)
+        project = ref_part_unquoter(quoted_project)
         project_id = f"{entity}/{project}"
         remaining = parts[3:]
     else:
