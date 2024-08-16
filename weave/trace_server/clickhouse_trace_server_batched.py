@@ -364,28 +364,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return ".".join(parts) or None, cur
 
-    @staticmethod
-    def _is_ref(val: typing.Any) -> bool:
-        return isinstance(val, str) and refs_internal.string_will_be_interpreted_as_ref(
-            val
-        )
-
     def _get_refs_to_resolve(
         self, calls: list[dict[str, typing.Any]], expand_columns: typing.List[str]
-    ) -> typing.Dict[tuple[int, str, typing.Optional[str]], str]:
+    ) -> typing.Dict[tuple[int, str, str], str]:
         # First get refs from call batch, store them where we can lookup them later
-        # format: (call_index, column_name, optional column_prefix) -> ref
-        refs_to_resolve: typing.Dict[tuple[int, str, typing.Optional[str]], str] = {}
+        # format: (call_index, column_name, column_prefix) -> ref
+        refs_to_resolve: typing.Dict[tuple[int, str, str], str] = {}
         for i, call in enumerate(calls):
             for col in expand_columns:
                 val = call.get(col)
+                col_prefix = col
                 if val is None:
                     # requested column not present, could be a nested ref
                     col_prefix, val = self._get_nested_ref_column_part(col, call)
                     if not col_prefix:
                         continue
 
-                if self._is_ref(val):
+                if refs_internal.is_ref_str(val):
                     refs_to_resolve[(i, col, col_prefix)] = val
 
         return refs_to_resolve
@@ -422,7 +417,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     val = val[part]
                     col_prefix += f".{part}"
 
-                    if self._is_ref(val):
+                    if refs_internal.is_ref_str(val):
                         unresolved_refs[(i, col, col_prefix)] = val
                         break
 
