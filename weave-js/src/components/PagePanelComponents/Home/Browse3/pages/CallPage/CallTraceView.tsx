@@ -344,7 +344,15 @@ export const useCallFlattenedTraceTree = (
     undefined,
     undefined,
     undefined,
-    ['id', 'trace_id', 'project_id', 'op_name', 'parent_id', 'started_at', 'ended_at'],
+    [
+      'id',
+      'trace_id',
+      'project_id',
+      'op_name',
+      'parent_id',
+      'started_at',
+      'ended_at',
+    ]
   );
   const traceCallsResult = useMemo(
     () => traceCalls.result ?? [],
