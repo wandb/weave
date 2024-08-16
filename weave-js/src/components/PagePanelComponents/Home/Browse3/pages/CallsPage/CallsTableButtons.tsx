@@ -356,42 +356,42 @@ function useMakeCodeText(
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
   console.log(filter);
-  let codeStr = `import weave\nfrom weave.weave_client import _CallsFilter\nclient = weave.init("${entity}/${project}")`;
+  let codeStr = `import weave\n\nclient = weave.init("${entity}/${project}")`;
 
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds.length > 0) {
     // specifying call_ids ignores other filters
-    codeStr += `\ncalls = client.calls(_CallsFilter(\n\tcall_ids=["${filteredCallIds.join(
+    codeStr += `\ncalls = client.calls({\n\t"call_ids": ["${filteredCallIds.join(
       '", "'
-    )}"],\n))`;
+    )}"],\n})`;
     return codeStr;
   }
 
-  codeStr += `\ncalls = client.calls(_CallsFilter(\n`;
+  codeStr += `\ncalls = client.calls({\n`;
   if (filter.opVersionRefs) {
-    codeStr += `\top_names=["${filter.opVersionRefs.join('", "')}"],\n`;
+    codeStr += `\t"op_names": ["${filter.opVersionRefs.join('", "')}"],\n`;
   }
   if (filter.runIds) {
-    codeStr += `\trun_ids=["${filter.runIds.join('", "')}"],\n`;
+    codeStr += `\t"run_ids": ["${filter.runIds.join('", "')}"],\n`;
   }
   if (filter.userIds) {
-    codeStr += `\tuser_ids=["${filter.userIds.join('", "')}"],\n`;
+    codeStr += `\t"user_ids": ["${filter.userIds.join('", "')}"],\n`;
   }
   if (filter.traceId) {
-    codeStr += `\ttrace_id="${filter.traceId}",\n`;
+    codeStr += `\t"trace_id": "${filter.traceId}",\n`;
   }
   if (filter.traceRootsOnly) {
-    codeStr += `\ttrace_roots_only=True,\n`;
+    codeStr += `\t"trace_roots_only": True,\n`;
   }
   if (filter.parentIds) {
-    codeStr += `\tparent_ids=["${filter.parentIds.join('", "')}"],\n`;
+    codeStr += `\t"parent_ids": ["${filter.parentIds.join('", "')}"],\n`;
   }
 
   if (sortBy.length > 0) {
-    codeStr += `\tsort_by=${JSON.stringify(sortBy, null, 0)},\n`;
+    codeStr += `\t"sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
   }
 
-  codeStr += `))`;
+  codeStr += `})`;
 
   return codeStr;
 }
