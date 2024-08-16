@@ -116,6 +116,15 @@ class Op(Protocol):
     __call__: Callable[..., Any]
     __self__: Any
 
+    # `_tracing_enabled` is a runtime-only flag that can be used to disable
+    # call tracing for an op. It is not persisted as a property of the op, but is
+    # respected by the current execution context. It is an underscore property
+    # because it is not intended to be used by users directly, but rather assists
+    # with internal Weave behavior. If we find a need to expose this to users, we
+    # should consider a more user-friendly API (perhaps a setter/getter) & whether
+    # it disables child ops as well.
+    _tracing_enabled: bool
+
 
 def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
     if func._on_output_handler is not None:
@@ -328,6 +337,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         return await func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
                         return await func(*args, **kwargs)
+                    if not wrapper._tracing_enabled:  # type: ignore
+                        return await func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
                     return res
@@ -338,6 +349,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if settings.should_disable_weave():
                         return func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
+                        return func(*args, **kwargs)
+                    if not wrapper._tracing_enabled:  # type: ignore
                         return func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
@@ -365,6 +378,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
+
+            wrapper._tracing_enabled = True  # type: ignore
 
             return cast(Op, wrapper)
 
