@@ -71,6 +71,40 @@ call.feedback.add_note("this is a note")
 call.feedback.add("correctness", { "value": 5 })
 ```
 
+### Retrieving the Call UUID 
+
+For scenarios where you need to add feedback immediately after a call, you can retrieve the call UUID programmatically during or after the call execution. Here are two ways to get the UUID of the call: 
+
+```python
+
+import weave
+weave.init("uuid")
+
+@weave.op()
+def simple_operation(input_value):
+    # Perform some simple operation
+    output = f"Processed {input_value}"
+    # Get the current call ID
+    current_call = weave.get_current_call()
+    call_id = current_call.id
+    return output, call_id
+```    
+    
+```python    
+import weave
+weave.init("uuid")
+
+@weave.op()
+def simple_operation(input_value):
+    return f"Processed {input_value}"
+
+# Execute the operation and retrieve the result and call ID
+result, call = simple_operation.call("example input")
+call_id = call.id
+```
+
+
+
 ### Querying feedback on a call
 
 ```python
