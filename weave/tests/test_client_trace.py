@@ -412,6 +412,98 @@ def get_all_calls_asserting_finished(
     return res
 
 
+def test_inline_dataclass_generates_no_refs_in_function(client):
+    @dataclasses.dataclass
+    class A:
+        b: int
+
+    @weave.op
+    def func(a: A):
+        return A(b=a.b + 1)
+
+    a = A(b=1)
+    func(a)
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    input_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
+    )
+    assert len(input_object_version_refs) == 0
+
+    output_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
+    )
+    assert len(output_object_version_refs) == 0
+
+
+def test_inline_dataclass_generates_no_refs_in_object(client):
+    @dataclasses.dataclass
+    class A:
+        b: int
+
+    class WeaveObject(weave.Object):
+        a: A
+
+    wo = WeaveObject(a=A(b=1))
+    ref = weave.publish(wo)
+
+    res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    assert len(res.objs) == 1  # Just the weave object, and not the dataclass
+
+
+def test_inline_pydantic_basemodel_generates_no_refs_in_function(client):
+    class A(BaseModel):
+        b: int
+
+    @weave.op
+    def func(a: A):
+        return A(b=a.b + 1)
+
+    a = A(b=1)
+    func(a)
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    input_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
+    )
+    assert len(input_object_version_refs) == 0
+
+    output_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
+    )
+    assert len(output_object_version_refs) == 0
+
+
+def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
+    class A(BaseModel):
+        b: int
+
+    class WeaveObject(weave.Object):
+        a: A
+
+    wo = WeaveObject(a=A(b=1))
+    ref = weave.publish(wo)
+
+    res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+        )
+    )
+    assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
+
+
 def test_trace_call_query_filter_input_object_version_refs(client):
     call_spec = simple_line_call_bootstrap()
 
