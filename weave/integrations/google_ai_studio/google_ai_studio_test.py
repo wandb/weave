@@ -1,12 +1,12 @@
 import asyncio
 import os
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import pytest
 
 import weave
-from weave.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+from weave.weave_client import WeaveClient
 
 
 def _get_call_output(call: tsi.CallSchema) -> Any:
