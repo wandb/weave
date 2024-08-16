@@ -9,7 +9,7 @@ import React from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../../react';
 import {ErrorBoundary} from '../../../../../../ErrorBoundary';
-import {flattenObject} from '../../../../Browse2/browse2Util';
+import {flattenObjectPreservingWeaveTypes} from '../../../../Browse2/browse2Util';
 import {CellValue} from '../../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
@@ -17,6 +17,8 @@ import {NotApplicable} from '../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../Browse2/SmallRef';
 import {CellFilterWrapper} from '../../../filters/CellFilterWrapper';
 import {privateRefToSimpleName} from '../../../refs';
+import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeProjectContext} from '../../../typeViews/CustomWeaveTypeDispatcher';
 import {
   OBJECT_ATTR_EDGE_NAME,
   WEAVE_PRIVATE_PREFIX,
@@ -60,7 +62,15 @@ export function prepareFlattenedDataForTable<T>(
 ): Array<T & {[key: string]: string}> {
   return data.map(r => {
     // First, flatten the inner object
-    let flattened = flattenObject(r ?? {});
+    let flattened = flattenObjectPreservingWeaveTypes(r ?? {});
+
+    // In the rare case that we have custom objects in the root (this only occurs if you directly)
+    // publish a custom object. Then we want to instead nest it under an empty key!
+    if (isCustomWeaveTypePayload(flattened)) {
+      flattened = {
+        ' ': flattened,
+      };
+    }
 
     flattened = replaceTableRefsInFlattenedData(flattened);
 
@@ -182,6 +192,7 @@ const isExpandedRefWithValueAsTableRef = (
 
 export const buildDynamicColumns = <T extends GridValidRowModel>(
   filteredDynamicColumnNames: string[],
+  entityProjectFromRow: (row: T) => {entity: string; project: string},
   valueForKey: (row: T, key: string) => any,
   columnIsExpanded?: (col: string) => boolean,
   columnCanBeExpanded?: (col: string) => boolean,
@@ -269,6 +280,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         return val;
       },
       renderCell: cellParams => {
+        const {entity, project} = entityProjectFromRow(cellParams.row);
         const val = valueForKey(cellParams.row, key);
         if (val === undefined) {
           return (
@@ -287,7 +299,12 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
               onAddFilter={onAddFilter}
               field={key}
               operation={null}
-              value={val}>
+              value={val}
+              style={{
+                width: '100%',
+                height: '100%',
+                alignContent: 'center',
+              }}>
               {/* In the future, we may want to move this isExpandedRefWithValueAsTableRef condition
             into `CellValue`. However, at the moment, `ExpandedRefWithValueAsTableRef` is a
             Table-specific data structure and we might not want to leak that into the
@@ -295,7 +312,10 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
               {isExpandedRefWithValueAsTableRef(val) ? (
                 <SmallRef objRef={parseRef(val[EXPANDED_REF_REF_KEY])} />
               ) : (
-                <CellValue value={val} />
+                <CustomWeaveTypeProjectContext.Provider
+                  value={{entity, project}}>
+                  <CellValue value={val} />
+                </CustomWeaveTypeProjectContext.Provider>
               )}
             </CellFilterWrapper>
           </ErrorBoundary>

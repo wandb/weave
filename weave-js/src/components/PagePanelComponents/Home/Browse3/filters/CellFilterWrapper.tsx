@@ -11,6 +11,7 @@ type CellFilterWrapperProps = {
   field: string;
   operation: string | null;
   value: any;
+  style?: React.CSSProperties;
 };
 
 export const CellFilterWrapper = ({
@@ -19,6 +20,7 @@ export const CellFilterWrapper = ({
   field,
   operation,
   value,
+  style,
 }: CellFilterWrapperProps) => {
   const onClickCapture = onAddFilter
     ? (e: React.MouseEvent) => {
@@ -31,5 +33,9 @@ export const CellFilterWrapper = ({
       }
     : undefined;
 
-  return <div onClickCapture={onClickCapture}>{children}</div>;
+  return (
+    <div style={style ?? {}} onClickCapture={onClickCapture}>
+      {children}
+    </div>
+  );
 };

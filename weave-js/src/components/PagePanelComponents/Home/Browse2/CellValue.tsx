@@ -6,6 +6,8 @@ import {parseRef} from '../../../../react';
 import {ValueViewNumber} from '../Browse3/pages/CallPage/ValueViewNumber';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
 import {isRef} from '../Browse3/pages/common/util';
+import {isCustomWeaveTypePayload} from '../Browse3/typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../Browse3/typeViews/CustomWeaveTypeDispatcher';
 import {CellValueBoolean} from './CellValueBoolean';
 import {CellValueImage} from './CellValueImage';
 import {CellValueString} from './CellValueString';
@@ -63,6 +65,9 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
         <ValueViewNumber value={value} fractionDigits={4} />
       </Box>
     );
+  }
+  if (isCustomWeaveTypePayload(value)) {
+    return <CustomWeaveTypeDispatcher data={value} />;
   }
   return <CellValueString value={JSON.stringify(value)} />;
 };

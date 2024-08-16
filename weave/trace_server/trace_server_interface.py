@@ -565,9 +565,15 @@ class FileContentReadRes(BaseModel):
     content: bytes
 
 
+class EnsureProjectExistsRes(BaseModel):
+    project_name: str
+
+
 class TraceServerInterface:
-    def ensure_project_exists(self, entity: str, project: str) -> None:
-        pass
+    def ensure_project_exists(
+        self, entity: str, project: str
+    ) -> EnsureProjectExistsRes:
+        return EnsureProjectExistsRes(project_name=project)
 
     # Call API
     @abc.abstractmethod
