@@ -1,3 +1,9 @@
+/**
+ * This File contains utility functions for working with Weave Refs. Unlike other parts of the codebase,
+ * this is specifically scoped to "New Weave" (aka Traces). We should incrementally move more code into
+ * here to match the `refs.py` file in the Python codebase.
+ */
+
 import {
   WEAVE_PRIVATE_PREFIX,
   WEAVE_REF_PREFIX,

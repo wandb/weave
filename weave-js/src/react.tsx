@@ -666,6 +666,11 @@ export const parseRef = (ref: string): ObjectRef => {
       artifactName: decodeURIComponent(artifactName),
       artifactVersion,
       artifactRefExtra: trimExtra(artifactRefExtra),
+      // `artifactRefExtra` is stored ALREADY ENCODED! No need to do the following:
+      // However, as a followup, we probably should change `artifactRefExtra` to be
+      // a list of strings and not a single string, which would allow us to decode
+      // the parts of the path individually. Leaving here to make this obvious to
+      // future readers.
       // ?.split('/')
       // ?.map(decodeURIComponent)
       // ?.join('/'),

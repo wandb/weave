@@ -47,12 +47,12 @@ def _print_version_check() -> None:
     weave_messages = None
     if hasattr(weave, "_wandb_module"):
         try:
-            orig_module = wandb._wandb_module
-            wandb._wandb_module = "weave"
+            orig_module = wandb._wandb_module  # type: ignore
+            wandb._wandb_module = "weave"  # type: ignore
             weave_messages = wandb.sdk.internal.update.check_available(
                 weave.__version__
             )
-            wandb._wandb_module = orig_module
+            wandb._wandb_module = orig_module  # type: ignore
         except Exception:
             weave_messages = None
 
