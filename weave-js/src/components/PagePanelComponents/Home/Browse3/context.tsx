@@ -92,8 +92,13 @@ export const browse2Context = {
   entityUrl: (entityName: string) => {
     return `/${entityName}`;
   },
-  projectUrl: (entityName: string, projectName: string) => {
-    return `/${entityName}/${projectName}`;
+  projectUrl: (entityName: string, projectName: string, noEncode?: boolean) => {
+    if (noEncode) {
+      return `/${entityName}/${projectName}`;
+    }
+    return `/${encodeURIComponent(entityName)}/${encodeURIComponent(
+      projectName
+    )}`;
   },
   callUIUrl: (
     entityName: string,
@@ -256,23 +261,42 @@ export const browse3ContextGen = (
       throw new Error('Unknown ref type');
     },
     entityUrl: (entityName: string) => {
-      return `/${entityName}`;
+      return `/${encodeURIComponent(entityName)}`;
     },
-    projectUrl: (entityName: string, projectName: string) => {
-      return `${projectRoot(entityName, projectName)}`;
+    projectUrl: (
+      entityName: string,
+      projectName: string,
+      noEncode?: boolean
+    ) => {
+      if (noEncode) {
+        return `${projectRoot(entityName, projectName)}`;
+      }
+      return `${projectRoot(
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
+      )}`;
     },
     typeUIUrl: (entityName: string, projectName: string, typeName: string) => {
-      return `${projectRoot(entityName, projectName)}/types/${typeName}`;
+      return `${projectRoot(
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
+      )}/types/${encodeURIComponent(typeName)}`;
     },
     objectUIUrl: (
       entityName: string,
       projectName: string,
       objectName: string
     ) => {
-      return `${projectRoot(entityName, projectName)}/objects/${objectName}`;
+      return `${projectRoot(
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
+      )}/objects/${encodeURIComponent(objectName)}`;
     },
     opUIUrl: (entityName: string, projectName: string, opName: string) => {
-      return `${projectRoot(entityName, projectName)}/ops/${opName}`;
+      return `${projectRoot(
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
+      )}/ops/${encodeURIComponent(opName)}`;
     },
     objectVersionUIUrl: (
       entityName: string,
@@ -286,8 +310,8 @@ export const browse3ContextGen = (
       const extra = refExtra ? `extra=${encodeURIComponent(refExtra)}` : '';
 
       return `${projectRoot(
-        entityName,
-        projectName
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
       )}/objects/${encodeURIComponent(
         objectName
       )}/versions/${objectVersionHash}?${path}&${extra}`;
@@ -299,7 +323,10 @@ export const browse3ContextGen = (
     ) => {
       const prunedFilter = pruneEmptyFields(filter);
       if (Object.keys(prunedFilter).length === 0) {
-        return `${projectRoot(entityName, projectName)}/op-versions`;
+        return `${projectRoot(
+          encodeURIComponent(entityName),
+          encodeURIComponent(projectName)
+        )}/op-versions`;
       }
       return `${projectRoot(
         entityName,
@@ -314,9 +341,10 @@ export const browse3ContextGen = (
       opName: string,
       opVersionHash: string
     ) => {
-      return `${projectRoot(entityName, projectName)}/ops/${encodeURIComponent(
-        opName
-      )}/versions/${opVersionHash}`;
+      return `${projectRoot(
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
+      )}/ops/${encodeURIComponent(opName)}/versions/${opVersionHash}`;
     },
     callUIUrl: (
       entityName: string,
@@ -326,7 +354,10 @@ export const browse3ContextGen = (
       path?: string | null,
       tracetree?: boolean
     ) => {
-      let url = `${projectRoot(entityName, projectName)}/calls/${callId}`;
+      let url = `${projectRoot(
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
+      )}/calls/${callId}`;
       const params = new URLSearchParams();
       if (path) {
         params.set(PATH_PARAM, path);
@@ -340,7 +371,10 @@ export const browse3ContextGen = (
       return url;
     },
     tracesUIUrl: (entityName: string, projectName: string) => {
-      return `${projectRoot(entityName, projectName)}/traces`;
+      return `${projectRoot(
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
+      )}/traces`;
     },
     callsUIUrl: (
       entityName: string,
@@ -349,7 +383,10 @@ export const browse3ContextGen = (
     ) => {
       const prunedFilter = pruneEmptyFields(filter);
       if (Object.keys(prunedFilter).length === 0) {
-        return `${projectRoot(entityName, projectName)}/calls`;
+        return `${projectRoot(
+          encodeURIComponent(entityName),
+          encodeURIComponent(projectName)
+        )}/calls`;
       }
       return `${projectRoot(
         entityName,
@@ -363,7 +400,10 @@ export const browse3ContextGen = (
     ) => {
       const prunedFilter = pruneEmptyFields(filter);
       if (Object.keys(prunedFilter).length === 0) {
-        return `${projectRoot(entityName, projectName)}/object-versions`;
+        return `${projectRoot(
+          encodeURIComponent(entityName),
+          encodeURIComponent(projectName)
+        )}/object-versions`;
       }
       return `${projectRoot(
         entityName,
@@ -385,10 +425,16 @@ export const browse3ContextGen = (
       );
     },
     boardsUIUrl: (entityName: string, projectName: string) => {
-      return `${projectRoot(entityName, projectName)}/boards`;
+      return `${projectRoot(
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
+      )}/boards`;
     },
     tablesUIUrl: (entityName: string, projectName: string) => {
-      return `${projectRoot(entityName, projectName)}/tables`;
+      return `${projectRoot(
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
+      )}/tables`;
     },
     boardForExpressionUIUrl: (
       entityName: string,
@@ -412,8 +458,8 @@ export const browse3ContextGen = (
       evaluationCallIds: string[]
     ) => {
       return `${projectRoot(
-        entityName,
-        projectName
+        encodeURIComponent(entityName),
+        encodeURIComponent(projectName)
       )}/compare-evaluations?evaluationCallIds=${encodeURIComponent(
         JSON.stringify(evaluationCallIds)
       )}`;
@@ -429,7 +475,11 @@ type RouteType = {
     wfTable?: WFDBTableType
   ) => string;
   entityUrl: (entityName: string) => string;
-  projectUrl: (entityName: string, projectName: string) => string;
+  projectUrl: (
+    entityName: string,
+    projectName: string,
+    noEncode?: boolean
+  ) => string;
   typeUIUrl: (
     entityName: string,
     projectName: string,

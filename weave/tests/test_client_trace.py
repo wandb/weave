@@ -2428,8 +2428,17 @@ class Custom(weave.Object):
     val: dict
 
 
+def test_object_with_disallowed_keys(client):
+    name = "%"
+    obj = Custom(name=name, val={"1": 1})
+
+    with pytest.raises(Exception):
+        weave.publish(obj)
+
+
 def test_objects_and_keys_with_special_characters(client):
-    name_with_special_characters = "name: /!@#$%^&*()_+"  # make sure to include ":", "/", and "%" which are URI-related
+    # make sure to include ":", "/" which are URI-related
+    name_with_special_characters = "name: /!@#$^&*()_+"
     dict_payload = {name_with_special_characters: "hello world"}
 
     obj = Custom(name=name_with_special_characters, val=dict_payload)

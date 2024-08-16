@@ -61,3 +61,9 @@ def require_max_str_len(s: str, length: int) -> str:
     if len(s) >= length:
         raise CHValidationError(f"String too long: {s}. Max length is {length}")
     return s
+
+
+def disallow_chars(s: str, chars: str) -> str:
+    if any(c in s for c in chars):
+        raise CHValidationError(f"String contains disallowed characters: {s}")
+    return s

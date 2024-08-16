@@ -240,12 +240,14 @@ const Browse3Mounted: FC<{
         </AppBar>
       )}
       <Switch>
-        <Route path={baseRouter.projectUrl(':entity', ':project')} exact>
+        <Route path={baseRouter.projectUrl(':entity', ':project', true)} exact>
           <ProjectRedirect />
         </Route>
         {hasTSContext ? (
           <Route
-            path={browse3Paths(baseRouter.projectUrl(':entity', ':project'))}>
+            path={browse3Paths(
+              baseRouter.projectUrl(':entity', ':project', true)
+            )}>
             <Box
               component="main"
               sx={{
@@ -284,15 +286,24 @@ const Browse3Mounted: FC<{
 
 const MainPeekingLayout: FC = () => {
   const {baseRouter} = useWeaveflowRouteContext();
-  const params = useParams<Browse3Params>();
-  const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
-  const generalProjectRoot = browse2Context.projectUrl(':entity', ':project');
+  const params = useParamsDecoded<Browse3Params>();
+  const baseRouterProjectRoot = baseRouter.projectUrl(
+    ':entity',
+    ':project',
+    true
+  );
+  const generalProjectRoot = browse2Context.projectUrl(
+    ':entity',
+    ':project',
+    true
+  );
   const query = useURLSearchParamsDict();
   const peekLocation = usePeekLocation();
   const generalBase = browse2Context.projectUrl(
     params.entity!,
     params.project!
   );
+
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
   const isDrawerOpen = peekLocation != null;
   const windowSize = useWindowSize();
@@ -405,8 +416,19 @@ const MainPeekingLayout: FC = () => {
   );
 };
 
+const useParamsDecoded = <
+  T extends {[K in keyof T]?: string | undefined}
+>(): T => {
+  const params = useParams<T>();
+  return Object.fromEntries(
+    Object.entries(params).map(([key, value]) => {
+      return [key, value ? decodeURIComponent(value as string) : value];
+    })
+  ) as T;
+};
+
 const ProjectRedirect: FC = () => {
-  const {entity, project} = useParams<Browse3ProjectMountedParams>();
+  const {entity, project} = useParamsDecoded<Browse3ProjectMountedParams>();
   const {baseRouter} = useWeaveflowRouteContext();
   const url = baseRouter.tracesUIUrl(entity, project);
   return <Redirect to={url} />;
@@ -497,12 +519,11 @@ const Browse3ProjectRoot: FC<{
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectVersionRoutePageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
   const query = useURLSearchParamsDict();
 
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
-  // const itemName = decodeURIComponent(params.itemName);
   const itemName = params.itemName;
   useEffect(() => {
     if (!params.version) {
@@ -536,10 +557,9 @@ const ObjectVersionRoutePageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const OpVersionRoutePageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
-  // const itemName = decodeURIComponent(params.itemName);
   const itemName = params.itemName;
   useEffect(() => {
     if (!params.version) {
@@ -573,7 +593,7 @@ const useCallPeekRedirect = () => {
   // This is a "hack" since the client doesn't have all the info
   // needed to make a correct peek URL. This allows the client to request
   // such a view and we can redirect to the correct URL.
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
   const {baseRouter} = useWeaveflowRouteContext();
   const history = useHistory();
   const {useCall} = useWFHooks();
@@ -621,7 +641,7 @@ const useCallPeekRedirect = () => {
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallPageBinding = () => {
   useCallPeekRedirect();
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
   const query = useURLSearchParamsDict();
 
   return (
@@ -636,7 +656,7 @@ const CallPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
-  const {entity, project, tab} = useParams<Browse3TabParams>();
+  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const initialFilter = useMemo(() => {
     if (tab === 'evaluations') {
@@ -769,7 +789,7 @@ const CallsPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectVersionsPageBinding = () => {
-  const {entity, project, tab} = useParams<Browse3TabParams>();
+  const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const filters: WFHighLevelObjectVersionFilter = useMemo(() => {
     let queryFilter: WFHighLevelObjectVersionFilter = {};
@@ -815,7 +835,7 @@ const ObjectVersionsPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const OpVersionsPageBinding = () => {
-  const params = useParams<Browse3TabParams>();
+  const params = useParamsDecoded<Browse3TabParams>();
 
   const query = useURLSearchParamsDict();
   const filters = useMemo(() => {
@@ -851,7 +871,7 @@ const OpVersionsPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const BoardPageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
 
   return (
     <BoardPage
@@ -865,7 +885,7 @@ const BoardPageBinding = () => {
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectPageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
   return (
     <ObjectPage
       entity={params.entity}
@@ -876,7 +896,7 @@ const ObjectPageBinding = () => {
 };
 
 const OpPageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
+  const params = useParamsDecoded<Browse3TabItemVersionParams>();
   return (
     <OpPage
       entity={params.entity}
@@ -887,7 +907,7 @@ const OpPageBinding = () => {
 };
 
 const CompareEvaluationsBinding = () => {
-  const {entity, project} = useParams<Browse3TabParams>();
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
   const evaluationCallIds = useMemo(() => {
     return JSON.parse(query.evaluationCallIds);
@@ -902,19 +922,19 @@ const CompareEvaluationsBinding = () => {
 };
 
 const OpsPageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <OpsPage entity={params.entity} project={params.project} />;
 };
 
 const BoardsPageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <BoardsPage entity={params.entity} project={params.project} />;
 };
 
 const TablesPageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
+  const params = useParamsDecoded<Browse3TabItemParams>();
 
   return <TablesPage entity={params.entity} project={params.project} />;
 };
@@ -934,7 +954,7 @@ const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
 );
 
 const Browse3Breadcrumbs: FC = props => {
-  const params = useParams<Browse3Params>();
+  const params = useParamsDecoded<Browse3Params>();
   const query = useURLSearchParamsDict();
   const filePathParts = query.path?.split('/') ?? [];
   const refFields = query.extra?.split('/') ?? [];

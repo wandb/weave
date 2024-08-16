@@ -32,6 +32,7 @@ from weave.trace_server.refs_internal import (
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
+from weave.trace_server.validation import object_id_validator
 
 from . import trace_server_interface as tsi
 from .ids import generate_id
@@ -549,6 +550,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         digest = str_digest(json_val)
 
         req_obj = req.obj
+
+        object_id_validator(req_obj.object_id)
         # TODO: version index isn't right here, what if we delete stuff?
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")

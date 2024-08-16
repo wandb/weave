@@ -58,6 +58,11 @@ def wb_run_id_validator(s: typing.Optional[str]) -> typing.Optional[str]:
 
 
 def object_id_validator(s: str) -> str:
+    # Do to a bug in ReactRouter, we cannot allow the '%' character in op names
+    # This is because ReactRouter completely crashes when loading `%25` in a URL
+    # which is the encoded form of `%`. This is a known issue in ReactRouterv5.
+    # Until we upgrade to ReactRouter6, we must disallow the '%' character in op names.
+    validation_util.disallow_chars(s, "%")
     return validation_util.require_max_str_len(s, 128)
 
 
