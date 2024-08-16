@@ -28,7 +28,7 @@ def test_robust_to_url_sensitive_chars(client):
     entity = "entity"
     project = "project"
     project_id = f"{entity}/{project}"
-    object_id = "mali:cious/obj%ect"
+    object_id = "mali:cious/obj#?ect"
     bad_key = "mali:cious/ke%y"
     bad_val = {bad_key: "hello world"}
 
@@ -61,7 +61,7 @@ def test_robust_to_url_sensitive_chars(client):
         )
 
     encoded_object_id = urllib.parse.quote_plus(object_id)
-    assert encoded_object_id == "mali%3Acious%2Fobj%25ect"
+    assert encoded_object_id == "mali%3Acious%2Fobj%23%3Fect"
     read_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
             refs=[
