@@ -416,6 +416,12 @@ const MainPeekingLayout: FC = () => {
   );
 };
 
+/**
+ * Returns a fully decoded version of the params object.
+ * After a bunch of research about ReactRouterv5, it is clear
+ * that their URL decoding is not perfect. This function
+ * ensures that all params are decoded.
+ */
 const useParamsDecoded = <
   T extends {[K in keyof T]?: string | undefined}
 >(): T => {
@@ -524,20 +530,23 @@ const ObjectVersionRoutePageBinding = () => {
 
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
-  const itemName = params.itemName;
   useEffect(() => {
     if (!params.version) {
       history.replace(
-        routerContext.objectUIUrl(params.entity, params.project, itemName)
+        routerContext.objectUIUrl(
+          params.entity,
+          params.project,
+          params.itemName
+        )
       );
     }
   }, [
     history,
     params.version,
     params.entity,
-    itemName,
     params.project,
     routerContext,
+    params.itemName,
   ]);
 
   if (!params.version) {
@@ -547,7 +556,7 @@ const ObjectVersionRoutePageBinding = () => {
     <ObjectVersionPage
       entity={params.entity}
       project={params.project}
-      objectName={itemName}
+      objectName={params.itemName}
       version={params.version}
       filePath={query.path ?? 'obj'} // Default to obj
       refExtra={query.extra}
@@ -560,20 +569,19 @@ const OpVersionRoutePageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemVersionParams>();
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
-  const itemName = params.itemName;
   useEffect(() => {
     if (!params.version) {
       history.replace(
-        routerContext.opUIUrl(params.entity, params.project, itemName)
+        routerContext.opUIUrl(params.entity, params.project, params.itemName)
       );
     }
   }, [
     history,
     params.version,
     params.entity,
-    itemName,
     params.project,
     routerContext,
+    params.itemName,
   ]);
 
   if (!params.version) {
@@ -583,7 +591,7 @@ const OpVersionRoutePageBinding = () => {
     <OpVersionPage
       entity={params.entity}
       project={params.project}
-      opName={itemName}
+      opName={params.itemName}
       version={params.version}
     />
   );

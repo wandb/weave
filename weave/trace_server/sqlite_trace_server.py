@@ -592,14 +592,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = [f"object_id = '{req.object_id}'"]
+        conds = ["object_id = ?"]
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
             conds.append(f"digest = '{req.digest}'")
         objs = self._select_objs_query(
-            req.project_id,
-            conditions=conds,
+            req.project_id, conditions=conds, condition_args=(req.object_id,)
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
@@ -755,13 +754,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         def read_ref(r: InternalObjectRef) -> Any:
             conds = [
-                f"object_id = '{r.name}'",
+                "object_id = ?",
                 f"digest = '{r.version}'",
             ]
+            cond_args = (r.name,)
             objs = self._select_objs_query(
-                r.project_id,
-                conditions=conds,
+                r.project_id, conditions=conds, condition_args=cond_args
             )
+
             if len(objs) == 0:
                 raise NotFoundError(f"Obj {r.name}:{r.version} not found")
             obj = objs[0]
@@ -965,6 +965,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         project_id: str,
         conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
+        condition_args: tuple[Any, ...] = (),
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
@@ -972,7 +973,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
             + pred
             + " ORDER BY created_at ASC",
-            (project_id,),
+            (project_id,) + condition_args,
         )
         query_result = cursor.fetchall()
         result: list[tsi.ObjSchema] = []

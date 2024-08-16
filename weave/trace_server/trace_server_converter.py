@@ -45,6 +45,10 @@ def universal_ext_to_int_ref_converter(
         parts = rest.split("/", 2)
         if len(parts) != 3:
             raise InvalidExternalRef(f"Invalid URI: {ref_str}")
+
+        # This is really critical to remember: the incoming URI will have
+        # the parts quoted. We must unquote them before using them to look up
+        # the internal project ID.
         quoted_entity, quoted_project, tail = parts
         entity = ri.ref_part_unquoter(quoted_entity)
         project = ri.ref_part_unquoter(quoted_project)
@@ -109,6 +113,10 @@ def universal_int_to_ext_ref_converter(
         unquoted_external_project_id = int_to_ext_project_cache[project_id]
         if not unquoted_external_project_id:
             return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
+
+        # Conversely, the outgoing URI must have the parts quoted. We must
+        # quote them before returning the external URI. Getting them back from
+        # Gorilla, they are plain strings.
         unquoted_entity, unquoted_project = unquoted_external_project_id.split("/")
         entity = ri.ref_part_quoter(unquoted_entity)
         project = ri.ref_part_quoter(unquoted_project)

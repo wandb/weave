@@ -509,7 +509,7 @@ const trimExtra = (extra: string | undefined) => {
   if (extra?.endsWith('/')) {
     extra = extra.slice(0, -1);
   }
-  if (extra === '') {
+  if (extra?.length === 0) {
     extra = undefined;
   }
   return extra;
@@ -519,7 +519,7 @@ const trimExtra = (extra: string | undefined) => {
 // Unfortunately many teams have been created that violate this.
 const PATTERN_ENTITY = '([^/]+)';
 const PATTERN_PROJECT = '([^/]+)'; // any non / char is valid in project_name
-const PATTERN_OBJ_NAME = '([^:]+)'; // Artifact name, allows any character except :
+const PATTERN_OBJ_NAME = '([^:/]+)'; // Artifact name, allows any character except :
 const PATTERN_DIGEST = '([*]|[a-zA-Z0-9]+)';
 const PATTERN_EXTRA = '(/(.*))?'; // Optional ref extra
 const PATTERN_CALL_ID =
@@ -534,7 +534,6 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     '/',
     '(object|op)', // Weave kind
     '/',
-    // TODO: make artifact name more constraining, disallow "/"
     PATTERN_OBJ_NAME, // Artifact name, allows any character except :
     ':',
     PATTERN_DIGEST, // Artifact version, allowing '*' for any version
@@ -576,107 +575,120 @@ export const parseRef = (ref: string): ObjectRef => {
   const isWeaveRef = url.protocol.startsWith('weave');
 
   if (isWeaveRef) {
-    const refWithoutScheme = ref.slice(WEAVE_REF_PREFIX.length);
-    const tableMatch = refWithoutScheme.match(RE_WEAVE_TABLE_REF_PATHNAME);
-    if (tableMatch !== null) {
-      const [entity, project, digest] = tableMatch.slice(1);
-      return {
-        scheme: 'weave',
-        entityName: decodeURIComponent(entity),
-        projectName: decodeURIComponent(project),
-        weaveKind: 'table' as WeaveKind,
-        artifactName: '',
-        artifactVersion: digest,
-        artifactRefExtra: undefined,
-      };
+    return parseWeaveTraceRef(ref);
+  }
+
+  if (isWandbArtifact) {
+    splitLimit = 4;
+  } else if (isLocalArtifact) {
+    splitLimit = 2;
+  } else if (isWeaveRef) {
+    splitLimit = 4;
+  } else {
+    throw new Error(`Unknown protocol: ${url.protocol}`);
+  }
+
+  // Decode the URI pathname to handle URL-encoded characters, required
+  // in some browsers (safari)
+  const decodedUri = decodeURIComponent(url.pathname);
+  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
+
+  if (isWandbArtifact) {
+    if (splitUri.length !== splitLimit) {
+      throw new Error(`Invalid Artifact URI: ${url}`);
     }
-    const callMatch = refWithoutScheme.match(RE_WEAVE_CALL_REF_PATHNAME);
-    if (callMatch !== null) {
-      const [entity, project, callId] = callMatch.slice(1);
-      return {
-        scheme: 'weave',
-        entityName: decodeURIComponent(entity),
-        projectName: decodeURIComponent(project),
-        weaveKind: 'call' as WeaveKind,
-        artifactName: callId,
-        artifactVersion: '',
-        artifactRefExtra: undefined,
-      };
-    }
-    const match = refWithoutScheme.match(RE_WEAVE_OBJECT_REF_PATHNAME);
-    if (match === null) {
-      throw new Error('Invalid weave ref uri: ' + ref);
-    }
-    const [
+    const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
+    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
+    return {
+      scheme: 'wandb-artifact',
       entityName,
       projectName,
-      weaveKind,
-      artifactName,
+      artifactName: artifactNamePart,
       artifactVersion,
-      artifactRefExtra,
-    ] = match.slice(1);
+      artifactPath: artifactPathPart,
+      artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
+    };
+  }
 
+  if (isLocalArtifact) {
+    const [artifactName, artifactPath] = splitUri;
+    return {
+      scheme: 'local-artifact',
+      artifactName,
+      artifactVersion: 'latest',
+      artifactPath,
+    };
+  }
+
+  throw new Error(`Unknown protocol: ${url.protocol}`);
+};
+
+/**
+ * This is the "New Weave" ref parser that doesn't need to worry about W&B
+ * artifacts or local artifacts. It is not exported currently, but is used for
+ * the new Weave branch in parseRef
+ */
+const parseWeaveTraceRef = (ref: string): WeaveObjectRef => {
+  if (!ref.startsWith(WEAVE_REF_PREFIX)) {
+    throw new Error('Invalid weave ref uri: ' + ref);
+  }
+  const refWithoutScheme = ref.slice(WEAVE_REF_PREFIX.length);
+  const tableMatch = refWithoutScheme.match(RE_WEAVE_TABLE_REF_PATHNAME);
+  if (tableMatch !== null) {
+    const [entity, project, digest] = tableMatch.slice(1);
     return {
       scheme: 'weave',
-      entityName: decodeURIComponent(entityName),
-      projectName: decodeURIComponent(projectName),
-      weaveKind: weaveKind as WeaveKind,
-      artifactName: decodeURIComponent(artifactName),
-      artifactVersion,
-      artifactRefExtra: trimExtra(artifactRefExtra),
-      // `artifactRefExtra` is stored ALREADY ENCODED! No need to do the following:
-      // However, as a followup, we probably should change `artifactRefExtra` to be
-      // a list of strings and not a single string, which would allow us to decode
-      // the parts of the path individually. Leaving here to make this obvious to
-      // future readers.
-      // ?.split('/')
-      // ?.map(decodeURIComponent)
-      // ?.join('/'),
+      entityName: decodeURIComponent(entity),
+      projectName: decodeURIComponent(project),
+      weaveKind: 'table' as WeaveKind,
+      artifactName: '',
+      artifactVersion: digest,
+      artifactRefExtra: undefined,
     };
-  } else {
-    if (isWandbArtifact) {
-      splitLimit = 4;
-    } else if (isLocalArtifact) {
-      splitLimit = 2;
-    } else if (isWeaveRef) {
-      splitLimit = 4;
-    } else {
-      throw new Error(`Unknown protocol: ${url.protocol}`);
-    }
-
-    // Decode the URI pathname to handle URL-encoded characters, required
-    // in some browsers (safari)
-    const decodedUri = decodeURIComponent(url.pathname);
-    const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
-
-    if (isWandbArtifact) {
-      if (splitUri.length !== splitLimit) {
-        throw new Error(`Invalid Artifact URI: ${url}`);
-      }
-      const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
-      const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
-      return {
-        scheme: 'wandb-artifact',
-        entityName,
-        projectName,
-        artifactName: artifactNamePart,
-        artifactVersion,
-        artifactPath: artifactPathPart,
-        artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
-      };
-    }
-
-    if (isLocalArtifact) {
-      const [artifactName, artifactPath] = splitUri;
-      return {
-        scheme: 'local-artifact',
-        artifactName,
-        artifactVersion: 'latest',
-        artifactPath,
-      };
-    }
   }
-  throw new Error(`Unknown protocol: ${url.protocol}`);
+  const callMatch = refWithoutScheme.match(RE_WEAVE_CALL_REF_PATHNAME);
+  if (callMatch !== null) {
+    const [entity, project, callId] = callMatch.slice(1);
+    return {
+      scheme: 'weave',
+      entityName: decodeURIComponent(entity),
+      projectName: decodeURIComponent(project),
+      weaveKind: 'call' as WeaveKind,
+      artifactName: callId,
+      artifactVersion: '',
+      artifactRefExtra: undefined,
+    };
+  }
+  const match = refWithoutScheme.match(RE_WEAVE_OBJECT_REF_PATHNAME);
+  if (match === null) {
+    throw new Error('Invalid weave ref uri: ' + ref);
+  }
+  const [
+    entityName,
+    projectName,
+    weaveKind,
+    artifactName,
+    artifactVersion,
+    artifactRefExtra,
+  ] = match.slice(1);
+
+  return {
+    scheme: 'weave',
+    entityName: decodeURIComponent(entityName),
+    projectName: decodeURIComponent(projectName),
+    weaveKind: weaveKind as WeaveKind,
+    artifactName: decodeURIComponent(artifactName),
+    artifactVersion,
+    artifactRefExtra: trimExtra(artifactRefExtra),
+    // `artifactRefExtra` is stored ALREADY ENCODED! No need to do the following:
+    // However, as a followup, we probably should change `artifactRefExtra` to be
+    // a list of strings and not a single string, which would allow us to decode
+    // the parts of the path individually. Leaving here to make this obvious to
+    // future readers.
+    // ?.split('/')
+    // ?.map(decodeURIComponent)
+    // ?.join('/'),
+  };
 };
 
 export const refUri = (ref: ObjectRef): string => {

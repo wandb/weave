@@ -31,7 +31,7 @@ def test_ref_parsing_external():
     )
 
     ref_str = ref_start.uri()
-    exp_ref = f"{refs_internal.WEAVE_SCHEME}:///{ref_start.entity}/{ref_start.project}/object/{quote(ref_start.name)}:{ref_start.digest}/{ref_start.extra[0]}/{quote(ref_start.extra[1])}"
+    exp_ref = f"{refs_internal.WEAVE_SCHEME}:///{quote(ref_start.entity)}/{quote(ref_start.project)}/object/{quote(ref_start.name)}:{ref_start.digest}/{ref_start.extra[0]}/{quote(ref_start.extra[1])}"
     assert ref_str == exp_ref
 
     parsed = refs.parse_uri(ref_str)

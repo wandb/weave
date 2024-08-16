@@ -2436,9 +2436,13 @@ def test_object_with_disallowed_keys(client):
         weave.publish(obj)
 
 
+chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
+
+
 def test_objects_and_keys_with_special_characters(client):
     # make sure to include ":", "/" which are URI-related
-    name_with_special_characters = "name: /!@#$^&*()_+"
+
+    name_with_special_characters = "name: /" + chars
     dict_payload = {name_with_special_characters: "hello world"}
 
     obj = Custom(name=name_with_special_characters, val=dict_payload)
@@ -2450,7 +2454,7 @@ def test_objects_and_keys_with_special_characters(client):
     project = f"{ref_part_quoter(entity)}/{ref_part_quoter(project)}"
     ref_base = f"weave:///{project}"
     exp_name = ref_part_quoter(name_with_special_characters)
-    exp_digest = "rUA8vNX3RqX6rPAVmdeNyJrMtmx3h8qOPxnlulaeB78"
+    exp_digest = "2bnzTXFjtlwrtXWNLhAyvYq0XbRFfr633kKL2IkBOlI"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
     assert obj.ref.uri() == exp_obj_ref
@@ -2467,10 +2471,10 @@ def test_objects_and_keys_with_special_characters(client):
     assert res == "hello world"
     assert res.ref.uri() == exp_res_ref
 
-    gotten_res = weave.ref(exp_res_ref).get()
+    gotten_res = weave.ref(res.ref.uri()).get()
     assert gotten_res == "hello world"
 
-    exp_op_digest = "3oDC8XjsT6mJfmrdFH4Cswx4TvbjkGualJCXnTK6I3Q"
+    exp_op_digest = "WZAc2HA5GyWPr7YzHiSBncbHKMywXN3hk8onqRy2KkA"
     exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
 
     assert test.ref.uri() == exp_op_ref
