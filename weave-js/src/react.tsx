@@ -505,6 +505,7 @@ export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
 // Unfortunately many teams have been created that violate this.
 const PATTERN_ENTITY = '([^/]+)';
 const PATTERN_PROJECT = '([^\\#?%:]{1,128})'; // Project name
+const PATTERN_REF_EXTRA = '([a-zA-Z0-9_/%]*)'; // Optional ref extra
 const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
   [
     '^', // Start of the string
@@ -518,7 +519,7 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     ':',
     '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
     '/?', // Ref extra portion is optional
-    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    PATTERN_REF_EXTRA, // Optional ref extra
     '$', // End of the string
   ].join('')
 );
@@ -531,7 +532,7 @@ const RE_WEAVE_TABLE_REF_PATHNAME = new RegExp(
     '/table/',
     '([a-f0-9]+)', // Digest
     '/?', // Ref extra portion is optional
-    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    PATTERN_REF_EXTRA, // Optional ref extra
     '$', // End of the string
   ].join('')
 );
@@ -544,7 +545,7 @@ const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
     '/call/',
     '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', // Call UUID
     '/?', // Ref extra portion is optional
-    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    PATTERN_REF_EXTRA, // Optional ref extra
     '$', // End of the string
   ].join('')
 );

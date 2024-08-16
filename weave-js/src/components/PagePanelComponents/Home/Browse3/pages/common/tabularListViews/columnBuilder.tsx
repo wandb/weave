@@ -160,7 +160,11 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
               if (parentRef) {
                 const newVal: ExpandedRefWithValueAsTableRef =
                   makeRefExpandedPayload(
-                    parentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/' + attr,
+                    parentRef +
+                      '/' +
+                      OBJECT_ATTR_EDGE_NAME +
+                      '/' +
+                      encodeURIComponent(attr),
                     val
                   );
                 return [key, newVal];

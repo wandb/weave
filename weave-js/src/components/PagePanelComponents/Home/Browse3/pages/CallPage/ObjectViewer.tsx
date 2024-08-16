@@ -460,7 +460,7 @@ const buildBaseRef = (
     const parts = path.toPath().slice(-startIndex);
     parts.forEach(part => {
       if (typeof part === 'string') {
-        baseRef += '/' + OBJECT_ATTR_EDGE_NAME + '/' + part;
+        baseRef += '/' + OBJECT_ATTR_EDGE_NAME + '/' + encodeURIComponent(part);
       } else if (typeof part === 'number') {
         baseRef += '/' + LIST_INDEX_EDGE_NAME + '/' + part.toString();
       } else {
