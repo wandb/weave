@@ -31,20 +31,8 @@ class InvalidInternalRef(ValueError):
     pass
 
 
-def extra_value_quoter(s: str, quote_chars: tuple[str, ...] = ("%", "/")) -> str:
-    """We don't need to quote every single character, rather
-    we just need to quote the characters that are used as
-    delimiters in the URI.
-    """
-    # We have to be careful here since quoting creates new "%" characters.
-    # We don't want to double-quote characters.
-    if "%" in quote_chars and quote_chars[0] != "%":
-        raise ValueError("Quoting '%' must be the first character in the list.")
-
-    for c in quote_chars:
-        s = s.replace(c, urllib.parse.quote(c, safe=""))
-
-    return s
+def extra_value_quoter(s: str) -> str:
+    return urllib.parse.quote(s, safe="")
 
 
 def validate_extra(extra: list[str]) -> None:

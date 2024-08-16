@@ -2471,8 +2471,10 @@ def test_objects_and_keys_with_special_characters(client):
     exp_name = sanitize_object_name(name_with_special_characters)
     assert exp_name == "name"
     exp_key = extra_value_quoter(name_with_special_characters)
-    # If we decide to quote everything, this would change
-    assert exp_key == "name: %2F+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
+    assert (
+        exp_key
+        == "name%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60"
+    )
     exp_digest = "2bnzTXFjtlwrtXWNLhAyvYq0XbRFfr633kKL2IkBOlI"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"

@@ -505,7 +505,7 @@ export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
 // Unfortunately many teams have been created that violate this.
 const PATTERN_ENTITY = '([^/]+)';
 const PATTERN_PROJECT = '([^\\#?%:]{1,128})'; // Project name
-const PATTERN_REF_EXTRA = '([a-zA-Z0-9_/%]*)'; // Optional ref extra
+const PATTERN_REF_EXTRA = '([a-zA-Z0-9_/%.-~]*)'; // Optional ref extra (valid chars are result of python urllib.parse.quote and javascript encodeURIComponent)
 const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
   [
     '^', // Start of the string
