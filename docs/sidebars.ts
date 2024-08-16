@@ -11,61 +11,151 @@ const CATEGORY_SECTION_HEADER_MIXIN: SidebarItemCategoryBase = {
 const sidebars: SidebarsConfig = {
   documentationSidebar: [
     {
-      label: "Getting Started",
+      type: 'doc',
+      label: '👋 Introduction',
+      id: "introduction"
+    },
+    {
+      type: 'doc',
+      label: '🤖 Live Demo',
+      id: "introduction"
+    },
+    {
+      type: 'doc',
+      label: '🚀 Quickstart',
+      id: "introduction"
+    },
+    {
+      label: "📝 End-to-End Tutorial",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
-        "introduction",
         {
-          type: 'doc',
-          label: 'Trace LLMs',
-          id: "quickstart"
+          label: "Tracing",
+          type: "category",
+          collapsible: false,
+          collapsed: false,
+          items: [
+            {
+              type: 'doc',
+              label: '1: "Hello World"',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: '2: Connect an LLM',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: '3: Define a Model',
+              id: "introduction"
+            },
+          ],
         },
         {
-          type: 'doc',
-          label: 'Trace Applications',
-          id: "tutorial-tracing_2"
+          label: "Evaluation",
+          type: "category",
+          collapsible: false,
+          collapsed: false,
+          items: [
+                        {
+              type: 'doc',
+              label: '4: Run an Evaluation',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: '5: Analyze Performance',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: '6: Compare Models',
+              id: "introduction"
+            },
+          ],
         },
-        "tutorial-weave_models",
         {
-          type: 'doc',
-          label: 'Build an Evaluation',
-          id: "tutorial-eval"
-        },
-        {
-          type: 'doc',
-          label: 'Evaluate a RAG App',
-          id: "tutorial-rag"
+          label: "Feedback",
+          type: "category",
+          collapsible: false,
+          collapsed: false,
+          items: [
+                        {
+              type: 'doc',
+              label: '7: Serve Predictions',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: '8: Collect Feedback',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: '9: Improve the Model',
+              id: "introduction"
+            },
+          ],
         },
       ],
     },
     {
-      label: "Product Walkthrough",
+      label: "💻 Product Walkthrough",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
         {
-          type: "category",
-          collapsible: true,
-          collapsed: false,
-          label: "Core Types",
-          link: { type: "doc", id: "guides/core-types/index" },
-          items: [
-            "guides/core-types/models",
-            "guides/core-types/datasets",
-            "guides/core-types/evaluations",
-          ],
+          type: 'doc',
+          label: 'Overview',
+          id: "introduction"
         },
         {
           type: "category",
-          collapsible: true,
+          collapsible: false,
           collapsed: false,
-          label: "Tracking",
-          link: { type: "doc", id: "guides/tracking/index" },
+          label: "Application Tracing",
           items: [
-            "guides/tracking/objects",
-            "guides/tracking/ops",
-            "guides/tracking/tracing",
-            "guides/tracking/feedback",
+            {
+              type: 'doc',
+              label: 'Understanding Traces',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: 'Calls',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: 'Ops',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: 'Objects',
+              id: "introduction"
+            },
           ],
+        },
+        {
+          type: 'doc',
+          label: 'Models',
+          id: "introduction"
+        },
+        {
+          type: 'doc',
+          label: 'Datasets',
+          id: "introduction"
+        },
+        {
+          type: 'doc',
+          label: 'Prompts',
+          id: "introduction"
+        },
+        {
+          type: 'doc',
+          label: 'Production Feedback',
+          id: "introduction"
         },
         {
           type: "category",
@@ -105,17 +195,30 @@ const sidebars: SidebarsConfig = {
           ],
         },
         {
-          type: "category",
-          collapsible: true,
-          collapsed: false,
-          label: "Tools",
-          link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy"],
+          label: "Technical FAQ",
+          items: [
+            {
+              type: 'doc',
+              label: 'Tables vs Lists',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: 'Refs',
+              id: "introduction"
+            },
+            {
+              type: 'doc',
+              label: 'Object Serialization',
+              id: "introduction"
+            },
+          ],
         },
       ],
+      
     },
     {
-      label: "Enterprise",
+      label: "🏭 Enterprise",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
         {
