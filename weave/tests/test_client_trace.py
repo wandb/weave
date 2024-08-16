@@ -2432,8 +2432,22 @@ def test_object_with_disallowed_keys(client):
     name = "%"
     obj = Custom(name=name, val={"1": 1})
 
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == "_"
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
     with pytest.raises(Exception):
-        weave.publish(obj)
+        client.server.obj_create(create_req)
 
 
 chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
