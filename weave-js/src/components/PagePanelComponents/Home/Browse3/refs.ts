@@ -9,20 +9,12 @@ import {
   WEAVE_REF_PREFIX,
 } from './pages/wfReactInterface/constants';
 
-const encodeSelect = (part: string): string => {
-  const symbols: string[] = ['%', '/', ':'];
-  for (const symbol of symbols) {
-    part = part.replace(new RegExp(symbol, 'g'), encodeURIComponent(symbol));
-  }
-  return part;
-};
-
 export const makeRefCall = (
   entity: string,
   project: string,
   callId: string
 ): string => {
-  return `${WEAVE_REF_PREFIX}${entity}/${project}/call/${callId}`;
+  return `${WEAVE_REF_PREFIX}${encodeURIComponent(entity)}/${encodeURIComponent(project)}/call/${callId}`;
 };
 
 export const makeRefObject = (
@@ -33,12 +25,12 @@ export const makeRefObject = (
   objectVersion: string,
   alreadyEncodedRefExtra: string | undefined = undefined
 ): string => {
-  let objNameAndVersion = `${encodeSelect(objectId)}:${objectVersion}`;
+  let objNameAndVersion = `${encodeURIComponent(objectId)}:${objectVersion}`;
   if (objectType === 'table') {
     objNameAndVersion = objectVersion;
   }
 
-  let ref = `${WEAVE_REF_PREFIX}${entity}/${project}/${objectType}/${objNameAndVersion}`;
+  let ref = `${WEAVE_REF_PREFIX}${encodeURIComponent(entity)}/${encodeURIComponent(project)}/${objectType}/${objNameAndVersion}`;
   if (alreadyEncodedRefExtra && alreadyEncodedRefExtra !== '') {
     ref += `/${alreadyEncodedRefExtra}`;
   }

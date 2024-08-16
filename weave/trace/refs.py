@@ -1,15 +1,12 @@
 import dataclasses
-import urllib
 from typing import Any, Union
 
-from ..trace_server import refs_internal
+from ..trace_server import refs_internal as ri
 
-DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
-LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
-OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
-TABLE_ROW_ID_EDGE_NAME = refs_internal.TABLE_ROW_ID_EDGE_NAME
-
-quote = refs_internal.quote_select
+DICT_KEY_EDGE_NAME = ri.DICT_KEY_EDGE_NAME
+LIST_INDEX_EDGE_NAME = ri.LIST_INDEX_EDGE_NAME
+OBJECT_ATTR_EDGE_NAME = ri.OBJECT_ATTR_EDGE_NAME
+TABLE_ROW_ID_EDGE_NAME = ri.TABLE_ROW_ID_EDGE_NAME
 
 
 @dataclasses.dataclass(frozen=True)
@@ -57,9 +54,9 @@ class ObjectRef(RefWithExtra):
     extra: tuple[str, ...] = ()
 
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/object/{quote(self.name)}:{self.digest}"
+        u = f"weave:///{ri.ref_part_quoter(self.entity)}/{ri.ref_part_quoter(self.project)}/object/{ri.ref_part_quoter(self.name)}:{self.digest}"
         if self.extra:
-            u += "/" + "/".join(quote(e) for e in self.extra)
+            u += "/" + "/".join(ri.ref_part_quoter(e) for e in self.extra)
         return u
 
     def get(self) -> Any:
@@ -107,9 +104,9 @@ class ObjectRef(RefWithExtra):
 @dataclasses.dataclass(frozen=True)
 class OpRef(ObjectRef):
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/op/{quote(self.name)}:{self.digest}"
+        u = f"weave:///{ri.ref_part_quoter(self.entity)}/{ri.ref_part_quoter(self.project)}/op/{ri.ref_part_quoter(self.name)}:{self.digest}"
         if self.extra:
-            u += "/" + "/".join(quote(e) for e in self.extra)
+            u += "/" + "/".join(ri.ref_part_quoter(e) for e in self.extra)
         return u
 
 
@@ -121,9 +118,9 @@ class CallRef(RefWithExtra):
     extra: tuple[str, ...] = ()
 
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
+        u = f"weave:///{ri.ref_part_quoter(self.entity)}/{ri.ref_part_quoter(self.project)}/call/{self.id}"
         if self.extra:
-            u += "/" + "/".join(quote(e) for e in self.extra)
+            u += "/" + "/".join(ri.ref_part_quoter(e) for e in self.extra)
         return u
 
 
@@ -146,10 +143,10 @@ def parse_uri(uri: str) -> AnyRef:
             entity=entity,
             project=project,
             id=remaining[0],
-            extra=tuple([urllib.parse.unquote(r) for r in remaining[1:]]),
+            extra=tuple([ri.ref_part_quoter(r) for r in remaining[1:]]),
         )
     elif kind == "object":
-        name, version, extra = refs_internal._parse_remaining(remaining)
+        name, version, extra = ri._parse_remaining(remaining)
         return ObjectRef(
             entity=entity,
             project=project,
@@ -158,7 +155,7 @@ def parse_uri(uri: str) -> AnyRef:
             extra=tuple(extra),
         )
     elif kind == "op":
-        name, version, extra = refs_internal._parse_remaining(remaining)
+        name, version, extra = ri._parse_remaining(remaining)
         return OpRef(
             entity=entity,
             project=project,

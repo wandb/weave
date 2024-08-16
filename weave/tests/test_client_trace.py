@@ -16,7 +16,7 @@ import weave
 from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace_server.ids import generate_id
-from weave.trace_server.refs_internal import quote_select
+from weave.trace_server.refs_internal import ref_part_quoter
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 from ..trace_server import trace_server_interface as tsi
@@ -2439,7 +2439,7 @@ def test_objects_and_keys_with_special_characters(client):
 
     project_id = client._project_id()
     ref_base = f"weave:///{project_id}"
-    exp_name = quote_select(name_with_special_characters)
+    exp_name = ref_part_quoter(name_with_special_characters)
     exp_digest = "rUA8vNX3RqX6rPAVmdeNyJrMtmx3h8qOPxnlulaeB78"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"

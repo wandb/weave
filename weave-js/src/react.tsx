@@ -518,8 +518,8 @@ const trimExtra = (extra: string | undefined) => {
 // Entity name should be lowercase, digits, dash, underscore
 // Unfortunately many teams have been created that violate this.
 const PATTERN_ENTITY = '([^/]+)';
-const PATTERN_PROJECT = '([^/]{1,128})'; // any non / char is valid in project_name
-const PATTERN_OBJ_NAME = '([^:]{1,128})'; // Artifact name, allows any character except :
+const PATTERN_PROJECT = '([^/]+)'; // any non / char is valid in project_name
+const PATTERN_OBJ_NAME = '([^:]+)'; // Artifact name, allows any character except :
 const PATTERN_DIGEST = '([*]|[a-zA-Z0-9]+)';
 const PATTERN_EXTRA = '(/(.*))?'; // Optional ref extra
 const PATTERN_CALL_ID =
@@ -574,48 +574,6 @@ export const parseRef = (ref: string): ObjectRef => {
   const isWandbArtifact = url.protocol.startsWith('wandb-artifact');
   const isLocalArtifact = url.protocol.startsWith('local-artifact');
   const isWeaveRef = url.protocol.startsWith('weave');
-  if (isWandbArtifact) {
-    splitLimit = 4;
-  } else if (isLocalArtifact) {
-    splitLimit = 2;
-  } else if (isWeaveRef) {
-    splitLimit = 4;
-  } else {
-    throw new Error(`Unknown protocol: ${url.protocol}`);
-  }
-
-  // Decode the URI pathname to handle URL-encoded characters, required
-  // in some browsers (safari)
-  const decodedUri = decodeURIComponent(url.pathname);
-  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
-
-  if (splitUri.length !== splitLimit) {
-    throw new Error(`Invalid Artifact URI: ${url}`);
-  }
-
-  if (isWandbArtifact) {
-    const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
-    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
-    return {
-      scheme: 'wandb-artifact',
-      entityName,
-      projectName,
-      artifactName: artifactNamePart,
-      artifactVersion,
-      artifactPath: artifactPathPart,
-      artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
-    };
-  }
-
-  if (isLocalArtifact) {
-    const [artifactName, artifactPath] = splitUri;
-    return {
-      scheme: 'local-artifact',
-      artifactName,
-      artifactVersion: 'latest',
-      artifactPath,
-    };
-  }
 
   if (isWeaveRef) {
     const refWithoutScheme = ref.slice(WEAVE_REF_PREFIX.length);
@@ -624,12 +582,12 @@ export const parseRef = (ref: string): ObjectRef => {
       const [entity, project, digest] = tableMatch.slice(1);
       return {
         scheme: 'weave',
-        entityName: entity,
-        projectName: project,
+        entityName: decodeURIComponent(entity),
+        projectName: decodeURIComponent(project),
         weaveKind: 'table' as WeaveKind,
         artifactName: '',
         artifactVersion: digest,
-        artifactRefExtra: '',
+        artifactRefExtra: undefined,
       };
     }
     const callMatch = refWithoutScheme.match(RE_WEAVE_CALL_REF_PATHNAME);
@@ -637,12 +595,12 @@ export const parseRef = (ref: string): ObjectRef => {
       const [entity, project, callId] = callMatch.slice(1);
       return {
         scheme: 'weave',
-        entityName: entity,
-        projectName: project,
+        entityName: decodeURIComponent(entity),
+        projectName: decodeURIComponent(project),
         weaveKind: 'call' as WeaveKind,
         artifactName: callId,
         artifactVersion: '',
-        artifactRefExtra: '',
+        artifactRefExtra: undefined,
       };
     }
     const match = refWithoutScheme.match(RE_WEAVE_OBJECT_REF_PATHNAME);
@@ -660,8 +618,8 @@ export const parseRef = (ref: string): ObjectRef => {
 
     return {
       scheme: 'weave',
-      entityName,
-      projectName,
+      entityName: decodeURIComponent(entityName),
+      projectName: decodeURIComponent(projectName),
       weaveKind: weaveKind as WeaveKind,
       artifactName: decodeURIComponent(artifactName),
       artifactVersion,
@@ -675,6 +633,48 @@ export const parseRef = (ref: string): ObjectRef => {
       // ?.map(decodeURIComponent)
       // ?.join('/'),
     };
+  } else {
+    if (isWandbArtifact) {
+      splitLimit = 4;
+    } else if (isLocalArtifact) {
+      splitLimit = 2;
+    } else if (isWeaveRef) {
+      splitLimit = 4;
+    } else {
+      throw new Error(`Unknown protocol: ${url.protocol}`);
+    }
+
+    // Decode the URI pathname to handle URL-encoded characters, required
+    // in some browsers (safari)
+    const decodedUri = decodeURIComponent(url.pathname);
+    const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
+
+    if (isWandbArtifact) {
+      if (splitUri.length !== splitLimit) {
+        throw new Error(`Invalid Artifact URI: ${url}`);
+      }
+      const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
+      const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
+      return {
+        scheme: 'wandb-artifact',
+        entityName,
+        projectName,
+        artifactName: artifactNamePart,
+        artifactVersion,
+        artifactPath: artifactPathPart,
+        artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
+      };
+    }
+
+    if (isLocalArtifact) {
+      const [artifactName, artifactPath] = splitUri;
+      return {
+        scheme: 'local-artifact',
+        artifactName,
+        artifactVersion: 'latest',
+        artifactPath,
+      };
+    }
   }
   throw new Error(`Unknown protocol: ${url.protocol}`);
 };

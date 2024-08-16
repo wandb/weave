@@ -3,7 +3,7 @@ import random
 from weave.trace import refs
 from weave.trace_server import refs_internal
 
-quote = refs_internal.quote_select
+quote = refs_internal.ref_part_quoter
 
 
 def test_isdescended_from():

@@ -151,19 +151,20 @@ describe('parseRef', () => {
       weaveKind: 'object',
       artifactName: _.shuffle(allChars).join(''),
       artifactVersion: '1234567890',
-      artifactRefExtra: ['key', _.shuffle(allChars).join('')].join('/'),
+      artifactRefExtra: ['key', _.shuffle(allChars).map(encodeURIComponent).join('')].join('/'),
     };
 
     const checkUrl = [
       'weave://',
-      ref.entityName,
-      ref.projectName,
+      encodeURIComponent(ref.entityName),
+      encodeURIComponent(ref.projectName),
       ref.weaveKind,
       encodeURIComponent(ref.artifactName) + ':' + ref.artifactVersion,
-      ref.artifactRefExtra?.split('/').map(encodeURIComponent).join('/'),
+      ref.artifactRefExtra
     ].join('/');
     const genUrl = refUri(ref);
     expect(genUrl).toEqual(checkUrl);
+    console.log(ref.entityName)
     const parsed = parseRef(genUrl);
     expect(parsed).toEqual(ref);
   });

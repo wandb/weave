@@ -45,7 +45,9 @@ def universal_ext_to_int_ref_converter(
         parts = rest.split("/", 2)
         if len(parts) != 3:
             raise InvalidExternalRef(f"Invalid URI: {ref_str}")
-        entity, project, tail = parts
+        quoted_entity, quoted_project, tail = parts
+        entity = ri.ref_part_unquoter(quoted_entity)
+        project = ri.ref_part_unquoter(quoted_project)
         project_key = f"{entity}/{project}"
         if project_key not in ext_to_int_project_cache:
             ext_to_int_project_cache[project_key] = convert_ext_to_int_project_id(
@@ -104,9 +106,13 @@ def universal_int_to_ext_ref_converter(
             int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
                 project_id
             )
-        external_project_id = int_to_ext_project_cache[project_id]
-        if not external_project_id:
+        unquoted_external_project_id = int_to_ext_project_cache[project_id]
+        if not unquoted_external_project_id:
             return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
+        unquoted_entity, unquoted_project = unquoted_external_project_id.split("/")
+        entity = ri.ref_part_quoter(unquoted_entity)
+        project = ri.ref_part_quoter(unquoted_project)
+        external_project_id = f"{entity}/{project}"
         return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
 
     def mapper(obj: D) -> D:
