@@ -1,0 +1,109 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "system", "content": "Your task is to extract the
+      fruit, color and flavor from a given sentence."}, {"role": "user", "content":
+      "\n    There are many fruits that were found on the recently discovered planet
+      Goocrux.\n    There are neoskizzles that grow there, which are purple and taste
+      like candy.\n    "}], "model": "gpt-3.5-turbo", "seed": 42, "tool_choice": {"type":
+      "function", "function": {"name": "FruitExtractor"}}, "tools": [{"type": "function",
+      "function": {"name": "FruitExtractor", "description": "Correctly extracted `FruitExtractor`
+      with all the required parameters with correct types", "parameters": {"properties":
+      {"fruit_name": {"title": "Fruit Name", "type": "string"}, "fruit_color": {"title":
+      "Fruit Color", "type": "string"}, "fruit_flavor": {"title": "Fruit Flavor",
+      "type": "string"}}, "required": ["fruit_color", "fruit_flavor", "fruit_name"],
+      "type": "object"}}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '912'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.29.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.29.0
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.10.14
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//bJLRa9swEMbf/VeIe06K4zRN6/eVFTYYlLGyZRhFOTtqJJ0qyVudkP99
+        yHZsN8wPRtxP3/cddzoljIHcQc5A7HkQ2qr5w1+py7cvt9+a+/Tuxbj0Jdsf3Fr//OwfUphFBW1f
+        UYSL6kaQtgqDJNNh4ZAHjK6LdbZc32dZumiBph2qKKtsmC9vVvNQuy3N00W26pV7kgI95OxXwhhj
+        p/YfezQ7fIecpbNLRaP3vELIh0uMgSMVK8C9lz5wE2A2QkEmoIltm1qpCQhEqhBcqTG4+06T8zgo
+        rlSBz4/kDpVcuuX3J908H7/qyrz9UJO8zrqxbUNlbcQwoAkf6vlVGGNguG61j66W4dN7cFwEclcO
+        jAF3Va3RhNg9nDZQxvtFVG8g34BB8gd5PCr0G5hdsCBFruW2dlbhBJWK/+mZ4GbXbOAMHzLPyf/O
+        vycTdVjWnqt+1H39POxOUWUdbf3VKqCURvp94ZD7diTgA9kuO+a0CVB/WDtYR9qGItABTTRc3K46
+        Pxif5UizrIeBAlcT1d066TsE3/iAuiilqdBZJ4cnk5yTfwAAAP//AwBFSl/yMQMAAA==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-RAY:
+      - 8b3ea605dd4a3cb2-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 16 Aug 2024 04:23:22 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=.1RZsRWcL1yIgdSeHXq38_acOQdKPpK28ZmUiK5XsDk-1723782202-1.0.1.1-RODD_icMH_VDUSNAMIb3odiiks1LrdTXS56S6DabYIhe.Bfv0DDM2rhDVHGxlhXyfx2Mw5rZq.yymy1JfT8tZw;
+        path=/; expires=Fri, 16-Aug-24 04:53:22 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=wYyW35fkmnPNP5AnxKb1uLwq_FFwzKQ.BVbeEef22JI-1723782202060-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '290'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=15552000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '50000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '49999920'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_f095c73ee87bf5e714bced97771cde79
+    status:
+      code: 200
+      message: OK
+version: 1
