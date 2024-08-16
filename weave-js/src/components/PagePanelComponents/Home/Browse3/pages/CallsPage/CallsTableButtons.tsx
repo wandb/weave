@@ -388,7 +388,7 @@ function useMakeCodeText(
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
   console.log(filter);
-  let codeStr = `import weave\n\nclient = weave.init("${entity}/${project}")`;
+  let codeStr = `import weave\n# assert weave.__version__ >= "0.50.14"\n\nclient = weave.init("${entity}/${project}")`;
 
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds.length > 0) {
