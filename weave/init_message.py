@@ -44,10 +44,17 @@ def _print_version_check() -> None:
             if use_message:
                 print(use_message)
 
-    orig_module = wandb._wandb_module
-    wandb._wandb_module = "weave"
-    weave_messages = wandb.sdk.internal.update.check_available(weave.__version__)
-    wandb._wandb_module = orig_module
+    weave_messages = None
+    if hasattr(weave, "_wandb_module"):
+        try:
+            orig_module = wandb._wandb_module
+            wandb._wandb_module = "weave"
+            weave_messages = wandb.sdk.internal.update.check_available(
+                weave.__version__
+            )
+            wandb._wandb_module = orig_module
+        except Exception:
+            weave_messages = None
 
     if weave_messages:
         use_message = (
