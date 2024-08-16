@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 
 import {LoadingDots} from '../../../../LoadingDots';
+import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
 import {
   CallsLink,
@@ -17,7 +18,6 @@ import {TabUseOp} from './TabUseOp';
 import {useWFHooks} from './wfReactInterface/context';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
-import {NotFoundPanel} from '../NotFoundPanel';
 
 export const OpVersionPage: React.FC<{
   entity: string;

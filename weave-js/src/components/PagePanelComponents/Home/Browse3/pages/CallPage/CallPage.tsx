@@ -9,6 +9,7 @@ import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
+import {NotFoundPanel} from '../../NotFoundPanel';
 import {makeRefCall} from '../../refs';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
@@ -21,7 +22,6 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
-import {NotFoundPanel} from '../../NotFoundPanel';
 
 export const CallPage: FC<{
   entity: string;

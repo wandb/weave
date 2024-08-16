@@ -4,6 +4,7 @@ import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {LoadingDots} from '../../../../LoadingDots';
+import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
@@ -34,7 +35,6 @@ import {
   CallSchema,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
-import {NotFoundPanel} from '../NotFoundPanel';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
