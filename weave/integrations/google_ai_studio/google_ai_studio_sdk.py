@@ -84,14 +84,5 @@ gemini_patcher = MultiPatcher(
                 name="google.generativeai.GenerativeModel.generate_content_async"
             ),
         ),
-        SymbolPatcher(
-            lambda: importlib.import_module(
-                "google.ai.generativelanguage_v1beta.services.generative_service.client"
-            ),
-            "GenerativeServiceClient.generate_content",
-            gemini_wrapper_sync(
-                name="google.ai.generativelanguage_v1beta.services.generative_service.client.GenerativeServiceClient.generate_content"
-            ),
-        ),
     ]
 )

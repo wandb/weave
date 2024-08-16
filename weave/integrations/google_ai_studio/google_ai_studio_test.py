@@ -5,6 +5,7 @@ from typing import Any, Optional, Union
 import pytest
 
 import weave
+from weave.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -43,36 +44,26 @@ def op_name_from_ref(ref: str) -> str:
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_content_generation(client: weave.weave_client.WeaveClient) -> None:
+def test_content_generation(client: WeaveClient) -> None:
     import google.generativeai as genai
 
     genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", "DUMMY_API_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content("Write a story about an AI and magic")
 
-    weave_server_respose = client.server.calls_query(
+    weave_server_response = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
-    assert len(weave_server_respose.calls) == 4
+    assert len(weave_server_response.calls) == 1
 
-    flatened_calls_list = [
+    flattened_calls_list = [
         (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
+        for (c, d) in flatten_calls(weave_server_response.calls)
     ]
-    assert flatened_calls_list == [
-        ("google.generativeai.GenerativeModel.start_chat", 0),
-        ("google.generativeai.GenerativeModel.generate_content", 1),
-        (
-            "google.ai.generativelanguage_v1beta.services.generative_service.client.GenerativeServiceClient.generate_content",
-            2,
-        ),
-        (
-            "google.generativeai.types.generation_types.GenerateContentResponse.from_response",
-            2,
-        ),
+    assert flattened_calls_list == [
+        ("google.generativeai.GenerativeModel.generate_content", 0),
     ]
-
-    for call in weave_server_respose.calls:
+    for call in weave_server_response.calls:
         assert call.exception is None and call.ended_at is not None
 
 
@@ -81,7 +72,7 @@ def test_content_generation(client: weave.weave_client.WeaveClient) -> None:
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_content_generation_stream(client: weave.weave_client.WeaveClient) -> None:
+def test_content_generation_stream(client: WeaveClient) -> None:
     import google.generativeai as genai
 
     genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", "DUMMY_API_KEY"))
@@ -90,27 +81,21 @@ def test_content_generation_stream(client: weave.weave_client.WeaveClient) -> No
         "Write a story about an AI and magic", stream=True
     )
     chunks = [chunk.text for chunk in response]
+    assert len(chunks) > 1
 
-    weave_server_respose = client.server.calls_query(
+    weave_server_response = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
-    assert len(weave_server_respose.calls) >= 4
+    assert len(weave_server_response.calls) == 1
 
-    flatened_calls_list = [
+    flattened_calls_list = [
         (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
+        for (c, d) in flatten_calls(weave_server_response.calls)
     ]
-    assert ("google.generativeai.GenerativeModel.start_chat", 0) in flatened_calls_list
-    assert (
-        "google.generativeai.GenerativeModel.generate_content",
-        1,
-    ) in flatened_calls_list
-    assert (
-        "google.generativeai.types.generation_types.GenerateContentResponse.from_response",
-        2,
-    ) in flatened_calls_list
-
-    for call in weave_server_respose.calls:
+    assert flattened_calls_list == [
+        ("google.generativeai.GenerativeModel.generate_content", 0)
+    ]
+    for call in weave_server_response.calls:
         assert call.exception is None and call.ended_at is not None
 
 
@@ -119,39 +104,30 @@ def test_content_generation_stream(client: weave.weave_client.WeaveClient) -> No
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_content_generation_async(client: weave.weave_client.WeaveClient) -> None:
+def test_content_generation_async(client: WeaveClient) -> None:
     import google.generativeai as genai
 
     genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", "DUMMY_API_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
 
     async def async_generate():
-        response = await model.generate_content_async(
-            "Write a story about an AI and magic"
-        )
-        return response
+        return await model.generate_content_async("Write a story about an AI and magic")
 
-    response = asyncio.run(async_generate())
+    asyncio.run(async_generate())
 
-    weave_server_respose = client.server.calls_query(
+    weave_server_response = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
-    assert len(weave_server_respose.calls) == 2
+    assert len(weave_server_response.calls) == 1
 
-    flatened_calls_list = [
+    flattened_calls_list = [
         (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
+        for (c, d) in flatten_calls(weave_server_response.calls)
     ]
-
-    assert flatened_calls_list == [
+    assert flattened_calls_list == [
         ("google.generativeai.GenerativeModel.generate_content_async", 0),
-        (
-            "google.generativeai.types.generation_types.GenerateContentResponse.from_response",
-            1,
-        ),
     ]
-
-    for call in weave_server_respose.calls:
+    for call in weave_server_response.calls:
         assert call.exception is None and call.ended_at is not None
 
 
@@ -160,42 +136,33 @@ def test_content_generation_async(client: weave.weave_client.WeaveClient) -> Non
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_content_generation_async_stream(
-    client: weave.weave_client.WeaveClient,
-) -> None:
+def test_content_generation_async_stream(client: WeaveClient) -> None:
     import google.generativeai as genai
 
     genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", "DUMMY_API_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
 
     async def get_response():
-        chunks = []
         async for chunk in await model.generate_content_async(
-            "Write a cute story about cats.", stream=True
+            "Write a story about an AI and magic", stream=True
         ):
-            chunks.append(chunk)
-        return chunks
+            if chunk.text:
+                print(chunk.text)
+            print("_" * 80)
 
-    chunks = asyncio.run(get_response())
+    asyncio.run(get_response())
 
-    weave_server_respose = client.server.calls_query(
+    weave_server_response = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
-    assert len(weave_server_respose.calls) >= 2
+    assert len(weave_server_response.calls) == 1
 
-    flatened_calls_list = [
+    flattened_calls_list = [
         (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
+        for (c, d) in flatten_calls(weave_server_response.calls)
     ]
-
-    assert (
-        "google.generativeai.GenerativeModel.generate_content_async",
-        0,
-    ) in flatened_calls_list
-    assert (
-        "google.generativeai.types.generation_types.GenerateContentResponse.from_response",
-        1,
-    ) in flatened_calls_list
-
-    for call in weave_server_respose.calls:
+    assert flattened_calls_list == [
+        ("google.generativeai.GenerativeModel.generate_content_async", 0)
+    ]
+    for call in weave_server_response.calls:
         assert call.exception is None and call.ended_at is not None
