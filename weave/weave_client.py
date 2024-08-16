@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import platform
+import re
 import sys
 import typing
 from functools import lru_cache
@@ -48,6 +49,7 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TraceServerInterface,
 )
+from weave.trace_server.validation import object_id_validator
 
 if typing.TYPE_CHECKING:
     from . import ref_base
@@ -762,6 +764,9 @@ class WeaveClient:
         if name is None:
             raise ValueError("Name must be provided for object saving")
 
+        name = sanitize_object_name(name)
+        object_id_validator(name)
+
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -997,6 +1002,18 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
         return tuple(tuple_res)
 
     return obj
+
+
+def sanitize_object_name(name: str) -> str:
+    # Replaces any non-alphanumeric characters with a single dash and removes
+    # any leading or trailing dashes. This is more restrictive than the DB
+    # constraints and can be relaxed if needed.
+    res = re.sub(r"\W+", "-", name).strip("-_")
+    if not res:
+        raise ValueError(f"Invalid object name: {name}")
+    if len(res) > 128:
+        raise ValueError(f"Object name too long: {name}")
+    return res
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

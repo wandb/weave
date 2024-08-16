@@ -1,6 +1,8 @@
 import dataclasses
 from typing import Any, Union
 
+import urllib3
+
 from ..trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
@@ -56,7 +58,7 @@ class ObjectRef(RefWithExtra):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
     def get(self) -> Any:
@@ -106,7 +108,7 @@ class OpRef(ObjectRef):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
 
@@ -120,7 +122,7 @@ class CallRef(RefWithExtra):
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
         if self.extra:
-            u += "/" + "/".join(self.extra)
+            u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
 
@@ -140,7 +142,10 @@ def parse_uri(uri: str) -> AnyRef:
         return TableRef(entity=entity, project=project, digest=remaining[0])
     elif kind == "call":
         return CallRef(
-            entity=entity, project=project, id=remaining[0], extra=remaining[1:]
+            entity=entity,
+            project=project,
+            id=remaining[0],
+            extra=[urllib3.parse.unquote(r) for r in remaining[1:]],
         )
     elif kind == "object":
         name, version = remaining[0].split(":")
@@ -149,7 +154,7 @@ def parse_uri(uri: str) -> AnyRef:
             project=project,
             name=name,
             digest=version,
-            extra=remaining[1:],
+            extra=[urllib3.parse.unquote(r) for r in remaining[1:]],
         )
     elif kind == "op":
         name, version = remaining[0].split(":")
@@ -158,7 +163,7 @@ def parse_uri(uri: str) -> AnyRef:
             project=project,
             name=name,
             digest=version,
-            extra=remaining[1:],
+            extra=[urllib3.parse.unquote(r) for r in remaining[1:]],
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
