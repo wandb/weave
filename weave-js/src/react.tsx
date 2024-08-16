@@ -679,21 +679,6 @@ export const parseRef = (ref: string): ObjectRef => {
   throw new Error(`Unknown protocol: ${url.protocol}`);
 };
 
-export const objectRefWithExtra = (
-  objRef: ObjectRef,
-  extra: string
-): ObjectRef => {
-  let newExtra = '';
-  if (objRef.artifactRefExtra != null && objRef.artifactRefExtra !== '') {
-    newExtra = objRef.artifactRefExtra + '/';
-  }
-  newExtra += extra;
-  return {
-    ...objRef,
-    artifactRefExtra: newExtra,
-  };
-};
-
 export const refUri = (ref: ObjectRef): string => {
   if (isWandbArtifactRef(ref)) {
     let uri = `wandb-artifact:///${ref.entityName}/${ref.projectName}/${ref.artifactName}:${ref.artifactVersion}`;

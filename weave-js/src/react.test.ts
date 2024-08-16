@@ -10,7 +10,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact-name',
-        artifactRefExtra: '',
+        artifactRefExtra: undefined,
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project',
@@ -26,7 +26,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact-name',
-        artifactRefExtra: '',
+        artifactRefExtra: undefined,
         artifactVersion: 'artifactversion',
         entityName: 'Entity',
         projectName: 'project',
@@ -40,7 +40,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact-name',
-        artifactRefExtra: '',
+        artifactRefExtra: undefined,
         artifactVersion: 'artifactversion',
         entityName: 'Entity Name',
         projectName: 'project',
@@ -68,7 +68,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'a/b/c',
-        artifactRefExtra: '',
+        artifactRefExtra: undefined,
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project',
@@ -96,7 +96,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact name with spaces',
-        artifactRefExtra: '',
+        artifactRefExtra: undefined,
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project with spaces',
@@ -110,7 +110,7 @@ describe('parseRef', () => {
       );
       expect(parsed).toEqual({
         artifactName: 'artifact name with spaces',
-        artifactRefExtra: '',
+        artifactRefExtra: undefined,
         artifactVersion: 'artifactversion',
         entityName: 'entity',
         projectName: 'project with spaces',
@@ -174,7 +174,7 @@ describe('parseRef', () => {
     expect(parsed).toEqual({
       scheme: 'weave',
       artifactName: '',
-      artifactRefExtra: '',
+      artifactRefExtra: undefined,
       artifactVersion:
         'b8dfcb84974c481fd98fd9878e56be02ebef3e2da44becb59d1863cd643b83fe',
       entityName: 'entity',
@@ -189,7 +189,7 @@ describe('parseRef', () => {
     expect(parsed).toEqual({
       scheme: 'weave',
       artifactName: '178a32ca-1c00-486d-bd55-6207a7a25ff7',
-      artifactRefExtra: '',
+      artifactRefExtra: undefined,
       artifactVersion: '',
       entityName: 'entity',
       projectName: 'project',
@@ -200,7 +200,7 @@ describe('parseRef', () => {
     const parsed = parseRef('weave:///entity/project/op/op-name:*');
     expect(parsed).toEqual({
       artifactName: 'op-name',
-      artifactRefExtra: '',
+      artifactRefExtra: undefined,
       artifactVersion: '*',
       entityName: 'entity',
       projectName: 'project',
