@@ -1,19 +1,33 @@
-import pytest
-
 import weave
-from weave.errors import WeaveInvalidStringError
+from weave.trace_server.refs_internal import quote_select
 
 
-def test_object_cant_have_invalid_name():
-    class A(weave.Object):
-        x: int
-
-    with pytest.raises(WeaveInvalidStringError):
-        a = A(x=1, name="in:valid/name")
+class A(weave.Object):
+    x: int
 
 
-def test_cant_publish_valid_object_with_invalid_name():
-    lst = [1, 2, 3]
+def test_publish_weave_object_instantiated_with_invalid_name(client):
+    a = A(x=1, name="must:be/quoted")
 
-    with pytest.raises(WeaveInvalidStringError):
-        weave.publish(lst, name="in:valid/name")
+    ref = weave.publish(a)
+    a2 = ref.get()
+    assert a2.name == "must:be/quoted"  # should be unquoted as normal
+    assert a2.ref.name == quote_select("must:be/quoted")
+
+
+def test_publish_weave_object_updated_with_invalid_name(client):
+    a = A(x=1)
+    a.name = "must:be/quoted"
+
+    ref = weave.publish(a)
+    a2 = ref.get()
+    assert a2.name == "must:be/quoted"  # should be unquoted as normal
+    assert a2.ref.name == quote_select("must:be/quoted")
+
+
+def test_publish_weave_object_published_with_invalid_name(client):
+    a = A(x=1)
+
+    ref = weave.publish(a, "must:be/quoted")
+    a2 = ref.get()
+    assert a2.ref.name == quote_select("must:be/quoted")  # ref should be quoted

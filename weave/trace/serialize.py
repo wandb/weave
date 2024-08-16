@@ -4,6 +4,7 @@ from typing import Any
 from weave.trace import custom_objs
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
+from weave.trace_server.refs_internal import unquote
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -94,18 +95,20 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         if (val_type := obj.pop("_type", None)) is None:
             return {k: from_json(v, project_id, server) for k, v in obj.items()}
         elif val_type == "ObjectRecord":
-            return ObjectRecord(
-                {k: from_json(v, project_id, server) for k, v in obj.items()}
-            )
+            d = {k: from_json(v, project_id, server) for k, v in obj.items()}
+            if "name" in d:
+                d["name"] = unquote(d["name"])
+            return ObjectRecord(d)
         elif val_type == "CustomWeaveType":
             files = _load_custom_obj_files(project_id, server, obj["files"])
             return custom_objs.decode_custom_obj(
                 obj["weave_type"], files, obj.get("load_op")
             )
         else:
-            return ObjectRecord(
-                {k: from_json(v, project_id, server) for k, v in obj.items()}
-            )
+            d = {k: from_json(v, project_id, server) for k, v in obj.items()}
+            if name := d.get("name"):
+                d["name"] = unquote(name)
+            return ObjectRecord(d)
     elif isinstance(obj, str) and obj.startswith("weave://"):
         return parse_uri(obj)
 

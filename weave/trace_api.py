@@ -6,10 +6,9 @@ import threading
 import time
 from typing import Any, Callable, Iterator, Optional, Union
 
-from pydantic import validate_call
-
 from weave.call_context import get_current_call
 from weave.client_context import weave_client as weave_client_context
+from weave.trace_server.refs_internal import quote_select
 
 from . import urls, util, weave_client, weave_init
 from .table import Table
@@ -18,7 +17,6 @@ from .trace.constants import TRACE_OBJECT_EMOJI
 from .trace.op import Op, op
 from .trace.refs import ObjectRef, parse_uri
 from .trace.settings import UserSettings, parse_and_apply_settings
-from .trace.validators import BackendString
 
 
 def init(
@@ -89,8 +87,7 @@ def as_op(fn: Callable) -> Op:
     return fn
 
 
-@validate_call
-def publish(obj: Any, name: Optional[BackendString] = None) -> weave_client.ObjectRef:
+def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -114,6 +111,7 @@ def publish(obj: Any, name: Optional[BackendString] = None) -> weave_client.Obje
         save_name = n
     else:
         save_name = obj.__class__.__name__
+    save_name = quote_select(save_name)
 
     ref = client._save_object(obj, save_name, "latest")
 

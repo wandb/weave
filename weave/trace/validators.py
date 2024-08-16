@@ -1,16 +1,11 @@
-from pydantic import AfterValidator
+from pydantic import BeforeValidator
 from typing_extensions import Annotated
 
-from weave.errors import WeaveInvalidStringError
-
-INVALID_BACKEND_STRING_CHARS = {":", " ", "/"}
+from weave.trace_server.refs_internal import quote_select
 
 
-def valid_backend_string(v: str) -> str:
-    for c in INVALID_BACKEND_STRING_CHARS:
-        if c in v:
-            raise WeaveInvalidStringError(f"Invalid string: {v} (contains `{c}`)")
-    return v
+def quote_string(v: str) -> str:
+    return quote_select(v)
 
 
-BackendString = Annotated[str, AfterValidator(valid_backend_string)]
+QuotedString = Annotated[str, BeforeValidator(quote_string)]

@@ -48,6 +48,18 @@ def quote_select(s: str, quote_chars: tuple[str, ...] = ("/", ":", "%")) -> str:
     return s
 
 
+def unquote(s: str, quote_chars: tuple[str, ...] = ("/", ":", "%")) -> str:
+    """Undo the quoting performed by quote_select.
+
+    This function reverses the quoting process applied by quote_select,
+    unquoting the specified characters in the reverse order they were quoted.
+    """
+    for c in reversed(quote_chars):
+        s = s.replace(urllib.parse.quote(c), c)
+
+    return s
+
+
 def validate_extra(extra: list[str]) -> None:
     """The `extra` path is always a series of `edge_name`/`edge_value` pairs.
     For example: `attr/attr_name/index/0`. The `edge_name` is one of the
