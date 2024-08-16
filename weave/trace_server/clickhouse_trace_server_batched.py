@@ -395,9 +395,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
         ref_cache: typing.Dict[str, typing.Any],
-        refs_to_resolve: typing.Optional[
-            typing.Dict[tuple[int, str, typing.Optional[str]], str]
-        ] = None,
+        refs_to_resolve: typing.Optional[typing.Dict[tuple[int, str, str], str]] = None,
     ) -> list[dict[str, typing.Any]]:
         # Find refs in the call batch, or skip when provided (if recursing)
         refs_to_resolve = refs_to_resolve or self._get_refs_to_resolve(
@@ -422,7 +420,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             f"Missing part '{part}' in val '{val}' from column '{col}'"
                         )
                     val = val[part]
-                    col_prefix += "." + part
+                    col_prefix += f".{part}"
 
                     if self._is_ref(val):
                         unresolved_refs[(i, col, col_prefix)] = val
