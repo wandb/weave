@@ -519,7 +519,7 @@ const trimExtra = (extra: string | undefined) => {
 // Unfortunately many teams have been created that violate this.
 const PATTERN_ENTITY = '([^/]+)';
 const PATTERN_PROJECT = '([^/]+)'; // any non / char is valid in project_name
-const PATTERN_OBJ_NAME = '([^:/]+)'; // Artifact name, allows any character except :
+const PATTERN_OBJ_NAME = '([^:]+)'; // Artifact name, allows any character except :
 const PATTERN_DIGEST = '([*]|[a-zA-Z0-9]+)';
 const PATTERN_EXTRA = '(/(.*))?'; // Optional ref extra
 const PATTERN_CALL_ID =
