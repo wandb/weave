@@ -544,9 +544,9 @@ const ObjectVersionRoutePageBinding = () => {
     history,
     params.version,
     params.entity,
+    params.itemName,
     params.project,
     routerContext,
-    params.itemName,
   ]);
 
   if (!params.version) {
@@ -579,9 +579,9 @@ const OpVersionRoutePageBinding = () => {
     history,
     params.version,
     params.entity,
+    params.itemName,
     params.project,
     routerContext,
-    params.itemName,
   ]);
 
   if (!params.version) {

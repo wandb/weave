@@ -593,10 +593,11 @@ export const parseRef = (ref: string): ObjectRef => {
   const decodedUri = decodeURIComponent(url.pathname);
   const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
 
+  if (splitUri.length !== splitLimit) {
+    throw new Error(`Invalid Artifact URI: ${url}`);
+  }
+
   if (isWandbArtifact) {
-    if (splitUri.length !== splitLimit) {
-      throw new Error(`Invalid Artifact URI: ${url}`);
-    }
     const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
     const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
     return {
