@@ -1,7 +1,6 @@
 import dataclasses
+import urllib
 from typing import Any, Union
-
-import urllib3
 
 from ..trace_server import refs_internal
 
@@ -140,30 +139,18 @@ def parse_uri(uri: str) -> AnyRef:
     remaining = tuple(parts[3:])
     if kind == "table":
         return TableRef(entity=entity, project=project, digest=remaining[0])
-    elif kind == "call":
-        return CallRef(
-            entity=entity,
-            project=project,
-            id=remaining[0],
-            extra=[urllib3.parse.unquote(r) for r in remaining[1:]],
-        )
+    extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
+    if kind == "call":
+        return CallRef(entity=entity, project=project, id=remaining[0], extra=extra)
     elif kind == "object":
         name, version = remaining[0].split(":")
         return ObjectRef(
-            entity=entity,
-            project=project,
-            name=name,
-            digest=version,
-            extra=[urllib3.parse.unquote(r) for r in remaining[1:]],
+            entity=entity, project=project, name=name, digest=version, extra=extra
         )
     elif kind == "op":
         name, version = remaining[0].split(":")
         return OpRef(
-            entity=entity,
-            project=project,
-            name=name,
-            digest=version,
-            extra=[urllib3.parse.unquote(r) for r in remaining[1:]],
+            entity=entity, project=project, name=name, digest=version, extra=extra
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
