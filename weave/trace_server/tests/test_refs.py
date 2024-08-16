@@ -6,7 +6,7 @@ from weave.trace import refs
 from weave.trace_server import refs_internal
 from weave.weave_client import sanitize_object_name
 
-quote = refs_internal.ref_part_quoter
+quote = refs_internal.extra_value_quoter
 
 
 def test_isdescended_from():
@@ -55,7 +55,7 @@ def test_ref_parsing_external_sanitized():
     assert parsed == ref_start
 
 
-def test_ref_parsing_external_invalid():
+def test_ref_parsing_internal_invalid():
     ref_start = refs_internal.InternalObjectRef(
         project_id="project",
         name=string_with_every_char(),
@@ -68,7 +68,7 @@ def test_ref_parsing_external_invalid():
         refs.parse_uri(ref_str)
 
 
-def test_ref_parsing_external_sanitized():
+def test_ref_parsing_internal_sanitized():
     ref_start = refs_internal.InternalObjectRef(
         entity="entity",
         project_id="project",
