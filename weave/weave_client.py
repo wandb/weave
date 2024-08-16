@@ -1012,7 +1012,7 @@ def sanitize_object_name(name: str) -> str:
     if not res:
         raise ValueError(f"Invalid object name: {name}")
     if len(res) > 128:
-        raise ValueError(f"Object name too long: {name}")
+        res = res[:128]
     return res
 
 

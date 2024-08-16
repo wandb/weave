@@ -42,7 +42,7 @@ def extra_value_quoter(s: str, quote_chars: tuple[str, ...] = ("%", "/")) -> str
         raise ValueError("Quoting '%' must be the first character in the list.")
 
     for c in quote_chars:
-        s = s.replace(c, urllib.parse.quote(c))
+        s = s.replace(c, urllib.parse.quote(c, safe=""))
 
     return s
 
