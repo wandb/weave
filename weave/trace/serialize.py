@@ -87,6 +87,22 @@ def _load_custom_obj_files(
     return loaded_files
 
 
+def from_json_special(obj: Any) -> Any:
+    if isinstance(obj, list):
+        return [from_json_special(v) for v in obj]
+    elif isinstance(obj, dict):
+        if (val_type := obj.pop("_type", None)) is None:
+            return {k: from_json_special(v) for k, v in obj.items()}
+        elif val_type == "ObjectRecord":
+            return ObjectRecord({k: from_json_special(v) for k, v in obj.items()})
+        else:
+            return ObjectRecord({k: from_json_special(v) for k, v in obj.items()})
+    elif isinstance(obj, str) and obj.startswith("weave://"):
+        return parse_uri(obj)
+
+    return obj
+
+
 def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     if isinstance(obj, list):
         return [from_json(v, project_id, server) for v in obj]
