@@ -73,7 +73,7 @@ call.feedback.add("correctness", { "value": 5 })
 
 ### Retrieving the Call UUID 
 
-For scenarios where you need to add feedback immediately after a call, you can retrieve the call UUID programmatically during or after the call execution. Here are two ways to get the UUID of the call: 
+For scenarios where you need to add feedback immediately after a call, you can retrieve the call UUID programmatically during or after the call execution. Here is how to get the UUID of the call from within the operation: 
 
 ```python
 
@@ -89,7 +89,7 @@ def simple_operation(input_value):
     call_id = current_call.id
     return output, call_id
 ```    
-Additionally, you can use call() method to execute the operation and retrieve the result and call ID: 
+Additionally, you can use call() method to execute the operation and retrieve the call ID after execution of the function: 
 
 ```python    
 import weave
