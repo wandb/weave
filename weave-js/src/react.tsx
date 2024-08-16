@@ -47,6 +47,7 @@ import {
   useState,
 } from 'react';
 
+import {WEAVE_REF_PREFIX} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/constants';
 import {PanelCompContext} from './components/Panel2/PanelComp';
 import {usePanelContext} from './components/Panel2/PanelContext';
 import {toWeaveType} from './components/Panel2/toWeaveType';
@@ -64,7 +65,6 @@ import {
   getChainRootVar,
   isConstructor,
 } from './core/mutate';
-import {trimStartChar} from './core/util/string';
 import {UseNodeValueServerExecutionError} from './errors';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
@@ -505,7 +505,7 @@ export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
 // Unfortunately many teams have been created that violate this.
 const PATTERN_ENTITY = '([^/]+)';
 const PATTERN_PROJECT = '([^\\#?%:]{1,128})'; // Project name
-const PATTERN_REF_EXTRA = '([a-zA-Z0-9_/%.-~]*)'; // Optional ref extra (valid chars are result of python urllib.parse.quote and javascript encodeURIComponent)
+const PATTERN_REF_EXTRA = '([a-zA-Z0-9_.~/%-]*)'; // Optional ref extra (valid chars are result of python urllib.parse.quote and javascript encodeURIComponent)
 const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
   [
     '^', // Start of the string
@@ -562,7 +562,7 @@ export const parseRef = (ref: string): ObjectRef => {
   } else if (isLocalArtifact) {
     splitLimit = 2;
   } else if (isWeaveRef) {
-    splitLimit = 4;
+    return parseWeaveRef(ref);
   } else {
     throw new Error(`Unknown protocol: ${url.protocol}`);
   }
@@ -599,58 +599,58 @@ export const parseRef = (ref: string): ObjectRef => {
       artifactPath,
     };
   }
+  throw new Error(`Unknown protocol: ${url.protocol}`);
+};
 
-  if (isWeaveRef) {
-    const trimmed = trimStartChar(decodedUri, '/');
-    const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
-    if (tableMatch !== null) {
-      const [entity, project, digest] = tableMatch.slice(1);
-      return {
-        scheme: 'weave',
-        entityName: entity,
-        projectName: project,
-        weaveKind: 'table' as WeaveKind,
-        artifactName: '',
-        artifactVersion: digest,
-        artifactRefExtra: '',
-      };
-    }
-    const callMatch = trimmed.match(RE_WEAVE_CALL_REF_PATHNAME);
-    if (callMatch !== null) {
-      const [entity, project, callId] = callMatch.slice(1);
-      return {
-        scheme: 'weave',
-        entityName: entity,
-        projectName: project,
-        weaveKind: 'call' as WeaveKind,
-        artifactName: callId,
-        artifactVersion: '',
-        artifactRefExtra: '',
-      };
-    }
-    const match = trimmed.match(RE_WEAVE_OBJECT_REF_PATHNAME);
-    if (match === null) {
-      throw new Error('Invalid weave ref uri: ' + ref);
-    }
-    const [
-      entityName,
-      projectName,
-      weaveKind,
-      artifactName,
-      artifactVersion,
-      artifactRefExtra,
-    ] = match.slice(1);
+const parseWeaveRef = (ref: string): WeaveObjectRef => {
+  const trimmed = ref.slice(WEAVE_REF_PREFIX.length);
+  const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
+  if (tableMatch !== null) {
+    const [entity, project, digest] = tableMatch.slice(1);
     return {
       scheme: 'weave',
-      entityName,
-      projectName,
-      weaveKind: weaveKind as WeaveKind,
-      artifactName,
-      artifactVersion,
-      artifactRefExtra: artifactRefExtra ?? '',
+      entityName: entity,
+      projectName: project,
+      weaveKind: 'table' as WeaveKind,
+      artifactName: '',
+      artifactVersion: digest,
+      artifactRefExtra: '',
     };
   }
-  throw new Error(`Unknown protocol: ${url.protocol}`);
+  const callMatch = trimmed.match(RE_WEAVE_CALL_REF_PATHNAME);
+  if (callMatch !== null) {
+    const [entity, project, callId] = callMatch.slice(1);
+    return {
+      scheme: 'weave',
+      entityName: entity,
+      projectName: project,
+      weaveKind: 'call' as WeaveKind,
+      artifactName: callId,
+      artifactVersion: '',
+      artifactRefExtra: '',
+    };
+  }
+  const match = trimmed.match(RE_WEAVE_OBJECT_REF_PATHNAME);
+  if (match === null) {
+    throw new Error('Invalid weave ref uri: ' + ref);
+  }
+  const [
+    entityName,
+    projectName,
+    weaveKind,
+    artifactName,
+    artifactVersion,
+    artifactRefExtra,
+  ] = match.slice(1);
+  return {
+    scheme: 'weave',
+    entityName,
+    projectName,
+    weaveKind: weaveKind as WeaveKind,
+    artifactName,
+    artifactVersion,
+    artifactRefExtra: artifactRefExtra ?? '',
+  };
 };
 
 export const objectRefWithExtra = (
