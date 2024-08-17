@@ -1,3 +1,4 @@
+import copy
 import typing
 from collections import OrderedDict
 
@@ -37,7 +38,7 @@ def _unflatten_dict(d: dict[str, typing.Any], sep: str = ".") -> dict[str, typin
         curr = out
         for key in keys[:-1]:
             curr = curr.setdefault(key, {})
-        curr[keys[-1]] = val
+        curr[keys[-1]] = copy.deepcopy(val)
     return out
 
 
