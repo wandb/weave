@@ -2430,13 +2430,13 @@ class Custom(weave.Object):
 
 
 def test_object_with_disallowed_keys(client):
-    name = "%"
+    name = "thing % with / disallowed : keys"
     obj = Custom(name=name, val={"1": 1})
 
     weave.publish(obj)
 
     # we sanitize the name
-    assert obj.ref.name == "_"
+    assert obj.ref.name == "thing-with-disallowed-keys"
 
     create_req = tsi.ObjCreateReq.model_validate(
         dict(
@@ -2457,7 +2457,7 @@ chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
 def test_objects_and_keys_with_special_characters(client):
     # make sure to include ":", "/" which are URI-related
 
-    name_with_special_characters = "name: /" + chars
+    name_with_special_characters = "n-a_m.e: /" + chars + "100"
     dict_payload = {name_with_special_characters: "hello world"}
 
     obj = Custom(name=name_with_special_characters, val=dict_payload)
@@ -2469,13 +2469,13 @@ def test_objects_and_keys_with_special_characters(client):
     project_id = f"{entity}/{project}"
     ref_base = f"weave:///{project_id}"
     exp_name = sanitize_object_name(name_with_special_characters)
-    assert exp_name == "name"
+    assert exp_name == "n-a_m.e-100"
     exp_key = extra_value_quoter(name_with_special_characters)
     assert (
         exp_key
-        == "name%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60"
+        == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
     )
-    exp_digest = "2bnzTXFjtlwrtXWNLhAyvYq0XbRFfr633kKL2IkBOlI"
+    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
     assert obj.ref.uri() == exp_obj_ref
@@ -2496,7 +2496,7 @@ def test_objects_and_keys_with_special_characters(client):
     gotten_res = weave.ref(found_ref).get()
     assert gotten_res == "hello world"
 
-    exp_op_digest = "WZAc2HA5GyWPr7YzHiSBncbHKMywXN3hk8onqRy2KkA"
+    exp_op_digest = "xEPCVKKjDWxKzqaCxxU09jD82FGGf5WcNy2fC9VUF3M"
     exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
 
     found_ref = test.ref.uri()
