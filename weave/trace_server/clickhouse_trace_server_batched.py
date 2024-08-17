@@ -38,7 +38,6 @@ import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from pydantic.utils import deep_update
 
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
@@ -46,7 +45,6 @@ from weave.trace_server.calls_query_builder import (
     combine_conditions,
 )
 from weave.trace_server.ids import generate_id
-from weave.trace_server.trace_server_common import make_nested_dict
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
@@ -69,6 +67,7 @@ from .feedback import (
     validate_feedback_purge_req,
 )
 from .orm import ParamBuilder, Row
+from .trace_server_common import _flatten_dict, _unflatten_dict
 from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
@@ -336,53 +335,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # if "feedback" in expand_columns:
         #     feedback = self._hydrate_calls_feedback(calls)
 
+        # flatten calls
+        calls = [_flatten_dict(call) for call in calls]
+
+        # expand refs in calls
         calls = self._expand_call_refs(calls, expand_columns, ref_cache)
+
+        # unflatten calls (for pydantic validation)
+        calls = [_unflatten_dict(call) for call in calls]
 
         return calls
 
-    @staticmethod
-    def _get_nested_ref_column_part(
-        column: str, call: dict[str, typing.Any]
-    ) -> typing.Tuple[typing.Optional[str], typing.Any]:
-        """
-        Given a column that is a nested ref, find the most nested column in the call that
-        matches the requested expanded column, and then return the column prefix and
-        nested column suffix parts as a list.
-        Example:
-            call = {"a": {"b": "weave:///..."}}
-            column = "a.b.c.d"
-            -> "a.b", "weave:///..."
-        """
-        cur = call
-        parts = []
-        for part in column.split("."):
-            if isinstance(cur, dict) and part in cur:
-                cur = cur[part]
-                parts.append(part)
-            else:
-                break
-
-        return ".".join(parts) or None, cur
-
     def _get_refs_to_resolve(
         self, calls: list[dict[str, typing.Any]], expand_columns: typing.List[str]
-    ) -> typing.Dict[tuple[int, str, str], str]:
-        # First get refs from call batch, store them where we can lookup them later
-        # format: (call_index, column_name, column_prefix) -> ref
-        refs_to_resolve: typing.Dict[tuple[int, str, str], str] = {}
+    ) -> typing.Dict[tuple[int, str], str]:
+        refs_to_resolve: typing.Dict[tuple[int, str], str] = {}
         for i, call in enumerate(calls):
             for col in expand_columns:
-                val = call.get(col)
-                col_prefix = None
-                if val is None:
-                    # requested column not present, could be a nested ref
-                    col_prefix, val = self._get_nested_ref_column_part(col, call)
-                    if not col_prefix:
+                if col not in call:
+                    # check if a key
+                    last_part = col.split(".")[-1]
+                    prefix = col.replace(f".{last_part}", "")
+                    if prefix not in call:
                         continue
+                    else:
+                        if last_part not in call[prefix]:
+                            continue
+                        # {"a.b": {"c": "d"}} -> {"a.b.c": "d"}
+                        call[col] = call[prefix][last_part]
 
-                if refs_internal.is_ref_str(val):
-                    refs_to_resolve[(i, col, col_prefix or col)] = val
+                if not refs_internal.is_ref_str(call[col]):
+                    raise ValueError(f"Expand column {col} is not a ref")
 
+                refs_to_resolve[(i, col)] = call[col]
         return refs_to_resolve
 
     def _expand_call_refs(
@@ -390,46 +375,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
         ref_cache: typing.Dict[str, typing.Any],
-        refs_to_resolve: typing.Optional[typing.Dict[tuple[int, str, str], str]] = None,
     ) -> list[dict[str, typing.Any]]:
-        # Find refs in the call batch, or skip when provided (if recursing)
-        refs_to_resolve = refs_to_resolve or self._get_refs_to_resolve(
-            calls, expand_columns
-        )
-        if not refs_to_resolve:
-            return calls
+        # format expand columns by depth, iterate through each batch in order
+        expand_column_by_depth = defaultdict(list)
+        for col in expand_columns:
+            expand_column_by_depth[col.count(".")].append(col)
 
-        vals = self._refs_read_batch(list(refs_to_resolve.values()), ref_cache)
-        if len(vals) != len(refs_to_resolve):
-            raise ValueError(f"Expected {len(refs_to_resolve)} refs, got {len(vals)}")
+        for depth in sorted(expand_column_by_depth.keys()):
+            columns = expand_column_by_depth[depth]
+            refs_to_resolve = self._get_refs_to_resolve(calls, columns)
+            if not refs_to_resolve:
+                continue
 
-        unresolved_refs = {}
-        for (i, col, col_prefix), val in zip(refs_to_resolve, vals):
-            if col_prefix != col:
-                next_part = col.replace(col_prefix, "")
-                if next_part.startswith("."):
-                    next_part = next_part[1:]
-                for part in next_part.split("."):
-                    if part not in val:
-                        raise ValueError(
-                            f"Missing part '{part}' in val '{val}' from column '{col}'"
-                        )
-                    val = val[part]
-                    col_prefix += f".{part}"
+            vals = self._refs_read_batch(list(refs_to_resolve.values()), ref_cache)
+            assert len(vals) == len(refs_to_resolve), "ref read batch inconsistency"
 
-                    if refs_internal.is_ref_str(val):
-                        unresolved_refs[(i, col, col_prefix)] = val
-                        break
+            for (i, col), val in zip(refs_to_resolve, vals):
+                calls[i][col] = val
 
-            # make a nested dict from the column list, with val as the last element
-            # if the val is a dict with a ref, it will stay as an internal ref (!)
-            payload = make_nested_dict(col.split("."), val)
-            calls[i] = deep_update(calls[i], payload)
-
-        if unresolved_refs:
-            return self._expand_call_refs(
-                calls, expand_columns, ref_cache, unresolved_refs
-            )
         return calls
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
