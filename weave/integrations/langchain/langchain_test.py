@@ -75,12 +75,12 @@ def test_simple_chain_invoke(
     )
     prompt = PromptTemplate.from_template("1 + {number} = ")
     long_str = (
-        "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy_"
+        "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy"
     )
     name = long_str + long_str
     prompt.name = name
 
-    exp_name = "really_massive_name_that_is_longer_than_max_characte_9ad6_t_is_longer_than_max_characters_which_would_be_crazy_"
+    exp_name = "really_massive_name_that_is_longer_than_max_characte_ff6e_at_is_longer_than_max_characters_which_would_be_crazy"
 
     llm_chain = prompt | llm
     _ = llm_chain.invoke({"number": 2})
