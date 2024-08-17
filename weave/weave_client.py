@@ -1008,7 +1008,7 @@ def sanitize_object_name(name: str) -> str:
     # Replaces any non-alphanumeric characters with a single dash and removes
     # any leading or trailing dashes. This is more restrictive than the DB
     # constraints and can be relaxed if needed.
-    res = re.sub(r"[._-]+", "-", re.sub(r"[^\w._]+", "-", name)).strip("-_")
+    res = re.sub(r"([._-]{2,})+", "-", re.sub(r"[^\w._]+", "-", name)).strip("-_")
     if not res:
         raise ValueError(f"Invalid object name: {name}")
     if len(res) > 128:
