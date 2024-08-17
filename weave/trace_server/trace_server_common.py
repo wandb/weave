@@ -1,4 +1,5 @@
 import typing
+from collections import OrderedDict
 
 
 def _flatten_dict(
@@ -38,3 +39,14 @@ def _unflatten_dict(d: dict[str, typing.Any], sep: str = ".") -> dict[str, typin
             curr = curr.setdefault(key, {})
         curr[keys[-1]] = val
     return out
+
+
+class LRUCache(OrderedDict):
+    def __init__(self, maxsize=1000, *args, **kwargs):
+        self.maxsize = maxsize
+        super().__init__(*args, **kwargs)
+
+    def __setitem__(self, key, value):
+        if len(self) >= self.maxsize:
+            self.popitem(last=False)
+        super().__setitem__(key, value)
