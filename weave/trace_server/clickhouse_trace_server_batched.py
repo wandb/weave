@@ -67,7 +67,7 @@ from .feedback import (
     validate_feedback_purge_req,
 )
 from .orm import ParamBuilder, Row
-from .trace_server_common import _flatten_dict, _unflatten_dict
+from .trace_server_common import LRUCache, _flatten_dict, _unflatten_dict
 from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
@@ -303,7 +303,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         else:
             batch_size = 10
             batch = []
-            ref_cache: typing.Dict[str, typing.Any] = {}
+
+            ref_cache = LRUCache(maxsize=1000)
             for row in raw_res:
                 call_dict = _ch_call_dict_to_call_schema_dict(
                     dict(zip(select_columns, row))
