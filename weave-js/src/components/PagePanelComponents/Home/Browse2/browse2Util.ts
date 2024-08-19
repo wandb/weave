@@ -7,7 +7,11 @@ export const flattenObjectPreservingWeaveTypes = (obj: {
   [key: string]: any;
 }) => {
   return flattenObject(obj, '', {}, (key, value) => {
-    return typeof value !== 'object' || value == null || value._type == null;
+    return (
+      typeof value !== 'object' ||
+      value == null ||
+      value._type !== 'CustomWeaveType'
+    );
   });
 };
 
