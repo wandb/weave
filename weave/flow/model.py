@@ -41,7 +41,7 @@ class Model(Object):
             if infer_method := getattr(self, name, None):
                 return infer_method
         raise MissingInferenceMethodError(
-            f"Missing a method with name like ({INFER_METHOD_NAMES})"
+            f"Missing a method with name in ({INFER_METHOD_NAMES})"
         )
 
 
