@@ -132,7 +132,7 @@ def test_sync_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            digest="nCFXG0JUooNi5QBQGsOPNhmNVRr8ueUKvEUDQ2TeSoc",
+            digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             extra=(),
         ),
         "a": 1,
@@ -167,7 +167,7 @@ async def test_async_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            digest="nCFXG0JUooNi5QBQGsOPNhmNVRr8ueUKvEUDQ2TeSoc",
+            digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             extra=(),
         ),
         "a": 1,
@@ -245,3 +245,21 @@ async def test_gotten_object_method_is_callable(client, weave_obj):
     weave_obj2 = ref.get()
     assert weave_obj.method(1) == weave_obj2.method(1) == 2
     assert await weave_obj.amethod(1) == await weave_obj2.amethod(1) == 2
+
+
+@pytest.mark.asyncio
+async def test_gotten_object_method_is_callable_with_call_func(client, weave_obj):
+    ref = weave.publish(weave_obj)
+
+    weave_obj2 = ref.get()
+    res, call = weave_obj.method.call(1)
+    res2, call2 = weave_obj2.method.call(1)
+    assert res == res2
+    assert call.inputs == call2.inputs
+    assert call.output == call2.output
+
+    res3, call3 = await weave_obj.amethod.call(1)
+    res4, call4 = await weave_obj2.amethod.call(1)
+    assert res3 == res4
+    assert call3.inputs == call4.inputs
+    assert call3.output == call4.output

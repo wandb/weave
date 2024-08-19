@@ -1,8 +1,3 @@
----
-sidebar_position: 3
-hide_table_of_contents: true
----
-
 # Feedback
 
 Evaluating LLM applications automatically is challenging. Teams often rely on direct user feedback, particularly from domain experts, who assess the content quality using simple indicators such as thumbs up or down. Developers also actively identify and resolve content issues.

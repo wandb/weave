@@ -1,7 +1,5 @@
-import asyncio
 import dataclasses
 import datetime
-import os
 import platform
 import sys
 import time
@@ -16,17 +14,15 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor, weave_client
-from weave.legacy import context_state
-from weave.trace.vals import MissingSelfInstanceError, WeaveObject
+from weave.trace.vals import MissingSelfInstanceError
+from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-from weave.weave_client import Call
 
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
-    generate_id,
 )
 
 pytestmark = pytest.mark.trace
@@ -102,12 +98,14 @@ def test_dataset(client):
 
 def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
+    trace_id = generate_id()
+    parent_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
         project_id=client._project_id(),
         id=call_id,
         op_name="test_name",
-        trace_id="test_trace_id",
-        parent_id="test_parent_id",
+        trace_id=trace_id,
+        parent_id=parent_id,
         started_at=datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
         attributes={"a": 5},
@@ -147,8 +145,8 @@ def test_trace_server_call_start_and_end(client):
         "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
-        "trace_id": "test_trace_id",
-        "parent_id": "test_parent_id",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": None,
         "exception": None,
@@ -186,8 +184,8 @@ def test_trace_server_call_start_and_end(client):
         "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
-        "trace_id": "test_trace_id",
-        "parent_id": "test_parent_id",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": FuzzyDateTimeMatcher(end.ended_at),
         "exception": None,
@@ -385,7 +383,7 @@ def test_trace_call_query_filter_op_version_refs(client):
         res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(op_names=op_version_refs),
+                filter=tsi.CallsFilter(op_names=op_version_refs),
             )
         )
         print(f"TEST CASE [{i}]", op_version_refs, exp_count)
@@ -461,7 +459,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(input_refs=input_object_version_refs),
+                filter=tsi.CallsFilter(input_refs=input_object_version_refs),
             )
         )
 
@@ -515,7 +513,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(output_refs=output_object_version_refs),
+                filter=tsi.CallsFilter(output_refs=output_object_version_refs),
             )
         )
 
@@ -551,7 +549,7 @@ def test_trace_call_query_filter_parent_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(parent_ids=parent_ids),
+                filter=tsi.CallsFilter(parent_ids=parent_ids),
             )
         )
 
@@ -578,7 +576,7 @@ def test_trace_call_query_filter_trace_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(trace_ids=trace_ids),
+                filter=tsi.CallsFilter(trace_ids=trace_ids),
             )
         )
 
@@ -605,7 +603,7 @@ def test_trace_call_query_filter_call_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(call_ids=call_ids),
+                filter=tsi.CallsFilter(call_ids=call_ids),
             )
         )
 
@@ -626,7 +624,7 @@ def test_trace_call_query_filter_trace_roots_only(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(trace_roots_only=trace_roots_only),
+                filter=tsi.CallsFilter(trace_roots_only=trace_roots_only),
             )
         )
 
@@ -652,7 +650,7 @@ def test_trace_call_query_filter_wb_run_ids(client, user_by_api_key_in_env):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(wb_run_ids=wb_run_ids),
+                filter=tsi.CallsFilter(wb_run_ids=wb_run_ids),
             )
         )
 
@@ -713,13 +711,13 @@ def test_trace_call_sort(client):
         basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
 
     for first, last, sort_by in [
-        (2, 0, [tsi._SortBy(field="started_at", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="inputs.in_val.prim", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="inputs.in_val.list.0", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="output.prim", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="output.list.0", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="output.dict.inner", direction="desc")]),
+        (2, 0, [tsi.SortBy(field="started_at", direction="desc")]),
+        (2, 0, [tsi.SortBy(field="inputs.in_val.prim", direction="desc")]),
+        (2, 0, [tsi.SortBy(field="inputs.in_val.list.0", direction="desc")]),
+        (2, 0, [tsi.SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
+        (2, 0, [tsi.SortBy(field="output.prim", direction="desc")]),
+        (2, 0, [tsi.SortBy(field="output.list.0", direction="desc")]),
+        (2, 0, [tsi.SortBy(field="output.dict.inner", direction="desc")]),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
@@ -769,7 +767,7 @@ def test_trace_call_sort_with_mixed_types(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                sort_by=[tsi._SortBy(field="inputs.in_val.prim", direction=direction)],
+                sort_by=[tsi.SortBy(field="inputs.in_val.prim", direction=direction)],
             )
         )
 
@@ -1239,7 +1237,7 @@ def test_root_type(client):
     inner_res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
-            filter=tsi._ObjectVersionFilter(
+            filter=tsi.ObjectVersionFilter(
                 base_object_classes=["BaseTypeA"],
             ),
         )
@@ -1259,7 +1257,7 @@ def test_attributes_on_ops(client):
     res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            filter=tsi._CallsFilter(op_names=[ref_str(op_with_attrs)]),
+            filter=tsi.CallsFilter(op_names=[ref_str(op_with_attrs)]),
         )
     )
 
@@ -1305,7 +1303,7 @@ def test_dataclass_support(client):
     res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            filter=tsi._CallsFilter(op_names=[ref_str(dataclass_maker)]),
+            filter=tsi.CallsFilter(op_names=[ref_str(dataclass_maker)]),
         )
     )
 
@@ -1382,7 +1380,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:PHOGkwSOn7DqLgIUNgUAq7d2vXpOmG8NGLltn6slzeU/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -1405,7 +1403,7 @@ def test_tuple_support(client):
     res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            filter=tsi._CallsFilter(op_names=[ref_str(tuple_maker)]),
+            filter=tsi.CallsFilter(op_names=[ref_str(tuple_maker)]),
         )
     )
 
@@ -1430,7 +1428,7 @@ def test_namedtuple_support(client):
     res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            filter=tsi._CallsFilter(op_names=[ref_str(tuple_maker)]),
+            filter=tsi.CallsFilter(op_names=[ref_str(tuple_maker)]),
         )
     )
 
@@ -1468,7 +1466,7 @@ def test_named_reuse(client):
     res = get_client_trace_server(client).objs_query(
         tsi.ObjQueryReq(
             project_id=get_client_project_id(client),
-            filter=tsi._ObjectVersionFilter(
+            filter=tsi.ObjectVersionFilter(
                 is_op=False, latest_only=True, base_object_classes=["Dataset"]
             ),
         )
@@ -2146,6 +2144,44 @@ def test_call_query_stream_equality(client):
     assert i == len(calls.calls)
 
 
+def test_call_query_stream_columns(client):
+    @weave.op
+    def calculate(a: int, b: int) -> int:
+        return {"result": {"a + b": a + b}, "not result": 123}
+
+    for i in range(2):
+        calculate(i, i * i)
+
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "inputs"],
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert len(calls[0].inputs) == 2
+
+    # NO output returned because not required and not requested
+    assert calls[0].output is None
+    assert calls[0].ended_at is None
+    assert calls[0].attributes == {}
+    assert calls[0].inputs == {"a": 0, "b": 0}
+
+    # now explicitly get output
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "inputs", "output.result"],
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].output["result"]["a + b"] == 0
+    assert calls[0].attributes == {}
+    assert calls[0].inputs == {"a": 0, "b": 0}
+
+
 @pytest.mark.skip("Not implemented: filter / sort through refs")
 def test_sort_and_filter_through_refs(client):
     @weave.op()
@@ -2186,10 +2222,10 @@ def test_sort_and_filter_through_refs(client):
     )
 
     for first, last, sort_by in [
-        (0, 21, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
-        (21, 0, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
-        (0, 21, [tsi._SortBy(field="output.a.b.c.d", direction="asc")]),
-        (21, 0, [tsi._SortBy(field="output.a.b.c.d", direction="desc")]),
+        (0, 21, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
+        (0, 21, [tsi.SortBy(field="output.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi.SortBy(field="output.a.b.c.d", direction="desc")]),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
@@ -2243,7 +2279,7 @@ def test_sort_and_filter_through_refs(client):
             tsi.CallsQueryReq.model_validate(
                 dict(
                     project_id=get_client_project_id(client),
-                    sort_by=[tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")],
+                    sort_by=[tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")],
                     query={"$expr": query},
                 )
             )
@@ -2374,7 +2410,7 @@ def test_model_save(client):
     inner_res = get_client_trace_server(client).objs_query(
         tsi.ObjQueryReq(
             project_id=get_client_project_id(client),
-            filter=tsi._ObjectVersionFilter(
+            filter=tsi.ObjectVersionFilter(
                 is_op=False, latest_only=True, base_object_classes=["Model"]
             ),
         )

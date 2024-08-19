@@ -14,7 +14,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
-import {useEvaluationsFilter} from '../CallsPage/CallsPage';
+import {useEvaluationsFilter} from '../CallsPage/evaluationsFilter';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,

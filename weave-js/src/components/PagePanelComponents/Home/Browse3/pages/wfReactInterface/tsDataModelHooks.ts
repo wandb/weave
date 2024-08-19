@@ -42,6 +42,7 @@ import {
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
+  Refetchable,
   RefMutation,
   TableQuery,
   WFDataModelHooksInterface,
@@ -511,9 +512,52 @@ const useCallUpdateFunc = () => {
   return callUpdate;
 };
 
+const useCallsExport = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const downloadCallsExport = useCallback(
+    (
+      entity: string,
+      project: string,
+      contentType: traceServerTypes.ContentType,
+      filter: CallFilter,
+      limit?: number,
+      offset?: number,
+      sortBy?: traceServerTypes.SortBy[],
+      query?: Query,
+      expandedRefCols?: string[]
+    ) => {
+      const req: traceServerTypes.TraceCallsQueryReq = {
+        project_id: projectIdFromParts({entity, project}),
+        filter: {
+          op_names: filter.opVersionRefs,
+          input_refs: filter.inputObjectVersionRefs,
+          output_refs: filter.outputObjectVersionRefs,
+          parent_ids: filter.parentIds,
+          trace_ids: filter.traceId ? [filter.traceId] : undefined,
+          call_ids: filter.callIds,
+          trace_roots_only: filter.traceRootsOnly,
+          wb_run_ids: filter.runIds,
+          wb_user_ids: filter.userIds,
+        },
+        limit,
+        offset,
+        sort_by: sortBy,
+        query,
+        columns: expandedRefCols ?? undefined,
+      };
+      return getTsClient().callsStreamDownload(req, contentType);
+    },
+    [getTsClient]
+  );
+
+  return downloadCallsExport;
+};
+
 const useFeedback = (
-  key: FeedbackKey | null
-): LoadableWithError<traceServerTypes.Feedback[]> => {
+  key: FeedbackKey | null,
+  sortBy?: traceServerTypes.SortBy[]
+): LoadableWithError<traceServerTypes.Feedback[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
 
   const [result, setResult] = useState<
@@ -523,10 +567,18 @@ const useFeedback = (
     result: null,
     error: null,
   });
+  const [doReload, setDoReload] = useState(false);
+  const refetch = useCallback(() => {
+    setDoReload(true);
+  }, [setDoReload]);
 
   const deepKey = useDeepMemo(key);
 
   useEffect(() => {
+    let mounted = true;
+    if (doReload) {
+      setDoReload(false);
+    }
     if (!deepKey) {
       return;
     }
@@ -542,20 +594,29 @@ const useFeedback = (
             $eq: [{$getField: 'weave_ref'}, {$literal: deepKey.weaveRef}],
           },
         },
-        sort_by: [{field: 'created_at', direction: 'desc'}],
+        sort_by: sortBy ?? [{field: 'created_at', direction: 'desc'}],
       })
       .then(res => {
+        if (!mounted) {
+          return;
+        }
         if ('result' in res) {
           setResult({loading: false, result: res.result, error: null});
         }
         // TODO: handle error case
       })
       .catch(err => {
+        if (!mounted) {
+          return;
+        }
         setResult({loading: false, result: null, error: err});
       });
-  }, [deepKey, getTsClient]);
+    return () => {
+      mounted = false;
+    };
+  }, [deepKey, getTsClient, doReload, sortBy]);
 
-  return result;
+  return {...result, refetch};
 };
 
 const useOpVersion = (
@@ -604,6 +665,13 @@ const useOpVersion = (
     if (opVersionRes == null || loadingRef.current) {
       return {
         loading: true,
+        result: null,
+      };
+    }
+
+    if (opVersionRes.obj == null) {
+      return {
+        loading: false,
         result: null,
       };
     }
@@ -683,7 +751,7 @@ const useOpVersions = makeTraceServerEndpointHook<
 const useFileContent = makeTraceServerEndpointHook<
   'fileContent',
   [string, string, string, {skip?: boolean}?],
-  string
+  ArrayBuffer
 >(
   'fileContent',
   (
@@ -747,6 +815,13 @@ const useObjectVersion = (
     if (objectVersionRes == null || loadingRef.current) {
       return {
         loading: true,
+        result: null,
+      };
+    }
+
+    if (objectVersionRes.obj == null) {
+      return {
+        loading: false,
         result: null,
       };
     }
@@ -1131,12 +1206,27 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
     }
     return null;
   }, [opVersionRef, query.result]);
-  const text = useFileContent(
+  const arrayBuffer = useFileContent(
     fileSpec?.entity ?? '',
     fileSpec?.project ?? '',
     fileSpec?.digest ?? '',
     {skip: fileSpec == null}
   );
+  const text = useMemo(() => {
+    if (arrayBuffer.loading) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+    return {
+      loading: false,
+      result: new TextDecoder().decode(
+        arrayBuffer.result ?? new ArrayBuffer(0)
+      ),
+    };
+  }, [arrayBuffer.loading, arrayBuffer.result]);
+
   return text;
 };
 
@@ -1389,6 +1479,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCallsStats,
   useCallsDeleteFunc,
   useCallUpdateFunc,
+  useCallsExport,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

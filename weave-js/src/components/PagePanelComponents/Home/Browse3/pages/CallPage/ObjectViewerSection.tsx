@@ -14,6 +14,8 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
+import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {isRef} from '../common/util';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
@@ -119,7 +121,7 @@ const ObjectViewerSectionNonEmpty = ({
       );
     }
     return null;
-  }, [apiRef, mode, data, expandedIds]);
+  }, [mode, apiRef, data, expandedIds]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
@@ -215,9 +217,20 @@ export const ObjectViewerSection = ({
   noHide,
   isExpanded,
 }: ObjectViewerSectionProps) => {
-  const numKeys = Object.keys(data).length;
   const currentRef = useContext(WeaveCHTableSourceRefContext);
 
+  if (isCustomWeaveTypePayload(data)) {
+    return (
+      <>
+        <TitleRow>
+          <Title>{title}</Title>
+        </TitleRow>
+        <CustomWeaveTypeDispatcher data={data} />
+      </>
+    );
+  }
+
+  const numKeys = Object.keys(data).length;
   if (numKeys === 0) {
     return (
       <>

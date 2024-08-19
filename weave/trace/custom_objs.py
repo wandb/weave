@@ -156,6 +156,9 @@ def decode_custom_obj(
             raise ValueError(f"No serializer found for {weave_type}")
         load_instance_op = serializer.load
 
+    # Disables tracing so that calls to loading data itself don't get traced
+    load_instance_op._tracing_enabled = False  # type: ignore
+
     art = MemTraceFilesArtifact(
         encoded_path_contents,
         metadata={},

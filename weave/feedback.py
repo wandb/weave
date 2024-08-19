@@ -5,7 +5,8 @@ from typing import Any, Iterable, Iterator, Optional
 
 from rich.table import Table
 
-from weave import client_context, rich_pydantic_util
+from weave import rich_pydantic_util
+from weave.client_context import weave_client as weave_client_context
 from weave.refs import Refs
 from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import parse_uri
@@ -100,7 +101,7 @@ class FeedbackQuery:
         limit: Optional[int] = None,
         show_refs: bool = False,
     ):
-        self.client = client_context.weave_client.require_weave_client()
+        self.client = weave_client_context.require_weave_client()
         self.entity = entity
         self.project = project
 
@@ -253,3 +254,10 @@ class RefFeedbackQuery(FeedbackQuery):
         )
         self.client.server.feedback_purge(req)
         self.feedbacks = None  # Clear cache
+
+
+__docspec__ = [
+    Feedbacks,
+    FeedbackQuery,
+    RefFeedbackQuery,
+]

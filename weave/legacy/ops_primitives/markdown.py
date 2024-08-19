@@ -1,6 +1,6 @@
 import dataclasses
 
-from weave import api as weave
+from weave import query_api as weave
 from weave import weave_types as types
 
 

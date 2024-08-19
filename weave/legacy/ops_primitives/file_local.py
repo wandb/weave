@@ -3,7 +3,7 @@ import typing
 
 from weave import environment
 from weave import weave_types as types
-from weave.api import op
+from weave.query_api import op
 from weave.legacy import file_local
 
 

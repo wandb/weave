@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
-
 # Track LLM inputs & outputs
 
 <!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
