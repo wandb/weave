@@ -1,5 +1,7 @@
 import {Box, Popover} from '@mui/material';
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Radio} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {
@@ -12,6 +14,7 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useWFHooks} from '../wfReactInterface/context';
 import {
   ContentType,
@@ -49,6 +52,12 @@ export const ExportSelector = ({
   const [downloadLoading, setDownloadLoading] = useState<ContentType | null>(
     null
   );
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {loading: orgNameLoading, orgName} = useOrgName({
+    entityName: userInfoLoaded?.username ?? '',
+    skip: viewerLoading,
+  });
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -82,6 +91,7 @@ export const ExportSelector = ({
     const columns = [ContentType.csv, ContentType.tsv].includes(contentType)
       ? visibleColumns
       : undefined;
+    const startTime = Date.now();
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -99,6 +109,33 @@ export const ExportSelector = ({
       initiateDownloadFromBlob(blob, fileName);
       setAnchorEl(null);
       setDownloadLoading(null);
+
+      // analytics
+      userEvents.exportClicked({
+        dataSize: blob.size,
+        numColumns: columns?.length ?? null,
+        numRows: numTotalCalls,
+        numExpandedColumns: 0,
+        maxDepth: 0,
+        type: contentType,
+        latency: Date.now() - startTime,
+        userId: userInfoLoaded?.id ?? '',
+        organizationName: orgName,
+        username: userInfoLoaded?.username ?? '',
+      });
+
+      console.log('export clicked', {
+        dataSize: blob.size,
+        numColumns: columns?.length ?? null,
+        numRows: numTotalCalls,
+        numExpandedColumns: 0,
+        maxDepth: 0,
+        type: contentType,
+        latency: Date.now() - startTime,
+        userId: userInfoLoaded?.id ?? '',
+        organizationName: orgName,
+        username: userInfoLoaded?.username ?? '',
+      });
     });
     setSelectionState('all');
   };
@@ -155,10 +192,12 @@ export const ExportSelector = ({
                   setSelectionState={setSelectionState}
                 />
               )}
-              <DownloadGrid
-                onClickDownload={onClickDownload}
-                downloadLoading={downloadLoading}
-              />
+              {!viewerLoading && !orgNameLoading && (
+                <DownloadGrid
+                  onClickDownload={onClickDownload}
+                  downloadLoading={downloadLoading}
+                />
+              )}
             </DraggableHandle>
           </div>
         </Tailwind>
