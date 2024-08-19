@@ -4,6 +4,8 @@ import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {LoadingDots} from '../../../../LoadingDots';
+import {NotFoundPanel} from '../NotFoundPanel';
+import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
@@ -58,7 +60,7 @@ export const ObjectVersionPage: React.FC<{
   if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
-    return <div>Object not found</div>;
+    return <NotFoundPanel title="Object not found" />;
   }
   return (
     <ObjectVersionPageInner {...props} objectVersion={objectVersion.result} />
@@ -207,7 +209,7 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Values',
           content: (
-            <ScrollableTabContent sx={{pb: 0}}>
+            <ScrollableTabContent>
               <Box
                 sx={{
                   flex: '0 0 auto',
@@ -217,12 +219,15 @@ const ObjectVersionPageInner: React.FC<{
                   <CenteredAnimatedLoader />
                 ) : (
                   <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <ObjectViewerSection
-                      title=""
-                      data={viewerDataAsObject}
-                      noHide
-                      isExpanded
-                    />
+                    <CustomWeaveTypeProjectContext.Provider
+                      value={{entity: entityName, project: projectName}}>
+                      <ObjectViewerSection
+                        title=""
+                        data={viewerDataAsObject}
+                        noHide
+                        isExpanded
+                      />
+                    </CustomWeaveTypeProjectContext.Provider>
                   </WeaveCHTableSourceRefContext.Provider>
                 )}
               </Box>

@@ -4,7 +4,7 @@
 
 It’s important to store traces of LLM applications in a central database, both during development and in production. You’ll use these traces for debugging and to help build a dataset of tricky examples to evaluate against while improving your application.
 
-Weave can automatically capture traces for the [openai python library](https://platform.openai.com/docs/api-reference?lang=python). 
+Weave can automatically capture traces for the [openai python library](https://platform.openai.com/docs/reference/python-sdk?lang=python). 
 
 Start capturing by calling `weave.init(<project-name>)` with a project name your choice.
 
@@ -39,7 +39,7 @@ response = client.chat.completions.create(
 
 Wrapping a function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
 
-Simply create a function decorated with [`@weave.op`](/guides/tracking/ops) that calls into [openai python library](https://platform.openai.com/docs/api-reference?lang=python).
+Simply create a function decorated with [`@weave.op`](/guides/tracking/ops) that calls into [openai python library](https://platform.openai.com/docs/reference/python-sdk?lang=python).
 
 In the example below, we have 2 functions wrapped with op. This helps us see how intermediate steps, like the retrieval step in a RAG app, are affecting how our app behaves.
 

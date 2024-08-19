@@ -89,6 +89,7 @@ ColumnType = typing.Literal[
     "string",
     "datetime",
     "json",  # Represented as string in ClickHouse
+    "float",
 ]
 
 
@@ -198,23 +199,39 @@ class PreparedSelect(BaseModel):
     fields: list[str]
 
 
+class Join:
+    join_type: typing.Optional[str]
+    table: Table
+    query: tsi.Query
+
+    def __init__(
+        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
+    ):
+        self.join_type = join_type
+        self.table = table
+        self.query = query
+
+
 class Select:
     table: Table
     all_columns: list[str]
+    joins: list[Join]
 
     action: Action
 
     _project_id: typing.Optional[str]
     _fields: typing.Optional[list[str]]
     _query: typing.Optional[tsi.Query]
-    _order_by: typing.Optional[typing.List[tsi._SortBy]]
+    _order_by: typing.Optional[typing.List[tsi.SortBy]]
     _limit: typing.Optional[int]
     _offset: typing.Optional[int]
+    _group_by: typing.Optional[list[str]]
 
     def __init__(self, table: Table, action: Action = "SELECT"):
         self.table = table
         self.action = action
         self.all_columns = [c.dbname() for c in table.cols]
+        self.joins = []
 
         self._project_id = None
         self._fields = []
@@ -222,6 +239,15 @@ class Select:
         self._order_by = None
         self._limit = None
         self._offset = None
+        self._group_by = None
+
+    def join(
+        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
+    ) -> "Select":
+        self.joins.append(Join(table, query, join_type))
+        for col in table.cols:
+            self.all_columns.append(col.dbname())
+        return self
 
     def project_id(self, project_id: typing.Optional[str]) -> "Select":
         self._project_id = project_id
@@ -235,7 +261,7 @@ class Select:
         self._query = query
         return self
 
-    def order_by(self, order_by: typing.Optional[typing.List[tsi._SortBy]]) -> "Select":
+    def order_by(self, order_by: typing.Optional[typing.List[tsi.SortBy]]) -> "Select":
         if order_by:
             for o in order_by:
                 assert o.direction in (
@@ -257,6 +283,10 @@ class Select:
         if offset is not None and offset < 0:
             raise ValueError("Offset must be non-negative")
         self._offset = offset
+        return self
+
+    def group_by(self, fields: typing.Optional[list[str]]) -> "Select":
+        self._group_by = fields
         return self
 
     def prepare(
@@ -286,6 +316,15 @@ class Select:
             sql = "DELETE "
 
         sql += f"FROM {self.table.name}"
+
+        # Handle joins
+        # Returns {join type} JOIN {table name} ON {join condition}
+        for j in self.joins:
+            query_conds, fields_used = _process_query_to_conditions(
+                j.query, self.all_columns, self.table.json_cols, param_builder
+            )
+            joined = combine_conditions(query_conds, "AND")
+            sql += f"\n{j.join_type + ' ' if j.join_type else ''}JOIN {j.table.name} ON {joined}"
 
         conditions = []
         if self._project_id:
@@ -347,6 +386,18 @@ class Select:
         if self._offset is not None:
             param_offset = param_builder.add(self._offset, "offset", "UInt64")
             sql += f"\nOFFSET {param_offset}"
+        if self._group_by is not None:
+            internal_fields = [
+                _transform_external_field_to_internal_field(
+                    f,
+                    self.all_columns,
+                    self.table.json_cols,
+                    param_builder=param_builder,
+                )[0]
+                for f in self._group_by
+            ]
+            joined_fields = ", ".join(internal_fields)
+            sql += f"\nGROUP BY {joined_fields}"
 
         parameters = param_builder.get_params()
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
@@ -494,11 +545,26 @@ def _transform_external_field_to_internal_field(
             json_path = quote_json_path(field[len(prefix + ".") :])
             field = prefix + "_dump"
 
+    # pops of table_prefix
+    # necessary for joins, allows table1.field1 and table2.field2
+    table_prefix = None
+    unprefixed_field = field
+    if "." in field:
+        table_prefix, field = field.split(".", 1)
+
     # validate field
-    if field not in all_columns and field.lower() != "count(*)":
+    if (
+        field not in all_columns
+        and field.lower() != "count(*)"
+        and not any(
+            # Checks that a column is in the field, allows prefixed columns to be used
+            substr in unprefixed_field.lower()
+            for substr in all_columns
+        )
+    ):
         raise ValueError(f"Unknown field: {field}")
 
-    raw_fields_used.add(field)
+    raw_fields_used.add(unprefixed_field)
     if json_path is not None:
         json_path_param = param_builder.add(json_path, None, "String")
         if cast == "exists":
@@ -509,6 +575,9 @@ def _transform_external_field_to_internal_field(
             field = json_func + field + ", " + json_path_param + ")"
             if not is_sqlite:
                 field = clickhouse_cast(field, cast or "string")  # type: ignore
+
+    if table_prefix:
+        field = f"{table_prefix}.{field}"
 
     return field, param_builder, raw_fields_used
 

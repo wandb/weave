@@ -8,6 +8,7 @@ import styled from 'styled-components';
 import {MOON_800} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {CallsTable} from '../CallsPage/CallsTable';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
@@ -117,7 +118,10 @@ export const CallDetails: FC<{
             flex: '0 0 auto',
             p: 2,
           }}>
-          <ObjectViewerSection title="Inputs" data={inputs} />
+          <CustomWeaveTypeProjectContext.Provider
+            value={{entity: call.entity, project: call.project}}>
+            <ObjectViewerSection title="Inputs" data={inputs} />
+          </CustomWeaveTypeProjectContext.Provider>
         </Box>
         <Box
           sx={{
@@ -132,7 +136,10 @@ export const CallDetails: FC<{
               <ExceptionDetails exceptionInfo={excInfo} />
             </>
           ) : (
-            <ObjectViewerSection title="Outputs" data={output} />
+            <CustomWeaveTypeProjectContext.Provider
+              value={{entity: call.entity, project: call.project}}>
+              <ObjectViewerSection title="Output" data={output} />
+            </CustomWeaveTypeProjectContext.Provider>
           )}
         </Box>
         {multipleChildCallOpRefs.map(opVersionRef => {
@@ -251,13 +258,15 @@ const getDisplayInputsAndOutput = (call: CallSchema) => {
   const span = call.rawSpan;
   const inputKeys =
     span.inputs._keys ??
-    Object.keys(span.inputs).filter(k => !k.startsWith('_'));
+    Object.keys(span.inputs).filter(k => !k.startsWith('_') || k === '_type');
   const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
 
   const callOutput = span.output ?? {};
   const outputKeys =
     callOutput._keys ??
-    Object.keys(callOutput).filter(k => k === '_result' || !k.startsWith('_'));
+    Object.keys(callOutput).filter(
+      k => k === '_result' || !k.startsWith('_') || k === '_type'
+    );
   const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
   return {inputs, output};
 };
