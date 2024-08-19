@@ -106,10 +106,7 @@ all_call_insert_columns = list(
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 all_call_json_columns = ("inputs", "output", "attributes", "summary")
-
-
-# Let's just make everything required for now ... can optimize when we implement column selection
-required_call_columns = list(set(all_call_select_columns) - set([]))
+required_call_columns = ["id", "project_id", "trace_id", "op_name", "started_at"]
 
 
 # Columns in the calls_merged table with special aggregation functions:
@@ -254,17 +251,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         cq = CallsQuery(
             project_id=req.project_id, include_costs=req.include_costs or False
         )
-
-        # TODO (Perf): By allowing a sub-selection of columns
-        # we will gain increased performance by not having to
-        # fetch all columns from the database. Currently all use
-        # cases call for every column to be fetched, so we have not
-        # implemented this yet.
         columns = all_call_select_columns
+        if req.columns:
+            # Set columns to user-requested columns, w/ required columns
+            # These are all formatted by the CallsQuery, which prevents injection
+            # and other attack vectors.
+            columns = list(set(required_call_columns + req.columns))
+            # TODO: add support for json extract fields
+            # Split out any nested column requests
+            columns = [col.split(".")[0] for col in columns]
+
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
             columns = [
-                *[col for col in all_call_select_columns if col != "summary_dump"],
+                *[col for col in columns if col != "summary_dump"],
                 "summary_dump",
             ]
         for col in columns:
@@ -291,9 +291,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             pb.get_params(),
         )
 
+        select_columns = [c.field for c in cq.select_fields]
         for row in raw_res:
             yield tsi.CallSchema.model_validate(
-                _ch_call_dict_to_call_schema_dict(dict(zip(columns, row)))
+                _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
             )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -1383,8 +1384,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         op_name=ch_call.op_name,
         started_at=_ensure_datetimes_have_tz(ch_call.started_at),
         ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
-        attributes=_dict_dump_to_dict(ch_call.attributes_dump),
-        inputs=_dict_dump_to_dict(ch_call.inputs_dump),
+        attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
+        inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
@@ -1404,8 +1405,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         op_name=ch_call_dict.get("op_name"),
         started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
         ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
-        attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
-        inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
+        attributes=_dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
+        inputs=_dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),

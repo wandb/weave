@@ -1324,3 +1324,13 @@ def test_summary_tokens_cost_sqlite(client):
 
     assert noCostCallSummary is None
     assert withCostCallSummary is None
+
+
+def test_ref_in_dict(client):
+    ref = client._save_object({"a": 5}, "d1")
+
+    # Put a ref directly in a dict.
+    ref2 = client._save_object({"b": ref}, "d2")
+
+    obj = weave.ref(ref2.uri()).get()
+    assert obj["b"] == {"a": 5}
