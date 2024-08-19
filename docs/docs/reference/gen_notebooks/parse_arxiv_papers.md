@@ -162,7 +162,7 @@ class ArxivModel(weave.Model):
             return pymupdf4llm.to_markdown(doc)
 
     @weave.op()
-    def predict(self, url_pdf: str) -> dict:
+    def predict(self, url_pdf: str) -> PaperInfo:
         md_text = self.get_markdown_from_arxiv(url_pdf)
         return structured_client.chat.completions.create(
             model=self.model,
@@ -173,7 +173,7 @@ class ArxivModel(weave.Model):
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": md_text},
             ],
-        ).model_dump()
+        )
 ```
 
 
@@ -202,27 +202,29 @@ Let us now evaluate how accurately our LLM workflow is able to extract the metho
 ```python
 @weave.op()
 def arxiv_method_score(
-    method: List[dict], model_output: Optional[dict]
+    method: List[dict], model_output: Optional[PaperInfo]
 ) -> dict[str, float]:
     if model_output is None:
         return {"method_prediction_accuracy": 0.0}
     predicted_methods = (
-        model_output["novel_methods"]
-        + model_output["existing_methods"]
-        + model_output["machine_learning_techniques"]
+        model_output.novel_methods
+        + model_output.existing_methods
+        + model_output.machine_learning_techniques
     )
     num_correct_methods = 0
     for gt_method in method:
         for predicted_method in predicted_methods:
             predicted_method = (
-                f"{predicted_method['method_name']}\n{predicted_method['explanation']}"
+                f"{predicted_method.method_name}\n{predicted_method.explanation}"
             )
             if (
                 gt_method["name"].lower() in predicted_method.lower()
                 or gt_method["full_name"].lower() in predicted_method.lower()
             ):
                 num_correct_methods += 1
-    return {"method_prediction_accuracy": num_correct_methods / len(predicted_methods)}
+    return {
+        "method_prediction_accuracy": num_correct_methods / len(predicted_methods)
+    }
 ```
 
 For this tutorial, we will use a dataset of more than 6000 machine learning research papers and their corresponding metadata created using the [paperswithcode client](https://paperswithcode-client.readthedocs.io/en/latest/) (check [this gist](https://gist.github.com/soumik12345/996c2ea538f6ff5b3747078ba557ece4) for reference). The dataset is stored as a [Weave Dataset](../../guides/core-types/datasets.md) which you can explore [here](https://wandb.ai/geekyrakshit/arxiv-data-extraction/weave/objects/cv-papers/versions/7wICKJjt3YyqL3ssICHi08v3swAGSUtD7TF4PVRJ0yc).
