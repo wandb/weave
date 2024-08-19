@@ -33,11 +33,11 @@ def set_nested_key(d: dict[str, typing.Any], col: str, val: typing.Any) -> None:
 
 
 class LRUCache(OrderedDict):
-    def __init__(self, maxsize=1000, *args, **kwargs):
-        self.maxsize = maxsize
+    def __init__(self, max_size: int = 1000, *args, **kwargs):
+        self.max_size = max_size
         super().__init__(*args, **kwargs)
 
-    def __setitem__(self, key, value):
-        if len(self) >= self.maxsize:
+    def __setitem__(self, key: str, value: typing.Any) -> None:
+        if len(self) >= self.max_size:
             self.popitem(last=False)
         super().__setitem__(key, value)
