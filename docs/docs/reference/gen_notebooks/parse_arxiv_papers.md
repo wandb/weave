@@ -223,7 +223,7 @@ def arxiv_method_score(
     return {"method_prediction_accuracy": num_correct_methods / len(predicted_methods)}
 ```
 
-For this tutorial, we will use a dataset of more than 6000 machine learning research papers and their corresponding metadata created using the [paperswithcode client](https://paperswithcode-client.readthedocs.io/en/latest/) (check [this gist](https://gist.github.com/soumik12345/996c2ea538f6ff5b3747078ba557ece4) for reference). The dataset is stored as a [Weave Dataset](../docs/guides/core-types/datasets.md) which you can explore [here](https://wandb.ai/geekyrakshit/arxiv-data-extraction/weave/objects/cv-papers/versions/7wICKJjt3YyqL3ssICHi08v3swAGSUtD7TF4PVRJ0yc).
+For this tutorial, we will use a dataset of more than 6000 machine learning research papers and their corresponding metadata created using the [paperswithcode client](https://paperswithcode-client.readthedocs.io/en/latest/) (check [this gist](https://gist.github.com/soumik12345/996c2ea538f6ff5b3747078ba557ece4) for reference). The dataset is stored as a [Weave Dataset](../../guides/core-types/datasets.md) which you can explore [here](https://wandb.ai/geekyrakshit/arxiv-data-extraction/weave/objects/cv-papers/versions/7wICKJjt3YyqL3ssICHi08v3swAGSUtD7TF4PVRJ0yc).
 
 
 ```python
@@ -233,7 +233,7 @@ eval_dataset = weave.ref(WEAVE_DATASET_REFERENCE).get()
 rich.print(f"{len(eval_dataset.rows)=}")
 ```
 
-Now, we can evaluate our LLM workflow using [Weave Evalations](../docs/guides/core-types/evaluations.md), that will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
+Now, we can evaluate our LLM workflow using [Weave Evalations](../../guides/core-types/evaluations.md), that will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
 
 
 ```python
