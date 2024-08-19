@@ -3,77 +3,99 @@ from typing import Optional
 
 from pydantic import AfterValidator, BaseModel, Field
 from typing_extensions import Annotated
-
-from . import validation
+from validation import (
+    call_id_validator,
+    display_name_validator,
+    object_id_validator,
+    op_name_validator,
+    parent_id_validator,
+    project_id_validator,
+    refs_list_validator,
+    trace_id_validator,
+    wb_run_id_validator,
+    wb_user_id_validator,
+)
 
 
 class CallStartCHInsertable(BaseModel):
-    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
-    id: Annotated[str, AfterValidator(validation.call_id_validator)]
-    trace_id: Annotated[str, AfterValidator(validation.trace_id_validator)]
-    parent_id: Annotated[Optional[str], AfterValidator(validation.parent_id_validator)]
-    op_name: Annotated[str, AfterValidator(validation.op_name_validator)]
+    project_id: Annotated[str, AfterValidator(project_id_validator)]
+    id: Annotated[str, AfterValidator(call_id_validator)]
+    trace_id: Annotated[str, AfterValidator(trace_id_validator)]
+    parent_id: Annotated[Optional[str], AfterValidator(parent_id_validator)]
+    op_name: Annotated[str, AfterValidator(op_name_validator)]
     started_at: datetime.datetime
     attributes_dump: str
     inputs_dump: str
-    input_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)]
-    output_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)]
-    display_name: Annotated[
-        Optional[str], AfterValidator(validation.display_name_validator)
-    ]
+    input_refs: Annotated[list[str], AfterValidator(refs_list_validator)]
+    output_refs: Annotated[list[str], AfterValidator(refs_list_validator)]
+    display_name: Annotated[Optional[str], AfterValidator(display_name_validator)]
 
-    wb_user_id: Annotated[
-        Optional[str], AfterValidator(validation.wb_user_id_validator)
-    ]
-    wb_run_id: Annotated[Optional[str], AfterValidator(validation.wb_run_id_validator)]
+    wb_user_id: Annotated[Optional[str], AfterValidator(wb_user_id_validator)]
+    wb_run_id: Annotated[Optional[str], AfterValidator(wb_run_id_validator)]
 
 
 class CallEndCHInsertable(BaseModel):
-    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
-    id: Annotated[str, AfterValidator(validation.call_id_validator)]
+    project_id: Annotated[str, AfterValidator(project_id_validator)]
+    id: Annotated[str, AfterValidator(call_id_validator)]
     ended_at: datetime.datetime
     exception: Optional[str] = None
     summary_dump: str
     output_dump: str
-    input_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)] = (
-        Field(default_factory=list)
-    )
-    output_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)]
+    input_refs: Annotated[
+        list[str],
+        AfterValidator(refs_list_validator),
+        Field(default_factory=list),
+    ]
+    output_refs: Annotated[
+        list[str],
+        AfterValidator(refs_list_validator),
+        Field(default_factory=list),
+    ]
 
 
 class CallDeleteCHInsertable(BaseModel):
-    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
-    id: Annotated[str, AfterValidator(validation.call_id_validator)]
-    wb_user_id: Annotated[str, AfterValidator(validation.wb_user_id_validator)]
+    project_id: Annotated[str, AfterValidator(project_id_validator)]
+    id: Annotated[str, AfterValidator(call_id_validator)]
+    wb_user_id: Annotated[str, AfterValidator(wb_user_id_validator)]
 
     deleted_at: datetime.datetime
 
     # required types
-    input_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)] = (
-        Field(default_factory=list)
-    )
+    input_refs: Annotated[
+        list[str],
+        AfterValidator(refs_list_validator),
+        Field(default_factory=list),
+    ]
     output_refs: Annotated[
-        list[str], AfterValidator(validation.refs_list_validator)
-    ] = Field(default_factory=list)
+        list[str],
+        AfterValidator(refs_list_validator),
+        Field(default_factory=list),
+    ]
 
 
 class CallUpdateCHInsertable(BaseModel):
-    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
-    id: Annotated[str, AfterValidator(validation.call_id_validator)]
-    wb_user_id: Annotated[str, AfterValidator(validation.wb_user_id_validator)]
+    project_id: Annotated[str, AfterValidator(project_id_validator)]
+    id: Annotated[str, AfterValidator(call_id_validator)]
+    wb_user_id: Annotated[str, AfterValidator(wb_user_id_validator)]
 
     # update types
     display_name: Annotated[
-        Optional[str], AfterValidator(validation.display_name_validator)
-    ] = None
+        Optional[str],
+        AfterValidator(display_name_validator),
+        Field(None),
+    ]
 
     # required types
-    input_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)] = (
-        Field(default_factory=list)
-    )
+    input_refs: Annotated[
+        list[str],
+        AfterValidator(refs_list_validator),
+        Field(default_factory=list),
+    ]
     output_refs: Annotated[
-        list[str], AfterValidator(validation.refs_list_validator)
-    ] = Field(default_factory=list)
+        list[str],
+        AfterValidator(refs_list_validator),
+        Field(default_factory=list),
+    ]
 
 
 # Very critical that this matches the calls table schema! This should
@@ -111,11 +133,11 @@ class SelectableCHCallSchema(BaseModel):
 
 
 class ObjCHInsertable(BaseModel):
-    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
+    project_id: Annotated[str, AfterValidator(project_id_validator)]
     kind: str
     base_object_class: Optional[str]
-    object_id: Annotated[str, AfterValidator(validation.object_id_validator)]
-    refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)]
+    object_id: Annotated[str, AfterValidator(object_id_validator)]
+    refs: Annotated[list[str], AfterValidator(refs_list_validator)]
     val_dump: str
     digest: str
 
