@@ -1,4 +1,6 @@
-
+---
+title: Extracting Structured Data from Documents using Instructor and Weave
+---
 
 :::tip[This is a notebook]
 
