@@ -3,13 +3,13 @@ import dataclasses
 import datetime
 import functools
 import inspect
-from dateutil.parser import isoparse
 import json
 import keyword
 import typing
 from collections.abc import Iterable
 
 import pydantic
+from dateutil.parser import isoparse
 
 from weave.legacy import box, context_state, mappers_python, object_type_ref_util
 from weave.legacy import timestamp as weave_timestamp
