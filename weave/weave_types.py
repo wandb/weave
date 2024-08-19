@@ -1,13 +1,13 @@
 import contextvars
 import dataclasses
 import datetime
+from dateutil.parser import isoparse
 import functools
 import inspect
 import json
 import keyword
 import typing
 from collections.abc import Iterable
-from dateutil.parser import isoparse
 
 import pydantic
 
