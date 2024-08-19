@@ -67,29 +67,29 @@ class CallSchema(BaseModel):
     # Optional display name of the call
     display_name: Optional[str] = None
 
-    ## Trace ID
+    # Trace ID
     trace_id: str
-    ## Parent ID is optional because the call may be a root
+    # Parent ID is optional because the call may be a root
     parent_id: Optional[str] = None
 
-    ## Start time is required
+    # Start time is required
     started_at: datetime.datetime
-    ## Attributes: properties of the call
+    # Attributes: properties of the call
     attributes: Dict[str, Any]
 
-    ## Inputs
+    # Inputs
     inputs: Dict[str, Any]
 
-    ## End time is required if finished
+    # End time is required if finished
     ended_at: Optional[datetime.datetime] = None
 
-    ## Exception is present if the call failed
+    # Exception is present if the call failed
     exception: Optional[str] = None
 
-    ## Outputs
+    # Outputs
     output: Optional[Any] = None
 
-    ## Summary: a summary of the call
+    # Summary: a summary of the call
     summary: Optional[SummaryMap] = None
 
     # WB Metadata
@@ -115,17 +115,17 @@ class StartedCallSchemaForInsert(BaseModel):
     # Optional display name of the call
     display_name: Optional[str] = None
 
-    ## Trace ID
+    # Trace ID
     trace_id: Optional[str] = None  # Will be generated if not provided
-    ## Parent ID is optional because the call may be a root
+    # Parent ID is optional because the call may be a root
     parent_id: Optional[str] = None
 
-    ## Start time is required
+    # Start time is required
     started_at: datetime.datetime
-    ## Attributes: properties of the call
+    # Attributes: properties of the call
     attributes: Dict[str, Any]
 
-    ## Inputs
+    # Inputs
     inputs: Dict[str, Any]
 
     # WB Metadata
@@ -137,16 +137,16 @@ class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
 
-    ## End time is required
+    # End time is required
     ended_at: datetime.datetime
 
-    ## Exception is present if the call failed
+    # Exception is present if the call failed
     exception: Optional[str] = None
 
-    ## Outputs
+    # Outputs
     output: Optional[Any] = None
 
-    ## Summary: a summary of the call
+    # Summary: a summary of the call
     summary: SummaryInsertMap
 
     @field_serializer("summary")
