@@ -50,5 +50,5 @@ def get_infer_method(model: Model) -> Callable:
         if (infer_method := getattr(model, name, None)) is not None:
             return infer_method
     raise MissingInferenceMethodError(
-        f"Missing a method with name like ({INFER_METHOD_NAMES})"
+        f"Missing a method with name in ({INFER_METHOD_NAMES})"
     )
