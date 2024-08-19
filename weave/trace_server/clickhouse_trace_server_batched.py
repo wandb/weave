@@ -69,8 +69,6 @@ from .feedback import (
 from .orm import ParamBuilder, Row
 from .trace_server_common import (
     LRUCache,
-    _flatten_dict,
-    _unflatten_dict,
     get_nested_key,
     set_nested_key,
 )
