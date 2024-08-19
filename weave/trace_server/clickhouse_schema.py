@@ -1,95 +1,79 @@
 import datetime
-import typing
+from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AfterValidator, BaseModel, Field
+from typing_extensions import Annotated
 
 from . import validation
 
 
 class CallStartCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    trace_id: str
-    parent_id: typing.Optional[str] = None
-    op_name: str
+    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
+    id: Annotated[str, AfterValidator(validation.call_id_validator)]
+    trace_id: Annotated[str, AfterValidator(validation.trace_id_validator)]
+    parent_id: Annotated[Optional[str], AfterValidator(validation.parent_id_validator)]
+    op_name: Annotated[str, AfterValidator(validation.op_name_validator)]
     started_at: datetime.datetime
     attributes_dump: str
     inputs_dump: str
-    input_refs: typing.List[str]
-    output_refs: typing.List[str] = Field(
-        default_factory=list
-    )  # sadly, this is required
-    display_name: typing.Optional[str] = None
+    input_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)]
+    output_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)]
+    display_name: Annotated[
+        Optional[str], AfterValidator(validation.display_name_validator)
+    ]
 
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
-    _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
-    _op_name_v = field_validator("op_name")(validation.op_name_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
-    _display_name_v = field_validator("display_name")(validation.display_name_validator)
-    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
-    _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
+    wb_user_id: Annotated[
+        Optional[str], AfterValidator(validation.wb_user_id_validator)
+    ]
+    wb_run_id: Annotated[Optional[str], AfterValidator(validation.wb_run_id_validator)]
 
 
 class CallEndCHInsertable(BaseModel):
-    project_id: str
-    id: str
+    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
+    id: Annotated[str, AfterValidator(validation.call_id_validator)]
     ended_at: datetime.datetime
-    exception: typing.Optional[str] = None
+    exception: Optional[str] = None
     summary_dump: str
     output_dump: str
-    input_refs: typing.List[str] = Field(
-        default_factory=list
-    )  # sadly, this is required
-    output_refs: typing.List[str]
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+    input_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)] = (
+        Field(default_factory=list)
+    )
+    output_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)]
 
 
 class CallDeleteCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    wb_user_id: str
+    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
+    id: Annotated[str, AfterValidator(validation.call_id_validator)]
+    wb_user_id: Annotated[str, AfterValidator(validation.wb_user_id_validator)]
 
     deleted_at: datetime.datetime
 
     # required types
-    input_refs: typing.List[str] = Field(default_factory=list)
-    output_refs: typing.List[str] = Field(default_factory=list)
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+    input_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)] = (
+        Field(default_factory=list)
+    )
+    output_refs: Annotated[
+        list[str], AfterValidator(validation.refs_list_validator)
+    ] = Field(default_factory=list)
 
 
 class CallUpdateCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    wb_user_id: str
+    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
+    id: Annotated[str, AfterValidator(validation.call_id_validator)]
+    wb_user_id: Annotated[str, AfterValidator(validation.wb_user_id_validator)]
 
     # update types
-    display_name: typing.Optional[str] = None
+    display_name: Annotated[
+        Optional[str], AfterValidator(validation.display_name_validator)
+    ] = None
 
     # required types
-    input_refs: typing.List[str] = Field(default_factory=list)
-    output_refs: typing.List[str] = Field(default_factory=list)
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
-    _display_name_v = field_validator("display_name")(validation.display_name_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+    input_refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)] = (
+        Field(default_factory=list)
+    )
+    output_refs: Annotated[
+        list[str], AfterValidator(validation.refs_list_validator)
+    ] = Field(default_factory=list)
 
 
 # Very critical that this matches the calls table schema! This should
@@ -100,54 +84,50 @@ class SelectableCHCallSchema(BaseModel):
     id: str
 
     op_name: str
-    display_name: typing.Optional[str] = None
+    display_name: Optional[str] = None
 
     trace_id: str
-    parent_id: typing.Optional[str] = None
+    parent_id: Optional[str] = None
 
     started_at: datetime.datetime
-    ended_at: typing.Optional[datetime.datetime] = None
-    exception: typing.Optional[str] = None
+    ended_at: Optional[datetime.datetime] = None
+    exception: Optional[str] = None
 
     # attributes and inputs are required on call schema, but can be
     # optionally selected when querying
-    attributes_dump: typing.Optional[str] = None
-    inputs_dump: typing.Optional[str] = None
+    attributes_dump: Optional[str] = None
+    inputs_dump: Optional[str] = None
 
-    output_dump: typing.Optional[str] = None
-    summary_dump: typing.Optional[str] = None
+    output_dump: Optional[str] = None
+    summary_dump: Optional[str] = None
 
-    input_refs: typing.List[str]
-    output_refs: typing.List[str]
+    input_refs: list[str]
+    output_refs: list[str]
 
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
+    wb_user_id: Optional[str] = None
+    wb_run_id: Optional[str] = None
 
-    deleted_at: typing.Optional[datetime.datetime] = None
+    deleted_at: Optional[datetime.datetime] = None
 
 
 class ObjCHInsertable(BaseModel):
-    project_id: str
+    project_id: Annotated[str, AfterValidator(validation.project_id_validator)]
     kind: str
-    base_object_class: typing.Optional[str]
-    object_id: str
-    refs: typing.List[str]
+    base_object_class: Optional[str]
+    object_id: Annotated[str, AfterValidator(validation.object_id_validator)]
+    refs: Annotated[list[str], AfterValidator(validation.refs_list_validator)]
     val_dump: str
     digest: str
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _object_id_v = field_validator("object_id")(validation.object_id_validator)
-    _refs = field_validator("refs")(validation.refs_list_validator)
 
 
 class SelectableCHObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
-    refs: typing.List[str]
+    refs: list[str]
     val_dump: str
     kind: str
-    base_object_class: typing.Optional[str]
+    base_object_class: Optional[str]
     digest: str
     version_index: int
     is_latest: int
