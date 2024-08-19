@@ -110,21 +110,7 @@ export const ExportSelector = ({
       setAnchorEl(null);
       setDownloadLoading(null);
 
-      // analytics
       userEvents.exportClicked({
-        dataSize: blob.size,
-        numColumns: columns?.length ?? null,
-        numRows: numTotalCalls,
-        numExpandedColumns: 0,
-        maxDepth: 0,
-        type: contentType,
-        latency: Date.now() - startTime,
-        userId: userInfoLoaded?.id ?? '',
-        organizationName: orgName,
-        username: userInfoLoaded?.username ?? '',
-      });
-
-      console.log('export clicked', {
         dataSize: blob.size,
         numColumns: columns?.length ?? null,
         numRows: numTotalCalls,
