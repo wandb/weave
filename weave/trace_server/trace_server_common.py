@@ -1,9 +1,9 @@
 import copy
-import typing
 from collections import OrderedDict
+from typing import Any, Dict
 
 
-def get_nested_key(d: dict[str, typing.Any], col: str) -> typing.Any:
+def get_nested_key(d: Dict[str, Any], col: str) -> Any:
     """
     Get a nested key from a dict.
 
@@ -18,7 +18,7 @@ def get_nested_key(d: dict[str, typing.Any], col: str) -> typing.Any:
     return curr.get(keys[-1], None)
 
 
-def set_nested_key(d: dict[str, typing.Any], col: str, val: typing.Any) -> None:
+def set_nested_key(d: Dict[str, Any], col: str, val: Any) -> None:
     """
     Set a nested key in a dict.
 
@@ -33,11 +33,11 @@ def set_nested_key(d: dict[str, typing.Any], col: str, val: typing.Any) -> None:
 
 
 class LRUCache(OrderedDict):
-    def __init__(self, max_size: int = 1000, *args, **kwargs):
+    def __init__(self, max_size: int = 1000, *args: Any, **kwargs: Dict[str, Any]):
         self.max_size = max_size
         super().__init__(*args, **kwargs)
 
-    def __setitem__(self, key: str, value: typing.Any) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         if len(self) >= self.max_size:
             self.popitem(last=False)
         super().__setitem__(key, value)
