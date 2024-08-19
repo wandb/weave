@@ -67,7 +67,13 @@ from .feedback import (
     validate_feedback_purge_req,
 )
 from .orm import ParamBuilder, Row
-from .trace_server_common import LRUCache, _flatten_dict, _unflatten_dict
+from .trace_server_common import (
+    LRUCache,
+    _flatten_dict,
+    _unflatten_dict,
+    get_nested_key,
+    set_nested_key,
+)
 from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
@@ -319,8 +325,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         yield tsi.CallSchema.model_validate(call)
 
                     batch = []
-                    # dynamically increase the batch size
-                    batch_size = min(1000, batch_size * 2)
+
+                    # double batch size up to what refs_read_batch can handle
+                    max_ref_depth = max(col.count(".") for col in req.expand_columns)
+                    max_size = 1000 // max_ref_depth
+                    batch_size = min(max_size, batch_size * 2)
 
             hydrated_batch = self._hydrate_calls(batch, req.expand_columns, ref_cache)
             for call in hydrated_batch:
@@ -336,15 +345,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # if "feedback" in expand_columns:
         #     feedback = self._hydrate_calls_feedback(calls)
 
-        # flatten calls
-        calls = [_flatten_dict(call) for call in calls]
-
-        # expand refs in calls
         calls = self._expand_call_refs(calls, expand_columns, ref_cache)
-
-        # unflatten calls (for pydantic validation)
-        calls = [_unflatten_dict(call) for call in calls]
-
         return calls
 
     def _get_refs_to_resolve(
@@ -353,22 +354,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         refs_to_resolve: typing.Dict[tuple[int, str], str] = {}
         for i, call in enumerate(calls):
             for col in expand_columns:
-                if col not in call:
-                    # check if a key
-                    last_part = col.split(".")[-1]
-                    prefix = col.replace(f".{last_part}", "")
-                    if prefix not in call:
+                if col in call:
+                    val = call[col]
+                else:
+                    val = get_nested_key(call, col)
+                    if not val:
                         continue
-                    else:
-                        if last_part not in call[prefix]:
-                            continue
-                        # {"a.b": {"c": "d"}} -> {"a.b.c": "d"}
-                        call[col] = call[prefix][last_part]
 
-                if not refs_internal.is_ref_str(call[col]):
+                if not refs_internal.is_ref_str(val):
                     raise ValueError(f"Expand column {col} is not a ref")
 
-                refs_to_resolve[(i, col)] = call[col]
+                refs_to_resolve[(i, col)] = val
         return refs_to_resolve
 
     def _expand_call_refs(
@@ -392,7 +388,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             assert len(vals) == len(refs_to_resolve), "ref read batch inconsistency"
 
             for (i, col), val in zip(refs_to_resolve, vals):
-                calls[i][col] = val
+                set_nested_key(calls[i], col, val)
 
         return calls
 
