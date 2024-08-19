@@ -1,10 +1,19 @@
 ---
-hide_table_of_contents: true
+title: Code Generation
 ---
 
-# Code Generation using Weave and OpenAI
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wandb/weave/blob/anish/codegen-testing-coobook/examples/cookbooks/codegen/codegen.ipynb)
+:::tip[This is a notebook]
+
+<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/codegen.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
+
+<a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/codegen.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
+
+:::
+
+
+
+# Code Generation using Weave and OpenAI
 
 Generating high-quality code with proper structure, documentation, and tests is a challenging task. This guide demonstrates how to implement a code generation pipeline using Weave, a powerful framework for building, tracking, and evaluating LLM applications. By combining OpenAI's language models with Weave's robust tooling, you'll learn to create a code generation pipeline that produces high-quality Python functions, complete with main program runners and unit tests, while gaining insights into the generation process.
 
@@ -17,7 +26,7 @@ Our pipeline will:
 
 We'll use Weave for pipeline orchestration and tracking, and OpenAI's GPT models for code generation. This combination allows for powerful code generation with robust evaluation and logging capabilities.
 
-![Evaluation](./media/eval_dash.png)
+![Evaluation](./media/codegen/eval_dash.png)
 
 ## Video Demonstration
 
@@ -42,6 +51,13 @@ By the end of this tutorial, you'll have created a code generation pipeline that
 
 First, let's set up our environment and import the necessary libraries:
 
+
+```python
+!pip install -qU autopep8 autoflake weave isort openai set-env-colab-kaggle-dotenv
+
+```
+
+
 ```python
 import ast
 import re
@@ -51,16 +67,25 @@ import autopep8
 import isort
 import weave
 from autoflake import fix_code
-from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
 from weave import Dataset, Evaluation
 
-load_dotenv()
+from set_env import set_env
 
+set_env("WANDB_API_KEY")
+set_env("OPENAI_API_KEY")
+
+```
+
+
+```python
 WEAVE_PROJECT = "codegen-cookbook"
 weave.init(WEAVE_PROJECT)
+```
 
+
+```python
 client = OpenAI()
 ```
 
@@ -79,6 +104,7 @@ In this code generation pipeline, we utilize OpenAI's [structured outputs mode](
 
 Here's an example of how we define our Pydantic models and use them with OpenAI's structured outputs:
 
+
 ```python
 class GeneratedCode(BaseModel):
     code: str
@@ -94,20 +120,41 @@ class UnitTest(BaseModel):
 
 To ensure consistent and clean code output, we implement a `CodeFormatter` class using Weave operations. This formatter applies various linting and styling rules to the generated code, program runner, and unit tests.
 
+
 ```python
 class CodeFormatter(BaseModel):
 
     @weave.op()
     def lint_code(self, code: str) -> str:
+        # Replace escaped newlines with actual newlines
         code = code.replace('\\n', '\n')
+
+        # Remove unused imports and variables
         code = fix_code(code, remove_all_unused_imports=True,
                         remove_unused_variables=True)
+
+        # Sort imports
         code = isort.code(code)
+
+        # Apply PEP 8 formatting
         code = autopep8.fix_code(code, options={'aggressive': 1})
 
         return code
-    
-    # ... formatting functions ...
+
+    @weave.op()
+    def format_generated_code(self, generated_code: GeneratedCode) -> GeneratedCode:
+        cleaned_code = self.lint_code(generated_code.code)
+        return GeneratedCode(code=cleaned_code)
+
+    @weave.op()
+    def format_program_runner(self, program_runner: ProgramRunner) -> ProgramRunner:
+        cleaned_code = self.lint_code(program_runner.main_function_code)
+        return ProgramRunner(main_function_code=cleaned_code)
+
+    @weave.op()
+    def format_unit_test(self, unit_test: UnitTest) -> UnitTest:
+        cleaned_code = self.lint_code(unit_test.test_code)
+        return UnitTest(test_code=cleaned_code)
 ```
 
 This `CodeFormatter` class provides several Weave operations to clean and format the generated code:
@@ -116,10 +163,9 @@ This `CodeFormatter` class provides several Weave operations to clean and format
    - Sorting imports
    - Applying PEP 8 formatting
 
-
 ## Define the CodeGenerationPipeline
 
-![Code Generation Pipeline](./media/codegen_trace.png)
+![Code Generation Pipeline](./media/codegen/codegen_trace.png)
 
 Now, let's implement the core code generation logic using Weave operations:
 
@@ -129,7 +175,7 @@ Now, let's implement the core code generation logic using Weave operations:
 4. **Return results**: Combine formatted code, runner, and tests
 
 
-````python
+```python
 class CodeGenerationPipeline(weave.Model):
 
     model_name: str
@@ -220,10 +266,10 @@ Remember, your task is solely to create the main() function and the __main__ gua
 Generate a complete unittest for the following code:
 
 Context (Surrounding Code):
-```python
+<python>
 {generated_code.code}
 {program_runner.main_function_code}
-```
+</python>
 
 Requirements:
 
@@ -249,7 +295,8 @@ Provide only the complete, properly formatted test code, no explanations or mark
             return message.parsed
         else:
             raise ValueError(message.refusal)
-````
+
+```
 
 This `CodeGenerationPipeline` class encapsulates our code generation logic as a Weave Model, providing several key benefits:
 
@@ -262,6 +309,7 @@ This `CodeGenerationPipeline` class encapsulates our code generation logic as a 
 ## Implement evaluation metrics
 
 To assess the quality of our generated code, we'll implement simple evaluation metrics:
+
 
 ```python
 class TestResultScorer(weave.Scorer):
@@ -349,38 +397,38 @@ class TestResultScorer(weave.Scorer):
 
 These evaluation functions assess the quality of the generated code based on factors such as docstring presence, type hints, naming conventions, and test coverage.
 
-![Evaluation](./media/eval_trace.png)
+![Evaluation](./media/codegen/eval_trace.png)
 
 ## Create a Weave Dataset and run evaluation
 
 To evaluate our pipeline, we'll create a Weave Dataset and run an evaluation:
 
+
 ```python
-# Create a sample dataset
-prompt_dataset = Dataset(name="data_processing_functions", rows=[
-    {"prompt": "Create a Python function to calculate the moving average of a time series data."},
-    {"prompt": "Implement a function to perform z-score normalization on a dataset."},
-    {"prompt": "Write a function to detect and remove outliers using the IQR method."}
+prompt_dataset = Dataset(name="minimal_code_gen_example", rows=[
+    {
+        "prompt": "Create a Python function that calculates the factorial of a given number."
+    }
 ])
 weave.publish(prompt_dataset)
+```
 
-# Initialize the pipeline and scorer
-pipeline = CodeGenerationPipeline(model_name="gpt-4o-2024-08-06")
-test_result_scorer = TestResultScorer()
 
-# Run the evaluation
-evaluation = Evaluation(
-    name="data_processing_code_gen_evaluation",
-    dataset=prompt_dataset,
-    scorers=[test_result_scorer]
-)
-results = await evaluation.evaluate(pipeline)
-print(results)
+```python
+for model_name in ["gpt-4o-2024-08-06"]:
+    pipeline = CodeGenerationPipeline(model_name=model_name)
+    test_result_scorer = TestResultScorer()
+    evaluation = Evaluation(
+        name="minimal_code_gen_evaluation",
+        dataset=prompt_dataset,
+        scorers=[test_result_scorer]
+    )
+    results = await evaluation.evaluate(pipeline)
 ```
 
 This code creates a dataset with our sample prompts, defines a quality scorer, and runs an evaluation of our code generation pipeline.
 
-![Final Evaluation](./media/eval_dash.png)
+![Final Evaluation](./media/codegen/eval_dash.png)
 
 ## Conclusion
 
