@@ -11,11 +11,17 @@ def get_nested_key(d: Dict[str, Any], col: str) -> Any:
     get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c") -> "d"
     get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c.e") -> None
     """
+
+    def _get(dictionary: Dict[str, Any], key: str) -> Any:
+        if isinstance(dictionary, dict):
+            return dictionary.get(key, {})
+        return None
+
     keys = col.split(".")
     curr = d
     for key in keys[:-1]:
-        curr = curr.get(key, {})
-    return curr.get(keys[-1], None)
+        curr = _get(curr, key)
+    return _get(curr, keys[-1])
 
 
 def set_nested_key(d: Dict[str, Any], col: str, val: Any) -> None:
