@@ -109,65 +109,66 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     /**
      * Runtime validation of props' type constraints
      */
-    const ButtonInner = () => {
-      if (icon) {
-        if (children || startIcon || endIcon) {
-          console.warn(
-            'Button: `startIcon`, `endIcon`, and `children` are ignored when using `icon`.'
-          );
+    const ButtonInternal = () => {
+      const validatedChildren = () => {
+        if (icon) {
+          if (children || startIcon || endIcon) {
+            console.warn(
+              'Button: `startIcon`, `endIcon`, and `children` are ignored when using `icon`.'
+            );
+          }
+          return <Icon name={icon} role="presentation" />;
         }
-        return <Icon name={icon} role="presentation" />;
-      }
 
-      if (!children) {
-        console.error('Button: `children` is required when not using `icon`.');
-        return null;
-      }
+        if (!children) {
+          console.error(
+            'Button: `children` is required when not using `icon`.'
+          );
+          return null;
+        }
+
+        return (
+          <>
+            {startIcon ? <Icon name={startIcon} role="presentation" /> : null}
+            {children}
+            {endIcon ? <Icon name={endIcon} role="presentation" /> : null}
+          </>
+        );
+      };
 
       return (
-        <>
-          {startIcon ? <Icon name={startIcon} role="presentation" /> : null}
-          {children}
-          {endIcon ? <Icon name={endIcon} role="presentation" /> : null}
-        </>
+        <button
+          ref={ref}
+          {...htmlAttributes}
+          type="button"
+          aria-disabled={htmlAttributes.disabled}
+          aria-label={htmlAttributes['aria-label'] || tooltip}
+          className={twMerge(
+            classNames(
+              // Display
+              'inline-flex items-center justify-center',
+              // Font
+              "font-['Source_Sans_Pro'] font-semibold",
+              // Disabled
+              'disabled:pointer-events-none disabled:opacity-35',
+              // Focused
+              'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
+              // Other
+              'night-aware whitespace-nowrap rounded border-none',
+              sizeClasses[size],
+              variantClasses[variant],
+              // Conditional classes
+              {
+                [iconOnlySizeClasses[size]]: Boolean(icon),
+                [activeVariantClasses[variant]]: active,
+              },
+              className
+            )
+          )}>
+          {validatedChildren()}
+        </button>
       );
     };
-
-    const ButtonInternal = () => (
-      <button
-        ref={ref}
-        {...htmlAttributes}
-        type="button"
-        aria-disabled={htmlAttributes.disabled}
-        aria-label={htmlAttributes['aria-label'] || tooltip}
-        className={twMerge(
-          classNames(
-            'night-aware',
-            'inline-flex',
-            'items-center',
-            'justify-center',
-            'whitespace-nowrap',
-            'rounded',
-            'border-none',
-            "font-['Source_Sans_Pro']",
-            'font-semibold',
-            'disabled:pointer-events-none',
-            'disabled:opacity-35',
-            'focus-visible:outline',
-            'focus-visible:outline-[2px]',
-            'focus-visible:outline-teal-500',
-            sizeClasses[size],
-            variantClasses[variant],
-            {
-              [iconOnlySizeClasses[size]]: Boolean(icon),
-              [activeVariantClasses[variant]]: active,
-            },
-            className
-          )
-        )}>
-        <ButtonInner />
-      </button>
-    );
 
     const [isTooltipOpen, setIsTooltipOpen] = useState(false);
 
