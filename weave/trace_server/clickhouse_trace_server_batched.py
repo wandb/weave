@@ -29,7 +29,7 @@ import json
 import logging
 import threading
 import typing
-from collections import defaultdict
+from collections import Counter, defaultdict
 from contextlib import contextmanager
 from zoneinfo import ZoneInfo
 
@@ -324,9 +324,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                     batch = []
 
+                    # *** Dynamic Batch Size ***
+                    # count the number of columns at each depth
+                    depths = Counter(col.count(".") for col in req.expand_columns)
+                    # take the max number of columns at any depth
+                    max_count_at_ref_depth = max(depths.values())
+                    # divide max refs that we can resolve by max # refs at any depth
+                    max_size = 1000 // max_count_at_ref_depth
                     # double batch size up to what refs_read_batch can handle
-                    max_ref_depth = max(col.count(".") for col in req.expand_columns)
-                    max_size = 1000 // max_ref_depth
                     batch_size = min(max_size, batch_size * 2)
 
             hydrated_batch = self._hydrate_calls(batch, req.expand_columns, ref_cache)
