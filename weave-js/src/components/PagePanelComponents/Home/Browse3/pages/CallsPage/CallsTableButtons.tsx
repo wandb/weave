@@ -144,7 +144,7 @@ export const ExportSelector = ({
   const pythonText = useMakeCodeText(
     callQueryParams.entity,
     callQueryParams.project,
-    selectedCalls,
+    selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
     refColumnsToExpand,
     sortBy
@@ -152,7 +152,7 @@ export const ExportSelector = ({
   const curlText = useMakeCurlText(
     callQueryParams.entity,
     callQueryParams.project,
-    selectedCalls,
+    selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
     refColumnsToExpand,
     sortBy
@@ -347,7 +347,6 @@ const DownloadGrid: FC<{
         <div className="mt-8 flex max-w-full items-center">
           <CodeEditor
             value={codeMode === 'python' ? pythonText : curlText}
-            readOnly={true}
             language={codeMode === 'python' ? 'python' : 'shell'}
             handleMouseWheel={true}
             alwaysConsumeMouseWheel={false}
@@ -421,43 +420,50 @@ function initiateDownloadFromBlob(blob: Blob, fileName: string) {
 function useMakeCodeText(
   entity: string,
   project: string,
-  callIds: string[],
+  callIds: string[] | undefined,
   filter: CallFilter,
   expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
   let codeStr = `import weave\nassert weave.__version__ >= "0.50.14", "Please upgrade weave!" \n\nclient = weave.init("${entity}/${project}")`;
+  codeStr += `\ncalls = client.server.calls_query_stream({\n`;
+  codeStr += `   "project_id": "${entity}/${project}",\n`;
 
   const filteredCallIds = callIds ?? filter.callIds;
-  if (filteredCallIds.length > 0) {
+  if (filteredCallIds && filteredCallIds.length > 0) {
     // specifying call_ids ignores other filters
-    codeStr += `\ncalls = client.server.calls_query_stream({\n\t"call_ids": ["${filteredCallIds.join(
-      '", "'
-    )}"],\n})`;
+    codeStr += `   "call_ids": ["${filteredCallIds.join('", "')}"],\n`;
+    if (expandColumns.length > 0) {
+      codeStr += `   "expand_columns": ${JSON.stringify(
+        expandColumns,
+        null,
+        0
+      )},\n`;
+    }
+    codeStr += `})`;
     return codeStr;
   }
 
-  codeStr += `\ncalls = client.server.calls_query_stream({\n`;
   if (filter.opVersionRefs) {
-    codeStr += `\t"op_names": ["${filter.opVersionRefs.join('", "')}"],\n`;
+    codeStr += `   "op_names": ["${filter.opVersionRefs.join('", "')}"],\n`;
   }
   if (filter.runIds) {
-    codeStr += `\t"run_ids": ["${filter.runIds.join('", "')}"],\n`;
+    codeStr += `   "run_ids": ["${filter.runIds.join('", "')}"],\n`;
   }
   if (filter.userIds) {
-    codeStr += `\t"user_ids": ["${filter.userIds.join('", "')}"],\n`;
+    codeStr += `   "user_ids": ["${filter.userIds.join('", "')}"],\n`;
   }
   if (filter.traceId) {
-    codeStr += `\t"trace_id": "${filter.traceId}",\n`;
+    codeStr += `   "trace_id": "${filter.traceId}",\n`;
   }
   if (filter.traceRootsOnly) {
-    codeStr += `\t"trace_roots_only": True,\n`;
+    codeStr += `   "trace_roots_only": True,\n`;
   }
   if (filter.parentIds) {
-    codeStr += `\t"parent_ids": ["${filter.parentIds.join('", "')}"],\n`;
+    codeStr += `   "parent_ids": ["${filter.parentIds.join('", "')}"],\n`;
   }
   if (expandColumns.length > 0) {
-    codeStr += `\t"expand_columns": ${JSON.stringify(
+    codeStr += `   "expand_columns": ${JSON.stringify(
       expandColumns,
       null,
       0
@@ -465,7 +471,7 @@ function useMakeCodeText(
   }
 
   if (sortBy.length > 0) {
-    codeStr += `\t"sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
+    codeStr += `   "sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
   }
 
   codeStr += `})`;
@@ -476,14 +482,12 @@ function useMakeCodeText(
 function useMakeCurlText(
   entity: string,
   project: string,
-  callIds: string[],
+  callIds: string[] | undefined,
   filter: CallFilter,
   expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
   const baseUrl = 'https://trace.wandb.ai';
-  const authHeader = '';
-
   const filterStr = JSON.stringify(
     {
       op_names: filter.opVersionRefs,
@@ -501,9 +505,10 @@ function useMakeCurlText(
   );
   const sortByStr = JSON.stringify(sortBy, null, 0);
 
-  return `curl '${baseUrl}/calls/stream_query' \
-  -H '${authHeader}' \
-  -H 'content-type: application/json' \
+  return `# Ensure you have a WANDB_API_KEY set in your environment
+curl '${baseUrl}/calls/stream_query' \\
+  -u api:$WANDB_API_KEY \\
+  -H 'content-type: application/json' \\
   --data-raw '{
     "project_id":"${entity}/${project}",
     "filter":${filterStr},
@@ -511,5 +516,5 @@ function useMakeCurlText(
     "limit":${MAX_EXPORT},
     "offset":0,
     "sort_by":${sortByStr}
- }'`;
+  }'`;
 }
