@@ -1,10 +1,9 @@
 import weave
+from weave import weave_types as types
 from weave.legacy import box, graph
 from weave.legacy import context_state as _context_state
 from weave.legacy.language_features.tagging import tag_store
 from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
-
-from .. import weave_types as types
 
 tag_adders = 0
 

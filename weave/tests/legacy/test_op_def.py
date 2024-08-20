@@ -1,13 +1,12 @@
-# from ..ecosystem import keras
+# from weave.ecosystem import keras
 import json
 import typing
 from dataclasses import dataclass
 
 import pytest
 
+from weave import api as weave
 from weave.legacy import context_state
-
-from .. import api as weave
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 
@@ -57,7 +56,7 @@ def wrap(obj: typing.Any):
 context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
-test_data = json.load(open("./tests/test_op_def_data.json"))
+test_data = json.load(open("weave/tests/legacy/test_op_def_data.json"))
 
 
 def test_op_def_to_dict():

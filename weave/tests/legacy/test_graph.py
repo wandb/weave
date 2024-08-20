@@ -1,8 +1,7 @@
 import weave
+from weave import weave_internal
+from weave import weave_types as types
 from weave.legacy import graph
-
-from .. import weave_internal
-from .. import weave_types as types
 
 
 def test_map_dag_produces_same_len():

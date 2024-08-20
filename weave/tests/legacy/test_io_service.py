@@ -2,9 +2,8 @@ import asyncio
 
 import pytest
 
+from weave import filesystem
 from weave.legacy import io_service
-
-from .. import filesystem
 
 
 @pytest.mark.timeout(10)

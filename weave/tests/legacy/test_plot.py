@@ -4,12 +4,11 @@ from contextlib import contextmanager
 import pytest
 
 import weave
+from weave import storage
 from weave import weave_types as types
 from weave.legacy import graph
 from weave.legacy.panels.panel_plot import Plot, PlotConstants, Series
-
-from .. import storage
-from .test_run_segment import create_experiment
+from weave.tests.legacy.test_run_segment import create_experiment
 
 
 @contextmanager
