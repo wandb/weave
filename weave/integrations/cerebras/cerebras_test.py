@@ -2,18 +2,20 @@ import os
 from typing import Any
 
 import pytest
-from cerebras.cloud.sdk import Cerebras, AsyncCerebras
+from cerebras.cloud.sdk import AsyncCerebras, Cerebras
 
 import weave
 from weave.trace_server import trace_server_interface as tsi
 
 model = "llama3.1-8b"  # Cerebras model
 
+
 def _get_call_output(call: tsi.CallSchema) -> Any:
     call_output = call.output
     if isinstance(call_output, str) and call_output.startswith("weave://"):
         return weave.ref(call_output).get()
     return call_output
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -47,6 +49,7 @@ def test_cerebras_sync(client: weave.weave_client.WeaveClient) -> None:
     assert output.usage.completion_tokens == model_usage["completion_tokens"]
     assert output.usage.prompt_tokens == model_usage["prompt_tokens"]
     assert output.usage.total_tokens == model_usage["total_tokens"]
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
