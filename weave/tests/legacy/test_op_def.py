@@ -56,7 +56,7 @@ def wrap(obj: typing.Any):
 context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
-test_data = json.load(open("weave/tests/legacy/test_op_def_data.json"))
+test_data = json.load(open("./tests/legacy/test_op_def_data.json"))
 
 
 def test_op_def_to_dict():
