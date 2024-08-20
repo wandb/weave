@@ -2498,26 +2498,26 @@ def test_calls_stream_column_expansion(client):
     print(call_result)
     assert call_result.output["b"]["a"]["id"] == "123"
 
-    # incomplete expansion columns, should raise error
-    with pytest.raises(ValueError):
-        res = client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client._project_id(),
-                columns=["output"],
-                expand_columns=["output.b"],
-            )
+    # incomplete expansion columns, output should be un expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output"],
+            expand_columns=["output.b"],
         )
-        call_result = list(res)[0]
-        print(call_result)
+    )
+    call_result = list(res)[0]
+    print(call_result)
+    assert call_result.output == nested_ref.uri()
 
-    # non-existent column, should raise error
-    with pytest.raises(ValueError):
-        res = client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client._project_id(),
-                columns=["output.b.a"],
-                expand_columns=["output.b", "output.zzzz"],
-            )
+    # non-existent column, should be un expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output.b.a"],
+            expand_columns=["output.b", "output.zzzz"],
         )
-        call_result = list(res)[0]
-        print(call_result)
+    )
+    call_result = list(res)[0]
+    print(call_result)
+    assert call_result.output == nested_ref.uri()

@@ -487,7 +487,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if not val:
                 val = get_nested_key(data, col)
                 if not val:
-                    raise ValueError(f"Expand column {col} not found")
+                    continue
 
             if not is_ref_str(val):
                 raise ValueError(f"Expand column {col} is not a ref")
