@@ -9,8 +9,8 @@ from weave.legacy.language_features.tagging import tagged_value_type
 from weave.legacy.ops_domain import wb_domain_types
 from weave.legacy.ops_primitives import _dict_utils
 
-from ... import fixture_fakewandb as fwb
 from ... import registry_mem
+from .. import fixture_fakewandb as fwb
 
 """
 Tests in this file whould be used to test the graphs that can be constructed

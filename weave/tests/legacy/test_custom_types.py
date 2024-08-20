@@ -6,7 +6,7 @@ from weave.legacy import ops_arrow
 
 from ... import api as weave
 from ... import errors
-from . import geom
+from .. import geom
 
 
 def test_mapped_method_on_custom_type():

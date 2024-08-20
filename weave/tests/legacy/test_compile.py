@@ -10,7 +10,7 @@ from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
 from weave.weave_internal import const, define_fn, make_const_node
 
 from ... import weave_types as types
-from ..api import use
+from ...api import use
 
 
 def test_automatic_await_compile():

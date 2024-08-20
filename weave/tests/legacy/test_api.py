@@ -1,7 +1,7 @@
 import shutil
 
 from ... import api as weave
-from ..show import _show_params
+from ...show import _show_params
 
 
 def test_print_save_val():

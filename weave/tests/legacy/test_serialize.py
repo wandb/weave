@@ -8,7 +8,7 @@ from weave.legacy import graph, op_args, ops, serialize
 from weave.legacy.ops_primitives import list_
 from weave.weave_internal import make_const_node
 
-from . import fixture_fakewandb as fwb
+from .. import fixture_fakewandb as fwb
 
 response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {

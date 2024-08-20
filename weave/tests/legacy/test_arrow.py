@@ -29,8 +29,9 @@ from weave.tests import list_arrow_test_helpers as lath
 from ... import api as weave
 from ... import errors, storage, weave_internal
 from ... import weave_types as types
-from ..tests import tag_test_util as ttu
-from ..tests import test_wb, weavejs_ops
+from ...tests import tag_test_util as ttu
+from ...tests import weavejs_ops
+from ...tests.legacy import test_wb
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 # T in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation

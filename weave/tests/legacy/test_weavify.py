@@ -4,7 +4,7 @@ from weave.legacy import graph, ops
 
 from ... import weave_internal, weavify
 from ... import weave_types as types
-from . import geom
+from .. import geom
 
 
 @pytest.mark.parametrize(

@@ -4,8 +4,8 @@ import weave
 from weave.legacy.panels import panel_plot
 
 from ... import storage, weave_internal
-from ..legacy.panels.panel_group import Group
-from ..legacy.panels.panel_slider import Slider
+from ...legacy.panels.panel_group import Group
+from ...legacy.panels.panel_slider import Slider
 
 
 def test_panel_id():

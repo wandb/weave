@@ -9,7 +9,7 @@ from weave.legacy.ops_domain import table as table_ops
 from ... import api as weave
 from ... import storage, weave_internal
 from ... import weave_types as types
-from . import weavejs_ops
+from .. import weavejs_ops
 
 TABLE_TYPES = ["list", "pandas", "sql"]
 
