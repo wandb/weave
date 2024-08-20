@@ -4,7 +4,7 @@ import pytest
 
 from weave.legacy import io_service
 
-from .. import filesystem
+from ... import filesystem
 
 
 @pytest.mark.timeout(10)

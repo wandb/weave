@@ -14,7 +14,7 @@ from weave.legacy.language_features.tagging import (
 )
 from weave.legacy.ops_primitives import dict_, list_
 
-from .. import api as weave
+from ... import api as weave
 from ..tests import tag_test_util as ttu
 from . import list_arrow_test_helpers as lath
 

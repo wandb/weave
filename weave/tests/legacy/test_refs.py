@@ -10,7 +10,7 @@ from weave.trace_server.refs_internal import (
     OBJECT_ATTR_EDGE_NAME,
 )
 
-from .. import ref_util, storage
+from ... import ref_util, storage
 
 
 def test_laref_artifact_version_1():

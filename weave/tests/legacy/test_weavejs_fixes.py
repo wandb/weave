@@ -4,8 +4,8 @@ import pytest
 
 from weave.legacy import context_state, mappers_python, ops
 
-from .. import api, weave_internal, weavejs_fixes
-from .. import weave_types as types
+from ... import api, weave_internal, weavejs_fixes
+from ... import weave_types as types
 
 
 @pytest.mark.skip(

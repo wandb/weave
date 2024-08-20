@@ -17,9 +17,9 @@ from weave.legacy.ops_domain import run_ops
 from weave.legacy.ops_domain import wb_domain_types as wdt
 from weave.legacy.ops_primitives import Boolean, Number, date, dict_, list_
 
-from .. import api as weave
-from .. import errors, weave_internal
-from .. import weave_types as types
+from ... import api as weave
+from ... import errors, weave_internal
+from ... import weave_types as types
 
 string_ops_test_cases = [
     ("eq-scalar", lambda x: x == "bc", [True, False, False]),

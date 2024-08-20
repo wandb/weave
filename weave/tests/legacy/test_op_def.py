@@ -7,7 +7,7 @@ import pytest
 
 from weave.legacy import context_state
 
-from .. import api as weave
+from ... import api as weave
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 

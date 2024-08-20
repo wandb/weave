@@ -9,7 +9,7 @@ from weave.legacy.ops_arrow.vectorize import raise_on_python_bailout
 from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
 from weave.weave_internal import const, define_fn, make_const_node
 
-from .. import weave_types as types
+from ... import weave_types as types
 from ..api import use
 
 

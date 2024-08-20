@@ -4,7 +4,7 @@ import weave
 from weave.legacy import artifact_fs, artifact_local
 from weave.legacy import ops_arrow as arrow
 
-from .. import storage
+from ... import storage
 
 
 def test_artifact():

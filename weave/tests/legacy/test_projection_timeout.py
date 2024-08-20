@@ -3,7 +3,7 @@ import pytest
 
 from weave.legacy.ops_primitives import projection_utils
 
-from .. import errors
+from ... import errors
 
 
 def test_projection_timeout():
