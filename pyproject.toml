@@ -112,4 +112,5 @@ exclude = [
   "weave/__init__.py",
   "weave/legacy/**/*.py",
   "examples",
+  "weave/conftest.py",
 ]
