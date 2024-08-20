@@ -665,6 +665,7 @@ def _process_query_to_conditions(
                 tsi_query.EqOperation,
                 tsi_query.GtOperation,
                 tsi_query.GteOperation,
+                tsi_query.InOperation,
                 tsi_query.ContainsOperation,
             ),
         ):
