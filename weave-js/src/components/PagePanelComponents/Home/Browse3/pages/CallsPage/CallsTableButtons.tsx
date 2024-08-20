@@ -112,8 +112,10 @@ export const ExportSelector = ({
       : undefined;
     // Filter columns down to only the most nested, for example
     // ['output', 'output.x', 'output.x.y'] -> ['output.x.y']
+    // sort columns by length, longest to shortest
+    visibleColumns.sort((a, b) => b.length - a.length);
     const minimalColumns: string[] = [];
-    for (const col of visibleColumns.sort((a, b) => b.length - a.length)) {
+    for (const col of visibleColumns) {
       if (minimalColumns.some(minimalCol => minimalCol.startsWith(col))) {
         continue;
       }
@@ -431,7 +433,6 @@ function useMakeCodeText(
 
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
-    // specifying call_ids ignores other filters
     codeStr += `   "call_ids": ["${filteredCallIds.join('", "')}"],\n`;
     if (expandColumns.length > 0) {
       codeStr += `   "expand_columns": ${JSON.stringify(
@@ -440,6 +441,7 @@ function useMakeCodeText(
         0
       )},\n`;
     }
+    // specifying call_ids ignores other filters, return early
     codeStr += `})`;
     return codeStr;
   }
@@ -503,7 +505,6 @@ function useMakeCurlText(
     null,
     0
   );
-  const sortByStr = JSON.stringify(sortBy, null, 0);
 
   return `# Ensure you have a WANDB_API_KEY set in your environment
 curl '${baseUrl}/calls/stream_query' \\
@@ -515,6 +516,6 @@ curl '${baseUrl}/calls/stream_query' \\
     "expand_columns":${JSON.stringify(expandColumns, null, 0)},
     "limit":${MAX_EXPORT},
     "offset":0,
-    "sort_by":${sortByStr}
+    "sort_by":${JSON.stringify(sortBy, null, 0)}
   }'`;
 }
