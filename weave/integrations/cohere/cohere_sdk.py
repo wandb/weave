@@ -72,5 +72,17 @@ cohere_patcher = MultiPatcher(
             "AsyncClient.chat_stream",
             cohere_stream_wrapper("cohere.AsyncClient.chat_stream"),
         ),
+        # Add patch for cohere v2
+        SymbolPatcher(
+            lambda: importlib.import_module("cohere"),
+            "ClientV2.chat",
+            cohere_wrapper("cohere.ClientV2.chat"),
+        ),
+        # Add patch for cohre v2 async chat method
+        SymbolPatcher(
+            lambda: importlib.import_module("cohere"),
+            "AsyncClientV2.chat",
+            cohere_wrapper("cohere.AsyncClientV2.chat"),
+        ),
     ]
 )
