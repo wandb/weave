@@ -18,10 +18,10 @@ from weave.legacy.ops_domain import table, wb_util, wbmedia
 from weave.legacy.ops_domain import wb_domain_types as wdt
 from weave.legacy.ops_primitives import dict_, list_
 from weave.legacy.ops_primitives.file import _as_w0_dict_
-from weave.tests.test_wb_domain_ops import assert_gql_str_equal
+from weave.tests.legacy.test_wb_domain_ops import assert_gql_str_equal
 
-from . import fixture_fakewandb as fwb
-from . import weavejs_ops
+from .. import fixture_fakewandb as fwb
+from .. import weavejs_ops
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
@@ -315,13 +315,18 @@ artifact_version_sdk_response = {
     ],
 )
 def test_table_call(table_file_node_fn, mock_response, fake_wandb):
+    print(f"{mock_response=}")
     fake_wandb.fake_api.add_mock(lambda q, ndx: mock_response)
     table_file_node = table_file_node_fn()
     table_image0_node = table_file_node.table().rows()[0]["image"]
     table_image0 = weave.use(table_image0_node)
+    print(f"{table_file_node=}")
+    print(f"{table_image0_node=}")
+    print(f"{table_image0=}")
     assert table_image0.height == 299
     assert table_image0.width == 299
     assert table_image0.path == "media/images/6274b7484d7ed4b6ad1b.png"
+    raise
 
 
 def test_avfile_type(fake_wandb):
