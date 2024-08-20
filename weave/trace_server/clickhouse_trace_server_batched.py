@@ -308,7 +308,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             batch_size = 10
             batch = []
 
-            ref_cache = LRUCache(maxsize=1000)
+            ref_cache = LRUCache(max_size=1000)
             for row in raw_res:
                 call_dict = _ch_call_dict_to_call_schema_dict(
                     dict(zip(select_columns, row))
@@ -339,9 +339,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         expand_columns: typing.List[str],
         ref_cache: typing.Dict[str, typing.Any],
     ) -> list[dict[str, typing.Any]]:
-        # TODO: Implement feedback hydration
-        # if "feedback" in expand_columns:
-        #     feedback = self._hydrate_calls_feedback(calls)
+        # TODO: Implement feedback hydration here
 
         calls = self._expand_call_refs(calls, expand_columns, ref_cache)
         return calls
