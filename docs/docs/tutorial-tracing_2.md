@@ -5,7 +5,6 @@ In the [Track LLM inputs & outputs](/quickstart) tutorial, the basics of trackin
 In this tutorial you will learn how to:
 - **Track data** as it flows though your application
 - **Track metadata** at call time
-- **Export data** that was logged to Weave
 
 ## Tracking nested function calls
 
