@@ -327,6 +327,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     lhs_part = process_operand(operation.gte_[0])
                     rhs_part = process_operand(operation.gte_[1])
                     cond = f"({lhs_part} >= {rhs_part})"
+                elif isinstance(operation, tsi_query.InOperation):
+                    lhs_part = process_operand(operation.in_[0])
+                    rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
+                    cond = f"({lhs_part} IN ({rhs_part}))"
                 elif isinstance(operation, tsi_query.ContainsOperation):
                     lhs_part = process_operand(operation.contains_.input)
                     rhs_part = process_operand(operation.contains_.substr)
@@ -370,6 +374,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         tsi_query.EqOperation,
                         tsi_query.GtOperation,
                         tsi_query.GteOperation,
+                        tsi_query.InOperation,
                         tsi_query.ContainsOperation,
                     ),
                 ):
