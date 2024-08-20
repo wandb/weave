@@ -2311,12 +2311,12 @@ def test_in_operation(client):
     call_ids = [call.id for call in test_op.calls()]
     assert len(call_ids) == 4
 
-    strs = [{"$literal": str(call_id)} for call_id in call_ids]
+    strs = [str(call_id) for call_id in call_ids]
 
     query = {
         "$in": [
             {"$getField": "id"},
-            {"$literal": strs[:2]},
+            [{"$literal": x} for x in strs[:2]],
         ]
     }
 
@@ -2333,7 +2333,7 @@ def test_in_operation(client):
     query = {
         "$in": [
             {"$getField": "id"},
-            {"$literal": strs},
+            [{"$literal": x} for x in strs],
         ]
     }
     res = get_client_trace_server(client).calls_query_stream(

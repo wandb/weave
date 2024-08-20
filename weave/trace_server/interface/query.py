@@ -123,7 +123,7 @@ class GteOperation(BaseModel):
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/in/
 class InOperation(BaseModel):
-    in_: typing.Tuple["Operand", "Operand"] = Field(alias="$in")
+    in_: typing.Tuple["Operand", list["Operand"]] = Field(alias="$in")
 
 
 # This is not technically in the Mongo spec. Mongo has:
