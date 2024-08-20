@@ -10,13 +10,14 @@ import pytest
 import requests
 
 from weave import weave_client
-from weave.trace_server import (
+from weave.trace_server import environment as wf_env
+
+from ...trace_server import (
     clickhouse_trace_server_batched,
     external_to_internal_trace_server_adapter,
 )
-from weave.trace_server import environment as wf_env
-from weave.trace_server import trace_server_interface as tsi
-from weave.weave_init import InitializedClient
+from ...trace_server import trace_server_interface as tsi
+from ...weave_init import InitializedClient
 
 
 @pytest.fixture(scope="session")

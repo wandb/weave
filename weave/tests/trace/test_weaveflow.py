@@ -5,7 +5,8 @@ import pytest
 from pydantic import Field
 
 import weave
-from weave import ref_base
+
+from ... import ref_base
 
 pytestmark = pytest.mark.trace
 
