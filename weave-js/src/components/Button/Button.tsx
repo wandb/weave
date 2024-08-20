@@ -7,8 +7,8 @@
 import {type TooltipContentProps} from '@radix-ui/react-tooltip';
 import classNames from 'classnames';
 import React, {
-  CSSProperties,
   forwardRef,
+  type PropsWithChildren,
   type ReactElement,
   useState,
 } from 'react';
@@ -41,7 +41,6 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean;
   tooltip?: string;
   tooltipProps?: TooltipContentProps;
-  twWrapperStyles?: React.CSSProperties;
 } & (IconButtonProps | LabelButtonProps);
 
 const sizeClasses = {
@@ -90,112 +89,86 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       className = '',
       tooltip,
       tooltipProps,
-      twWrapperStyles,
       ...htmlAttributes
     },
     ref
   ) => {
-    /**
-     * The Tailwind wrapper is a div, which is a block-element. However, a normal button
-     * wouldn't be wrapped and would be inline-block by default. These styles are a
-     * necessary workaround to ensure Button is styled correctly despite the wrapper.
-     */
-    const wrapperStyles: CSSProperties = {
-      display: 'inline-flex',
-      width: className.includes('w-full') ? '100%' : undefined,
-      ...twWrapperStyles,
-    };
-
-    /**
-     * Runtime validation of props' type constraints
-     */
-    const ButtonInternal = () => {
-      const validatedChildren = () => {
-        if (icon) {
-          if (children || startIcon || endIcon) {
-            console.warn(
-              'Button: `startIcon`, `endIcon`, and `children` are ignored when using `icon`.'
-            );
-          }
-          return <Icon name={icon} role="presentation" />;
-        }
-
-        if (!children) {
-          console.error(
-            'Button: `children` is required when not using `icon`.'
-          );
-          return null;
-        }
-
-        return (
-          <>
-            {startIcon ? <Icon name={startIcon} role="presentation" /> : null}
-            {children}
-            {endIcon ? <Icon name={endIcon} role="presentation" /> : null}
-          </>
-        );
-      };
-
-      return (
-        <button
-          ref={ref}
-          {...htmlAttributes}
-          type="button"
-          aria-disabled={htmlAttributes.disabled}
-          aria-label={htmlAttributes['aria-label'] || tooltip}
-          className={twMerge(
-            classNames(
-              // Display
-              'inline-flex items-center justify-center',
-              // Font
-              "font-['Source_Sans_Pro'] font-semibold",
-              // Disabled
-              'disabled:pointer-events-none disabled:opacity-35',
-              // Focused
-              'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
-              // Other
-              'night-aware whitespace-nowrap rounded border-none',
-              sizeClasses[size],
-              variantClasses[variant],
-              // Conditional classes
-              {
-                [iconOnlySizeClasses[size]]: Boolean(icon),
-                [activeVariantClasses[variant]]: active,
-              },
-              className
-            )
-          )}>
-          {validatedChildren()}
-        </button>
-      );
-    };
-
-    const [isTooltipOpen, setIsTooltipOpen] = useState(false);
-
-    if (tooltip) {
-      return (
-        <Tailwind style={wrapperStyles}>
-          <Tooltip.Provider>
-            <Tooltip.Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
-              <Tooltip.Trigger asChild>
-                {/* span is needed so tooltip works on disabled buttons */}
-                <span>
-                  <ButtonInternal />
-                </span>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content {...tooltipProps}>{tooltip}</Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          </Tooltip.Provider>
-        </Tailwind>
-      );
-    }
+    const classes = twMerge(
+      classNames(
+        // Display
+        'inline-flex items-center justify-center',
+        // Font
+        "font-['Source_Sans_Pro'] font-semibold",
+        // Disabled
+        'disabled:pointer-events-none disabled:opacity-35',
+        // Focused
+        'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
+        // Other
+        'night-aware whitespace-nowrap rounded border-none',
+        sizeClasses[size],
+        variantClasses[variant],
+        // Conditional classes
+        {
+          [iconOnlySizeClasses[size]]: Boolean(icon),
+          [activeVariantClasses[variant]]: active,
+        },
+        className
+      )
+    );
 
     return (
-      <Tailwind style={wrapperStyles}>
-        <ButtonInternal />
+      <Tailwind
+        /**
+         * The Tailwind wrapper is a div, which is a block-element. However, a normal button
+         * wouldn't be wrapped and would be inline-block by default. These styles are a
+         * necessary workaround to ensure Button is styled correctly despite the wrapper.
+         */
+        style={{display: 'contents'}}>
+        <OptionalTooltip tooltip={Boolean(tooltip)} tooltipProps={tooltipProps}>
+          <button
+            ref={ref}
+            {...htmlAttributes}
+            type="button"
+            aria-disabled={htmlAttributes.disabled}
+            aria-label={htmlAttributes['aria-label'] || tooltip}
+            className={classes}>
+            {icon ? (
+              <Icon name={icon} role="presentation" />
+            ) : (
+              <>
+                {startIcon && <Icon name={startIcon} role="presentation" />}
+                {children}
+                {endIcon && <Icon name={endIcon} role="presentation" />}
+              </>
+            )}
+          </button>
+        </OptionalTooltip>
       </Tailwind>
     );
   }
 );
+
+function OptionalTooltip({
+  children,
+  tooltip,
+  tooltipProps,
+}: PropsWithChildren<{tooltip: boolean; tooltipProps?: TooltipContentProps}>) {
+  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+
+  if (tooltip) {
+    return (
+      <Tooltip.Provider>
+        <Tooltip.Root open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
+          <Tooltip.Trigger asChild>
+            {/* span is needed so tooltip works on disabled buttons */}
+            <span>{children}</span>
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content {...tooltipProps}>{tooltip}</Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+      </Tooltip.Provider>
+    );
+  }
+  return <>{children}</>;
+}
