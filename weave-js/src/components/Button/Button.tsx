@@ -86,7 +86,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       endIcon,
       active,
       children,
-      className = '',
+      className,
       tooltip,
       tooltipProps,
       ...htmlAttributes
@@ -124,7 +124,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
          * necessary workaround to ensure Button is styled correctly despite the wrapper.
          */
         style={{display: 'contents'}}>
-        <OptionalTooltip tooltip={Boolean(tooltip)} tooltipProps={tooltipProps}>
+        <OptionalTooltip tooltip={tooltip} tooltipProps={tooltipProps}>
           <button
             ref={ref}
             {...htmlAttributes}
@@ -152,7 +152,7 @@ function OptionalTooltip({
   children,
   tooltip,
   tooltipProps,
-}: PropsWithChildren<{tooltip: boolean; tooltipProps?: TooltipContentProps}>) {
+}: PropsWithChildren<{tooltip?: string; tooltipProps?: TooltipContentProps}>) {
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
 
   if (tooltip) {
@@ -170,5 +170,6 @@ function OptionalTooltip({
       </Tooltip.Provider>
     );
   }
+
   return <>{children}</>;
 }
