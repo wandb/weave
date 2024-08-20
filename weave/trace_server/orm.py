@@ -364,11 +364,7 @@ class Select:
                 for cast, direct in options:
                     # Future refactor: this entire section should be moved into its own helper
                     # method and hoisted out of this function
-                    (
-                        inner_field,
-                        _,
-                        _,
-                    ) = _transform_external_field_to_internal_field(
+                    (inner_field, _, _,) = _transform_external_field_to_internal_field(
                         field,
                         self.all_columns,
                         self.table.json_cols,
@@ -628,7 +624,7 @@ def _process_query_to_conditions(
             cond = f"({lhs_part} >= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_part = process_operand(operation.in_[0])
-            rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
+            rhs_part = ",".join([process_operand(op) for op in operation.in_[1]])
             cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):
             lhs_part = process_operand(operation.contains_.input)
@@ -648,11 +644,7 @@ def _process_query_to_conditions(
                 operand.literal_, None, python_value_to_ch_type(operand.literal_)
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            (
-                field,
-                _,
-                fields_used,
-            ) = _transform_external_field_to_internal_field(
+            (field, _, fields_used,) = _transform_external_field_to_internal_field(
                 operand.get_field_, all_columns, json_columns, None, pb
             )
             raw_fields_used.update(fields_used)
