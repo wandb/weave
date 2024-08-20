@@ -45,6 +45,11 @@ try:
 except ImportError:
     ANTHROPIC_NOT_GIVEN = None
 
+try:
+    from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
+except ImportError:
+    CEREBRAS_NOT_GIVEN = None
+
 
 def print_call_link(call: "Call") -> None:
     if settings.should_print_call_link():
@@ -61,6 +66,7 @@ def value_is_sentinel(param: Any) -> bool:
         or param.default is OPENAI_NOT_GIVEN
         or param.default is COHERE_NOT_GIVEN
         or param.default is ANTHROPIC_NOT_GIVEN
+        or param.default is CEREBRAS_NOT_GIVEN
     )
 
 
