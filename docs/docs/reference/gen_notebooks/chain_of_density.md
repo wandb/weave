@@ -13,11 +13,12 @@ title: Chain of Density Summarization
 
 
 
+<img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
+<!--- @wandbcode{cod-notebook} -->
+
 # Summarization using Chain of Density
 
-Summarizing complex technical documents while preserving crucial details is a challenging task. The Chain of Density (CoD) summarization technique offers a solution by iteratively refining summaries to be more concise and information-dense. This guide demonstrates how to implement CoD using Weave, a powerful framework for building, tracking, and evaluating LLM applications. By combining CoD's effectiveness with Weave's robust tooling, you'll learn to create a summarization pipeline that produces high-quality, entity-rich summaries of technical content while gaining insights into the summarization process.
-
-![Final Evaluation](./media/chain_of_density/eval_comparison.gif)
+Summarizing complex technical documents while preserving crucial details is a challenging task. The Chain of Density (CoD) summarization technique offers a solution by iteratively refining summaries to be more concise and information-dense. This guide demonstrates how to implement CoD using Weave for tracking and evaluating the application. 
 
 ## What is Chain of Density Summarization?
 
@@ -59,15 +60,17 @@ First, let's set up our environment and import the necessary libraries:
 
 
 ```python
-import os
-import anthropic
-import weave
-from datetime import datetime, timezone
-from pydantic import BaseModel
-import requests
 import io
+import os
+from datetime import datetime, timezone
+
+import anthropic
+import requests
+from pydantic import BaseModel
 from PyPDF2 import PdfReader
 from set_env import set_env
+
+import weave
 
 set_env("WANDB_API_KEY")
 set_env("ANTHROPIC_API_KEY")
@@ -76,7 +79,7 @@ weave.init("summarization-chain-of-density-cookbook")
 anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 ```
 
-We're using Weave to track our experiment and Anthropic's Claude model for text generation. The `weave.init()` call sets up a new Weave project for our summarization task.
+We're using Weave to track our experiment and Anthropic's Claude model for text generation. The `weave.init(<project name>)` call sets up a new Weave project for our summarization task.
 
 ## Define the ArxivPaper model
 
@@ -94,6 +97,7 @@ class ArxivPaper(BaseModel):
     summary: str
     pdf_url: str
 
+
 # Create sample ArxivPaper
 arxiv_paper = ArxivPaper(
     entry_id="http://arxiv.org/abs/2406.04744v1",
@@ -102,13 +106,11 @@ arxiv_paper = ArxivPaper(
     title="CRAG -- Comprehensive RAG Benchmark",
     authors=["Xiao Yang", "Kai Sun", "Hao Xin"],  # Truncated for brevity
     summary="Retrieval-Augmented Generation (RAG) has recently emerged as a promising solution...",  # Truncated
-    pdf_url="https://arxiv.org/pdf/2406.04744"
+    pdf_url="https://arxiv.org/pdf/2406.04744",
 )
 ```
 
 This class encapsulates the metadata and content of an ArXiv paper, which will be the input to our summarization pipeline.
-
-![Arxiv Paper](./media/chain_of_density/arxiv_paper.gif)
 
 ## Load PDF content
 
@@ -121,15 +123,15 @@ def load_pdf(pdf_url: str) -> str:
     # Download the PDF
     response = requests.get(pdf_url)
     pdf_file = io.BytesIO(response.content)
-    
+
     # Read the PDF
     pdf_reader = PdfReader(pdf_file)
-    
+
     # Extract text from all pages
     text = ""
     for page in pdf_reader.pages:
         text += page.extract_text()
-    
+
     return text
 ```
 
@@ -141,7 +143,13 @@ Now, let's implement the core CoD summarization logic using Weave operations:
 ```python
 # Chain of Density Summarization
 @weave.op()
-def summarize_current_summary(document: str, instruction: str, current_summary: str = "", iteration: int = 1, model: str = "claude-3-sonnet-20240229"):
+def summarize_current_summary(
+    document: str,
+    instruction: str,
+    current_summary: str = "",
+    iteration: int = 1,
+    model: str = "claude-3-sonnet-20240229",
+):
     prompt = f"""
     Document: {document}
     Current summary: {current_summary}
@@ -151,36 +159,57 @@ def summarize_current_summary(document: str, instruction: str, current_summary: 
     Generate an increasingly concise, entity-dense, and highly technical summary from the provided document that specifically addresses the given instruction.
     """
     response = anthropic_client.messages.create(
-        model=model,
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}]
+        model=model, max_tokens=4096, messages=[{"role": "user", "content": prompt}]
     )
     return response.content[0].text
 
+
 @weave.op()
-def iterative_density_summarization(document: str, instruction: str, current_summary: str, density_iterations: int, model: str = "claude-3-sonnet-20240229"):
+def iterative_density_summarization(
+    document: str,
+    instruction: str,
+    current_summary: str,
+    density_iterations: int,
+    model: str = "claude-3-sonnet-20240229",
+):
     iteration_summaries = []
     for iteration in range(1, density_iterations + 1):
-        current_summary = summarize_current_summary(document, instruction, current_summary, iteration, model)
+        current_summary = summarize_current_summary(
+            document, instruction, current_summary, iteration, model
+        )
         iteration_summaries.append(current_summary)
     return current_summary, iteration_summaries
 
+
 @weave.op()
-def final_summary(instruction: str, current_summary: str, model: str = "claude-3-sonnet-20240229"):
+def final_summary(
+    instruction: str, current_summary: str, model: str = "claude-3-sonnet-20240229"
+):
     prompt = f"""
     Given this summary: {current_summary}
     And this instruction to focus on: {instruction}
     Create an extremely dense, final summary that captures all key technical information in the most concise form possible, while specifically addressing the given instruction.
     """
-    return anthropic_client.messages.create(
-        model=model,
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}]
-    ).content[0].text
+    return (
+        anthropic_client.messages.create(
+            model=model, max_tokens=4096, messages=[{"role": "user", "content": prompt}]
+        )
+        .content[0]
+        .text
+    )
+
 
 @weave.op()
-def chain_of_density_summarization(document: str, instruction: str, current_summary: str = "", model: str = "claude-3-sonnet-20240229", density_iterations: int = 2):
-    current_summary, iteration_summaries = iterative_density_summarization(document, instruction, current_summary, density_iterations, model)
+def chain_of_density_summarization(
+    document: str,
+    instruction: str,
+    current_summary: str = "",
+    model: str = "claude-3-sonnet-20240229",
+    density_iterations: int = 2,
+):
+    current_summary, iteration_summaries = iterative_density_summarization(
+        document, instruction, current_summary, density_iterations, model
+    )
     final_summary_text = final_summary(instruction, current_summary, model)
     return {
         "final_summary": final_summary_text,
@@ -197,7 +226,6 @@ Here's what each function does:
 
 By using `@weave.op()` decorators, we ensure that Weave tracks the inputs, outputs, and execution of these functions.
 
-![Chain of Density](./media/chain_of_density/chain_of_density.gif)
 
 ## Create a Weave Model
 
@@ -213,9 +241,13 @@ class ArxivChainOfDensityPipeline(weave.Model):
     @weave.op()
     def predict(self, paper: ArxivPaper, instruction: str) -> dict:
         text = load_pdf(paper["pdf_url"])
-        result = chain_of_density_summarization(text, instruction, model=self.model, density_iterations=self.density_iterations)
+        result = chain_of_density_summarization(
+            text,
+            instruction,
+            model=self.model,
+            density_iterations=self.density_iterations,
+        )
         return result
-
 ```
 
 This `ArxivChainOfDensityPipeline` class encapsulates our summarization logic as a Weave Model, providing several key benefits:
@@ -226,8 +258,6 @@ This `ArxivChainOfDensityPipeline` class encapsulates our summarization logic as
 4. Hyperparameter management: Model attributes (like `model` and `density_iterations`) are clearly defined and tracked across different runs, facilitating experimentation.
 5. Integration with Weave ecosystem: Using `weave.Model` allows seamless integration with other Weave tools, such as evaluations and serving capabilities.
 
-![Arxiv Chain of Density Pipeline](./media/chain_of_density/model.gif)
-
 ## Implement evaluation metrics
 
 To assess the quality of our summaries, we'll implement simple evaluation metrics:
@@ -236,8 +266,11 @@ To assess the quality of our summaries, we'll implement simple evaluation metric
 ```python
 import json
 
+
 @weave.op()
-def evaluate_summary(summary: str, instruction: str, model: str = "claude-3-sonnet-20240229") -> dict:
+def evaluate_summary(
+    summary: str, instruction: str, model: str = "claude-3-sonnet-20240229"
+) -> dict:
     prompt = f"""
     Summary: {summary}
     Instruction: {instruction}
@@ -266,26 +299,22 @@ def evaluate_summary(summary: str, instruction: str, model: str = "claude-3-sonn
     Ensure that the scores are integers between 1 and 5, and that the explanations are concise.
     """
     response = anthropic_client.messages.create(
-        model=model,
-        max_tokens=1000,
-        messages=[{"role": "user", "content": prompt}]
+        model=model, max_tokens=1000, messages=[{"role": "user", "content": prompt}]
     )
     print(response.content[0].text)
-    
+
     eval_dict = json.loads(response.content[0].text)
-    
+
     return {
-        "relevance": eval_dict['relevance']['score'],
-        "conciseness": eval_dict['conciseness']['score'],
-        "technical_accuracy": eval_dict['technical_accuracy']['score'],
-        "average_score": sum(eval_dict[k]['score'] for k in eval_dict) / 3,
-        "evaluation_text": response.content[0].text
+        "relevance": eval_dict["relevance"]["score"],
+        "conciseness": eval_dict["conciseness"]["score"],
+        "technical_accuracy": eval_dict["technical_accuracy"]["score"],
+        "average_score": sum(eval_dict[k]["score"] for k in eval_dict) / 3,
+        "evaluation_text": response.content[0].text,
     }
 ```
 
 These evaluation functions use the Claude model to assess the quality of the generated summaries based on relevance, conciseness, and technical accuracy.
-
-![Evaluation](./media/chain_of_density/evals_main_screen.gif)
 
 ## Create a Weave Dataset and run evaluation
 
@@ -299,15 +328,13 @@ dataset = weave.Dataset(
     rows=[
         {
             "paper": arxiv_paper,
-            "instruction": "What was the approach to experimenting with different data mixtures?"
+            "instruction": "What was the approach to experimenting with different data mixtures?",
         },
-    ]
+    ],
 )
 
 weave.publish(dataset)
 ```
-
-![Dataset](./media/chain_of_density/eval_dataset.gif)
 
 For our evaluation, we'll use an LLM-as-a-judge approach. This technique involves using a language model to assess the quality of outputs generated by another model or system. It leverages the LLM's understanding and reasoning capabilities to provide nuanced evaluations, especially for tasks where traditional metrics may fall short.
 
@@ -329,8 +356,6 @@ evaluation = weave.Evaluation(dataset=dataset, scorers=[quality_scorer])
 arxiv_chain_of_density_pipeline = ArxivChainOfDensityPipeline()
 results = await evaluation.evaluate(arxiv_chain_of_density_pipeline)
 ```
-
-![Final Evaluation](./media/chain_of_density/eval_comparison.gif)
 
 This code creates a dataset with our sample ArXiv paper, defines a quality scorer, and runs an evaluation of our summarization pipeline.
 
