@@ -11,7 +11,14 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
+import React, {
+  Dispatch,
+  FC,
+  SetStateAction,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
 import {
@@ -70,6 +77,25 @@ export const ExportSelector = ({
     callQueryParams.gridSort
   );
 
+  // TODO(gst): tabulate correct list of ref columns
+  const refColumnsToExpand = useMemo(
+    () =>
+      visibleColumns.filter(col => {
+        for (const maybeRefCol of [
+          'inputs',
+          'output',
+          'attributes',
+          'summary',
+        ]) {
+          if (col.startsWith(maybeRefCol)) {
+            return true;
+          }
+        }
+        return false;
+      }),
+    [visibleColumns]
+  );
+
   const onClickDownload = (contentType: ContentType) => {
     if (downloadLoading) {
       return;
@@ -84,6 +110,16 @@ export const ExportSelector = ({
     const columns = [ContentType.csv, ContentType.tsv].includes(contentType)
       ? visibleColumns
       : undefined;
+    // Filter columns down to only the most nested, for example
+    // ['output', 'output.x', 'output.x.y'] -> ['output.x.y']
+    const minimalColumns: string[] = [];
+    for (const col of visibleColumns.sort((a, b) => b.length - a.length)) {
+      if (minimalColumns.some(minimalCol => minimalCol.startsWith(col))) {
+        continue;
+      }
+      minimalColumns.push(col);
+    }
+
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -110,6 +146,7 @@ export const ExportSelector = ({
     callQueryParams.project,
     selectedCalls,
     lowLevelFilter,
+    refColumnsToExpand,
     sortBy
   );
   const curlText = useMakeCurlText(
@@ -117,6 +154,7 @@ export const ExportSelector = ({
     callQueryParams.project,
     selectedCalls,
     lowLevelFilter,
+    refColumnsToExpand,
     sortBy
   );
 
@@ -385,21 +423,21 @@ function useMakeCodeText(
   project: string,
   callIds: string[],
   filter: CallFilter,
+  expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
-  console.log(filter);
-  let codeStr = `import weave\n# assert weave.__version__ >= "0.50.14"\n\nclient = weave.init("${entity}/${project}")`;
+  let codeStr = `import weave\nassert weave.__version__ >= "0.50.14", "Please upgrade weave!" \n\nclient = weave.init("${entity}/${project}")`;
 
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds.length > 0) {
     // specifying call_ids ignores other filters
-    codeStr += `\ncalls = client.calls({\n\t"call_ids": ["${filteredCallIds.join(
+    codeStr += `\ncalls = client.server.calls_query_stream({\n\t"call_ids": ["${filteredCallIds.join(
       '", "'
     )}"],\n})`;
     return codeStr;
   }
 
-  codeStr += `\ncalls = client.calls({\n`;
+  codeStr += `\ncalls = client.server.calls_query_stream({\n`;
   if (filter.opVersionRefs) {
     codeStr += `\t"op_names": ["${filter.opVersionRefs.join('", "')}"],\n`;
   }
@@ -418,6 +456,13 @@ function useMakeCodeText(
   if (filter.parentIds) {
     codeStr += `\t"parent_ids": ["${filter.parentIds.join('", "')}"],\n`;
   }
+  if (expandColumns.length > 0) {
+    codeStr += `\t"expand_columns": ${JSON.stringify(
+      expandColumns,
+      null,
+      0
+    )},\n`;
+  }
 
   if (sortBy.length > 0) {
     codeStr += `\t"sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
@@ -433,6 +478,7 @@ function useMakeCurlText(
   project: string,
   callIds: string[],
   filter: CallFilter,
+  expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
   const baseUrl = 'https://trace.wandb.ai';
@@ -445,7 +491,7 @@ function useMakeCurlText(
       output_refs: filter.outputObjectVersionRefs,
       parent_ids: filter.parentIds,
       trace_ids: filter.traceId ? [filter.traceId] : undefined,
-      call_ids: filter.callIds,
+      call_ids: callIds,
       trace_roots_only: filter.traceRootsOnly,
       wb_run_ids: filter.runIds,
       wb_user_ids: filter.userIds,
@@ -461,6 +507,7 @@ function useMakeCurlText(
   --data-raw '{
     "project_id":"${entity}/${project}",
     "filter":${filterStr},
+    "expand_columns":${JSON.stringify(expandColumns, null, 0)},
     "limit":${MAX_EXPORT},
     "offset":0,
     "sort_by":${sortByStr}
