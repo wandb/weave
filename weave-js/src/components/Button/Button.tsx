@@ -20,11 +20,11 @@ import {Tailwind} from '../Tailwind';
 import type {ButtonSize, ButtonVariant} from './types';
 
 type IconButtonProps = {
-  icon?: IconName;
+  icon: IconName;
   children?: never;
   startIcon?: never;
   endIcon?: never;
-  tooltip: string;
+  'aria-label': string;
 };
 
 type LabelButtonProps = {
@@ -32,7 +32,6 @@ type LabelButtonProps = {
   children: ReactElement | string;
   startIcon?: IconName;
   endIcon?: IconName;
-  tooltip?: string;
 };
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -45,22 +44,37 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   twWrapperStyles?: React.CSSProperties;
 } & (IconButtonProps | LabelButtonProps);
 
-const sizeMap = {
-  small:
-    'gap-6 px-6 py-3 text-sm leading-[18px] [&_svg]:h-16 [&_svg]:w-16 h-24 w-24 p-0',
-  medium: 'gap-10 px-10 py-4 text-base [&_svg]:h-18 [&_svg]:w-18 h-32 w-32 p-0',
-  large: 'gap-8 px-12 py-8 text-base h-40 w-40 p-0',
+const sizeClasses = {
+  small: 'gap-6 px-6 py-3 text-sm leading-[18px] [&_svg]:h-16 [&_svg]:w-16',
+  medium: 'gap-10 px-10 py-4 text-base [&_svg]:h-18 [&_svg]:w-18',
+  large: 'gap-8 px-12 py-8 text-base [&_svg]:h-20 [&_svg]:w-20',
 };
 
-const variantMap = {
+const iconOnlySizeClasses = {
+  small: 'h-24 w-24 p-0',
+  medium: 'h-32 w-32 p-0',
+  large: 'h-40 w-40 p-0',
+};
+
+const variantClasses = {
   primary: 'bg-teal-500 text-white hover:bg-teal-450',
   secondary:
     'bg-oblivion/[0.05] dark:bg-moonbeam/[0.05] text-moon-800 dark:text-moon-200 hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400',
   ghost:
-    'bg-oblivion/[0.05] dark:bg-moonbeam/[0.05] text-moon-800 dark:text-moon-200 hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400',
-  quiet:
-    'text-moon-500 hover:text-moon-800 dark:hover:text-moon-200 hover:bg-oblivion/[0.05] dark:hover:bg-moonbeam/[0.05]',
+    'text-moon-800 dark:text-moon-200 hover:bg-teal-300/[0.48] hover:text-teal-600 dark:hover:bg-teal-700/[0.48] dark:hover:text-teal-400',
+  quiet: 'text-moon-500 hover:text-moon-800 dark:hover:text-moon-200',
   destructive: 'bg-red-500 text-white hover:bg-red-450',
+};
+
+const activeVariantClasses = {
+  primary: 'bg-teal-450',
+  secondary:
+    'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400',
+  ghost:
+    'bg-teal-300/[0.48] text-teal-600 dark:bg-teal-700/[0.48] dark:text-teal-400',
+  quiet:
+    'bg-oblivion/[0.05] text-moon-800 dark:bg-moonbeam/[0.05] dark:text-moon-200',
+  destructive: 'bg-red-450',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -129,11 +143,25 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={twMerge(
           classNames(
             'night-aware',
-            "inline-flex items-center justify-center whitespace-nowrap rounded border-none font-['Source_Sans_Pro'] font-semibold",
-            'disabled:pointer-events-none disabled:opacity-35',
-            'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
-            sizeMap[size] + (icon && !children ? ' h-24 w-24 p-0' : ''),
-            variantMap[variant] + (active ? ' bg-teal-450' : ''),
+            'inline-flex',
+            'items-center',
+            'justify-center',
+            'whitespace-nowrap',
+            'rounded',
+            'border-none',
+            "font-['Source_Sans_Pro']",
+            'font-semibold',
+            'disabled:pointer-events-none',
+            'disabled:opacity-35',
+            'focus-visible:outline',
+            'focus-visible:outline-[2px]',
+            'focus-visible:outline-teal-500',
+            sizeClasses[size],
+            variantClasses[variant],
+            {
+              [iconOnlySizeClasses[size]]: Boolean(icon),
+              [activeVariantClasses[variant]]: active,
+            },
             className
           )
         )}>
