@@ -317,7 +317,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 if len(batch) >= batch_size:
                     hydrated_batch = self._hydrate_calls(
-                        batch, req.expand_columns, ref_cache
+                        req.project_id, batch, req.expand_columns, ref_cache
                     )
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
@@ -334,18 +334,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     # double batch size up to what refs_read_batch can handle
                     batch_size = min(max_size, batch_size * 2)
 
-            hydrated_batch = self._hydrate_calls(batch, req.expand_columns, ref_cache)
+            hydrated_batch = self._hydrate_calls(
+                req.project_id, batch, req.expand_columns, ref_cache
+            )
             for call in hydrated_batch:
                 yield tsi.CallSchema.model_validate(call)
 
     def _hydrate_calls(
         self,
+        project_id: str,
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
         ref_cache: typing.Dict[str, typing.Any],
     ) -> list[dict[str, typing.Any]]:
-        # TODO: Implement feedback hydration here
-
+        calls = self._add_feedback_to_calls(project_id, calls, expand_columns)
         calls = self._expand_call_refs(calls, expand_columns, ref_cache)
         return calls
 
@@ -391,6 +393,44 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for (i, col), val in zip(refs_to_resolve, vals):
                 set_nested_key(calls[i], col, val)
 
+        return calls
+
+    def _add_feedback_to_calls(
+        self,
+        project_id: str,
+        calls: list[dict[str, typing.Any]],
+        expand_columns: typing.List[str],
+    ) -> list[dict[str, typing.Any]]:
+        if "feedback" not in expand_columns:
+            return calls
+
+        call_refs: list[str] = []
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$in": [
+                        {"$getField": "id"},
+                        [{"$literal": call_ref} for call_ref in call_refs],
+                    ]
+                }
+            }
+        )
+        feedback_query_req = tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=[
+                "feedback_type",
+                "weave_ref",
+                "payload",
+                "creator",
+                "created_at",
+                "wb_user_id",
+            ],
+            query=query,
+        )
+        feedback = self.feedback_query(req=feedback_query_req)
+
+        for call, call_feedback in zip(calls, feedback.result):
+            call["feedback"] = call_feedback
         return calls
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
