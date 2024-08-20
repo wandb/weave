@@ -369,8 +369,7 @@ In this example, we've demonstrated how to implement a Chain of Density summariz
 4. Create a dataset and run an evaluation of the pipeline
 
 Weave's seamless integration allows us to track inputs, outputs, and intermediate steps throughout the summarization process, making it easier to debug, optimize, and evaluate our LLM application.
-
-For more information on Weave and its capabilities, check out the [Weave documentation](https://docs.wandb.ai/weave). You can extend this example to handle larger datasets, implement more sophisticated evaluation metrics, or integrate with other LLM workflows.
+You can extend this example to handle larger datasets, implement more sophisticated evaluation metrics, or integrate with other LLM workflows.
 
 <a 
   href="https://wandb.ai/wandb_fc/arxiv-reader/reports/Building-a-bot-to-summarize-arXiv-papers-as-PDFs-using-Anthrophic-and-W-B-Weave--Vmlldzo4Nzg0ODI4"

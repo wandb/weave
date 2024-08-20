@@ -20,14 +20,14 @@ title: Prompt Optimization
 
 The [BIG-bench (Beyond the Imitation Game Benchmark)](https://github.com/google/BIG-bench) is a collaborative benchmark intended to probe large language models and extrapolate their future capabilities consisting of more than 200 tasks. The [BIG-Bench Hard (BBH)](https://github.com/suzgunmirac/BIG-Bench-Hard) is a suite of 23 most challenging BIG-Bench tasks that can be quite difficult to be solved using the current generation of language models.
 
-This tutorial demonstrates how we can improve the performance of our LLM workflow implemented  on the **causal judgement task** from the BIG-bench Hard benchmark and evaluate our prompting strategies. We will use [DSPy](https://dspy-docs.vercel.app/) for implementing our LLM workflow and optimizing our prompting strategy. We will also use [Weave](../docs/introduction.md) to track our LLM workflow and evaluate our prompting strategies.
+This tutorial demonstrates how we can improve the performance of our LLM workflow implemented  on the **causal judgement task** from the BIG-bench Hard benchmark and evaluate our prompting strategies. We will use [DSPy](https://dspy-docs.vercel.app/) for implementing our LLM workflow and optimizing our prompting strategy. We will also use [Weave](../../introduction.md) to track our LLM workflow and evaluate our prompting strategies.
 
 ## Installing the Dependencies
 
 We need the following libraries for this tutorial:
 
 - [DSPy](https://dspy-docs.vercel.app/) for building the LLM workflow and optimizing it.
-- [Weave](../introduction.md) to track our LLM workflow and evaluate our prompting strategies.
+- [Weave](../../introduction.md) to track our LLM workflow and evaluate our prompting strategies.
 - [datasets](https://huggingface.co/docs/datasets/index) to access the Big-Bench Hard dataset from HuggingFace Hub.
 
 
@@ -48,7 +48,8 @@ os.environ["OPENAI_API_KEY"] = api_key
 
 ## Enable Tracking using Weave
 
-Weave is currently integrated with DSPy, and including [`weave.init`](../docs/reference/python-sdk/weave/index.md) at the start of our code lets us automatically trace our DSPy functions which can be explored in the Weave UI. Check out the [Weave integration docs for DSPy](../docs/guides/integrations/dspy.md) to learn more.
+Weave is currently integrated with DSPy, and including [`weave.init`](../../reference/python-sdk/weave/index.md) at the start of our code lets us automatically trace our DSPy functions which can be explored in the Weave UI. Check out the [Weave integration docs for DSPy](../../guides/integrations/dspy.md) to learn more.
+
 
 
 ```python
@@ -57,7 +58,7 @@ import weave
 weave.init(project_name="dspy-bigbench-hard")
 ```
 
-In this tutorial, we use a metadata class inherited from [`weave.Object`](../docs/guides/tracking/objects.md) to manage our metadata.
+In this tutorial, we use a metadata class inherited from [`weave.Object`](../../guides/tracking/objects.md) to manage our metadata.
 
 
 ```python
@@ -80,7 +81,7 @@ The `Metadata` objects are automatically versioned and traced when functions con
 
 ## Load the BIG-Bench Hard Dataset
 
-We will load this dataset from HuggingFace Hub, split into training and validation sets, and [publish](../docs/guides/core-types/datasets.md) them on Weave, this will let us version the datasets, and also use [`weave.Evaluation`](../docs/guides/core-types/evaluations.md) to evaluate our prompting strategy.
+We will load this dataset from HuggingFace Hub, split into training and validation sets, and [publish](../../guides/core-types/datasets.md) them on Weave, this will let us version the datasets, and also use [`weave.Evaluation`](../../guides/core-types/evaluations.md) to evaluate our prompting strategy.
 
 
 ```python
@@ -190,7 +191,7 @@ rich.print(prediction)
 
 ## Evaluating our DSPy Program
 
-Now that we have a baseline prompting strategy, let's evaluate it on our validation set using [`weave.Evaluation`](../docs/guides/core-types/evaluations.md) on a simple metric that matches the predicted answer with the ground truth. Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
+Now that we have a baseline prompting strategy, let's evaluate it on our validation set using [`weave.Evaluation`](../../guides/core-types/evaluations.md) on a simple metric that matches the predicted answer with the ground truth. Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
 
 First, we need to create a simple weave evaluation scoring function that tells whether the answer from the baseline module's output is the same as the ground truth answer or not. Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
 
