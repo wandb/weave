@@ -490,7 +490,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     continue
 
             if not is_ref_str(val):
-                raise ValueError(f"Expand column {col} is not a ref")
+                continue
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
             set_nested_key(data, col, derefed_val)

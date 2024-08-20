@@ -363,7 +363,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         continue
 
                 if not refs_internal.is_ref_str(val):
-                    raise ValueError(f"Expand column {col} is not a ref")
+                    continue
 
                 refs_to_resolve[(i, col)] = val
         return refs_to_resolve
