@@ -127,13 +127,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         aria-disabled={htmlAttributes.disabled}
         aria-label={htmlAttributes['aria-label'] || tooltip}
         className={twMerge(
-          'night-aware',
-          "inline-flex items-center justify-center whitespace-nowrap rounded border-none font-['Source_Sans_Pro'] font-semibold",
-          'disabled:pointer-events-none disabled:opacity-35',
-          'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
-          sizeMap[size] + (icon && !children ? ' h-24 w-24 p-0' : ''),
-          variantMap[variant] + (active ? ' bg-teal-450' : ''),
-          className
+          classNames(
+            'night-aware',
+            "inline-flex items-center justify-center whitespace-nowrap rounded border-none font-['Source_Sans_Pro'] font-semibold",
+            'disabled:pointer-events-none disabled:opacity-35',
+            'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
+            sizeMap[size] + (icon && !children ? ' h-24 w-24 p-0' : ''),
+            variantMap[variant] + (active ? ' bg-teal-450' : ''),
+            className
+          )
         )}>
         <ButtonInner />
       </button>
