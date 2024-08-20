@@ -5,9 +5,6 @@ import pyarrow as pa
 import pytest
 from pyarrow import compute as pc
 
-from weave import api as weave
-from weave import errors, weave_internal
-from weave import weave_types as types
 from weave.legacy import box, dispatch, ops
 from weave.legacy import ops_arrow as arrow
 from weave.legacy.language_features.tagging import (
@@ -19,6 +16,10 @@ from weave.legacy.ops_arrow import arraylist_ops, convert_ops, util
 from weave.legacy.ops_domain import run_ops
 from weave.legacy.ops_domain import wb_domain_types as wdt
 from weave.legacy.ops_primitives import Boolean, Number, date, dict_, list_
+
+from ... import api as weave
+from ... import errors, weave_internal
+from ... import weave_types as types
 
 string_ops_test_cases = [
     ("eq-scalar", lambda x: x == "bc", [True, False, False]),

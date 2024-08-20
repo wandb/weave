@@ -3,8 +3,9 @@
 # need to match what javascript expects.
 
 from weave.legacy import ops
-from weave.show import _show_params
-from weave.tests.legacy import test_helpers
+
+from ...show import _show_params
+from . import test_helpers
 
 
 def test_show_simple_call(cereal_csv):

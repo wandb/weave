@@ -7,7 +7,8 @@ import weave.weave_types as types
 from weave.legacy import box, ops_arrow
 from weave.legacy.arrow.convert import to_arrow
 from weave.legacy.language_features.tagging import tag_store, tagged_value_type
-from weave.tests.legacy.concrete_tagged_value import (
+
+from .concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,
     concrete_to_tagstore,

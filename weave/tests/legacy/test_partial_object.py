@@ -1,11 +1,12 @@
-from weave import api as weave
-from weave import weave_types as types
 from weave.legacy import compile, ops
 from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.legacy.ops_domain import wb_domain_types as wdt
 from weave.legacy.ops_domain.project_ops import root_all_projects
 from weave.legacy.ops_domain.report_ops import root_all_reports
-from weave.tests.legacy.test_wb import table_mock1_no_display_name
+
+from ... import api as weave
+from ... import weave_types as types
+from .test_wb import table_mock1_no_display_name
 
 
 def test_gql_compilation_with_keys():

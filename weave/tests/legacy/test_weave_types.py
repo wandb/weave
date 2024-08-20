@@ -5,11 +5,12 @@ import pytest
 import weave
 import weave.legacy
 import weave.weave_types
-from weave import errors
-from weave import weave_types as types
 from weave.legacy import _dict_utils, runs
 from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.legacy.ops_domain import wbmedia
+
+from ... import errors
+from ... import weave_types as types
 
 
 def test_typeof_string():

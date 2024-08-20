@@ -1,10 +1,11 @@
 import pytest
 
 import weave
-from weave import storage, weave_internal
-from weave.legacy.panels import panel_plot
-from weave.legacy.panels.panel_group import Group
-from weave.legacy.panels.panel_slider import Slider
+
+from ... import storage, weave_internal
+from ...legacy.panels import panel_plot
+from ...legacy.panels.panel_group import Group
+from ...legacy.panels.panel_slider import Slider
 
 
 def test_panel_id():

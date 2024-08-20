@@ -7,9 +7,6 @@ import pyarrow as pa
 import pytest
 from PIL import Image
 
-from weave import api as weave
-from weave import errors, storage, weave_internal
-from weave import weave_types as types
 from weave.legacy import box, context_state, graph, mappers_arrow, ops
 
 # If you're thinking of import vectorize here, don't! Put your
@@ -27,9 +24,13 @@ from weave.legacy.language_features.tagging import (
 from weave.legacy.op_def import map_type
 from weave.legacy.ops_domain import project_ops
 from weave.legacy.ops_primitives import list_, make_list
-from weave.tests.legacy import list_arrow_test_helpers as lath
-from weave.tests.legacy import tag_test_util as ttu
-from weave.tests.legacy import test_wb, weavejs_ops
+
+from ... import api as weave
+from ... import errors, storage, weave_internal
+from ... import weave_types as types
+from . import list_arrow_test_helpers as lath
+from . import tag_test_util as ttu
+from . import test_wb, weavejs_ops
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 # T in `conftest::pre_post_each_test` we set a custom artifact directory for each test for isolation

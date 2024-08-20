@@ -1,5 +1,6 @@
 import weave
-from weave import weave_internal
+
+from ... import weave_internal
 
 
 def test_weave_fn_in_data():

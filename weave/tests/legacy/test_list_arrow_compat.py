@@ -3,7 +3,6 @@ import itertools
 import numpy as np
 import pytest
 
-from weave import api as weave
 from weave import weave_internal
 from weave import weave_types as types
 from weave.legacy import box, ops
@@ -14,8 +13,10 @@ from weave.legacy.language_features.tagging import (
     tagged_value_type,
 )
 from weave.legacy.ops_primitives import dict_, list_
-from weave.tests.legacy import list_arrow_test_helpers as lath
-from weave.tests.legacy import tag_test_util as ttu
+
+from ... import api as weave
+from ...tests.legacy import tag_test_util as ttu
+from . import list_arrow_test_helpers as lath
 
 
 def filter_fn(row) -> bool:

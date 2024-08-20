@@ -1,8 +1,6 @@
 import pytest
 
 import weave
-from weave import weave_internal
-from weave import weave_types as types
 from weave.legacy import box
 from weave.legacy.artifact_fs import FilesystemArtifactFileType
 from weave.legacy.language_features.tagging import (
@@ -15,6 +13,9 @@ from weave.legacy.ops_domain.run_ops import run_tag_getter_op
 from weave.legacy.ops_domain.wb_domain_types import ProjectType, Run, RunType
 from weave.legacy.ops_primitives import dict as dict_ops
 from weave.legacy.ops_primitives import list_ as list_ops
+
+from ... import weave_internal
+from ... import weave_types as types
 
 
 def test_tagged_value():

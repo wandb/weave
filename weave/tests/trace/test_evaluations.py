@@ -4,7 +4,8 @@ import pytest
 
 import weave
 from weave import Evaluation, Model
-from weave.trace_server import trace_server_interface as tsi
+
+from ...trace_server import trace_server_interface as tsi
 
 
 def flatten_calls(

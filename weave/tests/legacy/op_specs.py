@@ -6,9 +6,8 @@ import weave
 from weave.legacy import op_def, ops_primitives
 from weave.legacy.language_features.tagging import tagged_value_type
 from weave.legacy.timestamp import PY_DATETIME_MAX_MS, PY_DATETIME_MIN_MS
-from weave.tests.legacy.concrete_tagged_value import (
-    TaggedValue,
-)
+
+from .concrete_tagged_value import TaggedValue
 
 
 @dataclasses.dataclass

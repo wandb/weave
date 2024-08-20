@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from weave import environment, errors, filesystem
+from ... import environment, errors, filesystem
 
 
 @pytest.fixture()

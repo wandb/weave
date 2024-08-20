@@ -1,8 +1,9 @@
 import pytest
 
 import weave
-from weave import environment, errors, storage
 from weave.legacy import artifact_fs, artifact_local, wandb_api
+
+from ... import environment, errors, storage
 
 
 @pytest.fixture()
