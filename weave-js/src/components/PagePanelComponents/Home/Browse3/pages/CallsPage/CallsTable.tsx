@@ -552,10 +552,11 @@ export const CallsTable: FC<{
     return Array.from(keysSet);
   }, [tableData]);
 
-  const visibleColumns =
-    tableData.length > 0
+  const visibleColumns = useMemo(() => {
+    return tableData.length > 0
       ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
       : [];
+  }, [allRowKeys, columnVisibilityModel, tableData]);
 
   // Register Export Button
 
