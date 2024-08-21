@@ -1,4 +1,5 @@
 import socket
+from typing import Optional
 
 import analytics
 
@@ -9,14 +10,14 @@ from .. import environment
 analytics.write_key = "uJ8vZgKqTBVH6ZdhD4GZGZYsR7ucfJmb"
 
 
-def hostname():
+def hostname() -> str:
     return socket.gethostname()
 
 
 identify_called = False
 
 
-def _identify():
+def _identify() -> None:
     global identify_called
     if not identify_called:
         host = hostname()
@@ -24,14 +25,14 @@ def _identify():
     identify_called = True
 
 
-def analytics_enabled():
-    context_enabled = context_state.analytics_enabled()
-    env_enabled = environment.usage_analytics_enabled()
+def analytics_enabled() -> bool:
+    context_enabled: bool = context_state.analytics_enabled()
+    env_enabled: bool = environment.usage_analytics_enabled()
 
     return context_enabled and env_enabled
 
 
-def track(action: str, info=None):
+def track(action: str, info: Optional[dict] = None) -> None:
     if not analytics_enabled():
         return
     try:
@@ -43,9 +44,9 @@ def track(action: str, info=None):
         pass
 
 
-def use_called():
+def use_called() -> None:
     track("called use")
 
 
-def show_called(info=None):
+def show_called(info: Optional[dict] = None) -> None:
     track("called show", info)
