@@ -26,6 +26,10 @@ class WeaveInternalError(WeaveBaseError):
     pass
 
 
+class WeaveSerializeError(WeaveBaseError):
+    pass
+
+
 class WeaveConfigurationError(WeaveBaseError):
     pass
 
