@@ -42,8 +42,8 @@ numpy<2.0.0
 # Segment logging
 analytics-python>=1.2.9
 
-# Used for ISO date parsing (analytics-python uses 2.8.2, so match it to avoid multiple versions)
-python-dateutil==2.8.2
+# Used for ISO date parsing
+python-dateutil>=2.8.2
 
 # Used for version parsing in integrations.
 packaging>=21.0
