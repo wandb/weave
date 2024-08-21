@@ -27,6 +27,7 @@ import {
   fileExtensions,
 } from '../wfReactInterface/traceServerClientTypes';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
+import {isDynamicCallColumn, stringToPath} from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
@@ -78,22 +79,8 @@ export const ExportSelector = ({
     callQueryParams.gridSort
   );
 
-  // TODO(gst): tabulate correct list of ref columns
   const refColumnsToExpand = useMemo(
-    () =>
-      visibleColumns.filter(col => {
-        for (const maybeRefCol of [
-          'inputs',
-          'output',
-          'attributes',
-          'summary',
-        ]) {
-          if (col.startsWith(maybeRefCol)) {
-            return true;
-          }
-        }
-        return false;
-      }),
+    () => visibleColumns.filter(col => isDynamicCallColumn(stringToPath(col))),
     [visibleColumns]
   );
 
@@ -270,7 +257,7 @@ const SelectionCheckboxes: FC<{
 const ClickableOutlinedCardWithIcon: FC<{
   iconName: IconName;
   downloadLoading?: boolean;
-  disabled: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }> = ({iconName, children, downloadLoading, disabled, onClick}) => (
   <div
@@ -336,14 +323,12 @@ const DownloadGrid: FC<{
       <div className="mt-8 flex items-center">
         <ClickableOutlinedCardWithIcon
           iconName="python-logo"
-          disabled={false}
           onClick={() => setCodeMode('python')}>
           Use Python
         </ClickableOutlinedCardWithIcon>
         <div className="ml-8" />
         <ClickableOutlinedCardWithIcon
           iconName="code-alt"
-          disabled={false}
           onClick={() => setCodeMode('curl')}>
           Use CURL
         </ClickableOutlinedCardWithIcon>
@@ -491,6 +476,7 @@ function useMakeCurlText(
   expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
+  // TODO: Fix for dedicated, how???
   const baseUrl = 'https://trace.wandb.ai';
   const filterStr = JSON.stringify(
     {
