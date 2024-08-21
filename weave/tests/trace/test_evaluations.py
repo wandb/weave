@@ -4,8 +4,7 @@ import pytest
 
 import weave
 from weave import Evaluation, Model
-
-from ..trace_server import trace_server_interface as tsi
+from weave.trace_server import trace_server_interface as tsi
 
 
 def flatten_calls(
@@ -136,7 +135,7 @@ async def test_basic_evaluation(client):
     objs = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
-            filter=tsi._ObjectVersionFilter(base_object_classes=["Model"]),
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Model"]),
         )
     )
     assert len(objs.objs) == 1

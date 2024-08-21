@@ -3,17 +3,8 @@ import datetime
 import platform
 import sys
 import typing
-import uuid
 from functools import lru_cache
-from typing import (
-    Any,
-    Dict,
-    Iterator,
-    Optional,
-    Sequence,
-    TypedDict,
-    Union,
-)
+from typing import Any, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
 from requests import HTTPError
@@ -30,25 +21,22 @@ from weave.trace.object_record import (
 )
 from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import (
-    CallRef,
-    ObjectRef,
-    OpRef,
-    Ref,
-    TableRef,
-)
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
+from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
+    CallsFilter,
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
     EndedCallSchemaForInsert,
     ObjCreateReq,
+    ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
     ObjSchema,
@@ -59,8 +47,6 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
     TraceServerInterface,
-    _CallsFilter,
-    _ObjectVersionFilter,
 )
 
 if typing.TYPE_CHECKING:
@@ -71,13 +57,6 @@ if typing.TYPE_CHECKING:
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
-
-
-class ValueFilter(TypedDict, total=False):
-    id: uuid.UUID
-    ref: Ref
-    type: str
-    val: dict
 
 
 def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
@@ -123,6 +102,8 @@ def _get_direct_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
+    if isinstance(obj, Ref):
+        return obj
     if ref := _get_direct_ref(obj):
         return ref
 
@@ -150,11 +131,6 @@ def map_to_refs(obj: Any) -> Any:
         return map_to_refs(obj._val)
 
     return obj
-
-
-@dataclasses.dataclass
-class Dataset:
-    rows: list[Any]
 
 
 @dataclasses.dataclass
@@ -206,7 +182,7 @@ class Call:
         return CallsIter(
             client.server,
             self.project_id,
-            _CallsFilter(parent_ids=[self.id]),
+            CallsFilter(parent_ids=[self.id]),
         )
 
     def delete(self) -> bool:
@@ -230,14 +206,14 @@ class Call:
 
 class CallsIter:
     server: TraceServerInterface
-    filter: _CallsFilter
+    filter: CallsFilter
     include_costs: bool
 
     def __init__(
         self,
         server: TraceServerInterface,
         project_id: str,
-        filter: _CallsFilter,
+        filter: CallsFilter,
         include_costs: bool = False,
     ) -> None:
         self.server = server
@@ -315,7 +291,7 @@ def make_client_call(
         parent_id=server_call.parent_id,
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
-        output=output,
+        output=from_json(output, server_call.project_id, server),
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,
@@ -407,7 +383,9 @@ class WeaveClient:
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
-            self.server.ensure_project_exists(entity, project)
+            resp = self.server.ensure_project_exists(entity, project)
+            # Set Client project name with updated project name
+            self.project = resp.project_name
 
     ################ High Level Convenience Methods ################
 
@@ -470,11 +448,11 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def calls(
         self,
-        filter: Optional[_CallsFilter] = None,
+        filter: Optional[CallsFilter] = None,
         include_costs: Optional[bool] = False,
     ) -> CallsIter:
         if filter is None:
-            filter = _CallsFilter()
+            filter = CallsFilter()
 
         return CallsIter(
             self.server, self._project_id(), filter, include_costs or False
@@ -485,7 +463,7 @@ class WeaveClient:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
-                filter=_CallsFilter(call_ids=[call_id]),
+                filter=CallsFilter(call_ids=[call_id]),
                 include_costs=include_costs,
             )
         )
@@ -754,10 +732,18 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
         self._save_nested_objects(val, name=name)
+
+        # typically, this condition would belong inside of the
+        # `_save_nested_objects` switch. However, we don't want to recursively
+        # publish all custom objects. Instead we only want to do this at the
+        # top-most level if requested
+        if get_serializer_for_obj(val) is not None:
+            self._save_and_attach_ref(val)
+
         return self._save_object_basic(val, name, branch)
 
     def _save_object_basic(
-        self, val: Any, name: str, branch: str = "latest"
+        self, val: Any, name: Optional[str] = None, branch: str = "latest"
     ) -> ObjectRef:
         # The WeaveTable case is special because object saving happens inside
         # _save_object_nested and it has a special table_ref -- skip it here.
@@ -769,6 +755,14 @@ class WeaveClient:
         if isinstance(val, ObjectRef):
             return val
         json_val = to_json(val, self._project_id(), self.server)
+
+        if name is None:
+            if json_val.get("_type") == "CustomWeaveType":
+                custom_name = json_val.get("weave_type", {}).get("type")
+                name = custom_name
+
+        if name is None:
+            raise ValueError("Name must be provided for object saving")
 
         response = self.server.obj_create(
             ObjCreateReq(
@@ -805,7 +799,7 @@ class WeaveClient:
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
-        elif dataclasses.is_dataclass(obj):
+        elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):
             obj_rec = dataclass_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
@@ -835,11 +829,10 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
+        rows = to_json(table.rows, self._project_id(), self.server)
         response = self.server.table_create(
             TableCreateReq(
-                table=TableSchemaForInsert(
-                    project_id=self._project_id(), rows=table.rows
-                )
+                table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             )
         )
         return TableRef(
@@ -851,17 +844,15 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
+        return self.calls(CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(
-        self, filter: Optional[_ObjectVersionFilter] = None
-    ) -> list[ObjSchema]:
+    def _objects(self, filter: Optional[ObjectVersionFilter] = None) -> list[ObjSchema]:
         if not filter:
-            filter = _ObjectVersionFilter()
+            filter = ObjectVersionFilter()
         else:
             filter = filter.model_copy()
-        filter = typing.cast(_ObjectVersionFilter, filter)
+        filter = typing.cast(ObjectVersionFilter, filter)
         filter.is_op = False
 
         response = self.server.objs_query(
@@ -875,8 +866,16 @@ class WeaveClient:
     def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
         if op.ref is not None:
             return op.ref
+
         if name is None:
             name = op.name
+
+        return self._save_and_attach_ref(op, name)
+
+    def _save_and_attach_ref(self, op: Any, name: Optional[str] = None) -> Ref:
+        if (ref := getattr(op, "ref", None)) is not None:
+            return ref
+
         op_def_ref = self._save_object_basic(op, name)
 
         # setattr(op, "ref", op_def_ref) fails here

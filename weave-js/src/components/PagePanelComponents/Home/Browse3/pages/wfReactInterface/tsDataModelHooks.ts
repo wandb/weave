@@ -675,6 +675,13 @@ const useOpVersion = (
       };
     }
 
+    if (opVersionRes.obj == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+
     const returnedResult = convertTraceServerObjectVersionToOpSchema(
       opVersionRes.obj
     );
@@ -750,7 +757,7 @@ const useOpVersions = makeTraceServerEndpointHook<
 const useFileContent = makeTraceServerEndpointHook<
   'fileContent',
   [string, string, string, {skip?: boolean}?],
-  string
+  ArrayBuffer
 >(
   'fileContent',
   (
@@ -814,6 +821,13 @@ const useObjectVersion = (
     if (objectVersionRes == null || loadingRef.current) {
       return {
         loading: true,
+        result: null,
+      };
+    }
+
+    if (objectVersionRes.obj == null) {
+      return {
+        loading: false,
         result: null,
       };
     }
@@ -1198,12 +1212,27 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
     }
     return null;
   }, [opVersionRef, query.result]);
-  const text = useFileContent(
+  const arrayBuffer = useFileContent(
     fileSpec?.entity ?? '',
     fileSpec?.project ?? '',
     fileSpec?.digest ?? '',
     {skip: fileSpec == null}
   );
+  const text = useMemo(() => {
+    if (arrayBuffer.loading) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+    return {
+      loading: false,
+      result: new TextDecoder().decode(
+        arrayBuffer.result ?? new ArrayBuffer(0)
+      ),
+    };
+  }, [arrayBuffer.loading, arrayBuffer.result]);
+
   return text;
 };
 

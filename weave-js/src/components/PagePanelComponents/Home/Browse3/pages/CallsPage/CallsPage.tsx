@@ -1,5 +1,6 @@
 import {
   GridColumnVisibilityModel,
+  GridFilterModel,
   GridPaginationModel,
   GridPinnedColumns,
   GridSortModel,
@@ -36,6 +37,9 @@ export const CallsPage: FC<{
 
   pinModel: GridPinnedColumns;
   setPinModel: (newModel: GridPinnedColumns) => void;
+
+  filterModel: GridFilterModel;
+  setFilterModel: (newModel: GridFilterModel) => void;
 
   sortModel: GridSortModel;
   setSortModel: (newModel: GridSortModel) => void;
@@ -83,13 +87,16 @@ export const CallsPage: FC<{
                 // to the frozenFilter prop. Furthermore, "frozen" is only used when showing the
                 // evaluations table. So, in this case, I think we should really just remove the
                 // `frozen` property completely and have a top-level evaluations tab that hides controls.
-                hideControls={filter.frozen}
+                hideControls={filter.frozen && !isEvaluationTable}
+                hideOpSelector={isEvaluationTable}
                 initialFilter={filter}
                 onFilterUpdate={setFilter}
                 columnVisibilityModel={props.columnVisibilityModel}
                 setColumnVisibilityModel={props.setColumnVisibilityModel}
                 pinModel={props.pinModel}
                 setPinModel={props.setPinModel}
+                filterModel={props.filterModel}
+                setFilterModel={props.setFilterModel}
                 sortModel={props.sortModel}
                 setSortModel={props.setSortModel}
                 paginationModel={props.paginationModel}

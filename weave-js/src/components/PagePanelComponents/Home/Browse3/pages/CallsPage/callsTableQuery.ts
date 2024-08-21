@@ -6,10 +6,8 @@ import {
 import {useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {
-  isValuelessOperator,
-  operationConverter,
-} from '../common/tabularListViews/operators';
+import {isValuelessOperator} from '../../filters/common';
+import {operationConverter} from '../common/tabularListViews/operators';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';

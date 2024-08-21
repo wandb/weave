@@ -180,7 +180,7 @@ class Condition(BaseModel):
 
 
 class HardCodedFilter(BaseModel):
-    filter: tsi._CallsFilter
+    filter: tsi.CallsFilter
 
     def is_useful(self) -> bool:
         """Returns True if the filter is useful - i.e. it has any non-null fields
@@ -659,7 +659,7 @@ def process_query_to_conditions(
 
 
 def process_calls_filter_to_conditions(
-    filter: tsi._CallsFilter,
+    filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> list[str]:

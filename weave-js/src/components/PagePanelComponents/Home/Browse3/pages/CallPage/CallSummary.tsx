@@ -42,7 +42,7 @@ export const CallSummary: React.FC<{
   const usage = span.summary.usage as {[key: string]: LLMUsageSchema};
 
   return (
-    <div style={{padding: 8}}>
+    <div style={{padding: 8, overflow: 'auto'}}>
       <SimpleKeyValueTable
         data={{
           Operation:

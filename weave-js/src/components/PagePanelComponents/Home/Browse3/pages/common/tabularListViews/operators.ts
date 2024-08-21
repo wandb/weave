@@ -1,67 +1,9 @@
-import {
-  getGridBooleanOperators,
-  getGridDateOperators,
-  getGridNumericOperators,
-  getGridStringOperators,
-  GridFilterItem,
-  GridFilterOperator,
-} from '@mui/x-data-grid';
+import {GridFilterItem} from '@mui/x-data-grid';
+import _ from 'lodash';
 
 import {Query} from '../../wfReactInterface/traceServerClientInterface/query';
 
-const operatorListAsMap = (operators: GridFilterOperator[]) => {
-  return operators.reduce((acc, operator) => {
-    acc[operator.value] = operator;
-    return acc;
-  }, {} as Record<string, GridFilterOperator>);
-};
-const stringOperators = operatorListAsMap(getGridStringOperators());
-const numberOperators = operatorListAsMap(getGridNumericOperators());
-const booleanOperators = operatorListAsMap(getGridBooleanOperators());
-const dateTimeOperators = operatorListAsMap(getGridDateOperators(true));
-const allGeneralPurposeOperators = {
-  string: {
-    contains: stringOperators.contains,
-    equals: stringOperators.equals,
-  },
-  number: {
-    '=': numberOperators['='],
-    '!=': numberOperators['!='],
-    '>': numberOperators['>'],
-    '>=': numberOperators['>='],
-    '<': numberOperators['<'],
-    '<=': numberOperators['<='],
-  },
-  bool: {
-    is: booleanOperators.is,
-  },
-  date: {
-    after: dateTimeOperators.after,
-    before: dateTimeOperators.before,
-  },
-  any: {
-    isEmpty: stringOperators.isEmpty,
-    isNotEmpty: stringOperators.isEmpty,
-  },
-};
-
-export const allOperators = Object.entries(allGeneralPurposeOperators).flatMap(
-  ([type, operators]) =>
-    Object.entries(operators).map(([label, operator]) => {
-      return {
-        ...operator,
-        value: `(${type}): ${label}`,
-        label: `(${type}): ${label}`,
-      };
-    })
-);
-
-const VALUELESS_OPERATORS = new Set(['(any): isEmpty', '(any): isNotEmpty']);
-
-export const isValuelessOperator = (operator: string) => {
-  return VALUELESS_OPERATORS.has(operator);
-};
-
+// Convert one Material GridFilterItem to our Mongo-like query format.
 export const operationConverter = (
   item: GridFilterItem
 ): null | Query['$expr'] => {
@@ -88,6 +30,14 @@ export const operationConverter = (
     return {
       $eq: [{$getField: item.field}, {$literal: item.value}],
     };
+  } else if (item.operator === '(string): in') {
+    const values = _.isArray(item.value)
+      ? item.value
+      : item.value.split(',').map((v: string) => v.trim());
+    const clauses = values.map((v: string) => ({
+      $eq: [{$getField: item.field}, {$literal: v}],
+    }));
+    return {$or: clauses};
   } else if (item.operator === '(number): =') {
     if (item.value === '') {
       return null;
@@ -171,7 +121,7 @@ export const operationConverter = (
       return null;
     }
     return {
-      $eq: [{$getField: item.field}, {$literal: item.value}],
+      $eq: [{$getField: item.field}, {$literal: `${item.value}`}],
     };
   } else if (item.operator === '(date): after') {
     if (item.value === '') {
@@ -194,6 +144,6 @@ export const operationConverter = (
       ],
     };
   } else {
-    throw new Error('Unsupported operator');
+    throw new Error(`Unsupported operator: ${item.operator}`);
   }
 };

@@ -35,6 +35,8 @@ The top-level functions and classes for working with Weave.
 ---
 
 
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_api.py#L21"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ### <kbd>function</kbd> `init`
 
 ```python
@@ -63,6 +65,8 @@ Following init, calls of weave.op() decorated functions will be logged to the sp
 
 ---
 
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_api.py#L89"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ### <kbd>function</kbd> `publish`
 
 ```python
@@ -89,6 +93,8 @@ TODO: Need to document how name works with this change.
 
 ---
 
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_api.py#L137"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ### <kbd>function</kbd> `ref`
 
 ```python
@@ -113,6 +119,8 @@ TODO: what happens if obj does not exist
  A weave Ref to the object. 
 
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/call_context.py#L71"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `get_current_call`
 
@@ -159,6 +167,8 @@ print(mycall.id)
 
 ---
 
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_api.py#L242"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ### <kbd>function</kbd> `finish`
 
 ```python
@@ -170,6 +180,8 @@ Stops logging to weave.
 Following finish, calls of weave.op() decorated functions will no longer be logged. You will need to run weave.init() again to resume logging. 
 
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L283"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `op`
 
@@ -204,80 +216,55 @@ await extract()  # calls the function and tracks the call in the Weave UI
 ``` 
 
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/obj.py#L17"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `Object`
-            
-```python
-class Object(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
 
-    # Allow Op attributes
-    model_config = ConfigDict(
-        ignored_types=(Op,),
-        arbitrary_types_allowed=True,
-        protected_namespaces=(),
-        extra="forbid",
-    )
 
-    __str__ = BaseModel.__repr__
 
-    # This is a "wrap" validator meaning we can run our own logic before
-    # and after the standard pydantic validation.
-    @model_validator(mode="wrap")
-    @classmethod
-    def handle_relocatable_object(
-        cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
-    ) -> Any:
-        if isinstance(v, ObjectRef):
-            return v.get()
-        if isinstance(v, WeaveObject):
-            # This is a relocated object, so destructure it into a dictionary
-            # so pydantic can validate it.
-            keys = v._val.__dict__.keys()
-            fields = {}
-            for k in keys:
-                if k.startswith("_"):
-                    continue
-                val = getattr(v, k)
-                fields[k] = val
 
-            # pydantic validation will construct a new pydantic object
-            def is_ignored_type(v: type) -> bool:
-                return isinstance(v, cls.model_config["ignored_types"])
 
-            allowed_fields = {k: v for k, v in fields.items() if not is_ignored_type(v)}
-            new_obj = handler(allowed_fields)
-            for k, kv in fields.items():
-                if is_ignored_type(kv):
-                    new_obj.__dict__[k] = kv
+**Pydantic Fields:**
 
-            # transfer ref to new object
-            # We can't attach a ref directly to pydantic objects yet.
-            # TODO: fix this. I think dedupe may make it so the user data ends up
-            #    working fine, but not setting a ref here will cause the client
-            #    to do extra work.
-            if isinstance(v, WeaveObject):
-                ref = get_ref(v)
-                new_obj.__dict__["ref"] = ref
-            # return new_obj
-
-            return new_obj
-        return handler(v)
-
-    def model_post_init(self, __context: Any) -> None:
-        super().model_post_init(__context)
-
-        # This binds the call "method" to the Op instance
-        # - before:  obj.method.call(obj, ...)
-        # - after:   obj.method.call(...)
-        for k in dir(self):
-            if not k.startswith("__") and isinstance(getattr(self, k), Op):
-                op = getattr(self, k)
-                op.__dict__["call"] = partial(call, op, self)
-
-```
-            
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/obj.py#L33"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>classmethod</kbd> `handle_relocatable_object`
+
+```python
+handle_relocatable_object(
+    v: Any,
+    handler: ValidatorFunctionWrapHandler,
+    info: ValidationInfo
+) → Any
+```
+
+
+
+
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/obj.py#L74"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>method</kbd> `model_post_init`
+
+```python
+model_post_init(_Object__context: Any) → None
+```
+
+
+
+
+
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L17"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Dataset`
 Dataset object with easy saving and automatic versioning 
@@ -306,31 +293,14 @@ example_label = dataset_ref.rows[2]['sentence']
 ``` 
 
 
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `rows`: `<class 'table.Table'>`
 ---
 
-#### <kbd>property</kbd> model_extra
-
-Get extra fields set during validation. 
-
-
-
-**Returns:**
-  A dictionary of extra fields, or `None` if `config.extra` is not set to `"allow"`. 
-
----
-
-#### <kbd>property</kbd> model_fields_set
-
-Returns the set of fields that have been explicitly set on this model instance. 
-
-
-
-**Returns:**
-  A set of strings representing the fields that have been set,  i.e. that were not filled from defaults. 
-
-
-
----
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L44"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>classmethod</kbd> `convert_to_table`
 
@@ -344,6 +314,8 @@ convert_to_table(rows: Any) → Table
 
 
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/model.py#L6"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Model`
 Intended to capture a combination of code and data the operates on an input. For example it might call an LLM with a prompt to make a prediction or generate text. 
@@ -368,31 +340,13 @@ class YourModel(Model):
 ``` 
 
 
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
 ---
 
-#### <kbd>property</kbd> model_extra
-
-Get extra fields set during validation. 
-
-
-
-**Returns:**
-  A dictionary of extra fields, or `None` if `config.extra` is not set to `"allow"`. 
-
----
-
-#### <kbd>property</kbd> model_fields_set
-
-Returns the set of fields that have been explicitly set on this model instance. 
-
-
-
-**Returns:**
-  A set of strings representing the fields that have been set,  i.e. that were not filled from defaults. 
-
-
-
----
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/model.py#L34"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `get_infer_method`
 
@@ -406,6 +360,8 @@ get_infer_method() → Callable
 
 
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/eval.py#L55"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Evaluation`
 Sets up an evaluation which includes a set of scorers and a dataset. 
@@ -452,31 +408,17 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 ``` 
 
 
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `dataset`: `typing.Union[flow.dataset.Dataset, list]`
+- `scorers`: `typing.Optional[list[typing.Union[typing.Callable, trace.op.Op, flow.scorer.Scorer]]]`
+- `preprocess_model_input`: `typing.Optional[typing.Callable]`
+- `trials`: `<class 'int'>`
 ---
 
-#### <kbd>property</kbd> model_extra
-
-Get extra fields set during validation. 
-
-
-
-**Returns:**
-  A dictionary of extra fields, or `None` if `config.extra` is not set to `"allow"`. 
-
----
-
-#### <kbd>property</kbd> model_fields_set
-
-Returns the set of fields that have been explicitly set on this model instance. 
-
-
-
-**Returns:**
-  A set of strings representing the fields that have been set,  i.e. that were not filled from defaults. 
-
-
-
----
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L277"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `evaluate`
 
@@ -490,6 +432,8 @@ evaluate(model: Union[Callable, Model]) → dict
 
 ---
 
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/eval.py#L105"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ### <kbd>method</kbd> `model_post_init`
 
 ```python
@@ -502,6 +446,8 @@ model_post_init(_Evaluation__context: Any) → None
 
 ---
 
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L129"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ### <kbd>method</kbd> `predict_and_score`
 
 ```python
@@ -513,6 +459,8 @@ predict_and_score(model: Union[Callable, Model], example: dict) → dict
 
 
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L255"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `summarize`
 
@@ -527,37 +475,21 @@ summarize(eval_table: EvaluationResults) → dict
 
 ---
 
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/scorer.py#L14"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
 ## <kbd>class</kbd> `Scorer`
 
 
 
 
 
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
 ---
 
-#### <kbd>property</kbd> model_extra
-
-Get extra fields set during validation. 
-
-
-
-**Returns:**
-  A dictionary of extra fields, or `None` if `config.extra` is not set to `"allow"`. 
-
----
-
-#### <kbd>property</kbd> model_fields_set
-
-Returns the set of fields that have been explicitly set on this model instance. 
-
-
-
-**Returns:**
-  A set of strings representing the fields that have been set,  i.e. that were not filled from defaults. 
-
-
-
----
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/scorer.py#L15"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `score`
 
@@ -570,6 +502,8 @@ score(target: Any, model_output: Any) → Any
 
 
 ---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L18"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `summarize`
 

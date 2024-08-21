@@ -68,12 +68,6 @@ const sidebar: SidebarsConfig = {
         },
         {
           type: "doc",
-          id: "reference/service-api/calls-query-calls-query-post",
-          label: "Calls Query",
-          className: "api-method post",
-        },
-        {
-          type: "doc",
           id: "reference/service-api/calls-query-stats-calls-query-stats-post",
           label: "Calls Query Stats",
           className: "api-method post",
@@ -156,13 +150,13 @@ const sidebar: SidebarsConfig = {
       items: [
         {
           type: "doc",
-          id: "reference/service-api/file-create-files-create-post",
+          id: "reference/service-api/file-create-file-create-post",
           label: "File Create",
           className: "api-method post",
         },
         {
           type: "doc",
-          id: "reference/service-api/file-content-files-content-post",
+          id: "reference/service-api/file-content-file-content-post",
           label: "File Content",
           className: "api-method post",
         },

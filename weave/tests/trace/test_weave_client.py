@@ -289,7 +289,7 @@ def test_calls_query(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call1 = client.create_call("x", {"a": 6, "b": 11})
     call2 = client.create_call("y", {"a": 5, "b": 10})
-    result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
+    result = list(client.calls(weave_client.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -340,16 +340,16 @@ def test_calls_delete(client):
 
     assert len(list(client.calls())) == 4
 
-    result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
+    result = list(client.calls(weave_client.CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
     client.delete_call(call0_child1)
 
-    result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
+    result = list(client.calls(weave_client.CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 1
 
-    result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
+    result = list(client.calls(weave_client.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 0
 
     # no-op if already deleted
@@ -1228,13 +1228,13 @@ def test_summary_tokens_cost(client):
 
     callsWithCost = list(
         client.calls(
-            weave_client._CallsFilter(op_names=[call.op_name]),
+            weave_client.CallsFilter(op_names=[call.op_name]),
             include_costs=True,
         )
     )
     callsNoCost = list(
         client.calls(
-            weave_client._CallsFilter(op_names=[call.op_name]),
+            weave_client.CallsFilter(op_names=[call.op_name]),
             include_costs=False,
         )
     )
@@ -1324,3 +1324,13 @@ def test_summary_tokens_cost_sqlite(client):
 
     assert noCostCallSummary is None
     assert withCostCallSummary is None
+
+
+def test_ref_in_dict(client):
+    ref = client._save_object({"a": 5}, "d1")
+
+    # Put a ref directly in a dict.
+    ref2 = client._save_object({"b": ref}, "d2")
+
+    obj = weave.ref(ref2.uri()).get()
+    assert obj["b"] == {"a": 5}
