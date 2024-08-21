@@ -21,6 +21,7 @@ import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {isRef} from '../common/util';
 import {
   LIST_INDEX_EDGE_NAME,
@@ -163,6 +164,37 @@ export const ObjectViewer = ({
       }
     > = [];
     traverse(resolvedData, context => {
+      // Ops should be migrated to the generic CustomWeaveType pattern, but for
+      // now they are custom handled.
+      const isOpPayload = context.value?.weave_type?.type === 'Op';
+
+      if (isCustomWeaveTypePayload(context.value) && !isOpPayload) {
+        /**
+         * This block adds an "empty" key that is used to render the custom
+         * weave type. In the event that a custom type has both properties AND
+         * custom views, then we might need to extend / modify this part.
+         */
+        const refBackingData = context.value?._ref;
+        let depth = context.depth;
+        let path = context.path;
+        if (refBackingData) {
+          contexts.push({
+            ...context,
+            isExpandableRef: true,
+          });
+          depth += 1;
+          path = context.path.plus('');
+        }
+        contexts.push({
+          depth,
+          isLeaf: true,
+          path,
+          value: context.value,
+          valueType: context.valueType,
+        });
+        return 'skip';
+      }
+
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
         const isNullDescription =
@@ -207,7 +239,8 @@ export const ObjectViewer = ({
       if (USE_TABLE_FOR_ARRAYS && context.valueType === 'array') {
         return 'skip';
       }
-      if (context.value?._ref && context.value?.weave_type?.type === 'Op') {
+      if (context.value?._ref && isOpPayload) {
+        // This should be moved to the CustomWeaveType pattern.
         contexts.push({
           depth: context.depth + 1,
           isLeaf: true,
@@ -377,11 +410,15 @@ export const ObjectViewer = ({
             isRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
           const {isCode} = params.model;
+          const isCustomWeaveType = isCustomWeaveTypePayload(
+            params.model.value
+          );
           if (
             isNonRefString ||
             (isArray && USE_TABLE_FOR_ARRAYS) ||
             isTableRef ||
-            isCode
+            isCode ||
+            isCustomWeaveType
           ) {
             return 'auto';
           }

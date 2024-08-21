@@ -15,11 +15,10 @@ from pydantic import BaseModel, ValidationError
 import weave
 from weave import Thread, ThreadPoolExecutor, weave_client
 from weave.trace.vals import MissingSelfInstanceError
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-
-from ..trace_server import trace_server_interface as tsi
-from ..trace_server.trace_server_interface_util import (
+from weave.trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
@@ -2142,6 +2141,44 @@ def test_call_query_stream_equality(client):
         i += 1
 
     assert i == len(calls.calls)
+
+
+def test_call_query_stream_columns(client):
+    @weave.op
+    def calculate(a: int, b: int) -> int:
+        return {"result": {"a + b": a + b}, "not result": 123}
+
+    for i in range(2):
+        calculate(i, i * i)
+
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "inputs"],
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert len(calls[0].inputs) == 2
+
+    # NO output returned because not required and not requested
+    assert calls[0].output is None
+    assert calls[0].ended_at is None
+    assert calls[0].attributes == {}
+    assert calls[0].inputs == {"a": 0, "b": 0}
+
+    # now explicitly get output
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "inputs", "output.result"],
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].output["result"]["a + b"] == 0
+    assert calls[0].attributes == {}
+    assert calls[0].inputs == {"a": 0, "b": 0}
 
 
 @pytest.mark.skip("Not implemented: filter / sort through refs")

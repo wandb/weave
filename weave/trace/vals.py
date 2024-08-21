@@ -292,7 +292,13 @@ class WeaveTable(Traceable):
 
             for item in response.rows:
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
-                yield make_trace_obj(item.val, new_ref, self.server, self.root)
+                res = from_json(
+                    item.val,
+                    self.table_ref.entity + "/" + self.table_ref.project,
+                    self.server,
+                )
+                res = make_trace_obj(res, new_ref, self.server, self.root)
+                yield res
 
             if len(response.rows) < page_size:
                 break
