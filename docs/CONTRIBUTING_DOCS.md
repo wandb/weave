@@ -116,6 +116,8 @@ To improve docs, basically follow FastAPI's instructions to create good Swagger 
 
 ### Notebook Doc Gen
 
+Run `python scripts/generate_notebook.py` inside of `docs/` to automatically create a markdown version of the notebook. Add all new files to the commit.
+
 See `docs/scripts/generate_notebooks.py`, `./docs/notebooks`, and `./docs/reference/gen_notebooks`.
 
 This script will load all notebooks in `./docs/notebooks`, transforming them into viable markdown docs in `./docs/reference/gen_notebooks` which can be referenced by docusaurus just like any other markdown file. If you need header metadata, you can add a markdown block at the top of your notebook with:
@@ -127,3 +129,8 @@ title: Head Metadata
 docusaurus_head_meta::end -->
 ```
 
+# Troubleshooting
+- Make sure to update your version of pip (tested on 24.2) before installing the requirements.dev.txt
+- Using the `docs/scripts/generate_notebook.py`
+    - Make sure to be in `docs/` when you run this command (the script is looking for `./notebooks`)
+    - The conversion might break because specific cell output might be misinterpreted - if you can delete the cell output of package installations
