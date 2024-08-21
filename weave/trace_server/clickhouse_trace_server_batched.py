@@ -305,10 +305,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
 
         else:
+            ref_cache = LRUCache(max_size=1000)
+
             batch_size = 10
             batch = []
-
-            ref_cache = LRUCache(max_size=1000)
             for row in raw_res:
                 call_dict = _ch_call_dict_to_call_schema_dict(
                     dict(zip(select_columns, row))
@@ -322,8 +322,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
 
-                    batch = []
-
                     # *** Dynamic Batch Size ***
                     # count the number of columns at each depth
                     depths = Counter(col.count(".") for col in req.expand_columns)
@@ -333,6 +331,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     max_size = 1000 // max_count_at_ref_depth
                     # double batch size up to what refs_read_batch can handle
                     batch_size = min(max_size, batch_size * 2)
+                    batch = []
 
             hydrated_batch = self._hydrate_calls(batch, req.expand_columns, ref_cache)
             for call in hydrated_batch:
@@ -342,8 +341,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
-        ref_cache: typing.Dict[str, typing.Any],
+        ref_cache: LRUCache,
     ) -> list[dict[str, typing.Any]]:
+        if len(calls) == 0:
+            return calls
+
         # TODO: Implement feedback hydration here
 
         calls = self._expand_call_refs(calls, expand_columns, ref_cache)
@@ -372,7 +374,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
-        ref_cache: typing.Dict[str, typing.Any],
+        ref_cache: LRUCache,
     ) -> list[dict[str, typing.Any]]:
         # format expand columns by depth, iterate through each batch in order
         expand_column_by_depth = defaultdict(list)

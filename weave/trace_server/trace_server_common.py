@@ -1,24 +1,26 @@
 import copy
 from collections import OrderedDict
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
-def get_nested_key(d: Dict[str, Any], col: str) -> Any:
+def get_nested_key(d: Dict[str, Any], col: str) -> Optional[Any]:
     """
-    Get a nested key from a dict.
+    Get a nested key from a dict. None if not found.
 
     Example:
     get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c") -> "d"
+    get_nested_key({"a": {"b": {"c": "d"}}}, "a.b") -> {"c": "d"}
     get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c.e") -> None
+    get_nested_key({"a": {"b": {"c": "d"}}}, "foobar") -> None
     """
 
-    def _get(dictionary: Dict[str, Any], key: str) -> Any:
-        if isinstance(dictionary, dict):
-            return dictionary.get(key, {})
-        return None
+    def _get(data: Optional[Any], key: str) -> Optional[Any]:
+        if not data or not isinstance(data, dict):
+            return None
+        return data.get(key)
 
     keys = col.split(".")
-    curr = d
+    curr: Optional[Any] = d
     for key in keys[:-1]:
         curr = _get(curr, key)
     return _get(curr, keys[-1])
@@ -44,6 +46,6 @@ class LRUCache(OrderedDict):
         super().__init__(*args, **kwargs)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        if len(self) >= self.max_size:
+        if key not in self and len(self) >= self.max_size:
             self.popitem(last=False)
         super().__setitem__(key, value)
