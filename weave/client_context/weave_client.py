@@ -5,7 +5,7 @@ from weave.errors import WeaveInitError
 from weave.legacy import context_state
 
 if TYPE_CHECKING:
-    from weave.weave_client import WeaveClient
+    from weave.trace.weave_client import WeaveClient
 
 _global_weave_client: Optional["WeaveClient"] = None
 lock = threading.Lock()

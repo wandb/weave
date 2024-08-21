@@ -34,7 +34,7 @@ from weave.legacy.run import Run
 from weave.weavejs_fixes import fixup_node
 
 if typing.TYPE_CHECKING:
-    from weave import weave_client
+    from weave.trace import weave_client
     from weave.legacy.run_streamtable_span import RunStreamTableSpan
 
 

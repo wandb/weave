@@ -18,7 +18,7 @@ from . import util as _util
 
 from weave.legacy import context as _context
 from . import weave_init as _weave_init
-from . import weave_client as _weave_client
+from .trace import weave_client as _weave_client
 
 # exposed as part of api
 from . import weave_types as types
