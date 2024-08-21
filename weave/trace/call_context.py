@@ -6,7 +6,7 @@ import typing
 
 if typing.TYPE_CHECKING:
     # from .run import Run
-    from .weave_client import Call
+    from ..weave_client import Call
 
 _call_stack: contextvars.ContextVar[list["Call"]] = contextvars.ContextVar(
     "call", default=[]
