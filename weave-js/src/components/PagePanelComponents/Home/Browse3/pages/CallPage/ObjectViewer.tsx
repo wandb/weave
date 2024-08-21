@@ -298,7 +298,9 @@ export const ObjectViewer = ({
             }
           }
 
-          const colInner = <ValueView data={row} isExpanded={isExpanded} />;
+          const colInner = (
+            <ValueView data={row} isExpanded={isExpanded} maxHeight={300} />
+          );
           if (baseRef) {
             return (
               <WeaveCHTableSourceRefContext.Provider value={baseRef}>

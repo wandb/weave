@@ -24,9 +24,10 @@ type ValueData = Record<string, any>;
 type ValueViewProps = {
   data: ValueData;
   isExpanded: boolean;
+  maxHeight?: number;
 };
 
-export const ValueView = ({data, isExpanded}: ValueViewProps) => {
+export const ValueView = ({data, isExpanded, maxHeight}: ValueViewProps) => {
   const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
     if (data.valueType === 'object' && '_ref' in data.value) {
@@ -59,7 +60,13 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     if (data.value.startsWith('data:image/')) {
       return <ValueViewImage value={data.value} />;
     }
-    return <ValueViewString value={data.value} isExpanded={isExpanded} />;
+    return (
+      <ValueViewString
+        value={data.value}
+        isExpanded={isExpanded}
+        maxHeight={maxHeight}
+      />
+    );
   }
 
   if (data.valueType === 'number') {

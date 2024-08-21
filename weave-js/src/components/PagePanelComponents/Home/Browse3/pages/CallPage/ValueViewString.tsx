@@ -15,9 +15,8 @@ import {ValueViewStringFormatMenu} from './ValueViewStringFormatMenu';
 type ValueViewStringProps = {
   value: string;
   isExpanded: boolean;
+  maxHeight?: number;
 };
-
-const MAX_SCROLL_HEIGHT = 300;
 
 const Column = styled.div`
   display: flex;
@@ -51,7 +50,6 @@ Collapsed.displayName = 'S.Collapsed';
 
 const Scrolling = styled.div`
   min-height: 38px;
-  max-height: ${MAX_SCROLL_HEIGHT}px;
   display: flex;
   align-items: center;
   overflow: auto;
@@ -60,7 +58,6 @@ Scrolling.displayName = 'S.Scrolling';
 
 const ScrollingInner = styled.div`
   width: 100%;
-  max-height: ${MAX_SCROLL_HEIGHT}px;
 `;
 ScrollingInner.displayName = 'S.ScrollingInner';
 
@@ -72,7 +69,11 @@ const PreserveWrapping = styled.div`
 `;
 PreserveWrapping.displayName = 'S.PreserveWrapping';
 
-export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
+export const ValueViewString = ({
+  value,
+  isExpanded,
+  maxHeight,
+}: ValueViewStringProps) => {
   const trimmed = value.trim();
   const hasScrolling = trimmed.indexOf('\n') !== -1 || value.length > 100;
   const [hasFull, setHasFull] = useState(false);
@@ -103,10 +104,10 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
   const scrollingRef = React.createRef<HTMLDivElement>();
 
   useEffect(() => {
-    if (scrollingRef.current) {
-      setHasFull(scrollingRef.current.offsetHeight >= MAX_SCROLL_HEIGHT);
+    if (scrollingRef.current && maxHeight) {
+      setHasFull(scrollingRef.current.offsetHeight >= maxHeight);
     }
-  }, [mode, value, scrollingRef]);
+  }, [mode, value, maxHeight, scrollingRef]);
 
   let toolbar = null;
   if (mode !== 0) {
@@ -188,8 +189,8 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     return (
       <Column>
         {toolbar}
-        <Scrolling ref={scrollingRef}>
-          <ScrollingInner>{content}</ScrollingInner>
+        <Scrolling ref={scrollingRef} style={{maxHeight}}>
+          <ScrollingInner style={{maxHeight}}>{content}</ScrollingInner>
         </Scrolling>
       </Column>
     );
