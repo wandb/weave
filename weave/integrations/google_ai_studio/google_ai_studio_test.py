@@ -40,16 +40,12 @@ def op_name_from_ref(ref: str) -> str:
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
 def test_content_generation(client: WeaveClient) -> None:
     import google.generativeai as genai
 
-    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", "DUMMY_API_KEY"))
+    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content("Write a story about an AI and magic")
+    model.generate_content("Write a story about an AI and magic")
 
     weave_server_response = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
@@ -68,10 +64,6 @@ def test_content_generation(client: WeaveClient) -> None:
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
 def test_content_generation_stream(client: WeaveClient) -> None:
     import google.generativeai as genai
 
@@ -100,10 +92,6 @@ def test_content_generation_stream(client: WeaveClient) -> None:
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
 def test_content_generation_async(client: WeaveClient) -> None:
     import google.generativeai as genai
 
@@ -132,10 +120,6 @@ def test_content_generation_async(client: WeaveClient) -> None:
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-)
 def test_content_generation_async_stream(client: WeaveClient) -> None:
     import google.generativeai as genai
 
