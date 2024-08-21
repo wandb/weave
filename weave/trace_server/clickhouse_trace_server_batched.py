@@ -457,20 +457,35 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             if feedback_format == "basic":
                 call["summary"]["feedback"] = feedback_items
+            # elif feedback_format in ["emoji", "emoji+note"]:
+            #     emoji_count: dict[str, int] = {}
+            #     notes: dict[str, str] = {}
+            #     for feedback_item in feedback_items:
+            #         if feedback_item["feedback_type"] == "wandb.reaction.1":
+            #             emoji_str = feedback_item["payload"]["alias"].replace(":", "")
+            #             emoji_count[emoji_str] = emoji_count.get(emoji_str, 0) + 1
+            #         elif (
+            #             feedback_format == "emoji+note"
+            #             and feedback_item["feedback_type"] == "wandb.note.1"
+            #         ):
+            #             notes[str(len(notes) + 1)] = feedback_item["payload"]["note"]
+            #     call["summary"]["feedback"] = emoji_count
             elif feedback_format in ["emoji", "emoji+note"]:
-                emoji_count: dict[str, int] = {}
-                notes: dict[str, str] = {}
+                count = 0
+                notes = []
                 for feedback_item in feedback_items:
                     if feedback_item["feedback_type"] == "wandb.reaction.1":
-                        emoji_str = feedback_item["payload"]["alias"].replace(":", "")
-                        emoji_count[emoji_str] = emoji_count.get(emoji_str, 0) + 1
+                        count += 1
                     elif (
                         feedback_format == "emoji+note"
                         and feedback_item["feedback_type"] == "wandb.note.1"
                     ):
-                        notes[str(len(notes) + 1)] = feedback_item["payload"]["note"]
+                        notes += [feedback_item["payload"]["note"]]
 
-                call["summary"]["feedback"] = emoji_count
+                call["summary"]["feedback"] = {
+                    "emoji_count": count,
+                    "notes": " | ".join(notes),
+                }
 
         return calls
 
