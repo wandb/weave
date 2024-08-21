@@ -39,6 +39,7 @@ from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
+from weave.trace.refs import CallRef
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -392,6 +393,86 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             for (i, col), val in zip(refs_to_resolve, vals):
                 set_nested_key(calls[i], col, val)
+
+        return calls
+
+    def _add_feedback_to_calls(
+        self,
+        calls: list[dict[str, typing.Any]],
+        expand_columns: typing.List[str],
+    ) -> list[dict[str, typing.Any]]:
+        # TODO: LOL
+        feedback_format = ""
+        if "feedback.emoji" in expand_columns:
+            feedback_format = "emoji"
+        if "feedback.note" in expand_columns:
+            feedback_format += "+note"
+        elif "feedback" in expand_columns:
+            feedback_format = "basic"
+        if not feedback_format:
+            return calls
+
+        feedback_map = defaultdict(list)
+
+        # Batch feedback queries by project_id
+        project_id_to_weave_refs = defaultdict(list)
+        for call in calls:
+            entity, project = call["project_id"].split("/")
+            weave_ref = CallRef(entity=entity, project=project, id=call["id"]).uri()
+            project_id_to_weave_refs[call["project_id"]].append(weave_ref)
+
+        for project_id, call_refs in project_id_to_weave_refs.items():
+            query = tsi.Query(
+                **{
+                    "$expr": {
+                        "$in": [
+                            {"$getField": "id"},
+                            [{"$literal": call_ref} for call_ref in call_refs],
+                        ]
+                    }
+                }
+            )
+            feedback_query_req = tsi.FeedbackQueryReq(
+                project_id=project_id,
+                fields=[
+                    "feedback_type",
+                    "weave_ref",
+                    "payload",
+                    "creator",
+                    "created_at",
+                    "wb_user_id",
+                ],
+                query=query,
+            )
+            feedback = self.feedback_query(req=feedback_query_req).result
+            for feedback_item in feedback:
+                feedback_map[feedback_item["weave_ref"]].append(feedback_item)
+
+        for call in calls:
+            ref = CallRef(entity=entity, project=project, id=call["id"]).uri()
+            feedback_items = feedback_map.get(ref)
+            if not feedback_items:
+                continue
+
+            if "summary" not in call:
+                call["summary"] = {}
+
+            if feedback_format == "basic":
+                call["summary"]["feedback"] = feedback_items
+            elif feedback_format in ["emoji", "emoji+note"]:
+                emoji_count: dict[str, int] = {}
+                notes: dict[str, str] = {}
+                for feedback_item in feedback_items:
+                    if feedback_item["feedback_type"] == "wandb.reaction.1":
+                        emoji_str = feedback_item["payload"]["alias"].replace(":", "")
+                        emoji_count[emoji_str] = emoji_count.get(emoji_str, 0) + 1
+                    elif (
+                        feedback_format == "emoji+note"
+                        and feedback_item["feedback_type"] == "wandb.note.1"
+                    ):
+                        notes[str(len(notes) + 1)] = feedback_item["payload"]["note"]
+
+                call["summary"]["feedback"] = emoji_count
 
         return calls
 

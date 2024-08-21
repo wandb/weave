@@ -43,11 +43,22 @@ class LLMCostSchema(LLMUsageSchema):
     created_by: Optional[str]
 
 
+class FeedbackDict(TypedDict, total=False):
+    id: str
+    feedback_type: str
+    weave_ref: str
+    payload: Dict[str, Any]
+    creator: Optional[str]
+    created_at: Optional[str]
+    wb_user_id: Optional[str]
+
+
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
     status: Optional[Literal["success", "error", "running"]]
     nice_trace_name: Optional[str]
     latency: Optional[int]
     costs: Optional[Dict[str, LLMCostSchema]]
+    feedback: Optional[List[FeedbackDict]]
 
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
