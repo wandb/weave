@@ -10,7 +10,6 @@ def get_nested_key(d: Dict[str, Any], col: str) -> Optional[Any]:
     Example:
     get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c") -> "d"
     get_nested_key({"a": {"b": {"c": "d"}}}, "a.b") -> {"c": "d"}
-    get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c.e") -> None
     get_nested_key({"a": {"b": {"c": "d"}}}, "foobar") -> None
     """
 
@@ -32,11 +31,18 @@ def set_nested_key(d: Dict[str, Any], col: str, val: Any) -> None:
 
     Example:
     set_nested_key({"a": {"b": "c"}}, "a.b", "e") -> {"a": {"b": "e"}}
+    set_nested_key({"a": {"b": "e"}}, "a.b.c", "e") -> {"a": {"b": {"c": "e"}}}
     """
     keys = col.split(".")
+    if not keys[-1]:
+        # If the columns is misformatted just return (ex: "a.b.")
+        return
+
     curr = d
     for key in keys[:-1]:
-        curr = curr.setdefault(key, {})
+        if key not in curr or not isinstance(curr[key], dict):
+            curr[key] = {}
+        curr = curr[key]
     curr[keys[-1]] = copy.deepcopy(val)
 
 
