@@ -124,6 +124,10 @@ export const isValuelessOperator = (operator: string) => {
   return VALUELESS_OPERATORS.has(operator);
 };
 
+export const isNumericOperator = (operator: string) => {
+  return operator.startsWith('(number):');
+};
+
 export type SelectOperatorOption = {
   value: string;
   label: string;

@@ -12,6 +12,7 @@ import {StyledDateTimePicker} from '../StyledDateTimePicker';
 import {
   getFieldType,
   getStringList,
+  isNumericOperator,
   isValuelessOperator,
   isWeaveRef,
 } from './common';
@@ -65,5 +66,6 @@ export const SelectValue = ({
     return <ValueInputBoolean value={value} onSetValue={onSetValue} />;
   }
 
-  return <TextValue value={value} onSetValue={onSetValue} />;
+  const type = isNumericOperator(operator) ? 'number' : 'text';
+  return <TextValue value={value} onSetValue={onSetValue} type={type} />;
 };
