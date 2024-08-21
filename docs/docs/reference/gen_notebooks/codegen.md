@@ -15,16 +15,9 @@ title: Code Generation
 
 # Code Generation using Weave and OpenAI
 
-Generating high-quality code with proper structure, documentation, and tests is a challenging task. This guide demonstrates how to implement a code generation pipeline using Weave, a powerful framework for building, tracking, and evaluating LLM applications. By combining OpenAI's language models with Weave's robust tooling, you'll learn to create a code generation pipeline that produces high-quality Python functions, complete with main program runners and unit tests, while gaining insights into the generation process.
+Generating high-quality code with proper structure, documentation, and tests is a challenging task. This guide demonstrates how to implement a code generation pipeline. You'll learn to create a code generation pipeline that produces high-quality Python functions, complete with main program runners and unit tests.
 
-Our pipeline will:
-
-1. Generate the main code based on a simple prompt
-2. Create a program runner to execute the code
-3. Produce comprehensive unit tests
-4. Evaluate the quality of the generated code
-
-We'll use Weave for pipeline orchestration and tracking, and OpenAI's GPT models for code generation. This combination allows for powerful code generation with robust evaluation and logging capabilities.
+We'll use Weave for evaluation comparison and tracking, and OpenAI's GPT models for code generation using structured outputs.
 
 ![Evaluation](./media/codegen/eval_dash.png)
 
@@ -40,12 +33,8 @@ This video provides a step-by-step walkthrough of the process, showcasing how We
 
 In this tutorial, we'll use Weave to implement and evaluate a code generation pipeline. You'll learn how to:
 
-1. **Track your LLM pipeline**: Use Weave to automatically log inputs, outputs, and intermediate steps of your code generation process.
-2. **Evaluate LLM outputs**: Create rigorous, apples-to-apples evaluations of your generated code using Weave's built-in tools.
-3. **Build composable operations**: Combine and reuse Weave operations across different parts of your code generation pipeline.
-4. **Integrate seamlessly**: Add Weave to your existing Python code with minimal overhead.
-
-By the end of this tutorial, you'll have created a code generation pipeline that leverages Weave's capabilities for model serving, evaluation, and result tracking.
+1. **Track your LLM pipeline**: Log inputs, outputs, and intermediate steps of your code generation process.
+2. **Evaluate LLM outputs**: Create and compare evaluations of your generated code with rich debugging tools and visualizations.
 
 ## Set up the environment
 
@@ -167,12 +156,14 @@ This `CodeFormatter` class provides several Weave operations to clean and format
 
 ![Code Generation Pipeline](./media/codegen/codegen_trace.png)
 
-Now, let's implement the core code generation logic using Weave operations:
+Now, let's implement the core code generation logic:
 
 1. **Generate code**: Create initial code from prompt
 2. **Create runner**: Generate main function to execute code
 3. **Generate tests**: Create unit tests for code and runner
 4. **Return results**: Combine formatted code, runner, and tests
+
+We're using a `weave.Model` so that it's automatically versioned when it changes. We're also keeping the `model_name` as an attribute so that we can experiment with it and easily diff & compare it in Weave. We're tracking our function calls with `@weave.op` so the inputs & outputs are logged to help with error tracking and debugging. 
 
 
 ```python
@@ -308,7 +299,49 @@ This `CodeGenerationPipeline` class encapsulates our code generation logic as a 
 
 ## Implement evaluation metrics
 
-To assess the quality of our generated code, we'll implement simple evaluation metrics:
+To assess the quality of our generated code, we'll implement simple evaluation metrics using a `weave.Scorer` subclass. This will run `score` on every `model_output` from our dataset. `model_output` comes from the output of the `predict` function in our `weave.Model`. `prompt` is taken from our dataset. You can also use something like `human-eval` for this. 
+
+Note for Anish:
+https://wandb.ai/shawn/humaneval6/weave
+
+Shawn implemented human eval here: https://wandb.ai/shawn/humaneval6/weave/calls?filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fshawn%2Fhumaneval6%2Fop%2FEvaluation.predict_and_score%3ANmwfShfFmgAhDGLXrF6Xn02T9MIAsCXBUcifCjyKpOM%22%5D%2C%22parentId%22%3A%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%7D&peekPath=%2Fshawn%2Fhumaneval6%2Fcalls%2F27d108e1-7524-4042-ba1b-a5ede9c176b2%3Fpath%3DEvaluation.predict_and_score*491%2Bscore_humaneval_test*0%26tracetree%3D1
+
+
+```python
+async def score_humaneval_test(test: str, entry_point: str, model_output: str):
+    # Generate the full source code
+    full_code = CODE_TEMPLATE.format(
+        model_output=model_output, test=test, entry_point=entry_point
+    )
+
+    # Create a temporary file to store the code
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as tmp_file:
+        # Write the generated code to the temporary file
+        tmp_file.write(full_code.encode())
+        tmp_file_path = tmp_file.name
+
+    try:
+        # Run the temporary Python file as a subprocess with a timeout
+        result = subprocess.run(
+            ["python", tmp_file_path],
+            capture_output=True,
+            text=True,
+            timeout=10,  # Timeout of 10 seconds
+        )
+
+        if result.returncode == 0:
+            return {"correct": True}
+        else:
+            return {"correct": False, "error": result.stderr, "output": result.stdout}
+    except subprocess.TimeoutExpired:
+        return {"correct": False, "error": "TimeoutExpired"}
+    except Exception as e:
+        return {"correct": False, "error": traceback.format_exc()}
+    finally:
+        # Ensure the temporary file is removed after execution
+        os.remove(tmp_file_path)
+
+```
 
 
 ```python
@@ -442,3 +475,8 @@ In this example, we've demonstrated how to implement a code generation pipeline 
 Weave's seamless integration allows us to track inputs, outputs, and intermediate steps throughout the code generation process, making it easier to debug, optimize, and evaluate our LLM application.
 
 For more information on Weave and its capabilities, check out the [Weave documentation](https://docs.wandb.ai/weave). You can extend this example to handle larger datasets, implement more sophisticated evaluation metrics, or integrate with other LLM workflows.
+
+
+```python
+
+```
