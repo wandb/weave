@@ -121,6 +121,11 @@ class GteOperation(BaseModel):
     gte_: typing.Tuple["Operand", "Operand"] = Field(alias="$gte")
 
 
+# https://www.mongodb.com/docs/manual/reference/operator/aggregation/in/
+class InOperation(BaseModel):
+    in_: typing.Tuple["Operand", list["Operand"]] = Field(alias="$in")
+
+
 # This is not technically in the Mongo spec. Mongo has:
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/regexMatch/,
 # however, rather than support a full regex match right now, we will
@@ -143,6 +148,7 @@ Operation = typing.Union[
     EqOperation,
     GtOperation,
     GteOperation,
+    InOperation,
     ContainsOperation,
 ]
 Operand = typing.Union[
@@ -159,4 +165,5 @@ NotOperation.model_rebuild()
 EqOperation.model_rebuild()
 GtOperation.model_rebuild()
 GteOperation.model_rebuild()
+InOperation.model_rebuild()
 ContainsOperation.model_rebuild()
