@@ -2520,7 +2520,6 @@ def test_calls_stream_column_expansion(client):
     )
 
     call_result = list(res)[0]
-    print(call_result)
     assert call_result.output["b"] == simple_ref.uri()
 
     # expand 2 refs, should be {"b": {"a": ref}}
@@ -2532,7 +2531,6 @@ def test_calls_stream_column_expansion(client):
         )
     )
     call_result = list(res)[0]
-    print(call_result)
     assert call_result.output["b"]["a"] == ref.uri()
 
     # expand 3 refs, should be {"b": {"a": {"id": 123}}}
@@ -2544,7 +2542,6 @@ def test_calls_stream_column_expansion(client):
         )
     )
     call_result = list(res)[0]
-    print(call_result)
     assert call_result.output["b"]["a"]["id"] == "123"
 
     # incomplete expansion columns, output should be un expanded
@@ -2556,7 +2553,6 @@ def test_calls_stream_column_expansion(client):
         )
     )
     call_result = list(res)[0]
-    print(call_result)
     assert call_result.output == nested_ref.uri()
 
     # non-existent column, should be un expanded
@@ -2568,5 +2564,4 @@ def test_calls_stream_column_expansion(client):
         )
     )
     call_result = list(res)[0]
-    print(call_result)
     assert call_result.output == nested_ref.uri()
