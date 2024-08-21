@@ -315,18 +315,13 @@ artifact_version_sdk_response = {
     ],
 )
 def test_table_call(table_file_node_fn, mock_response, fake_wandb):
-    print(f"{mock_response=}")
     fake_wandb.fake_api.add_mock(lambda q, ndx: mock_response)
     table_file_node = table_file_node_fn()
     table_image0_node = table_file_node.table().rows()[0]["image"]
     table_image0 = weave.use(table_image0_node)
-    print(f"{table_file_node=}")
-    print(f"{table_image0_node=}")
-    print(f"{table_image0=}")
     assert table_image0.height == 299
     assert table_image0.width == 299
     assert table_image0.path == "media/images/6274b7484d7ed4b6ad1b.png"
-    raise
 
 
 def test_avfile_type(fake_wandb):
