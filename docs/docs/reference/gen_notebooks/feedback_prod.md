@@ -130,25 +130,13 @@ def predict(input_data):
     return some_result
 ```
 
-    /Users/scottcondron/miniconda3/envs/weave/lib/python3.11/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-      from .autonotebook import tqdm as notebook_tqdm
-
-
-    weave version 0.50.14 is available!  To upgrade, please run:
-     $ pip install weave --upgrade
-    Logged in as Weights & Biases user: _scott.
-    View Weave data at https://wandb.ai/_scott/feedback-example/weave
-
-
 We can use it as usal to deliver some model response to the user:
 
 
 ```python
-result = predict(input_data="your data here") # user question through the App UI
+with weave.attributes({'session': '123abc'}): # attach arbitrary attributes to the call
+    result = predict(input_data="your data here") # user question through the App UI
 ```
-
-    🍩 https://wandb.ai/_scott/feedback-example/r/call/ad3464ae-2c75-4034-a027-8bae26825895
-
 
 To attach feedback, you need the `call` object, which is obtained by using the `.call()` method *instead of calling the function as normal*:
 
@@ -156,9 +144,6 @@ To attach feedback, you need the `call` object, which is obtained by using the `
 ```python
 result, call = predict.call(input_data="your data here")
 ```
-
-    🍩 https://wandb.ai/_scott/feedback-example/r/call/187af172-ca3f-4d41-aa54-065a999f406f
-
 
 This call object is needed for attaching feedback to the specific response.
 After making the call, the output of the operation is available using `result` above.
@@ -168,14 +153,9 @@ After making the call, the output of the operation is available using `result` a
 call.feedback.add_reaction("👍") # user reaction through the App UI
 ```
 
-
-
-
-    '01916b30-7071-76a3-b23c-55c05c16b565'
-
-
-
 ## Retrieving Feedback 
+
+We can pull feedback and their associated calls using weaves export APIs. 
 
 
 ```python
@@ -186,6 +166,14 @@ for call in calls:
     print(call.feedback)
 ```
 
+First, we gather all feedback of a certain type using `client.feedback(reaction="👎")`, then we can get the associalted calls with `.refs().calls()`. Finally, we can get the inputs and feedback of each call. 
+
+:::tip 
+After some post-processing, this can be used to build a `weave.Dataset` for use in `weave.Evaluation`.
+:::
+
 ## Conclusion
 
-In this tutorial, we built a chat UI with Streamlit which had inputs & outputs captured in Weave, alongside 👍👎 buttons to capture user feedback.
+In this tutorial, we built a chat UI with Streamlit which had inputs & outputs captured in Weave, alongside 👍👎 buttons to capture user feedback. We then showed how to retrieve and filter feedback using export APIs.
+
+
