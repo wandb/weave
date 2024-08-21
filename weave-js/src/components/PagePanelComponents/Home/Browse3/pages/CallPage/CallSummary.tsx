@@ -32,7 +32,7 @@ export const CallSummary: React.FC<{
   );
 
   return (
-    <div style={{padding: 8}}>
+    <div style={{padding: 8, overflow: 'auto'}}>
       <SimpleKeyValueTable
         data={{
           Operation:
