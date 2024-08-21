@@ -39,7 +39,6 @@ from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
-from weave.trace.refs import CallRef
 from weave.trace_server.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -347,8 +346,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(calls) == 0:
             return calls
 
-        # TODO: Implement feedback hydration here
-
+        calls = self._add_feedback_to_calls(calls, expand_columns)
         calls = self._expand_call_refs(calls, expand_columns, ref_cache)
         return calls
 
@@ -415,23 +413,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         feedback_map = defaultdict(list)
 
         # Batch feedback queries by project_id
-        project_id_to_weave_refs = defaultdict(list)
-        for call in calls:
-            entity, project = call["project_id"].split("/")
-            weave_ref = CallRef(entity=entity, project=project, id=call["id"]).uri()
-            project_id_to_weave_refs[call["project_id"]].append(weave_ref)
+        # project_id_to_weave_refs = defaultdict(list)
+        # for call in calls:
+        #     entity, project = call["project_id"].split("/")
+        #     weave_ref = CallRef(entity=entity, project=project, id=call["id"]).uri()
+        #     project_id_to_weave_refs[call["project_id"]].append(weave_ref)
 
-        for project_id, call_refs in project_id_to_weave_refs.items():
-            query = tsi.Query(
-                **{
-                    "$expr": {
-                        "$in": [
-                            {"$getField": "id"},
-                            [{"$literal": call_ref} for call_ref in call_refs],
-                        ]
-                    }
-                }
-            )
+        for project_id in set(call["project_id"] for call in calls):
+            # query = tsi.Query(
+            #     **{
+            #         "$expr": {
+            #             "$in": [
+            #                 {"$getField": "id"},
+            #                 [{"$literal": call_ref} for call_ref in call_refs],
+            #             ]
+            #         }
+            #     }
+            # )
             feedback_query_req = tsi.FeedbackQueryReq(
                 project_id=project_id,
                 fields=[
@@ -442,15 +440,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "created_at",
                     "wb_user_id",
                 ],
-                query=query,
+                # query=query,
             )
             feedback = self.feedback_query(req=feedback_query_req).result
             for feedback_item in feedback:
-                feedback_map[feedback_item["weave_ref"]].append(feedback_item)
+                _id = feedback_item["weave_ref"].split("/")[-1]
+                feedback_map[_id].append(feedback_item)
 
         for call in calls:
-            ref = CallRef(entity=entity, project=project, id=call["id"]).uri()
-            feedback_items = feedback_map.get(ref)
+            feedback_items = feedback_map.get(call["id"])
             if not feedback_items:
                 continue
 
