@@ -10,7 +10,7 @@ import {TargetBlank} from '../../../../../../common/util/links';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {ValueViewStringFormatMenu} from './ValueViewStringFormatMenu';
+import {Format, ValueViewStringFormatMenu} from './ValueViewStringFormatMenu';
 
 type ValueViewStringProps = {
   value: string;
@@ -84,7 +84,7 @@ const isLikelyMarkdown = (value: string): boolean => {
   return LIKELY_MARKDOWN_PATTERNS.some(pattern => pattern.test(value));
 };
 
-const getDefaultFormat = (value: string): string => {
+const getDefaultFormat = (value: string): Format => {
   // TODO: Add JSON detection.
   if (isLikelyMarkdown(value)) {
     return 'Markdown';
@@ -119,7 +119,7 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     toast('Copied to clipboard');
   }, [value]);
 
-  const onSetFormat = (newFormat: string) => {
+  const onSetFormat = (newFormat: Format) => {
     setFormat(newFormat);
   };
 
