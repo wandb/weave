@@ -293,6 +293,10 @@ def op(
 def op(func: Any) -> Op: ...
 
 
+@overload
+def op(*, display_name: str) -> Callable[[Any], Op]: ...
+
+
 def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     """
     A decorator to weave op-ify a function or method.  Works for both sync and async.
@@ -386,12 +390,14 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._tracing_enabled = True  # type: ignore
 
+            # Set the display_name attribute
+            wrapper.display_name = kwargs.get("display_name", name)  # type: ignore
+
             return cast(Op, wrapper)
 
         return create_wrapper(func)
 
     if len(args) == 1 and len(kwargs) == 0 and callable(func := args[0]):
-        # return wrap(args[0])
         return op_deco(func)
 
     return op_deco
