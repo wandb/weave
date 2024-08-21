@@ -21,6 +21,7 @@ import React, {
 } from 'react';
 
 import {useWFHooks} from '../wfReactInterface/context';
+import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
   ContentType,
   fileExtensions,
@@ -148,6 +149,7 @@ export const ExportSelector = ({
     callQueryParams.project,
     selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
+    filterBy,
     refColumnsToExpand,
     sortBy
   );
@@ -156,6 +158,7 @@ export const ExportSelector = ({
     callQueryParams.project,
     selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
+    filterBy,
     refColumnsToExpand,
     sortBy
   );
@@ -424,6 +427,7 @@ function useMakeCodeText(
   project: string,
   callIds: string[] | undefined,
   filter: CallFilter,
+  query: Query | undefined,
   expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
@@ -435,11 +439,8 @@ function useMakeCodeText(
   if (filteredCallIds && filteredCallIds.length > 0) {
     codeStr += `   "call_ids": ["${filteredCallIds.join('", "')}"],\n`;
     if (expandColumns.length > 0) {
-      codeStr += `   "expand_columns": ${JSON.stringify(
-        expandColumns,
-        null,
-        0
-      )},\n`;
+      const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
+      codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
     }
     // specifying call_ids ignores other filters, return early
     codeStr += `})`;
@@ -464,12 +465,12 @@ function useMakeCodeText(
   if (filter.parentIds) {
     codeStr += `   "parent_ids": ["${filter.parentIds.join('", "')}"],\n`;
   }
+  if (query) {
+    codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;
+  }
   if (expandColumns.length > 0) {
-    codeStr += `   "expand_columns": ${JSON.stringify(
-      expandColumns,
-      null,
-      0
-    )},\n`;
+    const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
+    codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
   }
 
   if (sortBy.length > 0) {
@@ -486,6 +487,7 @@ function useMakeCurlText(
   project: string,
   callIds: string[] | undefined,
   filter: CallFilter,
+  query: Query | undefined,
   expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
@@ -513,6 +515,7 @@ curl '${baseUrl}/calls/stream_query' \\
   --data-raw '{
     "project_id":"${entity}/${project}",
     "filter":${filterStr},
+    "query":${JSON.stringify(query, null, 0)},
     "expand_columns":${JSON.stringify(expandColumns, null, 0)},
     "limit":${MAX_EXPORT},
     "offset":0,
