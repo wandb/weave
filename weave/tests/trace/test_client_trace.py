@@ -2309,7 +2309,7 @@ def test_in_operation(client):
 
     call_ids = [call.id for call in test_op.calls()]
     assert len(call_ids) == 4
-    
+
     query = {
         "$in": [
             {"$getField": "id"},
