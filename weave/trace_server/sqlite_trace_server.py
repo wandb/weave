@@ -11,7 +11,6 @@ from zoneinfo import ZoneInfo
 
 import emoji
 
-from weave.trace.refs import CallRef
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -31,7 +30,11 @@ from weave.trace_server.refs_internal import (
     is_ref_str,
     parse_internal_uri,
 )
-from weave.trace_server.trace_server_common import get_nested_key, set_nested_key
+from weave.trace_server.trace_server_common import (
+    get_nested_key,
+    hydrate_calls_with_feedback,
+    set_nested_key,
+)
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -463,12 +466,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                             {json_field: data}, req.expand_columns
                         )[json_field]
                     call_dict[json_field] = data
-            if req.expand_columns:
-                feedback = self._add_feedback_to_calls(row, req.expand_columns)
-                if feedback:
-                    if "summary" not in call_dict:
-                        call_dict["summary"] = {}
-                    call_dict["summary"]["feedback"] = feedback
             # convert empty string display_names to None
             if "display_name" in call_dict and call_dict["display_name"] == "":
                 call_dict["display_name"] = None
@@ -483,7 +480,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         raise ValueError(f"Field '{col}' is required for selection")
                     else:
                         call_dict[col] = {}
-            calls.append(tsi.CallSchema(**call_dict))
+            calls += [call_dict]
+
+        if req.expand_columns:
+            calls = hydrate_calls_with_feedback(self, calls, req.expand_columns)
+
         return tsi.CallsQueryRes(calls=calls)
 
     def _expand_refs(
@@ -508,61 +509,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             set_nested_key(data, col, derefed_val)
 
         return data
-
-    def _add_feedback_to_calls(
-        self, call: Dict[str, Any], expand_columns: list[str]
-    ) -> Optional[Any]:
-        feedback_format = ""
-        if "feedback.emoji" in expand_columns:
-            feedback_format = "emoji"
-        if "feedback.note" in expand_columns:
-            feedback_format += "+note"
-        if not feedback_format:
-            return None
-
-        entity, project = call["project_id"].split("/")
-        weave_ref = CallRef(entity=entity, project=project, id=call["id"]).uri()
-        query = tsi.Query(
-            **{
-                "$expr": {
-                    "$eq": [
-                        {"$getField": "id"},
-                        [{"$literal": weave_ref}],
-                    ]
-                }
-            }
-        )
-        feedback_query_req = tsi.FeedbackQueryReq(
-            project_id=call["project_id"],
-            fields=[
-                "feedback_type",
-                "weave_ref",
-                "payload",
-                "creator",
-                "created_at",
-                "wb_user_id",
-            ],
-            query=query,
-        )
-        feedback = self.feedback_query(req=feedback_query_req).result
-        if "summary" not in call:
-            call["summary"] = {}
-
-        if feedback_format == "basic":
-            return feedback
-
-        count = 0
-        notes = []
-        for feedback_item in feedback:
-            if feedback_item["feedback_type"] == "wandb.reaction.1":
-                count += 1
-            elif (
-                feedback_format == "emoji+note"
-                and feedback_item["feedback_type"] == "wandb.note.1"
-            ):
-                notes += [feedback_item["payload"]["note"]]
-
-        return {"emoji_count": count, "notes": " | ".join(notes)}
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)

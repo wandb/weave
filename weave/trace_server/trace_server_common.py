@@ -1,6 +1,110 @@
 import copy
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from typing import Any, Dict, Optional
+
+from weave.trace_server.refs_internal import InternalCallRef
+from weave.trace_server.trace_server_interface import (
+    FeedbackQueryReq,
+    Query,
+    TraceServerInterface,
+)
+
+
+def hydrate_calls_with_feedback(
+    trace_server: TraceServerInterface,
+    calls: list[dict[str, Any]],
+    expand_columns: list[str],
+) -> list[dict[str, Any]]:
+    # TODO: LOL
+    feedback_format = ""
+    if "feedback.emoji" in expand_columns:
+        feedback_format = "emoji"
+    if "feedback.note" in expand_columns:
+        feedback_format += "+note"
+    elif "feedback" in expand_columns:
+        feedback_format = "basic"
+    if not feedback_format:
+        return calls
+
+    feedback_map = defaultdict(list)
+
+    # Batch feedback queries by project_id
+    project_id_to_weave_refs = defaultdict(list)
+    for call in calls:
+        weave_ref = InternalCallRef(project_id=call["project_id"], id=call["id"])
+        project_id_to_weave_refs[call["project_id"]].append(weave_ref.uri())
+
+    # This goes project by project for extra safety, even though
+    # calls_stream_query should only return calls in a single project
+    for project_id, call_refs in project_id_to_weave_refs.items():
+        query = Query(
+            **{
+                "$expr": {
+                    "$in": [
+                        {"$getField": "weave_ref"},
+                        [{"$literal": call_ref} for call_ref in call_refs],
+                    ]
+                }
+            }
+        )
+        feedback_query_req = FeedbackQueryReq(
+            project_id=project_id,
+            fields=[
+                "feedback_type",
+                "weave_ref",
+                "payload",
+                "creator",
+                "created_at",
+                "wb_user_id",
+            ],
+            query=query,
+        )
+        feedback = trace_server.feedback_query(req=feedback_query_req).result
+        for feedback_item in feedback:
+            _id = feedback_item["weave_ref"].split("/")[-1]
+            feedback_map[_id].append(feedback_item)
+
+    for call in calls:
+        feedback_items = feedback_map.get(call["id"])
+        if not feedback_items:
+            continue
+
+        if "summary" not in call:
+            call["summary"] = {}
+
+        if feedback_format == "basic":
+            call["summary"]["feedback"] = feedback_items
+        # elif feedback_format in ["emoji", "emoji+note"]:
+        #     emoji_count: dict[str, int] = {}
+        #     notes: dict[str, str] = {}
+        #     for feedback_item in feedback_items:
+        #         if feedback_item["feedback_type"] == "wandb.reaction.1":
+        #             emoji_str = feedback_item["payload"]["alias"].replace(":", "")
+        #             emoji_count[emoji_str] = emoji_count.get(emoji_str, 0) + 1
+        #         elif (
+        #             feedback_format == "emoji+note"
+        #             and feedback_item["feedback_type"] == "wandb.note.1"
+        #         ):
+        #             notes[str(len(notes) + 1)] = feedback_item["payload"]["note"]
+        #     call["summary"]["feedback"] = emoji_count
+        elif feedback_format in ["emoji", "emoji+note"]:
+            count = 0
+            notes = []
+            for feedback_item in feedback_items:
+                if feedback_item["feedback_type"] == "wandb.reaction.1":
+                    count += 1
+                elif (
+                    feedback_format == "emoji+note"
+                    and feedback_item["feedback_type"] == "wandb.note.1"
+                ):
+                    notes += [feedback_item["payload"]["note"]]
+
+            call["summary"]["feedback"] = {
+                "emoji_count": count,
+                "notes": " | ".join(notes),
+            }
+
+    return calls
 
 
 def get_nested_key(d: Dict[str, Any], col: str) -> Optional[Any]:
