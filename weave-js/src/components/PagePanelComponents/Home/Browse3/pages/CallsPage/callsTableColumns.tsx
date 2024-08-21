@@ -17,10 +17,7 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
-import {
-  getTokensAndCostFromUsage,
-  getUsageFromCellParams,
-} from '../CallPage/TraceUsageStats';
+import {getTokensAndCostFromCellParams} from '../CallPage/TraceCostStats';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
@@ -42,7 +39,7 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
 
-const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -351,13 +348,13 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {tokensNum} = getTokensAndCostFromUsage(usage);
+      const {tokensNum} = getTokensAndCostFromCellParams(cellParams.row);
       return tokensNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
+      const {tokens, tokenToolTip} = getTokensAndCostFromCellParams(
+        cellParams.row
+      );
       return <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTip} />;
     },
   });
@@ -372,13 +369,13 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: false,
     valueGetter: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {costNum} = getTokensAndCostFromUsage(usage);
+      const {costNum} = getTokensAndCostFromCellParams(cellParams.row);
       return costNum;
     },
     renderCell: cellParams => {
-      const usage = getUsageFromCellParams(cellParams.row);
-      const {cost, costToolTip} = getTokensAndCostFromUsage(usage);
+      const {cost, costToolTip} = getTokensAndCostFromCellParams(
+        cellParams.row
+      );
       return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
     },
   });

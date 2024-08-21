@@ -3,12 +3,16 @@ import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
 import {
   FORMAT_NUMBER_NO_DECIMALS,
   formatTokenCost,
-  getLLMTotalTokenCost,
 } from '@wandb/weave/util/llmTokenCosts';
 import React from 'react';
 
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {UsageData} from './TraceUsageStats';
+import {
+  LLMCostSchema,
+  LLMUsageSchema,
+} from '../wfReactInterface/traceServerClientTypes';
+import {sumCostData} from './TraceCostStats';
+import {sumUsageData} from './TraceUsageStats';
 
 const renderNumberCell = (params: GridRenderCellParams) => (
   <Box sx={{textAlign: 'right', width: '100%'}}>
@@ -54,48 +58,15 @@ const columns: GridColDef[] = [
   },
 ];
 
-export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
-  const usageData = Object.entries(usage ?? {}).map(([k, v]) => {
-    const promptTokens = v.input_tokens ?? v.prompt_tokens;
-    const completionTokens = v.output_tokens ?? v.completion_tokens;
-    return {
-      id: k,
-      ...v,
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: v.total_tokens || promptTokens + completionTokens,
-      cost: getLLMTotalTokenCost(k, promptTokens, completionTokens),
-    };
-  });
-
-  // if more than one model is used, add a row for the total usage
-  if (usageData.length > 1) {
-    const totalUsage = usageData.reduce(
-      (acc, curr) => {
-        const promptTokens = curr.input_tokens ?? curr.prompt_tokens;
-        const completionTokens = curr.output_tokens ?? curr.completion_tokens;
-        acc.requests += curr.requests;
-        acc.prompt_tokens += promptTokens;
-        acc.completion_tokens += completionTokens;
-        acc.total_tokens +=
-          curr.total_tokens || promptTokens + completionTokens;
-        acc.cost += curr.cost;
-        return acc;
-      },
-      {
-        requests: 0,
-        prompt_tokens: 0,
-        completion_tokens: 0,
-        total_tokens: 0,
-        cost: 0,
-      }
-    );
-
-    usageData.push({
-      id: 'Total',
-      ...totalUsage,
-    });
-  }
+export const CostTable = ({
+  costs,
+  usage,
+}: {
+  costs: {[key: string]: LLMCostSchema};
+  usage: {[key: string]: LLMUsageSchema};
+}) => {
+  const costData = sumCostData(costs);
+  const usageData = sumUsageData(usage);
 
   return (
     <StyledDataGrid
@@ -122,7 +93,7 @@ export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
       disableColumnPinning={false}
       columnHeaderHeight={38}
       columns={columns}
-      rows={usageData}
+      rows={costData.length ? costData : usageData}
       rowHeight={38}
       rowSelection={false}
       keepBorders={true}

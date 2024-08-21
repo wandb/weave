@@ -32,7 +32,8 @@ export const useCallsForQuery = (
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
   gridPage: GridPaginationModel,
-  expandedColumns: Set<string>
+  expandedColumns: Set<string>,
+  includeCosts?: boolean
 ) => {
   const {useCalls, useCallsStats} = useWFHooks();
   const offset = gridPage.page * gridPage.pageSize;
@@ -54,6 +55,7 @@ export const useCallsForQuery = (
     expandedColumns,
     {
       refetchOnDelete: true,
+      includeCosts,
     }
   );
 
