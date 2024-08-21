@@ -13,7 +13,7 @@ from weave.trace.refs import parse_uri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
 
-from . import util
+from .. import util
 
 
 class Feedbacks(AbstractRichContainer[tsi.Feedback]):
