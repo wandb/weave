@@ -190,7 +190,7 @@ rich.print(result)
 Executing this LLM workflow will cost approximately $0.05-$0.25 in OpenAI credits, depending on the number of attempts instructor needs makes to get the output in the desired format (which is set to 5).
 :::
 
-| ![](https://i.imgur.com/Etnjoyq.png) |
+| ![](../../../static/img/parse_arxiv_papers/predict_trace.png) |
 |---|
 | Here's how you can explore the traces of the `ArxivModel` in the Weave UI |
 
@@ -296,6 +296,6 @@ await evaluation.evaluate(arxiv_parser_model)
 Running the evaluation on 5 examples from evaluation dataset will cost approximately $0.25-$1.25 in OpenAI credits, depending on the number of attempts instructor needs makes to get the output in the desired format (which is set to 5) in evaluating each example.
 :::
 
-| ![](https://i.imgur.com/qFbt8T0.png) |
-|---|
+| ![](../../../static/img/parse_arxiv_papers/eval_trace.png)                                  |
+|-------------------------------------------------------------------------------|
 | Here's how you can explore and compare the evaluations traces in the Weave UI |

@@ -107,6 +107,10 @@ dspy_train_examples, dspy_val_examples = get_dataset(
 )
 ```
 
+| ![](../../../static/img/dspy_prompt_optimization/datasets.gif) |
+|--------------------------------------------------------------|
+| The datasets, once published, can be explored in the Weave UI |
+
 ## The DSPy Program
 
 [DSPy](https://dspy-docs.vercel.app) is a framework that pushes building new LM pipelines away from manipulating free-form strings and closer to programming (composing modular operators to build text transformation graphs) where a compiler automatically generates optimized LM invocation strategies and prompts from a program.
@@ -195,7 +199,7 @@ prediction = baseline_model.predict(dspy_train_examples[0]["question"])
 rich.print(prediction)
 ```
 
-| ![](https://i.imgur.com/woHRHjR.png) |
+| ![](../../../static/img/dspy_prompt_optimization/dspy_module_trace.png) |
 |---|
 | Here's how you can explore the traces of the `CausalReasoningModule` in the Weave UI |
 
@@ -286,9 +290,9 @@ optimized_model = optimizer.get_optimized_program(
 Running the evaluation causal reasoning dataset will cost approximately $0.04 in OpenAI credits.
 :::
 
-| ![](https://i.imgur.com/uXvbROM.png) |
+| ![](../../../static/img/dspy_prompt_optimization/dspy_compile.png) |
 |---|
-| You can explore the traces of the optimization process in the Weave UI.  |
+| You can explore the traces of the optimization process in the Weave UI. |
 
 Now that we have our optimized program (the optimized prompting strategy), let's evaluate it once again on our validation set and compare it with our baseline DSPy program.
 
@@ -307,7 +311,7 @@ await evaluation.evaluate(optimized_model)
 Running the evaluation causal reasoning dataset will cost approximately $0.30 in OpenAI credits.
 :::
 
-| ![](https://i.imgur.com/hneuY2K.png) |
+| ![](../../../static/img/dspy_prompt_optimization/eval_comparison.gif) |
 |---|
 | Comparing the evalution of the baseline program with the optimized one shows that the optimized program answers the causal reasoning questions with siginificantly more accuracy. |
 
