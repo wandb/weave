@@ -2,9 +2,9 @@ import os
 
 import pytest
 
-from weave.legacy import context_state, mappers_python, ops
+from weave.legacy import context_state, mappers_python, ops, weavejs_fixes
 
-from ... import api, weave_internal, weavejs_fixes
+from ... import api, weave_internal
 from ... import weave_types as types
 
 
