@@ -89,7 +89,9 @@ def test_instructor_openai(
     call = weave_server_response.calls[1]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    output_arguments = json.loads(output.choices[0].message.tool_calls[0].function._val.arguments)
+    output_arguments = json.loads(
+        output.choices[0].message.tool_calls[0].function._val.arguments
+    )
     assert "person_name" in output_arguments
     assert "age" in output_arguments
     assert "John" in output_arguments["person_name"]
@@ -147,7 +149,9 @@ def test_instructor_openai_async(
     call = weave_server_response.calls[1]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    output_arguments = json.loads(output.choices[0].message.tool_calls[0].function._val.arguments)
+    output_arguments = json.loads(
+        output.choices[0].message.tool_calls[0].function._val.arguments
+    )
     assert "person_name" in output_arguments
     assert "age" in output_arguments
     assert "John" in output_arguments["person_name"]
@@ -165,7 +169,9 @@ def test_instructor_iterable(
     import instructor
     from openai import OpenAI
 
-    lm_client = instructor.from_openai(OpenAI(), mode=instructor.function_calls.Mode.JSON)
+    lm_client = instructor.from_openai(
+        OpenAI(), mode=instructor.function_calls.Mode.JSON
+    )
     users = lm_client.chat.completions.create(
         model="gpt-3.5-turbo-1106",
         temperature=0.1,
