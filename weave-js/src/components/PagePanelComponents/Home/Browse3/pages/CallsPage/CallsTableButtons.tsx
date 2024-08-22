@@ -292,7 +292,13 @@ const ClickableOutlinedCardWithIcon: FC<{
       <Loading size={28} className="mr-4" />
     ) : (
       <div className="mr-4 rounded-2xl bg-moon-200 p-4">
-        <Icon size="xlarge" color="moon" name={iconName} />
+        <Icon
+          // manage python logo night mode
+          className={classNames({'night-aware': iconName.includes('logo')})}
+          size="xlarge"
+          color="moon"
+          name={iconName}
+        />
       </div>
     )}
     <div className="ml-4">{children}</div>
@@ -497,8 +503,7 @@ function useMakeCurlText(
   expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
-  // TODO: Fix for dedicated, how???
-  const baseUrl = 'https://trace.wandb.ai';
+  const baseUrl = (window as any).CONFIG.TRACE_BACKEND_BASE_URL;
   const filterStr = JSON.stringify(
     {
       op_names: filter.opVersionRefs,
