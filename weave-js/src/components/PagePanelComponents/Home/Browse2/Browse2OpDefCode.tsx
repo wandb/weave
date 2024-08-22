@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC} from 'react';
 
+import {Alert} from '../../../Alert';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 
 export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
@@ -21,6 +22,17 @@ export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
           width: '100%',
         }}>
         <Loading centered size={25} />
+      </Box>
+    );
+  }
+
+  if (text.result == null) {
+    return (
+      <Box
+        sx={{
+          margin: '10px 16px 0 10px',
+        }}>
+        <Alert severity="warning">No code found for this operation</Alert>
       </Box>
     );
   }
