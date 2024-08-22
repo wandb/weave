@@ -136,15 +136,6 @@ const CallPageInnerVertical: FC<{
   const assumeCallIsSelectedCall = path == null || path === '';
   const [currentCall, setCurrentCall] = useState(call);
 
-  console.log(
-    'selected',
-    selectedCall.callId.slice(0, 4),
-    'complete',
-    callComplete.result?.callId?.slice(0, 4),
-    'current',
-    currentCall.callId.slice(0, 4)
-  );
-
   useEffect(() => {
     if (assumeCallIsSelectedCall) {
       setCurrentCall(selectedCall);
