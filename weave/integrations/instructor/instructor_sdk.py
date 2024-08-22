@@ -55,7 +55,11 @@ def instructor_wrapper_async(name: str) -> Callable[[Callable], Callable]:
         "We need to do this so we can check if `stream` is used"
         op = weave.op()(_fn_wrapper(fn))
         op.name = name  # type: ignore
-        return op
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: instructor_iterable_accumulator,
+            should_accumulate=should_accumulate_iterable,
+        )
 
     return wrapper
 
