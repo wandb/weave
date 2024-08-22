@@ -5,11 +5,11 @@ from typing import Any, Iterable, Iterator, Optional
 
 from rich.table import Table
 
-from weave import rich_pydantic_util
 from weave.client_context import weave_client as weave_client_context
-from weave.refs import Refs
-from weave.rich_container import AbstractRichContainer
+from weave.trace import rich_pydantic_util
 from weave.trace.refs import parse_uri
+from weave.trace.rich_container import AbstractRichContainer
+from weave.trace.rich_refs import Refs
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
 
