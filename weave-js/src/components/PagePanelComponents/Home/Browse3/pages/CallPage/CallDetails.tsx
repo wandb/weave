@@ -82,6 +82,18 @@ export const CallDetails: FC<{
     () => getDisplayInputsAndOutput(call),
     [call]
   );
+  const columns = useMemo(
+    () => [
+      'id',
+      'trace_id',
+      'project_id',
+      'op_name',
+      'parent_id',
+      'started_at',
+      'ended_at',
+    ],
+    []
+  );
 
   const childCalls = useCalls(
     call.entity,
@@ -92,7 +104,8 @@ export const CallDetails: FC<{
     undefined,
     undefined,
     undefined,
-    undefined
+    undefined,
+    columns
   );
 
   const {singularChildCalls, multipleChildCallOpRefs} = useMemo(
