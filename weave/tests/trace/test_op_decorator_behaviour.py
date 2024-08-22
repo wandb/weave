@@ -265,8 +265,16 @@ async def test_gotten_object_method_is_callable_with_call_func(client, weave_obj
     assert call3.output == call4.output
 
 
-def test_op_display_name():
+def test_op_display_name_str():
     @op(display_name="example")
+    def func():
+        return 1
+
+    assert func.display_name == "example"
+
+
+def test_op_display_name_callable():
+    @op(display_name=lambda: "example")
     def func():
         return 1
 
