@@ -1,10 +1,10 @@
 from functools import wraps
 from typing import Any, Callable, List, Optional
 
+from pydantic import BaseModel
+
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
-
-from pydantic import BaseModel
 
 
 def instructor_iterable_accumulator(

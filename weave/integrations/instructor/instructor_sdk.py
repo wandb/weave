@@ -3,6 +3,7 @@ import importlib
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 from .instructor_iterable_utils import instructor_wrapper_async, instructor_wrapper_sync
+from .instructor_partial_utils import instructor_wrapper_partial_sync
 
 instructor_patcher = MultiPatcher(
     [
@@ -15,6 +16,11 @@ instructor_patcher = MultiPatcher(
             lambda: importlib.import_module("instructor.client"),
             "AsyncInstructor.create",
             instructor_wrapper_async(name="AsyncInstructor.create"),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("instructor.client"),
+            "Instructor.create_partial",
+            instructor_wrapper_partial_sync(name="Instructor.create_partial"),
         ),
     ]
 )
