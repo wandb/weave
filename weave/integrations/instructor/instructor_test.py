@@ -486,3 +486,99 @@ list of speakers.
         assert "user_name" in user
         assert "email" in user
         assert "twitter" in user
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_instructor_partial_stream_async(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    import instructor
+    from openai import AsyncOpenAI
+
+    lm_client = instructor.from_openai(AsyncOpenAI())
+    text_block = """
+In our recent online meeting, participants from various backgrounds joined to discuss the upcoming tech
+conference. The names and contact details of the participants were as follows:
+
+- Name: John Doe, Email: johndoe@email.com, Twitter: @TechGuru44
+- Name: Jane Smith, Email: janesmith@email.com, Twitter: @DigitalDiva88
+- Name: Alex Johnson, Email: alexj@email.com, Twitter: @CodeMaster2023
+
+During the meeting, we agreed on several key points. The conference will be held on March 15th, 2024,
+at the Grand Tech Arena located at 4521 Innovation Drive. Dr. Emily Johnson, a renowned AI researcher,
+will be our keynote speaker.
+
+The budget for the event is set at $50,000, covering venue costs, speaker fees, and promotional activities.
+Each participant is expected to contribute an article to the conference blog by February 20th.
+
+A follow-up meeting is scheduled for January 25th at 3 PM GMT to finalize the agenda and confirm the
+list of speakers.
+    """
+
+    async def fetch_results(text_block: str) -> List[Any]:
+        extraction_stream = lm_client.chat.completions.create_partial(
+            model="gpt-4",
+            response_model=MeetingInfo,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Get the information about the meeting and the users {text_block}",
+                },
+            ],
+            stream=True,
+        )
+        return [extraction async for extraction in extraction_stream]
+
+    extractions = asyncio.run(fetch_results(text_block))
+    assert extractions[-1].users[0].user_name == "John Doe"
+    assert extractions[-1].users[0].email == "johndoe@email.com"
+    assert extractions[-1].users[0].twitter == "@TechGuru44"
+    assert extractions[-1].users[1].user_name == "Jane Smith"
+    assert extractions[-1].users[1].email == "janesmith@email.com"
+    assert extractions[-1].users[1].twitter == "@DigitalDiva88"
+    assert extractions[-1].users[2].user_name == "Alex Johnson"
+    assert extractions[-1].users[2].email == "alexj@email.com"
+    assert extractions[-1].users[2].twitter == "@CodeMaster2023"
+
+    weave_server_response = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client._project_id())
+    )
+    assert len(weave_server_response.calls) == 2
+
+    flattened_calls_list = [
+        (op_name_from_ref(c.op_name), d)
+        for (c, d) in flatten_calls(weave_server_response.calls)
+    ]
+    assert flattened_calls_list == [
+        ("AsyncInstructor.create_partial", 0),
+        ("openai.chat.completions.create", 1),
+    ]
+
+    call = weave_server_response.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.users[0].user_name == "John Doe"
+    assert output.users[0].email == "johndoe@email.com"
+    assert output.users[0].twitter == "@TechGuru44"
+    assert output.users[1].user_name == "Jane Smith"
+    assert output.users[1].email == "janesmith@email.com"
+    assert output.users[1].twitter == "@DigitalDiva88"
+    assert output.users[2].user_name == "Alex Johnson"
+    assert output.users[2].email == "alexj@email.com"
+    assert output.users[2].twitter == "@CodeMaster2023"
+
+    call = weave_server_response.calls[1]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    output_arguments = json.loads(
+        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+    )
+    assert "users" in output_arguments
+    for user in output_arguments["users"]:
+        assert "user_name" in user
+        assert "email" in user
+        assert "twitter" in user
