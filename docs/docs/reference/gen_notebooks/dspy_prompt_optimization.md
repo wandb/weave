@@ -51,33 +51,11 @@ os.environ["OPENAI_API_KEY"] = api_key
 Weave is currently integrated with DSPy, and including [`weave.init`](../../reference/python-sdk/weave/index.md) at the start of our code lets us automatically trace our DSPy functions which can be explored in the Weave UI. Check out the [Weave integration docs for DSPy](../../guides/integrations/dspy.md) to learn more.
 
 
-
 ```python
 import weave
 
 weave.init(project_name="dspy-bigbench-hard")
 ```
-
-In this tutorial, we use a metadata class inherited from [`weave.Object`](../../guides/tracking/objects.md) to manage our metadata.
-
-
-```python
-class Metadata(weave.Object):
-    dataset_address: str = "maveriq/bigbenchhard"
-    big_bench_hard_task: str = "causal_judgement"
-    num_train_examples: int = 50
-    openai_model: str = "gpt-3.5-turbo"
-    openai_max_tokens: int = 2048
-    max_bootstrapped_demos: int = 8
-    max_labeled_demos: int = 8
-
-
-metadata = Metadata()
-```
-
-:::tip Object Versioning
-The `Metadata` objects are automatically versioned and traced when functions consuming them are traced
-:::
 
 ## Load the BIG-Bench Hard Dataset
 
@@ -90,16 +68,16 @@ from datasets import load_dataset
 
 
 @weave.op()
-def get_dataset(metadata: Metadata):
+def get_dataset(dataset_address: str, big_bench_hard_task: str, num_train_examples: int):
     # load the BIG-Bench Hard dataset corresponding to the task from Huggingface Hug
-    dataset = load_dataset(metadata.dataset_address, metadata.big_bench_hard_task)[
+    dataset = load_dataset(dataset_address, big_bench_hard_task)[
         "train"
     ]
 
     # create the training and validation datasets
     rows = [{"question": data["input"], "answer": data["target"]} for data in dataset]
-    train_rows = rows[0 : metadata.num_train_examples]
-    val_rows = rows[metadata.num_train_examples :]
+    train_rows = rows[0 : num_train_examples]
+    val_rows = rows[num_train_examples :]
 
     # create the training and validation examples consisting of `dspy.Example` objects
     dspy_train_examples = [
@@ -110,19 +88,23 @@ def get_dataset(metadata: Metadata):
     # publish the datasets to the Weave, this would let us version the data and use for evaluation
     weave.publish(
         weave.Dataset(
-            name=f"bigbenchhard_{metadata.big_bench_hard_task}_train", rows=train_rows
+            name=f"bigbenchhard_{big_bench_hard_task}_train", rows=train_rows
         )
     )
     weave.publish(
         weave.Dataset(
-            name=f"bigbenchhard_{metadata.big_bench_hard_task}_val", rows=val_rows
+            name=f"bigbenchhard_{big_bench_hard_task}_val", rows=val_rows
         )
     )
 
     return dspy_train_examples, dspy_val_examples
 
 
-dspy_train_examples, dspy_val_examples = get_dataset(metadata)
+dspy_train_examples, dspy_val_examples = get_dataset(
+    dataset_address="maveriq/bigbenchhard",
+    big_bench_hard_task="causal_judgement",
+    num_train_examples=50
+)
 ```
 
 ## The DSPy Program
@@ -130,17 +112,6 @@ dspy_train_examples, dspy_val_examples = get_dataset(metadata)
 [DSPy](https://dspy-docs.vercel.app) is a framework that pushes building new LM pipelines away from manipulating free-form strings and closer to programming (composing modular operators to build text transformation graphs) where a compiler automatically generates optimized LM invocation strategies and prompts from a program.
 
 We will use the [`dspy.OpenAI`](https://dspy-docs.vercel.app/api/language_model_clients/OpenAI) abstraction to make LLM calls to [GPT3.5 Turbo](https://platform.openai.com/docs/models/gpt-3-5-turbo).
-
-
-```python
-system_prompt = """
-You are an expert in the field of causal reasoning. You are to analyze the a given question carefully and answer in `Yes` or `No`.
-You should also provide a detailed explanation justifying your answer.
-"""
-
-llm = dspy.OpenAI(model="gpt-3.5-turbo", system_prompt=system_prompt)
-dspy.settings.configure(lm=llm)
-```
 
 ### Writing the Causal Reasoning Signature
 
@@ -177,17 +148,56 @@ class CausalReasoningModule(dspy.Module):
         return self.prog(input=Input(query=question)).output.dict()
 ```
 
-Let's test our LLM workflow, i.e., the `CausalReasoningModule` on an example from the causal reasoning subset of Big-Bench Hard.
+Next, we write a [weave.Model](../../guides/core-types/models.md) that wraps the `CausalReasoningModule` and the OpenAI language model to form a complete LLM workflow.
+
+
+```python
+class WeaveCausalReasoningModel(weave.Model):
+    openai_model: str
+    system_prompt: str
+    program: dspy.Module
+    language_model: dspy.LM
+    
+    def __init__(self, openai_model: str, system_prompt: str, program: dspy.Module):
+        super().__init__(
+            openai_model=openai_model,
+            system_prompt=system_prompt,
+            program=program,
+            language_model=dspy.OpenAI(
+                model=openai_model, system_prompt=system_prompt
+            )
+        )
+
+    @weave.op()
+    def predict(self, question: str) -> Output:
+        with dspy.context(lm=self.language_model):
+            return self.program(question)
+```
+
+Let's test our LLM workflow, i.e., the `WeaveCausalReasoningModel` on an example from the causal reasoning subset of Big-Bench Hard.
 
 
 ```python
 import rich
 
-baseline_module = CausalReasoningModule()
+SYSTEM_PROMPT = """
+You are an expert in the field of causal reasoning. You are to analyze the a given question carefully and answer in `Yes` or `No`.
+You should also provide a detailed explanation justifying your answer.
+"""
 
-prediction = baseline_module(dspy_train_examples[0]["question"])
+baseline_model = WeaveCausalReasoningModel(
+    openai_model="gpt-3.5-turbo",
+    system_prompt=SYSTEM_PROMPT,
+    program=CausalReasoningModule(),
+)
+
+prediction = baseline_model.predict(dspy_train_examples[0]["question"])
 rich.print(prediction)
 ```
+
+| ![](https://i.imgur.com/woHRHjR.png) |
+|---|
+| Here's how you can explore the traces of the `CausalReasoningModule` in the Weave UI |
 
 ## Evaluating our DSPy Program
 
@@ -206,9 +216,7 @@ Next, we can simply define the evaluation and run it.
 
 
 ```python
-validation_dataset = weave.ref(
-    f"bigbenchhard_{metadata.big_bench_hard_task}_val:v0"
-).get()
+validation_dataset = weave.ref("bigbenchhard_causal_judgement_val:v0").get()
 
 evaluation = weave.Evaluation(
     name="baseline_causal_reasoning_module",
@@ -216,7 +224,7 @@ evaluation = weave.Evaluation(
     scorers=[weave_evaluation_scorer],
 )
 
-await evaluation.evaluate(baseline_module.forward)
+await evaluation.evaluate(baseline_model)
 ```
 
 :::note
@@ -224,7 +232,7 @@ If you're running from a python script, you can use the following code to run th
 
 ```python
 import asyncio
-asyncio.run(evaluation.evaluate(baseline_module.forward))
+asyncio.run(evaluation.evaluate(baseline_model))
 ```
 :::
 
@@ -241,26 +249,46 @@ Now, that we have a baseline DSPy program, let us try to improve its performance
 from dspy.teleprompt import BootstrapFewShot
 
 
-@weave.op()
-def get_optimized_program(model: dspy.Module, metadata: Metadata) -> dspy.Module:
+class CausalReasoningOptimizer(weave.Model):
+    model: WeaveCausalReasoningModel
+
     @weave.op()
-    def dspy_evaluation_metric(true, prediction, trace=None):
-        return prediction["answer"].lower() == true.answer.lower()
+    def get_optimized_program(
+        self, max_bootstrapped_demos: int, max_labeled_demos: int
+    ) -> weave.Model:
+        @weave.op()
+        def dspy_evaluation_metric(true, prediction, trace=None):
+            return prediction["answer"].lower() == true.answer.lower()
+    
+        teleprompter = BootstrapFewShot(
+            metric=dspy_evaluation_metric,
+            max_bootstrapped_demos=max_bootstrapped_demos,
+            max_labeled_demos=max_labeled_demos,
+        )
+        with dspy.context(lm=self.model.language_model):
+            optimized_program = teleprompter.compile(
+                self.model.program, trainset=dspy_train_examples
+            )
+        return WeaveCausalReasoningModel(
+            openai_model=self.model.openai_model,
+            system_prompt=self.model.system_prompt,
+            program=optimized_program
+        )
 
-    teleprompter = BootstrapFewShot(
-        metric=dspy_evaluation_metric,
-        max_bootstrapped_demos=metadata.max_bootstrapped_demos,
-        max_labeled_demos=metadata.max_labeled_demos,
-    )
-    return teleprompter.compile(model, trainset=dspy_train_examples)
 
-
-optimized_module = get_optimized_program(baseline_module, metadata)
+optimizer = CausalReasoningOptimizer(model=baseline_model)
+optimized_model = optimizer.get_optimized_program(
+    max_bootstrapped_demos=8, max_labeled_demos=8
+)
 ```
 
 :::warning
 Running the evaluation causal reasoning dataset will cost approximately $0.04 in OpenAI credits.
 :::
+
+| ![](https://i.imgur.com/uXvbROM.png) |
+|---|
+| You can explore the traces of the optimization process in the Weave UI.  |
 
 Now that we have our optimized program (the optimized prompting strategy), let's evaluate it once again on our validation set and compare it with our baseline DSPy program.
 
@@ -272,10 +300,16 @@ evaluation = weave.Evaluation(
     scorers=[weave_evaluation_scorer],
 )
 
-await evaluation.evaluate(optimized_module.forward)
+await evaluation.evaluate(optimized_model)
 ```
 
-When coomparing the evalution of the baseline program with the optimized one shows that the optimized program answers the causal reasoning questions with siginificantly more accuracy.
+:::warning
+Running the evaluation causal reasoning dataset will cost approximately $0.30 in OpenAI credits.
+:::
+
+| ![](https://i.imgur.com/hneuY2K.png) |
+|---|
+| Comparing the evalution of the baseline program with the optimized one shows that the optimized program answers the causal reasoning questions with siginificantly more accuracy. |
 
 ## Conclusion
 
