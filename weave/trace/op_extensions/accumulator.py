@@ -126,7 +126,8 @@ _OnCloseType = Callable[[], None]
 
 class _IteratorWrapper(Generic[V]):
     """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
-    that this class will be helpful in other contexts and might be moved to a more general location in the future."""
+    that this class will be helpful in other contexts and might be moved to a more general location in the future.
+    """
 
     def __init__(
         self,

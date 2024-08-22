@@ -1,16 +1,44 @@
 import importlib
 from functools import wraps
-from typing import Any, Callable
+from typing import Any, Callable, List, Optional
+
+from pydantic import BaseModel
 
 import weave
+from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
+
+
+def instructor_iterable_accumulator(
+    acc: Optional[BaseModel], value: BaseModel
+) -> List[BaseModel]:
+    if acc is None:
+        acc = [value]
+    if acc[-1] != value:
+        acc.append(value)
+    return acc
+
+
+def should_accumulate_iterable(inputs: dict) -> bool:
+    if isinstance(inputs, dict):
+        return True
+    if "stream" in inputs:
+        return inputs.get("stream")
+    elif "kwargs" in inputs:
+        if "stream" in inputs["kwargs"]:
+            return inputs.get("kwargs").get("stream")
+    return False
 
 
 def instructor_wrapper_sync(name: str) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
-        return op
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: instructor_iterable_accumulator,
+            should_accumulate=should_accumulate_iterable,
+        )
 
     return wrapper
 

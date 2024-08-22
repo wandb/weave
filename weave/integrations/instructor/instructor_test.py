@@ -228,3 +228,76 @@ def test_instructor_iterable(
     assert "age" in output_arguments["tasks"][1]
     assert "John" in output_arguments["tasks"][1]["person_name"]
     assert output_arguments["tasks"][1]["age"] == 30
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_instructor_iterable_sync_stream(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    import instructor
+    from openai import OpenAI
+
+    lm_client = instructor.from_openai(OpenAI(), mode=instructor.Mode.TOOLS)
+    users = lm_client.chat.completions.create(
+        model="gpt-4",
+        stream=True,
+        response_model=Iterable[Person],
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a perfect entity extraction system",
+            },
+            {
+                "role": "user",
+                "content": ("Extract `Jason is 10 and John is 30`"),
+            },
+        ],
+    )
+    users = [user for user in users]
+    assert users[0].person_name == "Jason"
+    assert users[0].age == 10
+    assert users[1].person_name == "John"
+    assert users[1].age == 30
+
+    weave_server_response = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client._project_id())
+    )
+    assert len(weave_server_response.calls) == 2
+
+    flattened_calls_list = [
+        (op_name_from_ref(c.op_name), d)
+        for (c, d) in flatten_calls(weave_server_response.calls)
+    ]
+    assert flattened_calls_list == [
+        ("Instructor.create", 0),
+        ("openai.chat.completions.create", 1),
+    ]
+
+    call = weave_server_response.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    output = [weave.ref(reference).get() for reference in output]
+    assert output[0].person_name == "Jason"
+    assert output[0].age == 10
+    assert output[1].person_name == "John"
+    assert output[1].age == 30
+
+    call = weave_server_response.calls[1]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    output_arguments = json.loads(
+        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+    )
+    assert "tasks" in output_arguments
+    assert "person_name" in output_arguments["tasks"][0]
+    assert "age" in output_arguments["tasks"][0]
+    assert "Jason" in output_arguments["tasks"][0]["person_name"]
+    assert output_arguments["tasks"][0]["age"] == 10
+    assert "person_name" in output_arguments["tasks"][1]
+    assert "age" in output_arguments["tasks"][1]
+    assert "John" in output_arguments["tasks"][1]["person_name"]
+    assert output_arguments["tasks"][1]["age"] == 30
