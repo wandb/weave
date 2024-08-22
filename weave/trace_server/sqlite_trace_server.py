@@ -482,8 +482,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         call_dict[col] = {}
             calls += [call_dict]
 
-        if req.expand_columns:
-            calls = hydrate_calls_with_feedback(self, calls, req.expand_columns)
+        if req.include_feedback:
+            calls = hydrate_calls_with_feedback(self, calls, req.include_feedback)
 
         return tsi.CallsQueryRes(calls=calls)
 

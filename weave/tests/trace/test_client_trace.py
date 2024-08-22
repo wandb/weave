@@ -2591,7 +2591,7 @@ def test_calls_stream_feedback(client):
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
-            expand_columns=["feedback"],
+            include_feedback="all",
         )
     )
     calls = list(res)

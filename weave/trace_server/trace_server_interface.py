@@ -258,6 +258,7 @@ class CallsQueryReq(BaseModel):
     sort_by: Optional[List[SortBy]] = None
     query: Optional[Query] = None
     include_costs: Optional[bool] = False
+    include_feedback: Optional[Literal["all", "counts"]] = None
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)

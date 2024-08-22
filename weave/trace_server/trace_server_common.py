@@ -1,6 +1,6 @@
 import copy
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from weave.trace_server.refs_internal import InternalCallRef
 from weave.trace_server.trace_server_interface import (
@@ -13,19 +13,8 @@ from weave.trace_server.trace_server_interface import (
 def hydrate_calls_with_feedback(
     trace_server: TraceServerInterface,
     calls: list[dict[str, Any]],
-    expand_columns: list[str],
+    feedback_format: Literal["all", "counts"],
 ) -> list[dict[str, Any]]:
-    # TODO: LOL
-    feedback_format = ""
-    if "feedback.emoji" in expand_columns:
-        feedback_format = "emoji"
-    if "feedback.note" in expand_columns:
-        feedback_format += "+note"
-    elif "feedback" in expand_columns:
-        feedback_format = "basic"
-    if not feedback_format:
-        return calls
-
     feedback_map = defaultdict(list)
 
     # Batch feedback queries by project_id
@@ -65,31 +54,15 @@ def hydrate_calls_with_feedback(
             feedback_map[_id].append(feedback_item)
 
     for call in calls:
-        feedback_items = feedback_map.get(call["id"])
-        if not feedback_items:
-            continue
-
+        feedback_items = feedback_map.get(call["id"]) or []
         if "summary" not in call:
             call["summary"] = {}
 
-        if feedback_format == "basic":
+        if feedback_format == "all":
             call["summary"]["feedback"] = feedback_items
-        # elif feedback_format in ["emoji", "emoji+note"]:
-        #     emoji_count: dict[str, int] = {}
-        #     notes: dict[str, str] = {}
-        #     for feedback_item in feedback_items:
-        #         if feedback_item["feedback_type"] == "wandb.reaction.1":
-        #             emoji_str = feedback_item["payload"]["alias"].replace(":", "")
-        #             emoji_count[emoji_str] = emoji_count.get(emoji_str, 0) + 1
-        #         elif (
-        #             feedback_format == "emoji+note"
-        #             and feedback_item["feedback_type"] == "wandb.note.1"
-        #         ):
-        #             notes[str(len(notes) + 1)] = feedback_item["payload"]["note"]
-        #     call["summary"]["feedback"] = emoji_count
-        elif feedback_format in ["emoji", "emoji+note"]:
+        elif feedback_format == "counts":
             count = 0
-            notes = []
+            notes: list[str] = []
             for feedback_item in feedback_items:
                 if feedback_item["feedback_type"] == "wandb.reaction.1":
                     count += 1
@@ -103,6 +76,8 @@ def hydrate_calls_with_feedback(
                 "emoji_count": count,
                 "notes": " | ".join(notes),
             }
+        else:
+            raise ValueError(f"Unknown feedback_format '{feedback_format}'")
 
     return calls
 

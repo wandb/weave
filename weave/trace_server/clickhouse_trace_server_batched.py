@@ -299,7 +299,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         select_columns = [c.field for c in cq.select_fields]
 
-        if not req.expand_columns:
+        if not req.expand_columns or req.include_feedback:
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(
                     _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
@@ -318,7 +318,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 if len(batch) >= batch_size:
                     hydrated_batch = self._hydrate_calls(
-                        batch, req.expand_columns, ref_cache
+                        batch, req.expand_columns, req.include_feedback, ref_cache
                     )
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
@@ -334,7 +334,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     batch_size = min(max_size, batch_size * 2)
                     batch = []
 
-            hydrated_batch = self._hydrate_calls(batch, req.expand_columns, ref_cache)
+            hydrated_batch = self._hydrate_calls(
+                batch, req.expand_columns, req.include_feedback, ref_cache
+            )
             for call in hydrated_batch:
                 yield tsi.CallSchema.model_validate(call)
 
@@ -342,12 +344,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
+        include_feedback: typing.Optional[typing.Literal["all", "counts"]],
         ref_cache: LRUCache,
     ) -> list[dict[str, typing.Any]]:
         if len(calls) == 0:
             return calls
 
-        calls = hydrate_calls_with_feedback(self, calls, expand_columns)
+        if include_feedback:
+            calls = hydrate_calls_with_feedback(self, calls, include_feedback)
         calls = self._expand_call_refs(calls, expand_columns, ref_cache)
         return calls
 
