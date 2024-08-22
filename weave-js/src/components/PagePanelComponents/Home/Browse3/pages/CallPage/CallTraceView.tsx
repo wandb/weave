@@ -249,6 +249,9 @@ const RE_TRAILING_INT = /\d+$/;
 // Sorting evaluation calls by dataset row.
 // Because of async they may have been processed in a different order.
 const getCallSortExampleRow = (call: CallSchema): number => {
+  if (!call.rawSpan.inputs?._keys) {
+    return Number.POSITIVE_INFINITY;
+  }
   const {example} = call.rawSpan.inputs;
   if (example) {
     // If not a string, we don't know how to sort.
@@ -334,6 +337,18 @@ export const useCallFlattenedTraceTree = (
   selectedPath: string | null
 ) => {
   const {useCalls} = useWFHooks();
+  const columns = useMemo(
+    () => [
+      'id',
+      'trace_id',
+      'project_id',
+      'op_name',
+      'parent_id',
+      'started_at',
+      'ended_at',
+    ],
+    []
+  );
   const traceCalls = useCalls(
     call.entity,
     call.project,
@@ -344,15 +359,7 @@ export const useCallFlattenedTraceTree = (
     undefined,
     undefined,
     undefined,
-    [
-      'id',
-      'trace_id',
-      'project_id',
-      'op_name',
-      'parent_id',
-      'started_at',
-      'ended_at',
-    ]
+    columns
   );
   const traceCallsResult = useMemo(
     () => traceCalls.result ?? [],

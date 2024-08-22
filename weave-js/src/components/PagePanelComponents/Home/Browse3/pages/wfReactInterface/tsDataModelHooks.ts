@@ -328,22 +328,24 @@ const useCallsNoExpansion = (
         result: [],
       };
     } else {
-      allResults.forEach(call => {
-        callCache.set(
-          {
-            entity,
-            project,
-            callId: call.callId,
-          },
-          call
-        );
-      });
+      if (!columns) {
+        allResults.forEach(call => {
+          callCache.set(
+            {
+              entity,
+              project,
+              callId: call.callId,
+            },
+            call
+          );
+        });
+      }
       return {
         loading: false,
         result,
       };
     }
-  }, [callRes, entity, project, opts?.skip]);
+  }, [callRes, entity, project, opts?.skip, columns]);
 };
 
 const useCalls = (
