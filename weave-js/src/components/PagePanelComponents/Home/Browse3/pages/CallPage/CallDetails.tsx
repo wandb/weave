@@ -277,12 +277,11 @@ export const CallDetails: FC<{
 
 const getDisplayInputsAndOutput = (call: CallSchema) => {
   const span = call.rawSpan;
-  if (!span.inputs?._keys) {
-    span.inputs = {_keys: []};
-  }
   const inputKeys =
     span.inputs._keys ??
-    Object.keys(span.inputs).filter(k => !k.startsWith('_') || k === '_type');
+    Object.keys(span.inputs ?? {}).filter(
+      k => !k.startsWith('_') || k === '_type'
+    );
   const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
 
   const callOutput = span.output ?? {};
