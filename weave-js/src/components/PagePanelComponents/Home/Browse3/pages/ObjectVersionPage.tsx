@@ -4,6 +4,7 @@ import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {LoadingDots} from '../../../../LoadingDots';
+import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
@@ -59,7 +60,7 @@ export const ObjectVersionPage: React.FC<{
   if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (objectVersion.result == null) {
-    return <div>Object not found</div>;
+    return <NotFoundPanel title="Object not found" />;
   }
   return (
     <ObjectVersionPageInner {...props} objectVersion={objectVersion.result} />

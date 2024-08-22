@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 
 import {LoadingDots} from '../../../../LoadingDots';
+import {NotFoundPanel} from '../NotFoundPanel';
 import {OpCodeViewer} from '../OpCodeViewer';
 import {
   CallsLink,
@@ -35,7 +36,7 @@ export const OpVersionPage: React.FC<{
   if (opVersion.loading) {
     return <CenteredAnimatedLoader />;
   } else if (opVersion.result == null) {
-    return <div>Op version not found</div>;
+    return <NotFoundPanel title="Op not found" />;
   }
   return <OpVersionPageInner opVersion={opVersion.result} />;
 };

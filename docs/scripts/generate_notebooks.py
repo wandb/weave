@@ -54,7 +54,7 @@ def export_all_notebooks_in_primary_dir():
 def main():
     export_all_notebooks_in_primary_dir()
     export_notebook(
-        "./intro_notebook.ipynb", "./docs/reference/gen_notebooks/intro_notebook.md"
+        "./intro_notebook.ipynb", "./docs/reference/gen_notebooks/01-intro_notebook.md"
     )
 
 
