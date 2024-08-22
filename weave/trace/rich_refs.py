@@ -5,8 +5,8 @@ from typing import Iterable, Optional
 from rich.table import Table
 
 from weave.client_context import weave_client as weave_client_context
-from weave.rich_container import AbstractRichContainer
 from weave.trace.refs import AnyRef, CallRef, parse_uri
+from weave.trace.rich_container import AbstractRichContainer
 from weave.trace.vals import WeaveObject
 
 
