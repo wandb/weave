@@ -105,7 +105,7 @@ def op(
             mutation=mutation,
         )
         if weavify:
-            from weave.weavify import op_to_weave_fn
+            from weave.legacy.weavify import op_to_weave_fn
 
             op.weave_fn = op_to_weave_fn(op)
 
