@@ -2297,6 +2297,56 @@ def test_sort_and_filter_through_refs(client):
         assert inner_res.count == count
 
 
+def test_in_operation(client):
+    @weave.op()
+    def test_op(label, val):
+        return val
+
+    test_op(1, [1, 2, 3])
+    test_op(2, [1, 2, 3])
+    test_op(3, [5, 6, 7])
+    test_op(4, [8, 2, 3])
+
+    call_ids = [call.id for call in test_op.calls()]
+    assert len(call_ids) == 4
+
+    query = {
+        "$in": [
+            {"$getField": "id"},
+            [{"$literal": call_id} for call_id in call_ids[:2]],
+        ]
+    }
+
+    res = get_client_trace_server(client).calls_query_stats(
+        tsi.CallsQueryStatsReq.model_validate(
+            dict(
+                project_id=get_client_project_id(client),
+                query={"$expr": query},
+            )
+        )
+    )
+    assert res.count == 2
+
+    query = {
+        "$in": [
+            {"$getField": "id"},
+            [{"$literal": call_id} for call_id in call_ids],
+        ]
+    }
+    res = get_client_trace_server(client).calls_query_stream(
+        tsi.CallsQueryReq.model_validate(
+            dict(
+                project_id=get_client_project_id(client),
+                query={"$expr": query},
+            )
+        )
+    )
+    res = list(res)
+    assert len(res) == 4
+    for i in range(4):
+        assert res[i].id == call_ids[i]
+
+
 def test_call_has_client_version(client):
     @weave.op
     def test():
