@@ -1,4 +1,5 @@
 import atexit
+import sys
 import weakref
 from typing import (
     Any,
@@ -14,6 +15,12 @@ from typing import (
 )
 
 from weave.trace.op import FinishCallbackType, Op
+
+if sys.version_info < (3, 10):
+
+    def aiter(obj):
+        return obj.__aiter__()
+
 
 S = TypeVar("S")
 V = TypeVar("V")
