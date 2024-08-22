@@ -10,8 +10,8 @@ from weave import (
     errors,
     registry_mem,
     weave_internal,
-    weavify,
 )
+from weave.legacy import weavify
 from weave import weave_types as types
 from weave.query_api import op, use
 from weave.legacy import dispatch, graph, graph_debug, op_args, op_def
