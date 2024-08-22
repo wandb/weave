@@ -100,6 +100,7 @@ const sidebars: SidebarsConfig = {
                 "guides/integrations/langchain",
                 "guides/integrations/llamaindex",
                 "guides/integrations/dspy",
+                "guides/integrations/instructor",
               ],
             },
           ],
