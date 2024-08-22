@@ -387,10 +387,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            vals = self._refs_read_batch(list(refs_to_resolve.values()), ref_cache)
-            assert len(vals) == len(refs_to_resolve), "ref read batch inconsistency"
-
-            for (i, col), val in zip(refs_to_resolve, vals):
+            refs = list(refs_to_resolve.values())
+            vals = self._refs_read_batch(refs, ref_cache)
+            for (i, col), val, ref in zip(refs_to_resolve, vals, refs):
+                if isinstance(val, dict):
+                    val["_ref"] = ref
                 set_nested_key(calls[i], col, val)
 
         return calls
