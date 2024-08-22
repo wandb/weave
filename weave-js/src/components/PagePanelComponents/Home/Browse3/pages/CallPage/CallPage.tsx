@@ -127,7 +127,6 @@ const CallPageInnerVertical: FC<{
   const {rows, expandKeys, loading} = tree;
 
   const {selectedCall} = tree;
-
   const callComplete = useCall({
     entity: selectedCall.entity,
     project: selectedCall.project,

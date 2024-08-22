@@ -184,7 +184,6 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
 
   useEffect(() => {
     doFetch();
-    console.log("dofetch", deepKey?.callId)
   }, [doFetch]);
 
   useEffect(() => {
@@ -192,7 +191,6 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   }, [getTsClient, doFetch]);
 
   return useMemo(() => {
-    console.log("memo", key?.callId, 'callRes', callRes && 'call' in callRes && callRes.call.id, 'loading', loadingRef.current, 'cachedCall', cachedCall?.callId)
     if (key == null) {
       return {
         loading: false,
@@ -216,7 +214,6 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
       };
     } else {
       if (result) {
-        console.log(">>>>>>>>>>>>>>>>>>> setting cache", key?.callId, result.callId)
         callCache.set(key, result);
       }
       return {
