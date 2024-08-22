@@ -674,6 +674,13 @@ const useOpVersion = (
       };
     }
 
+    if (opVersionRes.obj == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+
     const returnedResult = convertTraceServerObjectVersionToOpSchema(
       opVersionRes.obj
     );
@@ -813,6 +820,13 @@ const useObjectVersion = (
     if (objectVersionRes == null || loadingRef.current) {
       return {
         loading: true,
+        result: null,
+      };
+    }
+
+    if (objectVersionRes.obj == null) {
+      return {
+        loading: false,
         result: null,
       };
     }
@@ -1189,6 +1203,9 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
       return null;
     }
     const result = query.result[0];
+    if (result == null) {
+      return null;
+    }
     const ref = parseRef(opVersionRef);
     if (isWeaveObjectRef(ref)) {
       return {
@@ -1214,9 +1231,9 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
     }
     return {
       loading: false,
-      result: new TextDecoder().decode(
-        arrayBuffer.result ?? new ArrayBuffer(0)
-      ),
+      result: arrayBuffer.result
+        ? new TextDecoder().decode(arrayBuffer.result)
+        : null,
     };
   }, [arrayBuffer.loading, arrayBuffer.result]);
 
