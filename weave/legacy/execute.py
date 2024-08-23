@@ -10,7 +10,6 @@ import typing
 from collections.abc import Mapping
 
 from weave import (
-    environment,
     errors,
 )
 from weave import weave_types as types
@@ -23,6 +22,7 @@ from weave import weave_types as types
 # Language Features
 from weave.legacy import (
     engine_trace,
+    environment,
     parallelism,
     ref_base,
     registry_mem,

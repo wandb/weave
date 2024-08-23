@@ -6,7 +6,7 @@ import random
 import shutil
 import typing
 
-from weave import environment as weave_env
+from weave.legacy import environment as weave_env
 from weave import errors, filesystem
 from weave import weave_types as types
 from weave.legacy import artifact_fs, file_util, memo, uris, wandb_client_api
