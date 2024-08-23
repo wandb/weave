@@ -26,7 +26,6 @@ from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
 from weave import (
-    engine_trace,
     environment,
     errors,
     filesystem,
@@ -37,6 +36,7 @@ from weave import (
 )
 from weave.legacy import (
     context_state,
+    engine_trace,
     graph,
     registry_mem,
     value_or_error,

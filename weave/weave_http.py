@@ -13,9 +13,9 @@ import requests
 import requests.auth
 import yarl
 
-from weave.legacy import server_error_handling
+from weave.legacy import engine_trace, server_error_handling
 
-from . import engine_trace, filesystem
+from . import filesystem
 
 logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
 logging.getLogger("aiohttp.client").setLevel(logging.WARNING)
