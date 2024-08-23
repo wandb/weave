@@ -64,7 +64,7 @@ class ObjectRef(RefWithExtra):
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
         from weave.client_context.weave_client import get_weave_client
-        from weave.weave_init import init_weave
+        from weave.trace.weave_init import init_weave
 
         gc = get_weave_client()
         if gc is not None:
