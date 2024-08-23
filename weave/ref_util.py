@@ -25,7 +25,7 @@ def val_with_relative_ref(
 ) -> typing.Any:
     from weave.legacy import context_state
 
-    from . import ref_base
+    from .legacy import ref_base
 
     # If we already have a ref, resolve it
     if isinstance(child_object, ref_base.Ref):

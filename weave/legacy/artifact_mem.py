@@ -3,7 +3,7 @@ import typing
 from . import artifact_base
 from weave import weave_types as types
 from weave import errors
-from weave import ref_base
+from weave.legacy import ref_base
 
 
 class MemArtifact(artifact_base.Artifact):

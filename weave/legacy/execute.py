@@ -12,7 +12,6 @@ from collections.abc import Mapping
 from weave import (
     environment,
     errors,
-    ref_base,
 )
 from weave import weave_types as types
 
@@ -25,6 +24,7 @@ from weave import weave_types as types
 from weave.legacy import (
     engine_trace,
     parallelism,
+    ref_base,
     registry_mem,
     box,
     compile,

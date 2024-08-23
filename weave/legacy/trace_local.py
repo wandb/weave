@@ -6,9 +6,9 @@ import typing
 from typing import Mapping
 
 from weave.legacy import artifact_local, graph, op_def, op_policy, runs
+from . import ref_base
 
 from .. import (
-    ref_base,
     storage,
     weave_internal,
 )
