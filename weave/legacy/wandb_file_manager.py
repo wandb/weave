@@ -13,7 +13,7 @@ from requests.auth import HTTPBasicAuth
 from wandb.sdk.lib import hashutil
 
 from weave import errors, filesystem, weave_http
-from weave import environment as weave_env
+from weave.legacy import environment as weave_env
 from weave.legacy import artifact_wandb, cache, wandb_api, engine_trace
 
 tracer = engine_trace.tracer()  # type: ignore

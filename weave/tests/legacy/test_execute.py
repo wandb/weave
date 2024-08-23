@@ -4,9 +4,9 @@ import typing
 import pytest
 
 import weave
-from weave.legacy import execute, ops
+from weave.legacy import environment, execute, ops
 
-from ... import api, environment, weave_internal
+from ... import api, weave_internal
 from ... import weave_types as types
 from . import test_wb
 

@@ -21,7 +21,8 @@ from weave.trace.ipython import (
 )
 from weave.trace.refs import ObjectRef
 
-from .. import environment, errors, storage
+from .. import errors, storage
+from ..legacy import environment
 from . import serializer
 from .op import Op
 

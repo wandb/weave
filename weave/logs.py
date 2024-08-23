@@ -12,7 +12,7 @@ from logging.handlers import WatchedFileHandler
 
 from pythonjsonlogger import jsonlogger
 
-from . import environment
+from weave.legacy import environment
 
 try:
     from flask.logging import wsgi_errors_stream

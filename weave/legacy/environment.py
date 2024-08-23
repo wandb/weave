@@ -11,10 +11,10 @@ import typing
 from distutils.util import strtobool
 from urllib.parse import urlparse
 
-from . import errors, util
+from .. import errors, util
 
 if typing.TYPE_CHECKING:
-    from . import logs
+    from .. import logs
 
 WANDB_ERROR_REPORTING = "WANDB_ERROR_REPORTING"
 WEAVE_USAGE_ANALYTICS = "WEAVE_USAGE_ANALYTICS"
@@ -105,7 +105,7 @@ def is_public() -> bool:
 
 
 def weave_log_format(default: "logs.LogFormat") -> "logs.LogFormat":
-    from .logs import LogFormat
+    from ..logs import LogFormat
 
     return LogFormat(os.getenv("WEAVE_LOG_FORMAT", default))
 
