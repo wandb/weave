@@ -11,11 +11,11 @@ import pyarrow.compute as pc
 import typing_extensions
 
 from weave import (
-    errors,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.legacy import (
+    errors,
     _dict_utils,
     artifact_base,
     box,

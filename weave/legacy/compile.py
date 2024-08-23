@@ -6,11 +6,11 @@ import re
 import typing
 
 from weave import (
-    errors,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.legacy import (
+    errors,
     engine_trace,
     box,
     compile_domain,

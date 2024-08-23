@@ -9,9 +9,17 @@ import tempfile
 import typing
 from datetime import datetime
 
-from weave import errors, filesystem, util
+from weave import filesystem, util
 from weave import weave_types as types
-from weave.legacy import artifact_fs, artifact_wandb, environment, file_base, file_util, uris
+from weave.legacy import (
+    artifact_fs,
+    artifact_wandb,
+    environment,
+    errors,
+    file_base,
+    file_util,
+    uris,
+)
 
 WORKING_DIR_PREFIX = "__working__"
 

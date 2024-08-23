@@ -1,8 +1,8 @@
 import datetime
 import typing
 
-from weave import errors, storage, weave_types
-from weave.legacy import context_state, op_aliases, op_args, uris
+from weave import storage, weave_types
+from weave.legacy import errors, context_state, op_aliases, op_args, uris
 from weave.legacy.op_args import OpNamedArgs
 
 if typing.TYPE_CHECKING:

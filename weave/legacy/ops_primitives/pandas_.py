@@ -8,7 +8,7 @@ import pandas
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from weave import errors
+from weave.legacy import errors
 from weave import weave_types as types
 from weave.legacy.api import op, weave_class
 from weave.legacy import box, file_base, graph, mappers_python

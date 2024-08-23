@@ -2,7 +2,7 @@ import json
 import typing
 
 from weave.legacy import environment as weave_env
-from weave import errors
+from weave.legacy import errors
 from weave import weave_types as types
 from weave.legacy.api import op
 from weave.legacy import file_base, wandb_file_manager

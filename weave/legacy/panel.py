@@ -4,9 +4,9 @@ import typing
 from tarfile import DEFAULT_FORMAT
 
 from weave.legacy import api as weave
-from weave import errors, storage, weave_internal
+from weave import storage, weave_internal
 from weave import weave_types as types
-from weave.legacy import graph, panel_util
+from weave.legacy import graph, panel_util, errors
 
 
 def run_variable_lambdas(

@@ -9,7 +9,7 @@ from weave.client_context import weave_client as weave_client_context
 from weave.legacy import box, context_state, object_context, uris
 from weave.legacy.language_features.tagging import tag_store
 
-from .. import errors
+from weave.legacy import errors
 from .. import weave_types as types
 
 # We store Refs here if we can't attach them directly to the object

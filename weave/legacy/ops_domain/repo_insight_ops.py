@@ -1,7 +1,7 @@
 import datetime
 import json
 
-from weave import errors
+from weave.legacy import errors
 from weave import weave_types as types
 from weave.legacy.api import op
 from weave.legacy.gql_json_cache import use_json
