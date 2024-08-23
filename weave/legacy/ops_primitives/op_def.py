@@ -1,4 +1,4 @@
-from weave import query_api as weave
+from weave.legacy import api as weave
 from weave import weave_types as types
 from weave.legacy.op_def import OpDef
 from weave.legacy.op_def_type import OpDefType

@@ -1,7 +1,7 @@
 import json
 import typing
 
-from weave import query_api as weave
+from weave.legacy import api as weave
 from weave.legacy import file_base
 
 

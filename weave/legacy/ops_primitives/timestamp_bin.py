@@ -1,6 +1,6 @@
 from weave import weave_internal
 from weave import weave_types as types
-from weave.query_api import op, use
+from weave.legacy.api import op, use
 from weave.legacy import graph
 from weave.legacy.ops_primitives.dict import dict_
 from weave.weave_internal import call_fn, define_fn, make_const_node

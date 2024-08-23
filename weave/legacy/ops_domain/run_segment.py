@@ -4,7 +4,7 @@ from typing import Optional, cast
 
 import weave
 from weave import weave_types as types
-from weave.query_api import Node, get, use
+from weave.legacy.api import Node, get, use
 from weave.legacy import context_state as _context
 from weave.legacy import panels
 from weave.legacy.ops_arrow import ArrowWeaveList, ArrowWeaveListType
