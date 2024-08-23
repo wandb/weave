@@ -5,7 +5,7 @@ from tarfile import DEFAULT_FORMAT
 
 from weave.legacy import api as weave
 from weave import weave_internal
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import graph, panel_util, errors, storage
 
 

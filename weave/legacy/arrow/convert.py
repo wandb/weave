@@ -5,7 +5,7 @@ import pyarrow.compute as pc
 
 from weave.legacy import api as api
 from weave import weave_internal
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import errors, arrow_util, artifact_base, artifact_mem, box, mappers_arrow
 from weave.legacy.arrow.arrow import (
     ArrowWeaveListType,

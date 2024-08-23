@@ -1,6 +1,6 @@
 import weave
-from weave import weave_types as types
 from weave.legacy import storage
+from weave.legacy import weave_types as types
 
 
 def test_reffed_type(ref_tracking):

@@ -7,7 +7,7 @@ import json
 import pyarrow as pa
 
 from weave.legacy import engine_trace
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op, use
 from weave.legacy import artifact_mem, gql_json_cache
 from weave.legacy.arrow import convert

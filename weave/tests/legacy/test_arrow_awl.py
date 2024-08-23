@@ -3,7 +3,7 @@
 import pytest
 
 import weave
-import weave.weave_types as types
+import weave.legacy.weave_types as types
 from weave.legacy import box, ops_arrow
 from weave.legacy.arrow.convert import to_arrow
 from weave.legacy.language_features.tagging import tag_store, tagged_value_type

@@ -1,6 +1,6 @@
 import typing
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import context_state as _context_state
 from weave.legacy import decorator_op
 from weave.legacy.language_features.tagging import tag_store, tagged_value_type

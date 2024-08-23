@@ -2,7 +2,7 @@ import typing
 from dataclasses import dataclass
 from urllib import parse
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import artifact_fs, decorator_type
 from weave.legacy.artifact_wandb import (
     WandbArtifact,

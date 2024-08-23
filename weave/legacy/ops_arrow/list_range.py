@@ -2,7 +2,7 @@
 
 import pyarrow as pa
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op
 from weave.legacy.arrow.list_ import ArrowWeaveList
 

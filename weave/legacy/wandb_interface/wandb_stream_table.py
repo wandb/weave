@@ -15,7 +15,7 @@ from wandb.sdk.lib.ipython import _get_python_type
 from wandb.sdk.lib.paths import LogicalPath
 from wandb.sdk.lib.printer import get_printer
 
-from weave import weave_types
+from weave.legacy import weave_types
 from weave.legacy import (
     storage, 
     errors, 

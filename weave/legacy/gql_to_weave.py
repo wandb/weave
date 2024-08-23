@@ -18,7 +18,7 @@ from graphql import (
 )
 
 from weave.legacy import errors
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import gql_schema
 
 

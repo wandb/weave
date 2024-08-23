@@ -5,7 +5,7 @@ from weave.legacy import artifact_local, graph, runs
 
 from . import ref_base
 from . import errors
-from .. import weave_types as types
+from weave.legacy import weave_types as types
 
 
 def get_obj_creator(ref: ref_base.Ref) -> typing.Optional[runs.Run]:

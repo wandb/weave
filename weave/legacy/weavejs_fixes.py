@@ -10,7 +10,7 @@ import typing
 
 from weave.legacy import graph
 
-from .. import weave_types
+from weave.legacy import weave_types
 
 
 def _convert_specific_opname_to_generic_opname(

@@ -8,7 +8,7 @@ import typing
 
 from weave.legacy import environment as weave_env
 from weave.legacy import filesystem
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import (
     artifact_fs,
     errors,

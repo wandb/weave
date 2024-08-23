@@ -12,7 +12,7 @@ from .. import (
     storage,
     weave_internal,
 )
-from .. import weave_types as types
+from weave.legacy import weave_types as types
 
 
 @dataclasses.dataclass

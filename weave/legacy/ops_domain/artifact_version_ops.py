@@ -3,7 +3,7 @@ import typing
 from urllib.parse import quote
 
 from weave.legacy import errors
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op
 from weave.legacy import artifact_fs, artifact_wandb, input_provider
 from weave.legacy.gql_op_plugin import wb_gql_op_plugin

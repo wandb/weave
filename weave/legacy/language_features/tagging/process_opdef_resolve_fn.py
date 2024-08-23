@@ -11,7 +11,7 @@ import pyarrow as pa
 import typing_extensions
 from pyarrow import compute as pc
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import box
 from weave.legacy.arrow.arrow_tags import awl_add_arrow_tags
 from weave.legacy.arrow.list_ import ArrowWeaveList

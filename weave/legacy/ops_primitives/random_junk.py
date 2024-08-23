@@ -1,7 +1,7 @@
 # Ideas for ops, but not production ready.
 
 from weave.legacy import api as api
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op, weave_class
 
 op(
