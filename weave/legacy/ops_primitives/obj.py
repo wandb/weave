@@ -1,7 +1,7 @@
 import typing
 
 from weave.legacy import codify
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op, weave_class
 
 

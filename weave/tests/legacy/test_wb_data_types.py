@@ -12,8 +12,8 @@ from wandb.sdk.artifacts.artifact_state import ArtifactState
 from wandb.sdk.data_types._dtypes import TypeRegistry as SDKTypeRegistry
 
 import weave
-from weave import weave_types as types
 from weave.legacy import artifact_fs
+from weave.legacy import weave_types as types
 from weave.legacy.artifact_wandb import WandbArtifact, WeaveWBArtifactURI
 from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.legacy.ops_domain.wbmedia import ImageArtifactFileRefType

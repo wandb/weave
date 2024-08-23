@@ -1,8 +1,8 @@
 import weave
 from weave.legacy import context_state as _context
 from weave.legacy import graph
+from weave.legacy import weave_types as types
 
-from ... import weave_types as types
 from ...legacy import registry_mem
 from ...weave_internal import make_const_node
 

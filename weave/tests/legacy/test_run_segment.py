@@ -7,11 +7,11 @@ import pytest
 
 import weave
 from weave.legacy import ops
+from weave.legacy import weave_types as types
 from weave.legacy.ops_arrow import ArrowWeaveList, arrow_as_array
 from weave.legacy.ops_domain.run_segment import RunSegment
 
 from ... import api, storage, weave_internal
-from ... import weave_types as types
 
 N_NUMERIC_METRICS = 99  # number of numerical columns in the metrics table
 

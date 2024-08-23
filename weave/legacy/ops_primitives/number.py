@@ -4,7 +4,7 @@ import typing
 
 import numpy as np
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op, weave_class
 from weave.legacy import timestamp as weave_timestamp
 

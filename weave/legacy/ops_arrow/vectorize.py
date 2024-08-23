@@ -11,7 +11,7 @@ from weave import (
     weave_internal,
 )
 from weave.legacy import errors,weavify, registry_mem
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op, use
 from weave.legacy import dispatch, graph, graph_debug, op_args, op_def
 from weave.legacy.arrow import convert

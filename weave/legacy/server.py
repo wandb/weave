@@ -24,11 +24,11 @@ from weave.legacy import (
     wandb_api,
     logs, 
     util, 
+    storage,
+    weave_types,
 )
 from weave.legacy.language_features.tagging import tag_store
 from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context
-
-from .. import storage, weave_types
 
 # A function to monkeypatch the request post method
 # def patch_request_post():

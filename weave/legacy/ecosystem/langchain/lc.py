@@ -46,7 +46,7 @@ from weave.legacy import artifact_base
 from weave.legacy.artifact_fs import FilesystemArtifact
 from weave.legacy.ecosystem.langchain import util
 from weave.legacy.ops_domain import trace_tree
-from weave.weave_types import Type
+from weave.legacy.weave_types import Type
 
 
 class WeaveTracer(BaseTracer):

@@ -1,4 +1,4 @@
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
 
 

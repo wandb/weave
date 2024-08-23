@@ -1,6 +1,6 @@
 import typing
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy._dict_utils import typeddict_pick_output_type
 from weave.legacy.decorator_class import weave_class
 from weave.legacy.decorator_op import op

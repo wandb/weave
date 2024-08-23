@@ -7,6 +7,7 @@ from pyarrow import compute as pc
 
 from weave.legacy import box, dispatch, errors, ops
 from weave.legacy import ops_arrow as arrow
+from weave.legacy import weave_types as types
 from weave.legacy.language_features.tagging import (
     make_tag_getter_op,
     tag_store,
@@ -19,7 +20,6 @@ from weave.legacy.ops_primitives import Boolean, Number, date, dict_, list_
 
 from ... import api as weave
 from ... import weave_internal
-from ... import weave_types as types
 
 string_ops_test_cases = [
     ("eq-scalar", lambda x: x == "bc", [True, False, False]),

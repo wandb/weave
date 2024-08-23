@@ -1,4 +1,4 @@
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op
 from weave.legacy.gql_op_plugin import wb_gql_op_plugin
 from weave.legacy.language_features.tagging.make_tag_getter_op import (

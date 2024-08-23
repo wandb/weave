@@ -3,7 +3,7 @@ import json
 import pyarrow as pa
 
 from weave.legacy import engine_trace
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op
 from weave.legacy import gql_json_cache
 from weave.legacy.gql_op_plugin import wb_gql_op_plugin

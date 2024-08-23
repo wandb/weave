@@ -3,7 +3,7 @@ import inspect
 import typing
 
 from weave.legacy import errors
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import context_state, decorator_class, object_type_ref_util, infer_types
 
 _py_type = type

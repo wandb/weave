@@ -3,13 +3,13 @@ import wandb
 
 import weave
 from weave.legacy import async_demo, compile, graph
+from weave.legacy import weave_types as types
 from weave.legacy.dispatch import RuntimeOutputNode
 from weave.legacy.ops_arrow import to_arrow
 from weave.legacy.ops_arrow.vectorize import raise_on_python_bailout
 from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
 from weave.weave_internal import const, define_fn, make_const_node
 
-from ... import weave_types as types
 from ...api import use
 
 

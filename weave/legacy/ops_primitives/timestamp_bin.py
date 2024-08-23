@@ -1,10 +1,10 @@
 from weave import weave_internal
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op, use
 from weave.legacy import graph
 from weave.legacy.ops_primitives.dict import dict_
 from weave.weave_internal import call_fn, define_fn, make_const_node
-from weave.weave_types import Function, TimestampBinType
+from weave.legacy.weave_types import Function, TimestampBinType
 
 NICE_BIN_SIZES_SEC = [
     # TODO: will need more steps along here for smooth zooming.

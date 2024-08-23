@@ -2,7 +2,7 @@ import copy
 import functools
 import math
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op, weave_class
 from weave.legacy import decorator_type
 from weave.legacy.language_features.tagging import tagged_value_type

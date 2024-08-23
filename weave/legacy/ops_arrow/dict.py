@@ -3,7 +3,7 @@ import typing
 import numpy as np
 import pyarrow as pa
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import _dict_utils
 from weave.legacy.arrow import convert
 from weave.legacy.arrow.arrow import arrow_as_array, offsets_starting_at_zero

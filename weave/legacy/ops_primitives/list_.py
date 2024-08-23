@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from weave.legacy import storage
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import box, execute_fast, errors
 from weave.legacy._dict_utils import tag_aware_dict_val_for_escaped_key
 from weave.legacy.decorator_class import weave_class

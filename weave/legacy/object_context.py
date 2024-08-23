@@ -13,7 +13,7 @@ from typing import Any
 
 if typing.TYPE_CHECKING:
     from weave.legacy import ref_base
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import box, uris
 
 

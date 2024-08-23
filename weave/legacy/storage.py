@@ -22,7 +22,7 @@ from weave.legacy import (
     timestamp,
 )
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 
 Ref = ref_base.Ref
 
