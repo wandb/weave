@@ -2,7 +2,7 @@ import os
 import pathlib
 import typing
 
-from weave import filesystem
+from weave.legacy import filesystem
 from weave.legacy import cache, environment, path_util
 
 

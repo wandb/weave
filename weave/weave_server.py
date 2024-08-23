@@ -25,14 +25,12 @@ from flask import (
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-from weave import (
-    filesystem,
-)
 from weave.legacy import (
     context_state,
     engine_trace,
     environment,
     errors,
+    filesystem,
     graph,
     logs,
     registry_mem,
