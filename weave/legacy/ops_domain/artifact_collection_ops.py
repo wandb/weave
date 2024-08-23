@@ -1,7 +1,7 @@
 import typing
 import urllib
 
-from weave import errors
+from weave.legacy import errors
 from weave import weave_types as types
 from weave.legacy.api import op
 from weave.legacy.gql_op_plugin import wb_gql_op_plugin

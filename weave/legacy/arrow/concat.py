@@ -12,7 +12,7 @@ import numpy as np
 import pyarrow as pa
 from pyarrow import compute as pc
 
-from weave import errors
+from weave.legacy import errors
 from weave import weave_types as types
 from weave.legacy.arrow.list_ import (
     ArrowWeaveList,

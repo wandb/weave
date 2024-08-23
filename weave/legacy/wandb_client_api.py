@@ -12,7 +12,7 @@ from wandb.apis.public.api import gql
 from wandb.errors import CommError as WandbCommError
 from wandb.sdk.internal.internal_api import _thread_local_api_settings
 
-from weave import errors
+from weave.legacy import errors
 
 
 def wandb_public_api() -> public.Api:

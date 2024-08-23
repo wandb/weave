@@ -11,10 +11,14 @@ from collections.abc import Iterable
 import pydantic
 from dateutil.parser import isoparse
 
-from weave.legacy import box, context_state, mappers_python, object_type_ref_util
+from weave.legacy import (
+    box,
+    context_state,
+    errors,
+    mappers_python,
+    object_type_ref_util,
+)
 from weave.legacy import timestamp as weave_timestamp
-
-from . import errors
 
 if typing.TYPE_CHECKING:
     from weave.legacy import artifact_base

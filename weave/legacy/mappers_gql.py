@@ -1,6 +1,6 @@
 import json
 
-from weave import errors
+from weave.legacy import errors
 from weave import weave_types as types
 from weave.legacy import gql_json_cache, mappers
 from weave.legacy.mappers_weave import UnionMapper

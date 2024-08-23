@@ -3,7 +3,7 @@ import typing
 
 import pyarrow as pa
 
-from weave import errors
+from weave.legacy import errors
 from weave import weave_types as types
 from weave.legacy import artifact_base, box
 from weave.legacy.arrow import arrow_tags, convert
