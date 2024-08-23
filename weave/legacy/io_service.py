@@ -22,10 +22,8 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 
 import aioprocessing
 
-from weave import (
-    weave_http,
-)
 from weave.legacy import (
+    weave_http,
     filesystem,
     errors,
     engine_trace,

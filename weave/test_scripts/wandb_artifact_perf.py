@@ -20,9 +20,8 @@ from weave.legacy import (
     filesystem,
     wandb_api,
     wandb_file_manager,
+    weave_http,
 )
-
-from .. import weave_http
 
 tracer = engine_trace.tracer()  # type: ignore
 
