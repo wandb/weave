@@ -1057,7 +1057,7 @@ class ObjectType(Type):
 
     @classmethod
     def typeclass_of_class(cls, check_class):
-        from . import weave_pydantic
+        from .legacy import weave_pydantic
 
         if not issubclass(check_class, pydantic.BaseModel):
             return cls
