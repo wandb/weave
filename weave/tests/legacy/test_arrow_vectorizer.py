@@ -5,7 +5,7 @@ import pyarrow as pa
 import pytest
 from pyarrow import compute as pc
 
-from weave.legacy import box, dispatch, ops
+from weave.legacy import box, dispatch, errors, ops
 from weave.legacy import ops_arrow as arrow
 from weave.legacy.language_features.tagging import (
     make_tag_getter_op,
@@ -18,7 +18,7 @@ from weave.legacy.ops_domain import wb_domain_types as wdt
 from weave.legacy.ops_primitives import Boolean, Number, date, dict_, list_
 
 from ... import api as weave
-from ... import errors, weave_internal
+from ... import weave_internal
 from ... import weave_types as types
 
 string_ops_test_cases = [

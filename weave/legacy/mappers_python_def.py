@@ -4,7 +4,7 @@ import inspect
 import math
 import typing
 
-from weave import errors, storage
+from weave import storage
 from weave import weave_types as types
 from weave.legacy import (
     artifact_fs,
@@ -14,6 +14,7 @@ from weave.legacy import (
     mappers_weave,
     ref_base,
     val_const,
+    errors,
 )
 from weave.legacy import timestamp as weave_timestamp
 from weave.legacy.language_features.tagging import tagged_value_type

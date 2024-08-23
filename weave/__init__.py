@@ -18,7 +18,7 @@ from . import storage
 from .legacy.api import *
 from .trace.api import *
 
-from .errors import *
+from .legacy.errors import *
 
 from weave.legacy import mappers_python_def
 

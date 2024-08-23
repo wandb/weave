@@ -1,7 +1,7 @@
 import inspect
 import typing
 
-from weave import errors
+from weave.legacy import errors
 from weave import weave_types as types
 from weave.legacy import context_state, derive_op, op_def, registry_mem
 

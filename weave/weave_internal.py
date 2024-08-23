@@ -1,8 +1,7 @@
 import typing
 
-from weave.legacy import client_interface, context_state, graph
+from weave.legacy import client_interface, context_state, errors, graph
 
-from . import errors
 from . import weave_types as types
 
 

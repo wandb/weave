@@ -3,13 +3,13 @@ import time
 import typing
 
 from weave import (
-    errors,
     storage,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.legacy.api import mutation, op, weave_class
 from weave.legacy import (
+    errors,
     ref_base,
     registry_mem,
     artifact_fs,

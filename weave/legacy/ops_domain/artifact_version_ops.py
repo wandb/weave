@@ -2,7 +2,7 @@ import json
 import typing
 from urllib.parse import quote
 
-from weave import errors
+from weave.legacy import errors
 from weave import weave_types as types
 from weave.legacy.api import op
 from weave.legacy import artifact_fs, artifact_wandb, input_provider

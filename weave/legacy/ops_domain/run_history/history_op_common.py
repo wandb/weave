@@ -5,12 +5,12 @@ import pyarrow as pa
 from pyarrow import parquet as pq
 
 from weave import (
-    errors,
     util,
 )
 from weave import weave_types as types
 from weave.legacy.api import use
 from weave.legacy import (
+    errors,
     engine_trace,
     registry_mem,
     _dict_utils,

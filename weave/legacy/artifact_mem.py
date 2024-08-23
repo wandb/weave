@@ -2,7 +2,7 @@ import typing
 
 from . import artifact_base
 from weave import weave_types as types
-from weave import errors
+from weave.legacy import errors
 from weave.legacy import ref_base
 
 

@@ -3,7 +3,7 @@ import typing
 
 from weave.legacy import infer_types, op_args
 
-from .. import errors
+from weave.legacy import errors
 from .. import weave_types as types
 
 InputTypeItemType = typing.Union[types.Type, typing.Callable[..., types.Type]]

@@ -15,13 +15,13 @@ from weave.legacy import (
     artifact_mem,
     artifact_wandb,
     box,
+    errors,
     graph,
     mappers_python,
     ref_base,
     timestamp,
 )
 
-from . import errors
 from . import weave_types as types
 
 Ref = ref_base.Ref

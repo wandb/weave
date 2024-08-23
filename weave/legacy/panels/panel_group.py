@@ -3,8 +3,9 @@ import dataclasses
 import typing
 
 import weave
-from weave import errors, weave_internal
+from weave import weave_internal
 from weave.legacy import (
+    errors, 
     codifiable_value_mixin,
     codify,
     dispatch,

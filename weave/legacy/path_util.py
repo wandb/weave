@@ -1,7 +1,7 @@
 import pathlib
 import typing
 
-from .. import errors
+from weave.legacy import errors
 
 
 def safe_join(*args: typing.Union[str, pathlib.Path]) -> str:
