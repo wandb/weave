@@ -24,7 +24,7 @@ from .trace import weave_client as _weave_client
 from . import weave_types as types
 
 # needed to enable automatic numpy serialization
-from . import types_numpy as _types_numpy
+from .legacy import types_numpy as _types_numpy
 
 from . import errors
 from weave.legacy.decorators import weave_class, mutation, type
