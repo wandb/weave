@@ -12,7 +12,6 @@ from requests import HTTPError
 from weave import trace_sentry, urls, version
 from weave.client_context import weave_client as weave_client_context
 from weave.exception import exception_to_json_str
-from weave.table import Table
 from weave.trace import call_context
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -25,6 +24,7 @@ from weave.trace.op import op as op_deco
 from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
+from weave.trace.table import Table
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
