@@ -1,7 +1,7 @@
 import json
 import typing
 
-from weave import environment as weave_env
+from weave.legacy import environment as weave_env
 from weave import errors
 from weave import weave_types as types
 from weave.legacy.api import op

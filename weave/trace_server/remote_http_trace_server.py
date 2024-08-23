@@ -6,7 +6,7 @@ import typing as t
 import tenacity
 from pydantic import BaseModel, ValidationError
 
-from weave.environment import weave_trace_server_url
+from weave.legacy.environment import weave_trace_server_url
 from weave.legacy.wandb_interface import project_creator
 
 from . import requests

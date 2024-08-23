@@ -18,8 +18,8 @@ import os
 import time
 import typing
 
-from .. import environment, logs
-from . import stream_data_interfaces
+from .. import logs
+from . import environment, stream_data_interfaces
 
 
 # Thanks co-pilot!
