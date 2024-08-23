@@ -2,6 +2,8 @@ import asyncio
 import os
 from typing import Any, Optional
 
+import pytest
+
 import weave
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
@@ -37,7 +39,7 @@ def op_name_from_ref(ref: str) -> str:
     return ref.split("/")[-1].split(":")[0]
 
 
-# @pytest.mark.skip_clickhouse_client
+@pytest.mark.single_threaded
 def test_content_generation(client: WeaveClient) -> None:
     import google.generativeai as genai
 
@@ -61,7 +63,7 @@ def test_content_generation(client: WeaveClient) -> None:
         assert call.exception is None and call.ended_at is not None
 
 
-# @pytest.mark.skip_clickhouse_client
+@pytest.mark.single_threaded
 def test_content_generation_stream(client: WeaveClient) -> None:
     import google.generativeai as genai
 
@@ -89,7 +91,7 @@ def test_content_generation_stream(client: WeaveClient) -> None:
         assert call.exception is None and call.ended_at is not None
 
 
-# @pytest.mark.skip_clickhouse_client
+@pytest.mark.single_threaded
 def test_content_generation_async(client: WeaveClient) -> None:
     import google.generativeai as genai
 
@@ -117,7 +119,7 @@ def test_content_generation_async(client: WeaveClient) -> None:
         assert call.exception is None and call.ended_at is not None
 
 
-# @pytest.mark.skip_clickhouse_client
+@pytest.mark.single_threaded
 def test_content_generation_async_stream(client: WeaveClient) -> None:
     import google.generativeai as genai
 
