@@ -24,7 +24,7 @@ from weave.trace_server import (
 )
 from weave.trace_server import trace_server_interface as tsi
 
-from . import logs
+from .legacy import logs
 from .tests import fixture_fakewandb
 from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
