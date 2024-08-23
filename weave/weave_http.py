@@ -13,7 +13,7 @@ import requests
 import requests.auth
 import yarl
 
-from weave import server_error_handling
+from weave.legacy import server_error_handling
 
 from . import engine_trace, filesystem
 
