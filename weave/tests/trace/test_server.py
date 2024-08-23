@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import requests
 
-from weave import api as weave
+from weave.legacy import api as weave
 from weave.legacy import client as _client
 from weave.legacy import context_state, ops
 from weave.legacy import server as _server
