@@ -23,11 +23,11 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 import aioprocessing
 
 from weave import (
-    errors,
     filesystem,
     weave_http,
 )
 from weave.legacy import (
+    errors,
     engine_trace,
     server_error_handling,
     artifact_wandb,

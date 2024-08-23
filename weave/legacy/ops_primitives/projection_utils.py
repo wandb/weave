@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
-from weave import errors
+from weave.legacy import errors
 from weave.legacy import context_state, environment
 
 umap_lib = {}

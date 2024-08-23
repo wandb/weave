@@ -7,11 +7,11 @@ import typing
 from typing import Iterator, Sequence
 
 from weave import (
-    errors,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.legacy import (
+    errors,
     context_state,
     engine_trace,
     graph,

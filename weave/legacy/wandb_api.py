@@ -14,7 +14,7 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 
-from weave import errors
+from weave.legacy import errors
 from weave.legacy import environment as weave_env
 from weave.legacy import wandb_client_api, engine_trace
 

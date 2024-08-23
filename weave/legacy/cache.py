@@ -6,7 +6,7 @@ import shutil
 import time
 import typing
 
-from weave import errors
+from weave.legacy import errors
 from weave.legacy import context_state, environment, wandb_api, engine_trace
 
 statsd = engine_trace.statsd()  # type: ignore

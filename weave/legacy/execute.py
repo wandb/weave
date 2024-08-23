@@ -9,9 +9,6 @@ import traceback
 import typing
 from collections.abc import Mapping
 
-from weave import (
-    errors,
-)
 from weave import weave_types as types
 
 # Configuration
@@ -21,6 +18,7 @@ from weave import weave_types as types
 # Trace / cache
 # Language Features
 from weave.legacy import (
+    errors,
     engine_trace,
     environment,
     parallelism,
