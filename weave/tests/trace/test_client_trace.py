@@ -1568,7 +1568,7 @@ def _no_graph_client():
 
 @contextmanager
 def _patched_default_initializer(trace_client: weave_client.WeaveClient):
-    from weave import weave_init
+    from weave.trace import weave_init
 
     def init_weave_get_server_patched(api_key):
         return trace_client.server

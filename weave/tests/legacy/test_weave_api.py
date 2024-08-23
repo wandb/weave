@@ -5,7 +5,7 @@ import pytest
 import weave
 import weave.legacy.context_state
 import weave.legacy.wandb_api
-import weave.weave_init
+import weave.trace.weave_init
 
 
 def test_create_list_rename_delete():
@@ -40,9 +40,11 @@ def test_weave_finish_unsets_client(client):
         return 1
 
     weave.client_context.weave_client.set_weave_client_global(None)
-    weave.weave_init._current_inited_client = weave.weave_init.InitializedClient(client)
-    weave_client = weave.weave_init._current_inited_client.client
-    assert weave.weave_init._current_inited_client is not None
+    weave.trace.weave_init._current_inited_client = (
+        weave.trace.weave_init.InitializedClient(client)
+    )
+    weave_client = weave.trace.weave_init._current_inited_client.client
+    assert weave.trace.weave_init._current_inited_client is not None
 
     foo()
     assert len(list(weave_client.calls())) == 1
@@ -51,4 +53,4 @@ def test_weave_finish_unsets_client(client):
 
     foo()
     assert len(list(weave_client.calls())) == 1
-    assert weave.weave_init._current_inited_client is None
+    assert weave.trace.weave_init._current_inited_client is None

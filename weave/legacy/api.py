@@ -17,7 +17,7 @@ from .. import weave_internal as _weave_internal
 from weave.legacy import util as _util
 
 from weave.legacy import context as _context
-from .. import weave_init as _weave_init
+from ..trace import weave_init as _weave_init
 from ..trace import weave_client as _weave_client
 
 # exposed as part of api
