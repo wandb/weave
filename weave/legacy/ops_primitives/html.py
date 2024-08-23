@@ -1,7 +1,7 @@
 import dataclasses
 
 from weave.legacy import api as weave
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 
 
 class HtmlType(types.Type):

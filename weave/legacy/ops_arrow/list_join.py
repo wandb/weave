@@ -5,7 +5,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from weave.legacy import engine_trace
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op
 from weave.legacy import graph
 from weave.legacy.arrow import convert

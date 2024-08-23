@@ -12,6 +12,7 @@ from weave.legacy import box, context_state, errors, graph, mappers_arrow, ops
 # If you're thinking of import vectorize here, don't! Put your
 # tests in test_arrow_vectorizer.py instead
 from weave.legacy import ops_arrow as arrow
+from weave.legacy import weave_types as types
 from weave.legacy.arrow import constructors
 from weave.legacy.arrow.arrow_tags import (
     recursively_encode_pyarrow_strings_as_dictionaries,
@@ -28,7 +29,6 @@ from weave.tests import list_arrow_test_helpers as lath
 
 from ... import api as weave
 from ... import storage, weave_internal
-from ... import weave_types as types
 from ...tests import tag_test_util as ttu
 from ...tests import weavejs_ops
 from ...tests.legacy import test_wb

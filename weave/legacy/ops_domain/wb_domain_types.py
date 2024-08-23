@@ -1,6 +1,6 @@
 import typing
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.decorator_type import type as weave_type
 from weave.legacy.partial_object import (
     PartialObject,

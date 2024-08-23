@@ -1,4 +1,4 @@
-from weave import weave_types
+from weave.legacy import weave_types
 from weave.legacy import storage
 
 

@@ -1,4 +1,4 @@
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.ops_domain import wb_domain_types as wdt
 from weave.legacy.ops_domain.wandb_domain_gql import (
     gql_connection_op,

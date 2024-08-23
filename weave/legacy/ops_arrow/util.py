@@ -3,7 +3,7 @@ import typing
 import pyarrow as pa
 from pyarrow import compute as pc
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import graph
 
 

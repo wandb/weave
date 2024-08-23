@@ -5,9 +5,9 @@ import pytest
 
 import weave
 from weave.legacy import environment, execute, ops
+from weave.legacy import weave_types as types
 
 from ... import api, weave_internal
-from ... import weave_types as types
 from . import test_wb
 
 execute_test_count_op_run_count = 0

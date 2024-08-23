@@ -2,7 +2,7 @@ import pytest
 
 from weave.legacy import api as weave
 from weave import weave_internal
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import box
 from weave.legacy.language_features.tagging import (
     make_tag_getter_op,

@@ -1,9 +1,9 @@
 import numpy as np
 
 from weave.legacy import artifact_fs, artifact_wandb
+from weave.legacy import weave_types as types
 from weave.legacy.ops_domain import table
 
-from ... import weave_types as types
 from ...legacy import types_numpy as numpy_types
 
 

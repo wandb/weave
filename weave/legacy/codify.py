@@ -6,7 +6,7 @@ import typing
 
 import black
 
-from weave import weave_types
+from weave.legacy import weave_types
 from weave.legacy import storage, graph, registry_mem
 
 from . import codifiable_value_mixin
@@ -128,7 +128,7 @@ def _try_otc_using_dataclasses(obj: typing.Any) -> typing.Optional[str]:
     if class_type.__module__.startswith("weave.decorator_type") and issubclass(
         class_type, weave_types.Type
     ):
-        qualified_classpath = "weave.weave_types"
+        qualified_classpath = "weave.legacy.weave_types"
         qualified_classname = f"type_name_to_type('{class_type.name}')"
     else:
         qualified_classpath = _module_name_corrections(class_type.__module__)

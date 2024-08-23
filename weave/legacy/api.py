@@ -21,7 +21,7 @@ from .. import weave_init as _weave_init
 from ..trace import weave_client as _weave_client
 
 # exposed as part of api
-from .. import weave_types as types
+from weave.legacy import weave_types as types
 
 # needed to enable automatic numpy serialization
 from . import types_numpy as _types_numpy

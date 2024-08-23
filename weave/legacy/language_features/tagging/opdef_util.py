@@ -1,6 +1,6 @@
 import typing
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.language_features.tagging import tagged_value_type
 
 if typing.TYPE_CHECKING:

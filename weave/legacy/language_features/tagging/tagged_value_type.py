@@ -31,7 +31,7 @@ import json
 import typing
 
 from weave.legacy import errors
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import box, mappers, mappers_python
 from weave.legacy.language_features.tagging import tag_store
 

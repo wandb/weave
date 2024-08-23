@@ -10,7 +10,7 @@ import typing
 from datetime import datetime
 
 from weave.legacy import filesystem
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import (
     artifact_fs,
     artifact_wandb,

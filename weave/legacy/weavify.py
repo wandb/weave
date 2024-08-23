@@ -3,7 +3,7 @@ import typing
 from weave.legacy import errors, graph, op_args, val_const
 
 from .. import weave_internal
-from .. import weave_types as types
+from weave.legacy import weave_types as types
 
 if typing.TYPE_CHECKING:
     from weave.legacy import op_def

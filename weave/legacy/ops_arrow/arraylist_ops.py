@@ -3,7 +3,7 @@ import typing
 import pyarrow as pa
 from pyarrow import compute as pc
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.arrow.arrow import ArrowWeaveListType, arrow_as_array
 from weave.legacy.arrow.list_ import ArrowWeaveList
 from weave.legacy.decorator_arrow_op import arrow_op

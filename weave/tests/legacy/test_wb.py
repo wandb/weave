@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 import wandb
 
-from weave import weave_types as types
 from weave.legacy import api as weave
 from weave.legacy import artifact_fs, artifact_wandb, compile, graph, ops, stitch, uris
 from weave.legacy import ops_arrow as arrow
+from weave.legacy import weave_types as types
 from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
 from weave.legacy.ops_arrow import ArrowWeaveListType
 from weave.legacy.ops_domain import artifact_membership_ops as amo

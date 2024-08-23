@@ -5,7 +5,7 @@ import math
 import typing
 
 from weave.legacy import storage
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import (
     artifact_fs,
     box,

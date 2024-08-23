@@ -3,7 +3,7 @@ import typing
 from typing import Optional, cast
 
 import weave
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import Node, get, use
 from weave.legacy import context_state as _context
 from weave.legacy import panels
