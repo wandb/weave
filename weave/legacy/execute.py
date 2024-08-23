@@ -13,7 +13,6 @@ from weave import (
     engine_trace,
     environment,
     errors,
-    parallelism,
     ref_base,
     trace_local,
 )
@@ -26,6 +25,7 @@ from weave import weave_types as types
 # Trace / cache
 # Language Features
 from weave.legacy import (
+    parallelism,
     registry_mem,
     box,
     compile,
