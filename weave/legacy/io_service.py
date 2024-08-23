@@ -26,10 +26,10 @@ from weave import (
     engine_trace,
     errors,
     filesystem,
-    server_error_handling,
     weave_http,
 )
 from weave.legacy import (
+    server_error_handling,
     artifact_wandb,
     async_queue,
     cache,

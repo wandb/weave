@@ -27,7 +27,7 @@ from werkzeug import Response
 from werkzeug import exceptions as werkzeug_exceptions
 from werkzeug import http as werkzeug_http
 
-from . import errors, util
+from .. import errors, util
 
 
 class WeaveInternalHttpException(werkzeug_exceptions.HTTPException):
