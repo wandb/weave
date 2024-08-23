@@ -8,6 +8,7 @@ import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CallStatusType} from '../common/StatusChip';
@@ -107,6 +108,15 @@ export const CallTraceView: FC<{
           )
         );
       }
+      userEvents.callTreeCellClicked({
+        callId: rowCall.callId,
+        entity: rowCall.entity,
+        project: rowCall.project,
+        traceId: rowCall.traceId,
+        path: params.row.path,
+        isParentRow: params.row.isParentRow,
+        heirarchyDepth: params.row.hierarchy.length,
+      });
     },
     [
       call.callId,
@@ -334,6 +344,17 @@ export const useCallFlattenedTraceTree = (
   selectedPath: string | null
 ) => {
   const {useCalls} = useWFHooks();
+  const columns = useMemo(
+    () => [
+      'parent_id',
+      'started_at',
+      'ended_at',
+      'display_name',
+      'summary',
+      'exception',
+    ],
+    []
+  );
   const traceCalls = useCalls(
     call.entity,
     call.project,
@@ -344,8 +365,10 @@ export const useCallFlattenedTraceTree = (
     undefined,
     undefined,
     undefined,
+    columns,
     undefined,
-    {includeCosts: false}
+    // Refetch the trace tree on delete or rename
+    {refetchOnDelete: true, includeCosts: false}
   );
   const traceCallsResult = useMemo(
     () => traceCalls.result ?? [],

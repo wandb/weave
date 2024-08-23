@@ -13,16 +13,26 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from weave import Thread, ThreadPoolExecutor, weave_client
+from weave import Thread, ThreadPoolExecutor
+from weave.tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    FuzzyDateTimeMatcher,
+    MaybeStringMatcher,
+)
+from weave.trace import weave_client
 from weave.trace.vals import MissingSelfInstanceError
+from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
+from weave.trace_server.validation import SHOULD_ENFORCE_OBJ_ID_CHARSET
 
 pytestmark = pytest.mark.trace
 
@@ -56,7 +66,7 @@ def test_simple_op(client):
     # assert client._ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     fetched_call = calls[0]
     digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
@@ -72,7 +82,13 @@ def test_simple_op(client):
         inputs={"a": 5},
         exception=None,
         output=6,
-        summary={},
+        summary={
+            "weave": {
+                "status": "success",
+                "trace_name": "my_op",
+                "latency_ms": AnyIntMatcher(),
+            }
+        },
         attributes={
             "weave": {
                 "client_version": weave.version.VERSION,
@@ -83,6 +99,9 @@ def test_simple_op(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=DatetimeMatcher(),
+        ended_at=DatetimeMatcher(),
+        deleted_at=None,
     )
 
 
@@ -123,23 +142,6 @@ def test_trace_server_call_start_and_end(client):
         start.started_at.isoformat(timespec="milliseconds")
     )
 
-    class FuzzyDateTimeMatcher:
-        def __init__(self, dt):
-            self.dt = dt
-
-        def __eq__(self, other):
-            # Checks within 1ms
-            return abs((self.dt - other).total_seconds()) < 0.001
-
-    class MaybeStringMatcher:
-        def __init__(self, s):
-            self.s = s
-
-        def __eq__(self, other):
-            if other is None:
-                return True
-            return self.s == other
-
     assert res.call.model_dump() == {
         "project_id": client._project_id(),
         "id": call_id,
@@ -152,7 +154,12 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": None,
-        "summary": None,
+        "summary": {
+            "weave": {
+                "trace_name": "test_name",
+                "status": "running",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -191,7 +198,14 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": {"d": 5},
-        "summary": {"c": 5},
+        "summary": {
+            "c": 5,
+            "weave": {
+                "trace_name": "test_name",
+                "latency_ms": AnyIntMatcher(),
+                "status": "success",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -218,7 +232,7 @@ def test_graph_call_ordering(client):
     for i in range(10):
         my_op(i)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 10
 
     # We want to preserve insert order
@@ -1557,17 +1571,17 @@ def test_ref_get_no_client(trace_init_client):
 
 @contextmanager
 def _no_graph_client():
-    client = weave.client_context.weave_client.get_weave_client()
-    weave.client_context.weave_client.set_weave_client_global(None)
+    client = weave.trace.client_context.weave_client.get_weave_client()
+    weave.trace.client_context.weave_client.set_weave_client_global(None)
     try:
         yield
     finally:
-        weave.client_context.weave_client.set_weave_client_global(client)
+        weave.trace.client_context.weave_client.set_weave_client_global(client)
 
 
 @contextmanager
 def _patched_default_initializer(trace_client: weave_client.WeaveClient):
-    from weave import weave_init
+    from weave.trace import weave_init
 
     def init_weave_get_server_patched(api_key):
         return trace_client.server
@@ -2297,6 +2311,56 @@ def test_sort_and_filter_through_refs(client):
         assert inner_res.count == count
 
 
+def test_in_operation(client):
+    @weave.op()
+    def test_op(label, val):
+        return val
+
+    test_op(1, [1, 2, 3])
+    test_op(2, [1, 2, 3])
+    test_op(3, [5, 6, 7])
+    test_op(4, [8, 2, 3])
+
+    call_ids = [call.id for call in test_op.calls()]
+    assert len(call_ids) == 4
+
+    query = {
+        "$in": [
+            {"$getField": "id"},
+            [{"$literal": call_id} for call_id in call_ids[:2]],
+        ]
+    }
+
+    res = get_client_trace_server(client).calls_query_stats(
+        tsi.CallsQueryStatsReq.model_validate(
+            dict(
+                project_id=get_client_project_id(client),
+                query={"$expr": query},
+            )
+        )
+    )
+    assert res.count == 2
+
+    query = {
+        "$in": [
+            {"$getField": "id"},
+            [{"$literal": call_id} for call_id in call_ids],
+        ]
+    }
+    res = get_client_trace_server(client).calls_query_stream(
+        tsi.CallsQueryReq.model_validate(
+            dict(
+                project_id=get_client_project_id(client),
+                query={"$expr": query},
+            )
+        )
+    )
+    res = list(res)
+    assert len(res) == 4
+    for i in range(4):
+        assert res[i].id == call_ids[i]
+
+
 def test_call_has_client_version(client):
     @weave.op
     def test():
@@ -2420,3 +2484,284 @@ def test_model_save(client):
     assert isinstance(expected_predict_op, str) and expected_predict_op.startswith(
         "weave:///"
     )
+
+
+def test_calls_stream_column_expansion(client):
+    # make an object, and a nested object
+    # make an op that accepts the nested object, and returns it
+    # call the op
+
+    class ObjectRef(weave.Object):
+        id: str
+
+    obj = ObjectRef(id="123")
+    ref = weave.publish(obj)
+
+    class SimpleObject(weave.Object):
+        a: str
+
+    class NestedObject(weave.Object):
+        b: SimpleObject
+
+    @weave.op()
+    def return_nested_object(nested_obj: NestedObject):
+        return nested_obj
+
+    simple_obj = SimpleObject(a=ref.uri())
+    simple_ref = weave.publish(simple_obj)
+    nested_obj = NestedObject(b=simple_obj)
+    nested_ref = weave.publish(nested_obj)
+
+    return_nested_object(nested_obj)
+
+    # output is a ref
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    call_result = list(res)[0]
+    assert call_result.output == nested_ref.uri()
+
+    # output is dereffed
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output"],
+            expand_columns=["output"],
+        )
+    )
+
+    call_result = list(res)[0]
+    assert call_result.output["b"] == simple_ref.uri()
+
+    # expand 2 refs, should be {"b": {"a": ref}}
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output.b"],
+            expand_columns=["output", "output.b"],
+        )
+    )
+    call_result = list(res)[0]
+    assert call_result.output["b"]["a"] == ref.uri()
+
+    # expand 3 refs, should be {"b": {"a": {"id": 123}}}
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output.b.a"],
+            expand_columns=["output", "output.b", "output.b.a"],
+        )
+    )
+    call_result = list(res)[0]
+    assert call_result.output["b"]["a"]["id"] == "123"
+
+    # incomplete expansion columns, output should be un expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output"],
+            expand_columns=["output.b"],
+        )
+    )
+    call_result = list(res)[0]
+    assert call_result.output == nested_ref.uri()
+
+    # non-existent column, should be un expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output.b.a"],
+            expand_columns=["output.b", "output.zzzz"],
+        )
+    )
+    call_result = list(res)[0]
+    assert call_result.output == nested_ref.uri()
+
+
+class Custom(weave.Object):
+    val: dict
+
+
+def test_object_with_disallowed_keys(client):
+    name = "thing % with / disallowed : keys"
+    obj = Custom(name=name, val={"1": 1})
+
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == "thing-with-disallowed-keys"
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
+
+    if SHOULD_ENFORCE_OBJ_ID_CHARSET:
+        with pytest.raises(Exception):
+            client.server.obj_create(create_req)
+
+
+CHAR_LIMIT = 128
+
+
+def test_object_with_char_limit(client):
+    name = "l" * CHAR_LIMIT
+    obj = Custom(name=name, val={"1": 1})
+
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == name
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
+    client.server.obj_create(create_req)
+
+
+def test_object_with_char_over_limit(client):
+    name = "l" * (CHAR_LIMIT + 1)
+    obj = Custom(name=name, val={"1": 1})
+
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == name[:-1]
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
+    with pytest.raises(Exception):
+        client.server.obj_create(create_req)
+
+
+chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
+
+
+def test_objects_and_keys_with_special_characters(client):
+    # make sure to include ":", "/" which are URI-related
+
+    name_with_special_characters = "n-a_m.e: /" + chars + "100"
+    dict_payload = {name_with_special_characters: "hello world"}
+
+    obj = Custom(name=name_with_special_characters, val=dict_payload)
+
+    weave.publish(obj)
+    assert obj.ref is not None
+
+    entity, project = client._project_id().split("/")
+    project_id = f"{entity}/{project}"
+    ref_base = f"weave:///{project_id}"
+    exp_name = sanitize_object_name(name_with_special_characters)
+    assert exp_name == "n-a_m.e-100"
+    exp_key = extra_value_quoter(name_with_special_characters)
+    assert (
+        exp_key
+        == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
+    )
+    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
+
+    exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
+    assert obj.ref.uri() == exp_obj_ref
+
+    @weave.op
+    def test(obj: Custom):
+        return obj.val[name_with_special_characters]
+
+    test.name = name_with_special_characters
+
+    res = test(obj)
+
+    exp_res_ref = f"{exp_obj_ref}/attr/val/key/{exp_key}"
+    found_ref = res.ref.uri()
+    assert res == "hello world"
+    assert found_ref == exp_res_ref
+
+    gotten_res = weave.ref(found_ref).get()
+    assert gotten_res == "hello world"
+
+    exp_op_digest = "xEPCVKKjDWxKzqaCxxU09jD82FGGf5WcNy2fC9VUF3M"
+    exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
+
+    found_ref = test.ref.uri()
+    assert found_ref == exp_op_ref
+    gotten_fn = weave.ref(found_ref).get()
+    assert gotten_fn(obj) == "hello world"
+
+
+def test_calls_stream_feedback(client):
+    @weave.op
+    def test_call(x):
+        return "ello chap"
+
+    test_call(1)
+    test_call(2)
+    test_call(3)
+
+    calls = list(test_call.calls())
+    assert len(calls) == 3
+
+    # add feedback to the first call
+    calls[0].feedback.add("note", {"note": "this is a note on call1"})
+    calls[0].feedback.add_reaction("👍")
+    calls[0].feedback.add_reaction("👍")
+    calls[0].feedback.add_reaction("👎")
+
+    calls[1].feedback.add_reaction("👍")
+
+    # now get calls from the server, with the feedback expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            include_feedback=True,
+        )
+    )
+    calls = list(res)
+
+    assert len(calls) == 3
+    assert len(calls[0].summary["weave"]["feedback"]) == 4
+    assert len(calls[1].summary["weave"]["feedback"]) == 1
+    assert not calls[2].summary.get("weave", {}).get("feedback")
+
+    call1_payloads = [f["payload"] for f in calls[0].summary["weave"]["feedback"]]
+    assert {"note": "this is a note on call1"} in call1_payloads
+    assert {
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+        "emoji": "👍",
+    } in call1_payloads
+    assert {
+        "alias": ":thumbs_down:",
+        "detoned": "👎",
+        "detoned_alias": ":thumbs_down:",
+        "emoji": "👎",
+    } in call1_payloads
+
+    call2_payloads = [f["payload"] for f in calls[1].summary["weave"]["feedback"]]
+    assert {
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+        "emoji": "👍",
+    } in call2_payloads

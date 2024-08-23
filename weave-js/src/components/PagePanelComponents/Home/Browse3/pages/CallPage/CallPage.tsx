@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {FC, useCallback} from 'react';
+import React, {FC, useCallback, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {makeRefCall} from '../../../../../../util/refs';
@@ -94,6 +94,7 @@ const CallPageInnerVertical: FC<{
 }> = ({call, path}) => {
   useViewTraceEvent(call);
 
+  const {useCall} = useWFHooks();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
 
@@ -127,16 +128,30 @@ const CallPageInnerVertical: FC<{
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading} = tree;
-  let {selectedCall} = tree;
+
+  const {selectedCall} = tree;
+  const callComplete = useCall({
+    entity: selectedCall.entity,
+    project: selectedCall.project,
+    callId: selectedCall.callId,
+  });
 
   const assumeCallIsSelectedCall = path == null || path === '';
+  const [currentCall, setCurrentCall] = useState(call);
 
-  if (assumeCallIsSelectedCall) {
-    // Allows us to bypass the loading state when the call is already selected.
-    selectedCall = call;
-  }
+  useEffect(() => {
+    if (assumeCallIsSelectedCall) {
+      setCurrentCall(selectedCall);
+    }
+  }, [assumeCallIsSelectedCall, selectedCall]);
 
-  const callTabs = useCallTabs(selectedCall);
+  useEffect(() => {
+    if (!callComplete.loading && callComplete.result) {
+      setCurrentCall(callComplete.result);
+    }
+  }, [callComplete]);
+
+  const callTabs = useCallTabs(currentCall);
 
   if (loading && !assumeCallIsSelectedCall) {
     return <Loading centered />;
@@ -159,14 +174,14 @@ const CallPageInnerVertical: FC<{
         </Box>
       }
       isSidebarOpen={showTraceTree}
-      headerContent={<CallOverview call={selectedCall} />}
+      headerContent={<CallOverview call={currentCall} />}
       leftSidebar={
         loading ? (
           <Loading centered />
         ) : (
           <CallTraceView
             call={call}
-            selectedCall={selectedCall}
+            selectedCall={currentCall}
             rows={rows}
             forcedExpandKeys={expandKeys}
             path={path}

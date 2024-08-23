@@ -101,19 +101,79 @@ export const getUsageOutputTokens = (usage: LLMUsageSchema) => {
   return usage.output_tokens ?? usage.completion_tokens ?? 0;
 };
 
+export type TokenCostMetrics = {
+  inputs: {
+    cost: Record<string, number>;
+    tokens: Record<string, number>;
+  };
+  outputs: {
+    cost: Record<string, number>;
+    tokens: Record<string, number>;
+  };
+};
+
+const tooltipRowStyles = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignContent: 'center',
+  gap: '16px',
+};
+
+const tooltipDivider = (
+  <Divider
+    sx={{
+      borderColor: MOON_600,
+      marginTop: '8px',
+      marginBottom: '7px',
+    }}
+  />
+);
+
+export const TokenToolTip = (metrics: TokenCostMetrics) => (
+  <Box>
+    {Object.keys(metrics.inputs.tokens).map(model => (
+      <Box key={model + 'input'} sx={tooltipRowStyles}>
+        <span>{model === 'total' ? 'Input tokens' : model}: </span>
+        <span>
+          {FORMAT_NUMBER_NO_DECIMALS.format(metrics.inputs.tokens[model])}
+        </span>
+      </Box>
+    ))}
+    {tooltipDivider}
+    {Object.keys(metrics.outputs.tokens).map(model => (
+      <Box key={model + 'output'} sx={tooltipRowStyles}>
+        <span>{model === 'total' ? 'Output tokens' : model}: </span>
+        <span>
+          {FORMAT_NUMBER_NO_DECIMALS.format(metrics.outputs.tokens[model])}
+        </span>
+      </Box>
+    ))}
+  </Box>
+);
+
+export const CostToolTip = (metrics: TokenCostMetrics) => (
+  <Box>
+    <span style={{fontWeight: 600}}>Estimated Cost</span>
+    {Object.keys(metrics.inputs.cost).map(model => (
+      <Box key={model + 'input'} sx={tooltipRowStyles}>
+        <span>{model === 'total' ? 'Input cost' : model}: </span>
+        <span>{formatTokenCost(metrics.inputs.cost[model])}</span>
+      </Box>
+    ))}
+    {tooltipDivider}
+    {Object.keys(metrics.outputs.cost).map(model => (
+      <Box key={model + 'output'} sx={tooltipRowStyles}>
+        <span>{model === 'total' ? 'Output cost' : model}: </span>
+        <span>{formatTokenCost(metrics.outputs.cost[model])}</span>
+      </Box>
+    ))}
+  </Box>
+);
+
 export const getTokensAndCostFromUsage = (usage: {
   [key: string]: LLMUsageSchema;
 }) => {
-  const metrics: {
-    inputs: {
-      cost: Record<string, number>;
-      tokens: Record<string, number>;
-    };
-    outputs: {
-      cost: Record<string, number>;
-      tokens: Record<string, number>;
-    };
-  } = {
+  const metrics: TokenCostMetrics = {
     inputs: {
       cost: {
         total: 0,
@@ -148,63 +208,9 @@ export const getTokensAndCostFromUsage = (usage: {
   const tokensNum = metrics.inputs.tokens.total + metrics.outputs.tokens.total;
   const tokens = formatTokenCount(tokensNum);
 
-  const tooltipRowStyles = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignContent: 'center',
-    gap: '16px',
-  };
+  const costToolTip = <CostToolTip {...metrics} />;
+  const tokenToolTip = <TokenToolTip {...metrics} />;
 
-  const tooltipDivider = (
-    <Divider
-      sx={{
-        borderColor: MOON_600,
-        marginTop: '8px',
-        marginBottom: '7px',
-      }}
-    />
-  );
-
-  const tokenToolTip = (
-    <Box>
-      {Object.keys(metrics.inputs.tokens).map(model => (
-        <Box key={model + 'input'} sx={tooltipRowStyles}>
-          <span>{model === 'total' ? 'Input tokens' : model}: </span>
-          <span>
-            {FORMAT_NUMBER_NO_DECIMALS.format(metrics.inputs.tokens[model])}
-          </span>
-        </Box>
-      ))}
-      {tooltipDivider}
-      {Object.keys(metrics.outputs.tokens).map(model => (
-        <Box key={model + 'output'} sx={tooltipRowStyles}>
-          <span>{model === 'total' ? 'Output tokens' : model}: </span>
-          <span>
-            {FORMAT_NUMBER_NO_DECIMALS.format(metrics.outputs.tokens[model])}
-          </span>
-        </Box>
-      ))}
-    </Box>
-  );
-
-  const costToolTip = (
-    <Box>
-      <span style={{fontWeight: 600}}>Estimated Cost</span>
-      {Object.keys(metrics.inputs.cost).map(model => (
-        <Box key={model + 'input'} sx={tooltipRowStyles}>
-          <span>{model === 'total' ? 'Input cost' : model}: </span>
-          <span>{formatTokenCost(metrics.inputs.cost[model])}</span>
-        </Box>
-      ))}
-      {tooltipDivider}
-      {Object.keys(metrics.outputs.cost).map(model => (
-        <Box key={model + 'output'} sx={tooltipRowStyles}>
-          <span>{model === 'total' ? 'Output cost' : model}: </span>
-          <span>{formatTokenCost(metrics.outputs.cost[model])}</span>
-        </Box>
-      ))}
-    </Box>
-  );
   return {costNum, cost, tokensNum, tokens, costToolTip, tokenToolTip};
 };
 

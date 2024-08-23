@@ -13,23 +13,24 @@ from fastapi.testclient import TestClient
 from flask.testing import FlaskClient
 
 import weave
-from weave import weave_init
-from weave.legacy import client as client_legacy
-from weave.legacy import context_state, io_service, serialize
-from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context
+from weave.legacy.weave import client as client_legacy
+from weave.legacy.weave import context_state, environment, io_service, serialize
+from weave.legacy.weave.language_features.tagging.tag_store import (
+    isolated_tagging_context,
+)
+from weave.trace import weave_init
 from weave.trace_server import (
     clickhouse_trace_server_batched,
-    remote_http_trace_server,
     sqlite_trace_server,
 )
-from weave.trace_server import (
-    trace_server_interface as tsi,
-)
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import remote_http_trace_server
 
-from . import autopatch, environment, logs
+from .legacy.weave import logs
 from .tests import fixture_fakewandb
 from .tests.trace.trace_server_clickhouse_conftest import *
 from .tests.wandb_system_tests_conftest import *
+from .trace import autopatch
 
 logs.configure_logger()
 
@@ -38,7 +39,7 @@ logs.configure_logger()
 # tests.
 context_state._eager_mode.set(False)
 
-# A lot of tests rely on weave.legacy.ops.* being in scope. Importing this here
+# A lot of tests rely on weave.legacy.weave.ops.* being in scope. Importing this here
 # makes that work...
 
 ### Disable datadog engine tracing
@@ -270,7 +271,7 @@ def io_server_factory():
 
 @pytest.fixture()
 def consistent_table_col_ids():
-    from weave.legacy.panels import table_state
+    from weave.legacy.weave.panels import table_state
 
     with table_state.use_consistent_col_ids():
         yield

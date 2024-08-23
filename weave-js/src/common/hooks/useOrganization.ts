@@ -1,7 +1,6 @@
-import {gql} from '@apollo/client';
+import {gql, useApolloClient} from '@apollo/client';
 import {useEffect, useState} from 'react';
 
-import {apolloClient} from '../../apollo';
 import {useIsMounted} from './useIsMounted';
 
 export const ORGANIZATION_QUERY = gql`
@@ -25,6 +24,7 @@ export const useOrgName = ({
 }) => {
   const [orgName, setOrgName] = useState<string | null>(null);
   const isMounted = useIsMounted();
+  const apolloClient = useApolloClient();
 
   useEffect(
     () => {

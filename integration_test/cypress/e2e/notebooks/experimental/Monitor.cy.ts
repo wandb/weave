@@ -1,7 +1,8 @@
 import {checkWeaveNotebookOutputs} from '../notebooks';
 
-describe('../examples/experimental/Monitor.ipynb notebook test', () => {
-    it('passes', () =>
-        checkWeaveNotebookOutputs('../examples/experimental/Monitor.ipynb')
-    );
+describe('../weave/legacy/examples/experimental/Monitor.ipynb notebook test', () => {
+  it('passes', () =>
+    checkWeaveNotebookOutputs(
+      '../weave/legacy/examples/experimental/Monitor.ipynb'
+    ));
 });

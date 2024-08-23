@@ -198,7 +198,7 @@ export const CustomGridTreeDataGroupingCell: FC<
                   whiteSpace: 'nowrap',
                   flex: '1 1 auto',
                 }}>
-                {opNiceName(call.spanName)}
+                {call.displayName ?? opNiceName(call.spanName)}
               </Box>
             </Box>
             {call?.rawSpan?.summary &&

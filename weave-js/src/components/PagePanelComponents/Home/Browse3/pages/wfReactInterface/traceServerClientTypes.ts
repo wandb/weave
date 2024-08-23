@@ -109,6 +109,7 @@ export type TraceCallsQueryReq = {
   query?: Query;
   columns?: string[];
   include_costs?: boolean;
+  expand_columns?: string[];
 };
 
 export type TraceCallsQueryRes = {

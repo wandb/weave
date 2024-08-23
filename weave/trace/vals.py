@@ -8,9 +8,8 @@ from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, U
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
-from weave.client_context.weave_client import get_weave_client
-from weave.table import Table
 from weave.trace import box
+from weave.trace.client_context.weave_client import get_weave_client
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import Op, call, maybe_bind_method
@@ -24,6 +23,7 @@ from weave.trace.refs import (
     TableRef,
 )
 from weave.trace.serialize import from_json
+from weave.trace.table import Table
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,

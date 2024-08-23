@@ -1,7 +1,10 @@
 import {Box, Popover} from '@mui/material';
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Radio} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
+import {CodeEditor} from '@wandb/weave/components/CodeEditor';
 import {
   DraggableGrow,
   DraggableHandle,
@@ -12,11 +15,14 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
 import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useWFHooks} from '../wfReactInterface/context';
+import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {
   ContentType,
   fileExtensions,
 } from '../wfReactInterface/traceServerClientTypes';
+import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
@@ -28,13 +34,14 @@ export const ExportSelector = ({
   selectedCalls,
   numTotalCalls,
   visibleColumns,
+  refColumnsToExpand,
   disabled,
   callQueryParams,
-  rightmostButton = false,
 }: {
   selectedCalls: string[];
   numTotalCalls: number;
   visibleColumns: string[];
+  refColumnsToExpand: string[];
   callQueryParams: {
     entity: string;
     project: string;
@@ -43,12 +50,17 @@ export const ExportSelector = ({
     gridSort?: GridSortModel;
   };
   disabled: boolean;
-  rightmostButton?: boolean;
 }) => {
   const [selectionState, setSelectionState] = useState<SelectionState>('all');
   const [downloadLoading, setDownloadLoading] = useState<ContentType | null>(
     null
   );
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {orgName} = useOrgName({
+    entityName: userInfoLoaded?.username ?? '',
+    skip: viewerLoading,
+  });
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -79,9 +91,10 @@ export const ExportSelector = ({
     const offset = 0;
     const limit = MAX_EXPORT;
     // TODO(gst): add support for JSONL and JSON column selection
-    const columns = [ContentType.csv, ContentType.tsv].includes(contentType)
-      ? visibleColumns
+    const leafColumns = [ContentType.csv, ContentType.tsv].includes(contentType)
+      ? makeLeafColumns(visibleColumns)
       : undefined;
+    const startTime = Date.now();
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -91,7 +104,8 @@ export const ExportSelector = ({
       offset,
       sortBy,
       filterBy,
-      columns
+      leafColumns,
+      refColumnsToExpand
     ).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];
@@ -99,15 +113,50 @@ export const ExportSelector = ({
       initiateDownloadFromBlob(blob, fileName);
       setAnchorEl(null);
       setDownloadLoading(null);
+
+      userEvents.exportClicked({
+        dataSize: blob.size,
+        numColumns: visibleColumns?.length ?? null,
+        numRows: numTotalCalls,
+        numExpandedColumns: refColumnsToExpand.length,
+        // the most nested refColumn to expand
+        maxDepth: refColumnsToExpand.reduce(
+          (max, col) => Math.max(max, col.split('.').length),
+          0
+        ),
+        type: contentType,
+        latency: Date.now() - startTime,
+        userId: userInfoLoaded?.id ?? '',
+        organizationName: orgName,
+        username: userInfoLoaded?.username ?? '',
+      });
     });
     setSelectionState('all');
   };
+
+  const pythonText = makeCodeText(
+    callQueryParams.entity,
+    callQueryParams.project,
+    selectionState === 'selected' ? selectedCalls : undefined,
+    lowLevelFilter,
+    filterBy,
+    refColumnsToExpand,
+    sortBy
+  );
+  const curlText = makeCurlText(
+    callQueryParams.entity,
+    callQueryParams.project,
+    selectionState === 'selected' ? selectedCalls : undefined,
+    lowLevelFilter,
+    filterBy,
+    refColumnsToExpand,
+    sortBy
+  );
 
   return (
     <>
       <span ref={ref}>
         <Button
-          className={rightmostButton ? 'mr-16' : 'mr-4'}
           icon="export-share-upload"
           variant="ghost"
           onClick={onClick}
@@ -135,7 +184,7 @@ export const ExportSelector = ({
         }}
         TransitionComponent={DraggableGrow}>
         <Tailwind>
-          <div className="min-w-[460px] p-12">
+          <div className="min-w-[560px] max-w-[660px] p-12">
             <DraggableHandle>
               <div className="flex items-center pb-8">
                 {selectedCalls.length === 0 ? (
@@ -155,11 +204,13 @@ export const ExportSelector = ({
                   setSelectionState={setSelectionState}
                 />
               )}
-              <DownloadGrid
-                onClickDownload={onClickDownload}
-                downloadLoading={downloadLoading}
-              />
             </DraggableHandle>
+            <DownloadGrid
+              pythonText={pythonText}
+              curlText={curlText}
+              downloadLoading={downloadLoading}
+              onClickDownload={onClickDownload}
+            />
           </div>
         </Tailwind>
       </Popover>
@@ -207,8 +258,8 @@ const SelectionCheckboxes: FC<{
 
 const ClickableOutlinedCardWithIcon: FC<{
   iconName: IconName;
-  downloadLoading: boolean;
-  disabled: boolean;
+  downloadLoading?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }> = ({iconName, children, downloadLoading, disabled, onClick}) => (
   <div
@@ -221,17 +272,26 @@ const ClickableOutlinedCardWithIcon: FC<{
       <Loading size={28} className="mr-4" />
     ) : (
       <div className="mr-4 rounded-2xl bg-moon-200 p-4">
-        <Icon size="xlarge" color="moon" name={iconName} />
+        <Icon
+          // manage python logo night mode
+          className={classNames({'night-aware': iconName.includes('logo')})}
+          size="xlarge"
+          color="moon"
+          name={iconName}
+        />
       </div>
     )}
-    <div className="ml-4">{children}</div>
+    <div className="ml-4 flex w-full items-center">{children}</div>
   </div>
 );
 
 const DownloadGrid: FC<{
+  pythonText: string;
+  curlText: string;
   downloadLoading: ContentType | null;
   onClickDownload: (contentType: ContentType) => void;
-}> = ({downloadLoading, onClickDownload}) => {
+}> = ({pythonText, curlText, downloadLoading, onClickDownload}) => {
+  const [codeMode, setCodeMode] = useState<'python' | 'curl' | null>(null);
   return (
     <>
       <div className="mt-12 flex items-center">
@@ -268,6 +328,29 @@ const DownloadGrid: FC<{
           Export to JSON
         </ClickableOutlinedCardWithIcon>
       </div>
+      <div className="mt-8 flex items-center">
+        <ClickableOutlinedCardWithIcon
+          iconName="python-logo"
+          onClick={() => setCodeMode('python')}>
+          <span className="w-full">Use Python</span>
+        </ClickableOutlinedCardWithIcon>
+        <div className="ml-8" />
+        <ClickableOutlinedCardWithIcon
+          iconName="code-alt"
+          onClick={() => setCodeMode('curl')}>
+          <span className="w-full">Use CURL</span>
+        </ClickableOutlinedCardWithIcon>
+      </div>
+      {codeMode && (
+        <div className="mt-8 flex max-w-full items-center">
+          <CodeEditor
+            value={codeMode === 'python' ? pythonText : curlText}
+            language={codeMode === 'python' ? 'python' : 'shell'}
+            handleMouseWheel={true}
+            alwaysConsumeMouseWheel={false}
+          />
+        </div>
+      )}
     </>
   );
 };
@@ -308,7 +391,6 @@ export const BulkDeleteButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        className="ml-4 mr-16"
         variant="ghost"
         size="medium"
         disabled={disabled}
@@ -330,4 +412,137 @@ function initiateDownloadFromBlob(blob: Blob, fileName: string) {
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(downloadUrl);
+}
+
+function makeLeafColumns(visibleColumns: string[]) {
+  // Filter columns down to only the most nested, for example
+  // ['output', 'output.x', 'output.x.y'] -> ['output.x.y']
+  // sort columns by length, longest to shortest
+  visibleColumns.sort((a, b) => b.length - a.length);
+  const leafColumns: string[] = [];
+  for (const col of visibleColumns) {
+    if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
+      continue;
+    }
+    leafColumns.push(col);
+  }
+  return leafColumns;
+}
+
+function makeCodeText(
+  entity: string,
+  project: string,
+  callIds: string[] | undefined,
+  filter: CallFilter,
+  query: Query | undefined,
+  expandColumns: string[],
+  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
+) {
+  let codeStr = `import weave\nassert weave.__version__ >= "0.50.14", "Please upgrade weave!" \n\nclient = weave.init("${entity}/${project}")`;
+  codeStr += `\ncalls = client.server.calls_query_stream({\n`;
+  codeStr += `   "project_id": "${entity}/${project}",\n`;
+
+  const filteredCallIds = callIds ?? filter.callIds;
+  if (filteredCallIds && filteredCallIds.length > 0) {
+    codeStr += `   "filter": {"call_ids": ["${filteredCallIds.join(
+      '", "'
+    )}"]},\n`;
+    if (expandColumns.length > 0) {
+      const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
+      codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
+    }
+    // specifying call_ids ignores other filters, return early
+    codeStr += `})`;
+    return codeStr;
+  }
+  if (Object.values(filter).some(value => value !== undefined)) {
+    codeStr += `   "filter": {`;
+    if (filter.opVersionRefs) {
+      codeStr += `"op_names": ["${filter.opVersionRefs.join('", "')}"],`;
+    }
+    if (filter.runIds) {
+      codeStr += `"run_ids": ["${filter.runIds.join('", "')}"],`;
+    }
+    if (filter.userIds) {
+      codeStr += `"user_ids": ["${filter.userIds.join('", "')}"],`;
+    }
+    if (filter.traceId) {
+      codeStr += `"trace_ids": ["${filter.traceId}"],`;
+    }
+    if (filter.traceRootsOnly) {
+      codeStr += `"trace_roots_only": True,`;
+    }
+    if (filter.parentIds) {
+      codeStr += `"parent_ids": ["${filter.parentIds.join('", "')}"],`;
+    }
+    codeStr = codeStr.slice(0, -1);
+    codeStr += `},\n`;
+  }
+  if (query) {
+    codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;
+  }
+  if (expandColumns.length > 0) {
+    const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
+    codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
+  }
+
+  if (sortBy.length > 0) {
+    codeStr += `   "sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
+  }
+
+  codeStr += `})`;
+
+  return codeStr;
+}
+
+function makeCurlText(
+  entity: string,
+  project: string,
+  callIds: string[] | undefined,
+  filter: CallFilter,
+  query: Query | undefined,
+  expandColumns: string[],
+  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
+) {
+  const baseUrl = (window as any).CONFIG.TRACE_BACKEND_BASE_URL;
+  const filterStr = JSON.stringify(
+    {
+      op_names: filter.opVersionRefs,
+      input_refs: filter.inputObjectVersionRefs,
+      output_refs: filter.outputObjectVersionRefs,
+      parent_ids: filter.parentIds,
+      trace_ids: filter.traceId ? [filter.traceId] : undefined,
+      call_ids: callIds,
+      trace_roots_only: filter.traceRootsOnly,
+      wb_run_ids: filter.runIds,
+      wb_user_ids: filter.userIds,
+    },
+    null,
+    0
+  );
+
+  let baseCurl = `# Ensure you have a WANDB_API_KEY set in your environment
+curl '${baseUrl}/calls/stream_query' \\
+  -u api:$WANDB_API_KEY \\
+  -H 'content-type: application/json' \\
+  --data-raw '{
+    "project_id":"${entity}/${project}",
+    "filter":${filterStr},
+`;
+  if (query) {
+    baseCurl += `    "query":${JSON.stringify(query, null, 0)},\n`;
+  }
+  if (expandColumns.length > 0) {
+    baseCurl += `    "expand_columns":${JSON.stringify(
+      expandColumns,
+      null,
+      0
+    )},\n`;
+  }
+  baseCurl += `    "limit":${MAX_EXPORT},
+    "offset":0,
+    "sort_by":${JSON.stringify(sortBy, null, 0)}
+  }'`;
+
+  return baseCurl;
 }

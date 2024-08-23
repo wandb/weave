@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 import weave
-from weave.legacy import artifact_fs, derive_op, op_def
+from weave.legacy.weave import artifact_fs, derive_op
 from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
 
 
@@ -523,3 +523,46 @@ def test_op_basic_execution(client):
 
     op2 = weave.ref(ref.uri()).get()
     assert op2(2) == 3
+
+
+class SomeOtherClass:
+    pass
+
+
+class SomeClass:
+    def some_fn(self):
+        return SomeOtherClass()
+
+
+EXPECTED_NO_REPEATS_CODE = """import weave
+
+class SomeOtherClass:
+    pass
+
+class SomeClass:
+    def some_fn(self):
+        return SomeOtherClass()
+
+@weave.op()
+def some_d(v):
+    a = SomeOtherClass()
+    b = SomeClass()
+    return SomeClass()
+"""
+
+
+def test_op_no_repeats(client):
+    @weave.op()
+    def some_d(v):
+        a = SomeOtherClass()
+        b = SomeClass()
+        return SomeClass()
+
+    some_d(SomeClass())
+    ref = weave.obj_ref(some_d)
+    assert ref is not None
+
+    saved_code = get_saved_code(client, ref)
+    print(saved_code)
+
+    assert saved_code == EXPECTED_NO_REPEATS_CODE

@@ -174,6 +174,7 @@ export type WFDataModelHooksInterface = {
     offset?: number,
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
+    columns?: string[],
     expandedRefColumns?: Set<string>,
     opts?: {skip?: boolean; refetchOnDelete?: boolean; includeCosts?: boolean}
   ) => Loadable<CallSchema[]>;
@@ -204,7 +205,8 @@ export type WFDataModelHooksInterface = {
     offset?: number,
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
-    columns?: string[]
+    columns?: string[],
+    expandedRefCols?: string[]
   ) => Promise<Blob>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
