@@ -1,8 +1,8 @@
 import os
 
 import weave
-from weave import weave_internal
-from weave import weave_internal as internal
+from weave.legacy import weave_internal
+from weave.legacy import weave_internal as internal
 from weave.legacy import weave_types as types
 from weave.legacy import util, dispatch, graph
 from weave.legacy.panels import panel_board, panel_group, panel_trace

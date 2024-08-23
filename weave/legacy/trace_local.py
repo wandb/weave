@@ -8,7 +8,7 @@ from typing import Mapping
 from weave.legacy import artifact_local, graph, op_def, op_policy, runs
 from . import ref_base
 
-from .. import (
+from weave.legacy import (
     storage,
     weave_internal,
 )

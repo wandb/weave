@@ -460,7 +460,7 @@ def artifact_version_weave_type(
 def _get_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
 ) -> dict[str, typing.Any]:
-    from weave import weave_internal
+    from weave.legacy import weave_internal
     from weave.legacy.compile import enable_compile
     from weave.legacy.graph import ConstNode, OutputNode
     from weave.legacy.ops_domain import wb_domain_types

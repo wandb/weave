@@ -3,8 +3,7 @@ import itertools
 import numpy as np
 import pytest
 
-from weave import weave_internal
-from weave.legacy import box, ops
+from weave.legacy import box, ops, weave_internal
 from weave.legacy import ops_arrow as arrow
 from weave.legacy import weave_types as types
 from weave.legacy.language_features.tagging import (

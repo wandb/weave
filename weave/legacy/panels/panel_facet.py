@@ -2,7 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy import weave_types as types
 from weave.legacy import graph, panel, panel_util
 from weave.legacy.arrow import list_

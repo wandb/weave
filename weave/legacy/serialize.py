@@ -7,7 +7,7 @@ import json
 import random
 import typing
 
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy import weave_types as types
 from weave.legacy import storage, errors, graph, memo, value_or_error
 

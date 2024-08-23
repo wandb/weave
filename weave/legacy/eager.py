@@ -2,7 +2,7 @@ import typing
 
 from weave.legacy import context_state, graph
 
-from .. import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy import weave_types as types
 
 WeaveIterObjectType = typing.TypeVar("WeaveIterObjectType")

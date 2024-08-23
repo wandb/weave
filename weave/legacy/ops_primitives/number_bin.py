@@ -5,7 +5,7 @@ from weave.legacy.api import op, use
 from weave.legacy import graph
 from weave.legacy.ops_primitives import date
 from weave.legacy.ops_primitives.dict import dict_
-from weave.weave_internal import call_fn, define_fn, make_const_node
+from weave.legacy.weave_internal import call_fn, define_fn, make_const_node
 from weave.legacy.weave_types import Function, NumberBinType
 
 
