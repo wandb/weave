@@ -33,7 +33,6 @@ export const ExportSelector = ({
   visibleColumns,
   disabled,
   callQueryParams,
-  rightmostButton = false,
 }: {
   selectedCalls: string[];
   numTotalCalls: number;
@@ -46,7 +45,6 @@ export const ExportSelector = ({
     gridSort?: GridSortModel;
   };
   disabled: boolean;
-  rightmostButton?: boolean;
 }) => {
   const [selectionState, setSelectionState] = useState<SelectionState>('all');
   const [downloadLoading, setDownloadLoading] = useState<ContentType | null>(
@@ -130,7 +128,6 @@ export const ExportSelector = ({
     <>
       <span ref={ref}>
         <Button
-          className={rightmostButton ? 'mr-16' : 'mr-4'}
           icon="export-share-upload"
           variant="ghost"
           onClick={onClick}
@@ -333,7 +330,6 @@ export const BulkDeleteButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        className="ml-4 mr-16"
         variant="ghost"
         size="medium"
         disabled={disabled}
