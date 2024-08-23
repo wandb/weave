@@ -209,7 +209,7 @@ def serve(
 
     from weave.legacy import wandb_api
 
-    from ..serve_fastapi import object_method_app
+    from .serve_fastapi import object_method_app
 
     client = weave_client_context.require_weave_client()
     # if not isinstance(
