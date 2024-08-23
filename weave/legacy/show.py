@@ -6,7 +6,7 @@ import urllib
 from IPython.display import IFrame, display
 
 from weave.legacy import storage, artifact_fs, context, errors, graph, ops, node_ref, panel, ref_base
-from weave import util
+from weave.legacy import util
 from . import usage_analytics
 from .. import weave_types as types
 from . import weavejs_fixes
