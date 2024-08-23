@@ -1,5 +1,5 @@
 from weave import weave_types as types
-from weave.query_api import op
+from weave.legacy.api import op
 from weave.legacy.arrow import convert
 from weave.legacy.arrow.arrow import ArrowWeaveListType
 

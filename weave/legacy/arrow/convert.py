@@ -3,7 +3,7 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave import query_api as api
+from weave.legacy import api as api
 from weave import errors, weave_internal
 from weave import weave_types as types
 from weave.legacy import arrow_util, artifact_base, artifact_mem, box, mappers_arrow

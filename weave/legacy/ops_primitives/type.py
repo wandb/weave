@@ -2,7 +2,7 @@ import typing
 
 from weave import errors
 from weave import weave_types as types
-from weave.query_api import op
+from weave.legacy.api import op
 
 
 @op(

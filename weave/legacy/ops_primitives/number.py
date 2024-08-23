@@ -5,7 +5,7 @@ import typing
 import numpy as np
 
 from weave import weave_types as types
-from weave.query_api import op, weave_class
+from weave.legacy.api import op, weave_class
 from weave.legacy import timestamp as weave_timestamp
 
 binary_number_op_input_type = {
