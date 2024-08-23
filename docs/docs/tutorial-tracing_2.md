@@ -9,9 +9,9 @@ In this tutorial you will learn how to:
 
 ## Tracking nested function calls
 
-LLM-powered applications can contain multiple LLMs calls and additional data processing and validation logic that is important to monitor. Even deep nested call structures common in many apps, Weave will keep track of the parent-child relationships in nested functions as long as `weave.op()` is added to every function you'd like to track. 
+LLM-powered applications can contain multiple LLMs calls and additional data processing and validation logic that is important to monitor. Even deep nested call structures common in many apps, Weave will keep track of the parent-child relationships in nested functions as long as `weave.op` is added to every function you'd like to track. 
 
-Building on our [basic tracing example](/quickstart), we will now add additional logic to count the returned items from our LLM and wrap them all in a higher level function. We'll then add `weave.op()` to trace every function, its call order and its parent-child relationship:
+Building on our [basic tracing example](/quickstart), we will now add additional logic to count the returned items from our LLM and wrap them all in a higher level function. We'll then add `weave.op` to trace every function, its call order and its parent-child relationship:
 
 ```python
 import weave
@@ -21,7 +21,7 @@ from openai import OpenAI
 client = OpenAI(api_key="...")
 
 # highlight-next-line
-@weave.op()
+@weave.op
 def extract_dinos(sentence: str) -> dict:
     response = client.chat.completions.create(
         model="gpt-4o",
@@ -29,7 +29,7 @@ def extract_dinos(sentence: str) -> dict:
             {
                 "role": "system",
                 "content": """Extract any dinorsaur `name`, their `common_name`, \
-  names and whether its `diet` is a herbivore or carnivore, in JSON format."""
+  and whether its `diet` is a herbivore or carnivore, in JSON format."""
             },
             {
                 "role": "user",
@@ -41,14 +41,14 @@ def extract_dinos(sentence: str) -> dict:
     return response.choices[0].message.content
 
 # highlight-next-line
-@weave.op()
+@weave.op
 def count_dinos(dino_data: dict) -> int:
     # count the number of items in the returned list
     k = list(dino_data.keys())[0]
     return len(dino_data[k])
 
 # highlight-next-line
-@weave.op()
+@weave.op
 def dino_tracker(sentence: str) -> dict:
     # extract dinosaurs using a LLM
     dino_data = extract_dinos(sentence)

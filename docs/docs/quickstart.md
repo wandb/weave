@@ -40,7 +40,7 @@ client = OpenAI(api_key="...")
 
 # Weave will track the inputs, outputs and code of this function
 # highlight-next-line
-@weave.op()
+@weave.op
 def extract_dinos(sentence: str) -> dict:
     response = client.chat.completions.create(
         model="gpt-4o",

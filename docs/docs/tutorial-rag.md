@@ -46,7 +46,7 @@ article_embeddings = docs_to_embeddings(articles) # Note: you would typically do
 
 ## 2. Create a RAG app
 
-Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.op()` decorator and we create our `Model` class. We call `weave.init('rag-qa')` to begin tracking all the inputs and outputs of our functions for later inspection.
+Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.op` decorator and we create our `Model` class. We call `weave.init('rag-qa')` to begin tracking all the inputs and outputs of our functions for later inspection.
 
 ```python
 from openai import OpenAI
@@ -56,7 +56,7 @@ import numpy as np
 import asyncio
 
 # highlight-next-line
-@weave.op()
+@weave.op
 def get_most_relevant_document(query):
     openai = OpenAI()
     query_embedding = (
@@ -79,7 +79,7 @@ class RAGModel(Model):
     model_name: str = "gpt-3.5-turbo-1106"
 
 # highlight-next-line
-    @weave.op()
+    @weave.op
     def predict(self, question: str) -> dict: # note: `question` will be used later to select data from our evaluation rows
         from openai import OpenAI
         context = get_most_relevant_document(question)
@@ -124,7 +124,7 @@ import weave
 import asyncio
 
 # highlight-next-line
-@weave.op()
+@weave.op
 async def context_precision_score(question, model_output):
     context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output. 
     Output in only valid JSON format.
@@ -172,11 +172,11 @@ In some applications we want to create custom evaluation classes - where for exa
 
 On a high-level the steps to create custom Scorer are quite simple: 
 1. Define a custom class that inherits from `weave.flow.scorer.Scorer`
-2. Overwrite the `score` function and add a `@weave.op()` if you want to track each call of the function
+2. Overwrite the `score` function and add a `@weave.op` if you want to track each call of the function
     - this function has to define a `model_output` argument where the prediction of the model will be passed to. We define it as type `Optional[dict]` in case the mode might return "None".
     - the rest of the arguments can either be a general `Any` or `dict` or can select specific columns from the dataset that is used to evaluate the model using the `weave.Evaluate` class - they have to have the exact same names as the column names or keys of a single row after being passed to `preprocess_model_input` if that is used.
 3. *Optional:* Overwrite the `summarize` function to customize the calculation of the aggregate score. By default Weave uses the `weave.flow.scorer.auto_summarize` function if you don't define a custom function.
-    - this function has to have a `@weave.op()` decorator.
+    - this function has to have a `@weave.op` decorator.
 
 
 ```python
@@ -188,7 +188,7 @@ class CorrectnessLLMJudge(Scorer):
     model_name: str
     device: str
 
-    @weave.op()
+    @weave.op
     async def score(self, model_output: Optional[dict], query: str, answer: str) -> Any:
         """Score the correctness of the predictions by comparing the pred, query, target.
            Args:
@@ -218,7 +218,7 @@ class CorrectnessLLMJudge(Scorer):
         # the column name displayed in Weave
         return {"correct": evaluation}
 
-    @weave.op()
+    @weave.op
     def summarize(self, score_rows: WeaveList) -> Optional[dict]:
         """Aggregate all the scores that are calculated for each row by the scoring function.
            Args:
@@ -256,7 +256,7 @@ evaluation = weave.Evaluation(dataset=questions, scorers=[CorrectnessLLMJudge()]
 ## 4. Pulling it all together
 
 To get the same result for your RAG apps:
-- Wrap LLM calls & retrieval step functions with `weave.op()`
+- Wrap LLM calls & retrieval step functions with `weave.op`
 - (optional) Create a `Model` subclass with `predict` function and app details
 - Collect examples to evaluate
 - Create scoring functions that score one example
@@ -301,7 +301,7 @@ article_embeddings = docs_to_embeddings(articles) # Note: you would typically do
 
 # We've added a decorator to our retrieval step
 # highlight-next-line
-@weave.op()
+@weave.op
 def get_most_relevant_document(query):
     openai = OpenAI()
     query_embedding = (
@@ -325,7 +325,7 @@ class RAGModel(Model):
     model_name: str = "gpt-3.5-turbo-1106"
 
 # highlight-next-line
-    @weave.op()
+    @weave.op
 # highlight-next-line
     def predict(self, question: str) -> dict: # note: `question` will be used later to select data from our evaluation rows
         from openai import OpenAI
@@ -358,7 +358,7 @@ model = RAGModel(
 
 # Here is our scoring function uses our question and model_output to product a score
 # highlight-next-line
-@weave.op()
+@weave.op
 # highlight-next-line
 async def context_precision_score(question, model_output):
     context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output. 
