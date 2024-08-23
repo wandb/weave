@@ -28,7 +28,6 @@ from werkzeug.exceptions import HTTPException
 from weave import (
     filesystem,
     logs,
-    storage,
     util,
 )
 from weave.legacy import (
@@ -39,6 +38,7 @@ from weave.legacy import (
     graph,
     registry_mem,
     server,
+    storage,
     value_or_error,
     wandb_api,
     weavejs_fixes,

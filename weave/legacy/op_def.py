@@ -365,7 +365,7 @@ class OpDef:
                 # This can happen due to nullability. In that case, accept the output type is null
                 final_output_type = types.NoneType()
             # Have to deref if in case a ref came back...
-            from weave import storage
+            from weave.legacy import storage
 
             final_output_type = storage.deref(final_output_type)
 

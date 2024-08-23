@@ -3,8 +3,7 @@ import typing
 import pytest
 
 import weave
-from weave import storage
-from weave.legacy import panels
+from weave.legacy import panels, storage
 from weave.legacy.artifact_fs import BranchPointType, FilesystemArtifactRef
 from weave.legacy.artifact_local import (
     LocalArtifact,

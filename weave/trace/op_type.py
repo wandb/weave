@@ -13,7 +13,7 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
-from weave.legacy import artifact_fs, context_state, errors
+from weave.legacy import artifact_fs, context_state, errors, storage
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -21,7 +21,6 @@ from weave.trace.ipython import (
 )
 from weave.trace.refs import ObjectRef
 
-from .. import storage
 from ..legacy import environment
 from . import serializer
 from .op import Op
