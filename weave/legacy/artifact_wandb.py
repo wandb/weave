@@ -15,7 +15,6 @@ from wandb.sdk.lib.hashutil import b64_to_hex_id, hex_to_b64_id
 
 from weave import (
     filesystem,
-    util,
 )
 from weave import weave_types as types
 from weave.legacy import (
@@ -29,6 +28,7 @@ from weave.legacy import (
     memo,
     uris,
     wandb_client_api,
+    util,
 )
 from weave.legacy.wandb_interface import wandb_artifact_pusher
 
