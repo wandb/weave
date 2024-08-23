@@ -14,7 +14,6 @@ from wandb.apis.public import api as wb_public
 from wandb.sdk.lib.hashutil import b64_to_hex_id, hex_to_b64_id
 
 from weave import (
-    eager,
     engine_trace,
     errors,
     filesystem,
@@ -24,6 +23,7 @@ from weave import (
 from weave import weave_types as types
 from weave.legacy import (
     artifact_fs,
+    eager,
     file_base,
     file_util,
     memo,
