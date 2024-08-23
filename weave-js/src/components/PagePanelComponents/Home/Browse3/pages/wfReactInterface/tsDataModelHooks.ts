@@ -1228,7 +1228,7 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
         ? new TextDecoder().decode(arrayBuffer.result)
         : null,
     };
-  }, [arrayBuffer.loading, arrayBuffer.result]);
+  }, [arrayBuffer.loading, arrayBuffer.result, query.loading]);
 
   return text;
 };
