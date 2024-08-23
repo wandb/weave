@@ -1,8 +1,7 @@
 import typing
 
 from weave.legacy import client_interface, context_state, errors, graph
-
-from . import weave_types as types
+from weave.legacy import weave_types as types
 
 
 def dereference_variables(

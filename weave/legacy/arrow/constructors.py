@@ -4,7 +4,7 @@ import typing
 import pyarrow as pa
 
 from weave.legacy import errors
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import artifact_base, box
 from weave.legacy.arrow import arrow_tags, convert
 from weave.legacy.arrow.arrow import ArrowWeaveListType, arrow_as_array

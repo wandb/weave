@@ -4,7 +4,7 @@ from weave.legacy import box
 from weave.legacy.language_features.tagging import tag_store, tagged_value_type
 
 from weave.legacy import errors
-from .. import weave_types as types
+from weave.legacy import weave_types as types
 
 
 def typeddict_pick_output_type(input_types):

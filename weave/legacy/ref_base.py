@@ -10,13 +10,13 @@ from weave.legacy import box, context_state, object_context, uris
 from weave.legacy.language_features.tagging import tag_store
 
 from weave.legacy import errors
-from .. import weave_types as types
+from weave.legacy import weave_types as types
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
-    from .. import weave_types as types
+    from weave.legacy import weave_types as types
     from ..trace import weave_client
 
 

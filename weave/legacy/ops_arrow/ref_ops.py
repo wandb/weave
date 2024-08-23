@@ -1,7 +1,7 @@
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from weave.legacy.decorator_arrow_op import arrow_op
 from weave.legacy.decorator_op import op

@@ -2,7 +2,7 @@ import json
 import typing
 from dataclasses import dataclass, field
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import artifact_fs
 
 T = typing.TypeVar("T", bound="PartialObject")

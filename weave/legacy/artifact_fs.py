@@ -7,7 +7,7 @@ import os
 import typing
 
 from weave.legacy import errors
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import artifact_base, file_base, object_context, ref_base, uris
 from weave.legacy.language_features.tagging import tag_store
 from weave.trace import ref_util

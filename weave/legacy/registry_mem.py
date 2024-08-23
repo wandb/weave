@@ -1,7 +1,7 @@
 import datetime
 import typing
 
-from weave import weave_types
+from weave.legacy import weave_types
 from weave.legacy import storage, errors, context_state, op_aliases, op_args, uris
 from weave.legacy.op_args import OpNamedArgs
 

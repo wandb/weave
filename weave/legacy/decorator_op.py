@@ -4,7 +4,7 @@ from typing import Callable, Optional, TypeVar
 
 from typing_extensions import ParamSpec
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy import context_state, derive_op, op_args, op_def, pyfunc_type_util, registry_mem
 
 if typing.TYPE_CHECKING:

@@ -6,7 +6,7 @@ import typing
 import pyarrow as pa
 
 from weave.legacy import errors
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op
 from weave.legacy import (
     engine_trace,

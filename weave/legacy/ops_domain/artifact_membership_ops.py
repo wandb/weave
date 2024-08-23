@@ -1,6 +1,6 @@
 import urllib
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op
 from weave.legacy.gql_op_plugin import wb_gql_op_plugin
 from weave.legacy.ops_domain import wb_domain_types as wdt

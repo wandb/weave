@@ -3,7 +3,7 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 from weave.legacy.api import op
 from weave.legacy.arrow.arrow import ArrowWeaveListType, offsets_starting_at_zero
 from weave.legacy.arrow.list_ import ArrowWeaveList, ArrowWeaveListType

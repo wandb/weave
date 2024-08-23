@@ -1,4 +1,4 @@
-from weave import weave_types
+from weave.legacy import weave_types
 from weave.legacy.api import op
 from weave.legacy import compile, op_def
 from weave.legacy.arrow.arrow import ArrowWeaveListType

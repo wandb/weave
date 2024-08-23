@@ -107,7 +107,7 @@ import tabulate
 
 from weave.legacy import graph
 
-from .. import weave_types as types
+from weave.legacy import weave_types as types
 from .partial_object import PartialObjectType
 
 

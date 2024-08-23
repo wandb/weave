@@ -5,8 +5,7 @@ import pytest
 from PIL import Image
 
 import weave
-from weave import weave_types
-from weave.legacy import context, execute, gql_json_cache, wandb_api
+from weave.legacy import context, execute, gql_json_cache, wandb_api, weave_types
 from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
 
 

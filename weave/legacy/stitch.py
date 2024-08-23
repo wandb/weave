@@ -26,7 +26,7 @@ from weave.legacy import graph, op_def, registry_mem
 from weave.legacy.language_features.tagging import opdef_util
 
 from weave.legacy import errors
-from .. import weave_types as types
+from weave.legacy import weave_types as types
 from . import _dict_utils
 
 

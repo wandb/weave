@@ -7,7 +7,7 @@ than StringType()
 
 import typing
 
-from weave import weave_types as types
+from weave.legacy import weave_types as types
 
 
 class Const:
