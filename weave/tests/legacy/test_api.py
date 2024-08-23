@@ -1,6 +1,7 @@
 import shutil
 
-from ... import api as weave
+from weave.legacy import api as weave
+
 from ...legacy.show import _show_params
 
 
