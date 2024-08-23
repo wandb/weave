@@ -15,10 +15,11 @@ from wandb.sdk.lib.ipython import _get_python_type
 from wandb.sdk.lib.paths import LogicalPath
 from wandb.sdk.lib.printer import get_printer
 
-from weave import environment, errors, storage, weave_types
+from weave import errors, storage, weave_types
 from weave.legacy import (
     artifact_base,
     box,
+    environment,
     file_util,
     graph,
     runfiles_wandb,

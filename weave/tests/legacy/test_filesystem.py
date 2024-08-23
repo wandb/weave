@@ -2,7 +2,9 @@ import asyncio
 
 import pytest
 
-from ... import environment, errors, filesystem
+from weave.legacy import environment
+
+from ... import errors, filesystem
 
 
 @pytest.fixture()

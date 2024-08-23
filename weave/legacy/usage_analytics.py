@@ -5,7 +5,7 @@ import analytics
 
 from weave.legacy import context_state
 
-from .. import environment
+from . import environment
 
 analytics.write_key = "uJ8vZgKqTBVH6ZdhD4GZGZYsR7ucfJmb"
 
