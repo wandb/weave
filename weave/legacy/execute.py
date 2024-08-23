@@ -13,7 +13,6 @@ from weave import (
     environment,
     errors,
     ref_base,
-    trace_local,
 )
 from weave import weave_types as types
 
@@ -41,6 +40,7 @@ from weave.legacy import (
     op_def,
     op_execute,
     op_policy,
+    trace_local,
     value_or_error,
     wandb_api,
 )
