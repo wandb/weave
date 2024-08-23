@@ -18,8 +18,7 @@ import os
 import time
 import typing
 
-from .. import logs
-from . import environment, stream_data_interfaces
+from weave.legacy import environment, logs, stream_data_interfaces
 
 
 # Thanks co-pilot!

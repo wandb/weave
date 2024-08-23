@@ -27,7 +27,6 @@ from werkzeug.exceptions import HTTPException
 
 from weave import (
     filesystem,
-    logs,
     util,
 )
 from weave.legacy import (
@@ -36,6 +35,7 @@ from weave.legacy import (
     environment,
     errors,
     graph,
+    logs,
     registry_mem,
     server,
     storage,
