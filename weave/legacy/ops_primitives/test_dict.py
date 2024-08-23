@@ -1,5 +1,5 @@
 import weave
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy.language_features.tagging import tagged_value_type
 
 

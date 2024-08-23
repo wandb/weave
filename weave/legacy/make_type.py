@@ -1,4 +1,4 @@
-from .. import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy import weave_types as types
 
 

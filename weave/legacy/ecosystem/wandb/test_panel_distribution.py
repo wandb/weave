@@ -1,7 +1,7 @@
 import random
 
 import weave
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy.ecosystem.wandb import panel_distribution
 
 

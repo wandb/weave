@@ -9,7 +9,7 @@ import plotly.express as px
 from plotly import graph_objs as go
 
 import weave
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy import infer_types
 
 

@@ -2,13 +2,11 @@ import dataclasses
 import time
 import typing
 
-from weave import (
-    storage,
-    weave_internal,
-)
 from weave.legacy import weave_types as types
 from weave.legacy.api import mutation, op, weave_class
 from weave.legacy import (
+    storage,
+    weave_internal,
     errors,
     ref_base,
     registry_mem,

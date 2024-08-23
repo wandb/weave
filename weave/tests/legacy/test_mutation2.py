@@ -1,7 +1,5 @@
 import weave
-from weave.legacy import ref_base, uris
-
-from ... import weave_internal
+from weave.legacy import ref_base, uris, weave_internal
 
 
 def test_mutation_set_direct_call():

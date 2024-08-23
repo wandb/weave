@@ -1,8 +1,7 @@
 import weave
-from weave.legacy import dispatch
+from weave.legacy import dispatch, weave_internal
 from weave.legacy import weave_types as types
 
-from ... import weave_internal
 from .. import weavejs_ops
 
 

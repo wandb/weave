@@ -2,7 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy.ecosystem.wandb import weave_plotly
 from weave.legacy.language_features.tagging import tagged_value_type
 from weave.legacy.panel_util import make_node

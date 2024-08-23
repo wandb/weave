@@ -9,7 +9,7 @@ from weave.legacy.language_features.tagging.tagged_value_type import TaggedValue
 from weave.legacy.ops_arrow.list_ops import filter
 from weave.legacy.ops_domain import wbmedia
 from weave.legacy.ops_domain.wandb_domain_gql import _make_alias
-from weave.weave_internal import make_const_node
+from weave.legacy.weave_internal import make_const_node
 
 
 def use_static_artifact_node(
