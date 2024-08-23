@@ -31,7 +31,7 @@ def val_with_relative_ref(
     # Only do this if ref_tracking_enabled right now. I just want to
     # avoid introducing new behavior into W&B prod for the moment.
     if context_state.ref_tracking_enabled():
-        from .. import storage
+        from weave.legacy import storage
 
         child_ref = storage.get_ref(child_object)
         parent_ref = ref_base.get_ref(parent_object)

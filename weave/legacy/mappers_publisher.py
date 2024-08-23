@@ -2,7 +2,8 @@ import copy
 import dataclasses
 import typing
 
-from weave import storage, weave_internal
+from weave.legacy import storage
+from weave import weave_internal
 from weave import weave_types as types
 from weave.legacy.node_ref import ref_to_node
 

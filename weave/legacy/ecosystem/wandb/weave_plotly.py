@@ -178,7 +178,7 @@ def plotly_time_series(data, mark, labels, label_overrides) -> plotly.graph_objs
 
 @weave.op()
 def plotly_scatter(data: list[ScatterData]) -> plotly.graph_objs.Figure:
-    from weave import storage
+    from weave.legacy import storage
 
     data = storage.to_weavejs(data)
     color = None

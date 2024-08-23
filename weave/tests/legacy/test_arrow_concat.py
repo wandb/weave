@@ -3,8 +3,7 @@ import dataclasses
 import pytest
 
 import weave
-from weave import storage
-from weave.legacy import artifact_local
+from weave.legacy import artifact_local, storage
 from weave.legacy.ops_arrow import to_arrow
 from weave.legacy.ops_domain import wbmedia
 
