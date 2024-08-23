@@ -5,7 +5,7 @@ import zlib
 
 from weave import storage
 from weave.legacy import serialize
-from weave.server import handle_request
+from weave.legacy.server import handle_request
 
 
 def test_graph_playback(dev_only_admin_env_override):
