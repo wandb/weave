@@ -9,7 +9,6 @@ from typing import Iterator, Sequence
 from weave import (
     engine_trace,
     errors,
-    pyfunc_type_util,
     weave_internal,
 )
 from weave import weave_types as types
@@ -22,6 +21,7 @@ from weave.legacy import (
     op_args,
     op_def_type,
     op_execute,
+    pyfunc_type_util,
     uris,
 )
 from weave.legacy.language_features.tagging import (
