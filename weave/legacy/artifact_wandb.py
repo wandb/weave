@@ -15,11 +15,11 @@ from wandb.sdk.lib.hashutil import b64_to_hex_id, hex_to_b64_id
 
 from weave import (
     filesystem,
-    urls,
     util,
 )
 from weave import weave_types as types
 from weave.legacy import (
+    urls,
     errors,
     engine_trace,
     artifact_fs,
