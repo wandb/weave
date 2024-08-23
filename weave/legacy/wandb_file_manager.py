@@ -12,9 +12,9 @@ from aiohttp import BasicAuth
 from requests.auth import HTTPBasicAuth
 from wandb.sdk.lib import hashutil
 
-from weave import filesystem, weave_http
+from weave import weave_http
 from weave.legacy import environment as weave_env
-from weave.legacy import artifact_wandb, cache, errors, wandb_api, engine_trace
+from weave.legacy import filesystem, artifact_wandb, cache, errors, wandb_api, engine_trace
 
 tracer = engine_trace.tracer()  # type: ignore
 

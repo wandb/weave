@@ -17,11 +17,12 @@ from weave.legacy import (
     artifact_wandb,
     async_map,
     engine_trace,
+    filesystem,
     wandb_api,
     wandb_file_manager,
 )
 
-from .. import filesystem, weave_http
+from .. import weave_http
 
 tracer = engine_trace.tracer()  # type: ignore
 
