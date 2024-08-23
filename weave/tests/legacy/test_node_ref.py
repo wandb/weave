@@ -1,6 +1,6 @@
+from weave.legacy import api as weave
 from weave.legacy import graph
 
-from ... import api as weave
 from ...legacy import node_ref
 
 

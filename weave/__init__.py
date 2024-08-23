@@ -13,25 +13,21 @@ from weave.legacy import context_state as _context_state
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
 from weave.legacy import weave_types as types
-from .legacy import storage
-
-from .legacy.api import *
-from .trace.api import *
-
-from .legacy.errors import *
-
+from weave.legacy import storage
+from weave.legacy.api import *
+from weave.legacy.errors import *
 from weave.legacy import mappers_python_def
-
 from weave.legacy import wandb_api as _wandb_api
+from weave.legacy import context as _context
 
-from . import version
+from weave import version
 
 _wandb_api.init()
 
 # Ensure there is a client available for eager mode
-from weave.legacy import context as _context
 
 
+from weave.trace.api import *
 _context_state.clear_loading_built_ins(_loading_builtins_token)
 
 __version__ = version.VERSION
