@@ -3,7 +3,7 @@
 import pyarrow as pa
 
 from weave import weave_types as types
-from weave.query_api import op
+from weave.legacy.api import op
 from weave.legacy.arrow.list_ import ArrowWeaveList
 
 py_range = range

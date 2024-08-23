@@ -8,7 +8,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from weave import weave_types as types
-from weave.query_api import op, type_of
+from weave.legacy.api import op, type_of
 from weave.legacy import op_args, op_def
 from weave.legacy.arrow import arrow_tags, convert
 from weave.legacy.arrow.arrow import (
