@@ -5,7 +5,7 @@ import dateutil
 import dateutil.parser
 
 from weave import weave_types as types
-from weave.query_api import op, type
+from weave.legacy.api import op, type
 
 
 @op(

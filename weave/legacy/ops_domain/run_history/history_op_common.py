@@ -9,7 +9,7 @@ from weave import (
     util,
 )
 from weave import weave_types as types
-from weave.query_api import use
+from weave.legacy.api import use
 from weave.legacy import (
     engine_trace,
     registry_mem,

@@ -2,7 +2,7 @@ import typing
 
 import pytest
 
-from weave import query_api as weave
+from weave.legacy import api as weave
 from weave.legacy import box
 from weave.legacy.ops_primitives import any
 

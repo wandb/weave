@@ -5,7 +5,7 @@ from inspect import Parameter, signature
 import pyarrow as pa
 
 from weave import errors, weave_types
-from weave.query_api import op
+from weave.legacy.api import op
 from weave.legacy import gql_op_plugin, op_def, partial_object
 from weave.legacy.decorator_arrow_op import arrow_op
 from weave.legacy.gql_op_plugin import wb_gql_op_plugin

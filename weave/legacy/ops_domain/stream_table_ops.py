@@ -1,5 +1,5 @@
 from weave import weave_types
-from weave.query_api import op
+from weave.legacy.api import op
 from weave.legacy import compile, op_def
 from weave.legacy.arrow.arrow import ArrowWeaveListType
 from weave.legacy.core_types import StreamTableType
