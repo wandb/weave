@@ -8,7 +8,6 @@ import typing
 from weave import (
     engine_trace,
     errors,
-    registry_mem,
     weave_internal,
 )
 from weave import weave_types as types
@@ -26,6 +25,7 @@ from weave.legacy import (
     op_args,
     partial_object,
     propagate_gql_keys,
+    registry_mem,
     serialize,
     stitch,
     value_or_error,
