@@ -8,12 +8,12 @@ import typing
 
 from weave import (
     errors,
-    parallelism,
     storage,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.legacy import (
+    parallelism,
     registry_mem,
     box,
     context_state,
