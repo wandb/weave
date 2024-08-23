@@ -1216,7 +1216,7 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
     {skip: fileSpec == null}
   );
   const text = useMemo(() => {
-    if (arrayBuffer.loading) {
+    if (arrayBuffer.loading || query.loading) {
       return {
         loading: true,
         result: null,
