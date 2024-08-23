@@ -2,7 +2,7 @@ import typing
 from typing import Iterable
 
 from weave.legacy import stream_data_interfaces
-from weave.eager import WeaveIter
+from weave.legacy.eager import WeaveIter
 from weave.legacy import artifact_wandb, uris
 from weave.legacy.run import Run
 
