@@ -4,7 +4,7 @@ import typing
 
 import numpy as np
 
-from weave import ref_util
+from weave.trace import ref_util
 from weave.legacy import context_state
 
 
