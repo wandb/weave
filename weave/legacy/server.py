@@ -26,7 +26,7 @@ from weave.legacy import (
 from weave.legacy.language_features.tagging import tag_store
 from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context
 
-from . import logs, storage, util, weave_types
+from .. import logs, storage, util, weave_types
 
 # A function to monkeypatch the request post method
 # def patch_request_post():
@@ -59,14 +59,14 @@ class HandleRequestResponse:
     nodes: value_or_error.ValueOrErrors[graph.Node]
 
 
-def handle_request(
+def handle_request(  # type: ignore
     request, deref=False, serialize_fn=storage.to_python
 ) -> HandleRequestResponse:
     # Stuff in the server path relies on lazy execution. Eager is now the default
     # in the weave package itself, so we need to switch to lazy mode here.
     with context.lazy_execution():
         start_time = time.time()
-        tracer = engine_trace.tracer()
+        tracer = engine_trace.tracer()  # type: ignore[no-untyped-call]
         # Need to add wandb_api.from_environment, which sets up the wandb api
         # The existing code only did this within the execute() function. But now
         # I'm hitting the need for this in deserialize, because node_id in deserialize
@@ -90,7 +90,7 @@ def handle_request(
                     result = result.zip(nodes).safe_map(
                         lambda t: t[0]
                         if isinstance(t[1].type, weave_types.RefType)
-                        else storage.deref(t[0])
+                        else storage.deref(t[0])  # type: ignore[no-untyped-call]
                     )
 
         # print("Server request %s (%0.5fs): %s..." % (start_time,
@@ -110,12 +110,12 @@ def handle_request(
 
 
 class SubprocessServer(multiprocessing.Process):
-    def __init__(self, req_queue, resp_queue):
+    def __init__(self, req_queue, resp_queue):  # type: ignore
         multiprocessing.Process.__init__(self)
         self.req_queue = req_queue
         self.resp_queue = resp_queue
 
-    def run(self):
+    def run(self):  # type: ignore
         while True:
             req = self.req_queue.get()
             try:
@@ -127,21 +127,21 @@ class SubprocessServer(multiprocessing.Process):
                 self.resp_queue.put(Exception("Caught exception in sub-process server"))
                 break
 
-    def shutdown(self):
+    def shutdown(self):  # type: ignore
         self.kill()
 
 
 class SubprocessServerClient:
-    def __init__(self):
+    def __init__(self):  # type: ignore
         self.req_queue = multiprocessing.Queue()
         self.resp_queue = multiprocessing.Queue()
         self.server_proc = SubprocessServer(self.req_queue, self.resp_queue)
         self.server_proc.start()
 
-    def shutdown(self):
+    def shutdown(self):  # type: ignore
         self.server_proc.shutdown()
 
-    def execute(self, nodes, no_cache=False):
+    def execute(self, nodes, no_cache=False):  # type: ignore
         self.req_queue.put({"graphs": serialize.serialize(nodes)})
         response = self.resp_queue.get()
         deserialized = [storage.from_python(r) for r in response]
@@ -149,15 +149,15 @@ class SubprocessServerClient:
 
 
 class InProcessServer(object):
-    def __init__(self):
+    def __init__(self):  # type: ignore
         pass
 
-    def execute(self, nodes, no_cache=False):
+    def execute(self, nodes, no_cache=False):  # type: ignore
         return execute.execute_nodes(nodes, no_cache=no_cache).unwrap()
 
 
 class HttpServerClient(object):
-    def __init__(self, url, emulate_weavejs=False, auth: OptionalAuthType = None):
+    def __init__(self, url, emulate_weavejs=False, auth: OptionalAuthType = None):  # type: ignore
         """Constructor.
 
         Args:
@@ -172,7 +172,7 @@ class HttpServerClient(object):
         if emulate_weavejs:
             self.execute_endpoint = "/__weave/execute"
 
-    def execute(self, nodes, no_cache=False):
+    def execute(self, nodes, no_cache=False):  # type: ignore
         serialized = serialize.serialize(nodes)
         r = requests.post(
             self.url + self.execute_endpoint,
@@ -195,8 +195,8 @@ _REQUESTED_SERVER_LOG_LEVEL: typing.Optional[int] = None
 
 
 class HttpServer(threading.Thread):
-    def __init__(self, port=0, host="localhost"):
-        from . import weave_server
+    def __init__(self, port=0, host="localhost"):  # type: ignore
+        from weave import weave_server
 
         self.host = host
 
@@ -209,10 +209,10 @@ class HttpServer(threading.Thread):
         self.port = self.srv.socket.getsockname()[1]
 
     @property
-    def name(self):
+    def name(self):  # type: ignore
         return f"Weave Port: {self.port}"
 
-    def run(self):
+    def run(self):  # type: ignore
         if _REQUESTED_SERVER_LOG_LEVEL is None:
             capture_weave_server_logs(logging.ERROR)
 
@@ -227,11 +227,11 @@ class HttpServer(threading.Thread):
 
         self.srv.serve_forever()
 
-    def shutdown(self):
+    def shutdown(self):  # type: ignore
         self.srv.shutdown()
 
     @property
-    def url(self):
+    def url(self):  # type: ignore
         if util.is_colab():
             url = f"https://{self.host}"
         else:
@@ -241,7 +241,7 @@ class HttpServer(threading.Thread):
         return url
 
 
-def capture_weave_server_logs(log_level: int = logging.INFO):
+def capture_weave_server_logs(log_level: int = logging.INFO):  # type: ignore
     global _REQUESTED_SERVER_LOG_LEVEL
     _REQUESTED_SERVER_LOG_LEVEL = log_level
 

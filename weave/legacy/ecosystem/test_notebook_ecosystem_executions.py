@@ -1,4 +1,4 @@
-from weave.server import handle_request
+from weave.legacy.server import handle_request
 
 
 def test_playback():
