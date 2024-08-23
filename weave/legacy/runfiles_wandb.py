@@ -7,7 +7,7 @@ import shutil
 import typing
 
 from weave.legacy import environment as weave_env
-from weave import filesystem
+from weave.legacy import filesystem
 from weave import weave_types as types
 from weave.legacy import (
     artifact_fs,
