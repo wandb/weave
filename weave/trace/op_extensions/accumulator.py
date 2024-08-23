@@ -18,7 +18,7 @@ from weave.trace.op import FinishCallbackType, Op
 
 if sys.version_info < (3, 10):
 
-    def aiter(obj):
+    def aiter(obj: Any) -> AsyncIterator[Any]:
         return obj.__aiter__()
 
 
@@ -165,7 +165,9 @@ class _IteratorWrapper(Generic[V]):
         return self
 
     def __next__(self) -> Generator[None, None, V]:
-        if not hasattr(self._iterator, "__next__"):
+        if isinstance(self._iterator, Iterator) and not hasattr(
+            self._iterator, "__next__"
+        ):
             try:
                 self._iterator = iter(self._iterator)
             except TypeError:
