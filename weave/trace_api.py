@@ -17,12 +17,12 @@ from . import (
     util,
     weave_init,
 )
-from .table import Table
 from .trace import context, weave_client
 from .trace.constants import TRACE_OBJECT_EMOJI
 from .trace.op import Op, op
 from .trace.refs import ObjectRef, parse_uri
 from .trace.settings import UserSettings, parse_and_apply_settings
+from .trace.table import Table
 
 
 def init(
