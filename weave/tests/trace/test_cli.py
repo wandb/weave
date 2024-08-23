@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 
-from weave.cli import cli
+from weave.trace.cli import cli
 from weave.version import VERSION
 
 
