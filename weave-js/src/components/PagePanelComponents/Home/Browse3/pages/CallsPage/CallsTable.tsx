@@ -243,7 +243,7 @@ export const CallsTable: FC<{
     sortModelResolved,
     paginationModelResolved,
     expandedRefCols,
-    false
+    true
   );
 
   // Here, we only update our local state once the calls have loaded.
@@ -942,7 +942,7 @@ const useParentIdOptions = (
       : null,
 
     {
-      includeCosts: false,
+      includeCosts: true,
     }
   );
   return useMemo(() => {
