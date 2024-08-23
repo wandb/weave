@@ -22,7 +22,7 @@ from weave.legacy import (
     timestamp,
 )
 
-from . import weave_types as types
+from weave import weave_types as types
 
 Ref = ref_base.Ref
 
@@ -30,7 +30,7 @@ if typing.TYPE_CHECKING:
     from weave.legacy.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 
 
-def split_path_dotfile(path, dotfile_name):
+def split_path_dotfile(path, dotfile_name):  # type: ignore
     while path != "/":
         path, tail = os.path.split(path)
         if os.path.exists(os.path.join(path, dotfile_name)):
@@ -50,7 +50,7 @@ def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
     # return f"{wb_type.name}-{obj_names[-1]}"
 
 
-def _get_weave_type_with_refs(obj: typing.Any):
+def _get_weave_type_with_refs(obj: typing.Any):  # type: ignore
     try:
         return types.type_of_with_refs(obj)
     except errors.WeaveTypeError as e:
@@ -60,7 +60,7 @@ def _get_weave_type_with_refs(obj: typing.Any):
         )
 
 
-def _ensure_object_components_are_published(
+def _ensure_object_components_are_published(  # type: ignore
     obj: typing.Any, wb_type: types.Type, artifact: artifact_wandb.WandbArtifact
 ):
     from weave.legacy.mappers_publisher import map_to_python_remote
@@ -69,7 +69,7 @@ def _ensure_object_components_are_published(
     return mapper.apply(obj)
 
 
-def _assert_valid_name_part(part: typing.Optional[str] = None):
+def _assert_valid_name_part(part: typing.Optional[str] = None):  # type: ignore
     if part is None:
         return
     if not re.match(r"^[a-zA-Z0-9_\-]+$", part):
@@ -78,7 +78,7 @@ def _assert_valid_name_part(part: typing.Optional[str] = None):
         )
 
 
-def _assert_valid_entity_name(part: typing.Optional[str] = None):
+def _assert_valid_entity_name(part: typing.Optional[str] = None):  # type: ignore
     if part is None:
         return
     if not re.match(r"^[a-z0-9_\-]+$", part):
@@ -88,7 +88,7 @@ def _assert_valid_entity_name(part: typing.Optional[str] = None):
         )
 
 
-def _assert_valid_project_name(part: typing.Optional[str] = None):
+def _assert_valid_project_name(part: typing.Optional[str] = None):  # type: ignore
     if part is None:
         return
     if len(part) > 128:
@@ -99,7 +99,7 @@ def _assert_valid_project_name(part: typing.Optional[str] = None):
         )
 
 
-def _assert_valid_artifact_name(part: typing.Optional[str] = None):
+def _assert_valid_artifact_name(part: typing.Optional[str] = None):  # type: ignore
     if part is None:
         return
     if len(part) > 128:
@@ -123,7 +123,7 @@ _pubish_target_project: contextvars.ContextVar[
 
 
 @contextlib.contextmanager
-def publish_target_project(project: PublishTargetProject):
+def publish_target_project(project: PublishTargetProject):  # type: ignore
     token = _pubish_target_project.set(project)
     yield
     _pubish_target_project.reset(token)
@@ -243,12 +243,12 @@ def direct_save(
     # Only save if we have a ref into the artifact we created above. Otherwise
     #     nothing new was created, so just return the existing ref.
     if ref.artifact == artifact:
-        artifact.save(branch=branch_name)
+        artifact.save(branch=branch_name)  # type: ignore[no-untyped-call]
 
     return ref  # type: ignore
 
 
-def publish(obj, name=None, type=None):
+def publish(obj, name=None, type=None):  # type: ignore
     # We would probably refactor this method to be more like _direct_publish. This effectively
     # just a wrapper that let's the user specify project name with a slash.
     # TODO: should we only expose save for our API with a "remote" flag or something
@@ -264,7 +264,7 @@ def publish(obj, name=None, type=None):
     )
 
 
-def save(
+def save(  # type: ignore
     obj,
     name=None,
     type=None,
@@ -297,7 +297,7 @@ get_local_version_ref = artifact_local.get_local_version_ref
 get_local_version = artifact_local.get_local_version
 
 
-def deref(ref):
+def deref(ref):  # type: ignore
     if isinstance(ref, ref_base.Ref):
         return ref.get()
     return ref
@@ -309,7 +309,7 @@ def _get_ref(obj: typing.Any) -> typing.Optional[ref_base.Ref]:
     return ref_base.get_ref(obj)
 
 
-def clear_ref(obj):
+def clear_ref(obj):  # type: ignore
     ref_base.clear_ref(obj)
 
 
@@ -330,7 +330,7 @@ def local_artifacts() -> typing.List[artifact_local.LocalArtifact]:
     return result
 
 
-def all_objects():
+def all_objects():  # type: ignore
     result = []
     obj_paths = sorted(
         pathlib.Path(artifact_local.local_artifact_dir()).iterdir(),
@@ -365,7 +365,7 @@ def objects(
     return [r[1] for r in sorted(result)]
 
 
-def recursively_unwrap_arrow(obj):
+def recursively_unwrap_arrow(obj):  # type: ignore
     if getattr(obj, "to_pylist_notags", None):
         return obj.to_pylist_notags()
     if getattr(obj, "as_py", None):
@@ -387,7 +387,7 @@ def _default_ref_persister_artifact(
     for mem_ref in refs:
         if mem_ref.path is not None and mem_ref._type is not None:
             fs_art.set(mem_ref.path, mem_ref._type, mem_ref._obj)
-    fs_art.save()
+    fs_art.save()  # type: ignore[no-untyped-call]
     return fs_art
 
 
@@ -421,7 +421,7 @@ def to_python(
     return {"_type": wb_type.to_dict(), "_val": val}
 
 
-def to_safe_const(obj):
+def to_safe_const(obj):  # type: ignore
     wb_type = types.TypeRegistry.type_of(obj)
     mapper = mappers_python.map_to_python(wb_type, artifact_mem.MemArtifact())
     val = mapper.apply(obj)
@@ -436,7 +436,7 @@ def from_python(obj: dict, wb_type: typing.Optional[types.Type] = None) -> typin
     return res
 
 
-def to_json_with_refs(
+def to_json_with_refs(  # type: ignore
     obj: typing.Any,
     artifact: artifact_base.Artifact,
     path: typing.Optional[list[str]] = None,
@@ -492,7 +492,7 @@ def to_json_with_refs(
         return res
 
 
-def make_js_serializer():
+def make_js_serializer():  # type: ignore
     artifact = artifact_mem.MemArtifact()
     return functools.partial(to_weavejs, artifact=artifact)
 
@@ -507,7 +507,7 @@ def convert_timestamps_to_epoch_ms(obj: typing.Any) -> typing.Any:
     return obj
 
 
-def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
+def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):  # type: ignore
     from weave.legacy.arrow import list_ as arrow_list
 
     obj = box.unbox(obj)

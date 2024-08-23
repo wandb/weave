@@ -283,7 +283,7 @@ class LegacyTableNDArrayType(types.Type):
 # code can work with it.
 @weave.op()
 def html_file(html: html.Html) -> HtmlArtifactFileRef:
-    from weave import storage
+    from weave.legacy import storage
 
     # This is a ref to the html object
     with isolated_tagging_context():
@@ -305,7 +305,7 @@ def html_file(html: html.Html) -> HtmlArtifactFileRef:
     )
 )
 def markdown_file(md: markdown.Markdown):
-    from weave import storage
+    from weave.legacy import storage
 
     with isolated_tagging_context():
         ref = storage.save(md)

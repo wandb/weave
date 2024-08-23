@@ -2,9 +2,9 @@ import typing
 
 import pytest
 
-from weave import storage, types, weave_internal
+from weave import types, weave_internal
 from weave.legacy import api as weave
-from weave.legacy import context_state, graph, uris
+from weave.legacy import context_state, graph, storage, uris
 from weave.legacy import context_state as _context_state
 
 from . import test_helpers

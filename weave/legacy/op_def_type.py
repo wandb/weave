@@ -11,7 +11,7 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any
 
-from weave import storage
+from weave.legacy import storage
 from weave import weave_types as types
 from weave.legacy import (
     artifact_fs,

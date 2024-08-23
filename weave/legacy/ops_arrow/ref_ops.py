@@ -22,7 +22,7 @@ nullable_binary_input_type = {
     output_type=ArrowWeaveListType(types.Boolean()),
 )
 def ref_equal(self, other):
-    from weave import storage
+    from weave.legacy import storage
 
     # Weave engine automatically derefs, so we need to undo that via
     # _get_ref here.
