@@ -5,7 +5,7 @@ import numpy as np
 import pyarrow as pa
 from scipy.signal import butter, filtfilt
 
-from ... import util
+from weave.legacy import util
 from ..ops_arrow import ArrowWeaveList
 
 value_fns: list[typing.Any] = [

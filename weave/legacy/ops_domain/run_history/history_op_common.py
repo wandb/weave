@@ -4,12 +4,10 @@ import typing
 import pyarrow as pa
 from pyarrow import parquet as pq
 
-from weave import (
-    util,
-)
 from weave import weave_types as types
 from weave.legacy.api import use
 from weave.legacy import (
+    util,
     errors,
     engine_trace,
     registry_mem,
