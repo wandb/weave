@@ -13,7 +13,7 @@ from weave.legacy import context_state as _context_state
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
 from . import weave_types as types
-from . import storage
+from .legacy import storage
 
 from .legacy.api import *
 from .trace.api import *

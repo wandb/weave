@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from weave import storage
+from weave.legacy import storage
 from weave.legacy.ops_primitives import api as weave
 
 

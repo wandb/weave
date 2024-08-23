@@ -3,8 +3,7 @@ import json
 import os
 import zlib
 
-from weave import storage
-from weave.legacy import serialize
+from weave.legacy import serialize, storage
 from weave.legacy.server import handle_request
 
 

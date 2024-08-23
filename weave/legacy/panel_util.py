@@ -1,7 +1,7 @@
 import typing
 
-from weave import storage, weave_types
-from weave.legacy import graph, panel
+from weave import weave_types
+from weave.legacy import storage, graph, panel
 
 
 def make_node(v: typing.Any) -> graph.Node:
