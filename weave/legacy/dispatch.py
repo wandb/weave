@@ -5,7 +5,7 @@ import logging
 import typing
 from dataclasses import dataclass
 
-from weave import util
+from weave.legacy import util
 from weave import weave_types as types
 from weave.legacy import graph, memo, op_args, op_def, pyfunc_type_util, registry_mem, errors
 from weave.legacy.language_features.tagging.is_tag_getter import is_tag_getter
