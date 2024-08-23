@@ -4,7 +4,7 @@ import pytest
 
 import weave
 from weave.legacy import context_state as _context
-from weave.weave_internal import make_const_node, make_output_node
+from weave.legacy.weave_internal import make_const_node, make_output_node
 
 _loading_builtins_token = _context.set_loading_built_ins()
 

@@ -6,12 +6,10 @@ import copy
 import inspect
 import typing
 
-from weave import (
-    storage,
-    weave_internal,
-)
 from weave.legacy import weave_types as types
 from weave.legacy import (
+    storage,
+    weave_internal,
     errors,
     parallelism,
     registry_mem,

@@ -1,7 +1,6 @@
 import math
 
-from weave import weave_internal
-from weave.legacy import api, context, mappers_python, val_const
+from weave.legacy import api, context, mappers_python, val_const, weave_internal
 from weave.legacy import weave_types as types
 
 

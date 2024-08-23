@@ -5,11 +5,9 @@ import random
 import re
 import typing
 
-from weave import (
-    weave_internal,
-)
 from weave.legacy import weave_types as types
 from weave.legacy import (
+    weave_internal,
     errors,
     engine_trace,
     box,

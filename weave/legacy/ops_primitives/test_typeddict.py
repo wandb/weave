@@ -1,7 +1,7 @@
 import pytest
 
 import weave
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy import box
 from weave.legacy.arrow.arrow import ArrowWeaveListType
 from weave.legacy.language_features.tagging import tag_store, tagged_value_type

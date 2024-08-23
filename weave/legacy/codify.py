@@ -201,7 +201,7 @@ def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
 
         if current_frame is not None and node.name in current_frame:
             return node.name
-        return f"weave.weave_internal.make_var_node({_type_to_code(node.type)}, '{node.name}')"
+        return f"weave.legacy.weave_internal.make_var_node({_type_to_code(node.type)}, '{node.name}')"
     elif isinstance(node, graph.ConstNode):
         if isinstance(node.type, weave_types.Function):
             vars = list(node.type.input_types.keys())
@@ -209,7 +209,7 @@ def _node_to_code(node: graph.Node, wrap_const_node: bool = True) -> str:
         else:
             val_as_code = object_to_code_no_format(node.val)
             if wrap_const_node:
-                return f"weave.weave_internal.const({val_as_code})"
+                return f"weave.legacy.weave_internal.const({val_as_code})"
             else:
                 return val_as_code
     elif isinstance(node, graph.OutputNode):

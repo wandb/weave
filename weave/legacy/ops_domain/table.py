@@ -5,7 +5,7 @@ import json
 import logging
 import typing
 
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy import weave_types as types
 from weave.legacy.api import op, weave_class
 from weave.legacy import (

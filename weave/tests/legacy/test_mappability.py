@@ -2,9 +2,9 @@ import weave
 from weave.legacy import context_state as _context
 from weave.legacy import graph
 from weave.legacy import weave_types as types
+from weave.legacy.weave_internal import make_const_node
 
 from ...legacy import registry_mem
-from ...weave_internal import make_const_node
 
 _loading_builtins_token = _context.set_loading_built_ins()
 
@@ -61,7 +61,7 @@ def test_non_mapped_use():
 
 
 def test_non_mapped_serialized():
-    node = weave.weave_internal.make_output_node(
+    node = weave.legacy.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
         {"x": weave.legacy.graph.ConstNode(weave.types.Int(), 1)},
@@ -82,7 +82,7 @@ def test_mapped_nullable_use():
 
 
 def test_mapped_serialized():
-    node = weave.weave_internal.make_output_node(
+    node = weave.legacy.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
         {
@@ -101,7 +101,7 @@ def test_mapped_empty_use():
 
 
 def test_mapped_empty_serialized():
-    node = weave.weave_internal.make_output_node(
+    node = weave.legacy.weave_internal.make_output_node(
         weave.types.Int(),
         _test_add_one.name,
         {"x": weave.legacy.graph.ConstNode(weave.types.List(weave.types.Int()), [])},

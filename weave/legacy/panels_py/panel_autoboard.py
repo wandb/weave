@@ -26,7 +26,7 @@ import os
 import typing
 
 import weave
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy.panels import panel_plot
 from weave.legacy.panels_py.generator_templates import template_registry
 from weave.legacy import util

@@ -2,7 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy import codifiable_value_mixin, codify, panel
 from weave.legacy.graph import ConstNode, Node, OutputNode, VoidNode
 from weave.legacy.panels import table_state

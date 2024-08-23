@@ -6,11 +6,9 @@ import inspect
 import typing
 from typing import Iterator, Sequence
 
-from weave import (
-    weave_internal,
-)
 from weave.legacy import weave_types as types
 from weave.legacy import (
+    weave_internal,
     errors,
     context_state,
     engine_trace,

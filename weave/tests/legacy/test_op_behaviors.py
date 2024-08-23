@@ -19,13 +19,14 @@ from weave.legacy import (
     op_def,
     ops_arrow,
     ops_primitives,
+    storage,
+    weave_internal,
 )
 from weave.legacy.language_features.tagging import make_tag_getter_op
 from weave.legacy.language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
 
-from ... import storage, weave_internal
 from ...legacy import registry_mem
 from ..concrete_tagged_value import (
     TaggedValue,
