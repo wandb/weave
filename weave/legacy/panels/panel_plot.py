@@ -4,7 +4,7 @@ import dataclasses
 import typing
 
 import weave
-from weave import weave_internal
+from weave.legacy import weave_internal
 from weave.legacy import weave_types as types
 from weave.legacy import errors, codifiable_value_mixin, codify, graph, panel
 from weave.legacy.ops_primitives import boolean, list_

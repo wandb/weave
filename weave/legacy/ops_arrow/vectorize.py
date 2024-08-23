@@ -6,10 +6,7 @@ import typing
 import numpy as np
 import pyarrow as pa
 
-from weave import (
-    
-    weave_internal,
-)
+from weave.legacy import weave_internal
 from weave.legacy import errors,weavify, registry_mem
 from weave.legacy import weave_types as types
 from weave.legacy.api import op, use

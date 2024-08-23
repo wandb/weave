@@ -12,7 +12,7 @@ from .. import storage as _storage
 from . import ref_base as _ref_base
 from weave.legacy import wandb_api as _wandb_api
 
-from .. import weave_internal as _weave_internal
+from weave.legacy import weave_internal as _weave_internal
 
 from weave.legacy import util as _util
 

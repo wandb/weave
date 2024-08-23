@@ -12,7 +12,7 @@ from weave.legacy import context_state, ops
 from weave.legacy import server as _server
 from weave.legacy import weave_types as types
 from weave.legacy.decorator_op import op
-from weave.weave_internal import make_const_node
+from weave.legacy.weave_internal import make_const_node
 
 SERVER_TYPES = ["inprocess", "subprocess", "http"]
 

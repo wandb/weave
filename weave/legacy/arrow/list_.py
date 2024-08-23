@@ -10,11 +10,9 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import typing_extensions
 
-from weave import (
-    weave_internal,
-)
 from weave.legacy import weave_types as types
 from weave.legacy import (
+    weave_internal,
     errors,
     _dict_utils,
     artifact_base,

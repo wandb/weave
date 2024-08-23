@@ -8,7 +8,7 @@ from weave.legacy.dispatch import RuntimeOutputNode
 from weave.legacy.ops_arrow import to_arrow
 from weave.legacy.ops_arrow.vectorize import raise_on_python_bailout
 from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
-from weave.weave_internal import const, define_fn, make_const_node
+from weave.legacy.weave_internal import const, define_fn, make_const_node
 
 from ...api import use
 
