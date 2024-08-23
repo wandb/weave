@@ -1,9 +1,9 @@
 import re
 
+from weave.legacy import api as weave
 from weave.legacy import graph, storage
 from weave.legacy.weave_internal import make_const_node
 
-from ... import api as weave
 from ...legacy import trace_legacy
 
 

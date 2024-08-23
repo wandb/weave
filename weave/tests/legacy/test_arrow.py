@@ -7,6 +7,7 @@ import pyarrow as pa
 import pytest
 from PIL import Image
 
+from weave.legacy import api as weave
 from weave.legacy import (
     box,
     context_state,
@@ -36,7 +37,6 @@ from weave.legacy.ops_domain import project_ops
 from weave.legacy.ops_primitives import list_, make_list
 from weave.tests import list_arrow_test_helpers as lath
 
-from ... import api as weave
 from ...tests import tag_test_util as ttu
 from ...tests import weavejs_ops
 from ...tests.legacy import test_wb
