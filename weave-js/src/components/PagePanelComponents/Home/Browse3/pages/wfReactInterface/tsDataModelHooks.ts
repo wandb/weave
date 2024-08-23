@@ -212,13 +212,19 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         loading: true,
         result: null,
       };
-    } else {
+    } else if (result?.callId === key?.callId) {
       if (result) {
         callCache.set(key, result);
       }
       return {
         loading: false,
         result,
+      };
+    } else {
+      // Stale call result
+      return {
+        loading: false,
+        result: null,
       };
     }
   }, [cachedCall, callRes, key]);
