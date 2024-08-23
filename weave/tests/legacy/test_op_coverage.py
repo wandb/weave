@@ -1,4 +1,4 @@
-from ... import registry_mem
+from ...legacy import registry_mem
 
 
 def make_error_message(missing_ops, section_name):

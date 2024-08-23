@@ -25,7 +25,8 @@ from weave.legacy.language_features.tagging.tagged_value_type import (
     TaggedValueType,
 )
 
-from ... import registry_mem, storage, weave_internal
+from ... import storage, weave_internal
+from ...legacy import registry_mem
 from ..concrete_tagged_value import (
     TaggedValue,
     concrete_from_tagstore,

@@ -5,7 +5,7 @@ function exported is `process_opdef_output_type`
 
 import typing
 
-from weave import registry_mem
+from weave.legacy import registry_mem
 from weave import weave_types as types
 from weave.legacy import graph
 from weave.legacy.language_features.tagging.opdef_util import (

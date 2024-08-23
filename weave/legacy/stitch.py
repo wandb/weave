@@ -22,10 +22,10 @@
 import dataclasses
 import typing
 
-from weave.legacy import graph, op_def
+from weave.legacy import graph, op_def, registry_mem
 from weave.legacy.language_features.tagging import opdef_util
 
-from .. import errors, registry_mem
+from .. import errors
 from .. import weave_types as types
 from . import _dict_utils
 
