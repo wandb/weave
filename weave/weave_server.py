@@ -30,7 +30,6 @@ from weave import (
     errors,
     filesystem,
     logs,
-    server,
     storage,
     util,
 )
@@ -39,6 +38,7 @@ from weave.legacy import (
     engine_trace,
     graph,
     registry_mem,
+    server,
     value_or_error,
     wandb_api,
     weavejs_fixes,
