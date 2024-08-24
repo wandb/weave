@@ -20,7 +20,7 @@ from weave.legacy.ops_primitives.file import _as_w0_dict_
 from .test_wb_domain_ops import assert_gql_str_equal
 
 from ...tests import fixture_fakewandb as fwb
-from ...tests import weavejs_ops
+from weave.legacy.tests.util import weavejs_ops
 
 file_path_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {

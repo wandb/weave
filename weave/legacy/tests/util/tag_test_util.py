@@ -8,7 +8,7 @@ from weave.legacy.language_features.tagging.tagged_value_type import TaggedValue
 tag_adders = 0
 
 
-def op_add_tag(obj_node: graph.Node, tags: dict[str, str]):
+def op_add_tag(obj_node: graph.Node, tags: dict[str, str]):  # type: ignore[no-untyped-def]
     global tag_adders
     tag_adders += 1
     name = f"_custom_tagger_{tag_adders}"
@@ -23,7 +23,7 @@ def op_add_tag(obj_node: graph.Node, tags: dict[str, str]):
             input_types["obj"],
         ),
     )
-    def custom_tagger(obj):
+    def custom_tagger(obj):  # type: ignore[no-untyped-def]
         return tag_store.add_tags(
             box.box(obj), {f"_ct_{k}": v for k, v in tags.items()}
         )
@@ -33,7 +33,7 @@ def op_add_tag(obj_node: graph.Node, tags: dict[str, str]):
     return custom_tagger(obj_node)
 
 
-def make_get_tag(tag_name: str):
+def make_get_tag(tag_name: str):  # type: ignore[no-untyped-def]
     from weave.legacy.language_features.tagging import make_tag_getter_op
 
     return make_tag_getter_op.make_tag_getter_op(f"_ct_{tag_name}", types.String())
