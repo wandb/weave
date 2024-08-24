@@ -15,7 +15,7 @@ from weave.legacy.language_features.tagging import (
 from weave.legacy.ops_primitives import dict_, list_
 
 from ...tests import tag_test_util as ttu
-from .. import list_arrow_test_helpers as lath
+from ...tests import list_arrow_test_helpers as lath
 
 
 def filter_fn(row) -> bool:
