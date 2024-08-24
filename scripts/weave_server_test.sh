@@ -1,3 +1,10 @@
 #!/bin/sh
 
-WEAVE_CI=true WEAVE_DISABLE_ANALYTICS=true WEAVE_SERVER_DEBUG=true WEAVE_SERVER_ENABLE_LOGGING=true WEAVE_WANDB_GQL_NUM_TIMEOUT_RETRIES=1 FLASK_APP=weave.weave_server flask run --port 9994 $@
+export WEAVE_CI=true
+export WEAVE_DISABLE_ANALYTICS=true
+export WEAVE_SERVER_DEBUG=true
+export WEAVE_SERVER_ENABLE_LOGGING=true
+export WEAVE_WANDB_GQL_NUM_TIMEOUT_RETRIES=1
+export FLASK_APP=weave.weave_server
+
+flask run --port 9994 "$@"
