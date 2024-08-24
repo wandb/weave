@@ -35,10 +35,10 @@ from weave.legacy.language_features.tagging import (
 from weave.legacy.op_def import map_type
 from weave.legacy.ops_domain import project_ops
 from weave.legacy.ops_primitives import list_, make_list
-from weave.tests import list_arrow_test_helpers as lath
+from .util import list_arrow_test_helpers as lath
 
-from ...tests import tag_test_util as ttu
-from ...tests import weavejs_ops
+from weave.legacy.tests.util import tag_test_util as ttu
+from weave.legacy.tests.util import weavejs_ops
 from . import test_wb
 
 _loading_builtins_token = context_state.set_loading_built_ins()
