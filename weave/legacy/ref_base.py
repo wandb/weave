@@ -5,7 +5,7 @@ import typing
 import weakref
 from typing import Sequence
 
-from weave.client_context import weave_client as weave_client_context
+from weave.trace.client_context import weave_client as weave_client_context
 from weave.legacy import box, context_state, object_context, uris
 from weave.legacy.language_features.tagging import tag_store
 

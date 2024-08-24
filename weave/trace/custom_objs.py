@@ -4,9 +4,9 @@ import os
 import tempfile
 from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
 
-from weave.client_context.weave_client import require_weave_client
 from weave.legacy import artifact_fs
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
+from weave.trace.client_context.weave_client import require_weave_client
 from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
