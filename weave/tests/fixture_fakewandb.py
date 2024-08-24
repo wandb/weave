@@ -22,8 +22,7 @@ from weave.legacy.artifact_wandb import (
     WeaveWBArtifactByIDURI,
     WeaveWBArtifactURI,
 )
-
-from .tag_test_util import op_add_tag
+from weave.legacy.tests.util.tag_test_util import op_add_tag
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacits/test_res_1fwmcd3q:v0"
 ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
