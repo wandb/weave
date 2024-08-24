@@ -21,7 +21,7 @@ from weave.legacy.ops_primitives import file
 from weave.legacy.wandb_client_api import wandb_gql_query
 from weave.legacy.wandb_util import weave0_type_json_to_weave1_type
 
-from ..fixture_fakewandb import FakeApi
+from ...tests.fixture_fakewandb import FakeApi
 
 
 class RandomClass:
