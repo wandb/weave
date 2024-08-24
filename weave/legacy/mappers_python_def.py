@@ -19,7 +19,7 @@ from weave.legacy import (
 from weave.legacy import timestamp as weave_timestamp
 from weave.legacy.language_features.tagging import tagged_value_type
 from weave.legacy.partial_object import PartialObject, PartialObjectType
-from weave.client_context import weave_client as weave_client_context
+from weave.trace.client_context import weave_client as weave_client_context
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):

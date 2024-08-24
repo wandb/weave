@@ -1,8 +1,8 @@
 import typing
 
-from weave.client_context import weave_client as weave_client_context
 from weave.legacy import errors
 from weave.trace import autopatch, init_message, trace_sentry, weave_client
+from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace_server import remote_http_trace_server, sqlite_trace_server
 
 _current_inited_client = None

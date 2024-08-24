@@ -134,7 +134,7 @@ def gcp(
 )
 @click.option("--dev", is_flag=True, help="Run the function locally.")
 def modal(model_ref: str, project: str, auth_entity: str, dev: bool = False) -> None:
-    from .deploy import modal as mdp
+    from weave.deploy import modal as mdp
 
     if dev:
         print(f"Developing model {model_ref}...")
