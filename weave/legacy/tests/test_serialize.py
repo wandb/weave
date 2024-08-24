@@ -7,7 +7,7 @@ from weave.legacy import weave_types as types
 from weave.legacy.ops_primitives import list_
 from weave.legacy.weave_internal import make_const_node
 
-from .. import fixture_fakewandb as fwb
+from ...tests import fixture_fakewandb as fwb
 
 response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
