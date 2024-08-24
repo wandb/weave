@@ -2,7 +2,7 @@ import weave
 from weave.legacy import dispatch, weave_internal
 from weave.legacy import weave_types as types
 
-from .. import weavejs_ops
+from ...tests import weavejs_ops
 
 
 def test_nested_weavejs_call():
