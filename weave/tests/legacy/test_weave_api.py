@@ -39,7 +39,7 @@ def test_weave_finish_unsets_client(client):
     def foo():
         return 1
 
-    weave.client_context.weave_client.set_weave_client_global(None)
+    weave.trace.client_context.weave_client.set_weave_client_global(None)
     weave.trace.weave_init._current_inited_client = (
         weave.trace.weave_init.InitializedClient(client)
     )
