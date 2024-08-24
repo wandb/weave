@@ -16,7 +16,7 @@ from weave.legacy import (
 from weave.legacy import weave_types as types
 from weave.legacy.ops_domain import table as table_ops
 
-from ...tests import weavejs_ops
+from weave.legacy.tests.util import weavejs_ops
 
 TABLE_TYPES = ["list", "pandas", "sql"]
 
