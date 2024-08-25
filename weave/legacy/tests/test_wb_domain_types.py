@@ -1,7 +1,7 @@
-from weave.legacy import api as weave
-from weave.legacy import storage
-from weave.legacy import weave_types as types
-from weave.legacy.ops_domain import wb_domain_types as wdt
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import storage
+from weave.legacy.weave import weave_types as types
+from weave.legacy.weave.ops_domain import wb_domain_types as wdt
 
 
 def test_with_keys_assignability():
