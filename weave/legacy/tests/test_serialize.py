@@ -1,11 +1,11 @@
 import pytest
 
 import weave
-from weave.legacy import api as api
-from weave.legacy import graph, op_args, ops, registry_mem, serialize, weave_internal
-from weave.legacy import weave_types as types
-from weave.legacy.ops_primitives import list_
-from weave.legacy.weave_internal import make_const_node
+from weave.legacy.weave import api as api
+from weave.legacy.weave import graph, op_args, ops, registry_mem, serialize, weave_internal
+from weave.legacy.weave import weave_types as types
+from weave.legacy.weave.ops_primitives import list_
+from weave.legacy.weave.weave_internal import make_const_node
 
 from ...tests import fixture_fakewandb as fwb
 

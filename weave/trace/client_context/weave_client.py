@@ -1,8 +1,8 @@
 import threading
 from typing import TYPE_CHECKING, Optional
 
-from weave.legacy import context_state
-from weave.legacy.errors import WeaveInitError
+from weave.legacy.weave import context_state
+from weave.legacy.weave.errors import WeaveInitError
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient

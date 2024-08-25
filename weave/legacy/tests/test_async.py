@@ -1,6 +1,6 @@
 import pytest
 
-from weave.legacy import api, async_demo, ops, runs, storage
+from weave.legacy.weave import api, async_demo, ops, runs, storage
 
 
 def test_run_basic():

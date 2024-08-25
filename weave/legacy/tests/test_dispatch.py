@@ -1,7 +1,7 @@
 import pytest
 
 import weave
-from weave.legacy import ops_arrow
+from weave.legacy.weave import ops_arrow
 
 
 def test_dispatch_lambda():

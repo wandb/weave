@@ -1,6 +1,6 @@
-from weave.legacy import api as weave
-from weave.legacy import ops_arrow as arrow
-from weave.legacy.ops_primitives import list_
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import ops_arrow as arrow
+from weave.legacy.weave.ops_primitives import list_
 
 
 class ListLikeNodeInterface:

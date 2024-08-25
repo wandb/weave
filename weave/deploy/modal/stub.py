@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from modal import Image, Secret, Stub, asgi_app
 
 from weave.deploy.util import safe_name
-from weave.legacy.uris import WeaveURI
+from weave.legacy.weave.uris import WeaveURI
 from weave.trace.refs import ObjectRef, parse_uri
 
 image = (

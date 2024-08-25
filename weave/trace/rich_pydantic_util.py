@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from rich.console import Console
 from rich.table import Table
 
-from weave.legacy import util
+from weave.legacy.weave import util
 
 
 def dict_to_table(d: dict[str, Any]) -> Table:
