@@ -1673,7 +1673,7 @@ def map_with_copying_thread_executor(fn, vals):
 
 
 # TODO: Make an async version of this
-@pytest.mark.flaky(retries=3)  # <-- Flakes in CI
+@pytest.mark.flaky(reruns=3, reruns_delay=2)  # <-- Flakes in CI
 @pytest.mark.parametrize(
     "mapper",
     [
