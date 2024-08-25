@@ -16,6 +16,7 @@ from weave.legacy.weave import weave_types as types
 from weave.legacy.weave import storage
 from weave.legacy.weave.api import *
 from weave.legacy.weave.errors import *
+from weave.legacy.weave import errors
 from weave.legacy.weave import mappers_python_def
 from weave.legacy.weave import wandb_api as _wandb_api
 from weave.legacy.weave import context as _context
