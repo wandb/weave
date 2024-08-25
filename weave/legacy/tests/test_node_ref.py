@@ -1,7 +1,7 @@
-from weave.legacy import api as weave
-from weave.legacy import graph
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import graph
 
-from ...legacy import node_ref
+from ...legacy.weave import node_ref
 
 
 def test_node_to_ref():

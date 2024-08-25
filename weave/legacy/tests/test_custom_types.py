@@ -1,9 +1,9 @@
 import pytest
 from PIL import Image
 
-from weave.legacy import api as weave
-from weave.legacy import context_state as _context
-from weave.legacy import ops_arrow
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import context_state as _context
+from weave.legacy.weave import ops_arrow
 
 from ... import errors
 from weave.legacy.tests.util import geom

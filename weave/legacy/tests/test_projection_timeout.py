@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from weave.legacy.ops_primitives import projection_utils
+from weave.legacy.weave.ops_primitives import projection_utils
 
 from ... import errors
 

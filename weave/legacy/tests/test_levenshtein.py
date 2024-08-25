@@ -1,6 +1,6 @@
 import pytest
 
-from weave.legacy.ops_primitives.string import _levenshtein
+from weave.legacy.weave.ops_primitives.string import _levenshtein
 
 
 @pytest.mark.parametrize(

@@ -6,17 +6,17 @@ import numpy as np
 import pytest
 import wandb
 
-from weave.legacy import api as weave
-from weave.legacy import artifact_fs, artifact_wandb, compile, graph, ops, stitch, uris
-from weave.legacy import ops_arrow as arrow
-from weave.legacy import weave_types as types
-from weave.legacy.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.legacy.ops_arrow import ArrowWeaveListType
-from weave.legacy.ops_domain import artifact_membership_ops as amo
-from weave.legacy.ops_domain import table, wb_util, wbmedia
-from weave.legacy.ops_domain import wb_domain_types as wdt
-from weave.legacy.ops_primitives import dict_, list_
-from weave.legacy.ops_primitives.file import _as_w0_dict_
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import artifact_fs, artifact_wandb, compile, graph, ops, stitch, uris
+from weave.legacy.weave import ops_arrow as arrow
+from weave.legacy.weave import weave_types as types
+from weave.legacy.weave.language_features.tagging.tagged_value_type import TaggedValueType
+from weave.legacy.weave.ops_arrow import ArrowWeaveListType
+from weave.legacy.weave.ops_domain import artifact_membership_ops as amo
+from weave.legacy.weave.ops_domain import table, wb_util, wbmedia
+from weave.legacy.weave.ops_domain import wb_domain_types as wdt
+from weave.legacy.weave.ops_primitives import dict_, list_
+from weave.legacy.weave.ops_primitives.file import _as_w0_dict_
 from .test_wb_domain_ops import assert_gql_str_equal
 
 from ...tests import fixture_fakewandb as fwb
