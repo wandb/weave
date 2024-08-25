@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from weave.legacy import (
+from weave.legacy.weave import (
     api,
     context_state,
     mappers_python,
@@ -10,7 +10,7 @@ from weave.legacy import (
     weave_internal,
     weavejs_fixes,
 )
-from weave.legacy import weave_types as types
+from weave.legacy.weave import weave_types as types
 
 
 @pytest.mark.skip(

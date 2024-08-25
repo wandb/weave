@@ -1,6 +1,6 @@
 import typing
 
-from weave.legacy import urls
+from weave.legacy.weave import urls
 
 if typing.TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]

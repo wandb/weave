@@ -1,11 +1,11 @@
 import pytest
 
 import weave
-from weave.legacy import storage, weave_internal
-from weave.legacy.panels import panel_plot
+from weave.legacy.weave import storage, weave_internal
+from weave.legacy.weave.panels import panel_plot
 
-from ...legacy.panels.panel_group import Group
-from ...legacy.panels.panel_slider import Slider
+from ...legacy.weave.panels.panel_group import Group
+from ...legacy.weave.panels.panel_slider import Slider
 
 
 def test_panel_id():
@@ -82,7 +82,7 @@ def test_synced():
 
 def test_object_picker_choice_type():
     ints = weave.save([1, 2, 3], name="my-ints")
-    panel = weave.legacy.panels.ObjectPicker(ints)
+    panel = weave.legacy.weave.panels.ObjectPicker(ints)
     panel_node = weave_internal.make_var_node(weave.type_of(panel), "panel")
     choice = panel_node.config.choice
     assert choice.type == weave.types.Function({}, weave.types.Int())
@@ -92,17 +92,17 @@ def test_facet_selected():
     data = weave.save(
         [{"guess": "dog", "truth": "cat"}, {"guess": "dog", "truth": "dog"}]
     )
-    facet = weave.legacy.panels.Group(
+    facet = weave.legacy.weave.panels.Group(
         equalSize=True,
         items={
-            "confusion": weave.legacy.panels.Facet(
+            "confusion": weave.legacy.weave.panels.Facet(
                 data,
                 x=lambda row: row["guess"],
                 y=lambda row: row["truth"],
-                select=lambda row: weave.legacy.panels.Group(
+                select=lambda row: weave.legacy.weave.panels.Group(
                     layered=True,
                     items={
-                        "color": weave.legacy.panels.Color(row.count() / 50),
+                        "color": weave.legacy.weave.panels.Color(row.count() / 50),
                         "count": row.count(),
                     },
                 ),
@@ -115,11 +115,11 @@ def test_facet_selected():
 
 def test_board():
     # Just make sure it runs for now.
-    weave.legacy.panels.Board(
+    weave.legacy.weave.panels.Board(
         {
-            "nums": weave.legacy.ops.range(0, 3, 1),
+            "nums": weave.legacy.weave.ops.range(0, 3, 1),
         },
-        [weave.legacy.panels.BoardPanel(id="panel0", panel=lambda nums: nums)],
+        [weave.legacy.weave.panels.BoardPanel(id="panel0", panel=lambda nums: nums)],
     )
 
 
@@ -130,6 +130,6 @@ def test_plot_constants_assign():
 
 
 def test_plot_assign():
-    assert weave.legacy.panels.Plot.WeaveType().assign_type(
-        weave.type_of(weave.legacy.panels.Plot([{"a": 5}]))
+    assert weave.legacy.weave.panels.Plot.WeaveType().assign_type(
+        weave.type_of(weave.legacy.weave.panels.Plot([{"a": 5}]))
     )

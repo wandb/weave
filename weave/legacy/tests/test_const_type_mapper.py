@@ -1,7 +1,7 @@
 import typing
 
 import weave
-from weave.legacy import context_state, weave_internal
+from weave.legacy.weave import context_state, weave_internal
 
 _loading_builtins_token = context_state.set_loading_built_ins()
 
