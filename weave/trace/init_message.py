@@ -1,8 +1,8 @@
-import typing
+from typing import TYPE_CHECKING, Optional
 
 from weave.legacy.weave import urls
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
 
 REQUIRED_WANDB_VERSION = "0.16.4"
@@ -82,7 +82,7 @@ def assert_min_weave_version(
 
 
 def print_init_message(
-    username: typing.Optional[str],
+    username: Optional[str],
     entity_name: str,
     project_name: str,
     read_only: bool,
