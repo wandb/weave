@@ -15,7 +15,7 @@ import functools
 import os
 import site
 import sys
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Type, Union
 
 if sys.version_info >= (3, 8):
     from typing import Literal
@@ -178,7 +178,7 @@ class Sentry:
     @_safe_noop
     def configure_scope(
         self,
-        tags: Optional[Dict[str, Any]] = None,
+        tags: Optional[dict[str, Any]] = None,
     ) -> None:
         """Configure the Sentry scope for the current thread.
 

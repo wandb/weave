@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 ALLOW_MIXED_PROJECT_REFS = False
 
 
-def dataclasses_asdict_one_level(obj: Any) -> Dict[str, Any]:
+def dataclasses_asdict_one_level(obj: Any) -> dict[str, Any]:
     # dataclasses.asdict is recursive. We don't want that when json encoding
     return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
 
