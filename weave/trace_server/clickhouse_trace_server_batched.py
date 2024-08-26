@@ -45,6 +45,7 @@ from weave.trace_server.calls_query_builder import (
     combine_conditions,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.trace_server_common import make_derived_summary_fields
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
@@ -1387,7 +1388,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
+        summary=make_derived_summary_fields(ch_call.model_dump(), "summary_dump"),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
@@ -1408,7 +1409,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         attributes=_dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
         inputs=_dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
+        summary=make_derived_summary_fields(ch_call_dict, "summary_dump"),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),

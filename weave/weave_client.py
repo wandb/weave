@@ -309,7 +309,7 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
         for k, v in d.items():
             if isinstance(v, dict):
                 result[k] = sum_dict_leaves([result.get(k, {}), v])
-            else:
+            elif v is not None:
                 result[k] = result.get(k, 0) + v
     return result
 

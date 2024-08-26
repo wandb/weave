@@ -45,6 +45,11 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 ## End hacky interface compatibility helpers
 
 
+class AnyIntMatcher:
+    def __eq__(self, other):
+        return isinstance(other, int)
+
+
 def test_simple_op(client):
     @weave.op()
     def my_op(a: int) -> int:
@@ -72,7 +77,13 @@ def test_simple_op(client):
         inputs={"a": 5},
         exception=None,
         output=6,
-        summary={},
+        summary={
+            "weave": {
+                "status": "success",
+                "nice_trace_name": "my_op",
+                "latency": AnyIntMatcher(),
+            }
+        },
         attributes={
             "weave": {
                 "client_version": weave.version.VERSION,
@@ -102,7 +113,7 @@ def test_trace_server_call_start_and_end(client):
     start = tsi.StartedCallSchemaForInsert(
         project_id=client._project_id(),
         id=call_id,
-        op_name="test_name",
+        op_name="weave:///test_entity/test_project/op/test_name:test",
         trace_id=trace_id,
         parent_id=parent_id,
         started_at=datetime.datetime.now(tz=datetime.timezone.utc)
@@ -143,7 +154,7 @@ def test_trace_server_call_start_and_end(client):
     assert res.call.model_dump() == {
         "project_id": client._project_id(),
         "id": call_id,
-        "op_name": "test_name",
+        "op_name": "weave:///test_entity/test_project/op/test_name:test",
         "trace_id": trace_id,
         "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
@@ -152,7 +163,13 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": None,
-        "summary": None,
+        "summary": {
+            "weave": {
+                "nice_trace_name": "test_name",
+                "latency": None,
+                "status": "running",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -182,7 +199,7 @@ def test_trace_server_call_start_and_end(client):
     assert res.call.model_dump() == {
         "project_id": client._project_id(),
         "id": call_id,
-        "op_name": "test_name",
+        "op_name": "weave:///test_entity/test_project/op/test_name:test",
         "trace_id": trace_id,
         "parent_id": parent_id,
         "started_at": FuzzyDateTimeMatcher(start.started_at),
@@ -191,7 +208,14 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": {"d": 5},
-        "summary": {"c": 5},
+        "summary": {
+            "c": 5,
+            "weave": {
+                "nice_trace_name": "test_name",
+                "latency": AnyIntMatcher(),
+                "status": "success",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,

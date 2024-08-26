@@ -29,6 +29,9 @@ from weave.trace_server.refs_internal import (
     InternalTableRef,
     parse_internal_uri,
 )
+from weave.trace_server.trace_server_common import (
+    make_derived_summary_fields,
+)
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -456,6 +459,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             # convert empty string display_names to None
             if "display_name" in call_dict and call_dict["display_name"] == "":
                 call_dict["display_name"] = None
+            # fill in derived summary fields
+            call_dict["summary"] = make_derived_summary_fields(call_dict, "summary")
             # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
                 if mfield.is_required() and col not in call_dict:
