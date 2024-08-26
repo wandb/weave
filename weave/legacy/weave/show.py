@@ -6,6 +6,7 @@ import urllib
 from IPython.display import IFrame, display
 
 from weave.legacy.weave import storage, artifact_fs, context, errors, graph, ops, node_ref, panel, ref_base
+from weave.legacy.weave.arrow.list_ import dataframe_to_arrow
 from weave.legacy.weave import util
 from . import usage_analytics
 from weave.legacy.weave import weave_types as types
@@ -125,7 +126,7 @@ def show(obj: typing.Any = None, height: int = 400) -> typing.Any:
         )
 
     if util.is_pandas_dataframe(obj):  # type: ignore[no-untyped-call]
-        obj = ops.dataframe_to_arrow(obj)  # type: ignore[no-untyped-call]
+        obj = dataframe_to_arrow(obj)  # type: ignore[no-untyped-call]
 
     panel_url = show_url(obj)  # type: ignore[no-untyped-call]
 
