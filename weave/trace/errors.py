@@ -1,10 +1,19 @@
-class Error(Exception):
-    pass
+class Error(Exception): ...
 
 
-class InternalError(Error):
-    pass
+class InternalError(Error): ...
 
 
-class OpCallError(Error):
-    pass
+class OpCallError(Error): ...
+
+
+class WeaveTypeError(Error): ...
+
+
+class WeaveSerializeError(Error): ...
+
+
+class WeaveOpSerializeError(WeaveSerializeError): ...
+
+
+class WeaveInitError(Error): ...
