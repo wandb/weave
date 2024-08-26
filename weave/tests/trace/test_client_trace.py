@@ -14,6 +14,11 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor, weave_client
+from weave.tests.trace.util import (
+    AnyIntMatcher,
+    FuzzyDateTimeMatcher,
+    MaybeStringMatcher,
+)
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
@@ -43,11 +48,6 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 
 
 ## End hacky interface compatibility helpers
-
-
-class AnyIntMatcher:
-    def __eq__(self, other):
-        return isinstance(other, int)
 
 
 def test_simple_op(client):
@@ -133,23 +133,6 @@ def test_trace_server_call_start_and_end(client):
     exp_started_at = datetime.datetime.fromisoformat(
         start.started_at.isoformat(timespec="milliseconds")
     )
-
-    class FuzzyDateTimeMatcher:
-        def __init__(self, dt):
-            self.dt = dt
-
-        def __eq__(self, other):
-            # Checks within 1ms
-            return abs((self.dt - other).total_seconds()) < 0.001
-
-    class MaybeStringMatcher:
-        def __init__(self, s):
-            self.s = s
-
-        def __eq__(self, other):
-            if other is None:
-                return True
-            return self.s == other
 
     assert res.call.model_dump() == {
         "project_id": client._project_id(),

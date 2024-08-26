@@ -13,6 +13,7 @@ import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation, weave_client
 from weave.legacy import op_def
+from weave.tests.trace.util import AnyIntMatcher, RegexStringMatcher
 from weave.trace import refs
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
@@ -35,16 +36,6 @@ from weave.trace_server.trace_server_interface import (
 )
 
 pytestmark = pytest.mark.trace
-
-
-class RegexStringMatcher(str):
-    def __init__(self, pattern):
-        self.pattern = pattern
-
-    def __eq__(self, other_string):
-        if not isinstance(other_string, str):
-            return NotImplemented
-        return bool(re.match(self.pattern, other_string))
 
 
 def test_table_create(client):
@@ -269,7 +260,13 @@ def test_call_create(client):
         id=call.id,
         output="hello",
         exception=None,
-        summary={},
+        summary={
+            "weave": {
+                "status": "success",
+                "nice_trace_name": "x",
+                "latency": AnyIntMatcher(),
+            }
+        },
         _children=[],
         attributes={
             "weave": {
@@ -308,6 +305,13 @@ def test_calls_query(client):
                 "sys_version": sys.version,
             },
         },
+        summary={
+            "weave": {
+                "status": "running",
+                "nice_trace_name": "x",
+                "latency": None,
+            }
+        },
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -325,6 +329,13 @@ def test_calls_query(client):
                 "os_release": platform.release(),
                 "sys_version": sys.version,
             },
+        },
+        summary={
+            "weave": {
+                "status": "running",
+                "nice_trace_name": "x",
+                "latency": None,
+            }
         },
     )
     client.finish_call(call2, None)

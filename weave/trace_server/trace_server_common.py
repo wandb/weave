@@ -1,5 +1,5 @@
 import datetime
-from typing import Literal, Optional, cast
+from typing import Any, Dict, Literal, Optional, cast
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.refs_internal import InternalObjectRef, parse_internal_uri
@@ -15,24 +15,38 @@ def _make_call_status_from_exception_and_ended_at(
     return "success"
 
 
-def make_derived_summary_fields(call_dict: dict, summary_key: str) -> tsi.SummaryMap:
-    started_at = call_dict["started_at"]
-    ended_at = call_dict.get("ended_at")
-    exception = call_dict.get("exception")
+def _make_datetime_from_any(
+    dt: Optional[str | datetime.datetime],
+) -> Optional[datetime.datetime]:
+    """
+    Flexible datetime parser, accepts None, str and datetime.
+    This allows database agnostic parsing of datetime objects.
+    """
+    if dt is None:
+        return None
+    if isinstance(dt, str):
+        return datetime.datetime.fromisoformat(dt)
+    elif isinstance(dt, datetime.datetime):
+        return dt
+    return None
+
+
+def make_derived_summary_fields(
+    call_dict: Dict[str, Any], summary_key: str
+) -> tsi.SummaryMap:
     display_name = call_dict.get("display_name")
-    op_name = call_dict["op_name"]
-    ended_at_dt = (
-        None if ended_at is None else datetime.datetime.fromisoformat(ended_at)
+    started_at_dt = _make_datetime_from_any(call_dict["started_at"])
+    ended_at_dt = _make_datetime_from_any(call_dict.get("ended_at"))
+    status = _make_call_status_from_exception_and_ended_at(
+        call_dict.get("exception"), ended_at_dt
     )
-    started_at_dt = datetime.datetime.fromisoformat(started_at)
-    status = _make_call_status_from_exception_and_ended_at(exception, ended_at_dt)
     latency = None if not ended_at_dt else (ended_at_dt - started_at_dt).microseconds
     if not display_name:
-        op = parse_internal_uri(op_name)
+        op = parse_internal_uri(call_dict["op_name"])
         if isinstance(op, InternalObjectRef):
             display_name = op.name
         else:
-            display_name = op_name
+            display_name = call_dict["op_name"]
 
     weave_derived_fields = tsi.WeaveSummarySchema(
         nice_trace_name=display_name,
