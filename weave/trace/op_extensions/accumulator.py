@@ -1,4 +1,5 @@
 import atexit
+import sys
 import weakref
 from typing import (
     Any,
@@ -14,6 +15,12 @@ from typing import (
 )
 
 from weave.trace.op import FinishCallbackType, Op
+
+if sys.version_info < (3, 10):
+
+    def aiter(obj: Any) -> AsyncIterator[Any]:
+        return obj.__aiter__()
+
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -160,7 +167,7 @@ class _IteratorWrapper(Generic[V]):
     def __next__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator, "__next__"):
             try:
-                self._iterator = iter(self._iterator)
+                self._iterator = iter(self._iterator)  # type: ignore
             except TypeError:
                 raise TypeError(
                     f"Cannot call next on an iterator of type {type(self._iterator)}"
