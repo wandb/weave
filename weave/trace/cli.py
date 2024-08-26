@@ -1,5 +1,5 @@
 import os
-import typing
+from typing import Optional
 
 import click
 
@@ -48,8 +48,8 @@ def cli() -> None:
 @click.option("--port", default=9996, type=int)
 def serve(
     model_ref: str,
-    method: typing.Optional[str],
-    auth_entity: typing.Optional[str],
+    method: Optional[str],
+    auth_entity: Optional[str],
     project: str,
     env: str,
     port: int,
