@@ -203,7 +203,7 @@ def serve(
 ) -> str:
     import uvicorn
 
-    from weave.legacy.weave import wandb_api
+    from weave.wandb_api import api as wandb_api
 
     from .serve_fastapi import object_method_app
 
