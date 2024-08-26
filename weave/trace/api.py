@@ -6,7 +6,8 @@ import threading
 import time
 from typing import Any, Callable, Iterator, Optional, Union
 
-from weave.legacy.weave import urls, util
+from weave.legacy.weave import urls
+from weave.trace import util
 from weave.trace.call_context import get_current_call
 from weave.trace.client_context import weave_client as weave_client_context
 
