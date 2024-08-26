@@ -1,10 +1,10 @@
 import typing
 from typing import Mapping
 
-from weave.trace.constants import TRACE_CALL_EMOJI
-
 if typing.TYPE_CHECKING:
     from .op_def import OpDef
+    
+TRACE_CALL_EMOJI = "🍩"
 
 
 def print_run_link(run):
