@@ -5,7 +5,7 @@ import sys
 import typing
 import warnings
 from functools import lru_cache, wraps
-from typing import Any, Dict, Iterator, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
 from requests import HTTPError
@@ -60,10 +60,10 @@ if typing.TYPE_CHECKING:
 ALLOW_MIXED_PROJECT_REFS = False
 
 
-def deprecated(new_name: str):
-    def deco(func):
+def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def deco(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             warnings.warn(
                 f"{func.__name__} is deprecated and will be removed in a future version. Use {new_name} instead.",
                 DeprecationWarning,
@@ -759,7 +759,7 @@ class WeaveClient:
         offset: int = 0,
         limit: int = 100,
     ) -> FeedbackQuery:
-        return self.get_feedback(query, reaction, offset, limit)
+        return self.get_feedback(query, reaction=reaction, offset=offset, limit=limit)
 
     ################ Internal Helpers ################
 
