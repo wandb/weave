@@ -24,8 +24,11 @@ import weave
 
 # highlight-next-line
 class ExtractFruitsModel(weave.Model):
-    model_name: str
-    prompt_template: str
+    model_name: str = Field( default="gpt-fruity-fresh-1.0" )
+    prompt_template: str = Field( default="You are an AI fruit expert who can find any fruit, even the mythical ones!" )
+
+    def __init__(self):
+        super().__init__()
 
     # highlight-next-line
     @weave.op()
@@ -140,9 +143,12 @@ import openai
 
 # highlight-next-line
 class ExtractFruitsModel(weave.Model):
-    model_name: str
-    prompt_template: str
+    model_name: str = Field( default="gpt-fruity-fresh-1.0" )
+    prompt_template: str = Field( default="You are an AI fruit expert who can find any fruit, even the mythical ones!" )
 
+    def __init__(self):
+        super().__init__()
+    
     # highlight-next-line
     @weave.op()
     # highlight-next-line
