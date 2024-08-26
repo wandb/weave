@@ -8,8 +8,8 @@ from weave.legacy.weave.graph import Node
 # If this is not imported, serialization of Weave Nodes is incorrect!
 from weave.legacy.weave import graph_mapper as _graph_mapper
 
-from . import storage as _storage
-from . import ref_base as _ref_base
+from weave.legacy.weave import storage as _storage
+from weave.legacy.weave import ref_base as _ref_base
 from weave.legacy.weave import wandb_api as _wandb_api
 
 from weave.legacy.weave import weave_internal as _weave_internal
@@ -17,14 +17,12 @@ from weave.legacy.weave import weave_internal as _weave_internal
 from weave.legacy.weave import util as _util
 
 from weave.legacy.weave import context as _context
-from ...trace import weave_init as _weave_init
-from ...trace import weave_client as _weave_client
 
 # exposed as part of api
 from weave.legacy.weave import weave_types as types
 
 # needed to enable automatic numpy serialization
-from . import types_numpy as _types_numpy
+from weave.legacy.weave import types_numpy as _types_numpy
 
 from weave.legacy.weave import errors
 from weave.legacy.weave.decorators import weave_class, mutation, type
@@ -41,8 +39,6 @@ from weave.legacy.weave.panel import Panel
 
 from weave.legacy.weave.arrow.list_ import ArrowWeaveList as WeaveList
 
-# TODO: This is here because the op overloaded...
-from weave.trace.op import op  # noqa: F401
 
 def save(node_or_obj, name=None):  # type: ignore
     from weave.legacy.weave.ops_primitives.weave_api import get, save
@@ -128,8 +124,6 @@ __all__ = [
     "_weave_internal",
     "_util",
     "_context",
-    "_weave_init",
-    "_weave_client",
     "types",
     "_types_numpy",
     "errors",
