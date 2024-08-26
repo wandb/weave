@@ -10,7 +10,7 @@ from typing import Any, TypeVar
 
 import numpy as np
 
-from weave.legacy.weave.ref_base import Ref
+from weave.trace.refs import Ref
 
 T = TypeVar("T")
 
