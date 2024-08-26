@@ -1,4 +1,4 @@
-import typing
+from typing import Optional
 
 from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
 from weave.trace.client_context import weave_client as weave_client_context
@@ -16,7 +16,7 @@ class InitializedClient:
         weave_client_context.set_weave_client_global(None)
 
 
-def get_username() -> typing.Optional[str]:
+def get_username() -> Optional[str]:
     from weave.wandb_api import api as wandb_api
 
     api = wandb_api.get_wandb_api_sync()
@@ -148,7 +148,7 @@ def init_weave(
 
 
 def init_weave_get_server(
-    api_key: typing.Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> remote_http_trace_server.RemoteHTTPTraceServer:
     res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
     if api_key is not None:
