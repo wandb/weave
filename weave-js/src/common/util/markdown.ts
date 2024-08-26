@@ -54,10 +54,6 @@ export function buildSanitizationSchema(rules?: SanitizationRules) {
 export function generateHTML(markdown: string, rules?: SanitizationRules) {
   const sanitizationSchema = buildSanitizationSchema(rules);
   // IMPORTANT: We must sanitize as the final step of the pipeline to prevent XSS
-  // if (!isMarkdown(markdown)) {
-  //   return markdown;
-  // }
-
   const vfile = (
     unified()
       .use(parse)
