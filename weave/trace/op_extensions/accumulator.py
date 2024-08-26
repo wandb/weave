@@ -165,11 +165,9 @@ class _IteratorWrapper(Generic[V]):
         return self
 
     def __next__(self) -> Generator[None, None, V]:
-        if isinstance(self._iterator, Iterator) and not hasattr(
-            self._iterator, "__next__"
-        ):
+        if not hasattr(self._iterator, "__next__"):
             try:
-                self._iterator = iter(self._iterator)
+                self._iterator = iter(self._iterator)  # type: ignore
             except TypeError:
                 raise TypeError(
                     f"Cannot call next on an iterator of type {type(self._iterator)}"
