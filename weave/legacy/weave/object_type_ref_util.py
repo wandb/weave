@@ -1,6 +1,6 @@
 import typing
 
-from weave.trace import ref_util
+from weave.legacy.weave import ref_util
 from weave.legacy.weave import context_state
 
 
