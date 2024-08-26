@@ -3,7 +3,8 @@ import datetime
 import platform
 import sys
 import typing
-from functools import lru_cache
+import warnings
+from functools import lru_cache, wraps
 from typing import Any, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
@@ -57,6 +58,22 @@ if typing.TYPE_CHECKING:
 # If False, object refs with with mismatching projects will be recreated.
 # If True, use existing ref to object in other project.
 ALLOW_MIXED_PROJECT_REFS = False
+
+
+def deprecated(new_name: str):
+    def deco(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            warnings.warn(
+                f"{func.__name__} is deprecated and will be removed in a future version. Use {new_name} instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return deco
 
 
 def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
@@ -446,7 +463,7 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(
+    def get_calls(
         self,
         filter: Optional[CallsFilter] = None,
         include_costs: Optional[bool] = False,
@@ -458,8 +475,18 @@ class WeaveClient:
             self.server, self._project_id(), filter, include_costs or False
         )
 
+    @deprecated(new_name="get_calls")
+    def calls(
+        self,
+        filter: Optional[CallsFilter] = None,
+        include_costs: Optional[bool] = False,
+    ) -> CallsIter:
+        return self.get_calls(filter, include_costs)
+
     @trace_sentry.global_trace_sentry.watch()
-    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+    def get_call(
+        self, call_id: str, include_costs: Optional[bool] = False
+    ) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
@@ -471,6 +498,10 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = response.calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
+
+    @deprecated(new_name="get_call")
+    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+        return self.get_call(call_id, include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
@@ -644,7 +675,7 @@ class WeaveClient:
             )
         )
 
-    def feedback(
+    def get_feedback(
         self,
         query: Optional[Union[Query, str]] = None,
         *,
@@ -718,6 +749,17 @@ class WeaveClient:
             limit=limit,
             show_refs=True,
         )
+
+    @deprecated(new_name="get_feedback")
+    def feedback(
+        self,
+        query: Optional[Union[Query, str]] = None,
+        *,
+        reaction: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> FeedbackQuery:
+        return self.get_feedback(query, reaction, offset, limit)
 
     ################ Internal Helpers ################
 
@@ -844,7 +886,7 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(CallsFilter(op_names=[op_ref.uri()]))
+        return self.get_calls(CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(self, filter: Optional[ObjectVersionFilter] = None) -> list[ObjSchema]:

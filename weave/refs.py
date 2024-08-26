@@ -35,5 +35,5 @@ class Refs(AbstractRichContainer[str]):
         for ref in self.call_refs():
             parsed = parse_uri(ref)
             assert isinstance(parsed, CallRef)
-            objs.append(client.call(parsed.id))
+            objs.append(client.get_call(parsed.id))
         return objs
