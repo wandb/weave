@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Dict, Literal, Optional, cast
+from typing import Any, Dict, Literal, Optional, Union, cast
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.refs_internal import InternalObjectRef, parse_internal_uri
@@ -16,7 +16,7 @@ def _make_call_status_from_exception_and_ended_at(
 
 
 def _make_datetime_from_any(
-    dt: Optional[str | datetime.datetime],
+    dt: Optional[Union[str, datetime.datetime]],
 ) -> Optional[datetime.datetime]:
     """
     Flexible datetime parser, accepts None, str and datetime.
@@ -40,7 +40,11 @@ def make_derived_summary_fields(
     status = _make_call_status_from_exception_and_ended_at(
         call_dict.get("exception"), ended_at_dt
     )
-    latency = None if not ended_at_dt else (ended_at_dt - started_at_dt).microseconds
+
+    latency = None
+    if ended_at_dt and started_at_dt:
+        latency = (ended_at_dt - started_at_dt).microseconds
+
     if not display_name:
         op = parse_internal_uri(call_dict["op_name"])
         if isinstance(op, InternalObjectRef):
