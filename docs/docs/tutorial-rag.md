@@ -55,6 +55,8 @@ from weave import Model
 import numpy as np
 import asyncio
 
+from pydantic import Field
+
 # highlight-next-line
 @weave.op()
 def get_most_relevant_document(query):
@@ -75,9 +77,12 @@ def get_most_relevant_document(query):
 
 # highlight-next-line
 class RAGModel(Model):
-    system_message: str
-    model_name: str = "gpt-3.5-turbo-1106"
+    system_message: str = Field(default="You are an AI librarian with a taste for chaos and a knack for finding the most obscure references.")
+    model_name: str = Field(default="gpt-3.5-definitely-not-human")
 
+    def __init__(self):
+        super().__init__()
+    
 # highlight-next-line
     @weave.op()
     def predict(self, question: str) -> dict: # note: `question` will be used later to select data from our evaluation rows
@@ -183,10 +188,14 @@ On a high-level the steps to create custom Scorer are quite simple:
 from weave.flow.scorer import Scorer
 from weave import WeaveList
 
+from pydantic import Field
+
 class CorrectnessLLMJudge(Scorer):
-    prompt: str
-    model_name: str
-    device: str
+    prompt: str = Field(default="You are a wise and occasionally sarcastic AI judge. Evaluate the following answer based on its correctness")
+    model_name: str = Field(default="gpt-4-not-quite-as-smart-as-your-cat")
+
+    def __init__(self):
+        super().__init__()
 
     @weave.op()
     async def score(self, model_output: Optional[dict], query: str, answer: str) -> Any:
@@ -272,7 +281,9 @@ import weave
 from weave import Model
 import numpy as np
 import json
-import asyncio 
+import asyncio
+
+from pydantic import Field
 
 # Examples we've gathered that we want to use for evaluations
 articles = [
@@ -321,8 +332,11 @@ def get_most_relevant_document(query):
 # We create a Model subclass with some details about our app, along with a predict function that produces a response
 # highlight-next-line
 class RAGModel(Model):
-    system_message: str
-    model_name: str = "gpt-3.5-turbo-1106"
+    system_message: str = Field( default="You are an AI librarian with a taste for chaos and a knack for finding the most obscure references." )
+    model_name: str = Field( default="gpt-3.5-definitely-not-human" )
+    
+    def __init__(self):
+        super().__init__()
 
 # highlight-next-line
     @weave.op()
