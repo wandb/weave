@@ -20,10 +20,10 @@ from weave.trace.ipython import (
     get_class_source,
     is_running_interactively,
 )
+from weave.trace.op import Op
 from weave.trace.refs import ObjectRef
 
 from . import serializer
-from .op import Op
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
