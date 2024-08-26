@@ -212,13 +212,19 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         loading: true,
         result: null,
       };
-    } else {
+    } else if (result?.callId === key?.callId) {
       if (result) {
         callCache.set(key, result);
       }
       return {
         loading: false,
         result,
+      };
+    } else {
+      // Stale call result
+      return {
+        loading: false,
+        result: null,
       };
     }
   }, [cachedCall, callRes, key]);
@@ -1216,7 +1222,7 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
     {skip: fileSpec == null}
   );
   const text = useMemo(() => {
-    if (arrayBuffer.loading) {
+    if (arrayBuffer.loading || query.loading) {
       return {
         loading: true,
         result: null,
@@ -1228,7 +1234,7 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
         ? new TextDecoder().decode(arrayBuffer.result)
         : null,
     };
-  }, [arrayBuffer.loading, arrayBuffer.result]);
+  }, [arrayBuffer.loading, arrayBuffer.result, query.loading]);
 
   return text;
 };
