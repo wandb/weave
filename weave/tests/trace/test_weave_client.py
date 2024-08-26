@@ -12,7 +12,7 @@ import requests
 import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
-from weave.legacy.weave import op_def
+from weave.legacy.weave import op_def  # TODO: This is imported in a skipped test
 from weave.tests.trace.testutil import ObjectRefStrMatcher
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
