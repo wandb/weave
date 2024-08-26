@@ -183,8 +183,9 @@ def test_instructor_iterable(
     import instructor
     from openai import OpenAI
 
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(
-        OpenAI(), mode=instructor.function_calls.Mode.JSON
+        OpenAI(api_key=api_key), mode=instructor.function_calls.Mode.JSON
     )
     users = lm_client.chat.completions.create(
         model="gpt-3.5-turbo-1106",
@@ -255,7 +256,10 @@ def test_instructor_iterable_sync_stream(
     import instructor
     from openai import OpenAI
 
-    lm_client = instructor.from_openai(OpenAI(), mode=instructor.Mode.TOOLS)
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    lm_client = instructor.from_openai(
+        OpenAI(api_key=api_key), mode=instructor.Mode.TOOLS
+    )
     users = lm_client.chat.completions.create(
         model="gpt-4",
         stream=True,
@@ -328,7 +332,10 @@ def test_instructor_iterable_async_stream(
     import instructor
     from openai import AsyncOpenAI
 
-    lm_client = instructor.from_openai(AsyncOpenAI(), mode=instructor.Mode.TOOLS)
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    lm_client = instructor.from_openai(
+        AsyncOpenAI(api_key=api_key), mode=instructor.Mode.TOOLS
+    )
 
     async def print_iterable_results() -> List[Person]:
         model = await lm_client.chat.completions.create(
@@ -406,7 +413,8 @@ def test_instructor_partial_stream(
     import instructor
     from openai import OpenAI
 
-    lm_client = instructor.from_openai(OpenAI())
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    lm_client = instructor.from_openai(OpenAI(api_key=api_key))
     text_block = """
 In our recent online meeting, participants from various backgrounds joined to discuss the upcoming tech
 conference. The names and contact details of the participants were as follows:
@@ -499,7 +507,8 @@ def test_instructor_partial_stream_async(
     import instructor
     from openai import AsyncOpenAI
 
-    lm_client = instructor.from_openai(AsyncOpenAI())
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    lm_client = instructor.from_openai(AsyncOpenAI(api_key=api_key))
     text_block = """
 In our recent online meeting, participants from various backgrounds joined to discuss the upcoming tech
 conference. The names and contact details of the participants were as follows:

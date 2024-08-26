@@ -20,10 +20,10 @@ def instructor_iterable_accumulator(
 def should_accumulate_iterable(inputs: dict) -> bool:
     if isinstance(inputs, dict):
         if "stream" in inputs:
-            return inputs.get("stream")
+            return inputs["stream"]
         elif "kwargs" in inputs:
             if "stream" in inputs["kwargs"]:
-                return inputs.get("kwargs").get("stream")
+                return inputs.get("kwargs", {}).get("stream")
     return False
 
 
