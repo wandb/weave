@@ -9,6 +9,7 @@ import typing
 from collections.abc import Iterable
 
 import pydantic
+from dateutil.parser import isoparse
 
 from weave.legacy import box, context_state, mappers_python, object_type_ref_util
 from weave.legacy import timestamp as weave_timestamp
@@ -722,9 +723,7 @@ class Timestamp(Type):
     instance_classes = datetime.datetime
 
     def from_isostring(self, iso: str) -> datetime.datetime:
-        # NOTE: This assumes ISO 8601 format from GQL endpoints, it does NOT
-        # support RFC 3339 strings with a "Z" at the end before python 3.11
-        tz_naive = datetime.datetime.fromisoformat(iso)
+        tz_naive = isoparse(iso)
         return tz_naive.replace(tzinfo=datetime.timezone.utc)
 
     def save_instance(self, obj, artifact, name):

@@ -1,15 +1,9 @@
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import {Box, ListItemText, MenuList, SxProps, Theme} from '@mui/material';
-// import {Menu} from '@mui/base/Menu';
-import IconButton from '@mui/material/IconButton';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
+import {Box, SxProps, Theme} from '@mui/material';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
   createContext,
   FC,
-  MouseEvent,
   ReactNode,
   useContext,
   useEffect,
@@ -34,10 +28,6 @@ export const SimplePageLayout: FC<{
   tabs: Array<{
     label: string;
     content: ReactNode;
-  }>;
-  menuItems?: Array<{
-    label: string;
-    onClick: () => void;
   }>;
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
@@ -110,12 +100,6 @@ export const SimplePageLayout: FC<{
             }}>
             {props.title}
           </Box>
-          <Box
-            sx={{
-              flex: '0 0 auto',
-            }}>
-            {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
-          </Box>
           {simplePageLayoutContextValue.headerSuffix}
         </Box>
         <Box
@@ -181,10 +165,6 @@ export const SimplePageLayoutWithHeader: FC<{
     label: string;
     content: ReactNode;
   }>;
-  menuItems?: Array<{
-    label: string;
-    onClick: () => void;
-  }>;
   headerExtra?: ReactNode;
   headerContent: ReactNode;
   leftSidebar?: ReactNode;
@@ -248,12 +228,6 @@ export const SimplePageLayoutWithHeader: FC<{
           }}>
           {props.title}
         </Box>
-        <Box
-          sx={{
-            flex: '0 0 auto',
-          }}>
-          {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
-        </Box>
         {props.headerExtra}
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
@@ -312,56 +286,6 @@ export const SimplePageLayoutWithHeader: FC<{
           }
         />
       </div>
-    </Box>
-  );
-};
-
-const ActionMenu: FC<{
-  menuItems: Array<{
-    label: string;
-    onClick: () => void;
-  }>;
-}> = props => {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
-  const handleClick = (event: MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  return (
-    <Box
-      sx={{
-        height: '41px',
-        flex: '0 0 auto',
-      }}>
-      <IconButton
-        aria-label="more"
-        id="long-button"
-        aria-controls={open ? 'long-menu' : undefined}
-        aria-expanded={open ? 'true' : undefined}
-        aria-haspopup="true"
-        onClick={handleClick}>
-        <MoreVertIcon />
-      </IconButton>
-      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-        <Box sx={{width: 320, maxWidth: '100%'}}>
-          <MenuList>
-            {props.menuItems.map((item, i) => (
-              <MenuItem
-                key={i}
-                onClick={() => {
-                  handleClose();
-                  item.onClick();
-                }}>
-                <ListItemText>{item.label}</ListItemText>
-              </MenuItem>
-            ))}
-          </MenuList>
-        </Box>
-      </Menu>
     </Box>
   );
 };
