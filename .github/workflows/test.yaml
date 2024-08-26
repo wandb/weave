@@ -186,7 +186,7 @@ jobs:
         # github actions does something funky with the std file descriptors, they end up
         # being closed. tqdm (for example) raises an exception when the descriptor it
         # wants to write to is closed.
-        run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
+        run: nohup ./scripts/weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
         shell: bash
       - name: Cypress run
         # Use the following to run just a single test
