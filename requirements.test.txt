@@ -43,8 +43,7 @@ chromadb>=0.5.0             # LangChain
 pysqlite3-binary==0.5.3     # LangChain
 cohere>=5.5.8               # Cohere
 groq>=0.9.0                 # Groq
-cerebras-cloud-sdk @ https://cerebras-cloud-sdk.s3.us-west-1.amazonaws.com/test/cerebras_cloud_sdk-0.6.0-py3-none-any.whl
-
+cerebras-cloud-sdk          # cerebras-cloud-sdk
 
 # Used for Integration Tests
 semver
