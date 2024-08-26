@@ -3,10 +3,10 @@ import datetime
 import platform
 import sys
 import time
-import typing
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from contextvars import copy_context
+from typing import Any, Callable
 
 import pytest
 import wandb
@@ -227,12 +227,12 @@ def test_graph_call_ordering(client):
 
 
 class OpCallSummary(BaseModel):
-    op: typing.Callable
+    op: Callable
     num_calls: int = 0
 
 
 class OpCallSpec(BaseModel):
-    call_summaries: typing.Dict[str, OpCallSummary]
+    call_summaries: dict[str, OpCallSummary]
     total_calls: int
     root_calls: int
     run_calls: int
@@ -270,7 +270,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     def liner(m: Number, b, x) -> Number:
         return adder(Number(value=multiplier(m, x)), b)
 
-    result: typing.Dict[str, OpCallSummary] = {}
+    result: dict[str, OpCallSummary] = {}
     result["adder_v0"] = OpCallSummary(op=adder_v0)
     result["adder"] = OpCallSummary(op=adder)
     result["subtractor"] = OpCallSummary(op=subtractor)
@@ -391,11 +391,11 @@ def test_trace_call_query_filter_op_version_refs(client):
         assert len(res.calls) == exp_count
 
 
-def has_any(list_a: typing.List[str], list_b: typing.List[str]) -> bool:
+def has_any(list_a: list[str], list_b: list[str]) -> bool:
     return any([a in list_b for a in list_a])
 
 
-def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
+def unique_vals(list_a: list[str]) -> list[str]:
     return list(set(list_a))
 
 
@@ -2189,7 +2189,7 @@ def test_sort_and_filter_through_refs(client):
         return val
 
     class TestObj(weave.Object):
-        val: typing.Any
+        val: Any
 
     def test_obj(val):
         return weave.publish(TestObj(val=val))
