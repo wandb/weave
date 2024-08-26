@@ -1,6 +1,6 @@
 import contextvars
-import typing
+from typing import Any
 
-call_attributes: contextvars.ContextVar[typing.Dict[str, typing.Any]] = (
-    contextvars.ContextVar("call_attributes", default={})
+call_attributes: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
+    "call_attributes", default={}
 )
