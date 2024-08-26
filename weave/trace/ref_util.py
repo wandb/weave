@@ -1,5 +1,5 @@
 import dataclasses
-import typing
+from typing import Any, Optional, Tuple
 from urllib import parse
 
 from weave.legacy.weave import box
@@ -12,7 +12,7 @@ AWL_ROW_EDGE_NAME = "row"
 AWL_COL_EDGE_NAME = "col"
 
 
-def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]:
+def parse_local_ref_str(s: str) -> Tuple[str, Optional[list[str]]]:
     if "#" not in s:
         return s, None
     path, extra = s.split("#", 1)
@@ -20,8 +20,8 @@ def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]
 
 
 def val_with_relative_ref(
-    parent_object: typing.Any, child_object: typing.Any, ref_extra_parts: list[str]
-) -> typing.Any:
+    parent_object: Any, child_object: Any, ref_extra_parts: list[str]
+) -> Any:
     from weave.legacy.weave import context_state, ref_base
 
     # If we already have a ref, resolve it
@@ -63,8 +63,8 @@ class RefExtraTuple:
 @dataclasses.dataclass
 class ParsedRef:
     scheme: str
-    entity: typing.Optional[str]
-    project: typing.Optional[str]
+    entity: Optional[str]
+    project: Optional[str]
     artifact: str
     alias: str
     file_path_parts: list[str]
