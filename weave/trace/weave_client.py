@@ -2,9 +2,8 @@ import dataclasses
 import datetime
 import platform
 import sys
-import typing
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Sequence, Union, cast
 
 import pydantic
 from requests import HTTPError
@@ -60,7 +59,7 @@ if TYPE_CHECKING:
 ALLOW_MIXED_PROJECT_REFS = False
 
 
-def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
+def dataclasses_asdict_one_level(obj: Any) -> Dict[str, Any]:
     # dataclasses.asdict is recursive. We don't want that when json encoding
     return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
 
@@ -277,7 +276,7 @@ class CallsIter:
             return list(self._get_slice(key))
         return self._get_one(key)
 
-    def __iter__(self) -> typing.Iterator[WeaveObject]:
+    def __iter__(self) -> Iterator[WeaveObject]:
         return self._get_slice(slice(0, None, 1))
 
 
@@ -853,7 +852,7 @@ class WeaveClient:
             filter = ObjectVersionFilter()
         else:
             filter = filter.model_copy()
-        filter = typing.cast(ObjectVersionFilter, filter)
+        filter = cast(ObjectVersionFilter, filter)
         filter.is_op = False
 
         response = self.server.objs_query(
@@ -909,7 +908,7 @@ class WeaveClient:
     def _ref_value_input_to(self, ref: "ref_base.Ref") -> list[Call]:
         raise NotImplementedError()
 
-    def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
+    def _ref_output_of(self, ref: ObjectRef) -> Optional[Call]:
         raise NotImplementedError()
 
     def _op_runs(self, op_def: Op) -> Sequence[Call]:
@@ -969,7 +968,7 @@ REDACT_KEYS = (
 REDACTED_VALUE = "REDACTED"
 
 
-def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
+def redact_sensitive_keys(obj: Any) -> Any:
     # We should NEVER mutate reffed objects.
     #
     # 1. This code builds new objects that no longer have refs
