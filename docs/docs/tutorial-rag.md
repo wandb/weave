@@ -201,7 +201,7 @@ class CorrectnessLLMJudge(Scorer):
         # get_model is defined as general model getter based on provided params (OpenAI,HF...)
         eval_model = get_model(
             model_name = self.model_name,
-            prompt = self.prompt
+            prompt = self.prompt,
             device = self.device,
         )
         # async evaluation to speed up evaluation - this doesn't have to be async
