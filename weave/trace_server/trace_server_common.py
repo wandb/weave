@@ -1,4 +1,5 @@
 import datetime
+import json
 from typing import Any, Dict, Literal, Optional, Union, cast
 
 from weave.trace_server import trace_server_interface as tsi
@@ -31,6 +32,18 @@ def _make_datetime_from_any(
     return None
 
 
+def _load_json_maybe(value: Any) -> Any:
+    """
+    Loads a JSON string or returns the value if it's not a string.
+    Allows for database agnostic parsing of JSON strings.
+    """
+    if isinstance(value, str):
+        return json.loads(value)
+    elif isinstance(value, dict):
+        return value
+    return None
+
+
 def make_derived_summary_fields(
     call_dict: Dict[str, Any], summary_key: str
 ) -> tsi.SummaryMap:
@@ -57,6 +70,6 @@ def make_derived_summary_fields(
         status=status,
         latency=latency,
     )
-    summary = call_dict.get(summary_key) or {}
+    summary = _load_json_maybe(call_dict.get(summary_key)) or {}
     summary["weave"] = weave_derived_fields
     return cast(tsi.SummaryMap, summary)
