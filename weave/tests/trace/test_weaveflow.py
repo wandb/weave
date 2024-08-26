@@ -1,4 +1,4 @@
-import typing
+from typing import Any
 
 import numpy as np
 import pytest
@@ -30,7 +30,7 @@ def test_digestrefs(client):
     ds0 = weave.ref(str(ds0_ref)).get()
 
     @weave.op()
-    def add5_to_row(row: typing.Any) -> int:
+    def add5_to_row(row: Any) -> int:
         return row["val"] + 5
 
     ds0_row0 = ds0[0]
