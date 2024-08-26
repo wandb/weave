@@ -1,9 +1,16 @@
 import dataclasses
 import inspect
 import operator
-import typing
 from functools import partial
-from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
+from typing import (
+    Any,
+    Generator,
+    Iterator,
+    Literal,
+    Optional,
+    SupportsIndex,
+    Union,
+)
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
@@ -63,17 +70,17 @@ def make_mutation(
     if operation == "setitem":
         if len(args) != 2 or not isinstance(args[0], str):
             raise ValueError("setitem mutation requires 2 args")
-        args = typing.cast(tuple[str, Any], args)
+        args = cast(tuple[str, Any], args)
         return MutationSetitem(path, operation, args)
     elif operation == "setattr":
         if len(args) != 2 or not isinstance(args[0], str):
             raise ValueError("setattr mutation requires 2 args")
-        args = typing.cast(tuple[str, Any], args)
+        args = cast(tuple[str, Any], args)
         return MutationSetattr(path, operation, args)
     elif operation == "append":
         if len(args) != 1:
             raise ValueError("append mutation requires 1 arg")
-        args = typing.cast(tuple[Any], args)
+        args = cast(tuple[Any], args)
         return MutationAppend(path, operation, args)
     else:
         raise ValueError(f"Unknown operation: {operation}")
@@ -175,7 +182,7 @@ class WeaveObject(Traceable):
         val: Any,
         ref: Optional[RefWithExtra],
         server: TraceServerInterface,
-        root: typing.Optional[Traceable],
+        root: Optional[Traceable],
         parent: Optional[Traceable] = None,
     ) -> None:
         self._val = val
