@@ -1,16 +1,10 @@
 import datetime
 import inspect
 import typing
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-
-try:
-    from typing import Annotated
-# Support python 3.8
-except ImportError:
-    from typing_extensions import Annotated  # type: ignore
 
 from weave.legacy.weave import cache, op_args, pyfunc_type_util, weave_pydantic
 from weave.legacy.weave.wandb_api import WandbApiAsync
@@ -62,7 +56,8 @@ def api_key(
         ),
     ],
     x_wandb_api_key: Annotated[
-        Optional[str], Header(description="Optional W&B API Key")
+        Optional[str],
+        Header(description="Optional W&B API Key"),
     ] = None,
 ) -> Optional[str]:
     if x_wandb_api_key:
