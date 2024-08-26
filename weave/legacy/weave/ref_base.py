@@ -17,7 +17,7 @@ REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
     from weave.legacy.weave import weave_types as types
-    from ..trace import weave_client
+    from ...trace import weave_client
 
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
