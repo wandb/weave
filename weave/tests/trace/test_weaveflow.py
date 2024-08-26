@@ -36,7 +36,7 @@ def test_digestrefs(client):
     ds0_row0 = ds0[0]
 
     ds0_row0_ref = ref_base.get_ref(ds0_row0)
-    assert ds0_row0_ref != None
+    assert ds0_row0_ref is not None
 
     x = add5_to_row(ds0_row0)
 
