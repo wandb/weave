@@ -10,7 +10,7 @@ from weave.legacy.weave import errors
 from weave.legacy.weave import weave_types as types
 from weave.legacy.weave import artifact_base, file_base, object_context, ref_base, uris
 from weave.legacy.weave.language_features.tagging import tag_store
-from weave.trace import ref_util
+from weave.legacy.weave import ref_util
 
 if typing.TYPE_CHECKING:
     from weave.legacy.weave import graph
