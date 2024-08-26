@@ -1,7 +1,6 @@
 import datetime
 import inspect
-import typing
-from typing import Annotated, Optional
+from typing import Annotated, Any, Callable, Coroutine, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -12,8 +11,8 @@ from weave.trace.op import Op
 from weave.trace.refs import ObjectRef
 from weave.wandb_api.api import WandbApiAsync
 
-key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
-    cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
+key_cache: cache.LruTimeWindowCache[str, Optional[bool]] = cache.LruTimeWindowCache(
+    datetime.timedelta(minutes=5)
 )
 
 api: Optional[WandbApiAsync] = None
@@ -21,9 +20,7 @@ api: Optional[WandbApiAsync] = None
 
 def wandb_auth(
     entity: str,
-) -> typing.Callable[
-    [typing.Optional[str]], typing.Coroutine[typing.Any, typing.Any, bool]
-]:
+) -> Callable[[Optional[str]], Coroutine[Any, Any, bool]]:
     async def auth_inner(key: Annotated[Optional[str], Depends(api_key)]) -> bool:
         global api
         if api is None:
@@ -70,8 +67,8 @@ def api_key(
 
 def object_method_app(
     obj_ref: ObjectRef,
-    method_name: typing.Optional[str] = None,
-    auth_entity: typing.Optional[str] = None,
+    method_name: Optional[str] = None,
+    auth_entity: Optional[str] = None,
 ) -> FastAPI:
     obj = obj_ref.get()
 
