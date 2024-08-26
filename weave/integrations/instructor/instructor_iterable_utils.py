@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -17,7 +17,7 @@ def instructor_iterable_accumulator(
     return acc
 
 
-def should_accumulate_iterable(inputs: dict) -> bool:
+def should_accumulate_iterable(inputs: Dict) -> bool:
     if isinstance(inputs, dict):
         if "stream" in inputs:
             return inputs["stream"]
