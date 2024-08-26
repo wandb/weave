@@ -37,7 +37,7 @@ from weave.legacy.weave.language_features.tagging import (
     tag_store,
     tagged_value_type,
 )
-from weave.trace import ref_util
+from weave.legacy.weave import ref_util
 
 
 def reverse_dict(d: dict) -> dict:

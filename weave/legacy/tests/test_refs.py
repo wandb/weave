@@ -4,7 +4,7 @@ import weave
 from weave.flow.obj import Object
 from weave.legacy.weave import artifact_local, storage
 from weave.legacy.weave import ops_arrow as arrow
-from weave.trace import ref_util
+from weave.legacy.weave import ref_util
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
