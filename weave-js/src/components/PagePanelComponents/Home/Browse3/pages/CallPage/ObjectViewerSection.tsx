@@ -22,6 +22,7 @@ import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
+import { isWeaveRef } from '../../filters/common';
 
 type Data = Record<string, any>;
 
@@ -59,7 +60,7 @@ const isSimpleData = (data: Data): boolean => {
       isSimple = false;
       return false;
     }
-    if (isRef(context.value)) {
+    if (isWeaveRef(context.value)) {
       isSimple = false;
       return false;
     }
@@ -247,7 +248,7 @@ export const ObjectViewerSection = ({
     if (
       valueType === 'object' ||
       (valueType === 'array' && value.length > 0) ||
-      isRef(value)
+      isWeaveRef(value)
     ) {
       return (
         <ObjectViewerSectionNonEmptyMemoed

@@ -18,6 +18,7 @@ import {
 } from './ValueViewNumberTimestamp';
 import {ValueViewPrimitive} from './ValueViewPrimitive';
 import {ValueViewString} from './ValueViewString';
+import { isWeaveRef } from '../../filters/common';
 
 type ValueData = Record<string, any>;
 
@@ -44,7 +45,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   if (data.value === null) {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
-  if (isRef(data.value)) {
+  if (isWeaveRef(data.value)) {
     if (
       opDefRef &&
       opDefRef.scheme === 'weave' &&

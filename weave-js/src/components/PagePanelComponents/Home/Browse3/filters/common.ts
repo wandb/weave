@@ -11,6 +11,8 @@ import {
 import _ from 'lodash';
 
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
+import { parseRefMaybe } from '../../Browse2/SmallRef';
+import { isWeaveObjectRef } from '@wandb/weave/react';
 
 export type FilterId = number | string | undefined;
 
@@ -223,8 +225,16 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = {
   'attributes.weave.sys_version': 'Python version used',
 };
 
-export const isWeaveRef = (value: any): boolean => {
-  return typeof value === 'string' && value.startsWith('weave:///');
+// Create a unique symbol for RefString
+const WeaveRefStringSymbol = Symbol('WeaveRefString');
+
+// Define RefString type using the unique symbol
+export type WeaveRefString = string & { [WeaveRefStringSymbol]: never };
+
+
+export const isWeaveRef = (value: any): value is WeaveRefString => {
+  const parsed = parseRefMaybe(value);
+  return parsed ? isWeaveObjectRef(parsed) : false
 };
 
 export const getStringList = (value: any): string[] => {

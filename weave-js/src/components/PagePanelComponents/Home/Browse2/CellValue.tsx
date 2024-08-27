@@ -12,6 +12,7 @@ import {CellValueBoolean} from './CellValueBoolean';
 import {CellValueImage} from './CellValueImage';
 import {CellValueString} from './CellValueString';
 import {SmallRef} from './SmallRef';
+import { isWeaveRef } from '../Browse3/filters/common';
 
 type CellValueProps = {
   value: any;
@@ -35,7 +36,7 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
   if (value === null) {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
-  if (isRef(value)) {
+  if (isWeaveRef(value)) {
     return <SmallRef objRef={parseRef(value)} iconOnly={isExpanded} />;
   }
   if (typeof value === 'boolean') {

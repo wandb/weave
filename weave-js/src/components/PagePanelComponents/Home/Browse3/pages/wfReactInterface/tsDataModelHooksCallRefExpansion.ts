@@ -15,6 +15,7 @@ import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import * as traceServerClientTypes from './traceServerClientTypes';
 import {CallSchema, Loadable} from './wfDataModelHooksInterface';
+import { isWeaveRef } from '../../filters/common';
 
 export const EXPANDED_REF_REF_KEY = '__ref__';
 export const EXPANDED_REF_VAL_KEY = '__val__';
@@ -125,7 +126,7 @@ export const useClientSideCallRefExpansion = (
             value = value[EXPANDED_REF_VAL_KEY];
             path.push(EXPANDED_REF_VAL_KEY);
           }
-          if (isRef(value) && refsDataMap.has(value)) {
+          if (isWeaveRef(value) && refsDataMap.has(value)) {
             const refObj = refsDataMap.get(value);
             _.set(call, path, makeRefExpandedPayload(value, refObj));
           }
@@ -205,7 +206,7 @@ export const isTableRef = (ref: any): boolean => {
   if (typeof ref !== 'string') {
     return false;
   }
-  if (!isRef(ref)) {
+  if (!isWeaveRef(ref)) {
     return false;
   }
   const parsed = parseRef(ref);
@@ -219,7 +220,7 @@ export const isExpandableRef = (ref: any): boolean => {
   if (typeof ref !== 'string') {
     return false;
   }
-  if (!isRef(ref)) {
+  if (!isWeaveRef(ref)) {
     return false;
   }
   const parsed = parseRef(ref);

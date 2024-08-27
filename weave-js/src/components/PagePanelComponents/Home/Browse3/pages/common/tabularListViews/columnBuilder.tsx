@@ -33,6 +33,7 @@ import {
 } from '../../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {isRef} from '../util';
 import {buildTree} from './buildTree';
+import { isWeaveRef } from '../../../filters/common';
 
 /**
  * This function is responsible for taking the raw data and flattening it
@@ -137,7 +138,7 @@ export function prepareFlattenedDataForTable<T>(
 function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
   return Object.fromEntries(
     Object.entries(flattened).map(([key, val]) => {
-      if (isRef(val)) {
+      if (isWeaveRef(val)) {
         const parsedRef = parseRef(val);
         if (isWeaveObjectRef(parsedRef)) {
           if (parsedRef.weaveKind === 'table') {
@@ -150,7 +151,7 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
                   lookupPath.join('.') + '.' + EXPANDED_REF_REF_KEY;
                 if (parentKey in flattened) {
                   const parentVal = flattened[parentKey];
-                  if (isRef(parentVal)) {
+                  if (isWeaveRef(parentVal)) {
                     parentRef = parentVal;
                   }
                   break;

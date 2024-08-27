@@ -40,6 +40,7 @@ import {
 } from './objectViewerUtilities';
 import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
+import { isWeaveRef } from '../../filters/common';
 
 type Data = Record<string, any>;
 
@@ -55,7 +56,7 @@ type ObjectViewerProps = {
 const getRefs = (data: Data): string[] => {
   const refs = new Set<string>();
   traverse(data, (context: TraverseContext) => {
-    if (isRef(context.value)) {
+    if (isWeaveRef(context.value)) {
       refs.add(context.value);
     }
   });
@@ -138,7 +139,7 @@ export const ObjectViewer = ({
     let resolved = data;
     let dirty = true;
     const mapper = (context: TraverseContext) => {
-      if (isRef(context.value) && refValues[context.value] != null) {
+      if (isWeaveRef(context.value) && refValues[context.value] != null) {
         dirty = true;
         const res = refValues[context.value];
         delete refValues[context.value];
@@ -334,7 +335,7 @@ export const ObjectViewer = ({
                 }
                 return [...eIds, params.row.id];
               });
-              if (isRef(refToExpand)) {
+              if (isWeaveRef(refToExpand)) {
                 addExpandedRef(params.row.id, refToExpand);
               }
             }}
@@ -404,10 +405,10 @@ export const ObjectViewer = ({
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =
-            params.model.valueType === 'string' && !isRef(params.model.value);
+            params.model.valueType === 'string' && !isWeaveRef(params.model.value);
           const isArray = params.model.valueType === 'array';
           const isTableRef =
-            isRef(params.model.value) &&
+          isWeaveRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
           const {isCode} = params.model;
           const isCustomWeaveType = isCustomWeaveTypePayload(

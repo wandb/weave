@@ -41,6 +41,7 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
+import { isWeaveRef } from '../../filters/common';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
 
@@ -186,14 +187,14 @@ function buildCallsTableColumns(
       hideable: false,
       valueGetter: rowParams => {
         const op_name = rowParams.row.op_name;
-        if (!isRef(op_name)) {
+        if (!isWeaveRef(op_name)) {
           return op_name;
         }
         return opVersionRefOpName(op_name);
       },
       renderCell: rowParams => {
         const op_name = rowParams.row.op_name;
-        if (!isRef(op_name)) {
+        if (!isWeaveRef(op_name)) {
           return op_name;
         }
         return (
@@ -481,7 +482,7 @@ const useAllDynamicColumnNames = (
 };
 
 const refIsExpandable = (ref: string): boolean => {
-  if (!isRef(ref)) {
+  if (!isWeaveRef(ref)) {
     return false;
   }
   const parsed = parseRef(ref);

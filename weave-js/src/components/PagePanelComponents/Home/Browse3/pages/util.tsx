@@ -27,27 +27,6 @@ export const truncateID = (id: string, maxLen: number = 9) => {
   return `${id.slice(0, startLen)}...${id.slice(-endLen)}`;
 };
 
-export const renderCell = (value: any) => {
-  if (typeof value === 'string' && value.startsWith('wandb-artifact:///')) {
-    return <SmallRef objRef={parseRef(value)} />;
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'True' : 'False';
-  }
-  if (typeof value === 'number') {
-    const printedVal = Number.isInteger(value) ? value : value.toFixed(4);
-    return (
-      <Box
-        sx={{
-          textAlign: 'right',
-          width: '100%',
-        }}>
-        {printedVal}
-      </Box>
-    );
-  }
-  return value;
-};
 
 /**
  * A hook that returns a state that can be controlled by an external component.

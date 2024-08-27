@@ -3,6 +3,7 @@ import stringify from 'json-stable-stringify';
 import _ from 'lodash';
 
 import {isRef} from '../Browse3/pages/common/util';
+import { isWeaveRef } from '../Browse3/filters/common';
 
 type ValueType =
   | 'undefined'
@@ -82,7 +83,7 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
           const valueType = determineType(value);
           colStats.typeCounts[valueType] += 1;
           // Keep track of unique refs seen in column
-          if (isRef(value)) {
+          if (isWeaveRef(value)) {
             if (!(value in colStats.refCounts)) {
               colStats.refCounts[value] = 0;
             }
