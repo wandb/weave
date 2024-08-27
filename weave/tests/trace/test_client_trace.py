@@ -13,12 +13,13 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from weave import Thread, ThreadPoolExecutor, weave_client
+from weave import Thread, ThreadPoolExecutor
 from weave.tests.trace.util import (
     AnyIntMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
 )
+from weave.trace import weave_client
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
