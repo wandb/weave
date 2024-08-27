@@ -142,6 +142,8 @@ export const ObjectViewer = ({
       if (
         isRef(context.value) &&
         refValues[context.value] != null &&
+        // If this is a ref and the parent has been visited, we already resolved
+        // this ref. Example: `a._ref` where `a` is already in resolvedRefPaths
         !resolvedRefPaths.has(context.parent?.toString() ?? '')
       ) {
         dirty = true;
