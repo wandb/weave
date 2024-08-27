@@ -263,7 +263,7 @@ def get_ranked_prices(
 def get_top_ranked_prices(
     param_builder: ParamBuilder, table_alias: str
 ) -> PreparedSelect:
-    columns =  [*LLM_TOKEN_PRICES_COLUMNS]
+    columns = [*LLM_TOKEN_PRICES_COLUMNS]
 
     derived_columns = [
         Column(name="rank", type="string"),
