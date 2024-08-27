@@ -208,7 +208,7 @@ class _StreamTableSync:
         )
 
     def _ipython_display_(self) -> graph.Node:
-        from weave import show
+        from weave.legacy import show
 
         return show.show(self.rows())
 

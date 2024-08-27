@@ -27,7 +27,7 @@ def op_name_from_ref(ref: str) -> str:
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_cohere(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("COHERE_API_KEY", "DUMMY_API_KEY")
 
@@ -79,7 +79,7 @@ def test_cohere(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_cohere_stream(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("COHERE_API_KEY", "DUMMY_API_KEY")
     cohere_client = cohere.Client(api_key=api_key)
@@ -137,7 +137,7 @@ def test_cohere_stream(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 async def test_cohere_async(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("COHERE_API_KEY", "DUMMY_API_KEY")
 
@@ -190,7 +190,7 @@ async def test_cohere_async(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 async def test_cohere_async_stream(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("COHERE_API_KEY", "DUMMY_API_KEY")
     cohere_client = cohere.AsyncClient(api_key=api_key)

@@ -52,7 +52,7 @@ from weave.trace_server.trace_server_interface import (
 )
 
 if typing.TYPE_CHECKING:
-    from . import ref_base
+    from .. import ref_base
 
 
 # Controls if objects can have refs to projects not the WeaveClient project.

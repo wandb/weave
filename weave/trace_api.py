@@ -15,11 +15,10 @@ from . import (
     type_serializers,  # noqa: F401
     urls,
     util,
-    weave_client,
     weave_init,
 )
 from .table import Table
-from .trace import context
+from .trace import context, weave_client
 from .trace.constants import TRACE_OBJECT_EMOJI
 from .trace.op import Op, op
 from .trace.refs import ObjectRef, parse_uri
