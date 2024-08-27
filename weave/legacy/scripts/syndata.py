@@ -5,8 +5,8 @@ import numpy as np
 import pyarrow as pa
 from scipy.signal import butter, filtfilt
 
-from . import util
-from .legacy.ops_arrow import ArrowWeaveList
+from ... import util
+from ..ops_arrow import ArrowWeaveList
 
 value_fns: list[typing.Any] = [
     lambda steps: steps**2,

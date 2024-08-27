@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
     from weave.legacy import artifact_base
     from weave.legacy.artifact_fs import FilesystemArtifact
 
-    from . import weave_inspector
+    from .legacy import weave_inspector
 
 
 def to_weavejs_typekey(k: str) -> str:
@@ -456,7 +456,7 @@ class Type(metaclass=_TypeSubclassWatcher):
     def _inspect(self) -> "weave_inspector.TypeInspector":
         """Only intended to be used by developers to help debug the graph."""
         # Circular import, so we do it here.
-        from . import weave_inspector
+        from .legacy import weave_inspector
 
         return weave_inspector.TypeInspector(self)
 
