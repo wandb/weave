@@ -9,11 +9,12 @@ from typing import Any, Dict, Iterator, Optional, Sequence, Union
 import pydantic
 from requests import HTTPError
 
-from weave import call_context, trace_sentry, urls, version
+from weave import trace_sentry, urls, version
 from weave.client_context import weave_client as weave_client_context
 from weave.exception import exception_to_json_str
 from weave.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.table import Table
+from weave.trace import call_context
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
