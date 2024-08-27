@@ -3,7 +3,6 @@ import contextvars
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Generator, Iterator, Optional, TypeVar
 
-from weave import call_context
 from weave.legacy import (
     cache,
     context,
@@ -13,6 +12,7 @@ from weave.legacy import (
     memo,
     wandb_api,
 )
+from weave.trace import call_context
 
 # Must be power of 2
 MAX_PARALLELISM = 16
