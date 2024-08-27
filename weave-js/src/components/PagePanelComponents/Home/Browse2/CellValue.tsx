@@ -3,16 +3,15 @@ import React from 'react';
 import styled from 'styled-components';
 
 import {parseRef} from '../../../../react';
+import {isWeaveRef} from '../Browse3/filters/common';
 import {ValueViewNumber} from '../Browse3/pages/CallPage/ValueViewNumber';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
-import {isRef} from '../Browse3/pages/common/util';
 import {isCustomWeaveTypePayload} from '../Browse3/typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../Browse3/typeViews/CustomWeaveTypeDispatcher';
 import {CellValueBoolean} from './CellValueBoolean';
 import {CellValueImage} from './CellValueImage';
 import {CellValueString} from './CellValueString';
 import {SmallRef} from './SmallRef';
-import { isWeaveRef } from '../Browse3/filters/common';
 
 type CellValueProps = {
   value: any;

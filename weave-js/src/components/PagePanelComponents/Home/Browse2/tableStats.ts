@@ -2,8 +2,7 @@ import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
 import stringify from 'json-stable-stringify';
 import _ from 'lodash';
 
-import {isRef} from '../Browse3/pages/common/util';
-import { isWeaveRef } from '../Browse3/filters/common';
+import {isWeaveRef} from '../Browse3/filters/common';
 
 type ValueType =
   | 'undefined'

@@ -1,11 +1,8 @@
-import Box from '@mui/material/Box';
-import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 
 import {useDeepMemo} from '../../../../../hookUtils';
-import {SmallRef} from '../../Browse2/SmallRef';
 
 export const useURLSearchParamsDict = () => {
   const {search} = useLocation();
@@ -26,7 +23,6 @@ export const truncateID = (id: string, maxLen: number = 9) => {
   const endLen = maxLen - 3 - startLen;
   return `${id.slice(0, startLen)}...${id.slice(-endLen)}`;
 };
-
 
 /**
  * A hook that returns a state that can be controlled by an external component.

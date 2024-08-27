@@ -18,6 +18,7 @@ import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
+import {isWeaveRef} from '../../filters/common';
 import {
   getTokensAndCostFromUsage,
   getUsageFromCellParams,
@@ -25,7 +26,6 @@ import {
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
-import {isRef} from '../common/util';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
@@ -41,7 +41,6 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
-import { isWeaveRef } from '../../filters/common';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
 

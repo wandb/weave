@@ -20,9 +20,9 @@ import React, {
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
+import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
-import {isRef} from '../common/util';
 import {
   LIST_INDEX_EDGE_NAME,
   OBJECT_ATTR_EDGE_NAME,
@@ -40,7 +40,6 @@ import {
 } from './objectViewerUtilities';
 import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
-import { isWeaveRef } from '../../filters/common';
 
 type Data = Record<string, any>;
 
@@ -405,10 +404,11 @@ export const ObjectViewer = ({
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =
-            params.model.valueType === 'string' && !isWeaveRef(params.model.value);
+            params.model.valueType === 'string' &&
+            !isWeaveRef(params.model.value);
           const isArray = params.model.valueType === 'array';
           const isTableRef =
-          isWeaveRef(params.model.value) &&
+            isWeaveRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
           const {isCode} = params.model;
           const isCustomWeaveType = isCustomWeaveTypePayload(

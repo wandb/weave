@@ -8,11 +8,12 @@ import {
   GridFilterItem,
   GridFilterModel,
 } from '@mui/x-data-grid-pro';
+import {isWeaveObjectRef} from '@wandb/weave/react';
 import _ from 'lodash';
 
+import {parseRefMaybe} from '../../Browse2/SmallRef';
+import {isRef} from '../pages/common/util';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
-import { parseRefMaybe } from '../../Browse2/SmallRef';
-import { isWeaveObjectRef } from '@wandb/weave/react';
 
 export type FilterId = number | string | undefined;
 
@@ -229,12 +230,21 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = {
 const WeaveRefStringSymbol = Symbol('WeaveRefString');
 
 // Define RefString type using the unique symbol
-export type WeaveRefString = string & { [WeaveRefStringSymbol]: never };
+export type WeaveRefString = string & {[WeaveRefStringSymbol]: never};
 
-
+/**
+ * `isWeaveRef` is a very conservative check that will ensure the passed
+ * in value is a valid ref string - capabable of being safely parsed into
+ * a Weave ref object. It ensures that the value is a string with the correct
+ * prefix, is parsible, and matches the latest "weave trace" style refs. It
+ * should be used as the appropriate type guard before parsing a ref.
+ */
 export const isWeaveRef = (value: any): value is WeaveRefString => {
+  if (!isRef(value)) {
+    return false;
+  }
   const parsed = parseRefMaybe(value);
-  return parsed ? isWeaveObjectRef(parsed) : false
+  return parsed ? isWeaveObjectRef(parsed) : false;
 };
 
 export const getStringList = (value: any): string[] => {

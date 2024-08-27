@@ -2,9 +2,9 @@ import React, {useMemo} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
-import {isRef} from '../common/util';
 import {
   DataTableView,
   USE_TABLE_FOR_ARRAYS,
@@ -18,7 +18,6 @@ import {
 } from './ValueViewNumberTimestamp';
 import {ValueViewPrimitive} from './ValueViewPrimitive';
 import {ValueViewString} from './ValueViewString';
-import { isWeaveRef } from '../../filters/common';
 
 type ValueData = Record<string, any>;
 

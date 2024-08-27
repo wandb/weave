@@ -9,13 +9,12 @@ import * as _ from 'lodash';
 import {useEffect, useMemo, useState} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {isRef} from '../common/util';
+import {isWeaveRef} from '../../filters/common';
 import {refDataCache} from './cache';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import * as traceServerClientTypes from './traceServerClientTypes';
 import {CallSchema, Loadable} from './wfDataModelHooksInterface';
-import { isWeaveRef } from '../../filters/common';
 
 export const EXPANDED_REF_REF_KEY = '__ref__';
 export const EXPANDED_REF_VAL_KEY = '__val__';
