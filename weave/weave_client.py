@@ -49,7 +49,6 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TraceServerInterface,
 )
-from weave.trace_server.validation import object_id_validator
 
 if typing.TYPE_CHECKING:
     from . import ref_base
@@ -767,7 +766,6 @@ class WeaveClient:
             raise ValueError("Name must be provided for object saving")
 
         name = sanitize_object_name(name)
-        object_id_validator(name)
 
         response = self.server.obj_create(
             ObjCreateReq(
