@@ -5,14 +5,13 @@ import typing
 from weave import (
     errors,
     ref_base,
-    registry_mem,
     storage,
-    trace_legacy,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.query_api import mutation, op, weave_class
 from weave.legacy import (
+    registry_mem,
     artifact_fs,
     artifact_local,
     artifact_wandb,
@@ -20,6 +19,7 @@ from weave.legacy import (
     graph,
     object_context,
     runs,
+    trace_legacy,
     uris,
 )
 from weave.legacy.graph import Node

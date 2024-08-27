@@ -266,7 +266,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
 
         ot = self._outer_type
         if self.extra is not None:
-            from weave import types_numpy
+            from weave.legacy import types_numpy
 
             if not types.is_list_like(ot) and isinstance(
                 ot, types_numpy.NumpyArrayType

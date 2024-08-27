@@ -2477,3 +2477,98 @@ def test_model_save(client):
     assert isinstance(expected_predict_op, str) and expected_predict_op.startswith(
         "weave:///"
     )
+
+
+def test_calls_stream_column_expansion(client):
+    # make an object, and a nested object
+    # make an op that accepts the nested object, and returns it
+    # call the op
+
+    class ObjectRef(weave.Object):
+        id: str
+
+    obj = ObjectRef(id="123")
+    ref = weave.publish(obj)
+
+    class SimpleObject(weave.Object):
+        a: str
+
+    class NestedObject(weave.Object):
+        b: SimpleObject
+
+    @weave.op()
+    def return_nested_object(nested_obj: NestedObject):
+        return nested_obj
+
+    simple_obj = SimpleObject(a=ref.uri())
+    simple_ref = weave.publish(simple_obj)
+    nested_obj = NestedObject(b=simple_obj)
+    nested_ref = weave.publish(nested_obj)
+
+    return_nested_object(nested_obj)
+
+    # output is a ref
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    call_result = list(res)[0]
+    assert call_result.output == nested_ref.uri()
+
+    # output is dereffed
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output"],
+            expand_columns=["output"],
+        )
+    )
+
+    call_result = list(res)[0]
+    assert call_result.output["b"] == simple_ref.uri()
+
+    # expand 2 refs, should be {"b": {"a": ref}}
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output.b"],
+            expand_columns=["output", "output.b"],
+        )
+    )
+    call_result = list(res)[0]
+    assert call_result.output["b"]["a"] == ref.uri()
+
+    # expand 3 refs, should be {"b": {"a": {"id": 123}}}
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output.b.a"],
+            expand_columns=["output", "output.b", "output.b.a"],
+        )
+    )
+    call_result = list(res)[0]
+    assert call_result.output["b"]["a"]["id"] == "123"
+
+    # incomplete expansion columns, output should be un expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output"],
+            expand_columns=["output.b"],
+        )
+    )
+    call_result = list(res)[0]
+    assert call_result.output == nested_ref.uri()
+
+    # non-existent column, should be un expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["output.b.a"],
+            expand_columns=["output.b", "output.zzzz"],
+        )
+    )
+    call_result = list(res)[0]
+    assert call_result.output == nested_ref.uri()

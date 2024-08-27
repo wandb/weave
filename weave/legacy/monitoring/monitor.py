@@ -11,13 +11,14 @@ import sys
 import typing
 import uuid
 
-from weave import call_context, errors, stream_data_interfaces
+from weave import errors
 from weave.legacy import (
     graph,
     run_streamtable_span,
+    stream_data_interfaces
 )
 from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
-from weave.trace import context as trace_context
+from weave.trace import call_context, context as trace_context
 from weave.client_context import weave_client as weave_client_context
 
 logger = logging.getLogger(__name__)

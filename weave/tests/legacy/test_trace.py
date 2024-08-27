@@ -3,7 +3,8 @@ import re
 from weave.legacy import graph
 
 from ... import api as weave
-from ... import storage, trace_legacy
+from ... import storage
+from ...legacy import trace_legacy
 from ...weave_internal import make_const_node
 
 

@@ -6,7 +6,7 @@
 # the trace interface should only ever operate on internal refs.
 import dataclasses
 import urllib
-from typing import Union
+from typing import Any, Union
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -217,3 +217,7 @@ def string_will_be_interpreted_as_ref(s: str) -> bool:
     return s.startswith(f"{WEAVE_INTERNAL_SCHEME}:///") or s.startswith(
         f"{WEAVE_SCHEME}:///"
     )
+
+
+def any_will_be_interpreted_as_ref_str(val: Any) -> bool:
+    return isinstance(val, str) and string_will_be_interpreted_as_ref(val)

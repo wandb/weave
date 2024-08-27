@@ -9,12 +9,12 @@ import typing
 from weave import (
     errors,
     parallelism,
-    registry_mem,
     storage,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.legacy import (
+    registry_mem,
     box,
     context_state,
     execute_fast,
