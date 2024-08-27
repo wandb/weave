@@ -10,7 +10,6 @@ import typing
 from collections.abc import Mapping
 
 from weave import (
-    eager,
     engine_trace,
     environment,
     errors,
@@ -32,6 +31,7 @@ from weave.legacy import (
     compile,
     context,
     context_state,
+    eager,
     forward_graph,
     graph,
     graph_debug,

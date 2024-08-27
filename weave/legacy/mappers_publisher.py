@@ -4,7 +4,7 @@ import typing
 
 from weave import errors, ref_base, storage, weave_internal
 from weave import weave_types as types
-from weave.node_ref import ref_to_node
+from weave.legacy.node_ref import ref_to_node
 
 # from weave.legacy.ops_primitives import weave_api
 from weave.legacy import (
