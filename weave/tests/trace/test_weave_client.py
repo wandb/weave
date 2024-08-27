@@ -1333,8 +1333,16 @@ def test_summary_tokens_cost_sqlite(client):
     noCostCallSummary = callsNoCost[0].summary
     withCostCallSummary = callsWithCost[0].summary
 
-    assert noCostCallSummary is None
-    assert withCostCallSummary is None
+    assert noCostCallSummary == {
+        "weave": {"status": "running", "nice_trace_name": "x", "latency": None}
+    }
+    assert withCostCallSummary == {
+        "weave": {
+            "status": "running",
+            "nice_trace_name": "x",
+            "latency": None,
+        }
+    }
 
 
 def test_ref_in_dict(client):
