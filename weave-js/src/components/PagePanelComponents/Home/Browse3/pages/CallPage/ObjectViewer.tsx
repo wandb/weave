@@ -137,11 +137,19 @@ export const ObjectViewer = ({
     }
     let resolved = data;
     let dirty = true;
+    const resolvedRefPaths = new Set<string>();
     const mapper = (context: TraverseContext) => {
-      if (isRef(context.value) && refValues[context.value] != null) {
+      const parentPathStr = context.path
+        .ancestor(context.path.length() - 1)
+        .toString();
+      if (
+        isRef(context.value) &&
+        refValues[context.value] != null &&
+        !resolvedRefPaths.has(parentPathStr)
+      ) {
         dirty = true;
         const res = refValues[context.value];
-        delete refValues[context.value];
+        resolvedRefPaths.add(context.path.toString());
         return res;
       }
       return _.clone(context.value);
