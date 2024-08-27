@@ -1,8 +1,8 @@
 import typing
 
-from weave import registry_mem
+
 from weave import weave_types as types
-from weave.legacy import gql_op_plugin, graph, input_provider, op_def, partial_object
+from weave.legacy import gql_op_plugin, graph, input_provider, op_def, partial_object, registry_mem
 
 
 def _propagate_gql_keys_for_node(
