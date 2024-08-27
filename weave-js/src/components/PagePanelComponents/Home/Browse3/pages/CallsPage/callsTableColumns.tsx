@@ -192,15 +192,15 @@ function buildCallsTableColumns(
         return opVersionRefOpName(op_name);
       },
       renderCell: rowParams => {
-        const op_name = rowParams.row.op_name;
-        if (!isWeaveRef(op_name)) {
-          return op_name;
-        }
+        const opName =
+          rowParams.row.display_name ??
+          opVersionRefOpName(rowParams.row.op_name) ??
+          rowParams.row.op_name;
         return (
           <CallLink
             entityName={entity}
             projectName={project}
-            opName={rowParams.row.display_name ?? opVersionRefOpName(op_name)}
+            opName={opName}
             callId={rowParams.row.id}
             fullWidth={true}
             preservePath={preservePath}
