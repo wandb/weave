@@ -9,10 +9,11 @@ In the world of AI, speed is king. It's crucial to keep track of your LLM calls,
 Let's dive in and see how Weave can help you track your speed demon of an AI:
 
 ```python
+import os
 import weave
 from cerebras.cloud.sdk import Cerebras
-import os
 
+# Initialise the weave project
 weave.init("cerebras_speedster")
 
 # Use the Cerebras SDK as usual
@@ -38,11 +39,19 @@ Weave will now track and log all LLM calls made through the Cerebras SDK. You ca
 Want to make your results reproducible while still maintaining that Cerebras speed? Weave ops have got you covered. They automatically version your code as you experiment and capture inputs and outputs. Here's how you can use them with Cerebras:
 
 ```python
+import os
+import weave
+from cerebras.cloud.sdk import Cerebras
+
+# Initialise the weave project
+weave.init("cerebras_speedster")
+
+client = Cerebras(api_key=os.environ["CEREBRAS_API_KEY"])
+
+# Weave will track the inputs, outputs and code of this function
 @weave.op
 def animal_speedster(animal: str, model: str) -> str:
     "Find out how fast an animal can run"
-    
-    client = Cerebras(api_key=os.environ["CEREBRAS_API_KEY"])
     
     response = client.chat.completions.create(
         model=model,
@@ -62,9 +71,11 @@ When you're pushing the boundaries of speed with Cerebras, you need to keep trac
 Here's an example of how you can use it with Cerebras:
 
 ```python
+import os
 import weave
 from cerebras.cloud.sdk import Cerebras
 
+# Initialise the weave project
 weave.init("cerebras_speedster")
 
 client = Cerebras(api_key=os.environ["CEREBRAS_API_KEY"])
