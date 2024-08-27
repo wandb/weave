@@ -10,9 +10,9 @@ quote = refs_internal.extra_value_quoter
 
 
 def test_isdescended_from():
-    a = refs.ObjectRef(entity="e", project="p", name="n", digest="v", extra=["x1"])
+    a = refs.ObjectRef(entity="e", project="p", name="n", digest="v", extra=["attr", 'x2'])
     b = refs.ObjectRef(
-        entity="e", project="p", name="n", digest="v", extra=["x1", "x2"]
+        entity="e", project="p", name="n", digest="v", extra=["attr", "x2", 'attr', 'x4']
     )
     assert a.is_descended_from(b) == False
     assert b.is_descended_from(a) == True
