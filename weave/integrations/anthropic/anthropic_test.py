@@ -127,7 +127,6 @@ async def test_async_anthropic(
         max_tokens=1024,
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
-
     all_content = message.content[0]
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content.text == exp
@@ -256,3 +255,191 @@ def test_tools_calling(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 56
     assert output.usage.input_tokens == model_usage["input_tokens"] == 354
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+def test_anthropic_messages_stream_ctx_manager(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(
+        api_key=api_key,
+    )
+
+    all_content = ""
+    with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        for event in stream:
+            if event.type == "text":
+                all_content += event.text
+
+    exp = "Hello there!"
+    assert all_content.strip() == exp
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.stop_sequence is None
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_async_anthropic_messages_stream_ctx_manager(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    anthropic_client = AsyncAnthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+    )
+
+    all_content = ""
+    async with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        async for event in stream:
+            if event.type == "text":
+                all_content += event.text
+
+    exp = "Hello there!"
+    assert all_content.strip() == exp
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.stop_sequence is None
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+def test_anthropic_messages_stream_ctx_manager_text(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(
+        api_key=api_key,
+    )
+
+    all_content = ""
+    with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        for text in stream.text_stream:
+            all_content += text
+
+    exp = "Hello there!"
+    assert all_content.strip() == exp
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.stop_sequence is None
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_async_anthropic_messages_stream_ctx_manager_text(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    anthropic_client = AsyncAnthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+    )
+
+    all_content = ""
+    async with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        async for text in stream.text_stream:
+            all_content += text
+
+    exp = "Hello there!"
+    assert all_content.strip() == exp
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.stop_sequence is None
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
