@@ -38,7 +38,7 @@ Weave will now track and log all LLM calls made through the Cerebras SDK. You ca
 Want to make your results reproducible while still maintaining that Cerebras speed? Weave ops have got you covered. They automatically version your code as you experiment and capture inputs and outputs. Here's how you can use them with Cerebras:
 
 ```python
-@weave.op()
+@weave.op
 def animal_speedster(animal: str, model: str) -> str:
     "Find out how fast an animal can run"
     
@@ -73,7 +73,7 @@ class AnimalSpeedModel(weave.Model):
     model: str
     temperature: float
 
-    @weave.op()
+    @weave.op
     def predict(self, animal: str) -> str:
         "Predict the top speed of an animal"        
 
@@ -95,25 +95,3 @@ print(result)
 With this setup, you can easily experiment with different models and parameters, all while keeping track of your blazing-fast Cerebras-powered inferences!
 
 [![cerebras_model.png](imgs/cerebras_model.png)](https://wandb.ai/capecape/cerebras_speedster/weave/traces)
-
-
-## Async Support
-
-Cerebras is all about speed, so naturally, it supports async operations. Weave's got you covered there too:
-
-```python
-import asyncio
-from cerebras.cloud.sdk import AsyncCerebras
-
-async def main():
-    client = AsyncCerebras(api_key=os.environ["CEREBRAS_API_KEY"])
-    response = await client.chat.completions.create(
-        model="llama3.1-8b",
-        messages=[{"role": "user", "content": "What's the speed of light?"}],
-    )
-    print(response.choices[0].message.content)
-
-asyncio.run(main())
-```
-
-Weave will automatically track these async calls, ensuring you don't miss a beat (or a millisecond) in your high-speed AI operations.
