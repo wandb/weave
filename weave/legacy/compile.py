@@ -9,7 +9,6 @@ from weave import (
     engine_trace,
     errors,
     registry_mem,
-    stitch,
     weave_internal,
 )
 from weave import weave_types as types
@@ -28,6 +27,7 @@ from weave.legacy import (
     partial_object,
     propagate_gql_keys,
     serialize,
+    stitch,
     value_or_error,
 )
 from weave.legacy.language_features.tagging import tagged_value_type_helpers
