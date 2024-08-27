@@ -157,6 +157,6 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
         }
 
     def _ipython_display_(self):
-        from weave import show
+        from weave.legacy import show
 
         show.show(self)
