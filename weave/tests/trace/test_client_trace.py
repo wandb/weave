@@ -2565,3 +2565,61 @@ def test_calls_stream_column_expansion(client):
     )
     call_result = list(res)[0]
     assert call_result.output == nested_ref.uri()
+
+
+def test_calls_stream_feedback(client):
+    @weave.op
+    def test_call(x):
+        return "ello chap"
+
+    test_call(1)
+    test_call(2)
+    test_call(3)
+
+    calls = list(test_call.calls())
+    assert len(calls) == 3
+
+    # add feedback to the first call
+    calls[0].feedback.add("note", {"note": "this is a note on call1"})
+    calls[0].feedback.add_reaction("👍")
+    calls[0].feedback.add_reaction("👍")
+    calls[0].feedback.add_reaction("👎")
+
+    calls[1].feedback.add_reaction("👍")
+
+    # now get calls from the server, with the feedback expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            include_feedback="all",
+        )
+    )
+    calls = list(res)
+
+    assert len(calls) == 3
+    assert len(calls[0].summary["feedback"]) == 4
+    assert len(calls[1].summary["feedback"]) == 1
+    assert not calls[2].summary.get("feedback")
+
+    call1_payloads = [f["payload"] for f in calls[0].summary["feedback"]]
+    assert {"note": "this is a note on call1"} in call1_payloads
+    assert {
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+        "emoji": "👍",
+    } in call1_payloads
+    assert {
+        "alias": ":thumbs_down:",
+        "detoned": "👎",
+        "detoned_alias": ":thumbs_down:",
+        "emoji": "👎",
+    } in call1_payloads
+
+    call2_payloads = [f["payload"] for f in calls[1].summary["feedback"]]
+    assert {
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+        "emoji": "👍",
+    } in call2_payloads
