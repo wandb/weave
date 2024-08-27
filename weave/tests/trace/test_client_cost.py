@@ -1,17 +1,19 @@
-import pytest
 from datetime import datetime
-from weave.trace_server.errors import InvalidRequest
+
+import pytest
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+
 
 def test_cost_apis(client):
     is_sqlite = isinstance(client.server._internal_trace_server, SqliteTraceServer)
     if is_sqlite:
         # only run this test for sqlite
         return
-    
+
     project_id = client._project_id()
 
     costs = {
@@ -27,7 +29,7 @@ def test_cost_apis(client):
         "my_model_to_delete3": {
             "prompt_token_cost": 25,
             "completion_token_cost": 30,
-            "effective_date": datetime(2021,4,22),
+            "effective_date": datetime(2021, 4, 22),
         },
         "my_model_to_delete4": {
             "prompt_token_cost": 35,
@@ -38,8 +40,8 @@ def test_cost_apis(client):
     # Create some costs
     res = client.server.cost_create(
         tsi.CostCreateReq(
-            project_id = project_id,
-            costs = costs,
+            project_id=project_id,
+            costs=costs,
             wb_user_id="VXNlcjo0NTI1NDQ=",
         )
     )
@@ -48,10 +50,12 @@ def test_cost_apis(client):
     assert len(cost_ids) == 4
 
     # query costs by project
-    req = tsi.CostQueryReq(project_id = project_id,)
+    req = tsi.CostQueryReq(
+        project_id=project_id,
+    )
     res = client.server.cost_query(req)
     assert len(res.results) == 4
-    
+
     res = client.query_costs()
     assert len(res) == 4
 
@@ -81,13 +85,13 @@ def test_cost_apis(client):
         "my_model_to_delete3": {
             "prompt_token_cost": 500,
             "completion_token_cost": 1000,
-            "effective_date": datetime(1998,10,3),
+            "effective_date": datetime(1998, 10, 3),
         },
-    }       
+    }
     res = client.server.cost_create(
         tsi.CostCreateReq(
-            project_id = project_id,
-            costs = costs,
+            project_id=project_id,
+            costs=costs,
             wb_user_id="VXNlcjo0NTI1NDQ=",
         )
     )
@@ -111,16 +115,18 @@ def test_cost_apis(client):
     assert len(res) == 1
 
     # query with query
-    res = client.query_costs(query=Query(
-        **{
-            "$expr": {
-                "$gt": [
-                    {"$getField": "completion_token_cost"},
-                    {"$literal": 25},
-                ],
+    res = client.query_costs(
+        query=Query(
+            **{
+                "$expr": {
+                    "$gt": [
+                        {"$getField": "completion_token_cost"},
+                        {"$literal": 25},
+                    ],
+                }
             }
-        }
-    ))
+        )
+    )
     assert len(res) == 3
 
     # purge costs
@@ -141,7 +147,6 @@ def test_cost_apis(client):
     client.purge_costs(last_id)
     res = client.query_costs()
     assert len(res) == 0
-    
 
 
 def test_purge_only_ids(client):
@@ -149,7 +154,7 @@ def test_purge_only_ids(client):
     if is_sqlite:
         # only run this test for sqlite
         return
-    
+
     project_id = client._project_id()
     costs = {
         "my_model_to_delete": {
@@ -160,8 +165,8 @@ def test_purge_only_ids(client):
     # Create some costs
     res = client.server.cost_create(
         tsi.CostCreateReq(
-            project_id = project_id,
-            costs = costs,
+            project_id=project_id,
+            costs=costs,
             wb_user_id="VXNlcjo0NTI1NDQ=",
         )
     )
@@ -171,30 +176,33 @@ def test_purge_only_ids(client):
 
     with pytest.raises(InvalidRequest):
         client.server.cost_purge(
-            tsi.CostPurgeReq(project_id=project_id,
+            tsi.CostPurgeReq(
+                project_id=project_id,
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "llm_id"},
+                                {"$literal": "my_model_to_delete"},
+                            ],
+                        }
+                    }
+                ),
+            )
+        )
+
+    client.server.cost_purge(
+        tsi.CostPurgeReq(
+            project_id=project_id,
             query=Query(
                 **{
                     "$expr": {
                         "$eq": [
-                            {"$getField": "llm_id"},
-                            {"$literal": "my_model_to_delete"},
+                            {"$getField": "id"},
+                            {"$literal": cost_ids[0][0]},
                         ],
                     }
                 }
-            ),)
+            ),
         )
-
-    client.server.cost_purge(
-        tsi.CostPurgeReq(project_id=project_id,
-        query=Query(
-            **{
-                "$expr": {
-                    "$eq": [
-                        {"$getField": "id"},
-                        {"$literal": cost_ids[0][0]},
-                    ],
-                }
-            }
-        ),)
     )
-    

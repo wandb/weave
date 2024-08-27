@@ -336,6 +336,7 @@ def test_query_light_column_with_costs() -> None:
                         llm_usage.completion_tokens,
                         llm_usage.total_tokens,
                         llm_usage.started_at,
+                        llm_token_prices.id,
                         llm_token_prices.pricing_level,
                         llm_token_prices.pricing_level_id,
                         llm_token_prices.provider_id,

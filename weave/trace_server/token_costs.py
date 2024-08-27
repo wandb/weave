@@ -263,10 +263,7 @@ def get_ranked_prices(
 def get_top_ranked_prices(
     param_builder: ParamBuilder, table_alias: str
 ) -> PreparedSelect:
-    columns = [
-        Column(name="id", type="string"),
-        *LLM_TOKEN_PRICES_COLUMNS,
-    ]
+    columns =  [*LLM_TOKEN_PRICES_COLUMNS]
 
     derived_columns = [
         Column(name="rank", type="string"),
@@ -300,10 +297,7 @@ def get_top_ranked_prices(
 def join_usage_with_costs(
     param_builder: ParamBuilder, usage_table_alias: str, price_table_alias: str
 ) -> PreparedSelect:
-    price_columns = [
-        Column(name="id", type="string"),
-        *LLM_TOKEN_PRICES_COLUMNS,
-    ]
+    price_columns = [*LLM_TOKEN_PRICES_COLUMNS]
 
     derived_price_columns = [
         Column(name="prompt_tokens_cost", type="float"),
