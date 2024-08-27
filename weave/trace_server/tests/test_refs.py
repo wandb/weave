@@ -24,7 +24,32 @@ def string_with_every_char(disallowed_chars=[]):
     return "".join(chr(i) for i in char_codes if chr(i) not in disallowed_chars)
 
 
-# TODO: Write the equivalent tests for the external refs!
+def test_ref_parsing_external_invalid():
+    with pytest.raises(Exception):
+        ref_start = refs.ObjectRef(
+            entity="entity",
+            project="project",
+            name=string_with_every_char(),
+            digest="1234567890",
+            extra=("key", string_with_every_char()),
+        )
+
+
+def test_ref_parsing_external_sanitized():
+    ref_start = refs.ObjectRef(
+        entity="entity",
+        project="project",
+        name=sanitize_object_name(string_with_every_char()),
+        digest="1234567890",
+        extra=("key", string_with_every_char()),
+    )
+
+    ref_str = ref_start.uri()
+    exp_ref = f"{refs_internal.WEAVE_SCHEME}:///{ref_start.entity}/{ref_start.project}/object/{ref_start.name}:{ref_start.digest}/{ref_start.extra[0]}/{quote(ref_start.extra[1])}"
+    assert ref_str == exp_ref
+
+    parsed = refs.parse_uri(ref_str)
+    assert parsed == ref_start
 
 
 def test_ref_parsing_internal_invalid():

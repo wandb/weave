@@ -2,7 +2,7 @@ import dataclasses
 import urllib
 from typing import Any, Union
 
-from ..trace_server import refs_internal
+from ..trace_server import refs_internal, validation
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -53,6 +53,12 @@ class ObjectRef(RefWithExtra):
     name: str
     digest: str
     extra: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        refs_internal.validate_no_slashes(self.digest, "digest")
+        refs_internal.validate_no_colons(self.digest, "digest")
+        refs_internal.validate_extra(list(self.extra))
+        validation.object_id_validator(self.name)
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
