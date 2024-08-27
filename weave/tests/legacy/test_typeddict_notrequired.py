@@ -6,8 +6,8 @@ from typing_extensions import (
     TypedDict,
 )
 
-from weave import infer_types
 from weave import weave_types as types
+from weave.legacy import infer_types
 
 
 class _TestNotRequiredTypedDict(TypedDict):

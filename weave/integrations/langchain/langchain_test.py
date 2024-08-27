@@ -4,8 +4,8 @@ from typing import Any, Generator, List, Optional, Tuple
 import pytest
 
 import weave
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
-from weave.weave_client import WeaveClient
 
 
 def filter_body(r: Any) -> Any:

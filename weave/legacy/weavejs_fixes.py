@@ -10,7 +10,7 @@ import typing
 
 from weave.legacy import graph
 
-from . import weave_types
+from .. import weave_types
 
 
 def _convert_specific_opname_to_generic_opname(
@@ -85,7 +85,7 @@ def convert_specific_opname_to_generic_opname(
 def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
     """Converts specific ops like typedDict-pick to generic ops like pick"""
 
-    def convert_specific_op_to_generic_op(node: graph.Node):
+    def convert_specific_op_to_generic_op(node: graph.Node):  # type: ignore
         if isinstance(node, graph.ConstNode) and isinstance(
             node.type, weave_types.Function
         ):
@@ -102,14 +102,14 @@ def convert_specific_ops_to_generic_ops_node(node: graph.Node) -> graph.Node:
     return graph.map_nodes_full([node], convert_specific_op_to_generic_op)[0]
 
 
-def _obj_is_node_like(data: typing.Any):
+def _obj_is_node_like(data: typing.Any):  # type: ignore
     if not isinstance(data, dict):
         return False
     return data.get("nodeType") in ["const", "output", "var", "void"]
 
 
 # Non-perfect heuristic to determine if a serialized dict is likely an op
-def _dict_is_op_like(data: dict):
+def _dict_is_op_like(data: dict):  # type: ignore
     # Firstly, ops will only have "name" and "input" keys
     if set(data.keys()) == set(["name", "inputs"]):
         # Those keys will be str and list respectively.
@@ -121,7 +121,7 @@ def _dict_is_op_like(data: dict):
     return False
 
 
-def convert_specific_ops_to_generic_ops_data(data):
+def convert_specific_ops_to_generic_ops_data(data):  # type: ignore
     """Fix op call names for serialized objects containing graphs"""
     if isinstance(data, list):
         return [convert_specific_ops_to_generic_ops_data(d) for d in data]
@@ -138,7 +138,7 @@ def convert_specific_ops_to_generic_ops_data(data):
 def remove_opcall_versions_node(node: graph.Node) -> graph.Node:
     """Fix op call names"""
 
-    def remove_op_version(node: graph.Node):
+    def remove_op_version(node: graph.Node):  # type: ignore
         if not isinstance(node, graph.OutputNode):
             return node
         return graph.OutputNode(
@@ -150,7 +150,7 @@ def remove_opcall_versions_node(node: graph.Node) -> graph.Node:
     return graph.map_nodes_full([node], remove_op_version)[0]
 
 
-def remove_opcall_versions_data(data):
+def remove_opcall_versions_data(data):  # type: ignore
     """Fix op call names for serialized objects containing graphs"""
     if isinstance(data, list):
         return [remove_opcall_versions_data(d) for d in data]
@@ -168,7 +168,7 @@ def fixup_node(node: graph.Node) -> graph.Node:
     return convert_specific_ops_to_generic_ops_node(node)
 
 
-def recursively_unwrap_unions(obj):
+def recursively_unwrap_unions(obj):  # type: ignore
     if isinstance(obj, list):
         return [recursively_unwrap_unions(o) for o in obj]
     if isinstance(obj, dict):
@@ -183,7 +183,7 @@ def recursively_unwrap_unions(obj):
     return obj
 
 
-def remove_nan_and_inf(obj):
+def remove_nan_and_inf(obj):  # type: ignore
     if isinstance(obj, list):
         return [remove_nan_and_inf(o) for o in obj]
     if isinstance(obj, dict):
@@ -194,7 +194,7 @@ def remove_nan_and_inf(obj):
     return obj
 
 
-def remove_partialobject_from_types(data):
+def remove_partialobject_from_types(data):  # type: ignore
     """Convert weave-internal types like
 
     {"type":"PartialObject","keys":{"name":"string"},"keyless_weave_type_class":"project"}
@@ -218,7 +218,7 @@ def remove_partialobject_from_types(data):
     return data
 
 
-def fixup_data(data):
+def fixup_data(data):  # type: ignore
     data = recursively_unwrap_unions(data)
     data = remove_opcall_versions_data(data)
     # No good! We have to do this because remoteHttp doesn't handle NaN/inf in

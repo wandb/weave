@@ -1274,7 +1274,7 @@ class TypeType(ObjectType):
 
     @classmethod
     def type_of_instance(cls, obj):
-        from . import infer_types
+        from .legacy import infer_types
 
         attr_types = {}
         for field in dataclasses.fields(obj):
