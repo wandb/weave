@@ -460,7 +460,12 @@ const fetchEvaluationComparisonData = async (
           const maybeDigest = parts[1];
           if (maybeDigest != null && !maybeDigest.includes('/')) {
             const rowDigest = maybeDigest;
-            const possiblePredictNames = ['predict', 'infer', 'forward', 'invoke'];
+            const possiblePredictNames = [
+              'predict',
+              'infer',
+              'forward',
+              'invoke',
+            ];
             const isProbablyPredictCall =
               (_.some(possiblePredictNames, name =>
                 traceCall.op_name.includes(`.${name}:`)
