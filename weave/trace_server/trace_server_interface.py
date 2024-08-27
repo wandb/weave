@@ -49,7 +49,7 @@ class FeedbackDict(TypedDict, total=False):
     weave_ref: str
     payload: Dict[str, Any]
     creator: Optional[str]
-    created_at: Optional[str]
+    created_at: Optional[datetime.datetime]
     wb_user_id: Optional[str]
 
 
