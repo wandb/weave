@@ -31,10 +31,10 @@ from weave.legacy.language_features.tagging import (
     tagged_value_type,
 )
 from weave.legacy.run import Run
-from weave.weavejs_fixes import fixup_node
+from weave.legacy.weavejs_fixes import fixup_node
 
 if typing.TYPE_CHECKING:
-    from weave import weave_client
+    from weave.trace import weave_client
     from weave.legacy.run_streamtable_span import RunStreamTableSpan
 
 

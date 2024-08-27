@@ -24,7 +24,7 @@ from weave.trace.env import get_weave_parallelism
 from weave.trace.errors import OpCallError
 from weave.trace.op import Op
 from weave.trace.vals import WeaveObject
-from weave.weave_client import get_ref
+from weave.trace.weave_client import get_ref
 
 console = Console()
 

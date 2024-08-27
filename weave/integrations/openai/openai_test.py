@@ -30,7 +30,7 @@ def op_name_from_ref(ref: str) -> str:
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -77,7 +77,9 @@ def test_openai_quickstart(client: weave.weave_client.WeaveClient) -> None:
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_openai_async_quickstart(client: weave.weave_client.WeaveClient) -> None:
+async def test_openai_async_quickstart(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
@@ -122,7 +124,7 @@ async def test_openai_async_quickstart(client: weave.weave_client.WeaveClient) -
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -179,7 +181,7 @@ def test_openai_stream_quickstart(client: weave.weave_client.WeaveClient) -> Non
 )
 @pytest.mark.asyncio
 async def test_openai_async_stream_quickstart(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -231,7 +233,9 @@ async def test_openai_async_stream_quickstart(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_stream_usage_quickstart(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_stream_usage_quickstart(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -268,7 +272,7 @@ def test_openai_stream_usage_quickstart(client: weave.weave_client.WeaveClient) 
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -354,7 +358,7 @@ def test_openai_function_call(client: weave.weave_client.WeaveClient) -> None:
 )
 @pytest.mark.asyncio
 async def test_openai_function_call_async(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -440,7 +444,7 @@ async def test_openai_function_call_async(
 )
 @pytest.mark.asyncio
 async def test_openai_function_call_async_stream(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -527,7 +531,7 @@ async def test_openai_function_call_async_stream(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
+def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = OpenAI(api_key=api_key)
@@ -614,7 +618,9 @@ def test_openai_tool_call(client: weave.weave_client.WeaveClient) -> None:
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) -> None:
+async def test_openai_tool_call_async(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     openai_client = AsyncOpenAI(api_key=api_key)
@@ -700,7 +706,7 @@ async def test_openai_tool_call_async(client: weave.weave_client.WeaveClient) ->
 )
 @pytest.mark.asyncio
 async def test_openai_tool_call_async_stream(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -801,7 +807,7 @@ async def test_openai_tool_call_async_stream(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_openai_as_context_manager(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -854,7 +860,7 @@ def test_openai_as_context_manager(
 )
 @pytest.mark.asyncio
 async def test_openai_as_context_manager_async(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 

@@ -8,8 +8,7 @@
 #     weave Python code that I haven't documented here.
 
 from weave import weave_types as types
-from weave import weavejs_fixes
-from weave.legacy import partial_object
+from weave.legacy import partial_object, weavejs_fixes
 from weave.legacy.ops_domain import wb_domain_types
 
 
