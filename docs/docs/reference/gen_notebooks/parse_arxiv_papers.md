@@ -2,6 +2,7 @@
 title: Extracting Structured Data from Documents using Instructor and Weave
 ---
 
+
 :::tip[This is a notebook]
 
 <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/parse_arxiv_papers.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
@@ -11,11 +12,12 @@ title: Extracting Structured Data from Documents using Instructor and Weave
 :::
 
 
+
 # Extracting Structured Data from Documents using Instructor and Weave
 
 LLMs are widely used in downstream applications which necessitates outputs to be structured in a consistent manner. This often requires the LLM-powered applications to parse unstructured documents (such as PDF files) and extract specific information structured according to a specififc schema.
 
-In this tutorial, you will learn how to extract specific information from machine learning papers (such as key findings, novel methodologies, research directions, etc.). We will use [Instructor](https://python.useinstructor.com/) to get structured output from an OpenAI [GPT-4o](https://platform.openai.com/docs/models/gpt-4o) model in the form of [Pydantic objects](https://docs.pydantic.dev/latest/concepts/models/). We will also use [Weave](../../introduction.md) to track and evaluate our LLM workflow.
+In this tutorial, you will learn how to extract specific information from machine learning papers (such as key findings, novel methodologies, research directions, etc.). We will use [Instructor](https://python.useinstructor.com/) to get structured output from an OpenAI [GPT-4o](https://platform.openai.com/docs/models/gpt-4o) model in the form of [Pydantic objects](https://docs.pydantic.dev/latest/concepts/models/). We will also use [Weave](../docs/introduction.md) to track and evaluate our LLM workflow.
 
 ## Installing the Dependencies
 
@@ -23,7 +25,7 @@ We need the following libraries for this tutorial:
 
 - [Instructor](https://python.useinstructor.com/) to easily get structured output from LLMs.
 - [OpenAI](https://openai.com/index/openai-api/) as our LLM vendor.
-- [Weave](../../introduction.md) to track our LLM workflow and evaluate our prompting strategies.
+- [Weave](../introduction.md) to track our LLM workflow and evaluate our prompting strategies.
 
 
 ```python
@@ -44,7 +46,7 @@ os.environ["WEAVE_PARALLELISM"] = "1"
 
 ## Enable Tracking using Weave
 
-Weave is currently integrated with OpenAI, and including [`weave.init`](../../reference/python-sdk/weave/index.md) at the start of our code lets us automatically trace our OpenAI chat completions which can be explored in the Weave UI. Check out the [Weave integration docs for OpenAI](../../guides/integrations/openai.md) to learn more.
+Weave is currently integrated with OpenAI, and including [`weave.init`](../docs/reference/python-sdk/weave/index.md) at the start of our code lets us automatically trace our OpenAI chat completions which can be explored in the Weave UI. Check out the [Weave integration docs for OpenAI](../docs/guides/integrations/openai.md) to learn more.
 
 
 ```python
@@ -101,7 +103,7 @@ class PaperInfo(BaseModel):
 
 Next, we write a detailed system prompt that serve as a set of instructions providing context and guidelines to help the model perform the required task.
 
-First of all, we ask the model to play the role of "helpful assistant to a machine learning researcher who is reading a paper from arXiv", thus establishing the basic context of the task. Next, we provide the information regarding all the information in it needs to extract from the paper, in accordance with the schema `PaperInfo`.
+First, we ask the model to play the role of "helpful assistant to a machine learning researcher who is reading a paper from arXiv", thus establishing the basic context of the task. Next, we provide the details of all the information it needs to extract from the paper, in accordance with the schema `PaperInfo`.
 
 
 ```python
@@ -124,7 +126,7 @@ You are to extract the following information from the paper:
 ```
 
 :::note
-You can also checkout OpenAI's [Prompt engineering guide](https://platform.openai.com/docs/guides/prompt-engineering) for more details on writing good prompts for models like GPT-4o.
+You can checkout OpenAI's [Prompt engineering guide](https://platform.openai.com/docs/guides/prompt-engineering) for more details on writing effective prompts for models like GPT-4o.
 :::
 
 Next, we patch the OpenAI client to return structured outputs.
@@ -138,7 +140,7 @@ openai_client = OpenAI()
 structured_client = instructor.from_openai(openai_client)
 ```
 
-Finally, we write our LLM execution workflow as a [Weave Model](../../guides/core-types/models.md) thus combining the configurations associated with the workflow along with the code that defines how the model operates into a single object that will now be tracked and versioned using Weave.
+Finally, we write our LLM execution workflow as a [Weave Model](../docs/guides/core-types/models.md), thus combining the configurations associated with the workflow along with the code that defines how the model operates into a single object that will now be tracked and versioned using Weave.
 
 
 ```python
@@ -190,13 +192,13 @@ rich.print(result)
 Executing this LLM workflow will cost approximately $0.05-$0.25 in OpenAI credits, depending on the number of attempts instructor needs makes to get the output in the desired format (which is set to 5).
 :::
 
-| ![](../../../static/img/parse_arxiv_papers/predict_trace.png) |
+| ![](https://i.imgur.com/Etnjoyq.png) |
 |---|
 | Here's how you can explore the traces of the `ArxivModel` in the Weave UI |
 
 ## Evaluating the Prompting Workflow
 
-Let us now evaluate how accurately our LLM workflow is able to extract the methods from the paper using [Weave Evaluation](../../guides/core-types/evaluations.md). For this we will write a simple scoring function that compares the list of novel methods, existing methods, and ML techniques predicted by the promting worflow against a ground-truth list of methods associated with the paper to compute an accuracy score.
+Let us now evaluate how accurately our LLM workflow is able to extract the methods from the paper using [Weave Evaluation](../docs/guides/core-types/evaluations.md). For this we will write a simple scoring function that compares the list of novel methods, existing methods, and ML techniques predicted by the prompting workflow against a ground-truth list of methods associated with the paper to compute an accuracy score.
 
 
 ```python
@@ -222,12 +224,10 @@ def arxiv_method_score(
                 or gt_method["full_name"].lower() in predicted_method.lower()
             ):
                 num_correct_methods += 1
-    return {
-        "method_prediction_accuracy": num_correct_methods / len(predicted_methods)
-    }
+    return {"method_prediction_accuracy": num_correct_methods / len(predicted_methods)}
 ```
 
-For this tutorial, we will use a dataset of more than 6000 machine learning research papers and their corresponding metadata created using the [paperswithcode client](https://paperswithcode-client.readthedocs.io/en/latest/) (check [this gist](https://gist.github.com/soumik12345/996c2ea538f6ff5b3747078ba557ece4) for reference). The dataset is stored as a [Weave Dataset](../../guides/core-types/datasets.md) which you can explore [here](https://wandb.ai/geekyrakshit/arxiv-data-extraction/weave/objects/cv-papers/versions/7wICKJjt3YyqL3ssICHi08v3swAGSUtD7TF4PVRJ0yc).
+For this tutorial, we will use a dataset of more than 6000 machine learning research papers and their corresponding metadata created using the [paperswithcode client](https://paperswithcode-client.readthedocs.io/en/latest/) (check [this gist](https://gist.github.com/soumik12345/996c2ea538f6ff5b3747078ba557ece4) for reference). The dataset is stored as a [Weave Dataset](../docs/guides/core-types/datasets.md) which you can explore [here](https://wandb.ai/geekyrakshit/arxiv-data-extraction/weave/objects/cv-papers/versions/7wICKJjt3YyqL3ssICHi08v3swAGSUtD7TF4PVRJ0yc).
 
 
 ```python
@@ -237,7 +237,7 @@ eval_dataset = weave.ref(WEAVE_DATASET_REFERENCE).get()
 rich.print(f"{len(eval_dataset.rows)=}")
 ```
 
-Now, we can evaluate our LLM workflow using [Weave Evalations](../../guides/core-types/evaluations.md), that will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
+Now, we can evaluate our LLM workflow using [Weave Evalations](../docs/guides/core-types/evaluations.md), that will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
 
 
 ```python
@@ -296,6 +296,8 @@ await evaluation.evaluate(arxiv_parser_model)
 Running the evaluation on 5 examples from evaluation dataset will cost approximately $0.25-$1.25 in OpenAI credits, depending on the number of attempts instructor needs makes to get the output in the desired format (which is set to 5) in evaluating each example.
 :::
 
-| ![](../../../static/img/parse_arxiv_papers/eval_trace.png)                                  |
-|-------------------------------------------------------------------------------|
+| ![](https://i.imgur.com/qFbt8T0.png) |
+|---|
 | Here's how you can explore and compare the evaluations traces in the Weave UI |
+
+
