@@ -201,8 +201,7 @@ export type WFDataModelHooksInterface = {
     offset?: number,
     sortBy?: traceServerClientTypes.SortBy[],
     query?: Query,
-    columns?: string[],
-    expandedRefCols?: string[]
+    columns?: string[]
   ) => Promise<Blob>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (

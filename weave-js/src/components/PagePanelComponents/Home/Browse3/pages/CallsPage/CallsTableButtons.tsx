@@ -12,14 +12,7 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {
-  Dispatch,
-  FC,
-  SetStateAction,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -27,7 +20,6 @@ import {
   ContentType,
   fileExtensions,
 } from '../wfReactInterface/traceServerClientTypes';
-import {isDynamicCallColumn, stringToPath} from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
@@ -83,11 +75,6 @@ export const ExportSelector = ({
     callQueryParams.gridSort
   );
 
-  const refColumnsToExpand = useMemo(
-    () => visibleColumns.filter(col => isDynamicCallColumn(stringToPath(col))),
-    [visibleColumns]
-  );
-
   const onClickDownload = (contentType: ContentType) => {
     if (downloadLoading) {
       return;
@@ -103,16 +90,6 @@ export const ExportSelector = ({
       ? visibleColumns
       : undefined;
     const startTime = Date.now();
-
-    visibleColumns.sort((a, b) => b.length - a.length);
-    const leafColumns: string[] = [];
-    for (const col of visibleColumns) {
-      if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
-        continue;
-      }
-      leafColumns.push(col);
-    }
-
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -122,8 +99,7 @@ export const ExportSelector = ({
       offset,
       sortBy,
       filterBy,
-      leafColumns,
-      refColumnsToExpand
+      columns
     ).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];

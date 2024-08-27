@@ -531,7 +531,6 @@ const useCallsExport = () => {
       offset?: number,
       sortBy?: traceServerTypes.SortBy[],
       query?: Query,
-      columns?: string[],
       expandedRefCols?: string[]
     ) => {
       const req: traceServerTypes.TraceCallsQueryReq = {
@@ -551,8 +550,7 @@ const useCallsExport = () => {
         offset,
         sort_by: sortBy,
         query,
-        columns: columns ?? undefined,
-        expand_columns: expandedRefCols ?? undefined,
+        columns: expandedRefCols ?? undefined,
       };
       return getTsClient().callsStreamDownload(req, contentType);
     },
