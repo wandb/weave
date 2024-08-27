@@ -1,7 +1,7 @@
-from collections import OrderedDict
+import copy
 import datetime
 import json
-import copy
+from collections import OrderedDict
 from typing import Any, Dict, Literal, Optional, Union, cast
 
 from weave.trace_server import trace_server_interface as tsi

@@ -32,8 +32,8 @@ from weave.trace_server.refs_internal import (
 )
 from weave.trace_server.trace_server_common import (
     get_nested_key,
-    set_nested_key,
     make_derived_summary_fields,
+    set_nested_key,
 )
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -544,9 +544,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(
-                ", ".join("?" * len(req.call_ids))
-            )
+            """.format(", ".join("?" * len(req.call_ids)))
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -558,9 +556,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(
-                ", ".join("?" * len(all_ids))
-            )
+            """.format(", ".join("?" * len(all_ids)))
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()
