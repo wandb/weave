@@ -70,6 +70,8 @@ from .orm import ParamBuilder, Row
 from .trace_server_common import (
     LRUCache,
     get_nested_key,
+    hydrate_calls_with_feedback,
+    make_feedback_query_req,
     set_nested_key,
 )
 from .trace_server_interface_util import (
@@ -297,14 +299,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         select_columns = [c.field for c in cq.select_fields]
+        include_feedback = bool(req.columns and "weave.feedback" in req.columns)
 
-        if not req.expand_columns:
+        if not req.expand_columns and not include_feedback:
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(
                     _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
                 )
 
         else:
+            expand_columns = req.expand_columns or []
             ref_cache = LRUCache(max_size=1000)
 
             batch_size = 10
@@ -317,14 +321,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 if len(batch) >= batch_size:
                     hydrated_batch = self._hydrate_calls(
-                        req.project_id, batch, req.expand_columns, ref_cache
+                        req.project_id,
+                        batch,
+                        expand_columns,
+                        include_feedback,
+                        ref_cache,
                     )
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
 
                     # *** Dynamic Batch Size ***
                     # count the number of columns at each depth
-                    depths = Counter(col.count(".") for col in req.expand_columns)
+                    depths = Counter(col.count(".") for col in expand_columns)
                     # take the max number of columns at any depth
                     max_count_at_ref_depth = max(depths.values())
                     # divide max refs that we can resolve 1000 refs at any depth
@@ -334,7 +342,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     batch = []
 
             hydrated_batch = self._hydrate_calls(
-                req.project_id, batch, req.expand_columns, ref_cache
+                req.project_id,
+                batch,
+                expand_columns,
+                include_feedback,
+                ref_cache,
             )
             for call in hydrated_batch:
                 yield tsi.CallSchema.model_validate(call)
@@ -344,12 +356,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         project_id: str,
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
+        add_feedback: bool,
         ref_cache: LRUCache,
     ) -> list[dict[str, typing.Any]]:
         if len(calls) == 0:
             return calls
 
-        calls = self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
+        self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
+        if add_feedback:
+            feedback_query_req = make_feedback_query_req(project_id, calls)
+            feedback = self.feedback_query(feedback_query_req).result
+            hydrate_calls_with_feedback(calls, feedback)
+
         return calls
 
     def _get_refs_to_resolve(
@@ -377,7 +395,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
         ref_cache: LRUCache,
-    ) -> list[dict[str, typing.Any]]:
+    ) -> None:
         # format expand columns by depth, iterate through each batch in order
         expand_column_by_depth = defaultdict(list)
         for col in expand_columns:
@@ -400,8 +418,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if isinstance(val, dict) and "_ref" not in val:
                     val["_ref"] = ref
                 set_nested_key(calls[i], col, val)
-
-        return calls
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)

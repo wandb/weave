@@ -1,85 +1,67 @@
 import copy
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Optional
 
 from weave.trace_server.refs_internal import InternalCallRef
 from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
     Query,
-    TraceServerInterface,
 )
 
 
-def hydrate_calls_with_feedback(
-    trace_server: TraceServerInterface,
+def make_feedback_query_req(
+    project_id: str,
     calls: list[dict[str, Any]],
-    feedback_format: Literal["all", "counts"],
-) -> list[dict[str, Any]]:
-    feedback_map = defaultdict(list)
-
-    # Batch feedback queries by project_id
-    project_id_to_weave_refs = defaultdict(list)
+) -> FeedbackQueryReq:
+    # make list of weave refs to calls, to be used in feedback query
+    call_refs = []
     for call in calls:
-        weave_ref = InternalCallRef(project_id=call["project_id"], id=call["id"])
-        project_id_to_weave_refs[call["project_id"]].append(weave_ref.uri())
+        ref = InternalCallRef(project_id=call["project_id"], id=call["id"])
+        call_refs.append(ref.uri())
 
-    # This goes project by project for extra safety, even though
-    # calls_stream_query should only return calls in a single project
-    for project_id, call_refs in project_id_to_weave_refs.items():
-        query = Query(
-            **{
-                "$expr": {
-                    "$in": [
-                        {"$getField": "weave_ref"},
-                        [{"$literal": call_ref} for call_ref in call_refs],
-                    ]
-                }
+    # construct mogo style query
+    query = Query(
+        **{
+            "$expr": {
+                "$in": [
+                    {"$getField": "weave_ref"},
+                    [{"$literal": call_ref} for call_ref in call_refs],
+                ]
             }
-        )
-        feedback_query_req = FeedbackQueryReq(
-            project_id=project_id,
-            fields=[
-                "feedback_type",
-                "weave_ref",
-                "payload",
-                "creator",
-                "created_at",
-                "wb_user_id",
-            ],
-            query=query,
-        )
-        feedback = trace_server.feedback_query(req=feedback_query_req).result
-        for feedback_item in feedback:
-            _id = feedback_item["weave_ref"].split("/")[-1]
-            feedback_map[_id].append(feedback_item)
+        }
+    )
+    feedback_query_req = FeedbackQueryReq(
+        project_id=project_id,
+        fields=[
+            "feedback_type",
+            "weave_ref",
+            "payload",
+            "creator",
+            "created_at",
+            "wb_user_id",
+        ],
+        query=query,
+    )
+    return feedback_query_req
+
+
+def hydrate_calls_with_feedback(
+    calls: list[dict[str, Any]], feedback: list[dict[str, Any]]
+) -> None:
+    """Hydrate calls with feedback inplace."""
+    feedback_map = defaultdict(list)
+    # map feedback to calls
+    for feedback_item in feedback:
+        call_id = feedback_item["weave_ref"].split("/")[-1]
+        feedback_map[call_id].append(feedback_item)
 
     for call in calls:
         feedback_items = feedback_map.get(call["id"]) or []
         if "summary" not in call:
             call["summary"] = {}
-
-        if feedback_format == "all":
-            call["summary"]["feedback"] = feedback_items
-        elif feedback_format == "counts":
-            count = 0
-            notes: list[str] = []
-            for feedback_item in feedback_items:
-                if feedback_item["feedback_type"] == "wandb.reaction.1":
-                    count += 1
-                elif (
-                    feedback_format == "emoji+note"
-                    and feedback_item["feedback_type"] == "wandb.note.1"
-                ):
-                    notes += [feedback_item["payload"]["note"]]
-
-            call["summary"]["feedback"] = {
-                "emoji_count": count,
-                "notes": " | ".join(notes),
-            }
-        else:
-            raise ValueError(f"Unknown feedback_format '{feedback_format}'")
-
-    return calls
+        if "weave" not in call["summary"]:
+            call["summary"]["weave"] = {}
+        call["summary"]["weave"]["feedback"] = feedback_items
 
 
 def get_nested_key(d: Dict[str, Any], col: str) -> Optional[Any]:
