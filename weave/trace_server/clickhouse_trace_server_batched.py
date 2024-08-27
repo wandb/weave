@@ -299,9 +299,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         select_columns = [c.field for c in cq.select_fields]
-        include_feedback = bool(req.columns and "weave.feedback" in req.columns)
 
-        if not req.expand_columns and not include_feedback:
+        if not req.expand_columns and not req.include_feedback:
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(
                     _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
@@ -324,7 +323,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         req.project_id,
                         batch,
                         expand_columns,
-                        include_feedback,
+                        req.include_feedback or False,
                         ref_cache,
                     )
                     for call in hydrated_batch:
@@ -345,7 +344,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 req.project_id,
                 batch,
                 expand_columns,
-                include_feedback,
+                req.include_feedback or False,
                 ref_cache,
             )
             for call in hydrated_batch:
@@ -356,16 +355,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         project_id: str,
         calls: list[dict[str, typing.Any]],
         expand_columns: typing.List[str],
-        add_feedback: bool,
+        include_feedback: bool,
         ref_cache: LRUCache,
     ) -> list[dict[str, typing.Any]]:
         if len(calls) == 0:
             return calls
 
         self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
-        if add_feedback:
+        if include_feedback:
             feedback_query_req = make_feedback_query_req(project_id, calls)
-            feedback = self.feedback_query(feedback_query_req).result
+            feedback = self.feedback_query(feedback_query_req)
             hydrate_calls_with_feedback(calls, feedback)
 
         return calls

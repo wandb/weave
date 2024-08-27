@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 from weave.trace_server.refs_internal import InternalCallRef
 from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
+    FeedbackQueryRes,
     Query,
 )
 
@@ -46,12 +47,12 @@ def make_feedback_query_req(
 
 
 def hydrate_calls_with_feedback(
-    calls: list[dict[str, Any]], feedback: list[dict[str, Any]]
+    calls: list[dict[str, Any]], feedback: FeedbackQueryRes
 ) -> None:
     """Hydrate calls with feedback inplace."""
     feedback_map = defaultdict(list)
     # map feedback to calls
-    for feedback_item in feedback:
+    for feedback_item in feedback.result:
         call_id = feedback_item["weave_ref"].split("/")[-1]
         feedback_map[call_id].append(feedback_item)
 

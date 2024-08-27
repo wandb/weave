@@ -2592,17 +2592,17 @@ def test_calls_stream_feedback(client):
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
-            include_feedback="all",
+            include_feedback=True,
         )
     )
     calls = list(res)
 
     assert len(calls) == 3
-    assert len(calls[0].summary["feedback"]) == 4
-    assert len(calls[1].summary["feedback"]) == 1
-    assert not calls[2].summary.get("feedback")
+    assert len(calls[0].summary["weave"]["feedback"]) == 4
+    assert len(calls[1].summary["weave"]["feedback"]) == 1
+    assert not calls[2].summary.get("weave", {}).get("feedback")
 
-    call1_payloads = [f["payload"] for f in calls[0].summary["feedback"]]
+    call1_payloads = [f["payload"] for f in calls[0].summary["weave"]["feedback"]]
     assert {"note": "this is a note on call1"} in call1_payloads
     assert {
         "alias": ":thumbs_up:",
@@ -2617,7 +2617,7 @@ def test_calls_stream_feedback(client):
         "emoji": "👎",
     } in call1_payloads
 
-    call2_payloads = [f["payload"] for f in calls[1].summary["feedback"]]
+    call2_payloads = [f["payload"] for f in calls[1].summary["weave"]["feedback"]]
     assert {
         "alias": ":thumbs_up:",
         "detoned": "👍",
