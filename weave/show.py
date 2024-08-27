@@ -14,9 +14,9 @@ from . import (
     storage,
     usage_analytics,
     util,
-    weavejs_fixes,
 )
 from . import weave_types as types
+from .legacy import weavejs_fixes
 
 
 def make_varname_for_type(t: types.Type):
