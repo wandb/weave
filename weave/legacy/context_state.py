@@ -218,11 +218,11 @@ def analytics_disabled():
         _analytics_enabled.reset(analytics_token)
 
 
-def analytics_enabled():
+def analytics_enabled() -> bool:
     return _analytics_enabled.get()
 
 
-def disable_analytics():
+def disable_analytics() -> contextvars.Token:
     return _analytics_enabled.set(False)
 
 
