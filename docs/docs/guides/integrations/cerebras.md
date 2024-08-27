@@ -1,10 +1,10 @@
 # Cerebras
 
-Weave automatically tracks and logs LLM calls made via the Cerebras Cloud SDK. Because when you're using Cerebras, every millisecond counts!
+Weave automatically tracks and logs LLM calls made via the [Cerebras Cloud SDK](https://inference-docs.cerebras.ai/introduction). Because when you're using Cerebras, every millisecond counts!
 
 ## Traces
 
-In the world of AI, speed is king. It's crucial to keep track of your LLM calls, not just for debugging, but also to ensure you're getting the lightning-fast inference Cerebras is known for. Weave helps you do just that by automatically capturing traces for the Cerebras Cloud SDK.
+In the world of AI, speed is king. It's crucial to keep track of your LLM calls, not just for debugging, but also to ensure you're getting the lightning-fast [inference Cerebras](https://inference-docs.cerebras.ai/introduction) is known for. Weave helps you do just that by automatically capturing traces for the Cerebras Cloud SDK.
 
 Let's dive in and see how Weave can help you track your speed demon of an AI:
 
@@ -117,5 +117,3 @@ asyncio.run(main())
 ```
 
 Weave will automatically track these async calls, ensuring you don't miss a beat (or a millisecond) in your high-speed AI operations.
-
-Remember, with Cerebras and Weave, you're not just running AI - you're running AI at the speed of thought!
