@@ -98,7 +98,7 @@ speed_model = AnimalSpeedModel(
     model="llama3.1-8b",
     temperature=0.7
 )
-result = speed_model.predict(animal="peregrine falcon")
+result = speed_model.predict(animal="cheetah")
 print(result)
 ```
 
