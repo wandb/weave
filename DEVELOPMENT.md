@@ -72,7 +72,7 @@ yarn dev
 Weave backend server. This does not currently auto-reload, so you need to restart it if you change stuff.
 
 ```
-sh weave_server.sh
+sh scripts/weave_server.sh
 ```
 
 Now you should be able to go to localhost:3000 to see the weave home page.
@@ -91,7 +91,6 @@ You can tell everything is working if the weave UI renders and you see your serv
 ## Environment variables
 
 Some ops require environment variables to be set, like OPENAI_API_KEY. You need to set these for the server environment and your Jupyter notebook.
-
 
 ## Unit tests
 
