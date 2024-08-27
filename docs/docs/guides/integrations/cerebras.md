@@ -1,12 +1,12 @@
 # Cerebras
 
-Weave automatically tracks and logs LLM calls made via the [Cerebras Cloud SDK](https://inference-docs.cerebras.ai/introduction). Because when you're using Cerebras, every millisecond counts!
+Weave automatically tracks and logs LLM calls made via the [Cerebras Cloud SDK](https://inference-docs.cerebras.ai/introduction).
 
 ## Traces
 
-In the world of AI, speed is king. It's crucial to keep track of your LLM calls, not just for debugging, but also to ensure you're getting the lightning-fast [inference Cerebras](https://inference-docs.cerebras.ai/introduction) is known for. Weave helps you do just that by automatically capturing traces for the Cerebras Cloud SDK.
+Tracking LLM calls is crucial for debugging and performance monitoring. Weave helps you do this by automatically capturing traces for the Cerebras Cloud SDK.
 
-Let's dive in and see how Weave can help you track your speed demon of an AI:
+Here's an example of how to use Weave with Cerebras:
 
 ```python
 import os
@@ -36,7 +36,7 @@ Weave will now track and log all LLM calls made through the Cerebras SDK. You ca
 
 ## Wrapping with your own ops
 
-Want to make your results reproducible while still maintaining that Cerebras speed? Weave ops have got you covered. They automatically version your code as you experiment and capture inputs and outputs. Here's how you can use them with Cerebras:
+Weave ops offer a powerful way to enhance reproducibility and traceability in your experiments. By automatically versioning your code and capturing inputs and outputs. Here's an example of how you can leverage Weave ops with the Cerebras SDK:
 
 ```python
 import os
@@ -66,9 +66,8 @@ animal_speedster("human", "llama3.1-8b")
 
 ## Create a `Model` for easier experimentation
 
-When you're pushing the boundaries of speed with Cerebras, you need to keep track of your experiments. The [`Model`](/guides/core-types/models) class helps you organize and compare different iterations of your app.
+The [Model](/guides/core-types/models) class in Weave helps you organize and compare different iterations of your app. This is particularly useful when experimenting with Cerebras models. Here's an example:
 
-Here's an example of how you can use it with Cerebras:
 
 ```python
 import os
@@ -103,6 +102,6 @@ result = speed_model.predict(animal="peregrine falcon")
 print(result)
 ```
 
-With this setup, you can easily experiment with different models and parameters, all while keeping track of your blazing-fast Cerebras-powered inferences!
+With this setup, you can easily experiment with different models and parameters, all while keeping track of your Cerebras-powered inferences!
 
 [![cerebras_model.png](imgs/cerebras_model.png)](https://wandb.ai/capecape/cerebras_speedster/weave/traces)
