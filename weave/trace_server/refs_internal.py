@@ -219,5 +219,5 @@ def string_will_be_interpreted_as_ref(s: str) -> bool:
     )
 
 
-def is_ref_str(val: Any) -> bool:
+def any_will_be_interpreted_as_ref_str(val: Any) -> bool:
     return isinstance(val, str) and string_will_be_interpreted_as_ref(val)

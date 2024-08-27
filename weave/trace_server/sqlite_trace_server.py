@@ -27,7 +27,7 @@ from weave.trace_server.refs_internal import (
     WEAVE_INTERNAL_SCHEME,
     InternalObjectRef,
     InternalTableRef,
-    is_ref_str,
+    any_will_be_interpreted_as_ref_str,
     parse_internal_uri,
 )
 from weave.trace_server.trace_server_common import get_nested_key, set_nested_key
@@ -494,7 +494,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if not val:
                     continue
 
-            if not is_ref_str(val):
+            if not any_will_be_interpreted_as_ref_str(val):
                 continue
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
