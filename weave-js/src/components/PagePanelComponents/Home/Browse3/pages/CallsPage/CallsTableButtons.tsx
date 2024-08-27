@@ -105,12 +105,12 @@ export const ExportSelector = ({
     const startTime = Date.now();
 
     visibleColumns.sort((a, b) => b.length - a.length);
-    const minimalColumns: string[] = [];
+    const leafColumns: string[] = [];
     for (const col of visibleColumns) {
-      if (minimalColumns.some(minimalCol => minimalCol.startsWith(col))) {
+      if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
         continue;
       }
-      minimalColumns.push(col);
+      leafColumns.push(col);
     }
 
     download(
@@ -122,7 +122,7 @@ export const ExportSelector = ({
       offset,
       sortBy,
       filterBy,
-      minimalColumns,
+      leafColumns,
       refColumnsToExpand
     ).then(blob => {
       const fileExtension = fileExtensions[contentType];
