@@ -1,4 +1,4 @@
-from weave import weave_client
+from weave.trace import weave_client
 from weave.trace_server.trace_server_interface import CallsQueryReq
 
 

@@ -22,9 +22,7 @@ from weave.trace_server import (
     remote_http_trace_server,
     sqlite_trace_server,
 )
-from weave.trace_server import (
-    trace_server_interface as tsi,
-)
+from weave.trace_server import trace_server_interface as tsi
 
 from . import environment, logs
 from .tests import fixture_fakewandb

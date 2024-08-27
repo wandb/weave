@@ -42,7 +42,7 @@ from weave.integrations.integration_utilities import (
 )
 from weave.trace import call_context
 from weave.trace.patcher import Patcher
-from weave.weave_client import Call
+from weave.trace.weave_client import Call
 
 import_failed = False
 
