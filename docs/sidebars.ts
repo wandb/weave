@@ -82,6 +82,7 @@ const sidebars: SidebarsConfig = {
               items: [
                 "guides/integrations/openai",
                 "guides/integrations/anthropic",
+                "guides/integrations/cerebras",
                 "guides/integrations/cohere",
                 "guides/integrations/mistral",
                 "guides/integrations/together_ai",
