@@ -11,7 +11,7 @@ from langchain.callbacks.tracers.base import BaseTracer
 from langchain.callbacks.tracers.schemas import Run
 from wandb.sdk.data_types import trace_tree
 
-from weave import stream_data_interfaces
+from weave.legacy import stream_data_interfaces
 from weave.legacy.monitoring import StreamTable
 
 

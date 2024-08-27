@@ -7,7 +7,6 @@ from weave import (
     ref_base,
     registry_mem,
     storage,
-    trace_legacy,
     weave_internal,
 )
 from weave import weave_types as types
@@ -20,6 +19,7 @@ from weave.legacy import (
     graph,
     object_context,
     runs,
+    trace_legacy,
     uris,
 )
 from weave.legacy.graph import Node

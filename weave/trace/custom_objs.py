@@ -147,7 +147,7 @@ def decode_custom_obj(
         load_instance_op = wc.get(ref)
         if load_instance_op is None:
             raise ValueError(
-                f"Failed to load op needed to decoded object of type {weave_type}. See logs above for more information."
+                f"Failed to load op needed to decode object of type {weave_type}. See logs above for more information."
             )
 
     if load_instance_op is None:
