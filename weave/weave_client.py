@@ -34,6 +34,11 @@ from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
+    CostCreateInput,
+    CostCreateReq,
+    CostCreateRes,
+    CostPurgeReq,
+    CostQueryReq,
     EndedCallSchemaForInsert,
     ObjCreateReq,
     ObjectVersionFilter,
@@ -718,6 +723,103 @@ class WeaveClient:
             limit=limit,
             show_refs=True,
         )
+
+    def add_costs(self, costs: Dict[str, CostCreateInput]) -> CostCreateRes:
+        """Add a cost to the current project.
+
+        Args:
+            cost: The cost to add.
+        """
+        return self.server.cost_create(
+            CostCreateReq(project_id=self._project_id(), costs=costs)
+        )
+
+    def purge_costs(self, ids: Union[list[str], str]) -> None:
+        """Purge costs from the current project.
+
+        Args:
+            ids: The cost IDs to purge. Can be a single ID or a list of IDs.
+        """
+        if isinstance(ids, str):
+            ids = [ids]
+        expr = {
+            "$in": [
+                {"$getField": "id"},
+                [{"$literal": id} for id in ids],
+            ]
+        }
+        self.server.cost_purge(
+            CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr}))
+        )
+
+    def query_costs(
+        self,
+        query: Optional[Union[Query, str]] = None,
+        llm_ids: Optional[list[str]] = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Query project for costs.
+
+        Examples:
+            ```python
+            # Fetch a specific cost object.
+            # Note that this still returns a collection, which is expected
+            # to contain zero or one item(s).
+            client.query_costs("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+
+            # Find all cost objects with a specific reaction.
+            client.query_costs(llm_ids=["gpt-4o-mini-2024-07-18"], limit=10)
+            ```
+
+        Args:
+            query: A mongo-style query expression. For convenience, also accepts a cost UUID string.
+            llm_ids: For convenience, filter for a set of llm_ids.
+            offset: The offset to start fetching cost objects from.
+            limit: The maximum number of cost objects to fetch.
+
+        Returns:
+            A CostQuery object.
+        """
+        expr: dict[str, Any] = {
+            "$eq": [
+                {"$literal": "1"},
+                {"$literal": "1"},
+            ],
+        }
+        if isinstance(query, str):
+            expr = {
+                "$eq": [
+                    {"$getField": "id"},
+                    {"$literal": query},
+                ],
+            }
+        elif isinstance(query, Query):
+            expr = query.expr_
+
+        if llm_ids:
+            expr = {
+                "$and": [
+                    expr,
+                    {
+                        "$in": [
+                            {"$getField": "llm_id"},
+                            [{"$literal": llm_id} for llm_id in llm_ids],
+                        ],
+                    },
+                ]
+            }
+        rewritten_query = Query(**{"$expr": expr})
+
+        res = self.server.cost_query(
+            CostQueryReq(
+                project_id=self._project_id(),
+                query=rewritten_query,
+                offset=offset,
+                limit=limit,
+            )
+        )
+        return res.results
 
     ################ Internal Helpers ################
 

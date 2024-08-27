@@ -314,3 +314,22 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.feedback_purge, req)
+
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.cost_create, req)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.cost_purge, req)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        res = self._ref_apply(self._internal_trace_server.cost_query, req)
+        for cost in res.results:
+            if "pricing_level_id" in cost:
+                if cost["pricing_level_id"] != req.project_id:
+                    raise ValueError("Internal Error - Project Mismatch")
+                cost["pricing_level_id"] = original_project_id
+        return res

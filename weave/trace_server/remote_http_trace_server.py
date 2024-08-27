@@ -510,6 +510,28 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
         )
 
+    # Cost API
+    def cost_query(
+        self, req: t.Union[tsi.CostQueryReq, t.Dict[str, t.Any]]
+    ) -> tsi.CostQueryRes:
+        return self._generic_request(
+            "/cost/query", req, tsi.CostQueryReq, tsi.CostQueryRes
+        )
+
+    def cost_create(
+        self, req: t.Union[tsi.CostCreateReq, t.Dict[str, t.Any]]
+    ) -> tsi.CostCreateRes:
+        return self._generic_request(
+            "/cost/create", req, tsi.CostCreateReq, tsi.CostCreateRes
+        )
+
+    def cost_purge(
+        self, req: t.Union[tsi.CostPurgeReq, t.Dict[str, t.Any]]
+    ) -> tsi.CostPurgeRes:
+        return self._generic_request(
+            "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

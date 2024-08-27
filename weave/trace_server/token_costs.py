@@ -2,7 +2,13 @@ from datetime import datetime
 
 from . import trace_server_interface as tsi
 from .clickhouse_schema import SelectableCHCallSchema
+from .errors import InvalidRequest
 from .orm import Column, ColumnType, ParamBuilder, PreparedSelect, Table
+from .validation import (
+    validate_purge_req_in,
+    validate_purge_req_multiple,
+    validate_purge_req_one,
+)
 
 cost_string_fields = [
     "prompt_token_cost_unit",
@@ -27,6 +33,7 @@ cost_numeric_fields = [
 ]
 
 LLM_TOKEN_PRICES_COLUMNS = [
+    Column(name="id", type="string"),
     Column(name="pricing_level", type="string"),
     Column(name="pricing_level_id", type="string"),
     Column(name="provider_id", type="string"),
@@ -477,3 +484,22 @@ def cost_query(
         {final_call_select_with_cost(pb, 'all_calls', 'usage_with_costs', final_select_fields).sql}
     """
     return raw_sql
+
+
+MESSAGE_INVALID_PURGE = "Can only purge by specifying one or more cost ids"
+
+
+def validate_cost_purge_req(req: tsi.CostPurgeReq) -> None:
+    """For safety, we currently only allow purging by cost id."""
+    expr = req.query.expr_.model_dump()
+    keys = list(expr.keys())
+    if len(keys) != 1:
+        raise InvalidRequest(MESSAGE_INVALID_PURGE)
+    if keys[0] == "eq_":
+        validate_purge_req_one(expr, MESSAGE_INVALID_PURGE)
+    elif keys[0] == "in_":
+        validate_purge_req_in(expr, MESSAGE_INVALID_PURGE)
+    elif keys[0] == "or_":
+        validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_PURGE)
+    else:
+        raise InvalidRequest(MESSAGE_INVALID_PURGE)

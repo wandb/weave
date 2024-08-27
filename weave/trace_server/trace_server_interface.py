@@ -564,6 +564,55 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
+class CostCreateInput(BaseModel):
+    prompt_token_cost: Optional[float] = 0.015
+    completion_token_cost: Optional[float] = 0.015
+    prompt_token_cost_unit: Optional[str] = "USD"
+    completion_token_cost_unit: Optional[str] = "USD"
+    effective_date: Optional[datetime.datetime] = None
+    provider_id: Optional[str] = None
+
+
+class CostCreateReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    costs: Dict[str, CostCreateInput]
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+# Returns a list of tuples of (llm_id, cost_id)
+class CostCreateRes(BaseModel):
+    ids: list[tuple[str, str]]
+
+
+class CostQueryReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    fields: Optional[list[str]] = Field(
+        default=None,
+        examples=[["id", "llm_id", "prompt_token_cost", "completion_token_cost"]],
+    )
+    query: Optional[Query] = None
+    # TODO: From FeedbackQueryReq,
+    # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
+    # TODO: Might be nice to have shortcut for single field and implied ASC direction
+    sort_by: Optional[List[SortBy]] = None
+    limit: Optional[int] = Field(default=None, examples=[10])
+    offset: Optional[int] = Field(default=None, examples=[0])
+
+
+class CostQueryRes(BaseModel):
+    # Note: this is not a list of costs because user can request any fields.
+    results: list[dict[str, Any]]
+
+
+class CostPurgeReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    query: Query
+
+
+class CostPurgeRes(BaseModel):
+    pass
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -584,6 +633,11 @@ class TraceServerInterface(Protocol):
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
     def op_read(self, req: OpReadReq) -> OpReadRes: ...
     def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
+
+    # Cost API
+    def cost_create(self, req: CostCreateReq) -> CostCreateRes: ...
+    def cost_query(self, req: CostQueryReq) -> CostQueryRes: ...
+    def cost_purge(self, req: CostPurgeReq) -> CostPurgeRes: ...
 
     # Obj API
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
