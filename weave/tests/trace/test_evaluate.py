@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 import weave
-from weave import Dataset, Evaluation, Model, ref_base
+from weave import Dataset, Evaluation, Model
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
 
 pytestmark = pytest.mark.webtest

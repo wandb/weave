@@ -122,7 +122,7 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
-        from . import ref_base
+        from weave.legacy import ref_base
 
         if (
             context_state.ref_tracking_enabled()
@@ -1381,7 +1381,7 @@ class RefType(Type):
         return None
 
     def save_instance(self, obj, artifact, name):
-        from . import ref_base
+        from weave.legacy import ref_base
 
         obj_ref = ref_base.get_ref(obj)
         if obj_ref is None:

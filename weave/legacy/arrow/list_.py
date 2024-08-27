@@ -12,7 +12,6 @@ import typing_extensions
 
 from weave import (
     errors,
-    ref_base,
     ref_util,
     weave_internal,
 )
@@ -27,6 +26,7 @@ from weave.legacy import (
     op_def,
     op_def_type,
     node_ref,
+    ref_base,
 )
 from weave.legacy.arrow.arrow import (
     ArrowWeaveListType,
