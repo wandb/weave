@@ -1,6 +1,6 @@
 import pytest
 
-from weave.legacy.util import relpath_no_syscalls
+from weave.legacy.weave.util import relpath_no_syscalls
 
 
 @pytest.mark.parametrize(

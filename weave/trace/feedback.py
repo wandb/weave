@@ -5,7 +5,7 @@ from typing import Any, Iterable, Iterator, Optional
 
 from rich.table import Table
 
-from weave.legacy import util
+from weave.legacy.weave import util
 from weave.trace import rich_pydantic_util
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.refs import parse_uri

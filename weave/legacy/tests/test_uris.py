@@ -1,7 +1,7 @@
 import pytest
 
-from weave.legacy import uris
-from weave.legacy.artifact_wandb import WeaveWBArtifactURI
+from weave.legacy.weave import uris
+from weave.legacy.weave.artifact_wandb import WeaveWBArtifactURI
 
 URIS = [
     "op-get",

@@ -3,8 +3,8 @@ import time
 
 import pytest
 
-from weave.legacy import api as weave
-from weave.legacy import (
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import (
     box,
     context,
     context_state,
@@ -13,8 +13,8 @@ from weave.legacy import (
     storage,
     weave_internal,
 )
-from weave.legacy import weave_types as types
-from weave.legacy.ops_domain import table as table_ops
+from weave.legacy.weave import weave_types as types
+from weave.legacy.weave.ops_domain import table as table_ops
 
 from weave.legacy.tests.util import weavejs_ops
 

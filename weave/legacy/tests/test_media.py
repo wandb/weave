@@ -3,8 +3,8 @@ import dataclasses
 import numpy as np
 import pytest
 
-from weave.legacy import storage
-from weave.legacy import weave_types as types
+from weave.legacy.weave import storage
+from weave.legacy.weave import weave_types as types
 
 
 def test_nparray():

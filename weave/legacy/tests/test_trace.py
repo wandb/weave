@@ -1,10 +1,10 @@
 import re
 
-from weave.legacy import api as weave
-from weave.legacy import graph, storage
-from weave.legacy.weave_internal import make_const_node
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import graph, storage
+from weave.legacy.weave.weave_internal import make_const_node
 
-from ...legacy import trace_legacy
+from ...legacy.weave import trace_legacy
 
 
 def test_node_expr():

@@ -1,10 +1,10 @@
 import numpy as np
 
-from weave.legacy import artifact_fs, artifact_wandb
-from weave.legacy import weave_types as types
-from weave.legacy.ops_domain import table
+from weave.legacy.weave import artifact_fs, artifact_wandb
+from weave.legacy.weave import weave_types as types
+from weave.legacy.weave.ops_domain import table
 
-from ...legacy import types_numpy as numpy_types
+from ...legacy.weave import types_numpy as numpy_types
 
 
 def test_construct_numpy_type():

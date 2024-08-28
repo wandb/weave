@@ -25,7 +25,7 @@ def cli() -> None:
 # def start_ui() -> None:
 #     print("Starting server...")
 #     try:
-#         from weave.legacy import server
+#         from weave.legacy.weave import server
 #     except ModuleNotFoundError:
 #         print("Run 'pip install weave[engine]' to use the local server.")
 #         sys.exit(1)

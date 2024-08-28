@@ -7,19 +7,19 @@ import numpy as np
 import pytest
 import wandb
 
-from weave.legacy import api as weave
-from weave.legacy import (
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import (
     artifact_mem,
     artifact_wandb,
     mappers_python,
     ops_arrow,
     storage,
 )
-from weave.legacy import weave_types as types
-from weave.legacy.arrow import list_ as arrow
-from weave.legacy.weave_internal import make_const_node
+from weave.legacy.weave import weave_types as types
+from weave.legacy.weave.arrow import list_ as arrow
+from weave.legacy.weave.weave_internal import make_const_node
 
-from ...legacy.weavejs_fixes import recursively_unwrap_unions
+from ...legacy.weave.weavejs_fixes import recursively_unwrap_unions
 from . import test_helpers
 
 

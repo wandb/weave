@@ -1,6 +1,6 @@
 import typing
 
-from weave.legacy import op_def_type
+from weave.legacy.weave import op_def_type
 
 
 class MyTypedDict(typing.TypedDict):

@@ -1,8 +1,8 @@
 import math
 import typing
 
-from weave.legacy import api as weave
-from weave.legacy import context, context_state
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import context, context_state
 
 
 class XOnly(typing.TypedDict):
