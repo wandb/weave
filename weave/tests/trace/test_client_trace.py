@@ -16,8 +16,10 @@ import weave
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
 from weave.trace.vals import MissingSelfInstanceError
+from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
@@ -2566,3 +2568,129 @@ def test_calls_stream_column_expansion(client):
     )
     call_result = list(res)[0]
     assert call_result.output == nested_ref.uri()
+
+
+class Custom(weave.Object):
+    val: dict
+
+
+def test_object_with_disallowed_keys(client):
+    name = "thing % with / disallowed : keys"
+    obj = Custom(name=name, val={"1": 1})
+
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == "thing-with-disallowed-keys"
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
+    with pytest.raises(Exception):
+        client.server.obj_create(create_req)
+
+
+CHAR_LIMIT = 128
+
+
+def test_object_with_char_limit(client):
+    name = "l" * CHAR_LIMIT
+    obj = Custom(name=name, val={"1": 1})
+
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == name
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
+    client.server.obj_create(create_req)
+
+
+def test_object_with_char_over_limit(client):
+    name = "l" * (CHAR_LIMIT + 1)
+    obj = Custom(name=name, val={"1": 1})
+
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == name[:-1]
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
+    with pytest.raises(Exception):
+        client.server.obj_create(create_req)
+
+
+chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
+
+
+def test_objects_and_keys_with_special_characters(client):
+    # make sure to include ":", "/" which are URI-related
+
+    name_with_special_characters = "n-a_m.e: /" + chars + "100"
+    dict_payload = {name_with_special_characters: "hello world"}
+
+    obj = Custom(name=name_with_special_characters, val=dict_payload)
+
+    weave.publish(obj)
+    assert obj.ref is not None
+
+    entity, project = client._project_id().split("/")
+    project_id = f"{entity}/{project}"
+    ref_base = f"weave:///{project_id}"
+    exp_name = sanitize_object_name(name_with_special_characters)
+    assert exp_name == "n-a_m.e-100"
+    exp_key = extra_value_quoter(name_with_special_characters)
+    assert (
+        exp_key
+        == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
+    )
+    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
+
+    exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
+    assert obj.ref.uri() == exp_obj_ref
+
+    @weave.op
+    def test(obj: Custom):
+        return obj.val[name_with_special_characters]
+
+    test.name = name_with_special_characters
+
+    res = test(obj)
+
+    exp_res_ref = f"{exp_obj_ref}/attr/val/key/{exp_key}"
+    found_ref = res.ref.uri()
+    assert res == "hello world"
+    assert found_ref == exp_res_ref
+
+    gotten_res = weave.ref(found_ref).get()
+    assert gotten_res == "hello world"
+
+    exp_op_digest = "xEPCVKKjDWxKzqaCxxU09jD82FGGf5WcNy2fC9VUF3M"
+    exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
+
+    found_ref = test.ref.uri()
+    assert found_ref == exp_op_ref
+    gotten_fn = weave.ref(found_ref).get()
+    assert gotten_fn(obj) == "hello world"

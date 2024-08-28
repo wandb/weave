@@ -60,7 +60,7 @@ def _test_basic_publish(user_fixture):
         uri
         == f"wandb-artifact:///{user_fixture.username}/weave/list:0cdf3358dc939f961ca9/obj"
     )
-    assert weave.ref_base.Ref.from_str(uri).get() == [1, 2, 3]
+    assert weave.legacy.ref_base.Ref.from_str(uri).get() == [1, 2, 3]
 
 
 # Example of end to end integration test
