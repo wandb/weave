@@ -392,6 +392,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             refs = list(refs_to_resolve.values())
             parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in refs]
+            # Remove table refs from refs_to_resolve
+            for i, parsed_ref in enumerate(parsed_raw_refs):
+                if isinstance(parsed_ref, refs_internal.InternalTableRef):
+                    refs_to_resolve.pop((i, col))
+                    parsed_raw_refs.pop(i)
+
             parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
             vals = self._refs_read_batch_within_project(
                 project_id, parsed_refs, ref_cache
