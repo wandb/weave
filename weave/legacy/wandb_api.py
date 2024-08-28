@@ -14,9 +14,9 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 
-from weave import engine_trace, errors
+from weave import errors
 from weave import environment as weave_env
-from weave.legacy import wandb_client_api
+from weave.legacy import wandb_client_api, engine_trace
 
 # Importing at the top-level namespace so other files can import from here.
 from weave.legacy.context_state import WandbApiContext, _wandb_api_context

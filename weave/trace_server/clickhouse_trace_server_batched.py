@@ -29,7 +29,7 @@ import json
 import logging
 import threading
 import typing
-from collections import defaultdict
+from collections import Counter, defaultdict
 from contextlib import contextmanager
 from zoneinfo import ZoneInfo
 
@@ -67,6 +67,11 @@ from .feedback import (
     validate_feedback_purge_req,
 )
 from .orm import ParamBuilder, Row
+from .trace_server_common import (
+    LRUCache,
+    get_nested_key,
+    set_nested_key,
+)
 from .trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
@@ -292,10 +297,114 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         select_columns = [c.field for c in cq.select_fields]
-        for row in raw_res:
-            yield tsi.CallSchema.model_validate(
-                _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+
+        if not req.expand_columns:
+            for row in raw_res:
+                yield tsi.CallSchema.model_validate(
+                    _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+                )
+
+        else:
+            ref_cache = LRUCache(max_size=1000)
+
+            batch_size = 10
+            batch = []
+            for row in raw_res:
+                call_dict = _ch_call_dict_to_call_schema_dict(
+                    dict(zip(select_columns, row))
+                )
+                batch.append(call_dict)
+
+                if len(batch) >= batch_size:
+                    hydrated_batch = self._hydrate_calls(
+                        req.project_id, batch, req.expand_columns, ref_cache
+                    )
+                    for call in hydrated_batch:
+                        yield tsi.CallSchema.model_validate(call)
+
+                    # *** Dynamic Batch Size ***
+                    # count the number of columns at each depth
+                    depths = Counter(col.count(".") for col in req.expand_columns)
+                    # take the max number of columns at any depth
+                    max_count_at_ref_depth = max(depths.values())
+                    # divide max refs that we can resolve 1000 refs at any depth
+                    max_size = 1000 // max_count_at_ref_depth
+                    # double batch size up to what refs_read_batch can handle
+                    batch_size = min(max_size, batch_size * 2)
+                    batch = []
+
+            hydrated_batch = self._hydrate_calls(
+                req.project_id, batch, req.expand_columns, ref_cache
             )
+            for call in hydrated_batch:
+                yield tsi.CallSchema.model_validate(call)
+
+    def _hydrate_calls(
+        self,
+        project_id: str,
+        calls: list[dict[str, typing.Any]],
+        expand_columns: typing.List[str],
+        ref_cache: LRUCache,
+    ) -> list[dict[str, typing.Any]]:
+        if len(calls) == 0:
+            return calls
+
+        calls = self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
+        return calls
+
+    def _get_refs_to_resolve(
+        self, calls: list[dict[str, typing.Any]], expand_columns: typing.List[str]
+    ) -> typing.Dict[tuple[int, str], refs_internal.InternalObjectRef]:
+        refs_to_resolve: typing.Dict[
+            tuple[int, str], refs_internal.InternalObjectRef
+        ] = {}
+        for i, call in enumerate(calls):
+            for col in expand_columns:
+                if col in call:
+                    val = call[col]
+                else:
+                    val = get_nested_key(call, col)
+                    if not val:
+                        continue
+
+                if not refs_internal.any_will_be_interpreted_as_ref_str(val):
+                    continue
+
+                ref = refs_internal.parse_internal_uri(val)
+                if isinstance(ref, refs_internal.InternalTableRef):
+                    continue
+
+                refs_to_resolve[(i, col)] = ref
+        return refs_to_resolve
+
+    def _expand_call_refs(
+        self,
+        project_id: str,
+        calls: list[dict[str, typing.Any]],
+        expand_columns: typing.List[str],
+        ref_cache: LRUCache,
+    ) -> list[dict[str, typing.Any]]:
+        # format expand columns by depth, iterate through each batch in order
+        expand_column_by_depth = defaultdict(list)
+        for col in expand_columns:
+            expand_column_by_depth[col.count(".")].append(col)
+
+        for depth in sorted(expand_column_by_depth.keys()):
+            refs_to_resolve = self._get_refs_to_resolve(
+                calls, expand_column_by_depth[depth]
+            )
+            if not refs_to_resolve:
+                continue
+
+            vals = self._refs_read_batch_within_project(
+                project_id, list(refs_to_resolve.values()), ref_cache
+            )
+            for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
+                if isinstance(val, dict) and "_ref" not in val:
+                    val["_ref"] = ref.uri()
+                set_nested_key(calls[i], col, val)
+
+        return calls
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
@@ -711,8 +820,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Business logic to ensure that we don't have raw TableRefs (not allowed)
         if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
-        parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
 
+        parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
+        vals = self._parsed_refs_read_batch(parsed_refs)
+
+        return tsi.RefsReadBatchRes(vals=vals)
+
+    def _parsed_refs_read_batch(
+        self,
+        parsed_refs: ObjRefListType,
+        root_val_cache: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> list[typing.Any]:
         # Next, group the refs by project_id
         refs_by_project_id: dict[str, ObjRefListType] = defaultdict(list)
         for ref in parsed_refs:
@@ -727,19 +845,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for project in refs_by_project_id:
             project_refs = refs_by_project_id[project]
             project_results = self._refs_read_batch_within_project(
-                project, refs_by_project_id[project]
+                project,
+                refs_by_project_id[project],
+                root_val_cache,
             )
             for ref, result in zip(project_refs, project_results):
                 final_result_cache[make_ref_cache_key(ref)] = result
 
         # Return the final data payload
-        vals = [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
-        return tsi.RefsReadBatchRes(vals=vals)
+        return [final_result_cache[make_ref_cache_key(ref)] for ref in parsed_refs]
 
     def _refs_read_batch_within_project(
-        self, project_id_scope: str, parsed_refs: ObjRefListType
+        self,
+        project_id_scope: str,
+        parsed_refs: ObjRefListType,
+        root_val_cache: typing.Optional[typing.Dict[str, typing.Any]],
     ) -> list[typing.Any]:
-        root_val_cache: typing.Dict[str, typing.Any] = {}
+        if root_val_cache is None:
+            root_val_cache = {}
 
         def make_root_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
             return f"{ref.project_id}/{ref.name}/{ref.version}"

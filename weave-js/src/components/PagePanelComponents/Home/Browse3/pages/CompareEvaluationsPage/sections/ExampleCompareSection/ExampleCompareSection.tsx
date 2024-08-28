@@ -15,9 +15,9 @@ import {Button} from '../../../../../../../Button';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
+import {isWeaveRef} from '../../../../filters/common';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
-import {isRef} from '../../../common/util';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
@@ -944,7 +944,7 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
     return <NotApplicable />;
   } else if (typeof value === 'object') {
     text = JSON.stringify(value || {}, null, 2);
-  } else if (typeof value === 'string' && isRef(value)) {
+  } else if (typeof value === 'string' && isWeaveRef(value)) {
     return <SmallRef objRef={parseRef(value)} />;
   } else {
     text = value.toString();

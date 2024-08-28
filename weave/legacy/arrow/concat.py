@@ -30,7 +30,7 @@ from weave.legacy.language_features.tagging import tagged_value_type
 
 DEBUG = False
 
-from weave import engine_trace
+from weave.legacy import engine_trace
 
 tracer = engine_trace.tracer()
 

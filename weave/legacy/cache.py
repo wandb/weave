@@ -6,8 +6,8 @@ import shutil
 import time
 import typing
 
-from weave import engine_trace, environment, errors
-from weave.legacy import context_state, wandb_api
+from weave import environment, errors
+from weave.legacy import context_state, wandb_api, engine_trace
 
 statsd = engine_trace.statsd()  # type: ignore
 logger = logging.getLogger("root")

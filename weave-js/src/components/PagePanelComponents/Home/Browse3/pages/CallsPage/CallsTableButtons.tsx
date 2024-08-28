@@ -118,6 +118,16 @@ export const ExportSelector = ({
     }
 
     const startTime = Date.now();
+
+    visibleColumns.sort((a, b) => b.length - a.length);
+    const leafColumns: string[] = [];
+    for (const col of visibleColumns) {
+      if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
+        continue;
+      }
+      leafColumns.push(col);
+    }
+
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -127,7 +137,8 @@ export const ExportSelector = ({
       offset,
       sortBy,
       filterBy,
-      columns
+      leafColumns,
+      refColumnsToExpand
     ).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];

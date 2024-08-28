@@ -1,5 +1,5 @@
 from ... import api as weave
-from ... import registry_mem
+from ...legacy import registry_mem
 
 
 def test_mapped_add():

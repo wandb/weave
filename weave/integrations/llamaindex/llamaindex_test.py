@@ -81,7 +81,7 @@ def fake_api_key() -> Generator[None, None, None]:
     before_record_request=filter_body,
 )
 def test_llamaindex_quickstart(
-    client: weave.weave_client.WeaveClient, fake_api_key: None
+    client: weave.trace.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
     from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
@@ -105,7 +105,7 @@ def test_llamaindex_quickstart(
 )
 @pytest.mark.asyncio
 async def test_llamaindex_quickstart_async(
-    client: weave.weave_client.WeaveClient, fake_api_key: None
+    client: weave.trace.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
     from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
