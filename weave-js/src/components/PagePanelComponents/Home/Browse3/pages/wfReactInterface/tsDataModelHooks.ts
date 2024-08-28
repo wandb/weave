@@ -334,6 +334,9 @@ const useCallsNoExpansion = (
         result: [],
       };
     } else {
+      // Check if the query contained a column request. Only cache calls
+      // if no columns were requested, only then are we guaranteed to get
+      // all the call data
       if (!columns) {
         allResults.forEach(call => {
           callCache.set(
