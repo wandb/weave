@@ -34,7 +34,6 @@ from typing import (
     Any,
     Dict,
     Iterator,
-    List,
     Optional,
     Sequence,
     Set,
@@ -160,7 +159,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._password = password
         self._database = database
         self._flush_immediately = True
-        self._call_batch: List[List[Any]] = []
+        self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
 
     @classmethod
@@ -352,7 +351,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         calls: list[dict[str, Any]],
-        expand_columns: List[str],
+        expand_columns: list[str],
         ref_cache: LRUCache,
     ) -> list[dict[str, Any]]:
         if len(calls) == 0:
@@ -362,7 +361,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return calls
 
     def _get_refs_to_resolve(
-        self, calls: list[dict[str, Any]], expand_columns: List[str]
+        self, calls: list[dict[str, Any]], expand_columns: list[str]
     ) -> Dict[tuple[int, str], ri.InternalObjectRef]:
         refs_to_resolve: Dict[tuple[int, str], ri.InternalObjectRef] = {}
         for i, call in enumerate(calls):
@@ -388,7 +387,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         calls: list[dict[str, Any]],
-        expand_columns: List[str],
+        expand_columns: list[str],
         ref_cache: LRUCache,
     ) -> list[dict[str, Any]]:
         # format expand columns by depth, iterate through each batch in order
@@ -513,7 +512,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         parameters = {}
-        conds: List[str] = ["is_op = 1"]
+        conds: list[str] = ["is_op = 1"]
         if req.filter:
             if req.filter.op_names:
                 conds.append("object_id IN {op_names: Array(String)}")
@@ -743,11 +742,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         digest: str,
-        conditions: Optional[List[str]] = None,
+        conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         parameters: Optional[Dict[str, Any]] = None,
-    ) -> List[tsi.TableRowSchema]:
+    ) -> list[tsi.TableRowSchema]:
         conds = ["project_id = {project_id: String}"]
         if conditions:
             conds.extend(conditions)
@@ -1232,7 +1231,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # def __del__(self) -> None:
     #     self.ch_client.close()
 
-    def _insert_call_batch(self, batch: List) -> None:
+    def _insert_call_batch(self, batch: list) -> None:
         if batch:
             settings = {}
             if self._use_async_insert:
@@ -1248,10 +1247,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _select_objs_query(
         self,
         project_id: str,
-        conditions: Optional[List[str]] = None,
+        conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
         parameters: Optional[Dict[str, Any]] = None,
-    ) -> List[SelectableCHObjSchema]:
+    ) -> list[SelectableCHObjSchema]:
         if not conditions:
             conditions = ["1 = 1"]
 
@@ -1319,7 +1318,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """,
             {"project_id": project_id, **parameters},
         )
-        result: List[SelectableCHObjSchema] = []
+        result: list[SelectableCHObjSchema] = []
         for row in query_result:
             result.append(
                 SelectableCHObjSchema.model_validate(
@@ -1403,7 +1402,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         table: str,
         data: Sequence[Sequence[Any]],
-        column_names: List[str],
+        column_names: list[str],
         settings: Optional[Dict[str, Any]] = None,
     ) -> QuerySummary:
         try:
@@ -1669,9 +1668,9 @@ def _digest_is_version_like(digest: str) -> Tuple[bool, int]:
 
 
 def find_call_descendants(
-    root_ids: List[str],
-    all_calls: List[SelectableCHCallSchema],
-) -> List[str]:
+    root_ids: list[str],
+    all_calls: list[SelectableCHCallSchema],
+) -> list[str]:
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:
@@ -1679,7 +1678,7 @@ def find_call_descendants(
             children_map[call.parent_id].append(call.id)
 
     # do DFS to get all descendants
-    def find_all_descendants(root_ids: List[str]) -> Set[str]:
+    def find_all_descendants(root_ids: list[str]) -> Set[str]:
         descendants = set()
         stack = root_ids
 
