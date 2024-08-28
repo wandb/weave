@@ -26,12 +26,12 @@ Classes for working with feedback on a project or ref level.
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L19"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L17"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Feedbacks`
 A collection of Feedback objects with utilities. 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L24"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L22"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `__init__`
 
@@ -48,7 +48,7 @@ __init__(show_refs: bool, feedbacks: Optional[Iterable[Feedback]] = None) → No
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L30"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L28"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `refs`
 
@@ -61,12 +61,12 @@ Return the unique refs associated with these feedbacks.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L82"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L80"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FeedbackQuery`
 Lazy-loading object for fetching feedback from the server. 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L95"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L93"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `__init__`
 
@@ -90,7 +90,7 @@ __init__(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L143"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L141"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `execute`
 
@@ -104,7 +104,7 @@ execute() → Feedbacks
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L124"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L122"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `refresh`
 
@@ -118,7 +118,7 @@ refresh() → Feedbacks
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L149"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L147"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `refs`
 
@@ -133,12 +133,12 @@ refs() → Refs
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L166"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L164"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `RefFeedbackQuery`
 Object for interacting with feedback associated with a particular ref. 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L171"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L169"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `__init__`
 
@@ -155,7 +155,7 @@ __init__(ref: str) → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L202"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L200"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `add`
 
@@ -174,7 +174,7 @@ feedback_type: A string identifying the type of feedback. The "wandb." prefix is
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L230"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L228"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `add_note`
 
@@ -188,7 +188,7 @@ add_note(note: str, creator: Optional[str] = None) → str
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L221"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L219"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `add_reaction`
 
@@ -202,7 +202,7 @@ add_reaction(emoji: str, creator: Optional[str] = None) → str
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L143"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L141"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `execute`
 
@@ -216,7 +216,7 @@ execute() → Feedbacks
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L239"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L237"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `purge`
 
@@ -230,7 +230,7 @@ purge(feedback_id: str) → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L124"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L122"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `refresh`
 
@@ -244,7 +244,7 @@ refresh() → Feedbacks
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L149"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/feedback.py#L147"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `refs`
 

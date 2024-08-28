@@ -35,7 +35,7 @@ The top-level functions and classes for working with Weave.
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L28"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L24"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `init`
 
@@ -65,7 +65,7 @@ Following init, calls of weave.op() decorated functions will be logged to the sp
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L96"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L92"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `publish`
 
@@ -93,7 +93,7 @@ TODO: Need to document how name works with this change.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L144"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L140"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `ref`
 
@@ -167,7 +167,7 @@ print(mycall.id)
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L249"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L245"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `finish`
 
