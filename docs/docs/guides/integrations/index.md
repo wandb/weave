@@ -19,7 +19,10 @@ LLM providers are the vendors that offer access to large language models for gen
 - **[Groq](/guides/integrations/groq)**
 - **[Open Router](/guides/integrations/openrouter)**
 - **[LiteLLM](/guides/integrations/litellm)**
-- **[Local Models](/guides/integrations/local_models)**: For when you're running models on your own infrastructure.
+- **[Cerebras](/guides/integrations/cerebras)**
+
+
+**[Local Models](/guides/integrations/local_models)**: For when you're running models on your own infrastructure.
 
 ## Frameworks
 

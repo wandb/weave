@@ -84,6 +84,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/cerebras",
             "guides/integrations/cohere",
             "guides/integrations/mistral",
+            "guides/integrations/google-gemini",
             "guides/integrations/together_ai",
             "guides/integrations/groq",
             "guides/integrations/openrouter",
