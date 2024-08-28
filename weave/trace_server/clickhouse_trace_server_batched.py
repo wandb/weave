@@ -390,22 +390,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            refs = list(refs_to_resolve.values())
-            parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in refs]
+            parsed_raw_refs = [
+                refs_internal.parse_internal_uri(r)
+                for r in list(refs_to_resolve.values())
+            ]
             # Remove table refs from refs_to_resolve
             for i, parsed_ref in enumerate(parsed_raw_refs):
                 if isinstance(parsed_ref, refs_internal.InternalTableRef):
                     refs_to_resolve.pop((i, col))
                     parsed_raw_refs.pop(i)
-                    refs.pop(i)
 
-            parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
             vals = self._refs_read_batch_within_project(
-                project_id, parsed_refs, ref_cache
+                project_id, typing.cast(ObjRefListType, parsed_raw_refs), ref_cache
             )
-            for (i, col), val, ref in zip(refs_to_resolve, vals, refs):
+            for (i, col), val, ref in zip(refs_to_resolve, vals, parsed_raw_refs):
                 if isinstance(val, dict) and "_ref" not in val:
-                    val["_ref"] = ref
+                    val["_ref"] = ref.uri()
                 set_nested_key(calls[i], col, val)
 
         return calls
