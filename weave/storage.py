@@ -17,10 +17,11 @@ from weave.legacy import (
     box,
     graph,
     mappers_python,
+    ref_base,
     timestamp,
 )
 
-from . import errors, ref_base
+from . import errors
 from . import weave_types as types
 
 Ref = ref_base.Ref

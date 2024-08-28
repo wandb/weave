@@ -26,7 +26,6 @@ from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
 from weave import (
-    engine_trace,
     environment,
     errors,
     filesystem,
@@ -37,6 +36,7 @@ from weave import (
 )
 from weave.legacy import (
     context_state,
+    engine_trace,
     graph,
     registry_mem,
     value_or_error,
@@ -44,7 +44,7 @@ from weave.legacy import (
     weavejs_fixes,
 )
 from weave.legacy.language_features.tagging import tag_store
-from weave.server_error_handling import client_safe_http_exceptions_as_werkzeug
+from weave.legacy.server_error_handling import client_safe_http_exceptions_as_werkzeug
 
 logger = logging.getLogger(__name__)
 

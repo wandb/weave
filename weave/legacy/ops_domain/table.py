@@ -5,7 +5,7 @@ import json
 import logging
 import typing
 
-from weave import engine_trace, errors, util, weave_internal
+from weave import errors, util, weave_internal
 from weave import weave_types as types
 from weave.query_api import op, weave_class
 from weave.legacy import (
@@ -14,6 +14,7 @@ from weave.legacy import (
     io_service,
     ops_arrow,
     wandb_util,
+    engine_trace,
 )
 from weave.legacy import timestamp as weave_timestamp
 from weave.legacy.ops_domain import trace_tree, wbmedia

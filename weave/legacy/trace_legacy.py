@@ -3,7 +3,7 @@ import typing
 
 from weave.legacy import artifact_local, graph, runs
 
-from .. import ref_base
+from . import ref_base
 from . import errors
 from .. import weave_types as types
 
