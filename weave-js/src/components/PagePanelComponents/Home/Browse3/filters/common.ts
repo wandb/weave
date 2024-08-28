@@ -12,7 +12,7 @@ import {isWeaveObjectRef} from '@wandb/weave/react';
 import _ from 'lodash';
 
 import {parseRefMaybe} from '../../Browse2/SmallRef';
-import {isRef} from '../pages/common/util';
+import {WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
@@ -232,6 +232,16 @@ const WeaveRefStringSymbol = Symbol('WeaveRefString');
 // Define RefString type using the unique symbol
 export type WeaveRefString = string & {[WeaveRefStringSymbol]: never};
 
+const isRefPrefixedString = (value: any): boolean => {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  if (value.startsWith(WEAVE_REF_PREFIX)) {
+    return true;
+  }
+  return false;
+};
+
 /**
  * `isWeaveRef` is a very conservative check that will ensure the passed
  * in value is a valid ref string - capabable of being safely parsed into
@@ -240,7 +250,7 @@ export type WeaveRefString = string & {[WeaveRefStringSymbol]: never};
  * should be used as the appropriate type guard before parsing a ref.
  */
 export const isWeaveRef = (value: any): value is WeaveRefString => {
-  if (!isRef(value)) {
+  if (!isRefPrefixedString(value)) {
     return false;
   }
   const parsed = parseRefMaybe(value);
