@@ -433,7 +433,7 @@ def teardown(setup_response: SetupResponse):
     setup_response.fake_io.cleanup()
     wandb_client_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api
     io_service.get_sync_client = setup_response.orig_io_service_client  # type: ignore
-    wandb.Artifact = OriginalArtifactSymbol
+    wandb.Artifact = OriginalArtifactSymbol  # type: ignore
 
 
 entity_payload = {
