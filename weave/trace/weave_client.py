@@ -10,7 +10,7 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
-from weave.legacy import urls
+from weave.legacy.weave import urls
 from weave.trace import call_context, trace_sentry
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.exception import exception_to_json_str
@@ -52,7 +52,7 @@ from weave.trace_server.trace_server_interface import (
 )
 
 if typing.TYPE_CHECKING:
-    from ..legacy import ref_base
+    from ..legacy.weave import ref_base
 
 
 # Controls if objects can have refs to projects not the WeaveClient project.
