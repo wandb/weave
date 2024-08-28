@@ -197,6 +197,7 @@ const sidebars: SidebarsConfig = {
         },
         {
           label: "Technical FAQ",
+          type: "category",
           items: [
             {
               type: 'doc',

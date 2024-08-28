@@ -43,6 +43,7 @@ const config: Config = {
           editUrl: "https://github.com/wandb/weave/blob/master/docs/",
           routeBasePath: "/",
           docItemComponent: "@theme/ApiItem", // Derived from docusaurus-theme-openapi
+          showLastUpdateTime: true,
         },
         theme: {
           customCss: "./src/css/custom.scss",
