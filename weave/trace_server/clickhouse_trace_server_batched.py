@@ -397,6 +397,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if isinstance(parsed_ref, refs_internal.InternalTableRef):
                     refs_to_resolve.pop((i, col))
                     parsed_raw_refs.pop(i)
+                    refs.pop(i)
 
             parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
             vals = self._refs_read_batch_within_project(
