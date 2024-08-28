@@ -85,7 +85,7 @@ def init_weave(
         import wandb
 
         print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
-        wandb.login(anonymous="never", force=True)
+        wandb.login(anonymous="never", force=True)  # type: ignore
         wandb_api.init()
         wandb_context = wandb_api.get_wandb_api_context()
 
