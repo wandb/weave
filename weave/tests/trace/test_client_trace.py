@@ -2596,6 +2596,52 @@ def test_object_with_disallowed_keys(client):
         client.server.obj_create(create_req)
 
 
+CHAR_LIMIT = 128
+
+
+def test_object_with_char_limit(client):
+    name = "l" * CHAR_LIMIT
+    obj = Custom(name=name, val={"1": 1})
+
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == name
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
+    client.server.obj_create(create_req)
+
+
+def test_object_with_char_over_limit(client):
+    name = "l" * (CHAR_LIMIT + 1)
+    obj = Custom(name=name, val={"1": 1})
+
+    weave.publish(obj)
+
+    # we sanitize the name
+    assert obj.ref.name == name[:-1]
+
+    create_req = tsi.ObjCreateReq.model_validate(
+        dict(
+            obj=dict(
+                project_id=client._project_id(),
+                object_id=name,
+                val={"1": 1},
+            )
+        )
+    )
+    with pytest.raises(Exception):
+        client.server.obj_create(create_req)
+
+
 chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
 
 
