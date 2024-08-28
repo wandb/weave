@@ -91,7 +91,7 @@ export const EMPTY_PROPS_OPERATIONS: EmptyProps = {
   moreInformation: (
     <>
       Learn{' '}
-      <TargetBlank href="https://wandb.github.io/weave/guides/tracking/ops">
+      <TargetBlank href="https://wandb.github.io/weave/guides/tracing/ops">
         operations basics
       </TargetBlank>{' '}
       or see how to{' '}

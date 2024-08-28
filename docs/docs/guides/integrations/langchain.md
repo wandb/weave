@@ -133,7 +133,7 @@ For more detailed information, refer to the [LangChain documentation](https://py
 
 ## Models and Evaluations
 
-Organizing and evaluating LLMs in applications for various use cases is challenging with multiple components, such as prompts, model configurations, and inference parameters. Using the [`weave.Model`](/guides/core-types/models), you can capture and organize experimental details like system prompts or the models you use, making it easier to compare different iterations.
+Organizing and evaluating LLMs in applications for various use cases is challenging with multiple components, such as prompts, model configurations, and inference parameters. Using the [`weave.Model`](/guides/models), you can capture and organize experimental details like system prompts or the models you use, making it easier to compare different iterations.
 
 The following example demonstrates wrapping a Langchain chain in a `WeaveModel`:
 
@@ -188,10 +188,10 @@ This code creates a model that can be visualized in the Weave UI:
 [![langchain_model.png](imgs/langchain_model.png)](https://wandb.ai/parambharat/langchain_demo/weave/object-versions?filter=%7B%22baseObjectClass%22%3A%22Model%22%7D&peekPath=%2Fparambharat%2Flangchain_demo%2Fobjects%2FExtractFruitsModel%2Fversions%2FBeoL6WuCH8wgjy6HfmuBMyKzArETg1oAFpYaXZSq1hw%3F%26)
 
 
-You can also use Weave Models with `serve`, and [`Evaluations`](/guides/core-types/evaluations).
+You can also use Weave Models with `serve`, and [`Evaluations`](/guides/evaluations).
 
 ### Evaluations
-Evaluations help you measure the performance of your models. By using the [`weave.Evaluation`](/guides/core-types/evaluations) class, you can capture how well your model performs on specific tasks or datasets, making it easier to compare different models and iterations of your application. The following example demonstrates how to evaluate the model we created:
+Evaluations help you measure the performance of your models. By using the [`weave.Evaluation`](/guides/evaluations) class, you can capture how well your model performs on specific tasks or datasets, making it easier to compare different models and iterations of your application. The following example demonstrates how to evaluate the model we created:
 
 
 ```python

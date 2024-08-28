@@ -25,14 +25,14 @@ You can use Weave to:
 Weave's **core types** layer contains everything you need for organizing Generative AI projects, with built-in lineage, tracking, and reproducibility.
 
 - **[Datasets](/guides/core-types/datasets)**: Version, store, and share rich tabular data.
-- **[Models](/guides/core-types/models)**: Version, store, and share parameterized functions.
-- **[Evaluations](/guides/core-types/evaluations)**: Test suites for AI models.
+- **[Models](/guides/models)**: Version, store, and share parameterized functions.
+- **[Evaluations](/guides/evaluations)**: Test suites for AI models.
 - [soon] Agents: ...
 
 Weave's **tracking** layer brings immutable tracing and versioning to your programs and experiments.
 
 - **[Objects](/guides/tracking/objects)**: Weave's extensible serialization lets you easily version, track, and share Python objects.
-- **[Ops](/guides/tracking/ops)**: Versioned, reproducible functions, with automatic tracing.
+- **[Ops](/guides/tracing/ops)**: Versioned, reproducible functions, with automatic tracing.
 - **[Tracing](/guides/tracking/tracing)**: Automatic organization of function calls and data lineage.
 - **[Feedback](/guides/tracking/feedback)**: Simple utilities to capture user feedback and attach them to the underlying tracked call.
 
