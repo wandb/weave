@@ -6,17 +6,13 @@ import threading
 import time
 from typing import Any, Callable, Iterator, Optional, Union
 
-from weave.client_context import weave_client as weave_client_context
-from weave.legacy import urls, util
+from weave.legacy.weave import urls, util
 from weave.trace.call_context import get_current_call
+from weave.trace.client_context import weave_client as weave_client_context
 
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
-from .. import (
-    type_serializers,  # noqa: F401
-    weave_init,
-)
-from . import context, weave_client
+from . import context, weave_client, weave_init
 from .constants import TRACE_OBJECT_EMOJI
 from .op import Op, op
 from .refs import ObjectRef, parse_uri
@@ -206,7 +202,7 @@ def serve(
 ) -> str:
     import uvicorn
 
-    from weave.legacy import wandb_api
+    from weave.legacy.weave import wandb_api
 
     from .serve_fastapi import object_method_app
 
