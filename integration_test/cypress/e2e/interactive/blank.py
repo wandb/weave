@@ -1,5 +1,5 @@
 import weave
-from weave.show import show_url
+from weave.legacy.show import show_url
 
 weave.use_fixed_server_port()
 obj = [

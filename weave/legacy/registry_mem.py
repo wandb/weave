@@ -28,7 +28,7 @@ class Registry:
     # the registry over HTTP.
     _updated_at: float
 
-    def __init__(self):
+    def __init__(self):  # type: ignore
         self._types = {}
         self._ops = {}
         self._ops_by_common_name = {}
@@ -41,8 +41,8 @@ class Registry:
     def updated_at(self) -> float:
         return self._updated_at
 
-    def register_op(self, op: "OpDef", location=None):
-        if context_state.get_no_op_register():
+    def register_op(self, op: "OpDef", location=None):  # type: ignore
+        if context_state.get_no_op_register():  # type: ignore[no-untyped-call]
             return op
         self.mark_updated()
         # do not save built-in ops today
@@ -97,7 +97,7 @@ class Registry:
             raise errors.WeaveMissingOpDefError("Op not registered: %s" % uri)
         return res
 
-    def find_op_by_fn(self, lazy_local_fn):
+    def find_op_by_fn(self, lazy_local_fn):  # type: ignore
         for op_def in self._op_versions.values():
             if op_def.call_fn == lazy_local_fn:
                 return op_def
@@ -111,7 +111,7 @@ class Registry:
         return ops
 
     def find_chainable_ops(self, arg0_type: weave_types.Type) -> typing.List["OpDef"]:
-        def is_chainable(op):
+        def is_chainable(op):  # type: ignore
             if not isinstance(op.input_type, op_args.OpNamedArgs):
                 return False
             args = list(op.input_type.arg_types.values())
@@ -119,9 +119,9 @@ class Registry:
                 return False
             return args[0].assign_type(arg0_type)
 
-        return [op for op in self._ops.values() if is_chainable(op)]
+        return [op for op in self._ops.values() if is_chainable(op)]  # type: ignore[no-untyped-call]
 
-    def load_saved_ops(self):
+    def load_saved_ops(self):  # type: ignore
         from weave.legacy import op_def_type
 
         for op_ref in storage.objects(op_def_type.OpDefType()):
@@ -149,7 +149,7 @@ class Registry:
         ]
         return packages
 
-    def rename_op(self, name, new_name):
+    def rename_op(self, name, new_name):  # type: ignore
         """Internal use only, used during op bootstrapping at decorator time"""
         self.mark_updated()
         op = self._ops.pop(name)
@@ -186,4 +186,4 @@ class Registry:
 
 
 # Processes have a singleton MemoryRegistry
-memory_registry = Registry()
+memory_registry = Registry()  # type: ignore[no-untyped-call]

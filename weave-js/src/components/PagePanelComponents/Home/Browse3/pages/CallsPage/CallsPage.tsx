@@ -64,7 +64,9 @@ export const CallsPage: FC<{
     }
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
-      return opNiceName(opName) + ' Traces';
+      if (opName) {
+        return opNiceName(opName) + ' Traces';
+      }
     }
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);

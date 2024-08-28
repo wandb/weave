@@ -122,7 +122,7 @@ class TypeRegistry:
 
     @staticmethod
     def type_of(obj: typing.Any) -> "Type":
-        from . import ref_base
+        from weave.legacy import ref_base
 
         if (
             context_state.ref_tracking_enabled()
@@ -1057,7 +1057,7 @@ class ObjectType(Type):
 
     @classmethod
     def typeclass_of_class(cls, check_class):
-        from . import weave_pydantic
+        from .legacy import weave_pydantic
 
         if not issubclass(check_class, pydantic.BaseModel):
             return cls
@@ -1274,7 +1274,7 @@ class TypeType(ObjectType):
 
     @classmethod
     def type_of_instance(cls, obj):
-        from . import infer_types
+        from .legacy import infer_types
 
         attr_types = {}
         for field in dataclasses.fields(obj):
@@ -1381,7 +1381,7 @@ class RefType(Type):
         return None
 
     def save_instance(self, obj, artifact, name):
-        from . import ref_base
+        from weave.legacy import ref_base
 
         obj_ref = ref_base.get_ref(obj)
         if obj_ref is None:

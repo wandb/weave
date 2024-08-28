@@ -17,10 +17,9 @@ from typing import (
     runtime_checkable,
 )
 
-from weave import call_context
 from weave.client_context import weave_client as weave_client_context
 from weave.legacy import context_state
-from weave.trace import box, settings
+from weave.trace import box, call_context, settings
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -28,7 +27,7 @@ from weave.trace.refs import ObjectRef
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
-    from weave.weave_client import Call, CallsIter
+    from weave.trace.weave_client import Call, CallsIter
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN

@@ -5,21 +5,14 @@ import urllib
 
 from IPython.display import IFrame, display
 
-from weave.legacy import artifact_fs, context, graph, ops, panel
-
-from . import (
-    errors,
-    node_ref,
-    ref_base,
-    storage,
-    usage_analytics,
-    util,
-    weavejs_fixes,
-)
-from . import weave_types as types
+from weave.legacy import artifact_fs, context, graph, ops, node_ref, panel, ref_base
+from weave import errors, storage, util
+from . import usage_analytics
+from .. import weave_types as types
+from . import weavejs_fixes
 
 
-def make_varname_for_type(t: types.Type):
+def make_varname_for_type(t: types.Type):  # type: ignore
     if isinstance(t, types.List) and isinstance(t.object_type, types.TypedDict):
         return "table"
     return t.name
@@ -64,10 +57,10 @@ def make_show_obj(obj: typing.Any) -> tuple[typing.Union[panel.Panel, graph.Node
             uri = obj.uri
         return ops.get(uri), name  # type: ignore
 
-    if types.TypeRegistry.has_type(obj):
-        names = util.find_names(obj)
+    if types.TypeRegistry.has_type(obj):  # type: ignore[no-untyped-call]
+        names = util.find_names(obj)  # type: ignore[no-untyped-call]
 
-        ref = storage.save(obj, name=names[-1])
+        ref = storage.save(obj, name=names[-1])  # type: ignore[arg-type]
         node = ops.get(ref.uri)  # type: ignore
         return node, make_varname_for_type(ref.type)
 
@@ -77,7 +70,7 @@ def make_show_obj(obj: typing.Any) -> tuple[typing.Union[panel.Panel, graph.Node
 
 
 # Broken out into to separate function for testing
-def _show_params(obj):
+def _show_params(obj):  # type: ignore
     # Get a weave node (expression) that will return the object, and something to call it
     node, var_name = make_show_obj(obj)
 
@@ -105,7 +98,7 @@ def _show_params(obj):
     return {"weave_node": weavejs_fixes.fixup_node(show_node)}
 
 
-def show_url(obj=None):
+def show_url(obj=None):  # type: ignore
     if os.environ.get("WEAVE_FRONTEND_DEVMODE"):
         context.use_frontend_devmode()
     params = _show_params(obj)
@@ -131,12 +124,12 @@ def show(obj: typing.Any = None, height: int = 400) -> typing.Any:
             "a weave node, try `weave.use()`."
         )
 
-    if util.is_pandas_dataframe(obj):
-        obj = ops.dataframe_to_arrow(obj)
+    if util.is_pandas_dataframe(obj):  # type: ignore[no-untyped-call]
+        obj = ops.dataframe_to_arrow(obj)  # type: ignore[no-untyped-call]
 
-    panel_url = show_url(obj)
+    panel_url = show_url(obj)  # type: ignore[no-untyped-call]
 
-    if util.is_colab():
+    if util.is_colab():  # type: ignore[no-untyped-call]
         from google.colab.output import serve_kernel_port_as_iframe
 
         url = urllib.parse.urlparse(panel_url)
@@ -148,7 +141,7 @@ def show(obj: typing.Any = None, height: int = 400) -> typing.Any:
         display(iframe)
 
 
-def _ipython_display_method_(self):
+def _ipython_display_method_(self):  # type: ignore
     show(self)
 
 

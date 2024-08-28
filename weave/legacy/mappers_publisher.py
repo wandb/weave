@@ -2,9 +2,9 @@ import copy
 import dataclasses
 import typing
 
-from weave import errors, ref_base, storage, weave_internal
+from weave import errors, storage, weave_internal
 from weave import weave_types as types
-from weave.node_ref import ref_to_node
+from weave.legacy.node_ref import ref_to_node
 
 # from weave.legacy.ops_primitives import weave_api
 from weave.legacy import (
@@ -15,6 +15,7 @@ from weave.legacy import (
     graph,
     mappers,
     mappers_python_def,
+    ref_base,
 )
 from weave.legacy.artifact_wandb import likely_commit_hash
 from weave.legacy.language_features.tagging import tag_store, tagged_value_type

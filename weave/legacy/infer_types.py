@@ -8,7 +8,7 @@ import typing_extensions
 
 from weave.legacy import graph
 
-from . import errors, weave_types
+from .. import errors, weave_types
 
 
 class TypedDictLike:
@@ -19,7 +19,7 @@ def is_typed_dict_like(t: type) -> typing_extensions.TypeGuard[TypedDictLike]:
     return hasattr(t, "__required_keys__")
 
 
-def simple_python_type_to_type(py_type: type):
+def simple_python_type_to_type(py_type: type):  # type: ignore
     if isinstance(py_type, str):
         raise errors.WeaveTypeError(
             "Cannot yet detect Weave type from forward type references"

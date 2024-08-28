@@ -1,6 +1,6 @@
-from weave import node_ref, ref_base
+from weave.legacy import ref_base
 from weave import weave_types as types
-from weave.legacy import graph, mappers
+from weave.legacy import graph, mappers, node_ref
 from weave.legacy import mappers_python_def as mappers_python
 
 

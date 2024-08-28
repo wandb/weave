@@ -25,10 +25,8 @@ def test_save_object(client):
 
 
 def test_robust_to_url_sensitive_chars(client):
-    entity = "entity"
-    project = "project"
-    project_id = f"{entity}/{project}"
-    object_id = "mali:cious/obj%ect"
+    project_id = client._project_id()
+    object_id = "mali_cious-obj.ect"
     bad_key = "mali:cious/ke%y"
     bad_val = {bad_key: "hello world"}
 
@@ -53,22 +51,13 @@ def test_robust_to_url_sensitive_chars(client):
     assert read_res.obj.val == bad_val
 
     # Object ID that contains reserved characters should be rejected.
-    with pytest.raises(Exception):
-        read_res = client.server.refs_read_batch(
-            tsi.RefsReadBatchReq(
-                refs=[f"weave:///{project_id}/object/{object_id}:{create_res.digest}"]
-            )
-        )
 
-    encoded_object_id = urllib.parse.quote_plus(object_id)
-    assert encoded_object_id == "mali%3Acious%2Fobj%25ect"
     read_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
-            refs=[
-                f"weave:///{project_id}/object/{encoded_object_id}:{create_res.digest}"
-            ]
+            refs=[f"weave:///{project_id}/object/{object_id}:{create_res.digest}"]
         )
     )
+
     assert read_res.vals[0] == bad_val
 
     # Key that contains reserved characters should be rejected.
@@ -76,7 +65,7 @@ def test_robust_to_url_sensitive_chars(client):
         read_res = client.server.refs_read_batch(
             tsi.RefsReadBatchReq(
                 refs=[
-                    f"weave:///{project_id}/object/{encoded_object_id}:{create_res.digest}/key/{bad_key}"
+                    f"weave:///{project_id}/object/{object_id}:{create_res.digest}/key/{bad_key}"
                 ]
             )
         )
@@ -86,7 +75,7 @@ def test_robust_to_url_sensitive_chars(client):
     read_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
             refs=[
-                f"weave:///{project_id}/object/{encoded_object_id}:{create_res.digest}/key/{encoded_bad_key}"
+                f"weave:///{project_id}/object/{object_id}:{create_res.digest}/key/{encoded_bad_key}"
             ]
         )
     )

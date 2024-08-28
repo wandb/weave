@@ -2,7 +2,7 @@ import json
 import typing
 from dataclasses import dataclass, field
 
-from .. import stitch
+from . import stitch
 
 
 @dataclass
