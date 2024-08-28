@@ -109,17 +109,6 @@ export const ExportSelector = ({
     // ['output', 'output.x', 'output.x.y'] -> ['output.x.y']
     // sort columns by length, longest to shortest
     visibleColumns.sort((a, b) => b.length - a.length);
-    const minimalColumns: string[] = [];
-    for (const col of visibleColumns) {
-      if (minimalColumns.some(minimalCol => minimalCol.startsWith(col))) {
-        continue;
-      }
-      minimalColumns.push(col);
-    }
-
-    const startTime = Date.now();
-
-    visibleColumns.sort((a, b) => b.length - a.length);
     const leafColumns: string[] = [];
     for (const col of visibleColumns) {
       if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
@@ -128,6 +117,7 @@ export const ExportSelector = ({
       leafColumns.push(col);
     }
 
+    const startTime = Date.now();
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -163,7 +153,7 @@ export const ExportSelector = ({
     setSelectionState('all');
   };
 
-  const pythonText = useMakeCodeText(
+  const pythonText = makeCodeText(
     callQueryParams.entity,
     callQueryParams.project,
     selectionState === 'selected' ? selectedCalls : undefined,
@@ -172,7 +162,7 @@ export const ExportSelector = ({
     refColumnsToExpand,
     sortBy
   );
-  const curlText = useMakeCurlText(
+  const curlText = makeCurlText(
     callQueryParams.entity,
     callQueryParams.project,
     selectionState === 'selected' ? selectedCalls : undefined,
@@ -362,10 +352,7 @@ const DownloadGrid: FC<{
       <div className="mt-8 flex items-center">
         <ClickableOutlinedCardWithIcon
           iconName="python-logo"
-          onClick={() => {
-            setCodeMode('python');
-            navigator.clipboard.writeText(pythonText);
-          }}>
+          onClick={() => setCodeMode('python')}>
           <span className="w-full">Use Python</span>
           <div className="flex w-full justify-end">
             <Icon name="copy" size="small" />
@@ -374,10 +361,7 @@ const DownloadGrid: FC<{
         <div className="ml-8" />
         <ClickableOutlinedCardWithIcon
           iconName="code-alt"
-          onClick={() => {
-            setCodeMode('curl');
-            navigator.clipboard.writeText(curlText);
-          }}>
+          onClick={() => setCodeMode('curl')}>
           <span className="w-full">Use CURL</span>
           <div className="flex w-full justify-end">
             <Icon name="copy" size="small" />
@@ -457,7 +441,7 @@ function initiateDownloadFromBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(downloadUrl);
 }
 
-function useMakeCodeText(
+function makeCodeText(
   entity: string,
   project: string,
   callIds: string[] | undefined,
@@ -517,7 +501,7 @@ function useMakeCodeText(
   return codeStr;
 }
 
-function useMakeCurlText(
+function makeCurlText(
   entity: string,
   project: string,
   callIds: string[] | undefined,
