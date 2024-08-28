@@ -28,7 +28,7 @@ from werkzeug import exceptions as werkzeug_exceptions
 from werkzeug import http as werkzeug_http
 from weave.legacy import errors
 
-from .. import util
+from weave.legacy import util
 
 
 class WeaveInternalHttpException(werkzeug_exceptions.HTTPException):

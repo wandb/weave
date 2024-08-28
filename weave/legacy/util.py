@@ -8,12 +8,12 @@ import string
 # import ipynbname
 import typing
 
-from .legacy.errors import WeaveFingerprintErrorMixin
+from weave.legacy.errors import WeaveFingerprintErrorMixin
 
 sentry_inited = False
 
 
-def init_sentry():
+def init_sentry():  # type: ignore
     global sentry_inited
     if sentry_inited:
         return
@@ -59,11 +59,11 @@ def capture_exception_with_sentry_if_available(
 #     return ipynbname.name()
 
 
-def get_hostname():
+def get_hostname():  # type: ignore
     return socket.gethostname()
 
 
-def get_pid():
+def get_pid():  # type: ignore
     return os.getpid()
 
 
@@ -95,7 +95,7 @@ def parse_number_env_var(name: str) -> typing.Optional[typing.Union[int, float]]
         return float(raw_val)
 
 
-def find_names(obj):
+def find_names(obj):  # type: ignore
     if hasattr(obj, "name"):
         return [obj.name]
     frame = inspect.currentframe()
@@ -110,7 +110,7 @@ def find_names(obj):
     return obj_names
 
 
-def is_colab():
+def is_colab():  # type: ignore
     import importlib
 
     spec = importlib.util.find_spec("google.colab")
@@ -118,7 +118,7 @@ def is_colab():
 
 
 def is_notebook() -> bool:
-    if is_colab():
+    if is_colab():  # type: ignore[no-untyped-call]
         return True
     try:
         from IPython import get_ipython
@@ -135,7 +135,7 @@ def is_notebook() -> bool:
     return True
 
 
-def is_pandas_dataframe(obj):
+def is_pandas_dataframe(obj):  # type: ignore
     try:
         import pandas as pd
     except ImportError:

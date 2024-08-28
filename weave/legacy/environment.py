@@ -11,7 +11,7 @@ import typing
 from distutils.util import strtobool
 from urllib.parse import urlparse
 from weave.legacy import errors
-from .. import util
+from weave.legacy import util
 
 if typing.TYPE_CHECKING:
     from weave.legacy import logs
