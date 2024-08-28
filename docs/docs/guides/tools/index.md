@@ -1,21 +1,21 @@
 # Tools & Utilities
 
-Weave provides a set of powerful tools and utilities to enhance your workflow and streamline the deployment process of your AI applications. Here are the key features:
+Weave is developing a set of tools and utilities to help with your workflow and deployment process for AI applications. These are currently in early alpha stages and subject to change. Here's an overview of what we're working on:
 
 ## Serve
 
-[Serve](/guides/tools/serve) allows you to easily expose your Weave ops and models as API endpoints. With this tool, you can:
+[Serve](/guides/tools/serve) is an experimental feature that aims to expose your Weave ops and models as API endpoints. We're exploring possibilities such as:
 
-- Create scalable and efficient web services
-- Integrate your Weave components into existing applications
-- Test and iterate on your models in a production-like environment
+- Creating web services for your Weave components
+- Integrating Weave components into existing applications
+- Providing a way to test models in a more production-like setting
 
 ## Deploy
 
-[Deploy](/guides/tools/deploy) simplifies the process of deploying your Weave ops and models to various targets. This utility enables you to:
+[Deploy](/guides/tools/deploy) is another alpha-stage utility we're developing to help with deploying Weave ops and models. Some potential features we're considering include:
 
-- Seamlessly push your models to cloud platforms
-- Manage different deployment environments (development, staging, production)
-- Automate the deployment pipeline for continuous integration and delivery
+- Pushing models to cloud platforms
+- Managing different deployment environments
+- Exploring ways to automate parts of the deployment process
 
-By leveraging these tools, you can significantly reduce the time and effort required to move your AI projects from development to production, ensuring a smooth and efficient workflow throughout your project lifecycle.
+Please note that these tools are still in very early stages of development. They may not be fully functional, could change significantly, or might be discontinued. We recommend using them for experimental purposes only at this time.
