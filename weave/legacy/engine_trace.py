@@ -18,66 +18,66 @@ import os
 import time
 import typing
 
-from . import environment, logs
-from .legacy import stream_data_interfaces
+from .. import environment, logs
+from . import stream_data_interfaces
 
 
 # Thanks co-pilot!
 class DummySpan:
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):  # type: ignore
         self.args = args
         self.log_indent_token = None
 
-    def __enter__(self):
+    def __enter__(self):  # type: ignore
         logging.debug("-> %s", self.args[0])
         self.log_indent_token = logs.increment_indent()
         return self
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(self, *args, **kwargs):  # type: ignore
         logs.reset_indent(self.log_indent_token)
         logging.debug("<- %s", self.args[0])
 
-    def set_tag(self, key, unredacted_val, redacted_val=None):
+    def set_tag(self, key, unredacted_val, redacted_val=None):  # type: ignore
         pass
 
-    def set_meta(self, *args, **kwargs):
+    def set_meta(self, *args, **kwargs):  # type: ignore
         pass
 
-    def set_metric(self, *args, **kwargs):
+    def set_metric(self, *args, **kwargs):  # type: ignore
         pass
 
-    def finish(self, *args, **kwargs):
+    def finish(self, *args, **kwargs):  # type: ignore
         pass
 
 
 class TraceContext:
-    def __getstate__(self) -> dict:
+    def __getstate__(self) -> dict:  # type: ignore
         return {}
 
-    def __setstate__(self, state: dict) -> None:
+    def __setstate__(self, state: dict) -> None:  # type: ignore
         pass
 
 
 class ContextProvider:
-    def activate(self, context: TraceContext) -> None:
+    def activate(self, context: TraceContext) -> None:  # type: ignore
         pass
 
 
 class DummyTrace:
-    def trace(self, *args, **kwargs):
+    def trace(self, *args, **kwargs):  # type: ignore
         return DummySpan(*args)
 
     @property
-    def context_provider(self) -> ContextProvider:
+    def context_provider(self) -> ContextProvider:  # type: ignore
         return ContextProvider()
 
-    def current_trace_context(self) -> typing.Optional[TraceContext]:
+    def current_trace_context(self) -> typing.Optional[TraceContext]:  # type: ignore
         return None
 
-    def current_span(self):
-        return None
+    def current_span(self):  # type: ignore
+        return None 
 
-    def current_root_span(self):
+    def current_root_span(self):  # type: ignore
         return None
 
 
@@ -89,7 +89,7 @@ _weave_trace_span: contextvars.ContextVar[typing.Optional["WeaveTraceSpan"]] = (
 _weave_trace_stream = None
 
 
-def weave_trace_stream():
+def weave_trace_stream():  # type: ignore
     global _weave_trace_stream
     if _weave_trace_stream is None:
         from weave.legacy.wandb_interface.wandb_stream_table import StreamTable
@@ -98,25 +98,25 @@ def weave_trace_stream():
     return _weave_trace_stream
 
 
-def span_count(span):
+def span_count(span):  # type: ignore
     if span.child_spans is None:
         return 1
     return 1 + sum([span_count(child) for child in span.child_spans])
 
 
 class WeaveTraceSpan:
-    def __init__(self, name):
-        from .legacy.ops_domain import trace_tree
+    def __init__(self, name):  # type: ignore
+        from .ops_domain import trace_tree
 
         self.log_indent_token = None
         self._token = None
         self.span = trace_tree.Span(_name=name)
         self._parent = None
 
-    def total_span_count(self):
+    def total_span_count(self):  # type: ignore
         return span_count(self.span)
 
-    def __enter__(self):
+    def __enter__(self):  # type: ignore
         parent = _weave_trace_span.get()
         if parent is not None:
             if parent.span.child_spans is None:
@@ -128,11 +128,11 @@ class WeaveTraceSpan:
         self.span.start_time_ms = int(time.time() * 1000)
         return self
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(self, *args, **kwargs):  # type: ignore
         self.span.end_time_ms = int(time.time() * 1000)
         _weave_trace_span.reset(self._token)
 
-        from .legacy.ops_domain import trace_tree
+        from .ops_domain import trace_tree
 
         tt = trace_tree.WBTraceTree(json.dumps(dataclasses.asdict(self.span)))
         tags = self.attributes.get("tags", {})
@@ -147,12 +147,12 @@ class WeaveTraceSpan:
             )
 
     @property
-    def attributes(self):
+    def attributes(self):  # type: ignore
         if self.span.attributes is None:
             self.span.attributes = {}
         return self.span.attributes
 
-    def set_tag(self, key, unredacted_val, redacted_val=None):
+    def set_tag(self, key, unredacted_val, redacted_val=None):  # type: ignore
         if "tags" not in self.attributes:
             self.attributes["tags"] = {}
         if not environment.disable_weave_pii():
@@ -160,7 +160,7 @@ class WeaveTraceSpan:
         elif redacted_val is not None:
             self.attributes["tags"][key] = redacted_val
 
-    def set_meta(self, key, unredacted_val, redacted_val=None):
+    def set_meta(self, key, unredacted_val, redacted_val=None):  # type: ignore
         if "metadata" not in self.attributes:
             self.attributes["metadata"] = {}
         if not environment.disable_weave_pii():
@@ -168,7 +168,7 @@ class WeaveTraceSpan:
         elif redacted_val is not None:
             self.attributes["metadata"][key] = redacted_val
 
-    def set_metric(self, key, unredacted_val, redacted_val=None):
+    def set_metric(self, key, unredacted_val, redacted_val=None):  # type: ignore
         if "metrics" not in self.attributes:
             self.attributes["metrics"] = {}
         if not environment.disable_weave_pii():
@@ -176,15 +176,15 @@ class WeaveTraceSpan:
         elif redacted_val is not None:
             self.attributes["metrics"][key] = redacted_val
 
-    def finish(self, *args, **kwargs):
+    def finish(self, *args, **kwargs):  # type: ignore
         pass
 
 
 class WeaveTrace:
-    def __init__(self):
+    def __init__(self):  # type: ignore
         self._stream_table = None
 
-    def trace(self, name, *args, **kwargs):
+    def trace(self, name, *args, **kwargs):  # type: ignore
         return WeaveTraceSpan(name, *args)
 
     @property
@@ -194,17 +194,17 @@ class WeaveTrace:
     def current_trace_context(self) -> typing.Optional[TraceContext]:
         return None
 
-    def current_span(self):
+    def current_span(self):  # type: ignore
         return _weave_trace_span.get()
 
-    def current_root_span(self):
+    def current_root_span(self):  # type: ignore
         cur_span = _weave_trace_span.get()
         while cur_span is not None and cur_span._parent is not None:
             cur_span = cur_span._parent
         return cur_span
 
 
-def dd_span_to_weave_span(dd_span) -> stream_data_interfaces.TraceSpanDict:
+def dd_span_to_weave_span(dd_span) -> stream_data_interfaces.TraceSpanDict:  # type: ignore
     # Use '' for None, currently history2 doesn't read None columns from
     # the liveset correctly.
     parent_id = ""
@@ -227,7 +227,7 @@ def dd_span_to_weave_span(dd_span) -> stream_data_interfaces.TraceSpanDict:
     }
 
 
-def send_proc(queue):
+def send_proc(queue):  # type: ignore
     while True:
         spans = queue.get()
         if spans is None:
@@ -244,35 +244,35 @@ def send_proc(queue):
 # by datadog, so we have some kind of re-entrancy/deadlock. Putting in a separate
 # process fixes.
 class WeaveWriter:
-    def __init__(self, orig_writer):
+    def __init__(self, orig_writer):  # type: ignore
         self._orig_writer = orig_writer
         self._queue = multiprocessing.Queue()
         self._proc = multiprocessing.Process(
             target=send_proc, args=(self._queue,), daemon=True
         )
 
-    def recreate(self):
+    def recreate(self):  # type: ignore
         return WeaveWriter(self._orig_writer.recreate())
 
-    def stop(self, timeout=None):
+    def stop(self, timeout=None):  # type: ignore
         self._orig_writer.stop(timeout)
 
-    def _ensure_started(self):
+    def _ensure_started(self):  # type: ignore
         if not self._proc.is_alive():
             self._proc.start()
 
-    def write(self, spans):
+    def write(self, spans):  # type: ignore
         if len(spans) == 1:
             return
         self._ensure_started()
         self._queue.put([dd_span_to_weave_span(s) for s in spans])
         self._orig_writer.write(spans)
 
-    def flush_queue(self):
+    def flush_queue(self):  # type: ignore
         self._orig_writer.flush_queue()
 
 
-def patch_ddtrace_set_tag():
+def patch_ddtrace_set_tag():  # type: ignore
     from inspect import signature
 
     from ddtrace import span as ddtrace_span
@@ -285,7 +285,7 @@ def patch_ddtrace_set_tag():
         old_set_metric = ddtrace_span.Span.set_metric
 
         # Only logged redacted values if flag is on
-        def set_tag(self, key, unredacted_val=None, redacted_val=None):
+        def set_tag(self, key, unredacted_val=None, redacted_val=None):  # type: ignore
             if redacted_val is not None and environment.disable_weave_pii():
                 old_set_tag(self, key, redacted_val)
             elif (
@@ -296,7 +296,7 @@ def patch_ddtrace_set_tag():
                 old_set_tag(self, key, unredacted_val)
 
         # Log metric if flag is off or if flag is on and redacted
-        def set_metric(self, key, val, is_pii_redacted=False):
+        def set_metric(self, key, val, is_pii_redacted=False):  # type: ignore
             if not environment.disable_weave_pii() or is_pii_redacted or "_dd." in key:
                 old_set_metric(self, key, val)
 
@@ -304,7 +304,7 @@ def patch_ddtrace_set_tag():
         ddtrace_span.Span.set_tag = set_tag
 
 
-def tracer():
+def tracer():  # type: ignore
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
 
@@ -340,26 +340,26 @@ def new_trace_context() -> typing.Optional[TraceContext]:
 
 
 class DummyStatsd:
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):  # type: ignore
         pass
 
-    def increment(self, *args, **kwargs):
+    def increment(self, *args, **kwargs):  # type: ignore
         pass
 
-    def decrement(self, *args, **kwargs):
+    def decrement(self, *args, **kwargs):  # type: ignore
         pass
 
-    def gauge(self, *args, **kwargs):
+    def gauge(self, *args, **kwargs):  # type: ignore
         pass
 
-    def flush(self, *args, **kwargs):
+    def flush(self, *args, **kwargs):  # type: ignore
         pass
 
 
 _STATSD = None
 
 
-def _initialize_statsd():
+def _initialize_statsd():  # type: ignore
     if os.getenv("DD_ENV"):
         from datadog import initialize, statsd
 
@@ -369,7 +369,7 @@ def _initialize_statsd():
         return DummyStatsd()
 
 
-def statsd():
+def statsd():  # type: ignore
     global _STATSD
     if _STATSD is None:
         _STATSD = _initialize_statsd()
@@ -377,5 +377,5 @@ def statsd():
     return _STATSD
 
 
-def datadog_is_enabled():
+def datadog_is_enabled():  # type: ignore
     return os.getenv("DD_ENV")

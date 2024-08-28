@@ -7,13 +7,13 @@ import typing
 from typing import Iterator, Sequence
 
 from weave import (
-    engine_trace,
     errors,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.legacy import (
     context_state,
+    engine_trace,
     graph,
     language_autocall,
     memo,

@@ -14,9 +14,9 @@ import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
+import {isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
-import {isRef} from '../common/util';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
@@ -59,7 +59,7 @@ const isSimpleData = (data: Data): boolean => {
       isSimple = false;
       return false;
     }
-    if (isRef(context.value)) {
+    if (isWeaveRef(context.value)) {
       isSimple = false;
       return false;
     }
@@ -247,7 +247,7 @@ export const ObjectViewerSection = ({
     if (
       valueType === 'object' ||
       (valueType === 'array' && value.length > 0) ||
-      isRef(value)
+      isWeaveRef(value)
     ) {
       return (
         <ObjectViewerSectionNonEmptyMemoed
