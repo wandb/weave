@@ -32,6 +32,7 @@ class InvalidInternalRef(ValueError):
 
 
 def extra_value_quoter(s: str) -> str:
+    # Here, we encode all non alpha-numerics or `_.-~`.
     return urllib.parse.quote(s, safe="")
 
 
