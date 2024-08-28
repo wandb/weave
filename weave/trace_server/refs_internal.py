@@ -182,6 +182,9 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
             version=version,
             extra=extra,
         )
+    elif kind == "call":
+        id_ = remaining[0]
+        return InternalCallRef(project_id=project_id, id=id_)
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
 
