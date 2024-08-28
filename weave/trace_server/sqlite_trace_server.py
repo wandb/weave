@@ -499,7 +499,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if not ri.any_will_be_interpreted_as_ref_str(val):
                 continue
 
-            if isinstance(ri.parse_internal_uri(val), ri.InternalTableRef):
+            if not isinstance(ri.parse_internal_uri(val), ri.InternalObjectRef):
                 continue
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]

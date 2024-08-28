@@ -144,7 +144,9 @@ class InternalCallRef:
         return u
 
 
-def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
+def parse_internal_uri(
+    uri: str,
+) -> Union[InternalObjectRef, InternalTableRef, InternalCallRef]:
     if uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
         path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
         parts = path.split("/")

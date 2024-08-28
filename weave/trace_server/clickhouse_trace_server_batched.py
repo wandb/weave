@@ -394,7 +394,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     continue
 
                 ref = ri.parse_internal_uri(val)
-                if isinstance(ref, ri.InternalTableRef):
+                if not isinstance(ref, ri.InternalObjectRef):
                     continue
 
                 refs_to_resolve[(i, col)] = ref

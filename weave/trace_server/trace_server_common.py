@@ -53,8 +53,9 @@ def hydrate_calls_with_feedback(
     feedback_map = defaultdict(list)
     # map feedback to calls
     for feedback_item in feedback.result:
-        call_id = ri.parse_internal_uri(feedback_item["weave_ref"]).id
-        feedback_map[call_id].append(feedback_item)
+        uri = ri.parse_internal_uri(feedback_item["weave_ref"])
+        if isinstance(uri, ri.InternalCallRef):
+            feedback_map[uri.id].append(feedback_item)
 
     for call in calls:
         feedback_items = feedback_map.get(call["id"], [])
