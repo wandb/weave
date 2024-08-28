@@ -4,9 +4,9 @@ import os
 import tempfile
 from typing import Any, Dict, Generator, Iterator, Mapping, Optional, Union
 
-from weave.client_context.weave_client import require_weave_client
-from weave.legacy import artifact_fs
+from weave.legacy.weave import artifact_fs
 from weave.trace import op_type  # noqa: F401, Must import this to register op save/load
+from weave.trace.client_context.weave_client import require_weave_client
 from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.serializer import get_serializer_by_id, get_serializer_for_obj
@@ -136,7 +136,7 @@ def decode_custom_obj(
     encoded_path_contents: Mapping[str, Union[str, bytes]],
     load_instance_op_uri: Optional[str],
 ) -> Any:
-    from weave.legacy import artifact_fs
+    from weave.legacy.weave import artifact_fs
 
     load_instance_op = None
     if load_instance_op_uri is not None:
