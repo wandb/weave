@@ -22,7 +22,7 @@ Click the links in the sidebar to get started.
 """
 )
 
-from weave import registry_mem
+from weave.legacy import registry_mem
 
 op_org_name = registry_mem.memory_registry.get_op("user-name")
 
@@ -63,7 +63,7 @@ class Ecosystem:
 # objects.
 @weave.op(name="op-ecosystem", render_info={"type": "function"})
 def ecosystem() -> Ecosystem:
-    from weave import registry_mem
+    from weave.legacy import registry_mem
 
     return Ecosystem(
         _orgs=[],

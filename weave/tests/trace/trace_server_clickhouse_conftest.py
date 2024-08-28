@@ -9,7 +9,7 @@ import uuid
 import pytest
 import requests
 
-from weave import weave_client
+from weave.trace import weave_client
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     external_to_internal_trace_server_adapter,

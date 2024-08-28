@@ -7,14 +7,13 @@ import typing
 from typing import Iterator, Sequence
 
 from weave import (
-    engine_trace,
     errors,
-    pyfunc_type_util,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.legacy import (
     context_state,
+    engine_trace,
     graph,
     language_autocall,
     memo,
@@ -22,6 +21,7 @@ from weave.legacy import (
     op_args,
     op_def_type,
     op_execute,
+    pyfunc_type_util,
     uris,
 )
 from weave.legacy.language_features.tagging import (
@@ -31,10 +31,10 @@ from weave.legacy.language_features.tagging import (
     tagged_value_type,
 )
 from weave.legacy.run import Run
-from weave.weavejs_fixes import fixup_node
+from weave.legacy.weavejs_fixes import fixup_node
 
 if typing.TYPE_CHECKING:
-    from weave import weave_client
+    from weave.trace import weave_client
     from weave.legacy.run_streamtable_span import RunStreamTableSpan
 
 

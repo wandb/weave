@@ -18,6 +18,7 @@ import {makeRefCall} from '../../../../../../util/refs';
 import {Timestamp} from '../../../../../Timestamp';
 import {Reactions} from '../../feedback/Reactions';
 import {CellFilterWrapper} from '../../filters/CellFilterWrapper';
+import {isWeaveRef} from '../../filters/common';
 import {
   getTokensAndCostFromUsage,
   getUsageFromCellParams,
@@ -25,7 +26,6 @@ import {
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
-import {isRef} from '../common/util';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
@@ -186,21 +186,21 @@ function buildCallsTableColumns(
       hideable: false,
       valueGetter: rowParams => {
         const op_name = rowParams.row.op_name;
-        if (!isRef(op_name)) {
+        if (!isWeaveRef(op_name)) {
           return op_name;
         }
         return opVersionRefOpName(op_name);
       },
       renderCell: rowParams => {
-        const op_name = rowParams.row.op_name;
-        if (!isRef(op_name)) {
-          return op_name;
-        }
+        const opName =
+          rowParams.row.display_name ??
+          opVersionRefOpName(rowParams.row.op_name) ??
+          rowParams.row.op_name;
         return (
           <CallLink
             entityName={entity}
             projectName={project}
-            opName={rowParams.row.display_name ?? opVersionRefOpName(op_name)}
+            opName={opName}
             callId={rowParams.row.id}
             fullWidth={true}
             preservePath={preservePath}
@@ -481,7 +481,7 @@ const useAllDynamicColumnNames = (
 };
 
 const refIsExpandable = (ref: string): boolean => {
-  if (!isRef(ref)) {
+  if (!isWeaveRef(ref)) {
     return false;
   }
   const parsed = parseRef(ref);

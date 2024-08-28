@@ -2,7 +2,7 @@ import random
 
 import weave
 from weave.legacy import panels
-from weave.show import show_url
+from weave.legacy.show import show_url
 
 # Weave package now defaults to eager mode, but lazy mode required for this example notebook for now.
 weave.use_lazy_execution()

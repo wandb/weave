@@ -6,7 +6,7 @@ import hashlib
 import json
 import sqlite3
 import threading
-from typing import Any, Iterator, Optional, cast
+from typing import Any, Dict, Iterator, Optional, cast
 from zoneinfo import ZoneInfo
 
 import emoji
@@ -27,11 +27,14 @@ from weave.trace_server.refs_internal import (
     WEAVE_INTERNAL_SCHEME,
     InternalObjectRef,
     InternalTableRef,
+    any_will_be_interpreted_as_ref_str,
     parse_internal_uri,
 )
+from weave.trace_server.trace_server_common import get_nested_key, set_nested_key
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
+from weave.trace_server.validation import object_id_validator
 
 from . import trace_server_interface as tsi
 from .ids import generate_id
@@ -452,7 +455,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             # convert json dump fields into json
             for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):
-                    call_dict[json_field] = json.loads(call_dict[json_field])
+                    # load json
+                    data = json.loads(call_dict[json_field])
+                    # do ref expansion
+                    if req.expand_columns:
+                        data = self._expand_refs(
+                            {json_field: data}, req.expand_columns
+                        )[json_field]
+                    call_dict[json_field] = data
             # convert empty string display_names to None
             if "display_name" in call_dict and call_dict["display_name"] == "":
                 call_dict["display_name"] = None
@@ -469,6 +479,29 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         call_dict[col] = {}
             calls.append(tsi.CallSchema(**call_dict))
         return tsi.CallsQueryRes(calls=calls)
+
+    def _expand_refs(
+        self, data: Dict[str, Any], expand_columns: list[str]
+    ) -> Dict[str, Any]:
+        """
+        Recursively expand refs in the data. Only expand refs if requested in the
+        expand_columns list. expand_columns must be sorted by depth, shallowest first.
+        """
+        cols = sorted(expand_columns, key=lambda x: x.count("."))
+        for col in cols:
+            val = data.get(col)
+            if not val:
+                val = get_nested_key(data, col)
+                if not val:
+                    continue
+
+            if not any_will_be_interpreted_as_ref_str(val):
+                continue
+
+            derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
+            set_nested_key(data, col, derefed_val)
+
+        return data
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
@@ -552,6 +585,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         json_val = json.dumps(req.obj.val)
         digest = str_digest(json_val)
+
+        # Validate
+        object_id_validator(req.obj.object_id)
 
         req_obj = req.obj
         # TODO: version index isn't right here, what if we delete stuff?

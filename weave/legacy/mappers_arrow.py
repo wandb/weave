@@ -5,7 +5,7 @@ from contextlib import contextmanager
 
 import pyarrow as pa
 
-from weave import errors, node_ref, ref_base
+from weave import errors
 from weave import weave_types as types
 from weave.legacy import (
     arrow_util,
@@ -13,7 +13,9 @@ from weave.legacy import (
     box,
     mappers,
     mappers_weave,
+    node_ref,
     partial_object,
+    ref_base,
 )
 from weave.legacy import mappers_python_def as mappers_python
 from weave.legacy.arrow import arrow

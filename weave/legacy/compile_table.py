@@ -2,7 +2,8 @@
 
 import typing
 
-from weave import errors, stitch
+from weave import errors
+from weave.legacy import stitch
 
 KeyTree = typing.Dict[str, "KeyTree"]  # type:ignore
 
