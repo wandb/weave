@@ -543,17 +543,28 @@ function useMakeCurlText(
     0
   );
 
-  return `# Ensure you have a WANDB_API_KEY set in your environment
+  let baseCurl = `# Ensure you have a WANDB_API_KEY set in your environment
 curl '${baseUrl}/calls/stream_query' \\
   -u api:$WANDB_API_KEY \\
   -H 'content-type: application/json' \\
   --data-raw '{
     "project_id":"${entity}/${project}",
     "filter":${filterStr},
-    "query":${JSON.stringify(query, null, 0)},
-    "expand_columns":${JSON.stringify(expandColumns, null, 0)},
-    "limit":${MAX_EXPORT},
+`;
+  if (query) {
+    baseCurl += `    "query":${JSON.stringify(query, null, 0)},\n`;
+  }
+  if (expandColumns.length > 0) {
+    baseCurl += `    "expand_columns":${JSON.stringify(
+      expandColumns,
+      null,
+      0
+    )},\n`;
+  }
+  baseCurl += `    "limit":${MAX_EXPORT},
     "offset":0,
     "sort_by":${JSON.stringify(sortBy, null, 0)}
   }'`;
+
+  return baseCurl;
 }
