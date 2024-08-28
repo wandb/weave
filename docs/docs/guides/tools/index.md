@@ -2,15 +2,15 @@
 
 Weave is developing a set of tools and utilities to help with your workflow and deployment process for AI applications. These are currently in early alpha stages and subject to change. Here's an overview of what we're working on:
 
-## Serve
+## Serve (experimental)
 
-[Serve](/guides/tools/serve) is an experimental feature that aims to expose your Weave ops and models as API endpoints. We're exploring possibilities such as:
+[Serve](/guides/tools/serve) is a feature to expose your Weave ops and models as API endpoints. We're exploring possibilities such as:
 
 - Creating web services for your Weave components
 - Integrating Weave components into existing applications
 - Providing a way to test models in a more production-like setting
 
-## Deploy
+## Deploy (experimental)
 
 [Deploy](/guides/tools/deploy) is another alpha-stage utility we're developing to help with deploying Weave ops and models. Some potential features we're considering include:
 
