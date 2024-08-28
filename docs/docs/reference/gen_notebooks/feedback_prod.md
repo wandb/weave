@@ -17,7 +17,7 @@ title: Log Feedback from Production
 <!--- @wandbcode{feedback-colab} -->
 
 
-It is often hard to automatically evaluate a generated LLM response so, depending on your risk tolerance, you can gather direct user feedback to use to find areas to improve.
+It is often hard to automatically evaluate a generated LLM response so, depending on your risk tolerance, you can gather direct user feedback to find areas to improve.
 
 In this tutorial, we'll use a custom RAG chatbot as an example app with which the users can interact and which allows us to collect user feedback.
 We'll use Streamlit to build the interface and we'll capture the LLM interactions and feedback in Weave.
@@ -83,6 +83,7 @@ def get_and_process_prompt():
         with st.chat_message("assistant"):
 # highlight-next-line            
             with weave.attributes({'session': st.session_state['session_id']}):
+                # This could also be weave model.predict.call if you're using a weave.Model subclass
                 result, call = chat_response.call(prompt) # call the function with `.call`, this returns a tuple with a new Call object
 # highlight-next-line
                 st.button(":thumbsup:",   on_click=lambda: call.feedback.add_reaction("👍"), key='up')
@@ -113,9 +114,6 @@ Visit the Weave UI to see the attached feedback.
 ## Explanation
 
 If we consider our decorated prediction function as:
-
-We can use it as usal to deliver some model response to the user:
-
 
 
 ```python
