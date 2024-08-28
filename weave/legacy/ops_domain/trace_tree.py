@@ -12,7 +12,7 @@ from wandb.sdk.data_types.trace_tree import Result as WBSpanResult
 from wandb.sdk.data_types.trace_tree import Span as WBSpan
 
 from weave import query_api as weave
-from weave import stream_data_interfaces
+from weave.legacy import stream_data_interfaces
 from weave import weave_types as types
 from weave.legacy import op_def
 from weave.legacy.decorator_op import op

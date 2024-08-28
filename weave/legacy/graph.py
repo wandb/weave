@@ -6,7 +6,7 @@ from weave import errors, storage, weave_types
 from weave.legacy import uris
 
 if typing.TYPE_CHECKING:
-    from weave import weave_inspector
+    from weave.legacy import weave_inspector
 
 
 T = typing.TypeVar("T")
@@ -39,7 +39,7 @@ class Node(typing.Generic[T]):
     def _inspect(self) -> "weave_inspector.NodeInspector":
         """Only intended to be used by developers to help debug the graph."""
         # Circular import, so we do it here.
-        from weave import weave_inspector
+        from weave.legacy import weave_inspector
 
         return weave_inspector.NodeInspector(self)
 

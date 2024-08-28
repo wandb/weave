@@ -35,14 +35,14 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
-from weave import call_context
 from weave.client_context import weave_client as weave_client_context
 from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
 )
+from weave.trace import call_context
 from weave.trace.patcher import Patcher
-from weave.weave_client import Call
+from weave.trace.weave_client import Call
 
 import_failed = False
 

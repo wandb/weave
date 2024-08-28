@@ -1,6 +1,5 @@
-import abc
 import datetime
-import typing
+from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
@@ -21,42 +20,42 @@ ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")  # type: igno
 
 
 class LLMUsageSchema(TypedDict, total=False):
-    prompt_tokens: typing.Optional[int]
-    input_tokens: typing.Optional[int]
-    completion_tokens: typing.Optional[int]
-    output_tokens: typing.Optional[int]
-    requests: typing.Optional[int]
-    total_tokens: typing.Optional[int]
+    prompt_tokens: Optional[int]
+    input_tokens: Optional[int]
+    completion_tokens: Optional[int]
+    output_tokens: Optional[int]
+    requests: Optional[int]
+    total_tokens: Optional[int]
 
 
 class LLMCostSchema(LLMUsageSchema):
-    prompt_tokens_cost: typing.Optional[float]
-    completion_tokens_cost: typing.Optional[float]
-    prompt_token_cost: typing.Optional[float]
-    completion_token_cost: typing.Optional[float]
-    prompt_token_cost_unit: typing.Optional[str]
-    completion_token_cost_unit: typing.Optional[str]
-    effective_date: typing.Optional[str]
-    provider_id: typing.Optional[str]
-    pricing_level: typing.Optional[str]
-    pricing_level_id: typing.Optional[str]
-    created_at: typing.Optional[str]
-    created_by: typing.Optional[str]
+    prompt_tokens_cost: Optional[float]
+    completion_tokens_cost: Optional[float]
+    prompt_token_cost: Optional[float]
+    completion_token_cost: Optional[float]
+    prompt_token_cost_unit: Optional[str]
+    completion_token_cost_unit: Optional[str]
+    effective_date: Optional[str]
+    provider_id: Optional[str]
+    pricing_level: Optional[str]
+    pricing_level_id: Optional[str]
+    created_at: Optional[str]
+    created_by: Optional[str]
 
 
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
-    status: typing.Optional[typing.Literal["success", "error", "running"]]
-    nice_trace_name: typing.Optional[str]
-    latency: typing.Optional[int]
-    costs: typing.Optional[typing.Dict[str, LLMCostSchema]]
+    status: Optional[Literal["success", "error", "running"]]
+    nice_trace_name: Optional[str]
+    latency: Optional[int]
+    costs: Optional[Dict[str, LLMCostSchema]]
 
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
-    usage: typing.Dict[str, LLMUsageSchema]
+    usage: Dict[str, LLMUsageSchema]
 
 
 class SummaryMap(SummaryInsertMap, total=False):
-    weave: typing.Optional[WeaveSummarySchema]
+    weave: Optional[WeaveSummarySchema]
 
 
 class CallSchema(BaseModel):
@@ -66,43 +65,41 @@ class CallSchema(BaseModel):
     # Name of the calling function (op)
     op_name: str
     # Optional display name of the call
-    display_name: typing.Optional[str] = None
+    display_name: Optional[str] = None
 
-    ## Trace ID
+    # Trace ID
     trace_id: str
-    ## Parent ID is optional because the call may be a root
-    parent_id: typing.Optional[str] = None
+    # Parent ID is optional because the call may be a root
+    parent_id: Optional[str] = None
 
-    ## Start time is required
+    # Start time is required
     started_at: datetime.datetime
-    ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    # Attributes: properties of the call
+    attributes: Dict[str, Any]
 
-    ## Inputs
-    inputs: typing.Dict[str, typing.Any]
+    # Inputs
+    inputs: Dict[str, Any]
 
-    ## End time is required if finished
-    ended_at: typing.Optional[datetime.datetime] = None
+    # End time is required if finished
+    ended_at: Optional[datetime.datetime] = None
 
-    ## Exception is present if the call failed
-    exception: typing.Optional[str] = None
+    # Exception is present if the call failed
+    exception: Optional[str] = None
 
-    ## Outputs
-    output: typing.Optional[typing.Any] = None
+    # Outputs
+    output: Optional[Any] = None
 
-    ## Summary: a summary of the call
-    summary: typing.Optional[SummaryMap] = None
+    # Summary: a summary of the call
+    summary: Optional[SummaryMap] = None
 
     # WB Metadata
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
+    wb_user_id: Optional[str] = None
+    wb_run_id: Optional[str] = None
 
-    deleted_at: typing.Optional[datetime.datetime] = None
+    deleted_at: Optional[datetime.datetime] = None
 
     @field_serializer("attributes", "summary", when_used="unless-none")
-    def serialize_typed_dicts(
-        self, v: typing.Dict[str, typing.Any]
-    ) -> typing.Dict[str, typing.Any]:
+    def serialize_typed_dicts(self, v: Dict[str, Any]) -> Dict[str, Any]:
         return dict(v)
 
 
@@ -111,51 +108,49 @@ class CallSchema(BaseModel):
 # - trace_id is not required (will be generated)
 class StartedCallSchemaForInsert(BaseModel):
     project_id: str
-    id: typing.Optional[str] = None  # Will be generated if not provided
+    id: Optional[str] = None  # Will be generated if not provided
 
     # Name of the calling function (op)
     op_name: str
     # Optional display name of the call
-    display_name: typing.Optional[str] = None
+    display_name: Optional[str] = None
 
-    ## Trace ID
-    trace_id: typing.Optional[str] = None  # Will be generated if not provided
-    ## Parent ID is optional because the call may be a root
-    parent_id: typing.Optional[str] = None
+    # Trace ID
+    trace_id: Optional[str] = None  # Will be generated if not provided
+    # Parent ID is optional because the call may be a root
+    parent_id: Optional[str] = None
 
-    ## Start time is required
+    # Start time is required
     started_at: datetime.datetime
-    ## Attributes: properties of the call
-    attributes: typing.Dict[str, typing.Any]
+    # Attributes: properties of the call
+    attributes: Dict[str, Any]
 
-    ## Inputs
-    inputs: typing.Dict[str, typing.Any]
+    # Inputs
+    inputs: Dict[str, Any]
 
     # WB Metadata
-    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-    wb_run_id: typing.Optional[str] = None
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: Optional[str] = None
 
 
 class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
 
-    ## End time is required
+    # End time is required
     ended_at: datetime.datetime
 
-    ## Exception is present if the call failed
-    exception: typing.Optional[str] = None
+    # Exception is present if the call failed
+    exception: Optional[str] = None
 
-    ## Outputs
-    output: typing.Optional[typing.Any] = None
+    # Outputs
+    output: Optional[Any] = None
 
-    ## Summary: a summary of the call
+    # Summary: a summary of the call
     summary: SummaryInsertMap
 
     @field_serializer("summary")
-    def serialize_typed_dicts(
-        self, v: typing.Dict[str, typing.Any]
-    ) -> typing.Dict[str, typing.Any]:
+    def serialize_typed_dicts(self, v: Dict[str, Any]) -> Dict[str, Any]:
         return dict(v)
 
 
@@ -163,24 +158,24 @@ class ObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
-    deleted_at: typing.Optional[datetime.datetime] = None
+    deleted_at: Optional[datetime.datetime] = None
     digest: str
     version_index: int
     is_latest: int
     kind: str
-    base_object_class: typing.Optional[str]
-    val: typing.Any
+    base_object_class: Optional[str]
+    val: Any
 
 
 class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
-    val: typing.Any
+    val: Any
 
 
 class TableSchemaForInsert(BaseModel):
     project_id: str
-    rows: list[dict[str, typing.Any]]
+    rows: list[dict[str, Any]]
 
 
 class CallStartReq(BaseModel):
@@ -203,19 +198,19 @@ class CallEndRes(BaseModel):
 class CallReadReq(BaseModel):
     project_id: str
     id: str
-    include_costs: typing.Optional[bool] = False
+    include_costs: Optional[bool] = False
 
 
 class CallReadRes(BaseModel):
-    call: typing.Optional[CallSchema]
+    call: Optional[CallSchema]
 
 
 class CallsDeleteReq(BaseModel):
     project_id: str
-    call_ids: typing.List[str]
+    call_ids: List[str]
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallsDeleteRes(BaseModel):
@@ -223,15 +218,15 @@ class CallsDeleteRes(BaseModel):
 
 
 class CallsFilter(BaseModel):
-    op_names: typing.Optional[typing.List[str]] = None
-    input_refs: typing.Optional[typing.List[str]] = None
-    output_refs: typing.Optional[typing.List[str]] = None
-    parent_ids: typing.Optional[typing.List[str]] = None
-    trace_ids: typing.Optional[typing.List[str]] = None
-    call_ids: typing.Optional[typing.List[str]] = None
-    trace_roots_only: typing.Optional[bool] = None
-    wb_user_ids: typing.Optional[typing.List[str]] = None
-    wb_run_ids: typing.Optional[typing.List[str]] = None
+    op_names: Optional[List[str]] = None
+    input_refs: Optional[List[str]] = None
+    output_refs: Optional[List[str]] = None
+    parent_ids: Optional[List[str]] = None
+    trace_ids: Optional[List[str]] = None
+    call_ids: Optional[List[str]] = None
+    trace_roots_only: Optional[bool] = None
+    wb_user_ids: Optional[List[str]] = None
+    wb_run_ids: Optional[List[str]] = None
 
 
 class SortBy(BaseModel):
@@ -240,32 +235,38 @@ class SortBy(BaseModel):
     # dot-separated.
     field: str  # Consider changing this to _FieldSelect
     # Direction should be either 'asc' or 'desc'
-    direction: typing.Literal["asc", "desc"]
+    direction: Literal["asc", "desc"]
 
 
 class CallsQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[CallsFilter] = None
-    limit: typing.Optional[int] = None
-    offset: typing.Optional[int] = None
+    filter: Optional[CallsFilter] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
     # Sort by multiple fields
-    sort_by: typing.Optional[typing.List[SortBy]] = None
-    query: typing.Optional[Query] = None
-    include_costs: typing.Optional[bool] = False
+    sort_by: Optional[List[SortBy]] = None
+    query: Optional[Query] = None
+    include_costs: Optional[bool] = False
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
-    columns: typing.Optional[typing.List[str]] = None
+    columns: Optional[List[str]] = None
+    # columns to expand, i.e. refs to other objects, can be nested
+    expand_columns: Optional[List[str]] = Field(
+        default=None,
+        examples=[["inputs.self.message", "inputs.model.prompt"]],
+        description="Columns to expand, i.e. refs to other objects",
+    )
 
 
 class CallsQueryRes(BaseModel):
-    calls: typing.List[CallSchema]
+    calls: List[CallSchema]
 
 
 class CallsQueryStatsReq(BaseModel):
     project_id: str
-    filter: typing.Optional[CallsFilter] = None
-    query: typing.Optional[Query] = None
+    filter: Optional[CallsFilter] = None
+    query: Optional[Query] = None
 
 
 class CallsQueryStatsRes(BaseModel):
@@ -278,10 +279,10 @@ class CallUpdateReq(BaseModel):
     call_id: str
 
     # optional update fields
-    display_name: typing.Optional[str] = None
+    display_name: Optional[str] = None
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallUpdateRes(BaseModel):
@@ -307,17 +308,17 @@ class OpReadRes(BaseModel):
 
 
 class OpVersionFilter(BaseModel):
-    op_names: typing.Optional[typing.List[str]] = None
-    latest_only: typing.Optional[bool] = None
+    op_names: Optional[List[str]] = None
+    latest_only: Optional[bool] = None
 
 
 class OpQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[OpVersionFilter] = None
+    filter: Optional[OpVersionFilter] = None
 
 
 class OpQueryRes(BaseModel):
-    op_objs: typing.List[ObjSchema]
+    op_objs: List[ObjSchema]
 
 
 class ObjCreateReq(BaseModel):
@@ -339,19 +340,19 @@ class ObjReadRes(BaseModel):
 
 
 class ObjectVersionFilter(BaseModel):
-    base_object_classes: typing.Optional[typing.List[str]] = None
-    object_ids: typing.Optional[typing.List[str]] = None
-    is_op: typing.Optional[bool] = None
-    latest_only: typing.Optional[bool] = None
+    base_object_classes: Optional[List[str]] = None
+    object_ids: Optional[List[str]] = None
+    is_op: Optional[bool] = None
+    latest_only: Optional[bool] = None
 
 
 class ObjQueryReq(BaseModel):
     project_id: str
-    filter: typing.Optional[ObjectVersionFilter] = None
+    filter: Optional[ObjectVersionFilter] = None
 
 
 class ObjQueryRes(BaseModel):
-    objs: typing.List[ObjSchema]
+    objs: List[ObjSchema]
 
 
 class TableCreateReq(BaseModel):
@@ -410,7 +411,7 @@ to parse.
 
 
 class TableAppendSpecPayload(BaseModel):
-    row: dict[str, typing.Any]
+    row: dict[str, Any]
 
 
 class TableAppendSpec(BaseModel):
@@ -427,14 +428,14 @@ class TablePopSpec(BaseModel):
 
 class TableInsertSpecPayload(BaseModel):
     index: int
-    row: dict[str, typing.Any]
+    row: dict[str, Any]
 
 
 class TableInsertSpec(BaseModel):
     insert: TableInsertSpecPayload
 
 
-TableUpdateSpec = typing.Union[TableAppendSpec, TablePopSpec, TableInsertSpec]
+TableUpdateSpec = Union[TableAppendSpec, TablePopSpec, TableInsertSpec]
 
 
 class TableUpdateReq(BaseModel):
@@ -449,7 +450,7 @@ class TableUpdateRes(BaseModel):
 
 class TableRowSchema(BaseModel):
     digest: str
-    val: typing.Any
+    val: Any
 
 
 class TableCreateRes(BaseModel):
@@ -457,27 +458,27 @@ class TableCreateRes(BaseModel):
 
 
 class TableRowFilter(BaseModel):
-    row_digests: typing.Optional[typing.List[str]] = None
+    row_digests: Optional[List[str]] = None
 
 
 class TableQueryReq(BaseModel):
     project_id: str
     digest: str
-    filter: typing.Optional[TableRowFilter] = None
-    limit: typing.Optional[int] = None
-    offset: typing.Optional[int] = None
+    filter: Optional[TableRowFilter] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
 
 
 class TableQueryRes(BaseModel):
-    rows: typing.List[TableRowSchema]
+    rows: List[TableRowSchema]
 
 
 class RefsReadBatchReq(BaseModel):
-    refs: typing.List[str]
+    refs: List[str]
 
 
 class RefsReadBatchRes(BaseModel):
-    vals: typing.List[typing.Any]
+    vals: List[Any]
 
 
 class FeedbackPayloadReactionReq(BaseModel):
@@ -491,9 +492,9 @@ class FeedbackPayloadNoteReq(BaseModel):
 class FeedbackCreateReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
-    creator: typing.Optional[str] = Field(default=None, examples=["Jane Smith"])
+    creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
     feedback_type: str = Field(examples=["custom"])
-    payload: typing.Dict[str, typing.Any] = Field(
+    payload: Dict[str, Any] = Field(
         examples=[
             {
                 "key": "value",
@@ -502,7 +503,7 @@ class FeedbackCreateReq(BaseModel):
     )
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 # The response provides the additional fields needed to convert a request
@@ -511,7 +512,7 @@ class FeedbackCreateRes(BaseModel):
     id: str
     created_at: datetime.datetime
     wb_user_id: str
-    payload: typing.Dict[str, typing.Any]  # If not empty, replace payload
+    payload: Dict[str, Any]  # If not empty, replace payload
 
 
 class Feedback(FeedbackCreateReq):
@@ -521,20 +522,20 @@ class Feedback(FeedbackCreateReq):
 
 class FeedbackQueryReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
-    fields: typing.Optional[list[str]] = Field(
+    fields: Optional[list[str]] = Field(
         default=None, examples=[["id", "feedback_type", "payload.note"]]
     )
-    query: typing.Optional[Query] = None
+    query: Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
-    sort_by: typing.Optional[typing.List[SortBy]] = None
-    limit: typing.Optional[int] = Field(default=None, examples=[10])
-    offset: typing.Optional[int] = Field(default=None, examples=[0])
+    sort_by: Optional[List[SortBy]] = None
+    limit: Optional[int] = Field(default=None, examples=[10])
+    offset: Optional[int] = Field(default=None, examples=[0])
 
 
 class FeedbackQueryRes(BaseModel):
     # Note: this is not a list of Feedback because user can request any fields.
-    result: list[dict[str, typing.Any]]
+    result: list[dict[str, Any]]
 
 
 class FeedbackPurgeReq(BaseModel):
@@ -569,116 +570,45 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
-class TraceServerInterface:
+class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 
     # Call API
-    @abc.abstractmethod
-    def call_start(self, req: CallStartReq) -> CallStartRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def call_end(self, req: CallEndReq) -> CallEndRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def call_read(self, req: CallReadReq) -> CallReadRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_query_stream(self, req: CallsQueryReq) -> typing.Iterator[CallSchema]:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
-        raise NotImplementedError()
+    def call_start(self, req: CallStartReq) -> CallStartRes: ...
+    def call_end(self, req: CallEndReq) -> CallEndRes: ...
+    def call_read(self, req: CallReadReq) -> CallReadRes: ...
+    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
+    def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
+    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
 
     # Op API
-    @abc.abstractmethod
-    def op_create(self, req: OpCreateReq) -> OpCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def op_read(self, req: OpReadReq) -> OpReadRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def ops_query(self, req: OpQueryReq) -> OpQueryRes:
-        raise NotImplementedError()
+    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
+    def op_read(self, req: OpReadReq) -> OpReadRes: ...
+    def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
     # Obj API
-    @abc.abstractmethod
-    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def table_create(self, req: TableCreateReq) -> TableCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def table_update(self, req: TableUpdateReq) -> TableUpdateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def table_query(self, req: TableQueryReq) -> TableQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def file_create(self, req: FileCreateReq) -> FileCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
-        raise NotImplementedError()
+    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
+    def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
+    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+    def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+    def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
+    def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
+    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
+    def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
+    def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
+    def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
+    def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
+    def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
 
 
 # These symbols are used in the WB Trace Server and it is not safe
 # to remove them, else it will break the server. Once the server
 # is updated to use the new symbols, these can be removed.
-#
-# Remove once https://github.com/wandb/core/pull/22040 lands
-CallsDeleteReqForInsert = CallsDeleteReq
-CallUpdateReqForInsert = CallUpdateReq
-FeedbackCreateReqForInsert = FeedbackCreateReq
 
 # Legacy Names (i think these might be used in a few growth examples, so keeping
 # around until we clean those up of them)

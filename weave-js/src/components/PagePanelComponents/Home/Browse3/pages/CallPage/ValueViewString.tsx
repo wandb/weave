@@ -10,7 +10,7 @@ import {TargetBlank} from '../../../../../../common/util/links';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {ValueViewStringFormatMenu} from './ValueViewStringFormatMenu';
+import {Format, ValueViewStringFormatMenu} from './ValueViewStringFormatMenu';
 
 type ValueViewStringProps = {
   value: string;
@@ -72,12 +72,35 @@ const PreserveWrapping = styled.div`
 `;
 PreserveWrapping.displayName = 'S.PreserveWrapping';
 
+// Regular expressions for common Markdown syntax
+// Note this is intentionally limited in scope to reduce false positives.
+const LIKELY_MARKDOWN_PATTERNS: RegExp[] = [
+  /```[\s\S]*```/, // Code block
+  /\[.+\]\(.+\)/, // Links [text](url)
+  /!\[.*\]\(.+\)/, // Images ![alt](url)
+];
+
+const isLikelyMarkdown = (value: string): boolean => {
+  return LIKELY_MARKDOWN_PATTERNS.some(pattern => pattern.test(value));
+};
+
+const getDefaultFormat = (value: string): Format => {
+  // TODO: Add JSON detection.
+  if (isLikelyMarkdown(value)) {
+    return 'Markdown';
+  }
+  return 'Text';
+};
+
 export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
   const trimmed = value.trim();
   const hasScrolling = trimmed.indexOf('\n') !== -1 || value.length > 100;
   const [hasFull, setHasFull] = useState(false);
 
-  const [format, setFormat] = useState('Text');
+  const [format, setFormat] = useState(getDefaultFormat(value));
+  useEffect(() => {
+    setFormat(getDefaultFormat(value));
+  }, [value]);
 
   const [mode, setMode] = useState(hasScrolling ? (isExpanded ? 1 : 0) : 0);
 
@@ -96,7 +119,7 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     toast('Copied to clipboard');
   }, [value]);
 
-  const onSetFormat = (newFormat: string) => {
+  const onSetFormat = (newFormat: Format) => {
     setFormat(newFormat);
   };
 

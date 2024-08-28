@@ -1,3 +1,4 @@
+import re
 import typing
 
 from weave.trace_server import refs_internal
@@ -57,7 +58,20 @@ def wb_run_id_validator(s: typing.Optional[str]) -> typing.Optional[str]:
     return s
 
 
+def _validate_object_name_charset(name: str) -> None:
+    # Object names must be alphanumeric with dashes
+    invalid_chars = re.findall(r"[^\w._-]", name)
+    if invalid_chars:
+        raise ValueError(
+            f"Invalid object name: {name}. Contains invalid characters: {invalid_chars}"
+        )
+
+    if not name:
+        raise ValueError("Object name cannot be empty")
+
+
 def object_id_validator(s: str) -> str:
+    _validate_object_name_charset(s)
     return validation_util.require_max_str_len(s, 128)
 
 

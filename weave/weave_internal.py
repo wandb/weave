@@ -150,7 +150,7 @@ ENBoundParamsType = typing.Optional[dict[str, graph.Node]]
 # and the function doesn't explicitly operate on tagged values. this ensures that the input tags
 # are propagated appropriately to the output type of the function.
 def refine_graph(node: graph.Node) -> graph.Node:
-    from .registry_mem import memory_registry
+    from .legacy.registry_mem import memory_registry
 
     if isinstance(node, (graph.ConstNode, graph.VoidNode, graph.VarNode)):
         return node

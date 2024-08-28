@@ -6,8 +6,8 @@ import typing
 
 import black
 
-from weave import registry_mem, storage, weave_types
-from weave.legacy import graph
+from weave import storage, weave_types
+from weave.legacy import graph, registry_mem
 
 from . import codifiable_value_mixin
 

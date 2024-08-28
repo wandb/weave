@@ -5,10 +5,11 @@ import typing
 
 import pyarrow as pa
 
-from weave import engine_trace, errors
+from weave import errors
 from weave import weave_types as types
 from weave.query_api import op
 from weave.legacy import (
+    engine_trace,
     artifact_base,
     artifact_fs,
     artifact_mem,

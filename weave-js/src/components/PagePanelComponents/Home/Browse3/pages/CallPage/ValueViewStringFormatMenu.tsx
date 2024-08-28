@@ -3,9 +3,11 @@ import React, {useState} from 'react';
 
 import {Button} from '../../../../../Button';
 
+export type Format = 'Text' | 'JSON' | 'Markdown' | 'Code';
+
 type ValueViewStringFormatMenuProps = {
-  format: string;
-  onSetFormat: (format: string) => void;
+  format: Format;
+  onSetFormat: (format: Format) => void;
 };
 
 // Unfortunately necessary to be visible above drawer.

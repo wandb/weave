@@ -17,10 +17,9 @@ from typing import (
     runtime_checkable,
 )
 
-from weave import call_context
 from weave.client_context import weave_client as weave_client_context
 from weave.legacy import context_state
-from weave.trace import box, settings
+from weave.trace import box, call_context, settings
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -28,7 +27,7 @@ from weave.trace.refs import ObjectRef
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
-    from weave.weave_client import Call, CallsIter
+    from weave.trace.weave_client import Call, CallsIter
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
@@ -44,6 +43,11 @@ try:
     from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
 except ImportError:
     ANTHROPIC_NOT_GIVEN = None
+
+try:
+    from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
+except ImportError:
+    CEREBRAS_NOT_GIVEN = None
 
 
 def print_call_link(call: "Call") -> None:
@@ -61,6 +65,7 @@ def value_is_sentinel(param: Any) -> bool:
         or param.default is OPENAI_NOT_GIVEN
         or param.default is COHERE_NOT_GIVEN
         or param.default is ANTHROPIC_NOT_GIVEN
+        or param.default is CEREBRAS_NOT_GIVEN
     )
 
 

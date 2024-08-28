@@ -10,14 +10,8 @@ import typing
 from collections.abc import Mapping
 
 from weave import (
-    eager,
-    engine_trace,
     environment,
     errors,
-    parallelism,
-    ref_base,
-    registry_mem,
-    trace_local,
 )
 from weave import weave_types as types
 
@@ -28,10 +22,15 @@ from weave import weave_types as types
 # Trace / cache
 # Language Features
 from weave.legacy import (
+    engine_trace,
+    parallelism,
+    ref_base,
+    registry_mem,
     box,
     compile,
     context,
     context_state,
+    eager,
     forward_graph,
     graph,
     graph_debug,
@@ -41,6 +40,7 @@ from weave.legacy import (
     op_def,
     op_execute,
     op_policy,
+    trace_local,
     value_or_error,
     wandb_api,
 )
