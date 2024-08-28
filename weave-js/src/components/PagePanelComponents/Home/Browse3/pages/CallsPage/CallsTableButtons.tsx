@@ -1,5 +1,7 @@
 import {Box, Popover} from '@mui/material';
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Radio} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {
@@ -10,13 +12,22 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
+import React, {
+  Dispatch,
+  FC,
+  SetStateAction,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useWFHooks} from '../wfReactInterface/context';
 import {
   ContentType,
   fileExtensions,
 } from '../wfReactInterface/traceServerClientTypes';
+import {isDynamicCallColumn, stringToPath} from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
@@ -30,7 +41,6 @@ export const ExportSelector = ({
   visibleColumns,
   disabled,
   callQueryParams,
-  rightmostButton = false,
 }: {
   selectedCalls: string[];
   numTotalCalls: number;
@@ -43,12 +53,17 @@ export const ExportSelector = ({
     gridSort?: GridSortModel;
   };
   disabled: boolean;
-  rightmostButton?: boolean;
 }) => {
   const [selectionState, setSelectionState] = useState<SelectionState>('all');
   const [downloadLoading, setDownloadLoading] = useState<ContentType | null>(
     null
   );
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {loading: orgNameLoading, orgName} = useOrgName({
+    entityName: userInfoLoaded?.username ?? '',
+    skip: viewerLoading,
+  });
 
   // Popover management
   const ref = useRef<HTMLDivElement>(null);
@@ -68,6 +83,11 @@ export const ExportSelector = ({
     callQueryParams.gridSort
   );
 
+  const refColumnsToExpand = useMemo(
+    () => visibleColumns.filter(col => isDynamicCallColumn(stringToPath(col))),
+    [visibleColumns]
+  );
+
   const onClickDownload = (contentType: ContentType) => {
     if (downloadLoading) {
       return;
@@ -82,6 +102,17 @@ export const ExportSelector = ({
     const columns = [ContentType.csv, ContentType.tsv].includes(contentType)
       ? visibleColumns
       : undefined;
+    const startTime = Date.now();
+
+    visibleColumns.sort((a, b) => b.length - a.length);
+    const leafColumns: string[] = [];
+    for (const col of visibleColumns) {
+      if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
+        continue;
+      }
+      leafColumns.push(col);
+    }
+
     download(
       callQueryParams.entity,
       callQueryParams.project,
@@ -91,7 +122,8 @@ export const ExportSelector = ({
       offset,
       sortBy,
       filterBy,
-      columns
+      leafColumns,
+      refColumnsToExpand
     ).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];
@@ -99,6 +131,19 @@ export const ExportSelector = ({
       initiateDownloadFromBlob(blob, fileName);
       setAnchorEl(null);
       setDownloadLoading(null);
+
+      userEvents.exportClicked({
+        dataSize: blob.size,
+        numColumns: columns?.length ?? null,
+        numRows: numTotalCalls,
+        numExpandedColumns: 0,
+        maxDepth: 0,
+        type: contentType,
+        latency: Date.now() - startTime,
+        userId: userInfoLoaded?.id ?? '',
+        organizationName: orgName,
+        username: userInfoLoaded?.username ?? '',
+      });
     });
     setSelectionState('all');
   };
@@ -107,7 +152,6 @@ export const ExportSelector = ({
     <>
       <span ref={ref}>
         <Button
-          className={rightmostButton ? 'mr-16' : 'mr-4'}
           icon="export-share-upload"
           variant="ghost"
           onClick={onClick}
@@ -155,10 +199,12 @@ export const ExportSelector = ({
                   setSelectionState={setSelectionState}
                 />
               )}
-              <DownloadGrid
-                onClickDownload={onClickDownload}
-                downloadLoading={downloadLoading}
-              />
+              {!viewerLoading && !orgNameLoading && (
+                <DownloadGrid
+                  onClickDownload={onClickDownload}
+                  downloadLoading={downloadLoading}
+                />
+              )}
             </DraggableHandle>
           </div>
         </Tailwind>
@@ -308,7 +354,6 @@ export const BulkDeleteButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        className="ml-4 mr-16"
         variant="ghost"
         size="medium"
         disabled={disabled}

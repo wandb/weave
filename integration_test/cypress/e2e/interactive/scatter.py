@@ -2,7 +2,7 @@ import random
 
 import weave
 from weave.legacy.ecosystem import wandb
-from weave.show import show_url
+from weave.legacy.show import show_url
 
 weave.use_fixed_server_port()
 

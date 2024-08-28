@@ -1,14 +1,14 @@
 import logging
 
 from weave import (
-    engine_trace,
     errors,
-    ref_base,
-    registry_mem,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.legacy import (
+    engine_trace,
+    ref_base,
+    registry_mem,
     box,
     compile,
     forward_graph,

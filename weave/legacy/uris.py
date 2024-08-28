@@ -5,7 +5,7 @@ from urllib import parse
 from .. import errors
 
 if typing.TYPE_CHECKING:
-    from .. import ref_base
+    from . import ref_base
 
 
 @dataclasses.dataclass
