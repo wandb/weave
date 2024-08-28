@@ -7,12 +7,12 @@ from pyarrow import parquet as pq
 from weave import (
     engine_trace,
     errors,
-    registry_mem,
     util,
 )
 from weave import weave_types as types
 from weave.query_api import use
 from weave.legacy import (
+    registry_mem,
     _dict_utils,
     artifact_base,
     artifact_fs,

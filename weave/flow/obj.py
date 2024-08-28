@@ -11,7 +11,7 @@ from pydantic import (
 
 from weave.trace.op import ObjectRef, Op, call
 from weave.trace.vals import WeaveObject, pydantic_getattribute
-from weave.weave_client import get_ref
+from weave.trace.weave_client import get_ref
 
 
 class Object(BaseModel):

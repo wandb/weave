@@ -18,18 +18,18 @@ from . import util as _util
 
 from weave.legacy import context as _context
 from . import weave_init as _weave_init
-from . import weave_client as _weave_client
+from .trace import weave_client as _weave_client
 
 # exposed as part of api
 from . import weave_types as types
 
 # needed to enable automatic numpy serialization
-from . import types_numpy as _types_numpy
+from .legacy import types_numpy as _types_numpy
 
 from . import errors
 from weave.legacy.decorators import weave_class, mutation, type
 
-from . import usage_analytics
+from weave.legacy import usage_analytics
 from weave.legacy.context import (
     use_fixed_server_port,
     use_frontend_devmode,

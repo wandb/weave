@@ -1,10 +1,6 @@
 from typing import Iterable, Optional
 
 
-class WeaveUnmergableArtifactsError(Exception):
-    pass
-
-
 class WeaveFingerprintErrorMixin:
     fingerprint: Optional[Iterable] = None
 
@@ -30,11 +26,11 @@ class WeaveInternalError(WeaveBaseError):
     pass
 
 
-class WeaveConfigurationError(WeaveBaseError):
+class WeaveSerializeError(WeaveBaseError):
     pass
 
 
-class WeaveSerializeError(WeaveBaseError):
+class WeaveConfigurationError(WeaveBaseError):
     pass
 
 

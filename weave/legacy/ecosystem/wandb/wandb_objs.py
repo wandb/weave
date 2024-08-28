@@ -1,7 +1,7 @@
 import typing
 
 import weave
-from weave import registry_mem
+from weave.legacy import registry_mem
 from weave.legacy.ops_domain import run_ops, wb_domain_types
 
 # We can't chain ops called .name() because of a weird bug :( [its a field on VarNode].

@@ -31,7 +31,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
 
 // Controls the maximum number of rows to display in the table
-const MAX_ROWS = 1000;
+const MAX_ROWS = 10_000;
 
 // Controls whether to use a table for arrays or not.
 export const USE_TABLE_FOR_ARRAYS = false;
