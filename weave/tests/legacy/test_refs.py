@@ -4,13 +4,14 @@ import weave
 from weave.flow.obj import Object
 from weave.legacy import artifact_local
 from weave.legacy import ops_arrow as arrow
+from weave.trace import ref_util
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
 )
 
-from ... import ref_util, storage
+from ... import storage
 
 
 def test_laref_artifact_version_1():

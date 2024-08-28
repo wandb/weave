@@ -16,7 +16,7 @@ from . import weave_types as types
 from . import storage
 
 from .query_api import *
-from .trace_api import *
+from .trace.api import *
 
 from .errors import *
 
@@ -64,7 +64,7 @@ if ops_modules or panels_modules:
 # Special object informing doc generation tooling which symbols
 # to document & to associate with this module.
 __docspec__ = [
-    # Re-exported from trace_api
+    # Re-exported from trace.api
     init,
     publish,
     ref,
