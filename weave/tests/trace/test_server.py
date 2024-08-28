@@ -6,13 +6,13 @@ import numpy as np
 import pytest
 import requests
 
-from weave import api as weave
-from weave.legacy import client as _client
-from weave.legacy import context_state, ops
-from weave.legacy import server as _server
-from weave.legacy import weave_types as types
-from weave.legacy.decorator_op import op
-from weave.weave_internal import make_const_node
+from weave.legacy.weave import api as weave
+from weave.legacy.weave import client as _client
+from weave.legacy.weave import context_state, ops
+from weave.legacy.weave import server as _server
+from weave.legacy.weave import weave_types as types
+from weave.legacy.weave.decorator_op import op
+from weave.legacy.weave.weave_internal import make_const_node
 
 SERVER_TYPES = ["inprocess", "subprocess", "http"]
 

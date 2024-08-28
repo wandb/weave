@@ -13,7 +13,7 @@ import asyncio
 import cProfile
 import time
 
-from weave.legacy import (
+from weave.legacy.weave import (
     artifact_wandb,
     async_map,
     engine_trace,

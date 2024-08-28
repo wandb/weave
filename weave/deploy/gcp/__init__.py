@@ -8,8 +8,8 @@ import typing
 from pathlib import Path
 
 from weave import __version__
-from weave.legacy import environment
-from weave.legacy.artifact_wandb import WeaveWBArtifactURI as WeaveWBArtifactURI
+from weave.legacy.weave import environment
+from weave.legacy.weave.artifact_wandb import WeaveWBArtifactURI as WeaveWBArtifactURI
 from weave.trace.refs import ObjectRef, parse_uri
 
 from ..util import execute, safe_name
