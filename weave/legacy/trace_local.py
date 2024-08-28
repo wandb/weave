@@ -6,13 +6,13 @@ import typing
 from typing import Mapping
 
 from weave.legacy import artifact_local, graph, op_def, op_policy, runs
+from . import ref_base
 
-from . import (
-    ref_base,
+from .. import (
     storage,
     weave_internal,
 )
-from . import weave_types as types
+from .. import weave_types as types
 
 
 @dataclasses.dataclass
@@ -21,7 +21,7 @@ class RunKey:
     id: str
 
 
-def _value_id(val):
+def _value_id(val):  # type: ignore
     # Important, do not include the type here, as it can change.
     # This happens because you can have a ref to an item that's in a list.
     # The list's object_type can change as items are appended to it.
@@ -44,7 +44,7 @@ def make_run_key(
     else:
         hashable_inputs = {}
         for name, obj in inputs_refs.items():
-            hashable_inputs[name] = _value_id(obj)
+            hashable_inputs[name] = _value_id(obj)  # type: ignore[no-untyped-call]
         hash_val = {
             "op_name": op_def.name,
             "op_version": op_def.version,
@@ -89,7 +89,7 @@ class TraceLocal:
             types.RunType(),
         )
 
-    def _run_table(self, run_key: RunKey):
+    def _run_table(self, run_key: RunKey):  # type: ignore
         table_uri = artifact_local.WeaveLocalArtifactURI(
             f"run-{run_key.op_simple_name}", "latest", "obj"
         )
@@ -99,7 +99,7 @@ class TraceLocal:
             types.List(types.RunType()),
         )
 
-    def _should_save_to_table(self, run_key: RunKey):
+    def _should_save_to_table(self, run_key: RunKey):  # type: ignore
         # Restricted to just a couple ops for now.
         # A NOTE: for the future, async ops definitely can't be saved to
         # table (until we have safe table writes)
@@ -120,10 +120,10 @@ class TraceLocal:
     def get_run_val(self, run_key: RunKey) -> typing.Optional[runs.Run]:
         from weave.legacy import execute_fast
 
-        res = execute_fast._execute_fn_no_engine(None, None, self.get_run(run_key))
+        res = execute_fast._execute_fn_no_engine(None, None, self.get_run(run_key))  # type: ignore[no-untyped-call]
         return res
 
-    def save_run(self, run: runs.Run):
+    def save_run(self, run: runs.Run):  # type: ignore
         from weave.legacy.ops_primitives import weave_api
 
         run_key = RunKey(run.op_name, run.id)
@@ -132,7 +132,7 @@ class TraceLocal:
         else:
             weave_api.set(self._single_run(run_key), run, {})
 
-    def save_run_output(self, od: op_def.OpDef, run_key: RunKey, output: typing.Any):
+    def save_run_output(self, od: op_def.OpDef, run_key: RunKey, output: typing.Any):  # type: ignore
         if not od.pure:
             # If an op is impure, its output is saved to a name that does not
             # include run ID. This means consuming pure runs will hit cache if

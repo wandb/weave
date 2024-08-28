@@ -9,7 +9,7 @@ from weave.legacy.graph import Node
 from weave.legacy import graph_mapper as _graph_mapper
 
 from . import storage as _storage
-from . import ref_base as _ref_base
+from .legacy import ref_base as _ref_base
 from weave.legacy import wandb_api as _wandb_api
 
 from . import weave_internal as _weave_internal
@@ -24,7 +24,7 @@ from .trace import weave_client as _weave_client
 from . import weave_types as types
 
 # needed to enable automatic numpy serialization
-from . import types_numpy as _types_numpy
+from .legacy import types_numpy as _types_numpy
 
 from . import errors
 from weave.legacy.decorators import weave_class, mutation, type

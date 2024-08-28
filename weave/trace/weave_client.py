@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import platform
+import re
 import sys
 import typing
 from functools import lru_cache
@@ -9,11 +10,10 @@ from typing import Any, Dict, Iterator, Optional, Sequence, Union
 import pydantic
 from requests import HTTPError
 
-from weave import trace_sentry, urls, version
+from weave import urls, version
 from weave.client_context import weave_client as weave_client_context
-from weave.exception import exception_to_json_str
-from weave.table import Table
-from weave.trace import call_context
+from weave.trace import call_context, trace_sentry
+from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
     ObjectRecord,
@@ -25,6 +25,7 @@ from weave.trace.op import op as op_deco
 from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
+from weave.trace.table import Table
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
@@ -51,7 +52,7 @@ from weave.trace_server.trace_server_interface import (
 )
 
 if typing.TYPE_CHECKING:
-    from .. import ref_base
+    from ..legacy import ref_base
 
 
 # Controls if objects can have refs to projects not the WeaveClient project.
@@ -765,6 +766,8 @@ class WeaveClient:
         if name is None:
             raise ValueError("Name must be provided for object saving")
 
+        name = sanitize_object_name(name)
+
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -1000,6 +1003,18 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
         return tuple(tuple_res)
 
     return obj
+
+
+def sanitize_object_name(name: str) -> str:
+    # Replaces any non-alphanumeric characters with a single dash and removes
+    # any leading or trailing dashes. This is more restrictive than the DB
+    # constraints and can be relaxed if needed.
+    res = re.sub(r"([._-]{2,})+", "-", re.sub(r"[^\w._]+", "-", name)).strip("-_")
+    if not res:
+        raise ValueError(f"Invalid object name: {name}")
+    if len(res) > 128:
+        res = res[:128]
+    return res
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

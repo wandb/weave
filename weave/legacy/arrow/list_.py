@@ -12,8 +12,6 @@ import typing_extensions
 
 from weave import (
     errors,
-    ref_base,
-    ref_util,
     weave_internal,
 )
 from weave import weave_types as types
@@ -27,6 +25,7 @@ from weave.legacy import (
     op_def,
     op_def_type,
     node_ref,
+    ref_base,
 )
 from weave.legacy.arrow.arrow import (
     ArrowWeaveListType,
@@ -40,6 +39,7 @@ from weave.legacy.language_features.tagging import (
     tag_store,
     tagged_value_type,
 )
+from weave.trace import ref_util
 
 
 def reverse_dict(d: dict) -> dict:

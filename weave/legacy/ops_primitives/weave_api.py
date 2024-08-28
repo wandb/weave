@@ -4,14 +4,14 @@ import typing
 
 from weave import (
     errors,
-    ref_base,
-    registry_mem,
     storage,
     weave_internal,
 )
 from weave import weave_types as types
 from weave.query_api import mutation, op, weave_class
 from weave.legacy import (
+    ref_base,
+    registry_mem,
     artifact_fs,
     artifact_local,
     artifact_wandb,

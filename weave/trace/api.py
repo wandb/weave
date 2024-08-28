@@ -11,18 +11,18 @@ from weave.trace.call_context import get_current_call
 
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
-from . import (
+from .. import (
     type_serializers,  # noqa: F401
     urls,
     util,
     weave_init,
 )
+from . import context, weave_client
+from .constants import TRACE_OBJECT_EMOJI
+from .op import Op, op
+from .refs import ObjectRef, parse_uri
+from .settings import UserSettings, parse_and_apply_settings
 from .table import Table
-from .trace import context, weave_client
-from .trace.constants import TRACE_OBJECT_EMOJI
-from .trace.op import Op, op
-from .trace.refs import ObjectRef, parse_uri
-from .trace.settings import UserSettings, parse_and_apply_settings
 
 
 def init(

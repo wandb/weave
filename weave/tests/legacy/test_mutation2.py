@@ -1,6 +1,5 @@
 import weave
-from weave import ref_base
-from weave.legacy import uris
+from weave.legacy import ref_base, uris
 
 from ... import weave_internal
 

@@ -3,9 +3,9 @@ import React from 'react';
 import styled from 'styled-components';
 
 import {parseRef} from '../../../../react';
+import {isWeaveRef} from '../Browse3/filters/common';
 import {ValueViewNumber} from '../Browse3/pages/CallPage/ValueViewNumber';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
-import {isRef} from '../Browse3/pages/common/util';
 import {isCustomWeaveTypePayload} from '../Browse3/typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../Browse3/typeViews/CustomWeaveTypeDispatcher';
 import {CellValueBoolean} from './CellValueBoolean';
@@ -35,7 +35,7 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
   if (value === null) {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
-  if (isRef(value)) {
+  if (isWeaveRef(value)) {
     return <SmallRef objRef={parseRef(value)} iconOnly={isExpanded} />;
   }
   if (typeof value === 'boolean') {

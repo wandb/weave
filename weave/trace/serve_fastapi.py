@@ -17,7 +17,8 @@ from weave.legacy.wandb_api import WandbApiAsync
 from weave.trace.op import Op
 from weave.trace.refs import ObjectRef
 
-from . import errors, weave_pydantic
+from .. import errors
+from ..legacy import weave_pydantic
 
 key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
     cache.LruTimeWindowCache(datetime.timedelta(minutes=5))

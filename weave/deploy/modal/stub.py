@@ -27,7 +27,7 @@ uri = WeaveURI.parse("$MODEL_REF")
 @asgi_app(label=safe_name(uri.name))
 def fastapi_app() -> FastAPI:
     from weave import api
-    from weave.serve_fastapi import object_method_app
+    from weave.trace.serve_fastapi import object_method_app
 
     uri_ref = parse_uri(os.environ["MODEL_REF"])
     if not isinstance(uri_ref, ObjectRef):

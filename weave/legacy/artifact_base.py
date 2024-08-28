@@ -8,7 +8,7 @@
 import typing
 
 from weave import weave_types as types
-from weave import ref_base
+from weave.legacy import ref_base
 
 
 class Artifact:

@@ -15,6 +15,7 @@ from werkzeug.serving import make_server
 from weave.legacy import (
     cache,
     context,
+    engine_trace,
     execute,
     gql_json_cache,
     graph,
@@ -25,7 +26,7 @@ from weave.legacy import (
 from weave.legacy.language_features.tagging import tag_store
 from weave.legacy.language_features.tagging.tag_store import isolated_tagging_context
 
-from . import engine_trace, logs, storage, util, weave_types
+from . import logs, storage, util, weave_types
 
 # A function to monkeypatch the request post method
 # def patch_request_post():
