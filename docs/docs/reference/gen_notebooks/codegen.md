@@ -42,8 +42,7 @@ First, let's set up our environment and import the necessary libraries:
 
 
 ```python
-!pip install -qU autopep8 autoflake weave isort openai set-env-colab-kaggle-dotenv
-
+!pip install -qU autopep8 autoflake weave isort openai set-env-colab-kaggle-dotenv datasets
 ```
 
 
