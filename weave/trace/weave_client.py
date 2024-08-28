@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import platform
+import re
 import sys
 import typing
 from functools import lru_cache
@@ -765,6 +766,8 @@ class WeaveClient:
         if name is None:
             raise ValueError("Name must be provided for object saving")
 
+        name = sanitize_object_name(name)
+
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -1000,6 +1003,18 @@ def redact_sensitive_keys(obj: typing.Any) -> typing.Any:
         return tuple(tuple_res)
 
     return obj
+
+
+def sanitize_object_name(name: str) -> str:
+    # Replaces any non-alphanumeric characters with a single dash and removes
+    # any leading or trailing dashes. This is more restrictive than the DB
+    # constraints and can be relaxed if needed.
+    res = re.sub(r"([._-]{2,})+", "-", re.sub(r"[^\w._]+", "-", name)).strip("-_")
+    if not res:
+        raise ValueError(f"Invalid object name: {name}")
+    if len(res) > 128:
+        res = res[:128]
+    return res
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

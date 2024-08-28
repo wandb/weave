@@ -34,6 +34,7 @@ from weave.trace_server.trace_server_common import get_nested_key, set_nested_ke
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
+from weave.trace_server.validation import object_id_validator
 
 from . import trace_server_interface as tsi
 from .ids import generate_id
@@ -584,6 +585,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         json_val = json.dumps(req.obj.val)
         digest = str_digest(json_val)
+
+        # Validate
+        object_id_validator(req.obj.object_id)
 
         req_obj = req.obj
         # TODO: version index isn't right here, what if we delete stuff?
