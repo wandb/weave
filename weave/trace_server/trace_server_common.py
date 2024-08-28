@@ -17,7 +17,6 @@ def make_derived_summary_fields(
     status = _make_call_status_from_exception_and_ended_at(
         call_dict.get("exception"), ended_at_dt
     )
-
     latency = None
     if ended_at_dt and started_at_dt:
         latency = (ended_at_dt - started_at_dt).microseconds
@@ -29,13 +28,14 @@ def make_derived_summary_fields(
         else:
             display_name = call_dict["op_name"]
 
-    weave_derived_fields = tsi.WeaveSummarySchema(
-        nice_trace_name=display_name,
-        status=status,
-        latency=latency,
-    )
     summary = _load_json_maybe(call_dict.get(summary_key)) or {}
-    summary["weave"] = weave_derived_fields
+
+    weave_summary = summary.get("weave", {})
+    weave_summary["nice_trace_name"] = display_name
+    weave_summary["status"] = status
+    weave_summary["latency"] = latency
+
+    summary["weave"] = weave_summary
     return cast(tsi.SummaryMap, summary)
 
 
