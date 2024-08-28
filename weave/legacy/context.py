@@ -4,8 +4,8 @@ import os
 import typing
 from urllib.parse import urlparse
 
-from weave import urls, util
-from weave.legacy import client, context_state
+from weave.legacy import util
+from weave.legacy import urls, client, context_state
 from weave.legacy.client_interface import ClientInterface
 
 

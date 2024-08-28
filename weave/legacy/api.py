@@ -14,7 +14,7 @@ from weave.legacy import wandb_api as _wandb_api
 
 from .. import weave_internal as _weave_internal
 
-from .. import util as _util
+from weave.legacy import util as _util
 
 from weave.legacy import context as _context
 from .. import weave_init as _weave_init

@@ -7,14 +7,13 @@ import time
 from typing import Any, Callable, Iterator, Optional, Union
 
 from weave.client_context import weave_client as weave_client_context
+from weave.legacy import urls, util
 from weave.trace.call_context import get_current_call
 
 # TODO: type_serializers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from .. import (
     type_serializers,  # noqa: F401
-    urls,
-    util,
     weave_init,
 )
 from . import context, weave_client

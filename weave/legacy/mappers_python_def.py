@@ -4,7 +4,7 @@ import inspect
 import math
 import typing
 
-from weave import storage
+from weave.legacy import storage
 from weave import weave_types as types
 from weave.legacy import (
     artifact_fs,

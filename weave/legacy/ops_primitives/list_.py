@@ -6,7 +6,7 @@ import typing
 import numpy as np
 import pandas as pd
 
-from weave import storage
+from weave.legacy import storage
 from weave import weave_types as types
 from weave.legacy import box, execute_fast, errors
 from weave.legacy._dict_utils import tag_aware_dict_val_for_escaped_key

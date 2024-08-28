@@ -1,4 +1,5 @@
-from weave import storage, weave_types
+from weave import weave_types
+from weave.legacy import storage
 
 
 class Client:
