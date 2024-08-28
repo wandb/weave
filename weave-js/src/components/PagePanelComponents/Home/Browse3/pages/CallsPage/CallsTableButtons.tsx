@@ -312,7 +312,7 @@ const ClickableOutlinedCardWithIcon: FC<{
         />
       </div>
     )}
-    <div className="ml-4">{children}</div>
+    <div className="ml-4 flex w-full items-center">{children}</div>
   </div>
 );
 
@@ -362,14 +362,26 @@ const DownloadGrid: FC<{
       <div className="mt-8 flex items-center">
         <ClickableOutlinedCardWithIcon
           iconName="python-logo"
-          onClick={() => setCodeMode('python')}>
-          Use Python
+          onClick={() => {
+            setCodeMode('python');
+            navigator.clipboard.writeText(pythonText);
+          }}>
+          <span className="w-full">Use Python</span>
+          <div className="flex w-full justify-end">
+            <Icon name="copy" size="small" />
+          </div>
         </ClickableOutlinedCardWithIcon>
         <div className="ml-8" />
         <ClickableOutlinedCardWithIcon
           iconName="code-alt"
-          onClick={() => setCodeMode('curl')}>
-          Use CURL
+          onClick={() => {
+            setCodeMode('curl');
+            navigator.clipboard.writeText(curlText);
+          }}>
+          <span className="w-full">Use CURL</span>
+          <div className="flex w-full justify-end">
+            <Icon name="copy" size="small" />
+          </div>
         </ClickableOutlinedCardWithIcon>
       </div>
       {codeMode && (
