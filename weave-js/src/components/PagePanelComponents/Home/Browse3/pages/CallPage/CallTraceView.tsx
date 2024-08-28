@@ -337,18 +337,7 @@ export const useCallFlattenedTraceTree = (
   selectedPath: string | null
 ) => {
   const {useCalls} = useWFHooks();
-  const columns = useMemo(
-    () => [
-      'id',
-      'trace_id',
-      'project_id',
-      'op_name',
-      'parent_id',
-      'started_at',
-      'ended_at',
-    ],
-    []
-  );
+  const columns = useMemo(() => ['parent_id', 'started_at', 'ended_at'], []);
   const traceCalls = useCalls(
     call.entity,
     call.project,
