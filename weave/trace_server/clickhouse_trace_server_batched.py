@@ -354,8 +354,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _get_refs_to_resolve(
         self, calls: list[dict[str, typing.Any]], expand_columns: typing.List[str]
-    ) -> typing.Dict[tuple[int, str], str]:
-        refs_to_resolve: typing.Dict[tuple[int, str], str] = {}
+    ) -> typing.Dict[tuple[int, str], refs_internal.InternalObjectRef]:
+        refs_to_resolve: typing.Dict[
+            tuple[int, str], refs_internal.InternalObjectRef
+        ] = {}
         for i, call in enumerate(calls):
             for col in expand_columns:
                 if col in call:
@@ -368,7 +370,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if not refs_internal.any_will_be_interpreted_as_ref_str(val):
                     continue
 
-                refs_to_resolve[(i, col)] = val
+                ref = refs_internal.parse_internal_uri(val)
+                if isinstance(ref, refs_internal.InternalTableRef):
+                    continue
+
+                refs_to_resolve[(i, col)] = ref
         return refs_to_resolve
 
     def _expand_call_refs(
@@ -390,15 +396,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            refs = list(refs_to_resolve.values())
-            parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in refs]
-            parsed_refs = typing.cast(ObjRefListType, parsed_raw_refs)
             vals = self._refs_read_batch_within_project(
-                project_id, parsed_refs, ref_cache
+                project_id, list(refs_to_resolve.values()), ref_cache
             )
-            for (i, col), val, ref in zip(refs_to_resolve, vals, refs):
+            for ((i, col), ref), val in zip(refs_to_resolve.items(), vals):
                 if isinstance(val, dict) and "_ref" not in val:
-                    val["_ref"] = ref
+                    val["_ref"] = ref.uri()
                 set_nested_key(calls[i], col, val)
 
         return calls
