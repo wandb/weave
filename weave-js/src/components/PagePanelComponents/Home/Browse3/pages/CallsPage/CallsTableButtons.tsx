@@ -354,18 +354,12 @@ const DownloadGrid: FC<{
           iconName="python-logo"
           onClick={() => setCodeMode('python')}>
           <span className="w-full">Use Python</span>
-          <div className="flex w-full justify-end">
-            <Icon name="copy" size="small" />
-          </div>
         </ClickableOutlinedCardWithIcon>
         <div className="ml-8" />
         <ClickableOutlinedCardWithIcon
           iconName="code-alt"
           onClick={() => setCodeMode('curl')}>
           <span className="w-full">Use CURL</span>
-          <div className="flex w-full justify-end">
-            <Icon name="copy" size="small" />
-          </div>
         </ClickableOutlinedCardWithIcon>
       </div>
       {codeMode && (
