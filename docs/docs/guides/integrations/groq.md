@@ -37,7 +37,7 @@ chat_completion = client.chat.completions.create(
 
 Wrapping a function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
 
-Simply create a function decorated with [`@weave.op`](/guides/tracing/ops).
+Simply create a function decorated with [`@weave.op`](/guides/tracking/ops).
 
 In the example below, we have the function `recommend_places_to_visit` which is a function wrapped with `@weave.op` that recommends places to visit in a city.
 
@@ -82,9 +82,9 @@ recommend_places_to_visit("Kolkata")
 
 ## Create a `Model` for easier experimentation
 
-Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](../models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
+Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](../core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
 
-In addition to versioning code and capturing inputs/outputs, [`Model`](../models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](../evaluations.md)s.
+In addition to versioning code and capturing inputs/outputs, [`Model`](../core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](../core-types/evaluations.md)s.
 
 In the example below, you can experiment with `WeaveModel`. Every time you change one of these, you'll get a new _version_ of `WeaveModel`.
 
@@ -125,7 +125,7 @@ print(city_recommender.predict("Los Angeles"))
 
 | ![](./imgs/groq/groq_weave_model.png) |
 |---|
-| Tracing and versioning your calls using a [`Model`](../models) |
+| Tracing and versioning your calls using a [`Model`](../core-types/models) |
 
 ### Serving a Weave Model
 

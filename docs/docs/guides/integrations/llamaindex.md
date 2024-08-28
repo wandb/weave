@@ -66,7 +66,7 @@ Our integration leverages this capability of LlamaIndex and automatically sets [
 
 ## Create a `Model` for easier experimentation
 
-Organizing and evaluating LLMs in applications for various use cases is challenging with multiple components, such as prompts, model configurations, and inference parameters. Using the [`weave.Model`](/guides/models), you can capture and organize experimental details like system prompts or the models you use, making it easier to compare different iterations.
+Organizing and evaluating LLMs in applications for various use cases is challenging with multiple components, such as prompts, model configurations, and inference parameters. Using the [`weave.Model`](/guides/core-types/models), you can capture and organize experimental details like system prompts or the models you use, making it easier to compare different iterations.
 
 The following example demonstrates building a LlamaIndex query engine in a `WeaveModel`, using data that can be found in the [weave/data](https://github.com/wandb/weave/tree/master/data) folder:
 
@@ -148,7 +148,7 @@ This `SimpleRAGPipeline` class subclassed from `weave.Model` organizes the impor
 
 ## Doing Evaluation with `weave.Evaluation`
 
-Evaluations help you measure the performance of your applications. By using the [`weave.Evaluation`](/guides/evaluations) class, you can capture how well your model performs on specific tasks or datasets, making it easier to compare different models and iterations of your application. The following example demonstrates how to evaluate the model we created:
+Evaluations help you measure the performance of your applications. By using the [`weave.Evaluation`](/guides/core-types/evaluations) class, you can capture how well your model performs on specific tasks or datasets, making it easier to compare different models and iterations of your application. The following example demonstrates how to evaluate the model we created:
 
 ```python
 import asyncio

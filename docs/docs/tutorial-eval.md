@@ -63,7 +63,7 @@ print(asyncio.run(model.predict(sentence)))
 ```
 
 :::note
-Checkout the [Models](/guides/models) guide to learn more.
+Checkout the [Models](/guides/core-types/models) guide to learn more.
 :::
 
 ## 2. Collect some examples

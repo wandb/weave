@@ -41,7 +41,7 @@ We patch the Cohere `Client.chat`, `AsyncClient.chat`, `Client.chat_stream`, and
 
 ## Wrapping with your own ops
 
-Weave ops make results *reproducible* by automatically versioning code as you experiment, and they capture their inputs and outputs. Simply create a function decorated with [`@weave.op()`](/guides/tracing/ops) that calls into Cohere's chat methods, and Weave will track the inputs and outputs for you. Here's an example:
+Weave ops make results *reproducible* by automatically versioning code as you experiment, and they capture their inputs and outputs. Simply create a function decorated with [`@weave.op()`](/guides/tracking/ops) that calls into Cohere's chat methods, and Weave will track the inputs and outputs for you. Here's an example:
 
 ```python
 import cohere
@@ -76,9 +76,9 @@ print(weather("Boston", "command"))
 
 ## Create a `Model` for easier experimentation
 
-Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app.
+Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app.
 
-In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/models)s capture structured parameters that control your application's behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](/guides/evaluations)s.
+In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/core-types/models)s capture structured parameters that control your application's behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](/guides/core-types/evaluations)s.
 
 In the example below, you can experiment with `model` and `temperature`. Every time you change one of these, you'll get a new _version_ of `WeatherModel`.
 

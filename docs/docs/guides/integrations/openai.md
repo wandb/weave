@@ -39,7 +39,7 @@ response = client.chat.completions.create(
 
 Wrapping a function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
 
-Simply create a function decorated with [`@weave.op`](/guides/tracing/ops) that calls into [openai python library](https://platform.openai.com/docs/reference/python-sdk?lang=python).
+Simply create a function decorated with [`@weave.op`](/guides/tracking/ops) that calls into [openai python library](https://platform.openai.com/docs/reference/python-sdk?lang=python).
 
 In the example below, we have 2 functions wrapped with op. This helps us see how intermediate steps, like the retrieval step in a RAG app, are affecting how our app behaves.
 
@@ -107,9 +107,9 @@ Navigate to Weave and you can click `get_pokemon_data` in the UI to see the inpu
 
 ## Create a `Model` for easier experimentation
 
-Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
+Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
 
-In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](/guides/evaluations)s.
+In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](/guides/core-types/evaluations)s.
 
 In the example below, you can experiment with `model` and `system_message`. Every time you change one of these, you'll get a new _version_ of `GrammarCorrectorModel`. 
 

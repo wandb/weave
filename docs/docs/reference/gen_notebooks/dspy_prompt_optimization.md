@@ -58,7 +58,7 @@ import weave
 weave.init(project_name="dspy-bigbench-hard")
 ```
 
-In this tutorial, we use a metadata class inherited from [`weave.Object`](../../guides/tracing/objects.md) to manage our metadata.
+In this tutorial, we use a metadata class inherited from [`weave.Object`](../../guides/tracking/objects.md) to manage our metadata.
 
 
 ```python
@@ -81,7 +81,7 @@ The `Metadata` objects are automatically versioned and traced when functions con
 
 ## Load the BIG-Bench Hard Dataset
 
-We will load this dataset from HuggingFace Hub, split into training and validation sets, and [publish](../../guides/datasets.md) them on Weave, this will let us version the datasets, and also use [`weave.Evaluation`](../../guides/evaluations.md) to evaluate our prompting strategy.
+We will load this dataset from HuggingFace Hub, split into training and validation sets, and [publish](../../guides/core-types/datasets.md) them on Weave, this will let us version the datasets, and also use [`weave.Evaluation`](../../guides/core-types/evaluations.md) to evaluate our prompting strategy.
 
 
 ```python
@@ -191,7 +191,7 @@ rich.print(prediction)
 
 ## Evaluating our DSPy Program
 
-Now that we have a baseline prompting strategy, let's evaluate it on our validation set using [`weave.Evaluation`](../../guides/evaluations.md) on a simple metric that matches the predicted answer with the ground truth. Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
+Now that we have a baseline prompting strategy, let's evaluate it on our validation set using [`weave.Evaluation`](../../guides/core-types/evaluations.md) on a simple metric that matches the predicted answer with the ground truth. Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
 
 First, we need to create a simple weave evaluation scoring function that tells whether the answer from the baseline module's output is the same as the ground truth answer or not. Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
 

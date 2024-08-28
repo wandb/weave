@@ -8,21 +8,21 @@ Weave's tracing functionality comprises three main components:
 
 ### Calls
 
-[Calls](/guides/tracing/calls) trace function calls, inputs, and outputs, enabling you to:
+[Calls](/guides/tracking/tracing) trace function calls, inputs, and outputs, enabling you to:
 - Analyze data flow through your application
 - Debug complex interactions between components
 - Optimize application performance based on call patterns
 
 ### Ops
 
-[Ops](/guides/tracing/ops) are automatically versioned and tracked functions (which produce Calls) that allow you to:
+[Ops](/guides/tracking/ops) are automatically versioned and tracked functions (which produce Calls) that allow you to:
 - Monitor function performance and behavior
 - Maintain a record of function modifications
 - Ensure experiment reproducibility
 
 ### Objects
 
-[Objects](/guides/tracing/objects) form Weave's extensible serialization layer, automatically versioning runtime objects (often the inputs and outputs of Calls). This feature allows you to:
+[Objects](/guides/tracking/objects) form Weave's extensible serialization layer, automatically versioning runtime objects (often the inputs and outputs of Calls). This feature allows you to:
 - Track changes in data structures over time
 - Maintain a clear history of object modifications
 - Easily revert to previous versions when needed

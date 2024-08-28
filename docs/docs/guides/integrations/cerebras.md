@@ -66,7 +66,7 @@ animal_speedster("human", "llama3.1-8b")
 
 ## Create a `Model` for easier experimentation
 
-The [Model](/guides/models) class in Weave helps you organize and compare different iterations of your app. This is particularly useful when experimenting with Cerebras models. Here's an example:
+The [Model](/guides/core-types/models) class in Weave helps you organize and compare different iterations of your app. This is particularly useful when experimenting with Cerebras models. Here's an example:
 
 
 ```python
