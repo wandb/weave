@@ -82,7 +82,7 @@ def get_and_process_prompt():
 
         with st.chat_message("assistant"):
 # highlight-next-line            
-            with weave.attributes({'session': st.session_state['session_id']}):
+            with weave.attributes({'session': st.session_state['session_id'], 'env': 'prod'}):
                 # This could also be weave model.predict.call if you're using a weave.Model subclass
                 result, call = chat_response.call(prompt) # call the function with `.call`, this returns a tuple with a new Call object
 # highlight-next-line
@@ -132,7 +132,7 @@ We can use it as usal to deliver some model response to the user:
 
 
 ```python
-with weave.attributes({'session': '123abc'}): # attach arbitrary attributes to the call
+with weave.attributes({'session': '123abc', 'env': 'prod'}): # attach arbitrary attributes to the call alongside inputs & outputs
     result = predict(input_data="your data here") # user question through the App UI
 ```
 
