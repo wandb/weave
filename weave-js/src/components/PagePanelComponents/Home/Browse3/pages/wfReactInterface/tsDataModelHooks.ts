@@ -27,7 +27,7 @@ import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {Query} from './traceServerClientInterface/query';
 import * as traceServerTypes from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
-import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
+import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
   CallFilter,
   CallKey,
@@ -1044,12 +1044,16 @@ const useRefsData = (
     const sUris: string[] = [];
     const tUris: string[] = [];
     refUrisDeep
-      .map(uri => ({uri, ref: refUriToObjectVersionKey(uri)}))
+      .map(uri => {
+        return {uri, ref: refUriToObjectVersionKey(uri)};
+      })
       .forEach(({uri, ref}, ndx) => {
-        if (ref.scheme === 'weave' && ref.weaveKind === 'table') {
-          tUris.push(uri);
-        } else {
-          sUris.push(uri);
+        if (ref) {
+          if (ref.scheme === 'weave' && ref.weaveKind === 'table') {
+            tUris.push(uri);
+          } else {
+            sUris.push(uri);
+          }
         }
       });
     return [sUris, tUris];
@@ -1077,7 +1081,7 @@ const useRefsData = (
   if (tableRefUris.length > 1) {
     throw new Error('Multiple table refs not supported');
   } else if (tableRefUris.length === 1) {
-    const tableRef = refUriToObjectVersionKey(tableRefUris[0]);
+    const tableRef = refUriToObjectVersionKey(tableRefUris[0])!;
     tableUriProjectId = tableRef.entity + '/' + tableRef.project;
     tableUriDigest = tableRef.objectId;
   }
@@ -1447,7 +1451,7 @@ export const traceCallToUICallSchema = (
       opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
       opName.startsWith(WEAVE_REF_PREFIX)
     ) {
-      return refUriToOpVersionKey(opName).opId;
+      return opVersionRefOpName(opName);
     }
     if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
       return privateRefToSimpleName(opName);
