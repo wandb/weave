@@ -498,9 +498,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if not any_will_be_interpreted_as_ref_str(val):
                 continue
 
-            if isinstance(parse_internal_uri(val), InternalTableRef):
-                continue
-
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
             set_nested_key(data, col, derefed_val)
 
