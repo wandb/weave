@@ -1257,10 +1257,10 @@ def test_summary_tokens_cost(client):
     withCostCallSummary = callsWithCost[0].summary
 
     assert withCostCallSummary.get("weave", "bah") != "bah"
-    assert len(withCostCallSummary["weave"]["costs"]) == 2
+    assert len(withCostCallSummary["costs"]) == 2
 
-    gpt4cost = withCostCallSummary["weave"]["costs"]["gpt-4"]
-    gpt4ocost = withCostCallSummary["weave"]["costs"]["gpt-4o"]
+    gpt4cost = withCostCallSummary["costs"]["gpt-4"]
+    gpt4ocost = withCostCallSummary["costs"]["gpt-4o"]
 
     # delete the effective_date and created_at fields, as they will be different each start up
     del gpt4cost["effective_date"]
@@ -1308,7 +1308,11 @@ def test_summary_tokens_cost(client):
 
     # for no cost call, there should be no cost information
     # currently that means no weave object in the summary
-    assert noCostCallSummary.get("weave", "bah") == "bah"
+    assert noCostCallSummary["weave"] == {
+        "status": "running",
+        "nice_trace_name": "x",
+        "latency": AnyIntMatcher(),
+    }
 
 
 @pytest.mark.skip_clickhouse_client

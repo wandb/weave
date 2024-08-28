@@ -9,7 +9,7 @@ from weave.trace_server.refs_internal import InternalObjectRef, parse_internal_u
 
 
 def make_derived_summary_fields(
-    call_dict: Dict[str, Any], summary_key: str
+    call_dict: Dict[str, Any], summary_key: Literal["summary", "summary_dump"]
 ) -> tsi.SummaryMap:
     display_name = call_dict.get("display_name")
     started_at_dt = _make_datetime_from_any(call_dict["started_at"])
