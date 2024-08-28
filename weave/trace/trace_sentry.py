@@ -90,7 +90,7 @@ class Sentry:
         to avoid the possibility of interfering with the user's
         own Sentry SDK setup.
         """
-        from . import version
+        from .. import version
 
         client = sentry_sdk.Client(
             dsn=self.dsn,
