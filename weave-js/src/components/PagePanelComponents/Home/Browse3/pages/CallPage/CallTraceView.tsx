@@ -249,9 +249,6 @@ const RE_TRAILING_INT = /\d+$/;
 // Sorting evaluation calls by dataset row.
 // Because of async they may have been processed in a different order.
 const getCallSortExampleRow = (call: CallSchema): number => {
-  if (!call.rawSpan.inputs?._keys) {
-    return Number.POSITIVE_INFINITY;
-  }
   const {example} = call.rawSpan.inputs;
   if (example) {
     // If not a string, we don't know how to sort.
