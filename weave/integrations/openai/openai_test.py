@@ -5,7 +5,6 @@ from openai import AsyncOpenAI, OpenAI
 
 import weave
 from weave.integrations.integration_utilities import _get_call_output, op_name_from_ref
-from weave.trace_server import trace_server_interface as tsi
 
 model = "gpt-4o"
 
@@ -27,14 +26,13 @@ def test_openai_quickstart(client: weave.trace.weave_client.WeaveClient) -> None
         max_tokens=64,
         top_p=1,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    print(res)
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
     assert response.choices[0].message.content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -76,13 +74,13 @@ async def test_openai_async_quickstart(
         max_tokens=64,
         top_p=1,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
     assert response.choices[0].message.content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -128,13 +126,13 @@ def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) 
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
     assert all_content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -185,13 +183,13 @@ async def test_openai_async_stream_quickstart(
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "I'm just a computer program, so I don't have feelings, but thanks for asking! How can I assist you today?"
     assert all_content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -305,13 +303,13 @@ def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> N
         top_p=1,
     )
     print(response)
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
     assert response.choices[0].message.function_call.arguments == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -391,13 +389,13 @@ async def test_openai_function_call_async(
         max_tokens=64,
         top_p=1,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":200}'
     assert response.choices[0].message.function_call.arguments == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -567,13 +565,13 @@ def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     )
     print(response)
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
     assert response.choices[0].message.tool_calls[0].function.arguments == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -654,13 +652,13 @@ async def test_openai_tool_call_async(
         max_tokens=64,
         top_p=1,
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = '{"name":"Sachin Tendulkar","team":"India","highest_score":248}'
     assert response.choices[0].message.tool_calls[0].function.arguments == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -811,13 +809,13 @@ def test_openai_as_context_manager(
             if chunk.choices[0].delta.content:
                 all_content += chunk.choices[0].delta.content
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "Hello! As a context manager, you play a crucial role in managing resources efficiently and ensuring proper setup and teardown in Python. You likely implement methods like `__enter__` and `__exit__` to manage contexts properly. How can I assist you today?"
     assert all_content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -866,13 +864,13 @@ async def test_openai_as_context_manager_async(
             if chunk.choices[0].delta.content:
                 all_content += chunk.choices[0].delta.content
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     exp = "Hello! It sounds like you're referring to the concept of an asynchronous context manager in programming, typically found in languages like Python. Asynchronous context managers are useful for managing resources that need to be setup and cleaned up, often in an asynchronous manner. Do you have any specific questions or scenarios you need help with regarding async context managers?"
     assert all_content == exp
 
-    call = res.calls[0]
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore

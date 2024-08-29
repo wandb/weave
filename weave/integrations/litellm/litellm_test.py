@@ -9,7 +9,6 @@ import weave
 from weave.integrations.integration_utilities import (
     _get_call_output,
 )
-from weave.trace_server import trace_server_interface as tsi
 
 from .litellm import litellm_patcher
 
@@ -65,9 +64,9 @@ def test_litellm_quickstart(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 2
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 2
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output["choices"][0]["message"]["content"] == exp
@@ -106,9 +105,9 @@ async def test_litellm_quickstart_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you with whatever you need. How can I assist you today?"""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 2
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 2
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output["choices"][0]["message"]["content"] == exp
@@ -154,9 +153,9 @@ def test_litellm_quickstart_stream(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 2
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 2
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output["choices"][0]["message"]["content"] == exp
@@ -196,9 +195,9 @@ async def test_litellm_quickstart_stream_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with any questions or tasks you may have. How can I help you today?"""
 
     assert all_content == exp
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 2
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 2
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output["choices"][0]["message"]["content"] == exp
