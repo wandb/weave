@@ -59,9 +59,9 @@ def hydrate_calls_with_feedback(
 
     for call in calls:
         feedback_items = feedback_map.get(call["id"], [])
-        if "summary" not in call:
+        if not call.get("summary"):
             call["summary"] = {}
-        if "weave" not in call["summary"]:
+        if not call["summary"].get("weave"):
             call["summary"]["weave"] = {}
         call["summary"]["weave"]["feedback"] = feedback_items
 
