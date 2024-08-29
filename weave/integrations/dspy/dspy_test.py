@@ -18,6 +18,10 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     return call_output
 
 
+def _get_op_name(s: str) -> str:
+    pass
+
+
 def flatten_calls(
     calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
 ) -> list:
@@ -60,6 +64,7 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     assert len(calls) == 4
 
     calls_list = [c.display_name for c in calls]
+    print(f"{calls=}")
     assert calls_list == [
         "dspy.OpenAI",
         "dspy.OpenAI.request",
@@ -120,7 +125,7 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     calls = list(client.calls())
     assert len(calls) == 6
 
-    calls_list = [c.display_name for c in calls]
+    calls_list = [c.op_name for c in calls]
     assert calls_list == [
         "dspy.Predict",
         "dspy.Predict.forward",
