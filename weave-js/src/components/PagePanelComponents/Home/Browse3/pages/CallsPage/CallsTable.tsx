@@ -292,17 +292,18 @@ export const CallsTable: FC<{
       : undefined;
 
   // Column Management: Build the columns needed for the table
-  const {columns, setUserDefinedColumnWidths} = useCallsTableColumns(
-    entity,
-    project,
-    effectiveFilter,
-    tableData,
-    expandedRefCols,
-    onCollapse,
-    onExpand,
-    columnIsRefExpanded,
-    onAddFilter
-  );
+  const {columns, columnsWithRefs, setUserDefinedColumnWidths} =
+    useCallsTableColumns(
+      entity,
+      project,
+      effectiveFilter,
+      tableData,
+      expandedRefCols,
+      onCollapse,
+      onExpand,
+      columnIsRefExpanded,
+      onAddFilter
+    );
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -708,6 +709,7 @@ export const CallsTable: FC<{
               numTotalCalls={callsTotal}
               disabled={callsTotal === 0}
               visibleColumns={visibleColumns}
+              columnsWithRefs={columnsWithRefs}
               callQueryParams={{
                 entity,
                 project,

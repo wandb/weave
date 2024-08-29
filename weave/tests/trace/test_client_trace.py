@@ -26,6 +26,7 @@ from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
+from weave.trace_server.validation import SHOULD_ENFORCE_OBJ_ID_CHARSET
 
 pytestmark = pytest.mark.trace
 
@@ -2592,8 +2593,10 @@ def test_object_with_disallowed_keys(client):
             )
         )
     )
-    with pytest.raises(Exception):
-        client.server.obj_create(create_req)
+
+    if SHOULD_ENFORCE_OBJ_ID_CHARSET:
+        with pytest.raises(Exception):
+            client.server.obj_create(create_req)
 
 
 CHAR_LIMIT = 128
