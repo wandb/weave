@@ -116,36 +116,48 @@ You can customize display names to better identify calls by setting:
    func.display_name = "custom_name"
    ```
 
-3. The `display_name` can also be a function that takes in a `Call` object and returns a string. The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on call inputs, attributes, etc.
+3. The `display_name` can also be a function that takes in a `Call` object and returns a string. The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, attributes, etc.
 
-   ```py
-   def custom_attribute_name(call):
-       model = call.attributes["model"]
-       revision = call.attributes["revision"]
-       now = call.attributes["date"]
+   1. One common use case is just appending a timestamp to the function's name.
 
-       return f"{model}__{revision}__{now}"
+      ```py
+      from datetime import datetime
 
-   @weave.op(display_name=custom_attribute_name)
-   def func():
-       return ...
+      @weave.op(display_name=lambda call: f"{call.func_name}__{datetime.now()}")
+      def func():
+          return ...
+      ```
 
-   with weave.attributes(
-       {
-           "model": "finetuned-llama-3.1-8b",
-           "revision": "v0.1.2",
-           "date": "2024-08-01",
-       }
-   ):
-       func()  # the display name will be "finetuned-llama-3.1-8b__v0.1.2__2024-08-01"
+   2. You can also get creative with custom attributes
+
+      ```py
+      def custom_attribute_name(call):
+          model = call.attributes["model"]
+          revision = call.attributes["revision"]
+          now = call.attributes["date"]
+
+          return f"{model}__{revision}__{now}"
+
+      @weave.op(display_name=custom_attribute_name)
+      def func():
+          return ...
+
+      with weave.attributes(
+          {
+              "model": "finetuned-llama-3.1-8b",
+              "revision": "v0.1.2",
+              "date": "2024-08-01",
+          }
+      ):
+          func()  # the display name will be "finetuned-llama-3.1-8b__v0.1.2__2024-08-01"
 
 
-    with weave.attributes(
-        {
-            "model": "finetuned-gpt-4o",
-            "revision": "v0.1.3",
-            "date": "2024-08-02",
-        }
-    ):
-        func()  # the display name will be "finetuned-gpt-4o__v0.1.3__2024-08-02"
-   ```
+          with weave.attributes(
+              {
+                  "model": "finetuned-gpt-4o",
+                  "revision": "v0.1.3",
+                  "date": "2024-08-02",
+              }
+          ):
+              func()  # the display name will be "finetuned-gpt-4o__v0.1.3__2024-08-02"
+      ```

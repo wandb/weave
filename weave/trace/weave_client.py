@@ -27,6 +27,7 @@ from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.table import Table
+from weave.trace.util import _get_func_name_from_maybe_ref
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
@@ -149,6 +150,10 @@ class Call:
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
     _feedback: Optional[RefFeedbackQuery] = None
+
+    @property
+    def func_name(self):
+        return _get_func_name_from_maybe_ref(self.op_name)
 
     @property
     def feedback(self) -> RefFeedbackQuery:

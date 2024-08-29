@@ -119,6 +119,20 @@ def is_notebook() -> bool:
     return True
 
 
+def _get_func_name_from_maybe_ref(s: str) -> str:
+    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
+    Keeping this here for now, but it should be removed in the future once we have a better solution.
+    """
+    # it's not a ref, just return same thing
+    if "weave://" not in s:
+        return s
+
+    _, s = s.split("weave:///", 1)
+    _, s = s.rsplit("/", 1)  # skip entity/project/op
+    s, _ = s.split(":", 1)  # skip hash
+    return s
+
+
 # rename for cleaner export
 ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread
