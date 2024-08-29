@@ -14,6 +14,7 @@ from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from weave.legacy.weave import artifact_fs, context_state, errors, storage
+from weave.trace import settings
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -279,6 +280,10 @@ def get_source_or_fallback(fn: typing.Callable) -> str:
         """
     )[1:]  # skip first newline char
 
+    print(f"{settings.should_save_code()=}")
+    if not settings.should_save_code():
+        return missing_code_template
+
     try:
         return get_source_notebook_safe(fn)
     except OSError:
@@ -290,6 +295,7 @@ def get_code_deps(
     artifact: artifact_fs.FilesystemArtifact,
     depth: int = 0,
 ) -> GetCodeDepsResult:
+    print(f"get code deps... {settings.should_save_code()=}")
     """Given a python function, return source code that contains the dependencies of that function.
 
     This will:
@@ -469,6 +475,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 def save_instance(
     obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
 ) -> None:
+    print(f"save instance...{settings.should_save_code()=}")
     result = get_code_deps(obj.resolve_fn, artifact)
     import_code = result["import_code"]
     code = result["code"]

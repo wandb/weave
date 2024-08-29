@@ -32,6 +32,12 @@ class UserSettings(BaseModel):
     If True, prints a link to the Weave UI when calling a weave op.
     Can be overrided with the environment variable `WEAVE_PRINT_CALL_LINK`"""
 
+    save_code: bool = True
+    """Toggles op code saving.
+    
+    If True, the minimal amount of code to run the op will be saved.
+    Can be overrided with the environment variable `WEAVE_SAVE_CODE`"""
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -56,6 +62,10 @@ def should_disable_weave() -> bool:
 
 def should_print_call_link() -> bool:
     return _should("print_call_link")
+
+
+def should_save_code() -> bool:
+    return _should("save_code")
 
 
 def parse_and_apply_settings(

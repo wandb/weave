@@ -69,3 +69,28 @@ def test_print_call_link_env(client):
 
     output = captured_stdout.getvalue()
     assert TRACE_CALL_EMOJI in output
+
+
+def test_save_code_setting(client):
+    @weave.op
+    def func():
+        return 1
+
+    parse_and_apply_settings(UserSettings(save_code=False))
+    ref = client._save_object(func, "func")
+    func2 = ref.get()
+    print(f"{func2=}")
+    print(f"{func2()=}")
+    assert func2() is None  # no code saved
+
+    # TODO: Should be able to turn code saving on/off at any time, not need to redef
+    @weave.op
+    def func():
+        return 1
+
+    parse_and_apply_settings(UserSettings(save_code=True))
+    ref = client._save_object(func, "func")
+    func3 = ref.get()
+    print(f"{func3=}")
+    print(f"{func3()=}")
+    assert func3() == 1
