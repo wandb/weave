@@ -112,7 +112,7 @@ class InternalObjectRef:
         if self.extra:
             u += "/" + "/".join(extra_value_quoter(e) for e in self.extra)
         return u
-    
+
     def strict_validate(self) -> None:
         validation.object_id_validator(self.name)
 

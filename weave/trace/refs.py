@@ -2,7 +2,7 @@ import dataclasses
 import urllib
 from typing import Any, Union
 
-from ..trace_server import refs_internal, validation
+from ..trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
