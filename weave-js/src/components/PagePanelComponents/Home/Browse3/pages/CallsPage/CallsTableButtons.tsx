@@ -13,14 +13,7 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {
-  Dispatch,
-  FC,
-  SetStateAction,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -30,7 +23,6 @@ import {
   fileExtensions,
 } from '../wfReactInterface/traceServerClientTypes';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
-import {isDynamicCallColumn, stringToPath} from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
@@ -42,12 +34,14 @@ export const ExportSelector = ({
   selectedCalls,
   numTotalCalls,
   visibleColumns,
+  columnsWithRefs,
   disabled,
   callQueryParams,
 }: {
   selectedCalls: string[];
   numTotalCalls: number;
   visibleColumns: string[];
+  columnsWithRefs: Set<string>;
   callQueryParams: {
     entity: string;
     project: string;
@@ -86,10 +80,7 @@ export const ExportSelector = ({
     callQueryParams.gridSort
   );
 
-  const refColumnsToExpand = useMemo(
-    () => visibleColumns.filter(col => isDynamicCallColumn(stringToPath(col))),
-    [visibleColumns]
-  );
+  const refColumnsToExpand = Array.from(columnsWithRefs);
 
   const onClickDownload = (contentType: ContentType) => {
     if (downloadLoading) {
@@ -116,7 +107,6 @@ export const ExportSelector = ({
       }
       leafColumns.push(col);
     }
-
     const startTime = Date.now();
     download(
       callQueryParams.entity,
