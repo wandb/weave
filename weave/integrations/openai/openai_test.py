@@ -1,29 +1,13 @@
 import os
-import typing
 
 import pytest
 from openai import AsyncOpenAI, OpenAI
 
 import weave
-from weave.integrations.integration_utilities import op_name_from_ref
+from weave.integrations.integration_utilities import _get_call_output, op_name_from_ref
 from weave.trace_server import trace_server_interface as tsi
 
 model = "gpt-4o"
-
-
-def _get_call_output(call: tsi.CallSchema) -> typing.Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
-
-
-def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
