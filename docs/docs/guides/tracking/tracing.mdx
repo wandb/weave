@@ -3,72 +3,47 @@ import TabItem from '@theme/TabItem';
 
 # Calls
 
+:::info[Calls]
+Calls are the fundamental building block in Weave. 
+They represent a single execution of a function, including the inputs (aka arguments), outputs (aka return value), and any relevant metadata such as duration, execptions, llm usage, etc.
+Calls are a superset of the industry standard [OpenTelemetry](https://opentelemetry.io/docs/concepts/what-is-opentelemetry/) and [OpenTracing](https://opentracing.io/) standards.
+A call can belong to a trace, which is a collection of calls that belonging to the same execution context.
+Furthermore, a call can have children calls (and a parent call), forming a tree structure.
+:::
+
 :::warning[TODO]
 Screenshot
 :::
 
-Calls is a powerful feature in Weave that allows you to track the inputs and outputs of functions seamlessly. Follow these steps to get started:
 
-To track specific functions, decorate them with @weave.op(). This decorator tells Weave to monitor the inputs, outputs, and any code changes for the function. Now, every call to this function will be tracked and logged. Additionally, weave tracks how functions relate by keeping track of parent and children calls and building a trace tree.
-
-## Understanding Calls
 
 ## Create a Call
 
 <Tabs groupId="client-layer">
     {/* <TabItem value="web_app" label="Web App">Use Command + C to copy.</TabItem> */}
     <TabItem value="python_oo" label="High Level Python">
-```python
+    Weave can automatically track calls to [LLM Providers and Frameworks](../integrations/index) with a single line of code: `weave.init('project_name')`.
+    However, you often have existing code that you want to track. In that case, decorate them with @weave.op to get started!
+```python showLineNumbers
+# highlight-next-line
+# Import Weave
 # highlight-next-line
 import weave
-from openai import OpenAI
-import requests, random
-PROMPT="""Emulate the Pokedex from early Pokémon episodes. State the name of the Pokemon and then describe it.
-        Your tone is informative yet sassy, blending factual details with a touch of dry humor. Be concise, no more than 3 sentences. """
-POKEMON = ['pikachu', 'charmander', 'squirtle', 'bulbasaur', 'jigglypuff', 'meowth', 'eevee']
 
 # highlight-next-line
-@weave.op()
-def get_pokemon_data(pokemon_name):
-    url = f"https://pokeapi.co/api/v2/pokemon/{pokemon_name}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        name = data["name"]
-        types = [t["type"]["name"] for t in data["types"]]
-        species_url = data["species"]["url"]
-        species_response = requests.get(species_url)
-        evolved_from = "Unknown"
-        if species_response.status_code == 200:
-            species_data = species_response.json()
-            if species_data["evolves_from_species"]:
-                evolved_from = species_data["evolves_from_species"]["name"]
-        return {"name": name, "types": types, "evolved_from": evolved_from}
-    else:
-        return None
-
-# highlight-next-line
-@weave.op()
-def pokedex(name: str, prompt: str) -> str:
-    client = OpenAI()
-    data = get_pokemon_data(name)
-    if not data: return "Error: Unable to fetch data"
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system","content": prompt},
-            {"role": "user", "content": str(data)}
-        ],
-        temperature=0.7,
-        max_tokens=100,
-        top_p=1
-    )
-    return response.choices[0].message.content
-
+# Initialize Weave Tracing
 # highlight-next-line
 weave.init('intro-example')
-# Get data for a specific Pokémon
-pokemon_data = pokedex(random.choice(POKEMON), PROMPT)
+
+# highlight-next-line
+# Decorate your function
+# highlight-next-line
+@weave.op
+def my_function(name: str):
+    return f"Hello, {name}!"
+
+# Call your function
+print(my_function.call("World"))
 ```
     </TabItem>
     <TabItem value="python_binding" label="Low Level Python">Use Command + C to copy.</TabItem>
