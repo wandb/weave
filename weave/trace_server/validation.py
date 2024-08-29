@@ -79,7 +79,7 @@ def _validate_object_name_charset(name: str) -> None:
 
 def object_id_validator(s: str) -> str:
     if SHOULD_ENFORCE_OBJ_ID_CHARSET:
-       _validate_object_name_charset(s)
+        _validate_object_name_charset(s)
     return validation_util.require_max_str_len(s, 128)
 
 
