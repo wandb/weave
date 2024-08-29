@@ -56,28 +56,23 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     prediction = gpt3_turbo("hello! this is a raw prompt to GPT-3.5")
     expected_prediction = "Hello! How can I assist you today?"
     assert prediction == [expected_prediction]
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 4
+    calls = list(client.calls())
+    assert len(calls) == 4
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
-        ("dspy.OpenAI", 0),
-        ("dspy.OpenAI.request", 1),
-        ("dspy.OpenAI.basic_request", 2),
-        ("openai.chat.completions.create", 3),
+    calls_list = [c.op_name for c in calls]
+    assert calls_list == [
+        "dspy.OpenAI",
+        "dspy.OpenAI.request",
+        "dspy.OpenAI.basic_request",
+        "openai.chat.completions.create",
     ]
 
-    call_1 = weave_server_respose.calls[0]
+    call_1 = calls[0]
     assert call_1.exception is None and call_1.ended_at is not None
     output_1 = _get_call_output(call_1)
     assert output_1[0] == expected_prediction
 
-    call_2 = weave_server_respose.calls[1]
+    call_2 = calls[1]
     assert call_2.exception is None and call_2.ended_at is not None
     output_2 = _get_call_output(call_2)
     assert output_2["choices"][0]["finish_reason"] == "stop"
@@ -88,7 +83,7 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     assert output_2["usage"]["prompt_tokens"] == 21
     assert output_2["usage"]["total_tokens"] == 30
 
-    call_3 = weave_server_respose.calls[2]
+    call_3 = calls[2]
     assert call_3.exception is None and call_3.ended_at is not None
     output_3 = _get_call_output(call_3)
     assert output_3["choices"][0]["finish_reason"] == "stop"
