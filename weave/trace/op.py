@@ -107,6 +107,7 @@ class Op(Protocol):
     """
 
     name: str
+    display_name: str
     signature: inspect.Signature
     ref: Optional[ObjectRef]
     resolve_fn: Callable
