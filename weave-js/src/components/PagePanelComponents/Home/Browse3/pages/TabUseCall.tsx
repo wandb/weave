@@ -1,4 +1,5 @@
 import { Box } from '@mui/material';
+import React from 'react';
 
 import { Alert } from '../../../../Alert';
 import { CopyableText } from '../../../../CopyableText';
