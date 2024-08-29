@@ -1,6 +1,6 @@
-# Tracing
+# Calls
 
-Tracing is a powerful feature in Weave that allows you to track the inputs and outputs of functions seamlessly. Follow these steps to get started:
+Calls is a powerful feature in Weave that allows you to track the inputs and outputs of functions seamlessly. Follow these steps to get started:
 
 To track specific functions, decorate them with @weave.op(). This decorator tells Weave to monitor the inputs, outputs, and any code changes for the function. Now, every call to this function will be tracked and logged. Additionally, weave tracks how functions relate by keeping track of parent and children calls and building a trace tree.
 

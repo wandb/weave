@@ -24,18 +24,18 @@ The top-level functions and classes for working with Weave.
 
 ## Functions
 
-- [`trace_api.init`](#function-init): Initialize weave tracking, logging to a wandb project.
-- [`trace_api.publish`](#function-publish): Save and version a python object.
-- [`trace_api.ref`](#function-ref): Construct a Ref to a Weave object.
+- [`api.init`](#function-init): Initialize weave tracking, logging to a wandb project.
+- [`api.publish`](#function-publish): Save and version a python object.
+- [`api.ref`](#function-ref): Construct a Ref to a Weave object.
 - [`call_context.get_current_call`](#function-get_current_call): Get the Call object for the currently executing Op, within that Op.
-- [`trace_api.finish`](#function-finish): Stops logging to weave.
+- [`api.finish`](#function-finish): Stops logging to weave.
 - [`op.op`](#function-op): A decorator to weave op-ify a function or method.  Works for both sync and async.
 
 
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_api.py#L21"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L24"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `init`
 
@@ -65,7 +65,7 @@ Following init, calls of weave.op() decorated functions will be logged to the sp
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_api.py#L89"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L92"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `publish`
 
@@ -93,7 +93,7 @@ TODO: Need to document how name works with this change.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_api.py#L137"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L140"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `ref`
 
@@ -120,7 +120,7 @@ TODO: what happens if obj does not exist
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/call_context.py#L71"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/call_context.py#L71"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `get_current_call`
 
@@ -167,7 +167,7 @@ print(mycall.id)
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_api.py#L242"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L245"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `finish`
 
@@ -181,7 +181,7 @@ Following finish, calls of weave.op() decorated functions will no longer be logg
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L283"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L296"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `op`
 
@@ -297,7 +297,7 @@ example_label = dataset_ref.rows[2]['sentence']
 
 - `name`: `typing.Optional[str]`
 - `description`: `typing.Optional[str]`
-- `rows`: `<class 'table.Table'>`
+- `rows`: `<class 'trace.table.Table'>`
 ---
 
 <a href="https://github.com/wandb/weave/blob/master/weave/flow/dataset.py#L44"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
@@ -315,7 +315,7 @@ convert_to_table(rows: Any) → Table
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/model.py#L6"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/model.py#L11"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Model`
 Intended to capture a combination of code and data the operates on an input. For example it might call an LLM with a prompt to make a prediction or generate text. 
@@ -346,7 +346,7 @@ class YourModel(Model):
 - `description`: `typing.Optional[str]`
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/flow/model.py#L34"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/flow/model.py#L39"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `get_infer_method`
 

@@ -20,9 +20,9 @@ import React, {
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
+import {isWeaveRef} from '../../filters/common';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
-import {isRef} from '../common/util';
 import {
   LIST_INDEX_EDGE_NAME,
   OBJECT_ATTR_EDGE_NAME,
@@ -55,7 +55,7 @@ type ObjectViewerProps = {
 const getRefs = (data: Data): string[] => {
   const refs = new Set<string>();
   traverse(data, (context: TraverseContext) => {
-    if (isRef(context.value)) {
+    if (isWeaveRef(context.value)) {
       refs.add(context.value);
     }
   });
@@ -137,11 +137,18 @@ export const ObjectViewer = ({
     }
     let resolved = data;
     let dirty = true;
+    const resolvedRefPaths = new Set<string>();
     const mapper = (context: TraverseContext) => {
-      if (isRef(context.value) && refValues[context.value] != null) {
+      if (
+        isWeaveRef(context.value) &&
+        refValues[context.value] != null &&
+        // If this is a ref and the parent has been visited, we already resolved
+        // this ref. Example: `a._ref` where `a` is already in resolvedRefPaths
+        !resolvedRefPaths.has(context.value + context.parent?.toString() ?? '')
+      ) {
         dirty = true;
         const res = refValues[context.value];
-        delete refValues[context.value];
+        resolvedRefPaths.add(context.value + context.path.toString());
         return res;
       }
       return _.clone(context.value);
@@ -334,7 +341,7 @@ export const ObjectViewer = ({
                 }
                 return [...eIds, params.row.id];
               });
-              if (isRef(refToExpand)) {
+              if (isWeaveRef(refToExpand)) {
                 addExpandedRef(params.row.id, refToExpand);
               }
             }}
@@ -404,10 +411,11 @@ export const ObjectViewer = ({
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =
-            params.model.valueType === 'string' && !isRef(params.model.value);
+            params.model.valueType === 'string' &&
+            !isWeaveRef(params.model.value);
           const isArray = params.model.valueType === 'array';
           const isTableRef =
-            isRef(params.model.value) &&
+            isWeaveRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
           const {isCode} = params.model;
           const isCustomWeaveType = isCustomWeaveTypePayload(
@@ -460,7 +468,7 @@ const buildBaseRef = (
     const parts = path.toPath().slice(-startIndex);
     parts.forEach(part => {
       if (typeof part === 'string') {
-        baseRef += '/' + OBJECT_ATTR_EDGE_NAME + '/' + part;
+        baseRef += '/' + OBJECT_ATTR_EDGE_NAME + '/' + encodeURIComponent(part);
       } else if (typeof part === 'number') {
         baseRef += '/' + LIST_INDEX_EDGE_NAME + '/' + part.toString();
       } else {
