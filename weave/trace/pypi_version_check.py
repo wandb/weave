@@ -8,7 +8,6 @@ Copied here to avoid a dependency on the wandb library and allow more pointed co
 over the version checking logic.
 """
 
-from typing import TYPE_CHECKING, Dict, Optional, Tuple
 import queue
 import sys
 import threading
@@ -24,14 +23,13 @@ from typing import (
 
 import requests
 
-import requests
-
-
 if TYPE_CHECKING:
-    import packaging.version # type: ignore[import-not-found]
+    import packaging.version  # type: ignore[import-not-found]
 
 
-def check_available(current_version: str, module_name:str) -> Optional[Dict[str, Optional[str]]]:
+def check_available(
+    current_version: str, module_name: str
+) -> Optional[Dict[str, Optional[str]]]:
     """
     Check if there is a new version of the module available on PyPI.
 
@@ -93,6 +91,7 @@ def _parse_version(version: str) -> "packaging.version.Version":
 
     return parse_version(version)
 
+
 def _async_call(
     target: Callable, timeout: Optional[Union[int, float]] = None
 ) -> Callable:
@@ -132,7 +131,7 @@ def _async_call(
 
 
 def _find_available(
-    current_version: str, module_name:str
+    current_version: str, module_name: str
 ) -> Optional[Tuple[str, bool, bool, bool, Optional[str]]]:
     pypi_url = f"https://pypi.org/pypi/{module_name}/json"
     yanked_dict = {}
@@ -193,4 +192,3 @@ def _find_available(
         pip_prerelease = True
 
     return latest_version, pip_prerelease, deleted, yanked, yanked_reason
-
