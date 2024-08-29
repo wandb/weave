@@ -93,20 +93,9 @@ export const ExportSelector = ({
     const offset = 0;
     const limit = MAX_EXPORT;
     // TODO(gst): add support for JSONL and JSON column selection
-    const columns = [ContentType.csv, ContentType.tsv].includes(contentType)
-      ? visibleColumns
+    const leafColumns = [ContentType.csv, ContentType.tsv].includes(contentType)
+      ? makeLeafColumns(visibleColumns)
       : undefined;
-    // Filter columns down to only the most nested, for example
-    // ['output', 'output.x', 'output.x.y'] -> ['output.x.y']
-    // sort columns by length, longest to shortest
-    visibleColumns.sort((a, b) => b.length - a.length);
-    const leafColumns: string[] = [];
-    for (const col of visibleColumns) {
-      if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
-        continue;
-      }
-      leafColumns.push(col);
-    }
     const startTime = Date.now();
     download(
       callQueryParams.entity,
@@ -129,7 +118,7 @@ export const ExportSelector = ({
 
       userEvents.exportClicked({
         dataSize: blob.size,
-        numColumns: columns?.length ?? null,
+        numColumns: leafColumns?.length ?? null,
         numRows: numTotalCalls,
         numExpandedColumns: refColumnsToExpand.length,
         // the most nested refColumn to expand
@@ -427,6 +416,21 @@ function initiateDownloadFromBlob(blob: Blob, fileName: string) {
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(downloadUrl);
+}
+
+function makeLeafColumns(visibleColumns: string[]) {
+  // Filter columns down to only the most nested, for example
+  // ['output', 'output.x', 'output.x.y'] -> ['output.x.y']
+  // sort columns by length, longest to shortest
+  visibleColumns.sort((a, b) => b.length - a.length);
+  const leafColumns: string[] = [];
+  for (const col of visibleColumns) {
+    if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
+      continue;
+    }
+    leafColumns.push(col);
+  }
+  return leafColumns;
 }
 
 function makeCodeText(
