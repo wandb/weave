@@ -49,7 +49,7 @@ class RegexStringMatcher(str):
 
 
 class DatetimeMatcher:
-    def __eq__(self, other: datetime.datetime):
+    def __eq__(self, other):
         return isinstance(other, datetime.datetime)
 
 
