@@ -8,8 +8,6 @@ import dataclasses
 import urllib
 from typing import Any, Union
 
-from . import validation
-
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
 WEAVE_PRIVATE_SCHEME = "weave-private"
@@ -106,15 +104,14 @@ class InternalObjectRef:
         validate_no_slashes(self.version, "version")
         validate_no_colons(self.version, "version")
         validate_extra(self.extra)
+        validate_no_slashes(self.name, "name")
+        validate_no_colons(self.name, "name")
 
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/object/{self.name}:{self.version}"
         if self.extra:
             u += "/" + "/".join(extra_value_quoter(e) for e in self.extra)
         return u
-
-    def strict_validate(self) -> None:
-        validation.object_id_validator(self.name)
 
 
 @dataclasses.dataclass(frozen=True)
