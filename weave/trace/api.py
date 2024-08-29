@@ -6,13 +6,13 @@ import threading
 import time
 from typing import Any, Callable, Iterator, Optional, Union
 
+# TODO: type_serializers is imported here to trigger registration of the image serializer.
+# There is probably a better place for this, but including here for now to get the fix in.
 from weave.legacy.weave import urls
 from weave.trace import util
 from weave.trace.call_context import get_current_call
 from weave.trace.client_context import weave_client as weave_client_context
 
-# TODO: type_serializers is imported here to trigger registration of the image serializer.
-# There is probably a better place for this, but including here for now to get the fix in.
 from . import context, weave_client, weave_init
 from .constants import TRACE_OBJECT_EMOJI
 from .op import Op, op
