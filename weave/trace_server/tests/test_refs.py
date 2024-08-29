@@ -1,5 +1,7 @@
 import random
 
+import pytest
+
 from weave.trace import refs
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import refs_internal
@@ -28,6 +30,17 @@ def string_with_every_char(disallowed_chars=[]):
     return "".join(chr(i) for i in char_codes if chr(i) not in disallowed_chars)
 
 
+def test_ref_parsing_external_invalid():
+    with pytest.raises(Exception):
+        ref_start = refs.ObjectRef(
+            entity="entity",
+            project="project",
+            name=string_with_every_char(),
+            digest="1234567890",
+            extra=("key", string_with_every_char()),
+        )
+
+
 def test_ref_parsing_external_sanitized():
     ref_start = refs.ObjectRef(
         entity="entity",
@@ -43,6 +56,16 @@ def test_ref_parsing_external_sanitized():
 
     parsed = refs.parse_uri(ref_str)
     assert parsed == ref_start
+
+
+def test_ref_parsing_internal_invalid():
+    with pytest.raises(Exception):
+        ref_start = refs_internal.InternalObjectRef(
+            project_id="project",
+            name=string_with_every_char(),
+            version="1234567890",
+            extra=("key", string_with_every_char()),
+        )
 
 
 def test_ref_parsing_internal_sanitized():
