@@ -5,6 +5,12 @@ from weave.trace_server import refs_internal
 
 from . import validation_util
 
+# Ater >95% of users are on weave>=0.51.1, we
+# can set this to true. This will at least ensure
+# that the majority of potentially offending users
+# have client-side protection against this.
+SHOULD_ENFORCE_OBJ_ID_CHARSET = False
+
 
 def project_id_validator(s: str) -> str:
     return validation_util.require_base64(s)
@@ -72,7 +78,8 @@ def _validate_object_name_charset(name: str) -> None:
 
 
 def object_id_validator(s: str) -> str:
-    _validate_object_name_charset(s)
+    if SHOULD_ENFORCE_OBJ_ID_CHARSET:
+       _validate_object_name_charset(s)
     return validation_util.require_max_str_len(s, 128)
 
 
