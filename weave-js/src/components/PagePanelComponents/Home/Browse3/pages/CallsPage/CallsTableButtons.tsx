@@ -141,8 +141,12 @@ export const ExportSelector = ({
         dataSize: blob.size,
         numColumns: columns?.length ?? null,
         numRows: numTotalCalls,
-        numExpandedColumns: 0,
-        maxDepth: 0,
+        numExpandedColumns: refColumnsToExpand.length,
+        // the most nested refColumn to expand
+        maxDepth: refColumnsToExpand.reduce(
+          (max, col) => Math.max(max, col.split('.').length),
+          0
+        ),
         type: contentType,
         latency: Date.now() - startTime,
         userId: userInfoLoaded?.id ?? '',
