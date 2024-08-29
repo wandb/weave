@@ -47,7 +47,7 @@ def test_groq_quickstart(
         "groq.chat.completions.create",
     ]
 
-    call = weave_server_respose.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output.id == chat_completion.id
@@ -102,7 +102,7 @@ def test_groq_async_chat_completion(
         "groq.async.chat.completions.create",
     ]
 
-    call = weave_server_respose.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output.model == "llama3-8b-8192"
@@ -164,7 +164,7 @@ def test_groq_streaming_chat_completion(
         "groq.chat.completions.create",
     ]
 
-    call = weave_server_respose.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output.model == "llama3-8b-8192"
@@ -250,7 +250,7 @@ def test_groq_async_streaming_chat_completion(
         "groq.async.chat.completions.create",
     ]
 
-    call = weave_server_respose.calls[0]
+    call = calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output.model == "llama3-8b-8192"
@@ -426,12 +426,12 @@ def test_groq_tool_call(
         "groq.chat.completions.create",
     ]
 
-    call_0 = weave_server_respose.calls[0]
+    call_0 = calls[0]
     assert call_0.exception is None and call_0.ended_at is not None
     output_0 = _get_call_output(call_0)
     assert output_0 == response
 
-    call_1 = weave_server_respose.calls[1]
+    call_1 = calls[1]
     assert call_1.exception is None and call_1.ended_at is not None
     output_1 = _get_call_output(call_1)
     assert output_1.usage.completion_tokens == 47
@@ -452,7 +452,7 @@ def test_groq_tool_call(
     )
     assert output_1.choices[0].message.tool_calls[0].type == "function"
 
-    call_2 = weave_server_respose.calls[2]
+    call_2 = calls[2]
     assert call_2.exception is None and call_2.ended_at is not None
     output_2 = _get_call_output(call_2)
     game_score_data = json.loads(output_2)
@@ -463,7 +463,7 @@ def test_groq_tool_call(
     assert game_score_data["away_team"] == "Golden State Warriors"
     assert game_score_data["away_team_score"] == 128
 
-    call_3 = weave_server_respose.calls[3]
+    call_3 = calls[3]
     assert call_3.exception is None and call_3.ended_at is not None
     output_3 = _get_call_output(call_3)
     assert output_3.usage.completion_tokens == 20
