@@ -117,25 +117,20 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     ).sentiment
     expected_prediction = "Positive"
     assert prediction == expected_prediction
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 6
+    calls = list(client.calls())
+    assert len(calls) == 4
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
-        ("dspy.Predict", 0),
-        ("dspy.Predict.forward", 1),
-        ("dspy.OpenAI", 2),
-        ("dspy.OpenAI.request", 3),
-        ("dspy.OpenAI.basic_request", 4),
-        ("openai.chat.completions.create", 5),
+    calls_list = [c.op_name for c in calls]
+    assert calls_list == [
+        "dspy.Predict",
+        "dspy.Predict.forward",
+        "dspy.OpenAI",
+        "dspy.OpenAI.request",
+        "dspy.OpenAI.basic_request",
+        "openai.chat.completions.create",
     ]
 
-    call_1 = weave_server_respose.calls[0]
+    call_1 = calls[0]
     assert call_1.exception is None and call_1.ended_at is not None
     output_1 = _get_call_output(call_1)
     assert (
@@ -145,7 +140,7 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
 )"""
     )
 
-    call_2 = weave_server_respose.calls[1]
+    call_2 = calls[1]
     assert call_2.exception is None and call_2.ended_at is not None
     output_2 = _get_call_output(call_2)
     assert (
@@ -155,12 +150,12 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
 )"""
     )
 
-    call_3 = weave_server_respose.calls[2]
+    call_3 = calls[2]
     assert call_3.exception is None and call_3.ended_at is not None
     output_3 = _get_call_output(call_3)
     assert output_3[0] == expected_prediction
 
-    call_4 = weave_server_respose.calls[3]
+    call_4 = calls[3]
     assert call_4.exception is None and call_4.ended_at is not None
     output_4 = _get_call_output(call_4)
     assert output_4["choices"][0]["finish_reason"] == "stop"
@@ -171,7 +166,7 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     assert output_4["usage"]["prompt_tokens"] == 53
     assert output_4["usage"]["total_tokens"] == 54
 
-    call_5 = weave_server_respose.calls[4]
+    call_5 = calls[4]
     assert call_5.exception is None and call_5.ended_at is not None
     output_5 = _get_call_output(call_5)
     assert output_5["choices"][0]["finish_reason"] == "stop"
