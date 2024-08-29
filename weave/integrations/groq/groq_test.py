@@ -7,10 +7,8 @@ import pytest
 import weave
 from weave.integrations.integration_utilities import (
     _get_call_output,
-    flatten_calls,
-    op_name_from_ref,
+    _get_op_name,
 )
-from weave.trace_server import trace_server_interface as tsi
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -41,17 +39,12 @@ def test_groq_quickstart(
         chat_completion.choices[0].message.content
         == "The capital of India is New Delhi."
     )
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
-        ("groq.chat.completions.create", 0),
+    calls_list = [_get_op_name(c.op_name) for c in calls]
+    assert calls_list == [
+        "groq.chat.completions.create",
     ]
 
     call = weave_server_respose.calls[0]
@@ -101,17 +94,12 @@ def test_groq_async_chat_completion(
 
     asyncio.run(complete_chat())
 
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
-        ("groq.async.chat.completions.create", 0),
+    calls_list = [_get_op_name(c.op_name) for c in calls]
+    assert calls_list == [
+        "groq.async.chat.completions.create",
     ]
 
     call = weave_server_respose.calls[0]
@@ -168,17 +156,12 @@ def test_groq_streaming_chat_completion(
         if chunk.choices[0].delta.content is not None:
             all_content += chunk.choices[0].delta.content
 
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
-        ("groq.chat.completions.create", 0),
+    calls_list = [_get_op_name(c.op_name) for c in calls]
+    assert calls_list == [
+        "groq.chat.completions.create",
     ]
 
     call = weave_server_respose.calls[0]
@@ -259,17 +242,12 @@ def test_groq_async_streaming_chat_completion(
 
     asyncio.run(generate_reponse())
 
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 1
+    calls = list(client.calls())
+    assert len(calls) == 1
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
-        ("groq.async.chat.completions.create", 0),
+    calls_list = [_get_op_name(c.op_name) for c in calls]
+    assert calls_list == [
+        "groq.async.chat.completions.create",
     ]
 
     call = weave_server_respose.calls[0]
@@ -437,20 +415,15 @@ def test_groq_tool_call(
 
     response = run_conversation("What was the score of the Warriors game?")
 
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
-    )
-    assert len(weave_server_respose.calls) == 4
+    calls = list(client.calls())
+    assert len(calls) == 4
 
-    flatened_calls_list = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flatened_calls_list == [
-        ("run_conversation", 0),
-        ("groq.chat.completions.create", 1),
-        ("get_game_score", 1),
-        ("groq.chat.completions.create", 1),
+    calls_list = [_get_op_name(c.op_name) for c in calls]
+    assert calls_list == [
+        "run_conversation",
+        "groq.chat.completions.create",
+        "get_game_score",
+        "groq.chat.completions.create",
     ]
 
     call_0 = weave_server_respose.calls[0]

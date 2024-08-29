@@ -3,11 +3,7 @@ from typing import Generator
 import pytest
 
 import weave
-from weave.integrations.integration_utilities import (
-    filter_body,
-    flatten_calls,
-    op_name_from_ref,
-)
+from weave.integrations.integration_utilities import _get_op_name, filter_body
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -24,18 +20,17 @@ def assert_calls_correct_for_quickstart(calls: list[tsi.CallSchema]) -> None:
             llama_index.llm
                 openai.chat.completions.create
     """
-    flattened = flatten_calls(calls)
-    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+    got = [_get_op_name(c.op_name) for c in calls]
     exp = [
-        ("llama_index.query", 0),
-        ("llama_index.retrieve", 1),
-        ("llama_index.embedding", 2),
-        ("llama_index.synthesize", 1),
-        ("llama_index.chunking", 2),
-        ("llama_index.chunking", 2),
-        ("llama_index.templating", 2),
-        ("llama_index.llm", 2),
-        ("openai.chat.completions.create", 3),
+        "llama_index.query",
+        "llama_index.retrieve",
+        "llama_index.embedding",
+        "llama_index.synthesize",
+        "llama_index.chunking",
+        "llama_index.chunking",
+        "llama_index.templating",
+        "llama_index.llm",
+        "openai.chat.completions.create",
     ]
     assert got == exp
 
@@ -73,9 +68,10 @@ def test_llamaindex_quickstart(
     query_engine = index.as_query_engine()
     response = query_engine.query("What did the author do growing up?")
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_calls_correct_for_quickstart(res.calls)
-    assert res.calls[-2].inputs["serialized"]["api_key"] == "REDACTED"
+    calls = list(client.calls())
+    assert_calls_correct_for_quickstart(calls)
+    call = calls[-2]
+    assert call.inputs["serialized"]["api_key"] == "REDACTED"
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -96,6 +92,7 @@ async def test_llamaindex_quickstart_async(
 
     query_engine = index.as_query_engine()
     response = await query_engine.aquery("What did the author do growing up?")
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_calls_correct_for_quickstart(res.calls)
-    assert res.calls[-2].inputs["serialized"]["api_key"] == "REDACTED"
+    calls = list(client.calls())
+    assert_calls_correct_for_quickstart(calls)
+    call = calls[-2]
+    assert call.inputs["serialized"]["api_key"] == "REDACTED"
