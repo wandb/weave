@@ -37,7 +37,7 @@ from weave.trace_server.trace_server_interface import (
 
 
 class DatetimeMatcher:
-    def __eq__(self, other: datetime.datetime):
+    def __eq__(self, other):
         return isinstance(other, datetime.datetime)
 
 
