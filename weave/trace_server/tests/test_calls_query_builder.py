@@ -361,7 +361,7 @@ def test_query_light_column_with_costs() -> None:
                     ) AS rank
                 FROM llm_usage
                 LEFT JOIN llm_token_prices ON (llm_usage.llm_id = llm_token_prices.llm_id))
-            -- Final Select, which just pulls all the data from all_calls, and adds a costs object
+            -- Final Select, which just selects the correct fields, and adds a costs object
             SELECT
                 id,
                 started_at,
