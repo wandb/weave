@@ -1,8 +1,8 @@
 import random
 
 import weave
-from weave.legacy.ecosystem import wandb
-from weave.legacy.show import show_url
+from weave.legacy.weave.ecosystem import wandb
+from weave.legacy.weave.show import show_url
 
 weave.use_fixed_server_port()
 
@@ -19,14 +19,14 @@ data = weave.save(
     ]
 )
 
-panel: weave.legacy.panels.Group = weave.legacy.panels.Group(
+panel: weave.legacy.weave.panels.Group = weave.legacy.weave.panels.Group(
     items={
         "scatter": wandb.Scatter(  # type: ignore
             data, x_fn=lambda item: item["a"], y_fn=lambda item: item["b"]
         ),
-        "table": lambda scatter: weave.legacy.panels.LabeledItem(
+        "table": lambda scatter: weave.legacy.weave.panels.LabeledItem(
             label="Selected items",
-            item=weave.legacy.panels.Group(
+            item=weave.legacy.weave.panels.Group(
                 style="height: 400px;",
                 preferHorizontal=True,
                 items={"table": scatter.selected()},

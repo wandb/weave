@@ -1567,17 +1567,17 @@ def test_ref_get_no_client(trace_init_client):
 
 @contextmanager
 def _no_graph_client():
-    client = weave.client_context.weave_client.get_weave_client()
-    weave.client_context.weave_client.set_weave_client_global(None)
+    client = weave.trace.client_context.weave_client.get_weave_client()
+    weave.trace.client_context.weave_client.set_weave_client_global(None)
     try:
         yield
     finally:
-        weave.client_context.weave_client.set_weave_client_global(client)
+        weave.trace.client_context.weave_client.set_weave_client_global(client)
 
 
 @contextmanager
 def _patched_default_initializer(trace_client: weave_client.WeaveClient):
-    from weave import weave_init
+    from weave.trace import weave_init
 
     def init_weave_get_server_patched(api_key):
         return trace_client.server

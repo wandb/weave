@@ -12,8 +12,8 @@ import requests
 import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
-from weave.legacy import op_def
 from weave.tests.trace.util import AnyIntMatcher, RegexStringMatcher
+from weave.legacy.weave import op_def
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
