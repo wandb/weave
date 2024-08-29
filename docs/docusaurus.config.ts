@@ -3,6 +3,7 @@ import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
 
+
 const config: Config = {
   title: "W&B Weave",
   tagline: "Confidently ship LLM applications.",
@@ -43,6 +44,7 @@ const config: Config = {
           editUrl: "https://github.com/wandb/weave/blob/master/docs/",
           routeBasePath: "/",
           docItemComponent: "@theme/ApiItem", // Derived from docusaurus-theme-openapi
+          showLastUpdateTime: true,
         },
         theme: {
           customCss: "./src/css/custom.scss",

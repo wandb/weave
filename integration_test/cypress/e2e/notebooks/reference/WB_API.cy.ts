@@ -1,7 +1,8 @@
 import {checkWeaveNotebookOutputs} from '../notebooks';
 
-describe('../examples/reference/WB_API.ipynb notebook test', () => {
-    it('passes', () =>
-        checkWeaveNotebookOutputs('../examples/reference/WB_API.ipynb')
-    );
+describe('../weave/legacy/examples/reference/WB_API.ipynb notebook test', () => {
+  it('passes', () =>
+    checkWeaveNotebookOutputs(
+      '../weave/legacy/examples/reference/WB_API.ipynb'
+    ));
 });
