@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import datetime
 import json
 import platform
 import sys
@@ -33,6 +34,11 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
+
+
+class DatetimeMatcher:
+    def __eq__(self, other: datetime.datetime):
+        return isinstance(other, datetime.datetime)
 
 
 def test_table_create(client):
