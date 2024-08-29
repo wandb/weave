@@ -97,3 +97,45 @@ sentence = "There are many fruits that were found on the recently discovered pla
 with weave.attributes({'user_id': 'lukas', 'env': 'production'}):
     extract_fruit(sentence)
 ```
+
+## Customize display names
+
+You can customize display names to better identify calls by setting:
+
+1. The `display_name` parameter in the `@weave.op` decorator
+
+   ```python
+   @weave.op(display_name="custom_name")
+   def func():
+       ...
+   ```
+
+2. Or, the `display_name` attribute on the function object itself.
+
+   ```py
+   func.display_name = "custom_name"
+   ```
+
+3. The `display_name` can also be a function that takes in a `Call` object and returns a string. The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on call inputs, attributes, etc.
+
+   ```py
+   def custom_attribute_name(call):
+       model = call.attributes["model"]
+       revision = call.attributes["revision"]
+       now = call.attributes["date"]
+
+       return f"{model}__{revision}__{now}"
+
+   @weave.op(display_name=custom_attribute_name)
+   def func():
+       return ...
+
+   with weave.attributes(
+       {
+           "model": "finetuned-llama-3.1-8b",
+           "revision": "v0.1.2",
+           "date": "2024-08-01",
+       }
+   ):
+       func()  # the display name will be "finetuned-llama-3.1-8b__v0.1.2__2024-08-01"
+   ```

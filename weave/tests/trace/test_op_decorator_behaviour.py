@@ -1,11 +1,10 @@
 import inspect
-import random
 
 import pytest
 
 import weave
 from weave.trace import errors
-from weave.trace.op import DisplayNameFuncError, Op, op
+from weave.trace.op import Op, op
 from weave.trace.refs import ObjectRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import Call
@@ -351,3 +350,28 @@ def test_op_display_name_callable_other_attributes(client):
     calls = list(client.calls())
     assert calls[0].display_name == "finetuned-llama-3.1-8b__v0.1.2__2024-08-01"
     assert calls[1].display_name == "finetuned-gpt-4o__v0.1.3__2024-08-02"
+
+
+def test_op_display_name_modified_dynamically(client):
+    def custom_display_name1(call):
+        return "wow"
+
+    def custom_display_name2(call):
+        return "amazing"
+
+    @weave.op(display_name="string")
+    def func():
+        return 1
+
+    func()
+
+    func.display_name = custom_display_name1
+    func()
+
+    func.display_name = custom_display_name2
+    func()
+
+    calls = list(client.calls())
+    assert calls[0].display_name == "string"
+    assert calls[1].display_name == "wow"
+    assert calls[2].display_name == "amazing"
