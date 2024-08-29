@@ -324,7 +324,7 @@ def test_op_display_name_callable_other_attributes(client):
         revision = call.attributes["revision"]
         now = call.attributes["date"]
 
-        return f"{model}-{revision}-{now}"
+        return f"{model}__{revision}__{now}"
 
     @op(display_name=custom_attribute_name)
     def func():
@@ -349,5 +349,5 @@ def test_op_display_name_callable_other_attributes(client):
         func()
 
     calls = list(client.calls())
-    assert calls[0].display_name == "finetuned-llama-3.1-8b-v0.1.2-2024-08-01"
-    assert calls[1].display_name == "finetuned-gpt-4o-v0.1.3-2024-08-02"
+    assert calls[0].display_name == "finetuned-llama-3.1-8b__v0.1.2__2024-08-01"
+    assert calls[1].display_name == "finetuned-gpt-4o__v0.1.3__2024-08-02"
