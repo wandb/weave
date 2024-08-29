@@ -5,10 +5,17 @@ from weave.trace_server import refs_internal
 
 from . import validation_util
 
-# Ater >95% of users are on weave>=0.51.1, we
-# can set this to true. This will at least ensure
-# that the majority of potentially offending users
-# have client-side protection against this.
+# Temporary flag to disable database-side validation of object ids.
+# We want to enable this be default, but we need to wait until >95% of users
+# are on weave>=0.51.1, when we can enforce the charset check on the db
+# side.
+#
+# Actions:
+# 1. (ETA: Sept 30) - Verify that 95% of users are on weave>=0.51.1, or
+#    that 95% of new objects have the valid charset.
+# 2. Remove this flag (thereby setting this to True), and add a check to the
+#    server-side validation code to ensure that the charset is valid.
+# 3. Release and deploy backend.
 SHOULD_ENFORCE_OBJ_ID_CHARSET = False
 
 
