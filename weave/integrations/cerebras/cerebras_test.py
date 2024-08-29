@@ -33,9 +33,10 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     exp = "The capital of France is Paris."
     assert response.choices[0].message.content.strip() == exp
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output.choices[0].message.content.strip() == exp
@@ -68,9 +69,10 @@ async def test_cerebras_async(client: weave.trace.weave_client.WeaveClient) -> N
     exp = "The capital of France is Paris."
     assert response.choices[0].message.content.strip() == exp
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
     assert output.choices[0].message.content.strip() == exp

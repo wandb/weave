@@ -254,9 +254,10 @@ def test_openai_stream_usage_quickstart(
 
     for chunk in response:
         pass
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -496,9 +497,10 @@ async def test_openai_function_call_async_stream(
     async for chunk in response:
         pass
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
@@ -762,9 +764,10 @@ async def test_openai_tool_call_async_stream(
     async for chunk in response:
         pass
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore

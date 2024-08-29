@@ -41,9 +41,10 @@ def test_cohere(
 
     exp = response.text
     assert exp.strip() != ""
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.Client.chat"
@@ -95,9 +96,10 @@ def test_cohere_stream(
         pass
 
     response = event.response  # the NonStreamedChatResponse
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.Client.chat_stream"
@@ -151,9 +153,10 @@ async def test_cohere_async(
 
     exp = response.text
     assert exp.strip() != ""
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClient.chat"
@@ -205,9 +208,10 @@ async def test_cohere_async_stream(
         pass
 
     response = event.response  # the NonStreamedChatResponse
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClient.chat_stream"
