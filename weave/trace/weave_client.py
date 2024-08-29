@@ -10,9 +10,10 @@ from typing import Any, Dict, Iterator, Optional, Sequence, Union
 import pydantic
 from requests import HTTPError
 
-from weave import urls, version
-from weave.client_context import weave_client as weave_client_context
+from weave import version
+from weave.legacy.weave import ref_base, urls
 from weave.trace import call_context, trace_sentry
+from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.object_record import (
@@ -50,10 +51,6 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TraceServerInterface,
 )
-
-if typing.TYPE_CHECKING:
-    from ..legacy import ref_base
-
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -906,10 +903,10 @@ class WeaveClient:
     def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
 
-    def _ref_input_to(self, ref: "ref_base.Ref") -> Sequence[Call]:
+    def _ref_input_to(self, ref: ref_base.Ref) -> Sequence[Call]:
         raise NotImplementedError()
 
-    def _ref_value_input_to(self, ref: "ref_base.Ref") -> list[Call]:
+    def _ref_value_input_to(self, ref: ref_base.Ref) -> list[Call]:
         raise NotImplementedError()
 
     def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
