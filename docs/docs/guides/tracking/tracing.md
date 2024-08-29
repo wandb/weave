@@ -138,4 +138,14 @@ You can customize display names to better identify calls by setting:
        }
    ):
        func()  # the display name will be "finetuned-llama-3.1-8b__v0.1.2__2024-08-01"
+
+
+    with weave.attributes(
+        {
+            "model": "finetuned-gpt-4o",
+            "revision": "v0.1.3",
+            "date": "2024-08-02",
+        }
+    ):
+        func()  # the display name will be "finetuned-gpt-4o__v0.1.3__2024-08-02"
    ```
