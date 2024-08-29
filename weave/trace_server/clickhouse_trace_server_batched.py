@@ -1513,7 +1513,9 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=make_derived_summary_fields(ch_call.model_dump(), "summary_dump"),
+        summary=make_derived_summary_fields(
+            call_dict=ch_call.model_dump(), summary_key="summary_dump"
+        ),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,

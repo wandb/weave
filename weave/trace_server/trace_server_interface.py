@@ -1,4 +1,5 @@
 import datetime
+from enum import Enum
 from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
@@ -43,10 +44,16 @@ class LLMCostSchema(LLMUsageSchema):
     created_by: Optional[str]
 
 
+class TraceStatus(str, Enum):
+    SUCCESS = "success"
+    ERROR = "error"
+    RUNNING = "running"
+
+
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
-    status: Optional[Literal["success", "error", "running"]]
+    status: Optional[TraceStatus]
     trace_name: Optional[str]
-    latency: Optional[int]
+    latency_ms: Optional[int]
     costs: Optional[Dict[str, LLMCostSchema]]
 
 

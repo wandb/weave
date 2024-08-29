@@ -461,7 +461,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if "display_name" in call_dict and call_dict["display_name"] == "":
                 call_dict["display_name"] = None
             # fill in derived summary fields
-            call_dict["summary"] = make_derived_summary_fields(call_dict, "summary")
+            call_dict["summary"] = make_derived_summary_fields(
+                call_dict=call_dict, summary_key="summary"
+            )
             # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
                 if mfield.is_required() and col not in call_dict:

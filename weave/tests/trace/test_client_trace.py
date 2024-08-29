@@ -116,7 +116,7 @@ def test_trace_server_call_start_and_end(client):
     start = tsi.StartedCallSchemaForInsert(
         project_id=client._project_id(),
         id=call_id,
-        op_name="weave:///test_entity/test_project/op/test_name:test",
+        op_name="test_name",
         trace_id=trace_id,
         parent_id=parent_id,
         started_at=datetime.datetime.now(tz=datetime.timezone.utc)

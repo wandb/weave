@@ -2,10 +2,10 @@ import copy
 import datetime
 import json
 from collections import OrderedDict
-from typing import Any, Dict, Literal, Optional, Union, cast
+from typing import Any, Dict, Literal, Optional, Union
 
+from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.refs_internal import InternalObjectRef, parse_internal_uri
 
 
 def make_derived_summary_fields(
@@ -26,37 +26,37 @@ def make_derived_summary_fields(
     Returns:
         The derived summary fields.
     """
-    display_name = call_dict.get("display_name")
     started_at_dt = _make_datetime_from_any(call_dict["started_at"])
     ended_at_dt = _make_datetime_from_any(call_dict.get("ended_at"))
 
-    status = "success"
+    status = tsi.TraceStatus.SUCCESS
     if call_dict.get("exception"):
-        status = "error"
+        status = tsi.TraceStatus.ERROR
     elif ended_at_dt is None:
-        status = "running"
+        status = tsi.TraceStatus.RUNNING
 
     latency = None
     if ended_at_dt and started_at_dt:
         latency = (ended_at_dt - started_at_dt).microseconds
 
+    display_name = call_dict.get("display_name")
     if not display_name:
-        op = parse_internal_uri(call_dict["op_name"])
-        if isinstance(op, InternalObjectRef):
-            display_name = op.name
+        if ri.string_will_be_interpreted_as_ref(call_dict["op_name"]):
+            op = ri.parse_internal_uri(call_dict["op_name"])
+            if isinstance(op, ri.InternalObjectRef):
+                display_name = op.name
         else:
             display_name = call_dict["op_name"]
 
     summary = _load_json_maybe(call_dict.get(summary_key)) or {}
-
     weave_summary = summary.get("weave", {})
     weave_summary["trace_name"] = display_name
     weave_summary["status"] = status
     if latency is not None:
-        weave_summary["latency"] = latency
-
+        weave_summary["latency_ms"] = latency
     summary["weave"] = weave_summary
-    return cast(tsi.SummaryMap, summary)
+
+    return tsi.SummaryMap({"weave": weave_summary})
 
 
 def _make_datetime_from_any(
@@ -72,7 +72,6 @@ def _make_datetime_from_any(
         return datetime.datetime.fromisoformat(dt)
     elif isinstance(dt, datetime.datetime):
         return dt
-    return None
 
 
 def _load_json_maybe(value: Any) -> Any:
