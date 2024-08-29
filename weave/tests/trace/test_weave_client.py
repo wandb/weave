@@ -1,9 +1,7 @@
 import asyncio
 import dataclasses
-import datetime
 import json
 import platform
-import re
 import sys
 
 import pydantic
@@ -14,6 +12,7 @@ import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
 from weave.legacy.weave import op_def
+from weave.tests.trace.util import DatetimeMatcher, RegexStringMatcher
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
@@ -34,23 +33,6 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
-
-pytestmark = pytest.mark.trace
-
-
-class RegexStringMatcher(str):
-    def __init__(self, pattern):
-        self.pattern = pattern
-
-    def __eq__(self, other_string):
-        if not isinstance(other_string, str):
-            return NotImplemented
-        return bool(re.match(self.pattern, other_string))
-
-
-class DatetimeMatcher:
-    def __eq__(self, other):
-        return isinstance(other, datetime.datetime)
 
 
 def test_table_create(client):

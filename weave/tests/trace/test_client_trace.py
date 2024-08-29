@@ -14,6 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor
+from weave.tests.trace.util import DatetimeMatcher
 from weave.trace import weave_client
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
@@ -86,6 +87,9 @@ def test_simple_op(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=DatetimeMatcher(),
+        ended_at=None,
+        deleted_at=None,
     )
 
 
