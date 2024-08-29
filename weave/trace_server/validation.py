@@ -64,7 +64,7 @@ def _validate_object_name_charset(name: str) -> None:
     if invalid_chars:
         invalid_char_set = list(set(invalid_chars))
         raise ValueError(
-            f"Invalid object name: {name}. Contains invalid characters: {invalid_char_set}. Please upgrade your `weave` package to at least `0.51.0` to prevent this error."
+            f"Invalid object name: {name}. Contains invalid characters: {invalid_char_set}. Please upgrade your `weave` package to `>0.51.0` to prevent this error."
         )
 
     if not name:
