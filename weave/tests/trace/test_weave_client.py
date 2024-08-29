@@ -11,9 +11,9 @@ import requests
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
-from weave import Evaluation, weave_client
-from weave.legacy import op_def
-from weave.trace import refs
+from weave import Evaluation
+from weave.legacy.weave import op_def
+from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 from weave.trace.refs import (
@@ -1334,3 +1334,27 @@ def test_ref_in_dict(client):
 
     obj = weave.ref(ref2.uri()).get()
     assert obj["b"] == {"a": 5}
+
+
+def test_calls_stream_table_ref_expansion(client):
+    class ObjWithTable(weave.Object):
+        table: weave_client.Table
+
+    o = ObjWithTable(table=weave_client.Table([{"a": 1}, {"a": 2}, {"a": 3}]))
+    client._save_object(o, "my-obj")
+
+    @weave.op
+    def f(a):
+        return {"a": a, "table": o.table}
+
+    f(1)
+
+    calls = client.server.calls_query_stream(
+        req=tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            expand_columns=["output.table"],
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 1
+    assert calls[0].output["table"] == o.table.table_ref.uri()

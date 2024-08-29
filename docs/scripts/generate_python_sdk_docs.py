@@ -262,9 +262,8 @@ def doc_module(module, root_path="./docs/reference/python-sdk", module_root_path
 
 def main():
     import weave
-    from weave import feedback
-    from weave import weave_client as client
-    from weave.trace import util
+    from weave.trace import feedback, util
+    from weave.trace import weave_client as client
     from weave.trace_server import (
         remote_http_trace_server,
         trace_server_interface,

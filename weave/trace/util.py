@@ -94,6 +94,31 @@ class ContextAwareThread(_Thread):
         self.context.run(super().run)
 
 
+def is_colab():  # type: ignore
+    import importlib
+
+    spec = importlib.util.find_spec("google.colab")
+    return bool(spec)
+
+
+def is_notebook() -> bool:
+    if is_colab():  # type: ignore[no-untyped-call]
+        return True
+    try:
+        from IPython import get_ipython
+    except ImportError:
+        return False
+    else:
+        ip = get_ipython()
+        if ip is None:
+            return False
+        if "IPKernelApp" not in ip.config:
+            return False
+        # if "VSCODE_PID" in os.environ:
+        #     return False
+    return True
+
+
 # rename for cleaner export
 ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread

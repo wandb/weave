@@ -196,6 +196,7 @@ export type TraverseContext = {
   valueType: ValueType;
   isLeaf: boolean;
   depth: number;
+  parent?: ObjectPath;
 };
 
 type CallbackResult = void | boolean | 'skip';
@@ -256,6 +257,7 @@ export const traverse = (
           value,
           valueType: itemValueType,
           isLeaf: isLeafType(itemValueType),
+          parent: context.path,
           path: context.path.plus(i),
           depth: context.depth + 1,
         });
@@ -270,6 +272,7 @@ export const traverse = (
           value,
           valueType: itemValueType,
           isLeaf: isLeafType(itemValueType),
+          parent: context.path,
           path: context.path.plus(key),
           depth: context.depth + 1,
         });
