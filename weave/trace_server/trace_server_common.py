@@ -11,12 +11,31 @@ from weave.trace_server.refs_internal import InternalObjectRef, parse_internal_u
 def make_derived_summary_fields(
     call_dict: Dict[str, Any], summary_key: Literal["summary", "summary_dump"]
 ) -> tsi.SummaryMap:
+    """
+    Make derived summary fields for a call.
+
+    Summary is controlled by the user, but the `weave` summary key is
+    used to store derived fields, adhering to the tsi.SummaryMap type.
+
+    Args:
+        call_dict: The call dict.
+        summary_key: The key in the call dict that contains the summary. In
+            the clickhouse server this is "summary_dump", but in sqlite
+            it's "summary".
+
+    Returns:
+        The derived summary fields.
+    """
     display_name = call_dict.get("display_name")
     started_at_dt = _make_datetime_from_any(call_dict["started_at"])
     ended_at_dt = _make_datetime_from_any(call_dict.get("ended_at"))
-    status = _make_call_status_from_exception_and_ended_at(
-        call_dict.get("exception"), ended_at_dt
-    )
+
+    status = "success"
+    if call_dict.get("exception"):
+        status = "error"
+    elif ended_at_dt is None:
+        status = "running"
+
     latency = None
     if ended_at_dt and started_at_dt:
         latency = (ended_at_dt - started_at_dt).microseconds
@@ -31,22 +50,13 @@ def make_derived_summary_fields(
     summary = _load_json_maybe(call_dict.get(summary_key)) or {}
 
     weave_summary = summary.get("weave", {})
-    weave_summary["nice_trace_name"] = display_name
+    weave_summary["trace_name"] = display_name
     weave_summary["status"] = status
-    weave_summary["latency"] = latency
+    if latency is not None:
+        weave_summary["latency"] = latency
 
     summary["weave"] = weave_summary
     return cast(tsi.SummaryMap, summary)
-
-
-def _make_call_status_from_exception_and_ended_at(
-    exception: Optional[str], ended_at: Optional[datetime.datetime]
-) -> Literal["success", "error", "running"]:
-    if exception is not None:
-        return "error"
-    elif ended_at is None:
-        return "running"
-    return "success"
 
 
 def _make_datetime_from_any(
@@ -54,7 +64,7 @@ def _make_datetime_from_any(
 ) -> Optional[datetime.datetime]:
     """
     Flexible datetime parser, accepts None, str and datetime.
-    This allows database agnostic parsing of datetime objects.
+    This allows database type agnostic parsing of dates.
     """
     if dt is None:
         return None
@@ -68,7 +78,7 @@ def _make_datetime_from_any(
 def _load_json_maybe(value: Any) -> Any:
     """
     Loads a JSON string or returns the value if it's not a string.
-    Allows for database agnostic parsing of JSON strings.
+    Allows for database type agnostic parsing of JSON strings.
     """
     if isinstance(value, str):
         return json.loads(value)

@@ -83,7 +83,7 @@ def test_simple_op(client):
         summary={
             "weave": {
                 "status": "success",
-                "nice_trace_name": "my_op",
+                "trace_name": "my_op",
                 "latency": AnyIntMatcher(),
             }
         },
@@ -151,8 +151,7 @@ def test_trace_server_call_start_and_end(client):
         "output": None,
         "summary": {
             "weave": {
-                "nice_trace_name": "test_name",
-                "latency": None,
+                "trace_name": "test_name",
                 "status": "running",
             },
         },
@@ -197,7 +196,7 @@ def test_trace_server_call_start_and_end(client):
         "summary": {
             "c": 5,
             "weave": {
-                "nice_trace_name": "test_name",
+                "trace_name": "test_name",
                 "latency": AnyIntMatcher(),
                 "status": "success",
             },

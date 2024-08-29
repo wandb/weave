@@ -45,7 +45,7 @@ class LLMCostSchema(LLMUsageSchema):
 
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
     status: Optional[Literal["success", "error", "running"]]
-    nice_trace_name: Optional[str]
+    trace_name: Optional[str]
     latency: Optional[int]
     costs: Optional[Dict[str, LLMCostSchema]]
 

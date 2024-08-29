@@ -263,7 +263,7 @@ def test_call_create(client):
         summary={
             "weave": {
                 "status": "success",
-                "nice_trace_name": "x",
+                "trace_name": "x",
                 "latency": AnyIntMatcher(),
             }
         },
@@ -308,8 +308,7 @@ def test_calls_query(client):
         summary={
             "weave": {
                 "status": "running",
-                "nice_trace_name": "x",
-                "latency": None,
+                "trace_name": "x",
             }
         },
     )
@@ -333,8 +332,7 @@ def test_calls_query(client):
         summary={
             "weave": {
                 "status": "running",
-                "nice_trace_name": "x",
-                "latency": None,
+                "trace_name": "x",
             }
         },
     )
@@ -1310,7 +1308,7 @@ def test_summary_tokens_cost(client):
     # currently that means no weave object in the summary
     assert noCostCallSummary["weave"] == {
         "status": "success",
-        "nice_trace_name": "models",
+        "trace_name": "models",
         "latency": AnyIntMatcher(),
     }
 
@@ -1337,16 +1335,15 @@ def test_summary_tokens_cost_sqlite(client):
     noCostCallSummary = callsNoCost[0].summary
     withCostCallSummary = callsWithCost[0].summary
 
-    assert noCostCallSummary == {
-        "weave": {"status": "running", "nice_trace_name": "x", "latency": None}
-    }
-    assert withCostCallSummary == {
+    weave_summary = {
         "weave": {
             "status": "running",
-            "nice_trace_name": "x",
-            "latency": None,
+            "trace_name": "x",
         }
     }
+
+    assert noCostCallSummary == weave_summary
+    assert withCostCallSummary == weave_summary
 
 
 def test_ref_in_dict(client):
