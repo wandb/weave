@@ -118,7 +118,7 @@ export const ExportSelector = ({
 
       userEvents.exportClicked({
         dataSize: blob.size,
-        numColumns: leafColumns?.length ?? null,
+        numColumns: visibleColumns?.length ?? null,
         numRows: numTotalCalls,
         numExpandedColumns: refColumnsToExpand.length,
         // the most nested refColumn to expand
