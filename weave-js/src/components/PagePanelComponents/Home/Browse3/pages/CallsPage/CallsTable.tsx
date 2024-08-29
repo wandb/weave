@@ -522,6 +522,10 @@ export const CallsTable: FC<{
       : [];
   }, [allRowKeys, columnVisibilityModel, tableData]);
 
+  const refColumnsToExpand = useMemo(() => {
+    return Array.from(expandedRefCols).filter(col => columnsWithRefs.has(col));
+  }, [expandedRefCols, columnsWithRefs]);
+
   // Register Export Button
 
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
@@ -709,7 +713,7 @@ export const CallsTable: FC<{
               numTotalCalls={callsTotal}
               disabled={callsTotal === 0}
               visibleColumns={visibleColumns}
-              columnsWithRefs={columnsWithRefs}
+              refColumnsToExpand={refColumnsToExpand}
               callQueryParams={{
                 entity,
                 project,
