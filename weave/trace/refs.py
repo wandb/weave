@@ -58,7 +58,6 @@ class ObjectRef(RefWithExtra):
         refs_internal.validate_no_slashes(self.digest, "digest")
         refs_internal.validate_no_colons(self.digest, "digest")
         refs_internal.validate_extra(list(self.extra))
-        validation.object_id_validator(self.name)
 
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"

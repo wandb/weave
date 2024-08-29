@@ -106,7 +106,6 @@ class InternalObjectRef:
         validate_no_slashes(self.version, "version")
         validate_no_colons(self.version, "version")
         validate_extra(self.extra)
-        validation.object_id_validator(self.name)
 
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/object/{self.name}:{self.version}"
