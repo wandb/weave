@@ -1,6 +1,5 @@
 import asyncio
 import dataclasses
-import datetime
 import json
 import platform
 import sys
@@ -34,11 +33,6 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
-
-
-class DatetimeMatcher:
-    def __eq__(self, other):
-        return isinstance(other, datetime.datetime)
 
 
 def test_table_create(client):
@@ -277,7 +271,6 @@ def test_call_create(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
-        deleted_at=None,
     )
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
@@ -307,7 +300,6 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -328,7 +320,6 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
