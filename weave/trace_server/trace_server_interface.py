@@ -257,7 +257,7 @@ class CallsQueryReq(BaseModel):
     # Sort by multiple fields
     sort_by: Optional[List[SortBy]] = None
     query: Optional[Query] = None
-    include_costs: Optional[bool] =  Field(
+    include_costs: Optional[bool] = Field(
         default=False,
         description="Beta, subject to change. If true, the response will"
         " include any model costs for each call.",
