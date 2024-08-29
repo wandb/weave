@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import datetime
 import json
 import platform
 import re
@@ -45,6 +46,11 @@ class RegexStringMatcher(str):
         if not isinstance(other_string, str):
             return NotImplemented
         return bool(re.match(self.pattern, other_string))
+
+
+class DatetimeMatcher:
+    def __eq__(self, other: datetime.datetime):
+        return isinstance(other, datetime.datetime)
 
 
 def test_table_create(client):
@@ -308,6 +314,9 @@ def test_calls_query(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=DatetimeMatcher(),
+        ended_at=None,
+        deleted_at=None,
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -326,6 +335,9 @@ def test_calls_query(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=DatetimeMatcher(),
+        ended_at=None,
+        deleted_at=None,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
