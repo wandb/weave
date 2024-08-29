@@ -167,11 +167,15 @@ const config: Config = {
       style: "dark",
       links: [
         {
-          title: "Docs",
+          title: "Learning",
           items: [
             {
               label: "Documentation",
               to: "/quickstart",
+            },
+            {
+              label: "LLM Courses",
+              to: "https://www.wandb.courses/",
             },
           ],
         },
