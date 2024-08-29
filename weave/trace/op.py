@@ -175,6 +175,7 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
         func,
         inputs_with_defaults,
         parent_call,
+        display_name=func.display_name,
         attributes=attributes,
     )
 
@@ -394,7 +395,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._tracing_enabled = True  # type: ignore
 
-            if callable(display_name := kwargs.get("display_name", name)):
+            if callable(display_name := kwargs.get("display_name")):
                 display_name = display_name()
             wrapper.display_name = display_name  # type: ignore
 
