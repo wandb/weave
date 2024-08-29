@@ -269,6 +269,9 @@ def test_call_create(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=DatetimeMatcher(),
+        ended_at=DatetimeMatcher(),
+        deleted_at=None,
     )
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
