@@ -144,11 +144,11 @@ export const ObjectViewer = ({
         refValues[context.value] != null &&
         // If this is a ref and the parent has been visited, we already resolved
         // this ref. Example: `a._ref` where `a` is already in resolvedRefPaths
-        !resolvedRefPaths.has(context.parent?.toString() ?? '')
+        !resolvedRefPaths.has(context.value + context.parent?.toString() ?? '')
       ) {
         dirty = true;
         const res = refValues[context.value];
-        resolvedRefPaths.add(context.path.toString());
+        resolvedRefPaths.add(context.value + context.path.toString());
         return res;
       }
       return _.clone(context.value);
