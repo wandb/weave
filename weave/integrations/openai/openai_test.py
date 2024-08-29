@@ -5,6 +5,7 @@ import pytest
 from openai import AsyncOpenAI, OpenAI
 
 import weave
+from weave.integrations.integration_utilities import op_name_from_ref
 from weave.trace_server import trace_server_interface as tsi
 
 model = "gpt-4o"

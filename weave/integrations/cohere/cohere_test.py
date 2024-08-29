@@ -1,24 +1,12 @@
 import os
-from typing import Any
 
 import cohere
 import pytest
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
+from weave.integrations.integration_utilities import _get_call_output, op_name_from_ref
 
 cohere_model = "command"  # You can change this to a specific model if needed
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
-
-
-def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
 
 
 @pytest.mark.skip_clickhouse_client

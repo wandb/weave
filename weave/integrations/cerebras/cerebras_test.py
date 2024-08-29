@@ -1,20 +1,12 @@
 import os
-from typing import Any
 
 import pytest
 from cerebras.cloud.sdk import AsyncCerebras, Cerebras
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
+from weave.integrations.integration_utilities import _get_call_output
 
 model = "llama3.1-8b"  # Cerebras model
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
 
 
 @pytest.mark.skip_clickhouse_client

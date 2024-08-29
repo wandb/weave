@@ -1,5 +1,9 @@
 import hashlib
 import re
+from typing import Any, Optional
+
+import weave
+from weave.trace_server import trace_server_interface as tsi
 
 MAX_RUN_NAME_LENGTH = 128
 
@@ -65,3 +69,46 @@ def _truncate_string(s: str, max_len: int, from_start: bool = False) -> str:
 
 def _hash_str(s: str, hash_len: int) -> str:
     return hashlib.md5(s.encode()).hexdigest()[:hash_len]
+
+
+def _get_call_output(call: tsi.CallSchema) -> Any:
+    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
+    Keeping this here for now, but it should be removed in the future once we have a better solution.
+    """
+    call_output = call.output
+    if isinstance(call_output, str) and call_output.startswith("weave://"):
+        return weave.ref(call_output).get()
+    return call_output
+
+
+def _get_op_name(s: str) -> str:
+    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
+    Keeping this here for now, but it should be removed in the future once we have a better solution.
+    """
+    _, s = s.split("weave:///shawn/test-project/op/", 1)
+    s, _ = s.split(":", 1)
+    return s
+
+
+def flatten_calls(
+    calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
+) -> list:
+    def children_of_parent_id(id: Optional[str]) -> list[tsi.CallSchema]:
+        return [call for call in calls if call.parent_id == id]
+
+    children = children_of_parent_id(parent_id)
+    res = []
+    for child in children:
+        res.append((child, depth))
+        res.extend(flatten_calls(calls, child.id, depth + 1))
+
+    return res
+
+
+def op_name_from_ref(ref: str) -> str:
+    return ref.split("/")[-1].split(":")[0]
+
+
+def filter_body(r: Any) -> Any:
+    r.body = ""
+    return r

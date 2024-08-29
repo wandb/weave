@@ -1,35 +1,16 @@
 import os
-from typing import Any, Generator, List, Optional, Tuple
+from typing import Generator, List, Tuple
 
 import pytest
 
 import weave
+from weave.integrations.integration_utilities import (
+    filter_body,
+    flatten_calls,
+    op_name_from_ref,
+)
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
-
-
-def filter_body(r: Any) -> Any:
-    r.body = ""
-    return r
-
-
-def flatten_calls(
-    calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
-) -> list:
-    def children_of_parent_id(id: Optional[str]) -> list[tsi.CallSchema]:
-        return [call for call in calls if call.parent_id == id]
-
-    children = children_of_parent_id(parent_id)
-    res = []
-    for child in children:
-        res.append((child, depth))
-        res.extend(flatten_calls(calls, child.id, depth + 1))
-
-    return res
-
-
-def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
 
 
 def assert_ends_and_errors(calls: List[tsi.CallSchema]) -> None:

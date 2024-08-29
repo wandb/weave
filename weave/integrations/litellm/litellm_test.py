@@ -6,6 +6,9 @@ import pytest
 import semver
 
 import weave
+from weave.integrations.integration_utilities import (
+    _get_call_output,
+)
 from weave.trace_server import trace_server_interface as tsi
 
 from .litellm import litellm_patcher
@@ -26,17 +29,6 @@ class Nearly:
 
     def __eq__(self, other: Any) -> bool:
         return abs(self.v - other) < 2
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
-
-    Keeping this here for now, but it should be removed in the future once we have a better solution.
-    """
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
 
 
 @pytest.fixture(scope="package")
