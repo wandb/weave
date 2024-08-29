@@ -1,10 +1,9 @@
-import {Box} from '@mui/material';
-import React from 'react';
+import { Box } from '@mui/material';
 
-import {Alert} from '../../../../Alert';
-import {CopyableText} from '../../../../CopyableText';
-import {DocLink} from './common/Links';
-import {CallSchema} from './wfReactInterface/wfDataModelHooksInterface';
+import { Alert } from '../../../../Alert';
+import { CopyableText } from '../../../../CopyableText';
+import { DocLink } from './common/Links';
+import { CallSchema } from './wfReactInterface/wfDataModelHooksInterface';
 
 type TabUseCallProps = {
   call: CallSchema;
@@ -14,7 +13,7 @@ export const TabUseCall = ({call}: TabUseCallProps) => {
   const {entity, project, callId} = call;
   let codeFetch = `import weave
 client = weave.init("${entity}/${project}")
-call = client.call("${callId}")`;
+call = client.get_call("${callId}")`;
 
   const backend = (window as any).CONFIG.TRACE_BACKEND_BASE_URL;
   if (backend.endsWith('.wandb.test')) {

@@ -259,7 +259,7 @@ def test_pydantic(client):
 def test_call_create(client):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
-    result = client.call(call.id)
+    result = client.get_call(call.id)
     expected = weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
@@ -289,7 +289,7 @@ def test_calls_query(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call1 = client.create_call("x", {"a": 6, "b": 11})
     call2 = client.create_call("y", {"a": 5, "b": 10})
-    result = list(client.calls(weave_client.CallsFilter(op_names=[call1.op_name])))
+    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -338,18 +338,18 @@ def test_calls_delete(client):
     _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
     call1 = client.create_call("y", {"a": 6, "b": 11})
 
-    assert len(list(client.calls())) == 4
+    assert len(list(client.get_calls())) == 4
 
-    result = list(client.calls(weave_client.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
     client.delete_call(call0_child1)
 
-    result = list(client.calls(weave_client.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 1
 
-    result = list(client.calls(weave_client.CallsFilter(op_names=[call1.op_name])))
+    result = list(client.get_calls(weave_client.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 0
 
     # no-op if already deleted
@@ -357,7 +357,7 @@ def test_calls_delete(client):
     call1.delete()
     call1.delete()
 
-    result = list(client.calls())
+    result = list(client.get_calls())
     # only call0 should be left
     assert len(result) == 1
 
@@ -391,7 +391,7 @@ def test_calls_delete_cascade(client):
     client.delete_call(eval_call)
 
     # check that all the calls are gone
-    result = list(client.calls())
+    result = list(client.get_calls())
     assert len(result) == 0
 
 
@@ -401,40 +401,40 @@ def test_call_display_name(client):
     # Rename using the client method
     client._set_call_display_name(call0, "updated_name")
     # same op_name
-    result = list(client.calls())
+    result = list(client.get_calls())
     assert len(result) == 1
 
     # Rename using the call object's method
     call0 = result[0]
     call0.set_display_name("new_name")
-    result = list(client.calls())
+    result = list(client.get_calls())
     assert len(result) == 1
     assert result[0].display_name == "new_name"
 
     # delete the display name
     call0 = result[0]
     client._remove_call_display_name(call0)
-    call0 = client.call(call0.id)
+    call0 = client.get_call(call0.id)
     assert call0.display_name is None
 
     # add it back
     call0.set_display_name("new new name")
-    call0 = client.call(call0.id)
+    call0 = client.get_call(call0.id)
     assert call0.display_name == "new new name"
 
     # delete display_name by setting to None
     call0.remove_display_name()
-    call0 = client.call(call0.id)
+    call0 = client.get_call(call0.id)
     assert call0.display_name is None
 
     # add it back
     call0.set_display_name("new new name")
-    call0 = client.call(call0.id)
+    call0 = client.get_call(call0.id)
     assert call0.display_name == "new new name"
 
     # delete by passing None to set
     call0.set_display_name(None)
-    call0 = client.call(call0.id)
+    call0 = client.get_call(call0.id)
     assert call0.display_name is None
 
 
@@ -447,7 +447,7 @@ def test_dataset_calls(client):
         call = client.create_call("x", {"a": row["doc"]})
         client.finish_call(call, None)
 
-    calls = list(client.calls({"op_name": "x"}))
+    calls = list(client.get_calls({"op_name": "x"}))
     assert calls[0].inputs["a"] == "xx"
     assert calls[1].inputs["a"] == "yy"
 
@@ -532,7 +532,7 @@ def test_stable_dataset_row_refs(client):
     dataset2 = client.get(dataset2_ref)
     call = client.create_call("x", {"a": dataset2.rows[0]["doc"]})
     client.finish_call(call, "call2")
-    x = client.calls({"ref": weave_client.get_ref(dataset.rows[0]["doc"])})
+    x = client.get_calls({"ref": weave_client.get_ref(dataset.rows[0]["doc"])})
 
     assert len(list(x)) == 2
 
@@ -545,7 +545,7 @@ def test_opdef(client):
     res = add2(1, 3)
     assert isinstance(weave_client.get_ref(add2), refs.OpRef)
     assert res == 4
-    assert len(list(client.calls())) == 1
+    assert len(list(client.get_calls())) == 1
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
@@ -582,7 +582,7 @@ def test_object_mismatch_project_ref(client):
     client.project = "test-project2"
     obj.predict("x")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     assert calls[0].project_id == "shawn/test-project2"
     assert "weave:///shawn/test-project2/op" in str(calls[0].op_name)
@@ -597,7 +597,7 @@ def test_object_mismatch_project_ref_nested(client):
 
     hello_world()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     assert calls[0].project_id == "shawn/test-project"
     assert "weave:///shawn/test-project/op" in str(calls[0].op_name)
@@ -610,7 +610,7 @@ def test_object_mismatch_project_ref_nested(client):
 
     nested["a"]()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     assert calls[0].project_id == "shawn/test-project2"
     assert "weave:///shawn/test-project2/op" in str(calls[0].op_name)
@@ -1227,13 +1227,13 @@ def test_summary_tokens_cost(client):
     }
 
     callsWithCost = list(
-        client.calls(
+        client.get_calls(
             weave_client.CallsFilter(op_names=[call.op_name]),
             include_costs=True,
         )
     )
     callsNoCost = list(
-        client.calls(
+        client.get_calls(
             weave_client.CallsFilter(op_names=[call.op_name]),
             include_costs=False,
         )
@@ -1313,8 +1313,8 @@ def test_summary_tokens_cost_sqlite(client):
     _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
     call1 = client.create_call("y", {"a": 6, "b": 11})
 
-    callsWithCost = list(client.calls(include_costs=True))
-    callsNoCost = list(client.calls(include_costs=False))
+    callsWithCost = list(client.get_calls(include_costs=True))
+    callsNoCost = list(client.get_calls(include_costs=False))
 
     assert len(callsWithCost) == len(callsNoCost)
     assert len(callsWithCost) == 4

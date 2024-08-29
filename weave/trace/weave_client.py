@@ -673,10 +673,10 @@ class WeaveClient:
             # Fetch a specific feedback object.
             # Note that this still returns a collection, which is expected
             # to contain zero or one item(s).
-            client.feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+            client.get_feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
 
             # Find all feedback objects with a specific reaction.
-            client.feedback(reaction="👍", limit=10)
+            client.get_feedback(reaction="👍", limit=10)
             ```
 
         Args:
