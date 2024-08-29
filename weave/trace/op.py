@@ -50,6 +50,9 @@ except ImportError:
     CEREBRAS_NOT_GIVEN = None
 
 
+class DisplayNameFuncError(ValueError): ...
+
+
 def print_call_link(call: "Call") -> None:
     if settings.should_print_call_link():
         print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
@@ -396,9 +399,13 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._tracing_enabled = True  # type: ignore
 
-            if callable(display_name := kwargs.get("display_name")):
-                display_name = display_name()
-            wrapper.display_name = display_name  # type: ignore
+            if callable(name_func := kwargs.get("display_name")):
+                params = inspect.signature(name_func).parameters
+                if len(params) != 1:
+                    raise DisplayNameFuncError(
+                        "`display_name` function must take exactly 1 argument (the Call object)"
+                    )
+            wrapper.display_name = name_func  # type: ignore
 
             return cast(Op, wrapper)
 

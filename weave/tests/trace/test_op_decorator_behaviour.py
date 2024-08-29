@@ -1,10 +1,11 @@
 import inspect
+import random
 
 import pytest
 
 import weave
 from weave.trace import errors
-from weave.trace.op import Op, op
+from weave.trace.op import DisplayNameFuncError, Op, op
 from weave.trace.refs import ObjectRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import Call
@@ -270,8 +271,6 @@ def test_op_display_name_str(client):
     def func():
         return 1
 
-    assert func.display_name == "example"
-
     func()
 
     calls = list(client.calls())
@@ -280,16 +279,75 @@ def test_op_display_name_str(client):
     assert call.display_name == "example"
 
 
-def test_op_display_name_callable(client):
-    @op(display_name=lambda: "example")
+def test_op_display_name_callable_invalid():
+    with pytest.raises(ValueError, match="must take exactly 1 argument"):
+
+        @op(display_name=lambda: "example")
+        def func():
+            return 1
+
+
+def test_op_display_name_callable_lambda(client):
+    @op(display_name=lambda call: f"{call.project_id}-123")
     def func():
         return 1
 
-    assert func.display_name == "example"
+    func()
+
+    calls = list(client.calls())
+    call = calls[0]
+
+    assert call.display_name == "shawn/test-project-123"
+
+
+def test_op_display_name_callable_func(client):
+    def custom_display_name_func(call) -> str:
+        reversed_project = call.project_id[::-1]
+        name_ascii_sum = sum(ord(c) for c in reversed_project)
+        return f"wow-{name_ascii_sum}-{reversed_project}"
+
+    @op(display_name=custom_display_name_func)
+    def func():
+        return 1
 
     func()
 
     calls = list(client.calls())
     call = calls[0]
 
-    assert call.display_name == "example"
+    assert call.display_name == "wow-1844-tcejorp-tset/nwahs"
+
+
+def test_op_display_name_callable_other_attributes(client):
+    def custom_attribute_name(call):
+        model = call.attributes["model"]
+        revision = call.attributes["revision"]
+        now = call.attributes["date"]
+
+        return f"{model}-{revision}-{now}"
+
+    @op(display_name=custom_attribute_name)
+    def func():
+        return 1
+
+    with weave.attributes(
+        {
+            "model": "finetuned-llama-3.1-8b",
+            "revision": "v0.1.2",
+            "date": "2024-08-01",
+        }
+    ):
+        func()
+
+    with weave.attributes(
+        {
+            "model": "finetuned-gpt-4o",
+            "revision": "v0.1.3",
+            "date": "2024-08-02",
+        }
+    ):
+        func()
+
+    calls = list(client.calls())
+    assert calls[0].display_name == "finetuned-llama-3.1-8b-v0.1.2-2024-08-01"
+    assert calls[1].display_name == "finetuned-gpt-4o-v0.1.3-2024-08-02"

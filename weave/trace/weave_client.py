@@ -5,7 +5,7 @@ import re
 import sys
 import typing
 from functools import lru_cache
-from typing import Any, Dict, Iterator, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
 from requests import HTTPError
@@ -143,7 +143,7 @@ class Call:
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
-    display_name: Optional[str] = None
+    display_name: Optional[Union[str, Callable[["Call"], str]]] = None
     attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
@@ -478,7 +478,7 @@ class WeaveClient:
         inputs: dict,
         parent: Optional[Call] = None,
         attributes: Optional[dict] = None,
-        display_name: Optional[str] = None,
+        display_name: Optional[Union[str, Callable[[Call], str]]] = None,
         *,
         use_stack: bool = True,
     ) -> Call:
@@ -540,9 +540,13 @@ class WeaveClient:
             parent_id=parent_id,
             id=call_id,
             inputs=inputs_with_refs,
-            display_name=display_name,
             attributes=attributes,
         )
+        # feels like this should be in post init, but keping here
+        # because the func needs to be resolved for schema insert below
+        if callable(name_func := display_name):
+            display_name = name_func(call)
+        call.display_name = display_name
         if parent is not None:
             parent._children.append(call)
 
