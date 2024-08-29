@@ -175,7 +175,7 @@ const config: Config = {
             },
             {
               label: "LLM Courses",
-              to: "https://www.wandb.courses/",
+              href: "https://www.wandb.courses/",
             },
           ],
         },

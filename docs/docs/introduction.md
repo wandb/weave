@@ -22,4 +22,5 @@ You can use Weave to:
 
 ## What's next?
 
-Try the [Quickstart](/quickstart) to see Weave in action.
+- Try the **[Quickstart](/quickstart)** to see Weave in action.
+- Check out our **[AI Academy](https://www.wandb.courses/pages/w-b-courses)** to learn how Prompt, build an advanced RAGs system, fine-tune an LLM and more.
