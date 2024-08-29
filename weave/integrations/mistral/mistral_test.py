@@ -5,6 +5,7 @@ from mistralai.async_client import MistralAsyncClient
 from mistralai.client import MistralClient
 
 import weave
+from weave.integrations.integration_utilities import _get_call_output
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
