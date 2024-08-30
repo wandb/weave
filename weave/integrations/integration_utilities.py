@@ -1,8 +1,9 @@
 import hashlib
 import re
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable
 
 import weave
+from weave.trace.refs import parse_uri
 from weave.trace.weave_client import Call
 from weave.trace_server import trace_server_interface as tsi
 
@@ -91,27 +92,20 @@ def _get_op_name(s: str) -> str:
     return s
 
 
-def flatten_calls2(calls: Iterable[Call], *, depth: int = 0) -> list:
-    res = []
+def flatten_calls(calls: Iterable[Call], *, depth: int = 0) -> list:
+    lst = []
     for call in calls:
-        res.append((_get_op_name(call.op_name), depth))
-        res.extend(flatten_calls2(call.children(), depth=depth + 1))
-    return res
+        lst.append((call, depth))
+        lst.extend(flatten_calls(call.children(), depth=depth + 1))
+    return lst
 
 
-def flatten_calls(
-    calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
-) -> list:
-    def children_of_parent_id(id: Optional[str]) -> list[tsi.CallSchema]:
-        return [call for call in calls if call.parent_id == id]
-
-    children = children_of_parent_id(parent_id)
-    res = []
-    for child in children:
-        res.append((child, depth))
-        res.extend(flatten_calls(calls, child.id, depth + 1))
-
-    return res
+def flattened_calls_to_names(flattened_calls: list) -> list:
+    lst = []
+    for call, depth in flattened_calls:
+        ref = parse_uri(call.op_name)
+        lst.append((ref.name, depth))
+    return lst
 
 
 def op_name_from_ref(ref: str) -> str:

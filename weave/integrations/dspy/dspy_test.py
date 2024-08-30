@@ -4,7 +4,8 @@ import pytest
 
 from weave.integrations.integration_utilities import (
     _get_call_output,
-    flatten_calls2,
+    flatten_calls,
+    flattened_calls_to_names,
 )
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
@@ -30,10 +31,10 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     expected_prediction = "Hello! How can I assist you today?"
     assert prediction == [expected_prediction]
     calls = client.calls(filter=CallsFilter(trace_roots_only=True))
-    flattened_calls = flatten_calls2(calls)
+    flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 4
 
-    assert flattened_calls == [
+    assert flattened_calls_to_names(flattened_calls)_to_names(flattened_calls) == [
         ("dspy.OpenAI", 0),
         ("dspy.OpenAI.request", 1),
         ("dspy.OpenAI.basic_request", 2),
@@ -91,10 +92,10 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     expected_prediction = "Positive"
     assert prediction == expected_prediction
     calls = client.calls(filter=CallsFilter(trace_roots_only=True))
-    flattened_calls = flatten_calls2(calls)
+    flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 6
 
-    assert flattened_calls == [
+    assert flattened_calls_to_names(flattened_calls)_to_names(flattened_calls) == [
         ("dspy.Predict", 0),
         ("dspy.Predict.forward", 1),
         ("dspy.OpenAI", 2),

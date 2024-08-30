@@ -7,7 +7,8 @@ import pytest
 import weave
 from weave.integrations.integration_utilities import (
     _get_call_output,
-    flatten_calls2,
+    flatten_calls,
+    flattened_calls_to_names,
 )
 from weave.trace_server.trace_server_interface import CallsFilter
 
@@ -41,10 +42,10 @@ def test_groq_quickstart(
         == "The capital of India is New Delhi."
     )
     calls = client.calls(filter=CallsFilter(trace_roots_only=True))
-    flattened_calls = flatten_calls2(calls)
+    flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
-    assert flattened_calls == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("groq.chat.completions.create", 0),
     ]
 
@@ -96,10 +97,10 @@ def test_groq_async_chat_completion(
     asyncio.run(complete_chat())
 
     calls = client.calls(filter=CallsFilter(trace_roots_only=True))
-    flattened_calls = flatten_calls2(calls)
+    flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
-    assert flattened_calls == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("groq.async.chat.completions.create", 0),
     ]
 
@@ -158,10 +159,10 @@ def test_groq_streaming_chat_completion(
             all_content += chunk.choices[0].delta.content
 
     calls = client.calls(filter=CallsFilter(trace_roots_only=True))
-    flattened_calls = flatten_calls2(calls)
+    flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
-    assert flattened_calls == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("groq.chat.completions.create", 0),
     ]
 
@@ -244,10 +245,10 @@ def test_groq_async_streaming_chat_completion(
     asyncio.run(generate_reponse())
 
     calls = client.calls(filter=CallsFilter(trace_roots_only=True))
-    flattened_calls = flatten_calls2(calls)
+    flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
-    assert flattened_calls == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("groq.async.chat.completions.create", 0),
     ]
 
@@ -417,10 +418,10 @@ def test_groq_tool_call(
     response = run_conversation("What was the score of the Warriors game?")
 
     calls = client.calls(filter=CallsFilter(trace_roots_only=True))
-    flattened_calls = flatten_calls2(calls)
+    flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 4
 
-    assert flattened_calls == [
+    assert flattened_calls_to_names(flattened_calls) == [
         ("run_conversation", 0),
         ("groq.chat.completions.create", 1),
         ("get_game_score", 1),

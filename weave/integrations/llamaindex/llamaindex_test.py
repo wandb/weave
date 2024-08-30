@@ -5,7 +5,8 @@ import pytest
 import weave
 from weave.integrations.integration_utilities import (
     filter_body,
-    flatten_calls2,
+    flatten_calls,
+    flattened_calls_to_names,
 )
 from weave.trace.weave_client import Call
 from weave.trace_server.trace_server_interface import CallsFilter
@@ -23,7 +24,7 @@ def assert_calls_correct_for_quickstart(calls: list[Call]) -> None:
             llama_index.llm
                 openai.chat.completions.create
     """
-    flattened_calls = flatten_calls2(calls)
+    flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 9
 
     exp = [
@@ -37,7 +38,7 @@ def assert_calls_correct_for_quickstart(calls: list[Call]) -> None:
         ("llama_index.llm", 2),
         ("openai.chat.completions.create", 3),
     ]
-    assert flattened_calls == exp
+    assert flattened_calls_to_names(flattened_calls) == exp
 
 
 @pytest.fixture

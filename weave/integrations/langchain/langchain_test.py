@@ -6,7 +6,7 @@ import pytest
 import weave
 from weave.integrations.integration_utilities import (
     filter_body,
-    flatten_calls2,
+    flatten_calls,
     op_name_from_ref,
 )
 from weave.trace.weave_client import Call, WeaveClient
@@ -23,8 +23,8 @@ def assert_correct_calls_for_chain_invoke(
     calls: list[Call],
     prompt_template_name_part: str = "PromptTemplate",
 ) -> None:
-    flattened = flatten_calls2(calls)
-    assert len(calls) == 4
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 4
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
@@ -155,8 +155,8 @@ async def test_simple_chain_astream(
 
 
 def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
-    flattened = flatten_calls2(calls)
-    assert len(calls) == 8
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 8
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
@@ -230,8 +230,8 @@ async def test_simple_chain_abatch(
 
 
 def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
-    flattened = flatten_calls2(calls)
-    assert len(calls) == 9
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 9
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
@@ -284,8 +284,8 @@ def test_simple_chain_batch_inside_op(
 
 
 def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
-    flattened = flatten_calls2(calls)
-    assert len(calls) == 10
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 10
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
@@ -388,8 +388,8 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
 
 
 def assert_correct_calls_for_agent_with_tool(calls: list[Call]) -> None:
-    flattened = flatten_calls2(calls)
-    assert len(calls) == 10
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 10
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
@@ -505,8 +505,8 @@ def test_agent_run_with_tools(
 
 
 def assert_correct_calls_for_agent_with_function_call(calls: list[Call]) -> None:
-    flattened = flatten_calls2(calls)
-    assert len(calls) == 11
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 11
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
