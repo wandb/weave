@@ -194,7 +194,7 @@ def get_ranked_prices(
 
     # Clickhouse does not allow parameters in the row_number() over function
     # This is a temporary workaround, to check the validity of the project_id, to prevent SQL injection
-    validate_project_id(project_id)
+    is_project_id_sql_injection_safe(project_id)
 
     row_number_clause = f"""
         ROW_NUMBER() OVER (
@@ -421,7 +421,7 @@ def cost_query(
 # This is a temporary workaround for the issue of clickhouse not allowing the use of parametes in row_number() over function
 # Use a parameter when this is fixed
 # This checks that a project_id is a valid base64 encoded string, that follows the pattern "ProjectInternalId: <number>"
-def validate_project_id(project_id: str) -> None:
+def is_project_id_sql_injection_safe(project_id: str) -> None:
     try:
         # Attempt to decode the id from Base64
         decoded_str = base64.b64decode(project_id).decode("utf-8")
