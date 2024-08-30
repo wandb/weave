@@ -17,7 +17,6 @@ import {
   GridSortModel,
 } from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
-import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import _ from 'lodash';
