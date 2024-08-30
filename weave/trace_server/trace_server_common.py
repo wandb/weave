@@ -2,7 +2,7 @@ import copy
 import datetime
 import json
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union, cast
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -104,15 +104,15 @@ def make_derived_summary_fields(
         else:
             display_name = call_dict["op_name"]
 
-    summary = _load_json_maybe(call_dict.get(summary_key)) or {}
-    weave_summary = summary.get("weave", {})
+    summary = _load_json_or_dict(call_dict.get(summary_key))
+    weave_summary = summary.pop("weave", {})
     weave_summary["trace_name"] = display_name
     weave_summary["status"] = status
     if latency is not None:
         weave_summary["latency_ms"] = latency
     summary["weave"] = weave_summary
 
-    return tsi.SummaryMap(**summary)
+    return cast(tsi.SummaryMap, summary)
 
 
 def _make_datetime_from_any(
@@ -130,16 +130,18 @@ def _make_datetime_from_any(
         return dt
 
 
-def _load_json_maybe(value: Any) -> Optional[Dict[str, Any]]:
+def _load_json_or_dict(value: Optional[Any]) -> Dict[str, Any]:
     """
     Loads a JSON string or returns the value if it's not a string.
     Allows for database type agnostic parsing of JSON strings.
     """
+    if value is None:
+        return {}
     if isinstance(value, str):
         return json.loads(value)
-    elif isinstance(value, dict):
+    if isinstance(value, dict):
         return value
-    return None
+    return {}
 
 
 def get_nested_key(d: Dict[str, Any], col: str) -> Optional[Any]:
