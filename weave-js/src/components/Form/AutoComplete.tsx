@@ -1,6 +1,5 @@
-import React, {FC, SyntheticEvent, useState} from 'react';
+import React from 'react';
 import Autocomplete, {AutocompleteProps} from '@mui/material/Autocomplete';
-import TextField from '@mui/material/TextField';
 import {
   TEAL_500,
   TEAL_600,
@@ -11,8 +10,7 @@ import {
   MOON_500,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
-import {createTheme, styled, ThemeProvider} from '@mui/material/styles';
-import Box from '@mui/material/Box';
+import {createTheme, ThemeProvider} from '@mui/material/styles';
 
 const HEIGHTS = {
   small: '24px',
@@ -35,7 +33,7 @@ const PADDING = {
   variable: '2px 8px',
 };
 
-const getStyles = <Option,>(props: AdditionalProps) => {
+const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
   const customTheme = createTheme({
     components: {
@@ -69,11 +67,13 @@ const getStyles = <Option,>(props: AdditionalProps) => {
           option: {
             padding: '6px 10px',
             margin: '0 6px',
-            display: '-webkit-box',
+            display: '-webkit-box !important',
             WebkitBoxOrient: 'vertical',
             WebkitLineClamp: 5,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            // '-webkit-line-clamp': 5,
+            // '-webkit-box-orient': 'vertical',
             whiteSpace: 'normal',
             borderRadius: '4px',
             cursor: 'pointer',
@@ -96,8 +96,8 @@ const getStyles = <Option,>(props: AdditionalProps) => {
         styleOverrides: {
           root: {
             height: HEIGHTS[size],
-            padding: '4px 12px',
-            fontSize: '16px',
+            padding: PADDING[size],
+            fontSize: FONT_SIZES[size],
             color: MOON_800,
             '&& fieldset': {
               borderColor: MOON_250,
