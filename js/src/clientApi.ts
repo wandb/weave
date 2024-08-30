@@ -1,6 +1,6 @@
 import { Api } from './serverApi';
 import { v4 as uuidv4 } from 'uuid';
-import { uuidv7 } from 'uuidv7'; // Import uuid7
+import { uuidv7 } from 'uuidv7';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -47,11 +47,14 @@ function init(projectName: string): void {
         },
     });
     console.log(`Initializing project: ${projectName}`);
-    // Add any necessary initialization logic here
+
+    // Start auto-patching process
+    // patchOpenAI();
 }
 
 function op(fn: Function) {
     return async function (...args: any[]) {
+        console.log('op', fn.name, args);
         if (!globalProjectName) {
             throw new Error("Project not initialized. Call init() first.");
         }
@@ -130,13 +133,12 @@ function ref(uri: string) {
     console.log(`Ref: ${uri}`);
 }
 
-// Helper functions (you need to implement these)
 function generateTraceId(): string {
-    return uuidv4();
+    return uuidv4(); // Using v4 for traceId
 }
 
 function generateCallId(): string {
-    return uuidv7();
+    return uuidv7(); // Using v7 for callId
 }
 
 export { init, op, ref };
