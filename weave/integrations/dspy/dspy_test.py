@@ -2,8 +2,13 @@ import os
 
 import pytest
 
-from weave.integrations.integration_utilities import _get_call_output, _get_op_name
+from weave.integrations.integration_utilities import (
+    _get_call_output,
+    _get_op_name,
+    flatten_calls2,
+)
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @pytest.mark.skip_clickhouse_client
@@ -25,15 +30,15 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     prediction = gpt3_turbo("hello! this is a raw prompt to GPT-3.5")
     expected_prediction = "Hello! How can I assist you today?"
     assert prediction == [expected_prediction]
-    calls = list(client.calls())
-    assert len(calls) == 4
+    calls = client.calls(filter=CallsFilter(trace_roots_only=True))
+    flattened_calls = flatten_calls2(calls)
+    assert len(flattened_calls) == 4
 
-    calls_list = [_get_op_name(c.op_name) for c in calls]
-    assert calls_list == [
-        "dspy.OpenAI",
-        "dspy.OpenAI.request",
-        "dspy.OpenAI.basic_request",
-        "openai.chat.completions.create",
+    assert flattened_calls == [
+        ("dspy.OpenAI", 0),
+        ("dspy.OpenAI.request", 1),
+        ("dspy.OpenAI.basic_request", 2),
+        ("openai.chat.completions.create", 3),
     ]
 
     call_1 = calls[0]

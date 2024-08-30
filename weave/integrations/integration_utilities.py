@@ -1,8 +1,9 @@
 import hashlib
 import re
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 import weave
+from weave.trace.weave_client import Call
 from weave.trace_server import trace_server_interface as tsi
 
 MAX_RUN_NAME_LENGTH = 128
@@ -88,6 +89,14 @@ def _get_op_name(s: str) -> str:
     _, s = s.split("weave:///shawn/test-project/op/", 1)
     s, _ = s.split(":", 1)
     return s
+
+
+def flatten_calls2(calls: Iterable[Call], *, depth: int = 0) -> list:
+    res = []
+    for call in calls:
+        res.append(_get_op_name(call.op_name), depth)
+        res.extend(flatten_calls2(call.children(), depth=depth + 1))
+    return res
 
 
 def flatten_calls(
