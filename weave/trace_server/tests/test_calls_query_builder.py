@@ -282,7 +282,9 @@ def assert_sql(cq: CallsQuery, exp_query, exp_params):
 
 
 def test_query_light_column_with_costs() -> None:
-    cq = CallsQuery(project_id="project", include_costs=True)
+    cq = CallsQuery(
+        project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True
+    )
     cq.add_field("id")
     cq.add_field("started_at")
     cq.set_hardcoded_filter(
@@ -353,7 +355,7 @@ def test_query_light_column_with_costs() -> None:
                             CASE
                                 -- Order by pricing level then by effective_date
                                 -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_PARAM THEN 1
-                                WHEN llm_token_prices.pricing_level = 'project' AND llm_token_prices.pricing_level_id = 'project' THEN 2
+                                WHEN llm_token_prices.pricing_level = 'project' AND llm_token_prices.pricing_level_id = 'UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=' THEN 2
                                 WHEN llm_token_prices.pricing_level = 'default' AND llm_token_prices.pricing_level_id = 'default' THEN 3
                                 ELSE 4
                             END,
@@ -407,8 +409,8 @@ def test_query_light_column_with_costs() -> None:
         """,
         {
             "pb_0": ["a", "b"],
-            "pb_1": "project",
-            "pb_2": "project",
+            "pb_1": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
+            "pb_2": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
             "pb_3": 1,
         },
     )

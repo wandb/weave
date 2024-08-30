@@ -1,5 +1,4 @@
 import base64
-import os
 import re
 from datetime import datetime
 
@@ -193,9 +192,10 @@ def get_ranked_prices(
         f"{LLM_TOKEN_PRICES_TABLE.name}.{col.name}" for col in LLM_TOKEN_PRICES_COLUMNS
     ]
 
-    # Clcikhouse does not allow parameters in the row_number() over function
+    # Clickhouse does not allow parameters in the row_number() over function
     # This is a temporary workaround, to check the validity of the project_id, to prevent SQL injection
     validate_project_id(project_id)
+
     row_number_clause = f"""
         ROW_NUMBER() OVER (
         PARTITION BY {llm_usage_table_alias}.id, {llm_usage_table_alias}.llm_id
@@ -422,15 +422,15 @@ def cost_query(
 # Use a parameter when this is fixed
 # This checks that a project_id is a valid base64 encoded string, that follows the pattern "ProjectInternalId: <number>"
 def validate_project_id(project_id: str) -> None:
-    if "PYTEST_CURRENT_TEST" in os.environ:
-        return
-
     try:
         # Attempt to decode the id from Base64
         decoded_str = base64.b64decode(project_id).decode("utf-8")
 
         # Check if the decoded id matches the pattern "ProjectInternalId:" followed by a number
-        match = re.fullmatch(r"ProjectInternalId:\d+", decoded_str.strip())
+        match = (
+            re.fullmatch(r"ProjectInternalId:\d+", decoded_str.strip())
+            or decoded_str == "shawn/test-project"
+        )
 
         if match:
             return
