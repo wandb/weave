@@ -1,7 +1,7 @@
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useRef, MutableRefObject} from 'react';
+import React, {MutableRefObject, useCallback, useEffect, useRef} from 'react';
 
 // Width of the sidebar in pixels
 export const SIDEBAR_WIDTH = 57;
@@ -28,7 +28,9 @@ const setDrawerSize = (newSize: number, min: number, max: number) => {
   return Math.min(Math.max(newSize, min), max);
 };
 
-export const useDrawerResize = (drawerRef: MutableRefObject<HTMLElement | null>) => {
+export const useDrawerResize = (
+  drawerRef: MutableRefObject<HTMLElement | null>
+) => {
   const windowSize = useWindowSize();
 
   const [width, setWidth] = useLocalStorage(
@@ -58,8 +60,6 @@ export const useDrawerResize = (drawerRef: MutableRefObject<HTMLElement | null>)
       setWidth(currentWidthRef.current);
     }
   }, [setWidth]);
-
-
 
   const handleMousemove = useCallback(
     (e: MouseEvent) => {

@@ -26,8 +26,8 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useState,
   useRef,
+  useState,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
@@ -321,7 +321,9 @@ const MainPeekingLayout: FC = () => {
     [handleDragEnd, handleMousedown]
   );
 
-  useMousetrap('esc', useClosePeek());
+  const closePeek = useClosePeek();
+
+  useMousetrap('esc', closePeek);
 
   return (
     <WFDataModelAutoProvider
@@ -351,7 +353,7 @@ const MainPeekingLayout: FC = () => {
           variant="persistent"
           anchor="right"
           open={isDrawerOpen}
-          onClose={useClosePeek()}
+          onClose={closePeek}
           PaperProps={{
             ref: drawerRef,
             style: {
@@ -401,7 +403,7 @@ const MainPeekingLayout: FC = () => {
                         icon="close"
                         variant="ghost"
                         className="ml-4"
-                        onClick={useClosePeek()}
+                        onClick={closePeek}
                       />
                     </Box>
                   ),
