@@ -27,6 +27,8 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
+  useState,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
@@ -97,7 +99,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
-import {SIDEBAR_WIDTH, useDrawerResize} from './useDrawerResize';
+import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -297,8 +299,23 @@ const MainPeekingLayout: FC = () => {
   const isDrawerOpen = peekLocation != null;
   const windowSize = useWindowSize();
 
-  const {handleMousedown, drawerWidthPct} = useDrawerResize();
+  const {handleMousedown, drawerWidthPx} = useDrawerResize();
   const closePeek = useClosePeek();
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    setIsDragging(true);
+    handleMousedown(e);
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('mouseup', handleDragEnd);
+  }, [handleMousedown]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+    document.body.style.cursor = '';
+    window.removeEventListener('mouseup', handleDragEnd);
+  }, []);
 
   useMousetrap('esc', closePeek);
 
@@ -321,16 +338,7 @@ const MainPeekingLayout: FC = () => {
             flex: '1 1 40%',
             overflow: 'hidden',
             display: 'flex',
-            // This transition is from the mui drawer component, to keep the main content animation in similar
-            transition: !isDrawerOpen
-              ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
-              : 'none',
-            marginRight: !isDrawerOpen
-              ? 0
-              : // subtract the sidebar width
-                `${
-                  (drawerWidthPct * (windowSize.width - SIDEBAR_WIDTH)) / 100
-                }px`,
+            marginRight: !isDrawerOpen ? 0 : `${drawerWidthPx}px`,
           }}>
           <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
         </Box>
@@ -345,26 +353,27 @@ const MainPeekingLayout: FC = () => {
               overflow: 'hidden',
               display: isDrawerOpen ? 'flex' : 'none',
               zIndex: 1,
-              width: `${drawerWidthPct}%`,
+              width: isDrawerOpen ? `${drawerWidthPx}px` : 0,
               height: '100%',
-              boxShadow: '0px 0px 40px 0px rgba(0, 0, 0, 0.16)',
-              borderLeft: 0,
+              borderLeft: '1px solid #e0e0e0',
               position: 'absolute',
+              pointerEvents: isDragging ? 'none' : 'auto',
             },
           }}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
+            keepMounted: true,
           }}>
           <div
             id="dragger"
-            onMouseDown={handleMousedown}
+            onMouseDown={handleDragStart}
             style={{
               position: 'absolute',
-              inset: '0 auto 0 0',
-              zIndex: 2,
-              backgroundColor: 'transparent',
-              cursor: 'col-resize',
+              top: 0,
+              bottom: 0,
+              left: 0,
               width: '5px',
+              cursor: 'col-resize',
+              zIndex: 2,
             }}
           />
           {peekLocation && (
