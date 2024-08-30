@@ -1,6 +1,5 @@
 import { init, op, createPatchedOpenAI } from 'weave';
 
-init('shawn/weave-quickstart');
 const openai = createPatchedOpenAI();
 
 async function extractDinos(input) {
@@ -13,6 +12,7 @@ async function extractDinos(input) {
 const extractDinosOp = op(extractDinos);
 
 async function main() {
+    await init('weave-quickstart');
     const result = await extractDinosOp("I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below.");
     console.log(result);
 }
