@@ -16,8 +16,8 @@ import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../../../filters/common';
-import {getValueType} from '../../../CallPage/traverse';
-import {ValueView} from '../../../CallPage/ValueView';
+import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.types';
+import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
@@ -941,25 +941,40 @@ const removePrefix = (key: string, prefix: string) => {
 };
 
 const ICValueView: React.FC<{value: any}> = ({value}) => {
+  // We should merge this with ValueView.tsx. Unfortunately,
+  // the styling preferences and sizing differ enough to make
+  // this more challenging than it should be.
+
+  let text = '';
+  if (value == null) {
+    return <NotApplicable />;
+  } else if (typeof value === 'object') {
+    if (isCustomWeaveTypePayload(value)) {
+      return <CustomWeaveTypeDispatcher data={value} />;
+    }
+    text = JSON.stringify(value || {}, null, 2);
+  } else if (typeof value === 'string' && isWeaveRef(value)) {
+    return <SmallRef objRef={parseRef(value)} />;
+  } else {
+    text = value.toString();
+  }
+
+  text = trimWhitespace(text);
+
   return (
-    <ValueView
-      data={{value, valueType: getValueType(value), isLeaf: true}}
-      isExpanded={false}
-      stringifySpace={2}
-      defaultStringStyle={{
+    <pre
+      style={{
         whiteSpace: 'pre-wrap',
         textAlign: 'left',
         wordBreak: 'break-all',
         padding: 0,
         margin: 0,
-        fontFamily: 'monospace',
-        fontSize: '0.9em', // Reduced font size to match non-monospace text
-        display: 'block',
-        overflow: 'auto',
-      }}
-    />
+      }}>
+      {text}
+    </pre>
   );
 };
+
 const trimWhitespace = (str: string) => {
   // Trim leading and trailing whitespace
   return str.replace(/^\s+|\s+$/g, '');
