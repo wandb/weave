@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {NotApplicable} from '../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
@@ -24,9 +25,16 @@ type ValueData = Record<string, any>;
 type ValueViewProps = {
   data: ValueData;
   isExpanded: boolean;
+  stringifySpace?: number;
+  defaultStringStyle?: React.CSSProperties;
 };
 
-export const ValueView = ({data, isExpanded}: ValueViewProps) => {
+export const ValueView = ({
+  data,
+  isExpanded,
+  defaultStringStyle,
+      stringifySpace,
+}: ValueViewProps) => {
   const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
     if (data.valueType === 'object' && '_ref' in data.value) {
@@ -39,7 +47,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   }
 
   if (data.value === undefined) {
-    return null;
+    return <NotApplicable />;
   }
   if (data.value === null) {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
@@ -59,7 +67,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     if (data.value.startsWith('data:image/')) {
       return <ValueViewImage value={data.value} />;
     }
-    return <ValueViewString value={data.value} isExpanded={isExpanded} />;
+    return <ValueViewString value={data.value} isExpanded={isExpanded}/>;
   }
 
   if (data.valueType === 'number') {
@@ -76,7 +84,8 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   if (data.valueType === 'array') {
     // Compared to toString this keeps the square brackets.
     // This is particularly helpful for empty lists, for which toString would return an empty string.
-    return <div>{JSON.stringify(data.value)}</div>;
+
+    return <div style={defaultStringStyle}>{JSON.stringify(data.value, null, stringifySpace)}</div>;
   }
 
   if (data.valueType === 'object') {
@@ -106,7 +115,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     }
   }
 
-  return <div>{data.value.toString()}</div>;
+  return <div style={defaultStringStyle}>{JSON.stringify(data.value, null, stringifySpace)}</div>;
 };
 
 const valueIsExpandedRef = (data: ValueData) => {

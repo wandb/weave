@@ -16,6 +16,8 @@ import {CellValue} from '../../../../../Browse2/CellValue';
 import {NotApplicable} from '../../../../../Browse2/NotApplicable';
 import {parseRefMaybe, SmallRef} from '../../../../../Browse2/SmallRef';
 import {isWeaveRef} from '../../../../filters/common';
+import {getValueType} from '../../../CallPage/traverse';
+import {ValueView} from '../../../CallPage/ValueView';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
@@ -939,30 +941,23 @@ const removePrefix = (key: string, prefix: string) => {
 };
 
 const ICValueView: React.FC<{value: any}> = ({value}) => {
-  let text = '';
-  if (value == null) {
-    return <NotApplicable />;
-  } else if (typeof value === 'object') {
-    text = JSON.stringify(value || {}, null, 2);
-  } else if (typeof value === 'string' && isWeaveRef(value)) {
-    return <SmallRef objRef={parseRef(value)} />;
-  } else {
-    text = value.toString();
-  }
-
-  text = trimWhitespace(text);
-
   return (
-    <pre
-      style={{
+    <ValueView
+      data={{value, valueType: getValueType(value), isLeaf: true}}
+      isExpanded={false}
+      stringifySpace={2}
+      defaultStringStyle={{
         whiteSpace: 'pre-wrap',
         textAlign: 'left',
         wordBreak: 'break-all',
         padding: 0,
         margin: 0,
-      }}>
-      {text}
-    </pre>
+        fontFamily: 'monospace',
+        fontSize: '0.9em', // Reduced font size to match non-monospace text
+        display: 'block',
+        overflow: 'auto',
+      }}
+    />
   );
 };
 const trimWhitespace = (str: string) => {

@@ -14,6 +14,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {useEvaluationsFilter} from '../CallsPage/evaluationsFilter';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
@@ -239,7 +240,10 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
           height: 'calc(100vh - 114px)',
           overflow: 'auto',
         }}>
-        <ExampleCompareSection state={state} />
+        <CustomWeaveTypeProjectContext.Provider
+          value={{entity: state.data.entity, project: state.data.project}}>
+          <ExampleCompareSection state={state} />
+        </CustomWeaveTypeProjectContext.Provider>
       </Box>
     </VerticalBox>
   );
