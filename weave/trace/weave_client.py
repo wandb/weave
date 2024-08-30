@@ -23,11 +23,10 @@ from weave.trace.object_record import (
 )
 from weave.trace.op import Op, maybe_unbind_method
 from weave.trace.op import op as op_deco
-from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_uri
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.table import Table
-from weave.trace.util import _get_func_name_from_maybe_ref
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
@@ -153,7 +152,11 @@ class Call:
 
     @property
     def func_name(self) -> str:
-        return _get_func_name_from_maybe_ref(self.op_name)
+        if self.op_name.startswith("weave:///"):
+            ref = parse_uri(self.op_name)
+            return ref.name
+
+        return self.op_name
 
     @property
     def feedback(self) -> RefFeedbackQuery:
