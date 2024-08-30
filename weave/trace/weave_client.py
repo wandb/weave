@@ -152,7 +152,7 @@ class Call:
     _feedback: Optional[RefFeedbackQuery] = None
 
     @property
-    def func_name(self):
+    def func_name(self) -> str:
         return _get_func_name_from_maybe_ref(self.op_name)
 
     @property
