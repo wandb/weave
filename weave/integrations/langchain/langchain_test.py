@@ -6,25 +6,25 @@ import pytest
 import weave
 from weave.integrations.integration_utilities import (
     filter_body,
-    flatten_calls,
+    flatten_calls2,
     op_name_from_ref,
 )
-from weave.trace.weave_client import WeaveClient
+from weave.trace.weave_client import Call, WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 
-def assert_ends_and_errors(calls: List[tsi.CallSchema]) -> None:
+def assert_ends_and_errors(calls: list[Call]) -> None:
     for call, depth in calls:
         assert call.ended_at is not None
         assert call.exception is None
 
 
 def assert_correct_calls_for_chain_invoke(
-    calls: list[tsi.CallSchema], prompt_template_name_part: str = "PromptTemplate"
+    calls: list[Call],
+    prompt_template_name_part: str = "PromptTemplate",
 ) -> None:
+    flattened = flatten_calls2(calls)
     assert len(calls) == 4
-
-    flattened = flatten_calls(calls)
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
@@ -66,8 +66,8 @@ def test_simple_chain_invoke(
     llm_chain = prompt | llm
     _ = llm_chain.invoke({"number": 2})
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_invoke(res.calls, exp_name)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_chain_invoke(calls, exp_name)
 
 
 @pytest.mark.skip_clickhouse_client
@@ -94,8 +94,8 @@ async def test_simple_chain_ainvoke(
     llm_chain = prompt | llm
     _ = await llm_chain.ainvoke({"number": 2})
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_invoke(res.calls)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_chain_invoke(calls)
 
 
 @pytest.mark.skip_clickhouse_client
@@ -121,8 +121,8 @@ def test_simple_chain_stream(
     for _ in llm_chain.stream({"number": 2}):
         pass
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_invoke(res.calls)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_chain_invoke(calls)
 
 
 @pytest.mark.skip_clickhouse_client
@@ -150,13 +150,13 @@ async def test_simple_chain_astream(
     async for _ in llm_chain.astream({"number": 2}):
         pass
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_invoke(res.calls)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_chain_invoke(calls)
 
 
-def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
+def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
+    flattened = flatten_calls2(calls)
     assert len(calls) == 8
-    flattened = flatten_calls(calls)
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
@@ -197,8 +197,8 @@ def test_simple_chain_batch(
     llm_chain = prompt | llm
     _ = llm_chain.batch([{"number": 2}, {"number": 3}])
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_batch(res.calls)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_chain_batch(calls)
 
 
 @pytest.mark.skip_clickhouse_client
@@ -225,13 +225,13 @@ async def test_simple_chain_abatch(
     llm_chain = prompt | llm
     _ = await llm_chain.abatch([{"number": 2}, {"number": 3}])
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_batch(res.calls)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_chain_batch(calls)
 
 
-def assert_correct_calls_for_chain_batch_from_op(calls: list[tsi.CallSchema]) -> None:
+def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
+    flattened = flatten_calls2(calls)
     assert len(calls) == 9
-    flattened = flatten_calls(calls)
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
@@ -279,13 +279,13 @@ def test_simple_chain_batch_inside_op(
 
     run_batch([{"number": 2}, {"number": 3}])
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_batch_from_op(res.calls)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_chain_batch_from_op(calls)
 
 
-def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
+def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
+    flattened = flatten_calls2(calls)
     assert len(calls) == 10
-    flattened = flatten_calls(calls)
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
@@ -383,14 +383,13 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
         input="What is the essay about?",
     )
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_rag_chain(res.calls)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_rag_chain(calls)
 
 
-def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> None:
+def assert_correct_calls_for_agent_with_tool(calls: list[Call]) -> None:
+    flattened = flatten_calls2(calls)
     assert len(calls) == 10
-
-    flattened = flatten_calls(calls)
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
@@ -501,16 +500,13 @@ def test_agent_run_with_tools(
     _ = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_agent_with_tool(res.calls)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_agent_with_tool(calls)
 
 
-def assert_correct_calls_for_agent_with_function_call(
-    calls: list[tsi.CallSchema],
-) -> None:
+def assert_correct_calls_for_agent_with_function_call(calls: list[Call]) -> None:
+    flattened = flatten_calls2(calls)
     assert len(calls) == 11
-
-    flattened = flatten_calls(calls)
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
@@ -622,5 +618,5 @@ def test_agent_run_with_function_call(
     _ = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
     )
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_agent_with_function_call(res.calls)
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert_correct_calls_for_agent_with_function_call(calls)
