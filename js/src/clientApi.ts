@@ -118,6 +118,11 @@ function op(fn: Function, opName?: string) {
 
         activeCallStack.push({ callId, traceId });
 
+        // Add this new logging for top-level operations
+        if (activeCallStack.length === 1) {
+            console.log(`🍩 https://wandb.ai/${globalProjectName}/r/call/${callId}`);
+        }
+
         const startReq = {
             start: {
                 project_id: globalProjectName,
@@ -135,7 +140,6 @@ function op(fn: Function, opName?: string) {
         scheduleBatchProcessing();
 
         try {
-            console.log(`Operation: ${actualOpName}, Call ID: ${callId}, Trace ID: ${traceId}, Parent ID: ${parentId || 'None'}`);
             const result = await Promise.resolve(fn(...args));
 
             const endTime = new Date().toISOString();
