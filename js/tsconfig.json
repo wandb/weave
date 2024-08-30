@@ -5,7 +5,12 @@
     "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "paths": {
+      "graphql-request": [
+        "./node_modules/graphql-request/build/entrypoints/main.d.ts"
+      ]
+    }
   },
   "include": [
     "src/**/*.ts"

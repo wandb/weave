@@ -4,8 +4,10 @@ import { uuidv7 } from 'uuidv7';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { WandbApi } from './wandbApi';
 
 let serverApi: Api<any>;
+let wandbApi: WandbApi;
 let globalProjectName: string;
 let activeCallStack: { callId: string; traceId: string }[] = [];
 
@@ -35,27 +37,44 @@ function readApiKeyFromNetrc(host: string): string | undefined {
     return undefined;
 }
 
-function init(projectName: string): void {
-    globalProjectName = projectName;
-    const host = 'https://trace.wandb.ai'
+async function init(projectName: string): Promise<void> {
+    const host = 'https://api.wandb.ai';
     const apiKey = readApiKeyFromNetrc('api.wandb.ai');
+
+    if (!apiKey) {
+        throw new Error("API key not found in .netrc file");
+    }
+
     const headers: Record<string, string> = {
         'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
+        'Authorization': `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`
     };
-    console.log('apiKey', apiKey)
-    if (apiKey) {
-        headers['Authorization'] = `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`;
-    }
-    serverApi = new Api({
-        baseUrl: host,
-        baseApiParams: {
-            headers: headers,
-        },
-    });
-    console.log(`Initializing project: ${projectName}`);
 
-    // Start the batch processing
-    scheduleBatchProcessing();
+    try {
+        // Initialize WandbApi
+        wandbApi = new WandbApi(host, apiKey);
+
+        // Get default entity name
+        const defaultEntityName = await wandbApi.defaultEntityName();
+
+        // Set global project name
+        globalProjectName = `${defaultEntityName}/${projectName}`;
+
+        serverApi = new Api({
+            baseUrl: 'https://trace.wandb.ai',
+            baseApiParams: {
+                headers: headers,
+            },
+        });
+
+        console.log(`Initializing project: ${globalProjectName}`);
+
+        // Start the batch processing
+        scheduleBatchProcessing();
+    } catch (error) {
+        console.error("Error during initialization:", error);
+        throw error;
+    }
 }
 
 function scheduleBatchProcessing() {

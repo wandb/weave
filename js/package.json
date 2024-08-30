@@ -16,6 +16,8 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@types/uuid": "^10.0.0",
+    "graphql": "^16.9.0",
+    "graphql-request": "^7.1.0",
     "openai": "^4.57.0",
     "uuid": "^10.0.0",
     "uuidv7": "^1.0.1"
