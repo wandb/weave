@@ -14,6 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor
+from weave.tests.trace.util import DatetimeMatcher
 from weave.trace import weave_client
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
@@ -26,6 +27,7 @@ from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
+from weave.trace_server.validation import SHOULD_ENFORCE_OBJ_ID_CHARSET
 
 pytestmark = pytest.mark.trace
 
@@ -59,7 +61,7 @@ def test_simple_op(client):
     # assert client._ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     fetched_call = calls[0]
     digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
@@ -86,6 +88,9 @@ def test_simple_op(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=DatetimeMatcher(),
+        ended_at=DatetimeMatcher(),
+        deleted_at=None,
     )
 
 
@@ -221,7 +226,7 @@ def test_graph_call_ordering(client):
     for i in range(10):
         my_op(i)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 10
 
     # We want to preserve insert order
@@ -2592,8 +2597,10 @@ def test_object_with_disallowed_keys(client):
             )
         )
     )
-    with pytest.raises(Exception):
-        client.server.obj_create(create_req)
+
+    if SHOULD_ENFORCE_OBJ_ID_CHARSET:
+        with pytest.raises(Exception):
+            client.server.obj_create(create_req)
 
 
 CHAR_LIMIT = 128
@@ -2694,3 +2701,61 @@ def test_objects_and_keys_with_special_characters(client):
     assert found_ref == exp_op_ref
     gotten_fn = weave.ref(found_ref).get()
     assert gotten_fn(obj) == "hello world"
+
+
+def test_calls_stream_feedback(client):
+    @weave.op
+    def test_call(x):
+        return "ello chap"
+
+    test_call(1)
+    test_call(2)
+    test_call(3)
+
+    calls = list(test_call.calls())
+    assert len(calls) == 3
+
+    # add feedback to the first call
+    calls[0].feedback.add("note", {"note": "this is a note on call1"})
+    calls[0].feedback.add_reaction("👍")
+    calls[0].feedback.add_reaction("👍")
+    calls[0].feedback.add_reaction("👎")
+
+    calls[1].feedback.add_reaction("👍")
+
+    # now get calls from the server, with the feedback expanded
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            include_feedback=True,
+        )
+    )
+    calls = list(res)
+
+    assert len(calls) == 3
+    assert len(calls[0].summary["weave"]["feedback"]) == 4
+    assert len(calls[1].summary["weave"]["feedback"]) == 1
+    assert not calls[2].summary.get("weave", {}).get("feedback")
+
+    call1_payloads = [f["payload"] for f in calls[0].summary["weave"]["feedback"]]
+    assert {"note": "this is a note on call1"} in call1_payloads
+    assert {
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+        "emoji": "👍",
+    } in call1_payloads
+    assert {
+        "alias": ":thumbs_down:",
+        "detoned": "👎",
+        "detoned_alias": ":thumbs_down:",
+        "emoji": "👎",
+    } in call1_payloads
+
+    call2_payloads = [f["payload"] for f in calls[1].summary["weave"]["feedback"]]
+    assert {
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+        "emoji": "👍",
+    } in call2_payloads
