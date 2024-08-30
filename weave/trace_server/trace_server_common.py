@@ -77,34 +77,29 @@ def make_derived_summary_fields(
     Summary is controlled by the user, but the `weave` summary key is
     used to store derived fields, adhering to the tsi.SummaryMap type.
     """
-    # Parse the started_at and ended_at fields, in clickhouse they are datetime objects
-    # in sqlite they are strings
+    weave_summary = summary.pop("weave", {})
+
     status = tsi.TraceStatus.SUCCESS
     if exception:
         status = tsi.TraceStatus.ERROR
     elif ended_at is None:
         status = tsi.TraceStatus.RUNNING
+    weave_summary["status"] = status
 
-    latency = None
     if ended_at and started_at:
-        latency = (ended_at - started_at).microseconds
+        weave_summary["latency_us"] = (ended_at - started_at).microseconds
 
-    trace_name = display_name
-    if not trace_name:
+    if display_name:
+        weave_summary["display_name"] = display_name
+    else:
         if ri.string_will_be_interpreted_as_ref(op_name):
             op = ri.parse_internal_uri(op_name)
             if isinstance(op, ri.InternalObjectRef):
-                trace_name = op.name
+                weave_summary["trace_name"] = op.name
         else:
-            trace_name = op_name
+            weave_summary["trace_name"] = op_name
 
-    weave_summary = summary.pop("weave", {})
-    weave_summary["trace_name"] = display_name
-    weave_summary["status"] = status
-    if latency is not None:
-        weave_summary["latency_ms"] = latency
     summary["weave"] = weave_summary
-
     return cast(tsi.SummaryMap, summary)
 
 
