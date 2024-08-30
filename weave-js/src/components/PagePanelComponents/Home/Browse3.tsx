@@ -27,7 +27,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
@@ -297,25 +296,30 @@ const MainPeekingLayout: FC = () => {
   );
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
   const isDrawerOpen = peekLocation != null;
-  const windowSize = useWindowSize();
 
   const {handleMousedown, drawerWidthPx} = useDrawerResize();
   const closePeek = useClosePeek();
 
+  // State to track whether the user is currently dragging the drawer resize handle
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    setIsDragging(true);
-    handleMousedown(e);
-    document.body.style.cursor = 'col-resize';
-    window.addEventListener('mouseup', handleDragEnd);
-  }, [handleMousedown]);
-
+  // Callback function to handle the end of dragging
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
     document.body.style.cursor = '';
     window.removeEventListener('mouseup', handleDragEnd);
   }, []);
+
+  // Callback function to handle the start of dragging
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      setIsDragging(true);
+      handleMousedown(e);
+      document.body.style.cursor = 'col-resize';
+      window.addEventListener('mouseup', handleDragEnd);
+    },
+    [handleDragEnd, handleMousedown]
+  );
 
   useMousetrap('esc', closePeek);
 
