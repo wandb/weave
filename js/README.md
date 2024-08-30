@@ -120,3 +120,13 @@ We welcome contributions! Please read our [contributing guidelines](CONTRIBUTING
 ## License
 
 This project is licensed under the Apaache2 License - see the [LICENSE](../LICENSE) file for details.
+
+
+### Roadmap / TODO
+
+- [ ] Include system information in call attributes including package version.
+- [ ] Decide how to handle args in js, since they're not named
+- [ ] Op versioning / code capture
+- [ ] Objects / Datasets / Models / Evaluations
+- [ ] Ref tracking
+- [ ] More integrations
