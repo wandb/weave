@@ -113,9 +113,13 @@ openai.chat.completions.create({
 
 Weave reads API keys from the `.netrc` file located in your home directory. Ensure you have the required API keys configured for seamless integration and tracking.
 
-## Contributing
+```
+machine api.wandb.ai
+  login user
+  password <wandb-api-key>
+```
 
-We welcome contributions! Please read our [contributing guidelines](CONTRIBUTING.md) before making a pull request.
+Get your wandb API key from [here](https://wandb.ai/authorize).
 
 ## License
 
