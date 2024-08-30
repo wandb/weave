@@ -80,6 +80,7 @@ from .feedback import (
 from .orm import ParamBuilder, Row
 from .trace_server_common import (
     LRUCache,
+    empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
     make_feedback_query_req,
@@ -1512,50 +1513,66 @@ def _raw_call_dict_to_ch_call(
     return SelectableCHCallSchema.model_validate(call)
 
 
-def _empty_str_to_none(val: Optional[str]) -> Optional[str]:
-    return val if val != "" else None
-
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
+    started_at = _ensure_datetimes_have_tz(ch_call.started_at)
+    ended_at = _ensure_datetimes_have_tz(ch_call.ended_at)
+    summary = _nullable_any_dump_to_any(ch_call.summary_dump)
+    display_name = empty_str_to_none(ch_call.display_name)
     return tsi.CallSchema(
         project_id=ch_call.project_id,
         id=ch_call.id,
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
         op_name=ch_call.op_name,
-        started_at=_ensure_datetimes_have_tz(ch_call.started_at),
-        ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
+        started_at=started_at,
+        ended_at=ended_at,
         attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=make_derived_summary_fields(
-            call_dict=ch_call.model_dump(), summary_key="summary_dump"
+            summary=summary or {},
+            op_name=ch_call.op_name,
+            started_at=started_at,
+            ended_at=ended_at,
+            exception=ch_call.exception,
+            display_name=display_name,
         ),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
-        display_name=_empty_str_to_none(ch_call.display_name),
+        display_name=display_name,
     )
 
 
 # Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: Dict) -> Dict:
+    summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
+    started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
+    ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
+    display_name = empty_str_to_none(ch_call_dict.get("display_name"))
     return dict(
         project_id=ch_call_dict.get("project_id"),
         id=ch_call_dict.get("id"),
         trace_id=ch_call_dict.get("trace_id"),
         parent_id=ch_call_dict.get("parent_id"),
         op_name=ch_call_dict.get("op_name"),
-        started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
-        ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
+        started_at=started_at,
+        ended_at=ended_at,
         attributes=_dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
         inputs=_dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=make_derived_summary_fields(ch_call_dict, "summary_dump"),
+        summary=make_derived_summary_fields(
+            summary=summary or {},
+            op_name=ch_call_dict.get("op_name", ""),
+            started_at=started_at,
+            ended_at=ended_at,
+            exception=ch_call_dict.get("exception"),
+            display_name=display_name,
+        ),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
-        display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
+        display_name=display_name,
     )
 
 

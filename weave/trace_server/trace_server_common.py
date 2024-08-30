@@ -1,8 +1,7 @@
 import copy
 import datetime
-import json
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, Literal, Optional, Union, cast
+from typing import Any, Dict, Optional, cast
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -65,46 +64,40 @@ def hydrate_calls_with_feedback(
 
 
 def make_derived_summary_fields(
-    call_dict: Dict[str, Any], summary_key: Literal["summary", "summary_dump"]
+    summary: Dict[str, Any],
+    op_name: str,
+    started_at: Optional[datetime.datetime] = None,
+    ended_at: Optional[datetime.datetime] = None,
+    exception: Optional[str] = None,
+    display_name: Optional[str] = None,
 ) -> tsi.SummaryMap:
     """
     Make derived summary fields for a call.
 
     Summary is controlled by the user, but the `weave` summary key is
     used to store derived fields, adhering to the tsi.SummaryMap type.
-
-    Args:
-        call_dict: The call dict.
-        summary_key: The key in the call dict that contains the summary. In
-            the clickhouse server this is "summary_dump", but in sqlite
-            it's "summary".
-
-    Returns:
-        The derived summary fields.
     """
-    started_at_dt = _make_datetime_from_any(call_dict["started_at"])
-    ended_at_dt = _make_datetime_from_any(call_dict.get("ended_at"))
-
+    # Parse the started_at and ended_at fields, in clickhouse they are datetime objects
+    # in sqlite they are strings
     status = tsi.TraceStatus.SUCCESS
-    if call_dict.get("exception"):
+    if exception:
         status = tsi.TraceStatus.ERROR
-    elif ended_at_dt is None:
+    elif ended_at is None:
         status = tsi.TraceStatus.RUNNING
 
     latency = None
-    if ended_at_dt and started_at_dt:
-        latency = (ended_at_dt - started_at_dt).microseconds
+    if ended_at and started_at:
+        latency = (ended_at - started_at).microseconds
 
-    display_name = call_dict.get("display_name")
-    if not display_name:
-        if ri.string_will_be_interpreted_as_ref(call_dict["op_name"]):
-            op = ri.parse_internal_uri(call_dict["op_name"])
+    trace_name = display_name
+    if not trace_name:
+        if ri.string_will_be_interpreted_as_ref(op_name):
+            op = ri.parse_internal_uri(op_name)
             if isinstance(op, ri.InternalObjectRef):
-                display_name = op.name
+                trace_name = op.name
         else:
-            display_name = call_dict["op_name"]
+            trace_name = op_name
 
-    summary = _load_json_or_dict(call_dict.get(summary_key))
     weave_summary = summary.pop("weave", {})
     weave_summary["trace_name"] = display_name
     weave_summary["status"] = status
@@ -115,33 +108,8 @@ def make_derived_summary_fields(
     return cast(tsi.SummaryMap, summary)
 
 
-def _make_datetime_from_any(
-    dt: Optional[Union[str, datetime.datetime]],
-) -> Optional[datetime.datetime]:
-    """
-    Flexible datetime parser, accepts None, str and datetime.
-    This allows database type agnostic parsing of dates.
-    """
-    if dt is None:
-        return None
-    if isinstance(dt, str):
-        return datetime.datetime.fromisoformat(dt)
-    elif isinstance(dt, datetime.datetime):
-        return dt
-
-
-def _load_json_or_dict(value: Optional[Any]) -> Dict[str, Any]:
-    """
-    Loads a JSON string or returns the value if it's not a string.
-    Allows for database type agnostic parsing of JSON strings.
-    """
-    if value is None:
-        return {}
-    if isinstance(value, str):
-        return json.loads(value)
-    if isinstance(value, dict):
-        return value
-    return {}
+def empty_str_to_none(val: Optional[str]) -> Optional[str]:
+    return val if val != "" else None
 
 
 def get_nested_key(d: Dict[str, Any], col: str) -> Optional[Any]:

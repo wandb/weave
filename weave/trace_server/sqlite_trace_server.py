@@ -21,6 +21,7 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.orm import Row, quote_json_path
 from weave.trace_server.trace_server_common import (
+    empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
     make_derived_summary_fields,
@@ -460,11 +461,20 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         )[json_field]
                     call_dict[json_field] = data
             # convert empty string display_names to None
-            if "display_name" in call_dict and call_dict["display_name"] == "":
-                call_dict["display_name"] = None
+            if "display_name" in call_dict:
+                call_dict["display_name"] = empty_str_to_none(call_dict["display_name"])
             # fill in derived summary fields
             call_dict["summary"] = make_derived_summary_fields(
-                call_dict=call_dict, summary_key="summary"
+                summary=call_dict.get("summary") or {},
+                op_name=call_dict["op_name"],
+                started_at=datetime.datetime.fromisoformat(call_dict["started_at"]),
+                ended_at=(
+                    datetime.datetime.fromisoformat(call_dict["ended_at"])
+                    if call_dict.get("ended_at")
+                    else None
+                ),
+                exception=call_dict.get("exception"),
+                display_name=call_dict.get("display_name"),
             )
             # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
