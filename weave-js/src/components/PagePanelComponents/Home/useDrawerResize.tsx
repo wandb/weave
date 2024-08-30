@@ -5,6 +5,11 @@ import React, {useCallback, useEffect, useRef} from 'react';
 
 export const SIDEBAR_WIDTH = 57;
 const MIN_MAIN_CONTENT_WIDTH = 200;
+const DEFAULT_DRAWER_SIZE = 800;
+const MIN_DRAWER_WIDTH = 500;
+const MOUSE_OFFSET = 5;
+const RESIZE_DEBOUNCE_TIME = 1000;
+const LOCAL_STORAGE_KEY = 'weaveflow-drawer-width-pixels';
 
 const setDrawerSize = (newSize: number, min: number, max: number) => {
   return Math.min(Math.max(newSize, min), max);
@@ -12,11 +17,10 @@ const setDrawerSize = (newSize: number, min: number, max: number) => {
 
 export const useDrawerResize = () => {
   const windowSize = useWindowSize();
-  const defaultSize = 800; // Default size in pixels
 
   const [width, setWidth] = useLocalStorage(
-    'weaveflow-drawer-width-pixels',
-    defaultSize
+    LOCAL_STORAGE_KEY,
+    DEFAULT_DRAWER_SIZE
   );
 
   const currentWidthRef = useRef(width);
@@ -39,14 +43,12 @@ export const useDrawerResize = () => {
       if (!isResizingRef.current) return;
 
       const availableWidth = windowSize.width - SIDEBAR_WIDTH;
-      const minWidthPx = Math.min(500, availableWidth / 2);
+      const minWidthPx = Math.min(MIN_DRAWER_WIDTH, availableWidth / 2);
       const maxWidth = availableWidth - MIN_MAIN_CONTENT_WIDTH;
 
-      // Adjust the calculation to account for the offset
-      const newWidth = availableWidth - e.clientX + SIDEBAR_WIDTH + 5; // Add 2 pixels to align with the mouse
+      const newWidth = availableWidth - e.clientX + SIDEBAR_WIDTH + MOUSE_OFFSET;
       currentWidthRef.current = setDrawerSize(newWidth, minWidthPx, maxWidth);
 
-      // Update the drawer width directly for smooth resizing
       const drawer = document.querySelector('.MuiDrawer-paper') as HTMLElement;
       if (drawer) {
         drawer.style.width = `${currentWidthRef.current}px`;
@@ -65,7 +67,6 @@ export const useDrawerResize = () => {
     };
   }, [handleMousemove, handleMouseup]);
 
-  // Debounced function to handle window resize
   const debouncedHandleResize = useCallback(
     _.debounce(() => {
       const availableWidth =
@@ -80,11 +81,10 @@ export const useDrawerResize = () => {
           drawer.style.width = `${availableWidth}px`;
         }
       }
-    }, 1000), // 1 second debounce
+    }, RESIZE_DEBOUNCE_TIME),
     [windowSize.width, setWidth]
   );
 
-  // Effect to handle window resize
   useEffect(() => {
     debouncedHandleResize();
   }, [windowSize.width, debouncedHandleResize]);
