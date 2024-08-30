@@ -950,7 +950,14 @@ const ICValueView: React.FC<{value: any}> = ({value}) => {
     return <NotApplicable />;
   } else if (typeof value === 'object') {
     if (isCustomWeaveTypePayload(value)) {
-      return <CustomWeaveTypeDispatcher data={value} />;
+      // This is a bit arbitrary sizing. Just forcing 300px for now. It would be
+      // more ideal if `CustomWeaveTypeDispatcher` had some sort of dynamic sizing
+      // that could be applied here.
+      return (
+        <div style={{width: '100%', height: '300px', overflow: 'hidden'}}>
+          <CustomWeaveTypeDispatcher data={value} />
+        </div>
+      );
     }
     text = JSON.stringify(value || {}, null, 2);
   } else if (typeof value === 'string' && isWeaveRef(value)) {
