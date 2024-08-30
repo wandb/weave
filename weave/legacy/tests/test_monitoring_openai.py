@@ -463,7 +463,7 @@ def test_log_to_span_basic(
     result = chat_completions.create(**create_input)
     streamtable.finish()
 
-    call = client.calls()[0]
+    call = client.get_calls()[0]
     inputs = {k: v for k, v in call.inputs.items() if not k.startswith("_")}
     outputs = {k: v for k, v in call.output.items() if not k.startswith("_")}
 
@@ -493,7 +493,7 @@ def test_log_to_span_streaming(
     for x in stream:
         ...
 
-    call = client.calls()[0]
+    call = client.get_calls()[0]
     inputs = {k: v for k, v in call.inputs.items() if not k.startswith("_")}
     outputs = {k: v for k, v in call.output.items() if not k.startswith("_")}
 
@@ -524,7 +524,7 @@ async def test_log_to_span_async_streaming(
     async for x in stream:
         ...
 
-    call = client.calls()[0]
+    call = client.get_calls()[0]
     inputs = {k: v for k, v in call.inputs.items() if not k.startswith("_")}
     outputs = {k: v for k, v in call.output.items() if not k.startswith("_")}
 

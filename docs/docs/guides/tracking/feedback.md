@@ -33,18 +33,18 @@ import weave
 client = weave.init('intro-example')
 
 # Get all feedback in a project
-all_feedback = client.feedback()
+all_feedback = client.get_feedback()
 
 # Fetch a specific feedback object by id.
 # Note that the API still returns a collection, which is expected
 # to contain zero or one item(s).
-one_feedback = client.feedback("<feedback_uuid>")[0]
+one_feedback = client.get_feedback("<feedback_uuid>")[0]
 
 # Find all feedback objects with a specific reaction. You can specify offset and limit.
-thumbs_up = client.feedback(reaction="👍", limit=10)
+thumbs_up = client.get_feedback(reaction="👍", limit=10)
 
 # After retrieval you can view the details of individual feedback objects.
-for f in client.feedback():
+for f in client.get_feedback():
     print(f.id)
     print(f.created_at)
     print(f.feedback_type)
@@ -57,7 +57,7 @@ for f in client.feedback():
 import weave
 client = weave.init('intro-example')
 
-call = client.call("<call_uuid>")
+call = client.get_call("<call_uuid>")
 
 # Adding an emoji reaction
 call.feedback.add_reaction("👍")
