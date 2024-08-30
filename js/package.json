@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@types/uuid": "^10.0.0",
+    "openai": "^4.57.0",
     "uuid": "^10.0.0",
     "uuidv7": "^1.0.1"
   },
