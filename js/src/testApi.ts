@@ -1,4 +1,4 @@
-import { init, op } from './src/clientApi';
+import { init, op } from './clientApi';
 import { createPatchedOpenAI } from './integrations/openai';
 
 // Initialize the API

@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { op } from '../src/clientApi';
+import { op } from '../clientApi';
 
 export function createPatchedOpenAI(apiKey: string): OpenAI {
     const openai = new OpenAI({ apiKey });

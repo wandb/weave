@@ -10,6 +10,31 @@ You can install Weave via npm:
 npm install weave
 ```
 
+## Quickstart
+
+Put this in a file called `predict.ts`:
+
+```javascript
+import { init, op } from 'weave';
+import { createPatchedOpenAI } from 'weave/integrations/openai';
+
+init('<wb_user_name>/weave-quickstart');
+const openai = createPatchedOpenAI();
+
+function extractDinos(input) {
+    const response = openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: f"In JSON format extract a list of `dinosaurs`, with their `name`, their `common_name`, and whether its `diet` is a herbivore or carnivore: {input}" }],
+    });
+    return response.choices[0].message.content;
+}
+
+const extractDinosOp = op(extractDinos);
+
+const result = extractDinosOp("I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below.");
+console.log(result);
+```
+
 ## Usage
 
 ### Initializing a Project
