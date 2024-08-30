@@ -1,7 +1,23 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import { DesktopWindow } from '../../../src/components/DesktopImage'
+import TracingCallsMacroImage from '@site/static/img/tracing_calls_macro.png';
 
 # Calls
+
+<DesktopWindow 
+  images={[
+    TracingCallsMacroImage,
+    TracingCallsMacroImage,
+    TracingCallsMacroImage,
+    TracingCallsMacroImage,
+    TracingCallsMacroImage,
+    TracingCallsMacroImage,
+  ]}
+  alt="Screenshot of many calls"
+  title="Weave Calls"
+/>
+
 
 :::info[Calls]
 Calls are the fundamental building block in Weave. 
@@ -10,11 +26,6 @@ Calls are a superset of the industry standard [OpenTelemetry](https://openteleme
 A call can belong to a trace, which is a collection of calls that belonging to the same execution context.
 Furthermore, a call can have children calls (and a parent call), forming a tree structure.
 :::
-
-:::warning[TODO]
-Screenshot
-:::
-
 
 
 ## Create a Call
