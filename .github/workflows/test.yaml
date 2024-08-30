@@ -50,13 +50,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: source /root/venv/bin/activate && pre-commit run --hook-stage=pre-push --all-files
-      - name: Show changes if pre-commit fails
-        if: failure()
-        run: |
-          echo "Files were modified, printing names of changed files"
-          git diff --name-only
-          echo "Failing this step to expand logs in the UI"
-          exit 1
 
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile

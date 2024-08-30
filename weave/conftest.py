@@ -21,10 +21,10 @@ from weave.legacy.weave.language_features.tagging.tag_store import (
 from weave.trace import weave_init
 from weave.trace_server import (
     clickhouse_trace_server_batched,
-    remote_http_trace_server,
     sqlite_trace_server,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import remote_http_trace_server
 
 from .legacy.weave import logs
 from .tests import fixture_fakewandb
