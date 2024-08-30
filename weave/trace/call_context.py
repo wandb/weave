@@ -89,7 +89,7 @@ def get_current_call() -> typing.Optional["Call"]:
 
     ```python
     client = weave.init("<project>")
-    mycall = client.call("<call_id>")
+    mycall = client.get_call("<call_id>")
     ```
 
     Alternately, after defining your Op you can use its `call` method. For example:
