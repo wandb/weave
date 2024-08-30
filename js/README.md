@@ -1,6 +1,8 @@
-# Weave
+# Weave (Alpha)
 
 Weave is a library for tracing and monitoring AI applications.
+
+This is an Alpha release, APIs are extremely subject to change.
 
 ## Installation
 
@@ -10,29 +12,49 @@ You can install Weave via npm:
 npm install weave
 ```
 
+Ensure you have a wandb API key in ~/.netrc.
+
+Like
+
+```
+machine api.wandb.ai
+  login user
+  password <wandb-api-key>
+```
+
+Get your wandb API key from [here](https://wandb.ai/authorize).
+
 ## Quickstart
 
-Put this in a file called `predict.ts`:
+Put this in a file called `predict.mjs`:
 
 ```javascript
-import { init, op } from 'weave';
-import { createPatchedOpenAI } from 'weave/integrations/openai';
+import { init, op, createPatchedOpenAI } from 'weave';
 
-init('<wb_user_name>/weave-quickstart');
+init('shawn/weave-quickstart');
 const openai = createPatchedOpenAI();
 
-function extractDinos(input) {
-    const response = openai.chat.completions.create({
+async function extractDinos(input) {
+    const response = await openai.chat.completions.create({
         model: 'gpt-4o',
-        messages: [{ role: 'user', content: f"In JSON format extract a list of `dinosaurs`, with their `name`, their `common_name`, and whether its `diet` is a herbivore or carnivore: {input}" }],
+        messages: [{ role: 'user', content: `In JSON format extract a list of 'dinosaurs', with their 'name', their 'common_name', and whether its 'diet' is a herbivore or carnivore: ${input}` }],
     });
     return response.choices[0].message.content;
 }
-
 const extractDinosOp = op(extractDinos);
 
-const result = extractDinosOp("I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below.");
-console.log(result);
+async function main() {
+    const result = await extractDinosOp("I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below.");
+    console.log(result);
+}
+
+main();
+```
+
+and then run
+
+```
+node predict.mjs
 ```
 
 ## Usage
