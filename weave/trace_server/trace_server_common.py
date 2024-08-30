@@ -112,7 +112,7 @@ def make_derived_summary_fields(
         weave_summary["latency_ms"] = latency
     summary["weave"] = weave_summary
 
-    return tsi.SummaryMap({"weave": weave_summary})
+    return tsi.SummaryMap(**summary)
 
 
 def _make_datetime_from_any(
@@ -130,7 +130,7 @@ def _make_datetime_from_any(
         return dt
 
 
-def _load_json_maybe(value: Any) -> Any:
+def _load_json_maybe(value: Any) -> Optional[Dict[str, Any]]:
     """
     Loads a JSON string or returns the value if it's not a string.
     Allows for database type agnostic parsing of JSON strings.
