@@ -13,14 +13,7 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {
-  Dispatch,
-  FC,
-  SetStateAction,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -30,7 +23,6 @@ import {
   fileExtensions,
 } from '../wfReactInterface/traceServerClientTypes';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
-import {isDynamicCallColumn, stringToPath} from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
@@ -42,12 +34,14 @@ export const ExportSelector = ({
   selectedCalls,
   numTotalCalls,
   visibleColumns,
+  refColumnsToExpand,
   disabled,
   callQueryParams,
 }: {
   selectedCalls: string[];
   numTotalCalls: number;
   visibleColumns: string[];
+  refColumnsToExpand: string[];
   callQueryParams: {
     entity: string;
     project: string;
@@ -63,7 +57,7 @@ export const ExportSelector = ({
   );
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const userInfoLoaded = !viewerLoading ? userInfo : null;
-  const {loading: orgNameLoading, orgName} = useOrgName({
+  const {orgName} = useOrgName({
     entityName: userInfoLoaded?.username ?? '',
     skip: viewerLoading,
   });
@@ -86,11 +80,6 @@ export const ExportSelector = ({
     callQueryParams.gridSort
   );
 
-  const refColumnsToExpand = useMemo(
-    () => visibleColumns.filter(col => isDynamicCallColumn(stringToPath(col))),
-    [visibleColumns]
-  );
-
   const onClickDownload = (contentType: ContentType) => {
     if (downloadLoading) {
       return;
@@ -102,21 +91,9 @@ export const ExportSelector = ({
     const offset = 0;
     const limit = MAX_EXPORT;
     // TODO(gst): add support for JSONL and JSON column selection
-    const columns = [ContentType.csv, ContentType.tsv].includes(contentType)
-      ? visibleColumns
+    const leafColumns = [ContentType.csv, ContentType.tsv].includes(contentType)
+      ? makeLeafColumns(visibleColumns)
       : undefined;
-    // Filter columns down to only the most nested, for example
-    // ['output', 'output.x', 'output.x.y'] -> ['output.x.y']
-    // sort columns by length, longest to shortest
-    visibleColumns.sort((a, b) => b.length - a.length);
-    const leafColumns: string[] = [];
-    for (const col of visibleColumns) {
-      if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
-        continue;
-      }
-      leafColumns.push(col);
-    }
-
     const startTime = Date.now();
     download(
       callQueryParams.entity,
@@ -139,10 +116,14 @@ export const ExportSelector = ({
 
       userEvents.exportClicked({
         dataSize: blob.size,
-        numColumns: columns?.length ?? null,
+        numColumns: visibleColumns?.length ?? null,
         numRows: numTotalCalls,
-        numExpandedColumns: 0,
-        maxDepth: 0,
+        numExpandedColumns: refColumnsToExpand.length,
+        // the most nested refColumn to expand
+        maxDepth: refColumnsToExpand.reduce(
+          (max, col) => Math.max(max, col.split('.').length),
+          0
+        ),
         type: contentType,
         latency: Date.now() - startTime,
         userId: userInfoLoaded?.id ?? '',
@@ -224,14 +205,12 @@ export const ExportSelector = ({
                 />
               )}
             </DraggableHandle>
-            {!viewerLoading && !orgNameLoading && (
-              <DownloadGrid
-                pythonText={pythonText}
-                curlText={curlText}
-                downloadLoading={downloadLoading}
-                onClickDownload={onClickDownload}
-              />
-            )}
+            <DownloadGrid
+              pythonText={pythonText}
+              curlText={curlText}
+              downloadLoading={downloadLoading}
+              onClickDownload={onClickDownload}
+            />
           </div>
         </Tailwind>
       </Popover>
@@ -433,6 +412,21 @@ function initiateDownloadFromBlob(blob: Blob, fileName: string) {
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(downloadUrl);
+}
+
+function makeLeafColumns(visibleColumns: string[]) {
+  // Filter columns down to only the most nested, for example
+  // ['output', 'output.x', 'output.x.y'] -> ['output.x.y']
+  // sort columns by length, longest to shortest
+  visibleColumns.sort((a, b) => b.length - a.length);
+  const leafColumns: string[] = [];
+  for (const col of visibleColumns) {
+    if (leafColumns.some(leafCol => leafCol.startsWith(col))) {
+      continue;
+    }
+    leafColumns.push(col);
+  }
+  return leafColumns;
 }
 
 function makeCodeText(
