@@ -96,7 +96,10 @@ export const CompareEvaluationsPage: React.FC<
               }
               selectedInputDigest={selectedInputDigest ?? undefined}
               setSelectedInputDigest={setSelectedInputDigest}>
-              <CompareEvaluationsPageInner />
+              <CustomWeaveTypeProjectContext.Provider
+                value={{entity: props.entity, project: props.project}}>
+                <CompareEvaluationsPageInner />
+              </CustomWeaveTypeProjectContext.Provider>
             </CompareEvaluationsProvider>
           ),
         },
@@ -240,10 +243,7 @@ const ResultExplorer: React.FC<{state: EvaluationComparisonState}> = ({
           height: 'calc(100vh - 114px)',
           overflow: 'auto',
         }}>
-        <CustomWeaveTypeProjectContext.Provider
-          value={{entity: state.data.entity, project: state.data.project}}>
-          <ExampleCompareSection state={state} />
-        </CustomWeaveTypeProjectContext.Provider>
+        <ExampleCompareSection state={state} />
       </Box>
     </VerticalBox>
   );
