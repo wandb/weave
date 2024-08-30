@@ -292,18 +292,17 @@ export const CallsTable: FC<{
       : undefined;
 
   // Column Management: Build the columns needed for the table
-  const {columns, columnsWithRefs, setUserDefinedColumnWidths} =
-    useCallsTableColumns(
-      entity,
-      project,
-      effectiveFilter,
-      tableData,
-      expandedRefCols,
-      onCollapse,
-      onExpand,
-      columnIsRefExpanded,
-      onAddFilter
-    );
+  const {columns, setUserDefinedColumnWidths} = useCallsTableColumns(
+    entity,
+    project,
+    effectiveFilter,
+    tableData,
+    expandedRefCols,
+    onCollapse,
+    onExpand,
+    columnIsRefExpanded,
+    onAddFilter
+  );
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -522,8 +521,6 @@ export const CallsTable: FC<{
       : [];
   }, [allRowKeys, columnVisibilityModel, tableData]);
 
-  // Register Export Button
-
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
 
   // Called in reaction to Hide column menu
@@ -709,7 +706,10 @@ export const CallsTable: FC<{
               numTotalCalls={callsTotal}
               disabled={callsTotal === 0}
               visibleColumns={visibleColumns}
-              columnsWithRefs={columnsWithRefs}
+              // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
+              refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+                visibleColumns.includes(col)
+              )}
               callQueryParams={{
                 entity,
                 project,

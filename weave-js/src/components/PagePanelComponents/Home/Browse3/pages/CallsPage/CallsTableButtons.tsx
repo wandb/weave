@@ -34,14 +34,14 @@ export const ExportSelector = ({
   selectedCalls,
   numTotalCalls,
   visibleColumns,
-  columnsWithRefs,
+  refColumnsToExpand,
   disabled,
   callQueryParams,
 }: {
   selectedCalls: string[];
   numTotalCalls: number;
   visibleColumns: string[];
-  columnsWithRefs: Set<string>;
+  refColumnsToExpand: string[];
   callQueryParams: {
     entity: string;
     project: string;
@@ -57,7 +57,7 @@ export const ExportSelector = ({
   );
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const userInfoLoaded = !viewerLoading ? userInfo : null;
-  const {loading: orgNameLoading, orgName} = useOrgName({
+  const {orgName} = useOrgName({
     entityName: userInfoLoaded?.username ?? '',
     skip: viewerLoading,
   });
@@ -79,8 +79,6 @@ export const ExportSelector = ({
     callQueryParams.gridFilter,
     callQueryParams.gridSort
   );
-
-  const refColumnsToExpand = Array.from(columnsWithRefs);
 
   const onClickDownload = (contentType: ContentType) => {
     if (downloadLoading) {
@@ -207,14 +205,12 @@ export const ExportSelector = ({
                 />
               )}
             </DraggableHandle>
-            {!viewerLoading && !orgNameLoading && (
-              <DownloadGrid
-                pythonText={pythonText}
-                curlText={curlText}
-                downloadLoading={downloadLoading}
-                onClickDownload={onClickDownload}
-              />
-            )}
+            <DownloadGrid
+              pythonText={pythonText}
+              curlText={curlText}
+              downloadLoading={downloadLoading}
+              onClickDownload={onClickDownload}
+            />
           </div>
         </Tailwind>
       </Popover>
