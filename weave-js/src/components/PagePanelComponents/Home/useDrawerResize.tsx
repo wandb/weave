@@ -1,7 +1,7 @@
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useRef} from 'react';
+import React, {useCallback, useEffect, useRef, MutableRefObject} from 'react';
 
 // Width of the sidebar in pixels
 export const SIDEBAR_WIDTH = 57;
@@ -19,7 +19,7 @@ const MIN_DRAWER_WIDTH = 500;
 const MOUSE_OFFSET = 5;
 
 // Time in milliseconds to debounce resize events
-const RESIZE_DEBOUNCE_TIME = 1000;
+const RESIZE_DEBOUNCE_TIME = 100;
 
 // Key used to store the drawer width in local storage
 const LOCAL_STORAGE_KEY = 'weaveflow-drawer-width-pixels';
@@ -28,7 +28,7 @@ const setDrawerSize = (newSize: number, min: number, max: number) => {
   return Math.min(Math.max(newSize, min), max);
 };
 
-export const useDrawerResize = () => {
+export const useDrawerResize = (drawerRef: MutableRefObject<HTMLElement | null>) => {
   const windowSize = useWindowSize();
 
   const [width, setWidth] = useLocalStorage(
@@ -38,6 +38,14 @@ export const useDrawerResize = () => {
 
   const currentWidthRef = useRef(width);
   const isResizingRef = useRef(false);
+
+  const debouncedSetWidth = useCallback(() => {
+    const handleResize = _.debounce(() => {
+      setWidth(currentWidthRef.current);
+    }, RESIZE_DEBOUNCE_TIME);
+
+    handleResize();
+  }, [setWidth]);
 
   const handleMousedown = useCallback((e: React.MouseEvent) => {
     isResizingRef.current = true;
@@ -50,6 +58,8 @@ export const useDrawerResize = () => {
       setWidth(currentWidthRef.current);
     }
   }, [setWidth]);
+
+
 
   const handleMousemove = useCallback(
     (e: MouseEvent) => {
@@ -64,13 +74,13 @@ export const useDrawerResize = () => {
       const newWidth =
         availableWidth - e.clientX + SIDEBAR_WIDTH + MOUSE_OFFSET;
       currentWidthRef.current = setDrawerSize(newWidth, minWidthPx, maxWidth);
+      debouncedSetWidth();
 
-      const drawer = document.querySelector('.MuiDrawer-paper') as HTMLElement;
-      if (drawer) {
-        drawer.style.width = `${currentWidthRef.current}px`;
+      if (drawerRef.current) {
+        drawerRef.current.style.width = `${currentWidthRef.current}px`;
       }
     },
-    [windowSize.width]
+    [windowSize.width, debouncedSetWidth, drawerRef]
   );
 
   useEffect(() => {
@@ -83,34 +93,23 @@ export const useDrawerResize = () => {
     };
   }, [handleMousemove, handleMouseup]);
 
-  // This function handles resizing the drawer when the window is resized.
-  // It ensures that the drawer doesn't exceed the available width when the window is made smaller.
   const debouncedHandleResize = useCallback(() => {
     const handleResize = _.debounce(() => {
-      // Calculate the maximum available width for the drawer
       const availableWidth =
         windowSize.width - SIDEBAR_WIDTH - MIN_MAIN_CONTENT_WIDTH;
 
-      // If the current drawer width is larger than the available width
       if (currentWidthRef.current > availableWidth) {
-        // Update the current width reference
         currentWidthRef.current = availableWidth;
-
-        // Update the width in local storage
         setWidth(availableWidth);
 
-        // Find the drawer element and update its width
-        const drawer = document.querySelector(
-          '.MuiDrawer-paper'
-        ) as HTMLElement;
-        if (drawer) {
-          drawer.style.width = `${availableWidth}px`;
+        if (drawerRef.current) {
+          drawerRef.current.style.width = `${availableWidth}px`;
         }
       }
     }, RESIZE_DEBOUNCE_TIME);
 
     handleResize();
-  }, [windowSize.width, setWidth]);
+  }, [windowSize.width, setWidth, drawerRef]);
 
   useEffect(() => {
     debouncedHandleResize();

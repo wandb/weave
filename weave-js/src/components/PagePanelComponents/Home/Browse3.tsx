@@ -27,6 +27,7 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
@@ -296,8 +297,8 @@ const MainPeekingLayout: FC = () => {
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
   const isDrawerOpen = peekLocation != null;
 
-  const {handleMousedown, drawerWidthPx} = useDrawerResize();
-  const closePeek = useClosePeek();
+  const drawerRef = useRef<HTMLDivElement | null>(null);
+  const {handleMousedown, drawerWidthPx} = useDrawerResize(drawerRef);
 
   // State to track whether the user is currently dragging the drawer resize handle
   const [isDragging, setIsDragging] = useState(false);
@@ -320,7 +321,7 @@ const MainPeekingLayout: FC = () => {
     [handleDragEnd, handleMousedown]
   );
 
-  useMousetrap('esc', closePeek);
+  useMousetrap('esc', useClosePeek());
 
   return (
     <WFDataModelAutoProvider
@@ -350,8 +351,9 @@ const MainPeekingLayout: FC = () => {
           variant="persistent"
           anchor="right"
           open={isDrawerOpen}
-          onClose={closePeek}
+          onClose={useClosePeek()}
           PaperProps={{
+            ref: drawerRef,
             style: {
               overflow: 'hidden',
               display: isDrawerOpen ? 'flex' : 'none',
@@ -399,7 +401,7 @@ const MainPeekingLayout: FC = () => {
                         icon="close"
                         variant="ghost"
                         className="ml-4"
-                        onClick={closePeek}
+                        onClick={useClosePeek()}
                       />
                     </Box>
                   ),
