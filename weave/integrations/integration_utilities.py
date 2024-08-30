@@ -94,7 +94,7 @@ def _get_op_name(s: str) -> str:
 def flatten_calls2(calls: Iterable[Call], *, depth: int = 0) -> list:
     res = []
     for call in calls:
-        res.append(_get_op_name(call.op_name), depth)
+        res.append((_get_op_name(call.op_name), depth))
         res.extend(flatten_calls2(call.children(), depth=depth + 1))
     return res
 

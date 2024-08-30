@@ -4,7 +4,6 @@ import pytest
 
 from weave.integrations.integration_utilities import (
     _get_call_output,
-    _get_op_name,
     flatten_calls2,
 )
 from weave.trace.weave_client import WeaveClient
@@ -91,17 +90,17 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     ).sentiment
     expected_prediction = "Positive"
     assert prediction == expected_prediction
-    calls = list(client.calls())
-    assert len(calls) == 6
+    calls = client.calls(filter=CallsFilter(trace_roots_only=True))
+    flattened_calls = flatten_calls2(calls)
+    assert len(flattened_calls) == 6
 
-    calls_list = [_get_op_name(c.op_name) for c in calls]
-    assert calls_list == [
-        "dspy.Predict",
-        "dspy.Predict.forward",
-        "dspy.OpenAI",
-        "dspy.OpenAI.request",
-        "dspy.OpenAI.basic_request",
-        "openai.chat.completions.create",
+    assert flattened_calls == [
+        ("dspy.Predict", 0),
+        ("dspy.Predict.forward", 1),
+        ("dspy.OpenAI", 2),
+        ("dspy.OpenAI.request", 3),
+        ("dspy.OpenAI.basic_request", 4),
+        ("openai.chat.completions.create", 5),
     ]
 
     call_1 = calls[0]
