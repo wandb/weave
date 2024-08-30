@@ -52,9 +52,10 @@ function init(projectName: string): void {
     // patchOpenAI();
 }
 
-function op(fn: Function) {
+function op(fn: Function, opName?: string) {
+    const actualOpName = opName || fn.name || 'anonymous';
+
     return async function (...args: any[]) {
-        console.log('op', fn.name, args);
         if (!globalProjectName) {
             throw new Error("Project not initialized. Call init() first.");
         }
@@ -65,10 +66,8 @@ function op(fn: Function) {
         let parentId: string | null = null;
 
         if (activeCallStack.length === 0) {
-            // This is a root call, generate a new traceId
             traceId = generateTraceId();
         } else {
-            // This is a child call, use the traceId from the parent
             traceId = activeCallStack[activeCallStack.length - 1].traceId;
             parentId = activeCallStack[activeCallStack.length - 1].callId;
         }
@@ -79,7 +78,7 @@ function op(fn: Function) {
             start: {
                 project_id: globalProjectName,
                 id: callId,
-                op_name: fn.name,
+                op_name: actualOpName,
                 trace_id: traceId,
                 parent_id: parentId,
                 started_at: startTime,
@@ -91,7 +90,7 @@ function op(fn: Function) {
         try {
             await serverApi.call.callStartCallStartPost(startReq);
 
-            console.log(`Operation: ${fn.name}, Call ID: ${callId}, Trace ID: ${traceId}, Parent ID: ${parentId || 'None'}`);
+            console.log(`Operation: ${actualOpName}, Call ID: ${callId}, Trace ID: ${traceId}, Parent ID: ${parentId || 'None'}`);
             const result = await Promise.resolve(fn(...args));
 
             const endTime = new Date().toISOString();

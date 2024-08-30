@@ -6,10 +6,10 @@ export function createPatchedOpenAI(apiKey: string): OpenAI {
 
     const originalCreate = openai.chat.completions.create.bind(openai.chat.completions);
     // @ts-ignore
-    openai.chat.completions.create = op(async (...args: Parameters<typeof originalCreate>) => {
+    openai.chat.completions.create = op(async function (...args: Parameters<typeof originalCreate>) {
         console.log('Patched OpenAI chat.completions.create called');
         return await originalCreate(...args);
-    });
+    }, 'openai.chat.completions.create');
 
     return openai;
 }
