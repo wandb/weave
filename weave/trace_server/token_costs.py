@@ -1,28 +1,32 @@
+import base64
+import os
+import re
 from datetime import datetime
 
 from . import trace_server_interface as tsi
 from .clickhouse_schema import SelectableCHCallSchema
 from .orm import Column, ColumnType, ParamBuilder, PreparedSelect, Table
 
-cost_string_fields = [
-    "prompt_token_cost_unit",
-    "completion_token_cost_unit",
-    "effective_date",
-    "provider_id",
-    "pricing_level",
-    "pricing_level_id",
-    "created_by",
-    "created_at",
+DUMMY_LLM_ID = "weave_dummy_llm_id"
+DUMMY_LLM_USAGE = (
+    '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}'
+)
+DUMMY_LLM_USAGE_TUPLE = (DUMMY_LLM_ID, DUMMY_LLM_USAGE)
+
+# Org is currently not implemented
+PRICING_LEVELS = {"ORG": "org", "PROJECT": "project", "DEFAULT": "default"}
+DEFAULT_PRICING_LEVEL_ID = "default"
+COST_OBJECT_NAME = "costs"
+
+LLM_USAGE_COLUMNS = [
+    Column(name="id", type="string"),
+    Column(name="llm_id", type="string"),
+    Column(name="requests", type="float"),
+    Column(name="prompt_tokens", type="float"),
+    Column(name="completion_tokens", type="float"),
+    Column(name="total_tokens", type="float"),
 ]
 
-cost_numeric_fields = [
-    "prompt_token_cost",
-    "completion_token_cost",
-    "prompt_tokens",
-    "completion_tokens",
-    "requests",
-    "total_tokens",
-]
 
 LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="pricing_level", type="string"),
@@ -59,16 +63,6 @@ def calls_merged_table(table_alias: str) -> Table:
     return Table(table_alias, get_calls_merged_columns())
 
 
-LLM_USAGE_COLUMNS = [
-    Column(name="id", type="string"),
-    Column(name="llm_id", type="string"),
-    Column(name="requests", type="float"),
-    Column(name="prompt_tokens", type="float"),
-    Column(name="completion_tokens", type="float"),
-    Column(name="total_tokens", type="float"),
-]
-
-
 # SELECT
 #     *,
 #     Extracted Usage Fields
@@ -85,6 +79,18 @@ LLM_USAGE_COLUMNS = [
 #     JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
 # FROM all_calls
 # From a calls table alias, get the usage data for LLMs
+"""
+    Takes in something like the following:
+    1 call row
+        [ id, summary_dump: {usage: { llm_1, llm_2}} ]
+
+    Returns something like the following:
+    2 rows
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_1, requests, prompt_tokens, completion_tokens, total_tokens ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_2, requests, prompt_tokens, completion_tokens, total_tokens ]
+"""
+
+
 def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSelect:
     cols = [
         *get_calls_merged_columns(),
@@ -103,10 +109,12 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
     # Select fields
     usage_raw = "ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw"
     # This arrayJoin is used to split the usage data into rows each usage instance their own row
-    kv = """arrayJoin(
+    # Here to handle the case where usage_raw is empty, we use a dummy tuple, to ensure that we always have a row
+    # We wont return a cost object in the final select if we have a dummy llm_id
+    kv = f"""arrayJoin(
                 if(usage_raw != '',
                 JSONExtractKeysAndValuesRaw(usage_raw),
-                [('nothing', '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}')])
+                [{DUMMY_LLM_USAGE_TUPLE}])
             ) AS kv"""
     llm_id = "kv.1 AS llm_id"
     requests = "JSONExtractInt(kv.2, 'requests') AS requests"
@@ -145,6 +153,26 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
 #     llm_token_prices AS ltp
 # ON llm_usage.llm_id = llm_token_prices.llm_id
 # From an llm usage query, get the ranked prices for each llm_id in the usage data
+"""
+    Takes in something like the following:
+    2 rows
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_1, requests, prompt_tokens, completion_tokens, total_tokens ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_2, requests, prompt_tokens, completion_tokens, total_tokens ]
+
+    Returns something like the following:
+    4 rows
+         [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_1, requests, prompt_tokens, completion_tokens, total_tokens,
+            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 1 ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_1, requests, prompt_tokens, completion_tokens, total_tokens,
+            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 2 ]
+
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_2, requests, prompt_tokens, completion_tokens, total_tokens,
+            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 1 ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_2, requests, prompt_tokens, completion_tokens, total_tokens,
+            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 2 ]
+"""
+
+
 def get_ranked_prices(
     param_builder: ParamBuilder, llm_usage_table_alias: str, project_id: str
 ) -> PreparedSelect:
@@ -165,6 +193,9 @@ def get_ranked_prices(
         f"{LLM_TOKEN_PRICES_TABLE.name}.{col.name}" for col in LLM_TOKEN_PRICES_COLUMNS
     ]
 
+    # Clcikhouse does not allow parameters in the row_number() over function
+    # This is a temporary workaround, to check the validity of the project_id, to prevent SQL injection
+    validate_project_id(project_id)
     row_number_clause = f"""
         ROW_NUMBER() OVER (
         PARTITION BY {llm_usage_table_alias}.id, {llm_usage_table_alias}.llm_id
@@ -176,9 +207,9 @@ def get_ranked_prices(
             END,
             CASE
                 -- Order by pricing level then by effective_date
-                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = 'org' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_NAME THEN 1
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = 'project' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = 'default' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = 'default' THEN 3
+                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['ORG']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['PROJECT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['DEFAULT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
                 ELSE 4
             END,
             {LLM_TOKEN_PRICES_TABLE_NAME}.effective_date DESC
@@ -218,6 +249,25 @@ def get_ranked_prices(
 # GROUP BY (all_calls.id, all_calls.project_id, all_calls.display_name)
 # WHERE rank = 1
 # From all the calls usage, group by and construct the costs object
+"""
+    Takes in something like the following:
+    4 rows
+         [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_1, requests, prompt_tokens, completion_tokens, total_tokens,
+            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 1 ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_1, requests, prompt_tokens, completion_tokens, total_tokens,
+            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 2 ]
+
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_2, requests, prompt_tokens, completion_tokens, total_tokens,
+            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 1 ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_2, requests, prompt_tokens, completion_tokens, total_tokens,
+            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 2 ]
+
+    Returns something like the following:
+    1 row
+        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_cost, completion_tokens_cost, ... }, llm_2: { prompt_tokens_cost, completion_tokens_cost, ... } } } ]
+"""
+
+
 def final_call_select_with_cost(
     param_builder: ParamBuilder,
     price_table_alias: str,
@@ -226,10 +276,40 @@ def final_call_select_with_cost(
     # We filter out summary_dump, because we add costs to summary dump in the select statement
     final_select_fields = [field for field in select_fields if field != "summary_dump"]
 
+    # These two objects are used to construct the costs object
+    # We add two more fields in addition to this
+    # prompt_tokens_cost and completion_tokens_cost
+    cost_string_fields = [
+        "prompt_token_cost_unit",
+        "completion_token_cost_unit",
+        "effective_date",
+        "provider_id",
+        "pricing_level",
+        "pricing_level_id",
+        "created_by",
+        "created_at",
+    ]
+
+    cost_numeric_fields = [
+        "prompt_tokens",
+        "completion_tokens",
+        "requests",
+        "total_tokens",
+    ]
+
     numeric_fields_str = " ".join(
         [
-            f""" '"{field}":', toString({field}), ',', """
-            for field in cost_numeric_fields
+            *[
+                f""" '"{field}":', toString({field}), ',', """
+                for field in cost_numeric_fields
+            ],
+            # These numeric fields are derived or mapped to another name
+            """
+            '"cost_per_prompt_token":', toString(prompt_token_cost), ',',
+            '"cost_per_completion_token":', toString(completion_token_cost), ',',
+            '"prompt_tokens_cost":', toString(prompt_tokens * prompt_token_cost), ',',
+            '"completion_tokens_cost":', toString(completion_tokens * completion_token_cost), ',',
+        """,
         ]
     )
     string_fields_str = """ '",', """.join(
@@ -238,7 +318,7 @@ def final_call_select_with_cost(
 
     cost_snippet = f"""
     ',"weave":{{',
-        '"costs":',
+        '"{COST_OBJECT_NAME}":',
         concat(
             '{{',
             arrayStringConcat(
@@ -246,8 +326,6 @@ def final_call_select_with_cost(
                     concat(
                         '"', toString(llm_id), '":{{',
                         {numeric_fields_str}
-                        '"prompt_tokens_cost":', toString(prompt_tokens * prompt_token_cost), ',',
-                        '"completion_tokens_cost":', toString(completion_tokens * completion_token_cost), ',',
                         {string_fields_str}
                     '"}}'
                     )
@@ -258,7 +336,7 @@ def final_call_select_with_cost(
     """
 
     summary_dump_snippet = f"""
-    if( any(llm_id) = 'nothing',
+    if( any(llm_id) = '{DUMMY_LLM_ID}',
     any(summary_dump),
     concat(
         left(any(summary_dump), length(any(summary_dump)) - 1),
@@ -325,7 +403,7 @@ def cost_query(
             pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 2 ]
     Finally it joins the rows with rank 1 together and constructs the costs object
     1 row
-    [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_cost, completion_tokens_cost, ... }, llm_2: { prompt_tokens_cost, completion_tokens_cost, ... } } } ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_cost, completion_tokens_cost, ... }, llm_2: { prompt_tokens_cost, completion_tokens_cost, ... } } } ]
     """
     raw_sql = f"""
         -- From the all_calls we get the usage data for LLMs
@@ -338,3 +416,25 @@ def cost_query(
         {final_call_select_with_cost(pb, 'ranked_prices', select_fields).sql}
     """
     return raw_sql
+
+
+# This is a temporary workaround for the issue of clickhouse not allowing the use of parametes in row_number() over function
+# Use a parameter when this is fixed
+# This checks that a project_id is a valid base64 encoded string, that follows the pattern "ProjectInternalId: <number>"
+def validate_project_id(project_id: str) -> None:
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return
+
+    try:
+        # Attempt to decode the id from Base64
+        decoded_str = base64.b64decode(project_id).decode("utf-8")
+
+        # Check if the decoded id matches the pattern "ProjectInternalId:" followed by a number
+        match = re.fullmatch(r"ProjectInternalId:\d+", decoded_str.strip())
+
+        if match:
+            return
+
+        raise ValueError("Invalid project_id", project_id)
+    except Exception:
+        raise ValueError("Invalid project_id", project_id)

@@ -31,8 +31,8 @@ class LLMUsageSchema(TypedDict, total=False):
 class LLMCostSchema(LLMUsageSchema):
     prompt_tokens_cost: Optional[float]
     completion_tokens_cost: Optional[float]
-    prompt_token_cost: Optional[float]
-    completion_token_cost: Optional[float]
+    cost_per_prompt_token: Optional[float]
+    cost_per_completion_token: Optional[float]
     prompt_token_cost_unit: Optional[str]
     completion_token_cost_unit: Optional[str]
     effective_date: Optional[str]

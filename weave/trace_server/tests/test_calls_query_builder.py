@@ -319,7 +319,7 @@ def test_query_light_column_with_costs() -> None:
                     arrayJoin(
                         if(usage_raw != '',
                         JSONExtractKeysAndValuesRaw(usage_raw),
-                        [('nothing', '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}')])
+                        [('weave_dummy_llm_id', '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}')])
                     ) AS kv,
                     kv.1 AS llm_id,
                     JSONExtractInt(kv.2, 'requests') AS requests,
@@ -352,7 +352,7 @@ def test_query_light_column_with_costs() -> None:
                             END,
                             CASE
                                 -- Order by pricing level then by effective_date
-                                -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_NAME THEN 1
+                                -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_PARAM THEN 1
                                 WHEN llm_token_prices.pricing_level = 'project' AND llm_token_prices.pricing_level_id = 'project' THEN 2
                                 WHEN llm_token_prices.pricing_level = 'default' AND llm_token_prices.pricing_level_id = 'default' THEN 3
                                 ELSE 4
@@ -365,7 +365,7 @@ def test_query_light_column_with_costs() -> None:
             SELECT
                 id,
                 started_at,
-                if( any(llm_id) = 'nothing',
+                if( any(llm_id) = 'weave_dummy_llm_id',
                 any(summary_dump),
                 concat(
                     left(any(summary_dump), length(any(summary_dump)) - 1),
@@ -377,12 +377,12 @@ def test_query_light_column_with_costs() -> None:
                                 groupUniqArray(
                                     concat(
                                         '"', toString(llm_id), '":{',
-                                        '"prompt_token_cost":', toString(prompt_token_cost), ',',
-                                        '"completion_token_cost":', toString(completion_token_cost), ',',
                                         '"prompt_tokens":', toString(prompt_tokens), ',',
                                         '"completion_tokens":', toString(completion_tokens), ',',
                                         '"requests":', toString(requests), ',',
                                         '"total_tokens":', toString(total_tokens), ',',
+                                        '"cost_per_prompt_token":', toString(prompt_token_cost), ',',
+                                        '"cost_per_completion_token":', toString(completion_token_cost), ',',
                                         '"prompt_tokens_cost":', toString(prompt_tokens * prompt_token_cost), ',',
                                         '"completion_tokens_cost":', toString(completion_tokens * completion_token_cost), ',',
                                         '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit),  '",',
