@@ -3,13 +3,16 @@ from typing import Generator
 import pytest
 
 import weave
-from weave.integrations.integration_utilities import _get_op_name, filter_body
-from weave.trace_server import trace_server_interface as tsi
+from weave.integrations.integration_utilities import (
+    filter_body,
+    flatten_calls2,
+)
+from weave.trace.weave_client import Call
+from weave.trace_server.trace_server_interface import CallsFilter
 
 
-def assert_calls_correct_for_quickstart(calls: list[tsi.CallSchema]) -> None:
-    assert len(calls) == 9
-    """ Next, the major thing to assert is the "shape" of the calls:
+def assert_calls_correct_for_quickstart(calls: list[Call]) -> None:
+    """Next, the major thing to assert is the "shape" of the calls:
     llama_index.query
         llama_index.retrieve
             llama_index.embedding
@@ -20,19 +23,21 @@ def assert_calls_correct_for_quickstart(calls: list[tsi.CallSchema]) -> None:
             llama_index.llm
                 openai.chat.completions.create
     """
-    got = [_get_op_name(c.op_name) for c in calls]
+    flattened_calls = flatten_calls2(calls)
+    assert len(flattened_calls) == 9
+
     exp = [
-        "llama_index.query",
-        "llama_index.retrieve",
-        "llama_index.embedding",
-        "llama_index.synthesize",
-        "llama_index.chunking",
-        "llama_index.chunking",
-        "llama_index.templating",
-        "llama_index.llm",
-        "openai.chat.completions.create",
+        ("llama_index.query", 0),
+        ("llama_index.retrieve", 1),
+        ("llama_index.embedding", 2),
+        ("llama_index.synthesize", 1),
+        ("llama_index.chunking", 2),
+        ("llama_index.chunking", 2),
+        ("llama_index.templating", 2),
+        ("llama_index.llm", 2),
+        ("openai.chat.completions.create", 3),
     ]
-    assert got == exp
+    assert flattened_calls == exp
 
 
 @pytest.fixture
@@ -68,7 +73,7 @@ def test_llamaindex_quickstart(
     query_engine = index.as_query_engine()
     response = query_engine.query("What did the author do growing up?")
 
-    calls = list(client.calls())
+    calls = client.calls(filter=CallsFilter(trace_roots_only=True))
     assert_calls_correct_for_quickstart(calls)
     call = calls[-2]
     assert call.inputs["serialized"]["api_key"] == "REDACTED"
