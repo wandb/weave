@@ -5,9 +5,15 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-let serverApi: Api<null>;
+let serverApi: Api<any>;
 let globalProjectName: string;
 let activeCallStack: { callId: string; traceId: string }[] = [];
+
+// Queue for batching calls
+let callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
+let batchProcessTimeout: NodeJS.Timeout | null = null;
+let isBatchProcessing = false;
+const BATCH_INTERVAL = 200; // 200 milliseconds
 
 function readApiKeyFromNetrc(host: string): string | undefined {
     const netrcPath = path.join(os.homedir(), '.netrc');
@@ -48,8 +54,46 @@ function init(projectName: string): void {
     });
     console.log(`Initializing project: ${projectName}`);
 
-    // Start auto-patching process
-    // patchOpenAI();
+    // Start the batch processing
+    scheduleBatchProcessing();
+}
+
+function scheduleBatchProcessing() {
+    if (batchProcessTimeout || isBatchProcessing) return;
+    batchProcessTimeout = setTimeout(processBatch, BATCH_INTERVAL);
+}
+
+async function processBatch() {
+    if (isBatchProcessing || callQueue.length === 0) {
+        batchProcessTimeout = null;
+        return;
+    }
+
+    isBatchProcessing = true;
+
+    const batchToProcess = [...callQueue];
+    callQueue = [];
+
+    const batchReq = {
+        batch: batchToProcess.map(item => ({
+            mode: item.mode,
+            req: item.data
+        }))
+    };
+
+    try {
+        await serverApi.call.callStartBatchCallUpsertBatchPost(batchReq);
+    } catch (error) {
+        console.error('Error processing batch:', error);
+        // Re-add failed items to the queue
+        callQueue = [...batchToProcess, ...callQueue];
+    } finally {
+        isBatchProcessing = false;
+        batchProcessTimeout = null;
+        if (callQueue.length > 0) {
+            scheduleBatchProcessing();
+        }
+    }
 }
 
 function op(fn: Function, opName?: string) {
@@ -87,9 +131,10 @@ function op(fn: Function, opName?: string) {
             }
         };
 
-        try {
-            await serverApi.call.callStartCallStartPost(startReq);
+        callQueue.push({ mode: 'start', data: startReq });
+        scheduleBatchProcessing();
 
+        try {
             console.log(`Operation: ${actualOpName}, Call ID: ${callId}, Trace ID: ${traceId}, Parent ID: ${parentId || 'None'}`);
             const result = await Promise.resolve(fn(...args));
 
@@ -104,7 +149,8 @@ function op(fn: Function, opName?: string) {
                 }
             };
 
-            await serverApi.call.callEndCallEndPost(endReq);
+            callQueue.push({ mode: 'end', data: endReq });
+            scheduleBatchProcessing();
 
             return result;
         } catch (error) {
@@ -119,7 +165,8 @@ function op(fn: Function, opName?: string) {
                 }
             };
 
-            await serverApi.call.callEndCallEndPost(endReq);
+            callQueue.push({ mode: 'end', data: endReq });
+            scheduleBatchProcessing();
 
             throw error;
         } finally {
