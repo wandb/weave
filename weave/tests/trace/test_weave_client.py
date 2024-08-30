@@ -261,7 +261,7 @@ def test_call_create(client):
             "weave": {
                 "status": "success",
                 "trace_name": "x",
-                "latency_ms": AnyIntMatcher(),
+                "latency_us": AnyIntMatcher(),
             }
         },
         _children=[],
@@ -1315,7 +1315,7 @@ def test_summary_tokens_cost(client):
     assert noCostCallSummary["weave"] == {
         "status": "success",
         "trace_name": "models",
-        "latency_ms": AnyIntMatcher(),
+        "latency_us": AnyIntMatcher(),
     }
 
 

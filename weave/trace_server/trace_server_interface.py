@@ -63,7 +63,8 @@ class TraceStatus(str, Enum):
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
     status: Optional[TraceStatus]
     trace_name: Optional[str]
-    latency_ms: Optional[int]
+    # latency in microseconds
+    latency_us: Optional[int]
     costs: Optional[Dict[str, LLMCostSchema]]
     feedback: Optional[List[FeedbackDict]]
 

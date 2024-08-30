@@ -395,7 +395,7 @@ async def test_evaluation_data_topology(client):
             }
         },
         "weave": {
-            "latency_ms": AnyIntMatcher(),
+            "latency_us": AnyIntMatcher(),
             "trace_name": "SimpleModelWithConfidence.predict",
             "status": "success",
         },
@@ -472,7 +472,7 @@ async def test_evaluation_data_topology(client):
             }
         },
         "weave": {
-            "latency_ms": AnyIntMatcher(),
+            "latency_us": AnyIntMatcher(),
             "trace_name": "Evaluation.evaluate",
             "status": "success",
         },

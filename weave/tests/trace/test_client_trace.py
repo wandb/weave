@@ -86,7 +86,7 @@ def test_simple_op(client):
             "weave": {
                 "status": "success",
                 "trace_name": "my_op",
-                "latency_ms": AnyIntMatcher(),
+                "latency_us": AnyIntMatcher(),
             }
         },
         attributes={
@@ -202,7 +202,7 @@ def test_trace_server_call_start_and_end(client):
             "c": 5,
             "weave": {
                 "trace_name": "test_name",
-                "latency_ms": AnyIntMatcher(),
+                "latency_us": AnyIntMatcher(),
                 "status": "success",
             },
         },
