@@ -1,6 +1,7 @@
 import typing
 
 from weave.legacy.weave import urls
+from weave.trace.pypi_version_check import check_available
 
 if typing.TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
@@ -35,7 +36,7 @@ def _print_version_check() -> None:
         )
         print(message)
     else:
-        wandb_messages = wandb.sdk.internal.update.check_available(wandb.__version__)
+        wandb_messages = check_available(wandb.__version__, "wandb")
         if wandb_messages:
             # Don't print the upgrade message, only the delete or yank message
             use_message = wandb_messages.get("delete_message") or wandb_messages.get(
@@ -44,18 +45,7 @@ def _print_version_check() -> None:
             if use_message:
                 print(use_message)
 
-    weave_messages = None
-    if hasattr(weave, "_wandb_module"):
-        try:
-            orig_module = wandb._wandb_module  # type: ignore
-            wandb._wandb_module = "weave"  # type: ignore
-            weave_messages = wandb.sdk.internal.update.check_available(
-                weave.__version__
-            )
-            wandb._wandb_module = orig_module  # type: ignore
-        except Exception:
-            weave_messages = None
-
+    weave_messages = check_available(weave.__version__, "weave")
     if weave_messages:
         use_message = (
             weave_messages.get("delete_message")

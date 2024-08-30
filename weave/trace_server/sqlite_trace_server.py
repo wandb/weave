@@ -20,7 +20,12 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.orm import Row, quote_json_path
-from weave.trace_server.trace_server_common import get_nested_key, set_nested_key
+from weave.trace_server.trace_server_common import (
+    get_nested_key,
+    hydrate_calls_with_feedback,
+    make_feedback_query_req,
+    set_nested_key,
+)
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -467,8 +472,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         raise ValueError(f"Field '{col}' is required for selection")
                     else:
                         call_dict[col] = {}
-            calls.append(tsi.CallSchema(**call_dict))
-        return tsi.CallsQueryRes(calls=calls)
+            calls.append(call_dict)
+
+        if req.include_feedback:
+            feedback_query_req = make_feedback_query_req(req.project_id, calls)
+            feedback = self.feedback_query(feedback_query_req)
+            hydrate_calls_with_feedback(calls, feedback)
+
+        return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
 
     def _expand_refs(
         self, data: Dict[str, Any], expand_columns: list[str]
@@ -488,7 +499,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if not ri.any_will_be_interpreted_as_ref_str(val):
                 continue
 
-            if isinstance(ri.parse_internal_uri(val), ri.InternalTableRef):
+            if not isinstance(ri.parse_internal_uri(val), ri.InternalObjectRef):
                 continue
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
