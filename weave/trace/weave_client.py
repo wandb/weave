@@ -152,6 +152,11 @@ class Call:
 
     @property
     def func_name(self) -> str:
+        """
+        The decorated function's name that produced this call.
+
+        This is different from `op_name` which is usually the ref of the op.
+        """
         if self.op_name.startswith("weave:///"):
             ref = parse_uri(self.op_name)
             return ref.name
