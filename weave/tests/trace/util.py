@@ -41,3 +41,8 @@ class FuzzyDateTimeMatcher:
     def __eq__(self, other):
         # Checks within 1ms
         return abs((self.dt - other).total_seconds()) < 0.001
+
+
+class DatetimeMatcher:
+    def __eq__(self, other):
+        return isinstance(other, datetime.datetime)

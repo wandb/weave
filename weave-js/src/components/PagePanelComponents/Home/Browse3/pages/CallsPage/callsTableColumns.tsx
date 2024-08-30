@@ -150,10 +150,9 @@ export const useCallsTableColumns = (
   return useMemo(() => {
     return {
       columns,
-      columnsWithRefs,
       setUserDefinedColumnWidths,
     };
-  }, [columns, columnsWithRefs, setUserDefinedColumnWidths]);
+  }, [columns, setUserDefinedColumnWidths]);
 };
 function buildCallsTableColumns(
   entity: string,

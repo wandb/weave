@@ -2,7 +2,6 @@ import asyncio
 import dataclasses
 import json
 import platform
-import re
 import sys
 
 import pydantic
@@ -13,7 +12,7 @@ import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
 from weave.legacy.weave import op_def
-from weave.tests.trace.util import AnyIntMatcher, RegexStringMatcher
+from weave.tests.trace.util import AnyIntMatcher, DatetimeMatcher, RegexStringMatcher
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
@@ -34,8 +33,6 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
-
-pytestmark = pytest.mark.trace
 
 
 def test_table_create(client):
@@ -278,6 +275,9 @@ def test_call_create(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=DatetimeMatcher(),
+        ended_at=DatetimeMatcher(),
+        deleted_at=None,
     )
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
@@ -311,6 +311,9 @@ def test_calls_query(client):
                 "trace_name": "x",
             }
         },
+        started_at=DatetimeMatcher(),
+        ended_at=None,
+        deleted_at=None,
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -335,6 +338,9 @@ def test_calls_query(client):
                 "trace_name": "x",
             }
         },
+        started_at=DatetimeMatcher(),
+        ended_at=None,
+        deleted_at=None,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)

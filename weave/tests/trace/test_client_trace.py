@@ -18,6 +18,7 @@ from weave.tests.trace.util import (
     AnyIntMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
+    DatetimeMatcher,
 )
 from weave.trace import weave_client
 from weave.trace.vals import MissingSelfInstanceError
@@ -98,6 +99,9 @@ def test_simple_op(client):
                 "sys_version": sys.version,
             },
         },
+        started_at=DatetimeMatcher(),
+        ended_at=DatetimeMatcher(),
+        deleted_at=None,
     )
 
 
@@ -272,7 +276,9 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> (
+        int
+    ):  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
