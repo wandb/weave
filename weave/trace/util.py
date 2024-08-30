@@ -121,6 +121,8 @@ def is_notebook() -> bool:
 
 
 def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Decorator to mark a function as deprecated and redirect users to `new_name`."""
+
     def deco(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
