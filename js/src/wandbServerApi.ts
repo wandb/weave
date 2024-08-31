@@ -11,7 +11,7 @@ query DefaultEntity {
 }
 `
 
-export class WandbApi {
+export class WandbServerApi {
     private host: string;
     private apiKey: string;
 
