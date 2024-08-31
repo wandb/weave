@@ -85,10 +85,13 @@ describe('Op Flow', () => {
             return result2;
         }, { name: 'outerAsyncOp' });
 
-        // Call the outer async op concurrently
+        // Call the outer async op concurrently with a small delay between calls
         const [result1, result2] = await Promise.all([
             outerAsyncOp(5),
-            outerAsyncOp(10)
+            (async () => {
+                await new Promise(resolve => setTimeout(resolve, 5)); // 5ms delay
+                return outerAsyncOp(10);
+            })()
         ]);
 
         // Wait for any pending batch processing
