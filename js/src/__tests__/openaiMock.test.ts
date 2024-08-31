@@ -5,7 +5,7 @@ describe('OpenAI Mock', () => {
         content: messages[0].content.toUpperCase(),
         functionCalls: [{
             name: "test_function",
-            arguments: JSON.stringify({ arg: "value" })
+            arguments: { arg: "value" }
         }]
     });
 
@@ -36,7 +36,7 @@ describe('OpenAI Mock', () => {
             }],
             usage: {
                 prompt_tokens: 2,
-                completion_tokens: 4,  // 2 for content + 3 for function call
+                completion_tokens: 4,  // 2 for content + 2 for function call
                 total_tokens: 6
             },
             system_fingerprint: expect.any(String)
