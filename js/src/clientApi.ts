@@ -1,14 +1,14 @@
-import { Api } from './serverApi';
+import { Api as TraceServerApi } from './traceServerApi';
 import { v4 as uuidv4 } from 'uuid';
 import { uuidv7 } from 'uuidv7';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { WandbApi } from './wandbApi';
+import { WandbServerApi } from './wandbServerApi';
 import { packageVersion } from './userAgent';
 
-let serverApi: Api<any>;
-let wandbApi: WandbApi;
+let traceServerApi: TraceServerApi<any>;
+let wandbServerApi: WandbServerApi;
 let globalProjectName: string;
 let activeCallStack: { callId: string; traceId: string }[] = [];
 
@@ -53,15 +53,15 @@ async function init(projectName: string): Promise<void> {
 
     try {
         // Initialize WandbApi
-        wandbApi = new WandbApi(host, apiKey);
+        wandbServerApi = new WandbServerApi(host, apiKey);
 
         // Get default entity name
-        const defaultEntityName = await wandbApi.defaultEntityName();
+        const defaultEntityName = await wandbServerApi.defaultEntityName();
 
         // Set global project name
         globalProjectName = `${defaultEntityName}/${projectName}`;
 
-        serverApi = new Api({
+        traceServerApi = new TraceServerApi({
             baseUrl: 'https://trace.wandb.ai',
             baseApiParams: {
                 headers: headers,
@@ -102,7 +102,7 @@ async function processBatch() {
     };
 
     try {
-        await serverApi.call.callStartBatchCallUpsertBatchPost(batchReq);
+        await traceServerApi.call.callStartBatchCallUpsertBatchPost(batchReq);
     } catch (error) {
         console.error('Error processing batch:', error);
         // Re-add failed items to the queue
