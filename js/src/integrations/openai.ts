@@ -71,26 +71,7 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any) {
                     include_usage: true
                 };
 
-                const result = await originalCreate(params);
-
-                // // If the user didn't originally request usage, filter it out
-                // if (!originalParams.stream_options?.include_usage) {
-                //     return {
-                //         [Symbol.asyncIterator]: async function* () {
-                //             for await (const chunk of result) {
-                //                 if ('choices' in chunk && chunk.choices.length > 0) {
-                //                     // Only yield chunks with non-empty choices
-                //                     const filteredChunk = { ...chunk };
-                //                     delete filteredChunk.usage;  // Remove usage key if present
-                //                     yield filteredChunk;
-                //                 }
-                //                 // Usage-only chunks are filtered out
-                //             }
-                //         }
-                //     };
-                // }
-
-                return result;
+                return await originalCreate(params);
             } else {
                 return await originalCreate(originalParams);
             }
@@ -138,8 +119,10 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
     );
 }
 
-export function createPatchedOpenAI(apiKey: string): OpenAI {
-    const openai = new OpenAI({ apiKey });
+export function wrapOpenAI(openai?: OpenAI): OpenAI {
+    if (!openai) {
+        openai = new OpenAI();
+    }
 
     const originalCreate = openai.chat.completions.create.bind(openai.chat.completions);
     // @ts-ignore

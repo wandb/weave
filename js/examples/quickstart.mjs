@@ -1,6 +1,6 @@
-import { init, op, createPatchedOpenAI } from 'weave';
+import { init, op, wrapOpenAI } from 'weave';
 
-const openai = createPatchedOpenAI();
+const openai = wrapOpenAI();
 
 async function extractDinos(input) {
     const response = await openai.chat.completions.create({

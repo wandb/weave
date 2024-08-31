@@ -1,7 +1,7 @@
 import { initWithCustomTraceServer } from '../clientApi';
 import { InMemoryTraceServer } from '../inMemoryTraceServer';
 import { makeMockOpenAIChat } from './openaiMock';
-import { makeOpenAIChatCompletionsOp, createPatchedOpenAI } from '../integrations/openai';
+import { makeOpenAIChatCompletionsOp, wrapOpenAI } from '../integrations/openai';
 
 // Helper function to get calls
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
@@ -30,7 +30,7 @@ describe('OpenAI Integration', () => {
         }));
 
         mockOpenAI = { chat: { completions: { create: mockOpenAIChat } } };
-        patchedOpenAI = createPatchedOpenAI('fake-api-key');
+        patchedOpenAI = wrapOpenAI();
         patchedOpenAI.chat.completions.create = makeOpenAIChatCompletionsOp(mockOpenAIChat);
     });
 

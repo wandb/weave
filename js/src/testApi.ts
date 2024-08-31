@@ -1,11 +1,11 @@
 import { init, op } from './clientApi';
-import { createPatchedOpenAI } from './integrations/openai';
+import { wrapOpenAI } from './integrations/openai';
 
 // Initialize the API
 init('shawn/weavejs-test1');
 
 // Create OpenAI client
-const openai = createPatchedOpenAI(process.env.OPENAI_API_KEY!);
+const openai = wrapOpenAI();
 
 // Define a simple function to be wrapped
 function add(a: number, b: number): number {
