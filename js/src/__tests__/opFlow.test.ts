@@ -1,5 +1,6 @@
 import { op, initWithCustomTraceServer } from '../clientApi';
 import { InMemoryTraceServer } from '../inMemoryTraceServer';
+import { makeMockOpenAIChat } from './openaiMock';
 
 // Helper function to get calls
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string, limit?: number, filters?: any) {
@@ -165,26 +166,20 @@ describe('Op Flow', () => {
     });
 
     test('openai-like op with token usage summary', async () => {
-        const openaiLikeOp = op(
-            async (prompt: string) => {
-                // Simulate OpenAI API response
-                return {
-                    model: 'gpt-3.5-turbo',
-                    usage: { total_tokens: prompt.length * 2 }, // Simplified token count
-                    choices: [{ message: { content: prompt.toUpperCase() } }]
-                };
-            },
-            {
-                name: 'openai.chat.completions.create',
-                summarize: (result) => ({
-                    usage: {
-                        [result.model]: result.usage
-                    }
-                })
-            }
-        );
+        const testOpenAIChat = makeMockOpenAIChat((messages) => ({
+            content: messages[0].content.toUpperCase(),
+        }));
 
-        await openaiLikeOp('Hello, AI!');
+        const openaiLikeOp = op(testOpenAIChat, {
+            name: 'openai.chat.completions.create',
+            summarize: (result) => ({
+                usage: {
+                    [result.model]: result.usage
+                }
+            })
+        });
+
+        await openaiLikeOp({ messages: [{ role: 'user', content: 'Hello, AI!' }] });
 
         // Wait for any pending batch processing
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -193,15 +188,38 @@ describe('Op Flow', () => {
 
         expect(calls).toHaveLength(1);
         expect(calls[0].op_name).toBe('openai.chat.completions.create');
-        expect(calls[0].inputs).toEqual({ arg0: 'Hello, AI!' });
+        expect(calls[0].inputs).toEqual({ arg0: { messages: [{ role: 'user', content: 'Hello, AI!' }] } });
         expect(calls[0].output).toEqual({
-            model: 'gpt-3.5-turbo',
-            usage: { total_tokens: 20 },
-            choices: [{ message: { content: 'HELLO, AI!' } }]
+            id: expect.any(String),
+            object: "chat.completion",
+            created: expect.any(Number),
+            model: "gpt-4o-2024-05-13",
+            choices: [{
+                index: 0,
+                message: {
+                    role: "assistant",
+                    content: "HELLO, AI!",
+                    function_call: null,
+                    refusal: null
+                },
+                logprobs: null,
+                finish_reason: "stop"
+            }],
+            usage: {
+                prompt_tokens: 2,
+                completion_tokens: 2,
+                total_tokens: 4
+            },
+            system_fingerprint: expect.any(String)
         });
         expect(calls[0].summary).toEqual({
             usage: {
-                'gpt-3.5-turbo': { requests: 1, total_tokens: 20 }
+                'gpt-4o-2024-05-13': {
+                    requests: 1,
+                    completion_tokens: 2,
+                    prompt_tokens: 2,
+                    total_tokens: 4
+                }
             }
         });
     });
