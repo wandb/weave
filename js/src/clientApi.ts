@@ -13,7 +13,7 @@ const asyncLocalStorage = new AsyncLocalStorage<{
     callStack: { callId: string; traceId: string; childSummary: Summary }[]
 }>();
 
-class Client {
+class WeaveClient {
     traceServerApi: TraceServerApi<any>;
     wandbServerApi: WandbServerApi;
     projectName: string;
@@ -66,7 +66,7 @@ class Client {
 }
 
 // Global client instance
-let globalClient: Client | null = null;
+let globalClient: WeaveClient | null = null;
 
 function readApiKeyFromNetrc(host: string): string | undefined {
     const netrcPath = path.join(os.homedir(), '.netrc');
@@ -88,7 +88,7 @@ function readApiKeyFromNetrc(host: string): string | undefined {
     return undefined;
 }
 
-async function init(projectName: string): Promise<Client> {
+async function init(projectName: string): Promise<WeaveClient> {
     const host = 'https://api.wandb.ai';
     const apiKey = readApiKeyFromNetrc('api.wandb.ai');
 
@@ -113,7 +113,7 @@ async function init(projectName: string): Promise<Client> {
             },
         });
 
-        globalClient = new Client(traceServerApi, wandbServerApi, fullProjectName);
+        globalClient = new WeaveClient(traceServerApi, wandbServerApi, fullProjectName);
         console.log(`Initializing project: ${fullProjectName}`);
         return globalClient;
     } catch (error) {
@@ -148,7 +148,7 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
     return result;
 }
 
-function createEndReq(client: Client, callId: string, endTime: string, output: any, summary: Summary, exception?: string) {
+function createEndReq(client: WeaveClient, callId: string, endTime: string, output: any, summary: Summary, exception?: string) {
     return {
         end: {
             project_id: client.projectName,
@@ -322,10 +322,10 @@ function generateCallId(): string {
     return uuidv7();
 }
 
-export { init, op, ref, Client };
+export { init, op, ref, WeaveClient as Client };
 
 export function initWithCustomTraceServer(projectName: string, customTraceServer: InMemoryTraceServer) {
-    globalClient = new Client(
+    globalClient = new WeaveClient(
         customTraceServer as unknown as TraceServerApi<any>,
         {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
         projectName
