@@ -13,16 +13,60 @@ const asyncLocalStorage = new AsyncLocalStorage<{
     callStack: { callId: string; traceId: string; childSummary: Summary }[]
 }>();
 
-let traceServerApi: TraceServerApi<any>;
-let wandbServerApi: WandbServerApi;
-let globalProjectName: string;
-let activeCallStack: { callId: string; traceId: string }[] = [];
+class Client {
+    traceServerApi: TraceServerApi<any>;
+    wandbServerApi: WandbServerApi;
+    projectName: string;
+    callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
+    batchProcessTimeout: NodeJS.Timeout | null = null;
+    isBatchProcessing: boolean = false;
+    readonly BATCH_INTERVAL: number = 200;
 
-// Queue for batching calls
-let callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
-let batchProcessTimeout: NodeJS.Timeout | null = null;
-let isBatchProcessing = false;
-const BATCH_INTERVAL = 200; // 200 milliseconds
+    constructor(traceServerApi: TraceServerApi<any>, wandbServerApi: WandbServerApi, projectName: string) {
+        this.traceServerApi = traceServerApi;
+        this.wandbServerApi = wandbServerApi;
+        this.projectName = projectName;
+    }
+
+    scheduleBatchProcessing() {
+        if (this.batchProcessTimeout || this.isBatchProcessing) return;
+        this.batchProcessTimeout = setTimeout(() => this.processBatch(), this.BATCH_INTERVAL);
+    }
+
+    async processBatch() {
+        if (this.isBatchProcessing || this.callQueue.length === 0) {
+            this.batchProcessTimeout = null;
+            return;
+        }
+
+        this.isBatchProcessing = true;
+
+        const batchToProcess = [...this.callQueue];
+        this.callQueue = [];
+
+        const batchReq = {
+            batch: batchToProcess.map(item => ({
+                mode: item.mode,
+                req: item.data
+            }))
+        };
+
+        try {
+            await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(batchReq);
+        } catch (error) {
+            console.error('Error processing batch:', error);
+        } finally {
+            this.isBatchProcessing = false;
+            this.batchProcessTimeout = null;
+            if (this.callQueue.length > 0) {
+                this.scheduleBatchProcessing();
+            }
+        }
+    }
+}
+
+// Global client instance
+let globalClient: Client | null = null;
 
 function readApiKeyFromNetrc(host: string): string | undefined {
     const netrcPath = path.join(os.homedir(), '.netrc');
@@ -44,7 +88,7 @@ function readApiKeyFromNetrc(host: string): string | undefined {
     return undefined;
 }
 
-async function init(projectName: string): Promise<void> {
+async function init(projectName: string): Promise<Client> {
     const host = 'https://api.wandb.ai';
     const apiKey = readApiKeyFromNetrc('api.wandb.ai');
 
@@ -58,69 +102,24 @@ async function init(projectName: string): Promise<void> {
     };
 
     try {
-        // Initialize WandbApi
-        wandbServerApi = new WandbServerApi(host, apiKey);
-
-        // Get default entity name
+        const wandbServerApi = new WandbServerApi(host, apiKey);
         const defaultEntityName = await wandbServerApi.defaultEntityName();
+        const fullProjectName = `${defaultEntityName}/${projectName}`;
 
-        // Set global project name
-        globalProjectName = `${defaultEntityName}/${projectName}`;
-
-        traceServerApi = new TraceServerApi({
+        const traceServerApi = new TraceServerApi({
             baseUrl: 'https://trace.wandb.ai',
             baseApiParams: {
                 headers: headers,
             },
         });
 
-        console.log(`Initializing project: ${globalProjectName}`);
+        globalClient = new Client(traceServerApi, wandbServerApi, fullProjectName);
+        console.log(`Initializing project: ${fullProjectName}`);
+        return globalClient;
     } catch (error) {
         console.error("Error during initialization:", error);
         throw error;
     }
-}
-
-function scheduleBatchProcessing() {
-    if (batchProcessTimeout || isBatchProcessing) return;
-    batchProcessTimeout = setTimeout(processBatch, BATCH_INTERVAL);
-}
-
-async function processBatch() {
-    if (isBatchProcessing || callQueue.length === 0) {
-        batchProcessTimeout = null;
-        return;
-    }
-
-    isBatchProcessing = true;
-
-    const batchToProcess = [...callQueue];
-    callQueue = [];
-
-    const batchReq = {
-        batch: batchToProcess.map(item => ({
-            mode: item.mode,
-            req: item.data
-        }))
-    };
-
-    try {
-        await traceServerApi.call.callStartBatchCallUpsertBatchPost(batchReq);
-    } catch (error) {
-        console.error('Error processing batch:', error);
-    } finally {
-        isBatchProcessing = false;
-        batchProcessTimeout = null;
-        if (callQueue.length > 0) {
-            scheduleBatchProcessing();
-        }
-    }
-}
-
-interface OpOptions<T extends (...args: any[]) => any> {
-    name?: string;
-    streamReducer?: StreamReducer<any, any>;
-    summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
 }
 
 // Add this new type and function
@@ -149,10 +148,10 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
     return result;
 }
 
-function createEndReq(callId: string, endTime: string, output: any, summary: Summary, exception?: string) {
+function createEndReq(client: Client, callId: string, endTime: string, output: any, summary: Summary, exception?: string) {
     return {
         end: {
-            project_id: globalProjectName,
+            project_id: client.projectName,
             id: callId,
             ended_at: endTime,
             output,
@@ -190,6 +189,12 @@ function processSummary(
     return mergedSummary;
 }
 
+interface OpOptions<T extends (...args: any[]) => any> {
+    name?: string;
+    streamReducer?: StreamReducer<any, any>;
+    summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
+}
+
 function op<T extends (...args: any[]) => any>(
     fn: T,
     options?: OpOptions<T>
@@ -197,8 +202,9 @@ function op<T extends (...args: any[]) => any>(
     const actualOpName = options?.name || fn.name || 'anonymous';
 
     return async function (...args: Parameters<T>): Promise<ReturnType<T>> {
-        if (!globalProjectName) {
-            throw new Error("Project not initialized. Call init() first.");
+        if (!globalClient) {
+            // If there's no client initialized, just call the function and return its result
+            return await fn(...args);
         }
 
         const store = asyncLocalStorage.getStore() || { callStack: [] };
@@ -218,12 +224,12 @@ function op<T extends (...args: any[]) => any>(
         store.callStack.push({ callId, traceId, childSummary: {} });
 
         if (store.callStack.length === 1) {
-            console.log(`🍩 https://wandb.ai/${globalProjectName}/r/call/${callId}`);
+            console.log(`🍩 https://wandb.ai/${globalClient.projectName}/r/call/${callId}`);
         }
 
         const startReq = {
             start: {
-                project_id: globalProjectName,
+                project_id: globalClient.projectName,
                 id: callId,
                 op_name: actualOpName,
                 trace_id: traceId,
@@ -239,8 +245,8 @@ function op<T extends (...args: any[]) => any>(
             }
         };
 
-        callQueue.push({ mode: 'start', data: startReq });
-        scheduleBatchProcessing();
+        globalClient.callQueue.push({ mode: 'start', data: startReq });
+        globalClient.scheduleBatchProcessing();
 
         try {
             const result = await asyncLocalStorage.run(store, async () => {
@@ -261,11 +267,14 @@ function op<T extends (...args: any[]) => any>(
                                 yield chunk;
                             }
                         } finally {
-                            const endTime = new Date().toISOString();
-                            const mergedSummary = processSummary(state, options?.summarize, currentCall, parentCall);
-                            const endReq = createEndReq(callId, endTime, state, mergedSummary);
-                            callQueue.push({ mode: 'end', data: endReq });
-                            scheduleBatchProcessing();
+                            if (globalClient) {  // Check if globalClient still exists
+                                const endTime = new Date().toISOString();
+                                const mergedSummary = processSummary(state, options?.summarize, currentCall, parentCall);
+                                const endReq = createEndReq(globalClient, callId, endTime, state, mergedSummary);
+                                globalClient.callQueue.push({ mode: 'end', data: endReq });
+                                globalClient.scheduleBatchProcessing();
+                            }
+                            // If globalClient is null, we do nothing, as requested
                         }
                     }
                 };
@@ -276,23 +285,24 @@ function op<T extends (...args: any[]) => any>(
                 const currentCall = store.callStack[store.callStack.length - 1];
                 const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
                 const mergedSummary = processSummary(result, options?.summarize, currentCall, parentCall);
-                const endReq = createEndReq(callId, endTime, result, mergedSummary);
-                callQueue.push({ mode: 'end', data: endReq });
-                scheduleBatchProcessing();
+                const endReq = createEndReq(globalClient, callId, endTime, result, mergedSummary);
+                globalClient.callQueue.push({ mode: 'end', data: endReq });
+                globalClient.scheduleBatchProcessing();
                 return result;
             }
         } catch (error) {
             console.error(`Op ${actualOpName} failed:`, error);
             const endTime = new Date().toISOString();
             const endReq = createEndReq(
+                globalClient,
                 callId,
                 endTime,
                 null,
                 {},
                 error instanceof Error ? error.message : String(error)
             );
-            callQueue.push({ mode: 'end', data: endReq });
-            scheduleBatchProcessing();
+            globalClient.callQueue.push({ mode: 'end', data: endReq });
+            globalClient.scheduleBatchProcessing();
             throw error;
         } finally {
             store.callStack.pop();
@@ -312,9 +322,12 @@ function generateCallId(): string {
     return uuidv7();
 }
 
-export { init, op, ref };
+export { init, op, ref, Client };
 
 export function initWithCustomTraceServer(projectName: string, customTraceServer: InMemoryTraceServer) {
-    globalProjectName = projectName;
-    traceServerApi = customTraceServer as unknown as TraceServerApi<any>;
+    globalClient = new Client(
+        customTraceServer as unknown as TraceServerApi<any>,
+        {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
+        projectName
+    );
 }
