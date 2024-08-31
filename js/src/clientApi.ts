@@ -115,8 +115,13 @@ async function processBatch() {
     }
 }
 
-function op(fn: Function, opName?: string) {
-    const actualOpName = opName || fn.name || 'anonymous';
+interface OpOptions {
+    name?: string;
+    summarize?: (result: any) => Record<string, any>;
+}
+
+function op(fn: Function, options?: OpOptions) {
+    const actualOpName = options?.name || fn.name || 'anonymous';
 
     return async function (...args: any[]) {
         if (!globalProjectName) {
@@ -172,13 +177,27 @@ function op(fn: Function, opName?: string) {
             });
 
             const endTime = new Date().toISOString();
+            let summary = options?.summarize ? options.summarize(result) : {};
+
+            // Inject "requests": 1 for each model's usage if usage object exists
+            if (summary.usage) {
+                for (const model in summary.usage) {
+                    if (typeof summary.usage[model] === 'object') {
+                        summary.usage[model] = {
+                            requests: 1,
+                            ...summary.usage[model],
+                        };
+                    }
+                }
+            }
+
             const endReq = {
                 end: {
                     project_id: globalProjectName,
                     id: callId,
                     ended_at: endTime,
                     output: result,
-                    summary: {},
+                    summary: summary,
                 }
             };
 
