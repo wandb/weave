@@ -37,43 +37,44 @@ const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
   const customTheme = createTheme({
     components: {
-      MuiTextField: {
-        styleOverrides: {
-          root: {
-            '& .MuiInputBase-input::placeholder': {
-              color: MOON_500,
-              fontSize: '16px',
-              opacity: 1,
-              fontFamily: 'Source Sans Pro',
-            },
-          },
-        },
-      },
       MuiAutocomplete: {
         styleOverrides: {
-          clearIndicator: {
-            visibility: 'visible',
-            opacity: 1,
-            borderRadius: '4px',
-            width: '24px',
-            height: '24px',
-          },
-          hasClearIcon: {
-            '& .MuiAutocomplete-clearIndicator': {
-              visibility: 'visible',
-              opacity: 1,
+          root: {
+            '& .MuiOutlinedInput-root': {
+              height: HEIGHTS[size],
+              padding: PADDING[size],
+              fontSize: FONT_SIZES[size],
+              color: MOON_800,
+              '&& fieldset': {
+                borderColor: MOON_250,
+              },
+              '&&:hover fieldset': {
+                borderColor: hexToRGB(TEAL_500, 0.4),
+                borderWidth: '2px',
+              },
+              '&&.Mui-focused fieldset': {
+                borderColor: hexToRGB(TEAL_500, 0.64),
+                borderWidth: '2px',
+              },
+              borderColor: MOON_250,
+              '&:hover fieldset': {
+                borderColor: hexToRGB(TEAL_500, 0.4),
+                borderWidth: '2px',
+              },
+              '&.Mui-focused fieldset': {
+                borderColor: hexToRGB(TEAL_500, 0.64),
+                borderWidth: '2px',
+              },
             },
           },
           option: {
             padding: '6px 10px',
             margin: '0 6px',
-            display: '-webkit-box !important',
+            display: '-webkit-box',
             WebkitBoxOrient: 'vertical',
             WebkitLineClamp: 5,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            // '-webkit-line-clamp': 5,
-            // '-webkit-box-orient': 'vertical',
             whiteSpace: 'normal',
             borderRadius: '4px',
             cursor: 'pointer',
@@ -95,22 +96,41 @@ const getStyles = (props: AdditionalProps) => {
       MuiOutlinedInput: {
         styleOverrides: {
           root: {
-            height: HEIGHTS[size],
-            padding: PADDING[size],
-            fontSize: FONT_SIZES[size],
-            color: MOON_800,
-            '&& fieldset': {
-              borderColor: MOON_250,
-            },
-            '&&:hover fieldset': {
-              borderColor: hexToRGB(TEAL_500, 0.4),
-              borderWidth: '2px',
-            },
-            '&&.Mui-focused fieldset': {
-              borderColor: hexToRGB(TEAL_500, 0.64),
-              borderWidth: '2px',
+            '& .MuiOutlinedInput-root': {
+              height: HEIGHTS[size],
+              padding: PADDING[size],
+              fontSize: FONT_SIZES[size],
+              color: MOON_800,
+              '&& fieldset': {
+                borderColor: MOON_250,
+              },
+              '&&:hover fieldset': {
+                borderColor: hexToRGB(TEAL_500, 0.4),
+                borderWidth: '2px',
+              },
+              '&&.Mui-focused fieldset': {
+                borderColor: hexToRGB(TEAL_500, 0.64),
+                borderWidth: '2px',
+              },
             },
           },
+          // {
+          //   height: HEIGHTS[size],
+          //   padding: PADDING[size],
+          //   fontSize: FONT_SIZES[size],
+          //   color: MOON_800,
+          //   '&& fieldset': {
+          //     borderColor: MOON_250,
+          //   },
+          //   '&&:hover fieldset': {
+          //     borderColor: hexToRGB(TEAL_500, 0.4),
+          //     borderWidth: '2px',
+          //   },
+          //   '&&.Mui-focused fieldset': {
+          //     borderColor: hexToRGB(TEAL_500, 0.64),
+          //     borderWidth: '2px',
+          //   },
+          // },
         },
       },
     },
