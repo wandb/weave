@@ -331,3 +331,38 @@ export function initWithCustomTraceServer(projectName: string, customTraceServer
         projectName
     );
 }
+/**
+ * Saves a file blob to the trace server and returns a CustomWeaveType object.
+ * 
+ * The frontend will interpret the CustomWeaveType and display the file.
+ * 
+ * @param typeName - The type name, must match python serializer.
+ * @param fileName - The saved file name, must match python serializer.
+ * @param fileContent - The content of the file as a Blob.
+ * @returns A Promise that resolves to a CustomWeaveType object representing the saved file.
+ */
+async function saveFileBlob(typeName: string, fileName: string, fileContent: Blob) {
+    const client = globalClient!;
+
+    const fileCreateRes = await client.traceServerApi.file.fileCreateFileCreatePost({
+        project_id: client.projectName,
+        // @ts-ignore
+        file: fileContent
+    });
+
+    return {
+        _type: 'CustomWeaveType',
+        weave_type: { type: typeName },
+        files: {
+            [fileName]: fileCreateRes.data.digest
+        },
+        // TODO: Have to hack this because the frontend requires it at the moment.
+        load_op: 'NO_LOAD_OP'
+    }
+}
+
+export async function saveImage(imageData: Buffer, imageType: 'png') {
+    const blob = new Blob([imageData], { type: `image/${imageType}` });
+
+    return saveFileBlob('PIL.Image.Image', 'image.png', blob)
+}
