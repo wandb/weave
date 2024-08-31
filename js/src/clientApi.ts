@@ -120,11 +120,16 @@ async function processBatch() {
 interface OpOptions<T extends (...args: any[]) => any> {
     name?: string;
     summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
-    aggregateStream?: (stream: AsyncIterable<any>) => Promise<Awaited<ReturnType<T>>>;
+    streamReducer?: StreamReducer<any, any>;
 }
 
 // Add this new type and function
 type Summary = Record<string, any>;
+
+interface StreamReducer<T, R> {
+    initialState: R;
+    reduceFn: (state: R, chunk: T) => R;
+}
 
 function mergeSummaries(left: Summary, right: Summary): Summary {
     const result: Summary = { ...right };
@@ -144,6 +149,47 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
     return result;
 }
 
+function createEndReq(callId: string, endTime: string, output: any, summary: Summary, exception?: string) {
+    return {
+        end: {
+            project_id: globalProjectName,
+            id: callId,
+            ended_at: endTime,
+            output,
+            summary,
+            ...(exception && { exception }),
+        }
+    };
+}
+
+function processSummary(
+    result: any,
+    summarize: ((result: any) => Record<string, any>) | undefined,
+    currentCall: { childSummary: Summary },
+    parentCall: { childSummary: Summary } | undefined
+) {
+    let ownSummary = summarize ? summarize(result) : {};
+
+    if (ownSummary.usage) {
+        for (const model in ownSummary.usage) {
+            if (typeof ownSummary.usage[model] === 'object') {
+                ownSummary.usage[model] = {
+                    requests: 1,
+                    ...ownSummary.usage[model],
+                };
+            }
+        }
+    }
+
+    const mergedSummary = mergeSummaries(ownSummary, currentCall.childSummary);
+
+    if (parentCall) {
+        parentCall.childSummary = mergeSummaries(mergedSummary, parentCall.childSummary);
+    }
+
+    return mergedSummary;
+}
+
 function op<T extends (...args: any[]) => any>(
     fn: T,
     options?: OpOptions<T>
@@ -156,7 +202,6 @@ function op<T extends (...args: any[]) => any>(
         }
 
         const store = asyncLocalStorage.getStore() || { callStack: [] };
-
         const startTime = new Date().toISOString();
         const callId = generateCallId();
         let traceId: string;
@@ -202,66 +247,52 @@ function op<T extends (...args: any[]) => any>(
                 return await fn(...args);
             });
 
-            let aggregatedResult: Awaited<ReturnType<T>> = result;
-            let outputToLog = result;
+            if (options?.streamReducer && Symbol.asyncIterator in result) {
+                const { initialState, reduceFn } = options.streamReducer;
+                let state = initialState;
+                const currentCall = store.callStack[store.callStack.length - 1];
+                const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
 
-            if (options?.aggregateStream && Symbol.asyncIterator in result) {
-                aggregatedResult = await options.aggregateStream(result as unknown as AsyncIterable<any>);
-                outputToLog = aggregatedResult;  // Use the aggregated result for logging
-            }
-
-            const endTime = new Date().toISOString();
-            let ownSummary = options?.summarize ? options.summarize(aggregatedResult) : {};
-
-            if (ownSummary.usage) {
-                for (const model in ownSummary.usage) {
-                    if (typeof ownSummary.usage[model] === 'object') {
-                        ownSummary.usage[model] = {
-                            requests: 1,
-                            ...ownSummary.usage[model],
-                        };
+                const wrappedIterator = {
+                    [Symbol.asyncIterator]: async function* () {
+                        try {
+                            for await (const chunk of result as AsyncIterable<any>) {
+                                state = reduceFn(state, chunk);
+                                yield chunk;
+                            }
+                        } finally {
+                            const endTime = new Date().toISOString();
+                            const mergedSummary = processSummary(state, options?.summarize, currentCall, parentCall);
+                            const endReq = createEndReq(callId, endTime, state, mergedSummary);
+                            callQueue.push({ mode: 'end', data: endReq });
+                            scheduleBatchProcessing();
+                        }
                     }
-                }
+                };
+
+                return wrappedIterator as unknown as ReturnType<T>;
+            } else {
+                const endTime = new Date().toISOString();
+                const currentCall = store.callStack[store.callStack.length - 1];
+                const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
+                const mergedSummary = processSummary(result, options?.summarize, currentCall, parentCall);
+                const endReq = createEndReq(callId, endTime, result, mergedSummary);
+                callQueue.push({ mode: 'end', data: endReq });
+                scheduleBatchProcessing();
+                return result;
             }
-
-            const currentCall = store.callStack[store.callStack.length - 1];
-            const mergedSummary = mergeSummaries(ownSummary, currentCall.childSummary);
-
-            if (store.callStack.length > 1) {
-                const parentCall = store.callStack[store.callStack.length - 2];
-                parentCall.childSummary = mergeSummaries(mergedSummary, parentCall.childSummary);
-            }
-
-            const endReq = {
-                end: {
-                    project_id: globalProjectName,
-                    id: callId,
-                    ended_at: endTime,
-                    output: outputToLog,  // Use the aggregated result for streaming responses
-                    summary: mergedSummary,
-                }
-            };
-
-            callQueue.push({ mode: 'end', data: endReq });
-            scheduleBatchProcessing();
-
-            return result;  // Return the original result to maintain the same behavior for the user
         } catch (error) {
-            console.error(`Op ${actualOpName} failed:`, error);  // Debug log
+            console.error(`Op ${actualOpName} failed:`, error);
             const endTime = new Date().toISOString();
-            const endReq = {
-                end: {
-                    project_id: globalProjectName,
-                    id: callId,
-                    ended_at: endTime,
-                    exception: error instanceof Error ? error.message : String(error),
-                    summary: {},
-                }
-            };
-
+            const endReq = createEndReq(
+                callId,
+                endTime,
+                null,
+                {},
+                error instanceof Error ? error.message : String(error)
+            );
             callQueue.push({ mode: 'end', data: endReq });
             scheduleBatchProcessing();
-
             throw error;
         } finally {
             store.callStack.pop();
@@ -284,7 +315,6 @@ function generateCallId(): string {
 export { init, op, ref };
 
 export function initWithCustomTraceServer(projectName: string, customTraceServer: InMemoryTraceServer) {
-    console.log(`Initializing custom trace server for project: ${projectName}`);  // Debug log
     globalProjectName = projectName;
     traceServerApi = customTraceServer as unknown as TraceServerApi<any>;
 }
