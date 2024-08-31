@@ -5,6 +5,7 @@ import { uuidv7 } from 'uuidv7';
 import { Api as TraceServerApi } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
 import { packageVersion } from './userAgent';
+import { InMemoryTraceServer } from './inMemoryTraceServer';
 
 let traceServerApi: TraceServerApi<any>;
 let wandbServerApi: WandbServerApi;
@@ -68,9 +69,6 @@ async function init(projectName: string): Promise<void> {
         });
 
         console.log(`Initializing project: ${globalProjectName}`);
-
-        // Start the batch processing
-        scheduleBatchProcessing();
     } catch (error) {
         console.error("Error during initialization:", error);
         throw error;
@@ -104,8 +102,6 @@ async function processBatch() {
         await traceServerApi.call.callStartBatchCallUpsertBatchPost(batchReq);
     } catch (error) {
         console.error('Error processing batch:', error);
-        // Re-add failed items to the queue
-        callQueue = [...batchToProcess, ...callQueue];
     } finally {
         isBatchProcessing = false;
         batchProcessTimeout = null;
@@ -207,8 +203,17 @@ function ref(uri: string) {
     console.log(`Ref: ${uri}`);
 }
 
+function generateTraceId(): string {
+    return uuidv7();
+}
+
 function generateCallId(): string {
-    return uuidv7(); // Using v7 for callId
+    return uuidv7();
 }
 
 export { init, op, ref };
+
+export function initWithCustomTraceServer(projectName: string, customTraceServer: InMemoryTraceServer) {
+    globalProjectName = projectName;
+    traceServerApi = customTraceServer as unknown as TraceServerApi<any>;
+}
