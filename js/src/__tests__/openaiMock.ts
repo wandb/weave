@@ -1,5 +1,3 @@
-import { op } from '../clientApi';
-
 function generateId() {
     return "chatcmpl-" + Math.random().toString(36).substr(2, 9);
 }
@@ -28,11 +26,13 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
         messages,
         stream = false,
         model = "gpt-4o-2024-05-13",
+        stream_options,
         ...otherOptions
     }: {
         messages: any[];
         stream?: boolean;
         model?: string;
+        stream_options?: { include_usage?: boolean };
         [key: string]: any;
     }) {
         const response = responseFn(messages);
@@ -46,7 +46,7 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
         if (stream) {
             return {
                 [Symbol.asyncIterator]: async function* () {
-                    yield* generateChunks(content, functionCalls, model, promptTokens, completionTokens, totalTokens);
+                    yield* generateChunks(content, functionCalls, model, promptTokens, completionTokens, totalTokens, stream_options);
                 }
             };
         } else {
@@ -83,95 +83,99 @@ function* generateChunks(
     model: string,
     promptTokens: number,
     completionTokens: number,
-    totalTokens: number
+    totalTokens: number,
+    stream_options?: { include_usage?: boolean }
 ) {
     const id = generateId();
     const systemFingerprint = generateSystemFingerprint();
     const created = Math.floor(Date.now() / 1000);
 
-    // Initial chunk
-    yield {
+    const baseChunk = {
         id,
         object: "chat.completion.chunk",
         created,
         model,
         system_fingerprint: systemFingerprint,
+    };
+
+    const includeUsage = stream_options?.include_usage;
+
+    // Initial chunk
+    yield {
+        ...baseChunk,
         choices: [{
             index: 0,
             delta: { role: "assistant", content: "", refusal: null },
             logprobs: null,
             finish_reason: null
-        }]
+        }],
+        ...(includeUsage && { usage: null })
     };
 
     // Content chunks
     for (const word of content.split(' ')) {
         yield {
-            id,
-            object: "chat.completion.chunk",
-            created,
-            model,
-            system_fingerprint: systemFingerprint,
+            ...baseChunk,
             choices: [{
                 index: 0,
                 delta: { content: word + ' ' },
                 logprobs: null,
                 finish_reason: null
-            }]
+            }],
+            ...(includeUsage && { usage: null })
         };
     }
 
     // Function call chunks
     for (const functionCall of functionCalls) {
         yield {
-            id,
-            object: "chat.completion.chunk",
-            created,
-            model,
-            system_fingerprint: systemFingerprint,
+            ...baseChunk,
             choices: [{
                 index: 0,
                 delta: { function_call: { name: functionCall.name, arguments: "" } },
                 logprobs: null,
                 finish_reason: null
-            }]
+            }],
+            ...(includeUsage && { usage: null })
         };
 
         const args = functionCall.arguments;
         for (let i = 0; i < args.length; i += 10) {
             yield {
-                id,
-                object: "chat.completion.chunk",
-                created,
-                model,
-                system_fingerprint: systemFingerprint,
+                ...baseChunk,
                 choices: [{
                     index: 0,
                     delta: { function_call: { arguments: args.slice(i, i + 10) } },
                     logprobs: null,
                     finish_reason: null
-                }]
+                }],
+                ...(includeUsage && { usage: null })
             };
         }
     }
 
-    // Final chunk with usage information
+    // Second to last chunk (finish_reason)
     yield {
-        id,
-        object: "chat.completion.chunk",
-        created,
-        model,
-        system_fingerprint: systemFingerprint,
+        ...baseChunk,
         choices: [{
             index: 0,
             delta: {},
             logprobs: null,
             finish_reason: functionCalls.length > 0 ? "function_call" : "stop"
         }],
-        usage: {
-            prompt_tokens: promptTokens,
-            completion_tokens: completionTokens,
-            total_tokens: totalTokens
-        }
+        ...(includeUsage && { usage: null })
     };
+
+    // Final chunk with usage information (only if include_usage is true)
+    if (includeUsage) {
+        yield {
+            ...baseChunk,
+            choices: [],
+            usage: {
+                prompt_tokens: promptTokens,
+                completion_tokens: completionTokens,
+                total_tokens: totalTokens
+            }
+        };
+    }
 }
