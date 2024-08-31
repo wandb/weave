@@ -12,7 +12,7 @@ from weave.trace.weave_client import Call
 from weave.trace_server.trace_server_interface import CallsFilter
 
 
-def assert_calls_correct_for_quickstart(calls: list[Call]) -> None:
+def assert_calls_correct_for_quickstart(flattened_calls: list[Call]) -> None:
     """Next, the major thing to assert is the "shape" of the calls:
     llama_index.query
         llama_index.retrieve
@@ -24,7 +24,6 @@ def assert_calls_correct_for_quickstart(calls: list[Call]) -> None:
             llama_index.llm
                 openai.chat.completions.create
     """
-    flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 9
 
     exp = [
@@ -74,9 +73,10 @@ def test_llamaindex_quickstart(
     query_engine = index.as_query_engine()
     response = query_engine.query("What did the author do growing up?")
 
-    calls = client.calls(filter=CallsFilter(trace_roots_only=True))
-    assert_calls_correct_for_quickstart(calls)
-    call = calls[-2]
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    assert_calls_correct_for_quickstart(flattened_calls)
+    call, _ = flattened_calls[-2]
     assert call.inputs["serialized"]["api_key"] == "REDACTED"
 
 
@@ -98,7 +98,9 @@ async def test_llamaindex_quickstart_async(
 
     query_engine = index.as_query_engine()
     response = await query_engine.aquery("What did the author do growing up?")
-    calls = list(client.calls())
-    assert_calls_correct_for_quickstart(calls)
-    call = calls[-2]
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    assert_calls_correct_for_quickstart(flattened_calls)
+    call, _ = flattened_calls[-2]
     assert call.inputs["serialized"]["api_key"] == "REDACTED"
