@@ -205,4 +205,82 @@ describe('Op Flow', () => {
             }
         });
     });
+
+    test('nested op calls with summaries', async () => {
+        const leafOp = op(
+            (x: number) => x,
+            {
+                name: 'leafOp',
+                summarize: (result) => ({ leaf: { count: 1, sum: result } })
+            }
+        );
+
+        const midOp = op(
+            async (x: number, y: number) => {
+                const res1 = await leafOp(x);
+                const res2 = await leafOp(y);
+                return res1 + res2;
+            },
+            {
+                name: 'midOp',
+                summarize: (result) => ({ mid: { count: 1, sum: result } })
+            }
+        );
+
+        const rootOp = op(
+            async (a: number, b: number, c: number) => {
+                const res1 = await midOp(a, b);
+                const res2 = await leafOp(c);
+                return res1 + res2;
+            },
+            {
+                name: 'rootOp',
+                summarize: (result) => ({ root: { count: 1, sum: result } })
+            }
+        );
+
+        await rootOp(1, 2, 3);
+
+        // Wait for any pending batch processing
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        const calls = await getCalls(inMemoryTraceServer, testProjectName);
+
+        expect(calls).toHaveLength(5); // 1 root + 1 mid + 3 leaf calls
+
+        const rootCall = calls.find(call => call.op_name === 'rootOp');
+        expect(rootCall).toBeDefined();
+        expect(rootCall?.summary).toEqual({
+            root: { count: 1, sum: 6 },
+            mid: { count: 1, sum: 3 },
+            leaf: { count: 3, sum: 6 }  // This is correct: 3 leaf calls, sum of 1+2+3
+        });
+
+        const midCall = calls.find(call => call.op_name === 'midOp');
+        expect(midCall).toBeDefined();
+        expect(midCall?.summary).toEqual({
+            mid: { count: 1, sum: 3 },
+            leaf: { count: 2, sum: 3 }  // This is correct: 2 leaf calls within midOp, sum of 1+2
+        });
+
+        const leafCalls = calls.filter(call => call.op_name === 'leafOp');
+        expect(leafCalls).toHaveLength(3);
+
+        // Check individual leaf calls
+        expect(leafCalls[0].summary).toEqual({ leaf: { count: 1, sum: 1 } });
+        expect(leafCalls[1].summary).toEqual({ leaf: { count: 1, sum: 2 } });
+        expect(leafCalls[2].summary).toEqual({ leaf: { count: 1, sum: 3 } });
+
+        // Check parent-child relationships
+        expect(midCall?.parent_id).toBe(rootCall?.id);
+        expect(leafCalls[0].parent_id).toBe(midCall?.id);
+        expect(leafCalls[1].parent_id).toBe(midCall?.id);
+        expect(leafCalls[2].parent_id).toBe(rootCall?.id);
+
+        // Check that all calls have the same trace_id
+        const traceId = rootCall?.trace_id;
+        calls.forEach(call => {
+            expect(call.trace_id).toBe(traceId);
+        });
+    });
 });

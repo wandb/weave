@@ -128,12 +128,13 @@ This project is licensed under the Apaache2 License - see the [LICENSE](../LICEN
 
 ### Roadmap / TODO
 
-- [ ] Return token counts
+- [x] Return token counts
+- [x] Summary merging
+- [ ] Decide how to handle args in js, since they're not named
 - [ ] Make sure LLM streaming is handled
+- [ ] Op versioning / code capture
 - [ ] Retry logic
 - [ ] Include system information in call attributes including package version.
-- [ ] Decide how to handle args in js, since they're not named
-- [ ] Op versioning / code capture
 - [ ] Objects / Datasets / Models / Evaluations
 - [ ] Ref tracking
 - [ ] More integrations

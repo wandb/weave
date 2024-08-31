@@ -9,7 +9,9 @@ import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { AsyncLocalStorage } from 'async_hooks';
 
 // Create an AsyncLocalStorage instance
-const asyncLocalStorage = new AsyncLocalStorage<{ callStack: { callId: string; traceId: string }[] }>();
+const asyncLocalStorage = new AsyncLocalStorage<{
+    callStack: { callId: string; traceId: string; childSummary: Summary }[]
+}>();
 
 let traceServerApi: TraceServerApi<any>;
 let wandbServerApi: WandbServerApi;
@@ -120,6 +122,27 @@ interface OpOptions {
     summarize?: (result: any) => Record<string, any>;
 }
 
+// Add this new type and function
+type Summary = Record<string, any>;
+
+function mergeSummaries(left: Summary, right: Summary): Summary {
+    const result: Summary = { ...right };
+    for (const [key, leftValue] of Object.entries(left)) {
+        if (key in result) {
+            if (typeof leftValue === 'number' && typeof result[key] === 'number') {
+                result[key] = leftValue + result[key];
+            } else if (typeof leftValue === 'object' && typeof result[key] === 'object') {
+                result[key] = mergeSummaries(leftValue, result[key]);
+            } else {
+                result[key] = leftValue;
+            }
+        } else {
+            result[key] = leftValue;
+        }
+    }
+    return result;
+}
+
 function op(fn: Function, options?: OpOptions) {
     const actualOpName = options?.name || fn.name || 'anonymous';
 
@@ -143,7 +166,7 @@ function op(fn: Function, options?: OpOptions) {
             parentId = parentCall.callId;
         }
 
-        store.callStack.push({ callId, traceId });
+        store.callStack.push({ callId, traceId, childSummary: {} });
 
         // Add this new logging for top-level operations
         if (store.callStack.length === 1) {
@@ -177,18 +200,28 @@ function op(fn: Function, options?: OpOptions) {
             });
 
             const endTime = new Date().toISOString();
-            let summary = options?.summarize ? options.summarize(result) : {};
+            let ownSummary = options?.summarize ? options.summarize(result) : {};
 
             // Inject "requests": 1 for each model's usage if usage object exists
-            if (summary.usage) {
-                for (const model in summary.usage) {
-                    if (typeof summary.usage[model] === 'object') {
-                        summary.usage[model] = {
+            if (ownSummary.usage) {
+                for (const model in ownSummary.usage) {
+                    if (typeof ownSummary.usage[model] === 'object') {
+                        ownSummary.usage[model] = {
                             requests: 1,
-                            ...summary.usage[model],
+                            ...ownSummary.usage[model],
                         };
                     }
                 }
+            }
+
+            // Merge childSummary with ownSummary
+            const currentCall = store.callStack[store.callStack.length - 1];
+            const mergedSummary = mergeSummaries(ownSummary, currentCall.childSummary);
+
+            // Update parent's childSummary if exists
+            if (store.callStack.length > 1) {
+                const parentCall = store.callStack[store.callStack.length - 2];
+                parentCall.childSummary = mergeSummaries(mergedSummary, parentCall.childSummary);
             }
 
             const endReq = {
@@ -197,7 +230,7 @@ function op(fn: Function, options?: OpOptions) {
                     id: callId,
                     ended_at: endTime,
                     output: result,
-                    summary: summary,
+                    summary: mergedSummary,
                 }
             };
 
