@@ -13,7 +13,7 @@ from weave.trace.weave_client import Call, WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 
-def assert_ends_and_errors(calls: list[Call]) -> None:
+def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
     for call, depth in calls:
         assert call.ended_at is not None
         assert call.exception is None

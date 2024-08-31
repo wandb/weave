@@ -1,10 +1,10 @@
 import hashlib
 import re
-from typing import Any, Iterable
+from typing import Any, Iterable, Union
 
 import weave
-from weave.trace.refs import parse_uri
-from weave.trace.weave_client import Call
+from weave.trace.refs import OpRef, parse_uri
+from weave.trace.weave_client import Call, CallsIter
 from weave.trace_server import trace_server_interface as tsi
 
 MAX_RUN_NAME_LENGTH = 128
@@ -92,7 +92,7 @@ def _get_op_name(s: str) -> str:
     return s
 
 
-def flatten_calls(calls: Iterable[Call], *, depth: int = 0) -> list:
+def flatten_calls(calls: Union[Iterable[Call], CallsIter], *, depth: int = 0) -> list:
     lst = []
     for call in calls:
         lst.append((call, depth))
@@ -104,6 +104,7 @@ def flattened_calls_to_names(flattened_calls: list) -> list:
     lst = []
     for call, depth in flattened_calls:
         ref = parse_uri(call.op_name)
+        assert isinstance(ref, OpRef)
         lst.append((ref.name, depth))
     return lst
 

@@ -132,7 +132,7 @@ class CallRef(RefWithExtra):
         return u
 
 
-AnyRef = Union[ObjectRef, TableRef, CallRef]
+AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
 
 
 def parse_uri(uri: str) -> AnyRef:
