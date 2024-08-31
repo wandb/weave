@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { WandbApi } from './wandbApi';
+import { packageVersion } from './userAgent';
 
 let serverApi: Api<any>;
 let wandbApi: WandbApi;
@@ -150,7 +151,12 @@ function op(fn: Function, opName?: string) {
                 trace_id: traceId,
                 parent_id: parentId,
                 started_at: startTime,
-                attributes: {}, // Add any relevant attributes
+                attributes: {
+                    weave: {
+                        client_version: packageVersion,
+                        source: 'js-sdk'
+                    }
+                }, // Add any relevant attributes
                 inputs: args.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), {}),
             }
         };
