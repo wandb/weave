@@ -76,7 +76,7 @@ def test_llamaindex_quickstart(
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert_calls_correct_for_quickstart(flattened_calls)
-    call, _ = flattened_calls[-2]
+    call, _, _ = flattened_calls[-2]
     assert call.inputs["serialized"]["api_key"] == "REDACTED"
 
 
@@ -102,5 +102,5 @@ async def test_llamaindex_quickstart_async(
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert_calls_correct_for_quickstart(flattened_calls)
-    call, _ = flattened_calls[-2]
+    call, _, _ = flattened_calls[-2]
     assert call.inputs["serialized"]["api_key"] == "REDACTED"
