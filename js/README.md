@@ -131,10 +131,16 @@ This project is licensed under the Apaache2 License - see the [LICENSE](../LICEN
 - [x] Return token counts
 - [x] Summary merging
 - [ ] Decide how to handle args in js, since they're not named
-- [ ] Make sure LLM streaming is handled
+- [x] Make sure LLM streaming is handled
 - [ ] Op versioning / code capture
 - [ ] Retry logic
+- [ ] Handle other wandb backends (manaaged / self-hosted)
 - [ ] Include system information in call attributes including package version.
 - [ ] Objects / Datasets / Models / Evaluations
 - [ ] Ref tracking
 - [ ] More integrations
+
+## Known Issues
+
+- [ ] openai choices > 1 and "tools" not handled (function works though)
+- [ ] if a streaming op with streamReducer returns its iterator instead of iterating within the op, summary rollups won't work.
