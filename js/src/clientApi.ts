@@ -117,9 +117,10 @@ async function processBatch() {
     }
 }
 
-interface OpOptions {
+interface OpOptions<T extends (...args: any[]) => any> {
     name?: string;
-    summarize?: (result: any) => Record<string, any>;
+    summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
+    aggregateStream?: (stream: AsyncIterable<any>) => Promise<Awaited<ReturnType<T>>>;
 }
 
 // Add this new type and function
@@ -143,10 +144,13 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
     return result;
 }
 
-function op(fn: Function, options?: OpOptions) {
+function op<T extends (...args: any[]) => any>(
+    fn: T,
+    options?: OpOptions<T>
+): (...args: Parameters<T>) => Promise<ReturnType<T>> {
     const actualOpName = options?.name || fn.name || 'anonymous';
 
-    return async function (...args: any[]) {
+    return async function (...args: Parameters<T>): Promise<ReturnType<T>> {
         if (!globalProjectName) {
             throw new Error("Project not initialized. Call init() first.");
         }
@@ -168,7 +172,6 @@ function op(fn: Function, options?: OpOptions) {
 
         store.callStack.push({ callId, traceId, childSummary: {} });
 
-        // Add this new logging for top-level operations
         if (store.callStack.length === 1) {
             console.log(`🍩 https://wandb.ai/${globalProjectName}/r/call/${callId}`);
         }
@@ -199,10 +202,17 @@ function op(fn: Function, options?: OpOptions) {
                 return await fn(...args);
             });
 
-            const endTime = new Date().toISOString();
-            let ownSummary = options?.summarize ? options.summarize(result) : {};
+            let aggregatedResult: Awaited<ReturnType<T>> = result;
+            let outputToLog = result;
 
-            // Inject "requests": 1 for each model's usage if usage object exists
+            if (options?.aggregateStream && Symbol.asyncIterator in result) {
+                aggregatedResult = await options.aggregateStream(result as unknown as AsyncIterable<any>);
+                outputToLog = aggregatedResult;  // Use the aggregated result for logging
+            }
+
+            const endTime = new Date().toISOString();
+            let ownSummary = options?.summarize ? options.summarize(aggregatedResult) : {};
+
             if (ownSummary.usage) {
                 for (const model in ownSummary.usage) {
                     if (typeof ownSummary.usage[model] === 'object') {
@@ -214,11 +224,9 @@ function op(fn: Function, options?: OpOptions) {
                 }
             }
 
-            // Merge childSummary with ownSummary
             const currentCall = store.callStack[store.callStack.length - 1];
             const mergedSummary = mergeSummaries(ownSummary, currentCall.childSummary);
 
-            // Update parent's childSummary if exists
             if (store.callStack.length > 1) {
                 const parentCall = store.callStack[store.callStack.length - 2];
                 parentCall.childSummary = mergeSummaries(mergedSummary, parentCall.childSummary);
@@ -229,7 +237,7 @@ function op(fn: Function, options?: OpOptions) {
                     project_id: globalProjectName,
                     id: callId,
                     ended_at: endTime,
-                    output: result,
+                    output: outputToLog,  // Use the aggregated result for streaming responses
                     summary: mergedSummary,
                 }
             };
@@ -237,8 +245,9 @@ function op(fn: Function, options?: OpOptions) {
             callQueue.push({ mode: 'end', data: endReq });
             scheduleBatchProcessing();
 
-            return result;
+            return result;  // Return the original result to maintain the same behavior for the user
         } catch (error) {
+            console.error(`Op ${actualOpName} failed:`, error);  // Debug log
             const endTime = new Date().toISOString();
             const endReq = {
                 end: {
@@ -257,7 +266,7 @@ function op(fn: Function, options?: OpOptions) {
         } finally {
             store.callStack.pop();
         }
-    }
+    };
 }
 
 function ref(uri: string) {
@@ -275,6 +284,7 @@ function generateCallId(): string {
 export { init, op, ref };
 
 export function initWithCustomTraceServer(projectName: string, customTraceServer: InMemoryTraceServer) {
+    console.log(`Initializing custom trace server for project: ${projectName}`);  // Debug log
     globalProjectName = projectName;
     traceServerApi = customTraceServer as unknown as TraceServerApi<any>;
 }

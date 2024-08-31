@@ -116,12 +116,13 @@ function* generateChunks(
     };
 
     // Content chunks
-    for (const word of content.split(' ')) {
+    const words = content.split(' ');
+    for (let i = 0; i < words.length; i++) {
         yield {
             ...baseChunk,
             choices: [{
                 index: 0,
-                delta: { content: word + ' ' },
+                delta: { content: words[i] + (i < words.length - 1 ? ' ' : '') },
                 logprobs: null,
                 finish_reason: null
             }],
