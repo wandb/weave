@@ -195,6 +195,43 @@ interface OpOptions<T extends (...args: any[]) => any> {
     summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
 }
 
+// Define WeaveImage type
+interface WeaveImage {
+    _type: 'WeaveImage';
+    data: Buffer;
+    imageType: 'png';
+}
+
+export function weaveImage({ data, imageType }: { data: Buffer, imageType: 'png' }): WeaveImage {
+    return {
+        _type: 'WeaveImage',
+        data,
+        imageType
+    };
+}
+
+// Function to check if a value is a WeaveImage
+function isWeaveImage(value: any): value is WeaveImage {
+    return value && value._type === 'WeaveImage' && Buffer.isBuffer(value.data) && value.imageType === 'png';
+}
+
+// Function to process WeaveImage in inputs or output
+async function processWeaveValues(value: any): Promise<any> {
+    if (isWeaveImage(value)) {
+        return await saveImage(value.data, value.imageType);
+    } else if (Array.isArray(value)) {
+        return Promise.all(value.map(processWeaveValues));
+    } else if (typeof value === 'object' && value !== null) {
+        const processed: Record<string, any> = {};
+        for (const [key, val] of Object.entries(value)) {
+            processed[key] = await processWeaveValues(val);
+        }
+        return processed;
+    }
+    return value;
+}
+
+// Modify the op function
 function op<T extends (...args: any[]) => any>(
     fn: T,
     options?: OpOptions<T>
@@ -203,7 +240,6 @@ function op<T extends (...args: any[]) => any>(
 
     return async function (...args: Parameters<T>): Promise<ReturnType<T>> {
         if (!globalClient) {
-            // If there's no client initialized, just call the function and return its result
             return await fn(...args);
         }
 
@@ -227,6 +263,9 @@ function op<T extends (...args: any[]) => any>(
             console.log(`🍩 https://wandb.ai/${globalClient.projectName}/r/call/${callId}`);
         }
 
+        // Process WeaveImage in inputs
+        const processedArgs = await Promise.all(args.map(processWeaveValues));
+
         const startReq = {
             start: {
                 project_id: globalClient.projectName,
@@ -241,7 +280,7 @@ function op<T extends (...args: any[]) => any>(
                         source: 'js-sdk'
                     }
                 },
-                inputs: args.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), {}),
+                inputs: processedArgs.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), {}),
             }
         };
 
@@ -249,9 +288,10 @@ function op<T extends (...args: any[]) => any>(
         globalClient.scheduleBatchProcessing();
 
         try {
-            const result = await asyncLocalStorage.run(store, async () => {
-                return await fn(...args);
+            let result = await asyncLocalStorage.run(store, async () => {
+                return await fn(...processedArgs);
             });
+
 
             if (options?.streamReducer && Symbol.asyncIterator in result) {
                 const { initialState, reduceFn } = options.streamReducer;
@@ -268,6 +308,7 @@ function op<T extends (...args: any[]) => any>(
                             }
                         } finally {
                             if (globalClient) {  // Check if globalClient still exists
+                                state = await processWeaveValues(state);
                                 const endTime = new Date().toISOString();
                                 const mergedSummary = processSummary(state, options?.summarize, currentCall, parentCall);
                                 const endReq = createEndReq(globalClient, callId, endTime, state, mergedSummary);
@@ -281,6 +322,7 @@ function op<T extends (...args: any[]) => any>(
 
                 return wrappedIterator as unknown as ReturnType<T>;
             } else {
+                result = await processWeaveValues(result);
                 const endTime = new Date().toISOString();
                 const currentCall = store.callStack[store.callStack.length - 1];
                 const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;

@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { op } from '../clientApi';
+import { op, weaveImage } from '../clientApi';
 
 const openAIStreamReducer = {
     initialState: {
@@ -58,7 +58,7 @@ const openAIStreamReducer = {
     }
 };
 
-export function makeOpenAIOp(originalCreate: any) {
+export function makeOpenAIChatCompletionsOp(originalCreate: any) {
     return op(
         async function (...args: Parameters<typeof originalCreate>) {
             const [originalParams]: any[] = args;
@@ -107,12 +107,47 @@ export function makeOpenAIOp(originalCreate: any) {
     );
 }
 
+export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
+    return op(
+        async function (...args: Parameters<typeof originalGenerate>) {
+            const result = await originalGenerate(...args);
+
+            // Process the result to convert image data to WeaveImage
+            if (result.data) {
+                result.data = await Promise.all(result.data.map(async (item: any) => {
+                    if (item.b64_json) {
+                        const buffer = Buffer.from(item.b64_json, 'base64');
+                        return weaveImage({ data: buffer, imageType: 'png' });
+                    }
+                    return item;
+                }));
+            }
+
+            return result;
+        },
+        {
+            name: 'openai.images.generate',
+            summarize: (result) => ({
+                usage: {
+                    'dall-e': {
+                        images_generated: result.data.length
+                    }
+                }
+            })
+        }
+    );
+}
+
 export function createPatchedOpenAI(apiKey: string): OpenAI {
     const openai = new OpenAI({ apiKey });
 
     const originalCreate = openai.chat.completions.create.bind(openai.chat.completions);
     // @ts-ignore
-    openai.chat.completions.create = makeOpenAIOp(originalCreate);
+    openai.chat.completions.create = makeOpenAIChatCompletionsOp(originalCreate);
+
+    const originalGenerate = openai.images.generate.bind(openai.images);
+    // @ts-ignore
+    openai.images.generate = makeOpenAIImagesGenerateOp(originalGenerate);
 
     return openai;
 }

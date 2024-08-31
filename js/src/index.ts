@@ -1,3 +1,3 @@
 // src/index.ts
-export { init, op, saveImage } from './clientApi';
+export { init, op, weaveImage } from './clientApi';
 export { createPatchedOpenAI } from './integrations';
