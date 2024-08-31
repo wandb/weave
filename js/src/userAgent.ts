@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-let packageVersion: string;
+export let packageVersion: string;
 
 try {
     const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
