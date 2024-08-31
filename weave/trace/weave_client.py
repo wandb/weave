@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import Any, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
+import wandb
 from requests import HTTPError
 
 from weave import version
@@ -379,6 +380,7 @@ class WeaveClient:
         self,
         entity: str,
         project: str,
+        *,
         server: TraceServerInterface,
         ensure_project_exists: bool = True,
     ):
@@ -568,7 +570,7 @@ class WeaveClient:
         if parent is not None:
             parent._children.append(call)
 
-        current_wb_run_id = safe_current_wb_run_id()
+        current_wb_run_id = maybe_current_wb_run_id()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
         start = StartedCallSchemaForInsert(
             project_id=self._project_id(),
@@ -954,16 +956,10 @@ class WeaveClient:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
 
-def safe_current_wb_run_id() -> Optional[str]:
-    try:
-        import wandb
-
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
-    except ImportError:
+def maybe_current_wb_run_id() -> Optional[str]:
+    if wandb.run is None:
         return None
+    return f"{wandb.run.entity}/{wandb.run.project}/{wandb.run.id}"
 
 
 def check_wandb_run_matches(
