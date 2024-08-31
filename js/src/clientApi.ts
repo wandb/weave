@@ -6,6 +6,10 @@ import { Api as TraceServerApi } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
 import { packageVersion } from './userAgent';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
+import { AsyncLocalStorage } from 'async_hooks';
+
+// Create an AsyncLocalStorage instance
+const asyncLocalStorage = new AsyncLocalStorage<{ callStack: { callId: string; traceId: string }[] }>();
 
 let traceServerApi: TraceServerApi<any>;
 let wandbServerApi: WandbServerApi;
@@ -119,22 +123,25 @@ function op(fn: Function, opName?: string) {
             throw new Error("Project not initialized. Call init() first.");
         }
 
+        const store = asyncLocalStorage.getStore() || { callStack: [] };
+
         const startTime = new Date().toISOString();
         const callId = generateCallId();
         let traceId: string;
         let parentId: string | null = null;
 
-        if (activeCallStack.length === 0) {
+        if (store.callStack.length === 0) {
             traceId = generateTraceId();
         } else {
-            traceId = activeCallStack[activeCallStack.length - 1].traceId;
-            parentId = activeCallStack[activeCallStack.length - 1].callId;
+            const parentCall = store.callStack[store.callStack.length - 1];
+            traceId = parentCall.traceId;
+            parentId = parentCall.callId;
         }
 
-        activeCallStack.push({ callId, traceId });
+        store.callStack.push({ callId, traceId });
 
         // Add this new logging for top-level operations
-        if (activeCallStack.length === 1) {
+        if (store.callStack.length === 1) {
             console.log(`🍩 https://wandb.ai/${globalProjectName}/r/call/${callId}`);
         }
 
@@ -151,7 +158,7 @@ function op(fn: Function, opName?: string) {
                         client_version: packageVersion,
                         source: 'js-sdk'
                     }
-                }, // Add any relevant attributes
+                },
                 inputs: args.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), {}),
             }
         };
@@ -160,7 +167,9 @@ function op(fn: Function, opName?: string) {
         scheduleBatchProcessing();
 
         try {
-            const result = await Promise.resolve(fn(...args));
+            const result = await asyncLocalStorage.run(store, async () => {
+                return await fn(...args);
+            });
 
             const endTime = new Date().toISOString();
             const endReq = {
@@ -169,7 +178,7 @@ function op(fn: Function, opName?: string) {
                     id: callId,
                     ended_at: endTime,
                     output: result,
-                    summary: {}, // Add any relevant summary information
+                    summary: {},
                 }
             };
 
@@ -185,7 +194,7 @@ function op(fn: Function, opName?: string) {
                     id: callId,
                     ended_at: endTime,
                     exception: error instanceof Error ? error.message : String(error),
-                    summary: {}, // Add any relevant summary information
+                    summary: {},
                 }
             };
 
@@ -194,7 +203,7 @@ function op(fn: Function, opName?: string) {
 
             throw error;
         } finally {
-            activeCallStack.pop();
+            store.callStack.pop();
         }
     }
 }
