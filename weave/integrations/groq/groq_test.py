@@ -6,7 +6,6 @@ import pytest
 
 import weave
 from weave.integrations.integration_utilities import (
-    _get_call_output,
     flatten_calls,
     flattened_calls_to_names,
 )
@@ -51,7 +50,7 @@ def test_groq_quickstart(
 
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.id == chat_completion.id
     assert output.model == chat_completion.model
     assert output.usage.completion_tokens == 9
@@ -106,7 +105,7 @@ def test_groq_async_chat_completion(
 
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "llama3-8b-8192"
     assert output.usage.completion_tokens == 152
     assert output.usage.prompt_tokens == 38
@@ -168,7 +167,7 @@ def test_groq_streaming_chat_completion(
 
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "llama3-8b-8192"
     assert output.object == "chat.completion"
     assert output.usage.completion_tokens == 533
@@ -254,7 +253,7 @@ def test_groq_async_streaming_chat_completion(
 
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "llama3-8b-8192"
     assert output.usage.completion_tokens == 152
     assert output.usage.prompt_tokens == 38
@@ -430,12 +429,12 @@ def test_groq_tool_call(
 
     call_0 = calls[0]
     assert call_0.exception is None and call_0.ended_at is not None
-    output_0 = _get_call_output(call_0)
+    output_0 = call_0.output
     assert output_0 == response
 
     call_1 = calls[1]
     assert call_1.exception is None and call_1.ended_at is not None
-    output_1 = _get_call_output(call_1)
+    output_1 = call_1.output
     assert output_1.usage.completion_tokens == 47
     assert output_1.usage.prompt_tokens == 973
     assert output_1.usage.total_tokens == 1020
@@ -456,7 +455,7 @@ def test_groq_tool_call(
 
     call_2 = calls[2]
     assert call_2.exception is None and call_2.ended_at is not None
-    output_2 = _get_call_output(call_2)
+    output_2 = call_2.output
     game_score_data = json.loads(output_2)
     assert game_score_data["game_id"] == "401585601"
     assert game_score_data["status"] == "Final"
@@ -467,7 +466,7 @@ def test_groq_tool_call(
 
     call_3 = calls[3]
     assert call_3.exception is None and call_3.ended_at is not None
-    output_3 = _get_call_output(call_3)
+    output_3 = call_3.output
     assert output_3.usage.completion_tokens == 20
     assert output_3.usage.prompt_tokens == 177
     assert output_3.usage.total_tokens == 197

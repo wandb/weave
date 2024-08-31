@@ -5,7 +5,6 @@ from mistralai.async_client import MistralAsyncClient
 from mistralai.client import MistralClient
 
 import weave
-from weave.integrations.integration_utilities import _get_call_output
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -45,7 +44,7 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
     call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chat_response.id
@@ -97,7 +96,7 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
     call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chat_response.id
@@ -155,7 +154,7 @@ def test_mistral_quickstart_with_stream(
     call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chunk.id
@@ -212,7 +211,7 @@ async def test_mistral_quickstart_with_stream_async(
     call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chunk.id

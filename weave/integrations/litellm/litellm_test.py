@@ -6,9 +6,6 @@ import pytest
 import semver
 
 import weave
-from weave.integrations.integration_utilities import (
-    _get_call_output,
-)
 
 from .litellm import litellm_patcher
 
@@ -68,7 +65,7 @@ def test_litellm_quickstart(
     assert len(calls) == 2
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chat_response.id
@@ -109,7 +106,7 @@ async def test_litellm_quickstart_async(
     assert len(calls) == 2
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chat_response.id
@@ -157,7 +154,7 @@ def test_litellm_quickstart_stream(
     assert len(calls) == 2
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id
@@ -199,7 +196,7 @@ async def test_litellm_quickstart_stream_async(
     assert len(calls) == 2
     call = calls[0]
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id

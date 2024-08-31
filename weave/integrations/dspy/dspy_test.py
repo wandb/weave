@@ -3,7 +3,6 @@ import os
 import pytest
 
 from weave.integrations.integration_utilities import (
-    _get_call_output,
     flatten_calls,
     flattened_calls_to_names,
 )
@@ -43,12 +42,12 @@ def test_dspy_language_models(client: WeaveClient) -> None:
 
     call_1, _ = flattened_calls[0]
     assert call_1.exception is None and call_1.ended_at is not None
-    output_1 = _get_call_output(call_1)
+    output_1 = call_1.output
     assert output_1[0] == expected_prediction
 
     call_2, _ = flattened_calls[1]
     assert call_2.exception is None and call_2.ended_at is not None
-    output_2 = _get_call_output(call_2)
+    output_2 = call_2.output
     assert output_2["choices"][0]["finish_reason"] == "stop"
     assert output_2["choices"][0]["message"]["content"] == expected_prediction
     assert output_2["choices"][0]["message"]["role"] == "assistant"
@@ -59,7 +58,7 @@ def test_dspy_language_models(client: WeaveClient) -> None:
 
     call_3, _ = flattened_calls[2]
     assert call_3.exception is None and call_3.ended_at is not None
-    output_3 = _get_call_output(call_3)
+    output_3 = call_3.output
     assert output_3["choices"][0]["finish_reason"] == "stop"
     assert output_3["choices"][0]["message"]["content"] == expected_prediction
     assert output_3["choices"][0]["message"]["role"] == "assistant"
@@ -106,7 +105,7 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
 
     call_1, _ = flattened_calls[0]
     assert call_1.exception is None and call_1.ended_at is not None
-    output_1 = _get_call_output(call_1)
+    output_1 = call_1.output
     assert (
         output_1
         == """Prediction(
@@ -116,7 +115,7 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
 
     call_2, _ = flattened_calls[1]
     assert call_2.exception is None and call_2.ended_at is not None
-    output_2 = _get_call_output(call_2)
+    output_2 = call_2.output
     assert (
         output_2
         == """Prediction(
@@ -126,12 +125,12 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
 
     call_3, _ = flattened_calls[2]
     assert call_3.exception is None and call_3.ended_at is not None
-    output_3 = _get_call_output(call_3)
+    output_3 = call_3.output
     assert output_3[0] == expected_prediction
 
     call_4, _ = flattened_calls[3]
     assert call_4.exception is None and call_4.ended_at is not None
-    output_4 = _get_call_output(call_4)
+    output_4 = call_4.output
     assert output_4["choices"][0]["finish_reason"] == "stop"
     assert output_4["choices"][0]["message"]["content"] == expected_prediction
     assert output_4["choices"][0]["message"]["role"] == "assistant"
@@ -142,7 +141,7 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
 
     call_5, _ = flattened_calls[4]
     assert call_5.exception is None and call_5.ended_at is not None
-    output_5 = _get_call_output(call_5)
+    output_5 = call_5.output
     assert output_5["choices"][0]["finish_reason"] == "stop"
     assert output_5["choices"][0]["message"]["content"] == expected_prediction
     assert output_5["choices"][0]["message"]["role"] == "assistant"

@@ -4,7 +4,6 @@ import pytest
 from cerebras.cloud.sdk import AsyncCerebras, Cerebras
 
 import weave
-from weave.integrations.integration_utilities import _get_call_output
 
 model = "llama3.1-8b"  # Cerebras model
 
@@ -30,7 +29,7 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content.strip() == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == response.id
@@ -66,7 +65,7 @@ async def test_cerebras_async(client: weave.trace.weave_client.WeaveClient) -> N
     call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content.strip() == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == response.id

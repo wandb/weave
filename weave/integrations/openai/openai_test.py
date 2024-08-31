@@ -4,7 +4,7 @@ import pytest
 from openai import AsyncOpenAI, OpenAI
 
 import weave
-from weave.integrations.integration_utilities import _get_call_output, op_name_from_ref
+from weave.integrations.integration_utilities import op_name_from_ref
 
 model = "gpt-4o"
 
@@ -37,7 +37,7 @@ def test_openai_quickstart(client: weave.trace.weave_client.WeaveClient) -> None
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -85,7 +85,7 @@ async def test_openai_async_quickstart(
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -137,7 +137,7 @@ def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) 
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"
 
@@ -194,7 +194,7 @@ async def test_openai_async_stream_quickstart(
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"
 
@@ -245,7 +245,7 @@ def test_openai_stream_usage_quickstart(
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["total_tokens"] == 35
     assert usage["completion_tokens"] == 24
@@ -314,7 +314,7 @@ def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> N
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -400,7 +400,7 @@ async def test_openai_function_call_async(
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -576,7 +576,7 @@ def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -663,7 +663,7 @@ async def test_openai_tool_call_async(
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output.model == "gpt-4o-2024-05-13"
     assert output.object == "chat.completion"
 
@@ -820,7 +820,7 @@ def test_openai_as_context_manager(
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"
 
@@ -875,7 +875,7 @@ async def test_openai_as_context_manager_async(
     assert call.started_at is not None
     assert call.started_at < call.ended_at  # type: ignore
 
-    output = _get_call_output(call)
+    output = call.output
     assert output["model"] == "gpt-4o-2024-05-13"
     assert output["object"] == "chat.completion"
 
