@@ -1,9 +1,8 @@
-import { Api as TraceServerApi } from './traceServerApi';
-import { v4 as uuidv4 } from 'uuid';
-import { uuidv7 } from 'uuidv7';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { uuidv7 } from 'uuidv7';
+import { Api as TraceServerApi } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
 import { packageVersion } from './userAgent';
 
@@ -206,10 +205,6 @@ function op(fn: Function, opName?: string) {
 
 function ref(uri: string) {
     console.log(`Ref: ${uri}`);
-}
-
-function generateTraceId(): string {
-    return uuidv4(); // Using v4 for traceId
 }
 
 function generateCallId(): string {
