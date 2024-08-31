@@ -1,7 +1,7 @@
 import { op, initWithCustomTraceServer } from '../clientApi';
 import { InMemoryTraceServer } from '../inMemoryTraceServer';
 import { makeMockOpenAIChat } from './openaiMock';
-import { makeOpenAIOp } from '../integrations/openai';
+import { makeOpenAIChatCompletionsOp } from '../integrations/openai';
 
 // Helper function to get calls
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string, limit?: number, filters?: any) {
@@ -174,7 +174,7 @@ describe('Op Flow', () => {
             content: messages[0].content.toUpperCase(),
         }));
 
-        const openaiLikeOp = makeOpenAIOp(testOpenAIChat);
+        const openaiLikeOp = makeOpenAIChatCompletionsOp(testOpenAIChat);
 
         await openaiLikeOp({ messages: [{ role: 'user', content: 'Hello, AI!' }] });
 

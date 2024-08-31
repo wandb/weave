@@ -1,7 +1,7 @@
 import { initWithCustomTraceServer } from '../clientApi';
 import { InMemoryTraceServer } from '../inMemoryTraceServer';
 import { makeMockOpenAIChat } from './openaiMock';
-import { makeOpenAIOp, createPatchedOpenAI } from '../integrations/openai';
+import { makeOpenAIChatCompletionsOp, createPatchedOpenAI } from '../integrations/openai';
 
 // Helper function to get calls
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
@@ -31,7 +31,7 @@ describe('OpenAI Integration', () => {
 
         mockOpenAI = { chat: { completions: { create: mockOpenAIChat } } };
         patchedOpenAI = createPatchedOpenAI('fake-api-key');
-        patchedOpenAI.chat.completions.create = makeOpenAIOp(mockOpenAIChat);
+        patchedOpenAI.chat.completions.create = makeOpenAIChatCompletionsOp(mockOpenAIChat);
     });
 
     test('non-streaming chat completion', async () => {
@@ -211,7 +211,7 @@ describe('OpenAI Integration', () => {
             }]
         }));
         mockOpenAI.chat.completions.create = mockOpenAIChat;
-        patchedOpenAI.chat.completions.create = makeOpenAIOp(mockOpenAIChat);
+        patchedOpenAI.chat.completions.create = makeOpenAIChatCompletionsOp(mockOpenAIChat);
 
         // Direct API call
         const directResult = await mockOpenAI.chat.completions.create({ messages, functions });
