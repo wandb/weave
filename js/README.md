@@ -128,6 +128,7 @@ This project is licensed under the Apaache2 License - see the [LICENSE](../LICEN
 
 ### Roadmap / TODO
 
+- [ ] Active call stack is global and won't work with async! Need to use something like context.
 - [ ] Return token counts
 - [ ] Make sure LLM streaming is handled
 - [ ] Retry logic
