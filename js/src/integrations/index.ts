@@ -1,2 +1,2 @@
 
-export { createPatchedOpenAI } from './openai';
+export { wrapOpenAI } from './openai';
