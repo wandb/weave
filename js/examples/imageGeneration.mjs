@@ -1,9 +1,8 @@
-import { init, createPatchedOpenAI } from 'weave';
-import { promises as fs } from 'fs';
+import { init, wrapOpenAI } from 'weave';
 
 async function main() {
     const client = await init('weavejs-img');
-    const openai = createPatchedOpenAI();
+    const openai = wrapOpenAI();
 
     // Generate an image
     const result = await openai.images.generate({

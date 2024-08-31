@@ -29,9 +29,9 @@ Get your wandb API key from [here](https://wandb.ai/authorize).
 Put this in a file called `predict.mjs`:
 
 ```javascript
-import { init, op, createPatchedOpenAI } from 'weave';
+import { init, op, wrapOpenAI } from 'weave';
 
-const openai = createPatchedOpenAI();
+const openai = wrapOpenAI();
 
 async function extractDinos(input) {
     const response = await openai.chat.completions.create({
@@ -95,10 +95,10 @@ tracedFunction(5, 10);
 Weave provides an integration with OpenAI, allowing you to trace API calls made to OpenAI's services seamlessly.
 
 ```javascript
-import { createPatchedOpenAI } from 'weave/integrations/openai';
+import { wrapOpenAI } from 'weave/integrations/openai';
 
-// Create a patched instance of OpenAI with your API key
-const openai = createPatchedOpenAI('your-openai-api-key');
+// Create a patched instance of OpenAI
+const openai = wrapOpenAI();
 
 // Use the OpenAI instance as usual
 openai.chat.completions.create({
@@ -130,6 +130,7 @@ This project is licensed under the Apaache2 License - see the [LICENSE](../LICEN
 
 - [x] Return token counts
 - [x] Summary merging
+- [x] Image support
 - [ ] Decide how to handle args in js, since they're not named
 - [x] Make sure LLM streaming is handled
 - [ ] Op versioning / code capture
@@ -143,4 +144,7 @@ This project is licensed under the Apaache2 License - see the [LICENSE](../LICEN
 ## Known Issues
 
 - [ ] openai choices > 1 and "tools" not handled (function works though)
+- [ ] we always inject params.stream_options.include_usage in openai request, need to not send back usage chunk if user didn't ask for it.
+- [ ] handle all openai.images.generate formats, and images in inputs.
+- [ ] openai.images.generate token counts.
 - [ ] if a streaming op with streamReducer returns its iterator instead of iterating within the op, summary rollups won't work.

@@ -1,7 +1,7 @@
-import { init, op, createPatchedOpenAI } from 'weave';
+import { init, op, wrapOpenAI } from 'weave';
 import OpenAI from 'openai';
 
-const openai = createPatchedOpenAI();
+const openai = wrapOpenAI();
 // const openai = new OpenAI();
 
 async function extractDinos(input) {
