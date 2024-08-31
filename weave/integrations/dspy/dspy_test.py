@@ -29,7 +29,7 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     prediction = gpt3_turbo("hello! this is a raw prompt to GPT-3.5")
     expected_prediction = "Hello! How can I assist you today?"
     assert prediction == [expected_prediction]
-    calls = client.calls(filter=CallsFilter(trace_roots_only=True))
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 4
 
@@ -90,7 +90,7 @@ def test_dspy_inline_signatures(client: WeaveClient) -> None:
     ).sentiment
     expected_prediction = "Positive"
     assert prediction == expected_prediction
-    calls = client.calls(filter=CallsFilter(trace_roots_only=True))
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 6
 
