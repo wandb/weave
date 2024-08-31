@@ -8,7 +8,7 @@ function generateSystemFingerprint() {
 
 type FunctionCall = {
     name: string;
-    arguments: string;
+    arguments: Record<string, any>;
 };
 
 type ResponseFn = (messages: any[]) => {
@@ -40,7 +40,7 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
 
         const promptTokens = messages.reduce((acc, msg) => acc + estimateTokenCount(msg.content), 0);
         const completionTokens = estimateTokenCount(content) +
-            functionCalls.reduce((acc, fc) => acc + estimateTokenCount(fc.name) + estimateTokenCount(fc.arguments), 0);
+            functionCalls.reduce((acc, fc) => acc + estimateTokenCount(fc.name) + estimateTokenCount(JSON.stringify(fc.arguments)), 0);
         const totalTokens = promptTokens + completionTokens;
 
         if (stream) {
@@ -60,7 +60,10 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
                     message: {
                         role: "assistant",
                         content: content,
-                        function_call: functionCalls[0] || null,
+                        function_call: functionCalls[0] ? {
+                            name: functionCalls[0].name,
+                            arguments: JSON.stringify(functionCalls[0].arguments)
+                        } : null,
                         refusal: null
                     },
                     logprobs: null,
@@ -139,7 +142,7 @@ function* generateChunks(
             ...(includeUsage && { usage: null })
         };
 
-        const args = functionCall.arguments;
+        const args = JSON.stringify(functionCall.arguments);
         for (let i = 0; i < args.length; i += 10) {
             yield {
                 ...baseChunk,
