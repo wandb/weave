@@ -119,8 +119,8 @@ async function processBatch() {
 
 interface OpOptions<T extends (...args: any[]) => any> {
     name?: string;
-    summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
     streamReducer?: StreamReducer<any, any>;
+    summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
 }
 
 // Add this new type and function
