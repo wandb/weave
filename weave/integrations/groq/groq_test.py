@@ -427,12 +427,12 @@ def test_groq_tool_call(
         ("groq.chat.completions.create", 1),
     ]
 
-    call_0 = calls[0]
+    call_0, _ = flattened_calls[0]
     assert call_0.exception is None and call_0.ended_at is not None
     output_0 = call_0.output
     assert output_0 == response
 
-    call_1 = calls[1]
+    call_1, _ = flattened_calls[1]
     assert call_1.exception is None and call_1.ended_at is not None
     output_1 = call_1.output
     assert output_1.usage.completion_tokens == 47
@@ -453,7 +453,7 @@ def test_groq_tool_call(
     )
     assert output_1.choices[0].message.tool_calls[0].type == "function"
 
-    call_2 = calls[2]
+    call_2, _ = flattened_calls[2]
     assert call_2.exception is None and call_2.ended_at is not None
     output_2 = call_2.output
     game_score_data = json.loads(output_2)
@@ -464,7 +464,7 @@ def test_groq_tool_call(
     assert game_score_data["away_team"] == "Golden State Warriors"
     assert game_score_data["away_team_score"] == 128
 
-    call_3 = calls[3]
+    call_3, _ = flattened_calls[3]
     assert call_3.exception is None and call_3.ended_at is not None
     output_3 = call_3.output
     assert output_3.usage.completion_tokens == 20
