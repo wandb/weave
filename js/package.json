@@ -1,6 +1,6 @@
 {
   "name": "weave",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "AI development toolkit",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
@@ -16,8 +16,6 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@types/uuid": "^10.0.0",
-    "graphql": "^16.9.0",
-    "graphql-request": "^7.1.0",
     "openai": "^4.57.0",
     "uuid": "^10.0.0",
     "uuidv7": "^1.0.1"
