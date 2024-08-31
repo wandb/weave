@@ -454,6 +454,7 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def get_calls(
         self,
+        *,
         filter: Optional[CallsFilter] = None,
         include_costs: Optional[bool] = False,
     ) -> CallsIter:
@@ -474,7 +475,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def get_call(
-        self, call_id: str, include_costs: Optional[bool] = False
+        self, call_id: str, *, include_costs: Optional[bool] = False
     ) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
@@ -489,7 +490,7 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
-    def cll(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
