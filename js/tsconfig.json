@@ -1,21 +1,32 @@
 {
+  // "include": [
+  //   "src/**/*.ts"
+  // ],
+  // "exclude": [
+  //   "node_modules"
+  // ],
   "compilerOptions": {
+    "composite": true,
     "target": "es2018",
     "module": "commonjs",
     "moduleResolution": "node",
+    "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
     "outDir": "./dist",
-    "paths": {
-      "graphql-request": [
-        "./node_modules/graphql-request/build/entrypoints/main.d.ts"
-      ]
-    }
   },
-  "include": [
-    "src/**/*.ts"
-  ],
   "exclude": [
+    "src",
+    "examples",
+    "dist",
     "node_modules"
+  ],
+  "references": [
+    {
+      "path": "./src/tsconfig.src.json",
+    },
+    {
+      "path": "./examples/tsconfig.examples.json",
+    }
   ]
 }

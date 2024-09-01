@@ -1,24 +1,31 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { uuidv7 } from 'uuidv7';
+
 import { Api as TraceServerApi } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
 import { packageVersion } from './userAgent';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { AsyncLocalStorage } from 'async_hooks';
-import * as crypto from 'crypto';
+import { WeaveObject, getClassChain } from './weaveObject';
 
 // Create an AsyncLocalStorage instance
 const asyncLocalStorage = new AsyncLocalStorage<{
     callStack: { callId: string; traceId: string; childSummary: Summary }[]
 }>();
 
-class WeaveObject {
-}
-
 class ObjectRef {
     constructor(public projectId: string, public objectId: string, public digest: string) { }
+
+    public uri() {
+        return `weave:///${this.projectId}/obj/${this.objectId}:${this.digest}`;
+    }
+
+    public ui_url() {
+        return `https://wandb.ai/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
+    }
 }
 
 class OpRef {
@@ -116,11 +123,8 @@ class WeaveClient {
         return this.saveFileBlob('PIL.Image.Image', 'image.png', blob);
     }
 
-    async saveObject(obj: WeaveObject | Op<(...args: any[]) => any>, objId: string): Promise<any> {
-        if (obj instanceof WeaveObject) {
-            throw new Error("WeaveObject not implemented");
-        }
-        const opFn = getWrappedFunction(obj);
+    async saveOp(op: Op<(...args: any[]) => any>, objId: string): Promise<any> {
+        const opFn = getWrappedFunction(op);
         const saveValue = await this.saveFileBlob('Op', 'obj.py', new Blob([opFn.toString()]))
         const response = await this.traceServerApi.obj.objCreateObjCreatePost({
             obj: {
@@ -131,6 +135,31 @@ class WeaveClient {
         });
         // TODO: work in batch, return immediately
         return new OpRef(this.projectId, objId, response.data.digest);
+    }
+
+    async saveObject(obj: WeaveObject, objId?: string): Promise<any> {
+        const classChain = getClassChain(obj);
+        const className = classChain[0];
+        if (!objId) {
+            objId = obj.id() ?? className
+        }
+
+        const saveValue = {
+            _type: classChain[0],
+            _bases: classChain.slice(1),
+            ...obj.saveAttrs()
+        }
+        const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+            obj: {
+                project_id: this.projectId,
+                object_id: objId,
+                val: saveValue
+            }
+        });
+        // TODO: work in batch, return immediately
+        const ref = new ObjectRef(this.projectId, objId, response.data.digest);
+        console.log(`Saved object: ${ref.ui_url()}`);
+        return ref;
     }
 
     private async processFileQueue() {
@@ -372,7 +401,7 @@ function op<T extends (...args: any[]) => any>(
         // Process WeaveImage in inputs
         const processedArgs = await Promise.all(args.map(processWeaveValues));
 
-        const opRef = await globalClient.saveObject(opWrapper, actualOpName);
+        const opRef = await globalClient.saveOp(opWrapper, actualOpName);
 
         const startReq = {
             start: {
@@ -458,7 +487,7 @@ function op<T extends (...args: any[]) => any>(
             store.callStack.pop();
         }
     };
-    opWrapper.__isOp = true;
+    opWrapper.__isOp = true as true;
     opWrapper.wrappedFunction = fn;
     return opWrapper as Op<T>;
 }
