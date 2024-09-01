@@ -141,7 +141,7 @@ This project is licensed under the Apaache2 License - see the [LICENSE](../LICEN
 - [x] Image support
 - [ ] Decide how to handle args in js, since they're not named
 - [x] Make sure LLM streaming is handled
-- [ ] Op versioning / code capture
+- [x] Op versioning / code capture
 - [ ] Retry logic
 - [ ] Handle other wandb backends (managed / self-hosted)
 - [ ] Include system information in call attributes including package version.
