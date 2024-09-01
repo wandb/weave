@@ -143,7 +143,7 @@ This project is licensed under the Apaache2 License - see the [LICENSE](../LICEN
 - [x] Make sure LLM streaming is handled
 - [ ] Op versioning / code capture
 - [ ] Retry logic
-- [ ] Handle other wandb backends (manaaged / self-hosted)
+- [ ] Handle other wandb backends (managed / self-hosted)
 - [ ] Include system information in call attributes including package version.
 - [ ] Objects / Datasets / Models / Evaluations
 - [ ] Ref tracking
