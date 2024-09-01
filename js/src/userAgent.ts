@@ -4,7 +4,7 @@ import { join } from 'path';
 export let packageVersion: string;
 
 try {
-    const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+    const packageJson = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8'));
     packageVersion = packageJson.version;
 } catch (error) {
     console.warn('Failed to read package.json:', error);
