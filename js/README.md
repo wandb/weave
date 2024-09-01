@@ -156,3 +156,4 @@ This project is licensed under the Apaache2 License - see the [LICENSE](../LICEN
 - [ ] handle all openai.images.generate formats, and images in inputs.
 - [ ] openai.images.generate token counts.
 - [ ] if a streaming op with streamReducer returns its iterator instead of iterating within the op, summary rollups won't work.
+- [ ] Decide what's in public interface (WeaveClient)
