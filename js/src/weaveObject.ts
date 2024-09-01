@@ -1,3 +1,5 @@
+import { Op, boundOp } from "./op";
+
 interface WeaveObjectParameters {
     id?: string;
     description?: string;
@@ -55,11 +57,6 @@ export class DatasetFake extends WeaveObject {
     }
 }
 
-type Op<T extends (...args: any[]) => any> = {
-    __isOp: true;
-    wrappedFunction: T;
-} & T;
-
 interface EvaluationParameters extends WeaveObjectParameters {
     dataset: DatasetFake;
     scorers: Op<any>[];
@@ -74,6 +71,7 @@ export class Evaluation extends WeaveObject {
         super(parameters);
         this.dataset = parameters.dataset;
         this.scorers = parameters.scorers;
+        this.evaluate = boundOp(this, this.evaluate);
     }
 
 
