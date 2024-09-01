@@ -17,7 +17,7 @@ const asyncLocalStorage = new AsyncLocalStorage<{
 class WeaveClient {
     traceServerApi: TraceServerApi<any>;
     wandbServerApi: WandbServerApi;
-    projectName: string;
+    projectId: string;
     callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
     batchProcessTimeout: NodeJS.Timeout | null = null;
     isBatchProcessing: boolean = false;
@@ -26,10 +26,10 @@ class WeaveClient {
     private fileQueue: Array<{ fileContent: Blob }> = [];
     private isProcessingFiles: boolean = false;
 
-    constructor(traceServerApi: TraceServerApi<any>, wandbServerApi: WandbServerApi, projectName: string) {
+    constructor(traceServerApi: TraceServerApi<any>, wandbServerApi: WandbServerApi, projectId: string) {
         this.traceServerApi = traceServerApi;
         this.wandbServerApi = wandbServerApi;
-        this.projectName = projectName;
+        this.projectId = projectId;
     }
 
     scheduleBatchProcessing() {
@@ -111,11 +111,8 @@ class WeaveClient {
             const { fileContent } = this.fileQueue.shift()!;
 
             try {
-                const formData = new FormData();
-                formData.append('project_id', this.projectName);
-
                 const fileCreateRes = await this.traceServerApi.file.fileCreateFileCreatePost({
-                    project_id: this.projectName,
+                    project_id: this.projectId,
                     // @ts-ignore
                     file: fileContent
                 });
@@ -167,7 +164,7 @@ async function init(projectName: string): Promise<WeaveClient> {
     try {
         const wandbServerApi = new WandbServerApi(host, apiKey);
         const defaultEntityName = await wandbServerApi.defaultEntityName();
-        const fullProjectName = `${defaultEntityName}/${projectName}`;
+        const projectId = `${defaultEntityName}/${projectName}`;
 
         const traceServerApi = new TraceServerApi({
             baseUrl: 'https://trace.wandb.ai',
@@ -176,8 +173,8 @@ async function init(projectName: string): Promise<WeaveClient> {
             },
         });
 
-        globalClient = new WeaveClient(traceServerApi, wandbServerApi, fullProjectName);
-        console.log(`Initializing project: ${fullProjectName}`);
+        globalClient = new WeaveClient(traceServerApi, wandbServerApi, projectId);
+        console.log(`Initializing project: ${projectId}`);
         return globalClient;
     } catch (error) {
         console.error("Error during initialization:", error);
@@ -214,7 +211,7 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
 function createEndReq(client: WeaveClient, callId: string, endTime: string, output: any, summary: Summary, exception?: string) {
     return {
         end: {
-            project_id: client.projectName,
+            project_id: client.projectId,
             id: callId,
             ended_at: endTime,
             output,
@@ -325,7 +322,7 @@ function op<T extends (...args: any[]) => any>(
         store.callStack.push({ callId, traceId, childSummary: {} });
 
         if (store.callStack.length === 1) {
-            console.log(`🍩 https://wandb.ai/${globalClient.projectName}/r/call/${callId}`);
+            console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${callId}`);
         }
 
         // Process WeaveImage in inputs
@@ -333,7 +330,7 @@ function op<T extends (...args: any[]) => any>(
 
         const startReq = {
             start: {
-                project_id: globalClient.projectName,
+                project_id: globalClient.projectId,
                 id: callId,
                 op_name: actualOpName,
                 trace_id: traceId,
