@@ -1,4 +1,5 @@
 // src/index.ts
-export { init, op, weaveImage } from './clientApi';
+export { init, weaveImage } from './clientApi';
+export { op } from './op';
 export { wrapOpenAI } from './integrations';
 export { DatasetFake, Evaluation } from './weaveObject';

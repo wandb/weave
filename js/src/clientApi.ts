@@ -2,18 +2,17 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { uuidv7 } from 'uuidv7';
+import { AsyncLocalStorage } from 'async_hooks';
 
 import { Api as TraceServerApi } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
-import { packageVersion } from './userAgent';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
-import { AsyncLocalStorage } from 'async_hooks';
 import { WeaveObject, getClassChain } from './weaveObject';
 
 // Create an AsyncLocalStorage instance
-const asyncLocalStorage = new AsyncLocalStorage<{
-    callStack: { callId: string; traceId: string; childSummary: Summary }[]
+
+export const asyncLocalStorage = new AsyncLocalStorage<{
+    callStack: { callId: string; traceId: string; childSummary: Record<string, any> }[]
 }>();
 
 class ObjectRef {
@@ -28,15 +27,8 @@ class ObjectRef {
     }
 }
 
-class OpRef {
-    constructor(public projectId: string, public objectId: string, public digest: string) { }
 
-    public uri() {
-        return `weave:///${this.projectId}/op/${this.objectId}:${this.digest}`;
-    }
-}
-
-class WeaveClient {
+export class WeaveClient {
     traceServerApi: TraceServerApi<any>;
     wandbServerApi: WandbServerApi;
     projectId: string;
@@ -123,19 +115,6 @@ class WeaveClient {
         return this.saveFileBlob('PIL.Image.Image', 'image.png', blob);
     }
 
-    async saveOp(op: Op<(...args: any[]) => any>, objId: string): Promise<any> {
-        const opFn = getWrappedFunction(op);
-        const saveValue = await this.saveFileBlob('Op', 'obj.py', new Blob([opFn.toString()]))
-        const response = await this.traceServerApi.obj.objCreateObjCreatePost({
-            obj: {
-                project_id: this.projectId,
-                object_id: objId,
-                val: saveValue
-            }
-        });
-        // TODO: work in batch, return immediately
-        return new OpRef(this.projectId, objId, response.data.digest);
-    }
 
     async saveObject(obj: WeaveObject, objId?: string): Promise<any> {
         const classChain = getClassChain(obj);
@@ -162,6 +141,20 @@ class WeaveClient {
         return ref;
     }
 
+    public createEndReq(callId: string, endTime: string, output: any, summary: Record<string, any>, exception?: string) {
+        return {
+            end: {
+                project_id: this.projectId,
+                id: callId,
+                ended_at: endTime,
+                output,
+                summary,
+                ...(exception && { exception }),
+            }
+        };
+    }
+
+
     private async processFileQueue() {
         if (this.isProcessingFiles || this.fileQueue.length === 0) return;
 
@@ -186,7 +179,7 @@ class WeaveClient {
 }
 
 // Global client instance
-let globalClient: WeaveClient | null = null;
+export let globalClient: WeaveClient | null = null;
 
 function readApiKeyFromNetrc(host: string): string | undefined {
     const netrcPath = path.join(os.homedir(), '.netrc');
@@ -208,7 +201,7 @@ function readApiKeyFromNetrc(host: string): string | undefined {
     return undefined;
 }
 
-async function init(projectName: string): Promise<WeaveClient> {
+export async function init(projectName: string): Promise<WeaveClient> {
     const host = 'https://api.wandb.ai';
     const apiKey = readApiKeyFromNetrc('api.wandb.ai');
 
@@ -242,78 +235,8 @@ async function init(projectName: string): Promise<WeaveClient> {
     }
 }
 
-// Add this new type and function
-type Summary = Record<string, any>;
 
-interface StreamReducer<T, R> {
-    initialState: R;
-    reduceFn: (state: R, chunk: T) => R;
-}
 
-function mergeSummaries(left: Summary, right: Summary): Summary {
-    const result: Summary = { ...right };
-    for (const [key, leftValue] of Object.entries(left)) {
-        if (key in result) {
-            if (typeof leftValue === 'number' && typeof result[key] === 'number') {
-                result[key] = leftValue + result[key];
-            } else if (typeof leftValue === 'object' && typeof result[key] === 'object') {
-                result[key] = mergeSummaries(leftValue, result[key]);
-            } else {
-                result[key] = leftValue;
-            }
-        } else {
-            result[key] = leftValue;
-        }
-    }
-    return result;
-}
-
-function createEndReq(client: WeaveClient, callId: string, endTime: string, output: any, summary: Summary, exception?: string) {
-    return {
-        end: {
-            project_id: client.projectId,
-            id: callId,
-            ended_at: endTime,
-            output,
-            summary,
-            ...(exception && { exception }),
-        }
-    };
-}
-
-function processSummary(
-    result: any,
-    summarize: ((result: any) => Record<string, any>) | undefined,
-    currentCall: { childSummary: Summary },
-    parentCall: { childSummary: Summary } | undefined
-) {
-    let ownSummary = summarize ? summarize(result) : {};
-
-    if (ownSummary.usage) {
-        for (const model in ownSummary.usage) {
-            if (typeof ownSummary.usage[model] === 'object') {
-                ownSummary.usage[model] = {
-                    requests: 1,
-                    ...ownSummary.usage[model],
-                };
-            }
-        }
-    }
-
-    const mergedSummary = mergeSummaries(ownSummary, currentCall.childSummary);
-
-    if (parentCall) {
-        parentCall.childSummary = mergeSummaries(mergedSummary, parentCall.childSummary);
-    }
-
-    return mergedSummary;
-}
-
-interface OpOptions<T extends (...args: any[]) => any> {
-    name?: string;
-    streamReducer?: StreamReducer<any, any>;
-    summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
-}
 
 // Define WeaveImage type
 interface WeaveImage {
@@ -336,7 +259,7 @@ function isWeaveImage(value: any): value is WeaveImage {
 }
 
 // Function to process WeaveImage in inputs or output
-async function processWeaveValues(value: any): Promise<any> {
+export async function processWeaveValues(value: any): Promise<any> {
     if (!globalClient) return value;
 
     if (isWeaveImage(value)) {
@@ -353,158 +276,9 @@ async function processWeaveValues(value: any): Promise<any> {
     return value;
 }
 
-type Op<T extends (...args: any[]) => any> = {
-    __isOp: true;
-    wrappedFunction: T;
-} & T;
-
-function isOp(value: any): value is Op<any> {
-    return value && value.__isOp === true;
-}
-
-function getWrappedFunction<T extends (...args: any[]) => any>(opValue: Op<T>): T {
-    return opValue.wrappedFunction;
-}
-
-// Modify the op function
-function op<T extends (...args: any[]) => any>(
-    fn: T,
-    options?: OpOptions<T>
-): Op<(...args: Parameters<T>) => Promise<ReturnType<T>>> {
-    const actualOpName = options?.name || fn.name || 'anonymous';
-
-    const opWrapper = async function (...args: Parameters<T>): Promise<ReturnType<T>> {
-        if (!globalClient) {
-            return await fn(...args);
-        }
-
-        const store = asyncLocalStorage.getStore() || { callStack: [] };
-        const startTime = new Date().toISOString();
-        const callId = generateCallId();
-        let traceId: string;
-        let parentId: string | null = null;
-
-        if (store.callStack.length === 0) {
-            traceId = generateTraceId();
-        } else {
-            const parentCall = store.callStack[store.callStack.length - 1];
-            traceId = parentCall.traceId;
-            parentId = parentCall.callId;
-        }
-
-        store.callStack.push({ callId, traceId, childSummary: {} });
-
-        if (store.callStack.length === 1) {
-            console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${callId}`);
-        }
-
-        // Process WeaveImage in inputs
-        const processedArgs = await Promise.all(args.map(processWeaveValues));
-
-        const opRef = await globalClient.saveOp(opWrapper, actualOpName);
-
-        const startReq = {
-            start: {
-                project_id: globalClient.projectId,
-                id: callId,
-                op_name: opRef.uri(),
-                trace_id: traceId,
-                parent_id: parentId,
-                started_at: startTime,
-                attributes: {
-                    weave: {
-                        client_version: packageVersion,
-                        source: 'js-sdk'
-                    }
-                },
-                inputs: processedArgs.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), {}),
-            }
-        };
-
-        globalClient.callQueue.push({ mode: 'start', data: startReq });
-        globalClient.scheduleBatchProcessing();
-
-        try {
-            let result = await asyncLocalStorage.run(store, async () => {
-                return await fn(...processedArgs);
-            });
-
-
-            if (options?.streamReducer && Symbol.asyncIterator in result) {
-                const { initialState, reduceFn } = options.streamReducer;
-                let state = initialState;
-                const currentCall = store.callStack[store.callStack.length - 1];
-                const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
-
-                const wrappedIterator = {
-                    [Symbol.asyncIterator]: async function* () {
-                        try {
-                            for await (const chunk of result as AsyncIterable<any>) {
-                                state = reduceFn(state, chunk);
-                                yield chunk;
-                            }
-                        } finally {
-                            if (globalClient) {  // Check if globalClient still exists
-                                state = await processWeaveValues(state);
-                                const endTime = new Date().toISOString();
-                                const mergedSummary = processSummary(state, options?.summarize, currentCall, parentCall);
-                                const endReq = createEndReq(globalClient, callId, endTime, state, mergedSummary);
-                                globalClient.callQueue.push({ mode: 'end', data: endReq });
-                                globalClient.scheduleBatchProcessing();
-                            }
-                            // If globalClient is null, we do nothing, as requested
-                        }
-                    }
-                };
-
-                return wrappedIterator as unknown as ReturnType<T>;
-            } else {
-                result = await processWeaveValues(result);
-                const endTime = new Date().toISOString();
-                const currentCall = store.callStack[store.callStack.length - 1];
-                const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
-                const mergedSummary = processSummary(result, options?.summarize, currentCall, parentCall);
-                const endReq = createEndReq(globalClient, callId, endTime, result, mergedSummary);
-                globalClient.callQueue.push({ mode: 'end', data: endReq });
-                globalClient.scheduleBatchProcessing();
-                return result;
-            }
-        } catch (error) {
-            console.error(`Op ${actualOpName} failed:`, error);
-            const endTime = new Date().toISOString();
-            const endReq = createEndReq(
-                globalClient,
-                callId,
-                endTime,
-                null,
-                {},
-                error instanceof Error ? error.message : String(error)
-            );
-            globalClient.callQueue.push({ mode: 'end', data: endReq });
-            globalClient.scheduleBatchProcessing();
-            throw error;
-        } finally {
-            store.callStack.pop();
-        }
-    };
-    opWrapper.__isOp = true as true;
-    opWrapper.wrappedFunction = fn;
-    return opWrapper as Op<T>;
-}
-
 function ref(uri: string) {
     console.log(`Ref: ${uri}`);
 }
-
-function generateTraceId(): string {
-    return uuidv7();
-}
-
-function generateCallId(): string {
-    return uuidv7();
-}
-
-export { init, op, ref, WeaveClient as Client };
 
 export function initWithCustomTraceServer(projectName: string, customTraceServer: InMemoryTraceServer) {
     globalClient = new WeaveClient(

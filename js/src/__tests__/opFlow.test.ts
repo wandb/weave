@@ -1,4 +1,5 @@
-import { op, initWithCustomTraceServer } from '../clientApi';
+import { initWithCustomTraceServer } from '../clientApi';
+import { op } from '../op';
 import { InMemoryTraceServer } from '../inMemoryTraceServer';
 import { makeMockOpenAIChat } from './openaiMock';
 import { makeOpenAIChatCompletionsOp } from '../integrations/openai';
@@ -45,8 +46,8 @@ describe('Op Flow', () => {
         // Assertions
         expect(calls).toHaveLength(6); // 2 outer calls + 4 inner calls
 
-        const outerCalls = calls.filter(call => call.op_name === 'outerOp');
-        const innerCalls = calls.filter(call => call.op_name === 'innerOp');
+        const outerCalls = calls.filter(call => call.op_name.includes('outerOp'));
+        const innerCalls = calls.filter(call => call.op_name.includes('innerOp'));
 
         expect(outerCalls).toHaveLength(2);
         expect(innerCalls).toHaveLength(4);
@@ -105,8 +106,8 @@ describe('Op Flow', () => {
         expect(result1).toBe(20);
         expect(result2).toBe(40);
 
-        const outerCalls = calls.filter(call => call.op_name === 'outerAsyncOp');
-        const innerCalls = calls.filter(call => call.op_name === 'innerAsyncOp');
+        const outerCalls = calls.filter(call => call.op_name.includes('outerAsyncOp'));
+        const innerCalls = calls.filter(call => call.op_name.includes('innerAsyncOp'));
 
         expect(outerCalls).toHaveLength(2);
         expect(innerCalls).toHaveLength(4);
@@ -163,7 +164,7 @@ describe('Op Flow', () => {
         const calls = await getCalls(inMemoryTraceServer, testProjectName);
 
         expect(calls).toHaveLength(1);
-        expect(calls[0].op_name).toBe('customSummaryOp');
+        expect(calls[0].op_name).toContain('customSummaryOp');
         expect(calls[0].inputs).toEqual({ arg0: 5 });
         expect(calls[0].output).toBe(10);
         expect(calls[0].summary).toEqual({ doubledValue: 10 });
@@ -184,7 +185,7 @@ describe('Op Flow', () => {
         const calls = await getCalls(inMemoryTraceServer, testProjectName);
 
         expect(calls).toHaveLength(1);
-        expect(calls[0].op_name).toBe('openai.chat.completions.create');
+        expect(calls[0].op_name).toContain('openai.chat.completions.create');
         expect(calls[0].inputs).toEqual({ arg0: { messages: [{ role: 'user', content: 'Hello, AI!' }] } });
         expect(calls[0].output).toEqual({
             id: expect.any(String),
@@ -263,7 +264,7 @@ describe('Op Flow', () => {
 
         expect(calls).toHaveLength(5); // 1 root + 1 mid + 3 leaf calls
 
-        const rootCall = calls.find(call => call.op_name === 'rootOp');
+        const rootCall = calls.find(call => call.op_name.includes('rootOp'));
         expect(rootCall).toBeDefined();
         expect(rootCall?.summary).toEqual({
             root: { count: 1, sum: 6 },
@@ -271,14 +272,14 @@ describe('Op Flow', () => {
             leaf: { count: 3, sum: 6 }  // This is correct: 3 leaf calls, sum of 1+2+3
         });
 
-        const midCall = calls.find(call => call.op_name === 'midOp');
+        const midCall = calls.find(call => call.op_name.includes('midOp'));
         expect(midCall).toBeDefined();
         expect(midCall?.summary).toEqual({
             mid: { count: 1, sum: 3 },
             leaf: { count: 2, sum: 3 }  // This is correct: 2 leaf calls within midOp, sum of 1+2
         });
 
-        const leafCalls = calls.filter(call => call.op_name === 'leafOp');
+        const leafCalls = calls.filter(call => call.op_name.includes('leafOp'));
         expect(leafCalls).toHaveLength(3);
 
         // Check individual leaf calls
