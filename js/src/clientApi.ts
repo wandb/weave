@@ -8,6 +8,7 @@ import { Api as TraceServerApi } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { WeaveObject, getClassChain } from './weaveObject';
+import { Op, getOpName, getOpWrappedFunction, isOp, OpRef } from './opType';
 
 // Create an AsyncLocalStorage instance
 
@@ -19,7 +20,7 @@ class ObjectRef {
     constructor(public projectId: string, public objectId: string, public digest: string) { }
 
     public uri() {
-        return `weave:///${this.projectId}/obj/${this.objectId}:${this.digest}`;
+        return `weave:///${this.projectId}/object/${this.objectId}:${this.digest}`;
     }
 
     public ui_url() {
@@ -123,11 +124,14 @@ export class WeaveClient {
             objId = obj.id() ?? className
         }
 
+        let saveAttrs = obj.saveAttrs();
+        saveAttrs = await this.saveObjectAndOps(saveAttrs);
         const saveValue = {
             _type: classChain[0],
             _bases: classChain.slice(1),
-            ...obj.saveAttrs()
+            ...saveAttrs
         }
+        console.log("SAVE VALUE", JSON.stringify(saveValue, undefined, 2))
         const response = await this.traceServerApi.obj.objCreateObjCreatePost({
             obj: {
                 project_id: this.projectId,
@@ -139,6 +143,39 @@ export class WeaveClient {
         const ref = new ObjectRef(this.projectId, objId, response.data.digest);
         console.log(`Saved object: ${ref.ui_url()}`);
         return ref;
+    }
+
+    async saveOp(op: Op<(...args: any[]) => any>): Promise<any> {
+        const objId = getOpName(op);
+        const opFn = getOpWrappedFunction(op);
+        const saveValue = await this.saveFileBlob('Op', 'obj.py', new Blob([opFn.toString()]))
+        const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+            obj: {
+                project_id: this.projectId,
+                object_id: objId,
+                val: saveValue
+            }
+        });
+        // TODO: work in batch, return immediately
+        return new OpRef(this.projectId, objId, response.data.digest);
+    }
+
+    async saveObjectAndOps(val: any): Promise<any> {
+        if (Array.isArray(val)) {
+            return Promise.all(val.map(item => this.saveObjectAndOps(item)));
+        } else if (val instanceof WeaveObject) {
+            return (await this.saveObject(val)).uri();
+        } else if (isOp(val)) {
+            return (await this.saveOp(val)).uri();
+        } else if (typeof val === 'object' && val !== null) {
+            const result: { [key: string]: any } = {};
+            for (const [key, value] of Object.entries(val)) {
+                result[key] = await this.saveObjectAndOps(value);
+            }
+            return result;
+        } else {
+            return val;
+        }
     }
 
     public createEndReq(callId: string, endTime: string, output: any, summary: Record<string, any>, exception?: string) {

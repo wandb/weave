@@ -2,7 +2,7 @@ import 'source-map-support/register';
 import { init, wrapOpenAI, op, DatasetFake, Evaluation } from 'weave';
 
 async function main() {
-    const client = await init('weavejs-img');
+    const client = await init('weavejsdev-eval1');
     const ds = new DatasetFake({
         id: "My Dataset",
         description: "This is a dataset",
@@ -12,13 +12,11 @@ async function main() {
             { name: "Charlie", age: 34 }
         ]
     });
-    // client.saveObject(ds)
     const evaluation = new Evaluation({
         dataset: ds,
         scorers: [
-            function isEqual(modelOutput: any, datasetItem: any) {
-                return modelOutput == datasetItem.age
-            }
+            op((modelOutput: any, datasetItem: any) =>
+                modelOutput == datasetItem.age, { name: 'isEqual' }),
         ]
     })
 

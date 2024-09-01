@@ -3,43 +3,26 @@ import { globalClient, processWeaveValues } from "./clientApi";
 import { packageVersion } from "./userAgent";
 
 import { WeaveClient, asyncLocalStorage } from "./clientApi";
-import { getClassChain } from './weaveObject';
+import { WeaveObject, getClassChain } from './weaveObject';
+import { OpOptions, Op, isOp, getOpName, getOpWrappedFunction, OpRef } from './opType';
 
-export type Op<T extends (...args: any[]) => any> = {
-    __isOp: true;
-    wrappedFunction: T;
-} & T;
-
-
-interface StreamReducer<T, R> {
-    initialState: R;
-    reduceFn: (state: R, chunk: T) => R;
-}
-
-export interface OpOptions<T extends (...args: any[]) => any> {
-    name?: string;
-    streamReducer?: StreamReducer<any, any>;
-    originalFunction?: T;
-    summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
-}
-
-
-export function isOp(value: any): value is Op<any> {
-    return value && value.__isOp === true;
-}
-
-export function getOpWrappedFunction<T extends (...args: any[]) => any>(opValue: Op<T>): T {
-    return opValue.wrappedFunction;
-}
-
-// Modify the op function
 export function op<T extends (...args: any[]) => any>(
     fn: T,
     options?: OpOptions<T>
 ): Op<(...args: Parameters<T>) => Promise<ReturnType<T>>> {
-    const actualOpName = options?.name || fn.name || 'anonymous';
+    const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
+    let actualOpName = fnName;
+    if (options?.bindThis) {
+        actualOpName = `${options.bindThis.className()}.${fnName}`;
+    }
+    if (options?.name) {
+        actualOpName = options.name;
+    }
 
     const opWrapper = async function (...args: Parameters<T>): Promise<ReturnType<T>> {
+        // Use the bound 'this' if available, otherwise use the current 'this'
+        const thisArg = options?.bindThis;
+
         // @ts-ignore
         if (!globalClient) {
             return await fn(...args);
@@ -67,8 +50,25 @@ export function op<T extends (...args: any[]) => any>(
 
         // Process WeaveImage in inputs
         const processedArgs = await Promise.all(args.map(processWeaveValues));
+        // @ts-ignore
+        const initialInputs = thisArg instanceof WeaveObject ? {
+            this: thisArg
+        } : {};
+        const inputs = processedArgs.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), initialInputs);
+        const savedInputs = await globalClient.saveObjectAndOps(inputs);
+        console.log('savedInputs', savedInputs);
+        // const savedInputs: { [key: string]: any } = {};
+        // for (const [key, value] of Object.entries(inputs)) {
+        //     if (value instanceof WeaveObject) {
+        //         savedInputs[key] = (await globalClient.saveObject(value)).uri();
+        //     } else if (isOp(value)) {
+        //         savedInputs[key] = (await saveOp(globalClient, value)).uri();
+        //     } else {
+        //         savedInputs[key] = value;
+        //     }
+        // }
 
-        const opRef = await saveOp(globalClient, opWrapper, actualOpName);
+        const opRef = await globalClient.saveOp(opWrapper);
 
         const startReq = {
             start: {
@@ -84,7 +84,7 @@ export function op<T extends (...args: any[]) => any>(
                         source: 'js-sdk'
                     }
                 },
-                inputs: processedArgs.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), {}),
+                inputs: savedInputs
             }
         };
 
@@ -95,7 +95,6 @@ export function op<T extends (...args: any[]) => any>(
             let result = await asyncLocalStorage.run(store, async () => {
                 return await fn(...processedArgs);
             });
-
 
             if (options?.streamReducer && Symbol.asyncIterator in result) {
                 const { initialState, reduceFn } = options.streamReducer;
@@ -153,19 +152,26 @@ export function op<T extends (...args: any[]) => any>(
             store.callStack.pop();
         }
     };
+
+    opWrapper.__name = actualOpName;
     opWrapper.__isOp = true as true;
     if (options?.originalFunction) {
         opWrapper.wrappedFunction = options.originalFunction;
     } else {
         opWrapper.wrappedFunction = fn;
     }
+
+    if (options?.bindThis !== undefined) {
+        opWrapper.__boundThis = options.bindThis;
+    }
+
     return opWrapper as Op<T>;
 }
 
 export function boundOp(bindThis: any, fn: (...args: any[]) => any) {
-    const thisClass = getClassChain(bindThis)[0]
-
-    return op(fn.bind(bindThis), { originalFunction: fn, name: `${thisClass}.${fn.name}` });
+    const thisClass = getClassChain(bindThis)[0];
+    // return op(fn, { originalFunction: fn, name: `${thisClass}.${fn.name}`, bindThis });
+    return op(fn.bind(bindThis), { originalFunction: fn, bindThis });
 }
 
 function generateTraceId(): string {
@@ -221,26 +227,4 @@ function processSummary(
     }
 
     return mergedSummary;
-}
-
-class OpRef {
-    constructor(public projectId: string, public objectId: string, public digest: string) { }
-
-    public uri() {
-        return `weave:///${this.projectId}/op/${this.objectId}:${this.digest}`;
-    }
-}
-
-async function saveOp(client: WeaveClient, op: Op<(...args: any[]) => any>, objId: string): Promise<any> {
-    const opFn = getOpWrappedFunction(op);
-    const saveValue = await client.saveFileBlob('Op', 'obj.py', new Blob([opFn.toString()]))
-    const response = await client.traceServerApi.obj.objCreateObjCreatePost({
-        obj: {
-            project_id: client.projectId,
-            object_id: objId,
-            val: saveValue
-        }
-    });
-    // TODO: work in batch, return immediately
-    return new OpRef(client.projectId, objId, response.data.digest);
 }

@@ -1,4 +1,5 @@
-import { Op, boundOp } from "./op";
+import { boundOp } from "./op";
+import { Op } from './opType';
 
 interface WeaveObjectParameters {
     id?: string;
@@ -9,6 +10,10 @@ export class WeaveObject {
     saveAttrNames: string[] = [];
 
     constructor(private baseParameters: WeaveObjectParameters) { }
+
+    className() {
+        return Object.getPrototypeOf(this).constructor.name;
+    }
 
     saveAttrs() {
         const attrs: { [key: string]: any } = {};
@@ -74,7 +79,6 @@ export class Evaluation extends WeaveObject {
         this.evaluate = boundOp(this, this.evaluate);
     }
 
-
     async evaluate(model: Op<any>) {
         const results: Array<{ item: any, modelOutput: any, scores: { [key: string]: any } }> = [];
         for await (const item of this.dataset) {
@@ -91,13 +95,12 @@ export class Evaluation extends WeaveObject {
     }
 }
 
-
 // TODO: match python
 export function getClassChain(instance: WeaveObject): string[] {
     const bases: string[] = [];
     let currentProto = Object.getPrototypeOf(instance);
 
-    while (currentProto && currentProto.constructor.name !== 'object') {
+    while (currentProto && currentProto.constructor.name !== 'Object') {
         bases.push(currentProto.constructor.name);
         currentProto = Object.getPrototypeOf(currentProto);
     }
