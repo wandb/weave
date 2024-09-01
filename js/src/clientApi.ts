@@ -7,6 +7,7 @@ import { WandbServerApi } from './wandbServerApi';
 import { packageVersion } from './userAgent';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { AsyncLocalStorage } from 'async_hooks';
+import * as crypto from 'crypto';
 
 // Create an AsyncLocalStorage instance
 const asyncLocalStorage = new AsyncLocalStorage<{
@@ -21,6 +22,9 @@ class WeaveClient {
     batchProcessTimeout: NodeJS.Timeout | null = null;
     isBatchProcessing: boolean = false;
     readonly BATCH_INTERVAL: number = 200;
+
+    private fileQueue: Array<{ fileContent: Blob }> = [];
+    private isProcessingFiles: boolean = false;
 
     constructor(traceServerApi: TraceServerApi<any>, wandbServerApi: WandbServerApi, projectName: string) {
         this.traceServerApi = traceServerApi;
@@ -62,6 +66,65 @@ class WeaveClient {
                 this.scheduleBatchProcessing();
             }
         }
+    }
+
+    private computeDigest(data: Buffer): string {
+        // Must match python server algorithm in clickhouse_trace_server_batched.py
+        const hasher = crypto.createHash('sha256');
+        hasher.update(data);
+        const hashBytes = hasher.digest();
+        const base64EncodedHash = hashBytes.toString('base64url');
+        return base64EncodedHash.replace(/-/g, 'X').replace(/_/g, 'Y').replace(/=/g, '');
+    }
+
+    async saveFileBlob(typeName: string, fileName: string, fileContent: Blob): Promise<any> {
+        const buffer = await fileContent.arrayBuffer().then(Buffer.from);
+        const digest = this.computeDigest(buffer);
+
+        const placeholder = {
+            _type: 'CustomWeaveType',
+            weave_type: { type: typeName },
+            files: {
+                [fileName]: digest
+            },
+            load_op: 'NO_LOAD_OP'
+        };
+
+        this.fileQueue.push({ fileContent });
+        this.processFileQueue();
+
+        return placeholder;
+    }
+
+    async saveImage(imageData: Buffer, imageType: 'png'): Promise<any> {
+        const blob = new Blob([imageData], { type: `image/${imageType}` });
+        return this.saveFileBlob('PIL.Image.Image', 'image.png', blob);
+
+    }
+
+    private async processFileQueue() {
+        if (this.isProcessingFiles || this.fileQueue.length === 0) return;
+
+        this.isProcessingFiles = true;
+
+        while (this.fileQueue.length > 0) {
+            const { fileContent } = this.fileQueue.shift()!;
+
+            try {
+                const formData = new FormData();
+                formData.append('project_id', this.projectName);
+
+                const fileCreateRes = await this.traceServerApi.file.fileCreateFileCreatePost({
+                    project_id: this.projectName,
+                    // @ts-ignore
+                    file: fileContent
+                });
+            } catch (error) {
+                console.error('Error saving file:', error);
+            }
+        }
+
+        this.isProcessingFiles = false;
     }
 }
 
@@ -217,8 +280,10 @@ function isWeaveImage(value: any): value is WeaveImage {
 
 // Function to process WeaveImage in inputs or output
 async function processWeaveValues(value: any): Promise<any> {
+    if (!globalClient) return value;
+
     if (isWeaveImage(value)) {
-        return await saveImage(value.data, value.imageType);
+        return await globalClient.saveImage(value.data, value.imageType);
     } else if (Array.isArray(value)) {
         return Promise.all(value.map(processWeaveValues));
     } else if (typeof value === 'object' && value !== null) {
@@ -372,39 +437,4 @@ export function initWithCustomTraceServer(projectName: string, customTraceServer
         {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
         projectName
     );
-}
-/**
- * Saves a file blob to the trace server and returns a CustomWeaveType object.
- * 
- * The frontend will interpret the CustomWeaveType and display the file.
- * 
- * @param typeName - The type name, must match python serializer.
- * @param fileName - The saved file name, must match python serializer.
- * @param fileContent - The content of the file as a Blob.
- * @returns A Promise that resolves to a CustomWeaveType object representing the saved file.
- */
-async function saveFileBlob(typeName: string, fileName: string, fileContent: Blob) {
-    const client = globalClient!;
-
-    const fileCreateRes = await client.traceServerApi.file.fileCreateFileCreatePost({
-        project_id: client.projectName,
-        // @ts-ignore
-        file: fileContent
-    });
-
-    return {
-        _type: 'CustomWeaveType',
-        weave_type: { type: typeName },
-        files: {
-            [fileName]: fileCreateRes.data.digest
-        },
-        // TODO: Have to hack this because the frontend requires it at the moment.
-        load_op: 'NO_LOAD_OP'
-    }
-}
-
-export async function saveImage(imageData: Buffer, imageType: 'png') {
-    const blob = new Blob([imageData], { type: `image/${imageType}` });
-
-    return saveFileBlob('PIL.Image.Image', 'image.png', blob)
 }
