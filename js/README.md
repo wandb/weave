@@ -106,6 +106,14 @@ openai.chat.completions.create({
     prompt: 'Translate the following English text to French: "Hello, world!"',
     max_tokens: 60
 });
+
+// Weave tracks images too!
+openai.images.generate({
+    prompt: "A cute baby sea otter",
+    n: 3,
+    size: "256x256",
+    response_format: "b64_json"
+});
 ```
 
 
