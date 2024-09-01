@@ -14,6 +14,21 @@ const asyncLocalStorage = new AsyncLocalStorage<{
     callStack: { callId: string; traceId: string; childSummary: Summary }[]
 }>();
 
+class WeaveObject {
+}
+
+class ObjectRef {
+    constructor(public projectId: string, public objectId: string, public digest: string) { }
+}
+
+class OpRef {
+    constructor(public projectId: string, public objectId: string, public digest: string) { }
+
+    public uri() {
+        return `weave:///${this.projectId}/op/${this.objectId}:${this.digest}`;
+    }
+}
+
 class WeaveClient {
     traceServerApi: TraceServerApi<any>;
     wandbServerApi: WandbServerApi;
@@ -99,6 +114,23 @@ class WeaveClient {
     async saveImage(imageData: Buffer, imageType: 'png'): Promise<any> {
         const blob = new Blob([imageData], { type: `image/${imageType}` });
         return this.saveFileBlob('PIL.Image.Image', 'image.png', blob);
+    }
+
+    async saveObject(obj: WeaveObject | Op<(...args: any[]) => any>, objId: string): Promise<any> {
+        if (obj instanceof WeaveObject) {
+            throw new Error("WeaveObject not implemented");
+        }
+        const opFn = getWrappedFunction(obj);
+        const saveValue = await this.saveFileBlob('Op', 'obj.py', new Blob([opFn.toString()]))
+        const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+            obj: {
+                project_id: this.projectId,
+                object_id: objId,
+                val: saveValue
+            }
+        });
+        // TODO: work in batch, return immediately
+        return new OpRef(this.projectId, objId, response.data.digest);
     }
 
     private async processFileQueue() {
@@ -292,14 +324,27 @@ async function processWeaveValues(value: any): Promise<any> {
     return value;
 }
 
+type Op<T extends (...args: any[]) => any> = {
+    __isOp: true;
+    wrappedFunction: T;
+} & T;
+
+function isOp(value: any): value is Op<any> {
+    return value && value.__isOp === true;
+}
+
+function getWrappedFunction<T extends (...args: any[]) => any>(opValue: Op<T>): T {
+    return opValue.wrappedFunction;
+}
+
 // Modify the op function
 function op<T extends (...args: any[]) => any>(
     fn: T,
     options?: OpOptions<T>
-): (...args: Parameters<T>) => Promise<ReturnType<T>> {
+): Op<(...args: Parameters<T>) => Promise<ReturnType<T>>> {
     const actualOpName = options?.name || fn.name || 'anonymous';
 
-    return async function (...args: Parameters<T>): Promise<ReturnType<T>> {
+    const opWrapper = async function (...args: Parameters<T>): Promise<ReturnType<T>> {
         if (!globalClient) {
             return await fn(...args);
         }
@@ -327,11 +372,13 @@ function op<T extends (...args: any[]) => any>(
         // Process WeaveImage in inputs
         const processedArgs = await Promise.all(args.map(processWeaveValues));
 
+        const opRef = await globalClient.saveObject(opWrapper, actualOpName);
+
         const startReq = {
             start: {
                 project_id: globalClient.projectId,
                 id: callId,
-                op_name: actualOpName,
+                op_name: opRef.uri(),
                 trace_id: traceId,
                 parent_id: parentId,
                 started_at: startTime,
@@ -411,6 +458,9 @@ function op<T extends (...args: any[]) => any>(
             store.callStack.pop();
         }
     };
+    opWrapper.__isOp = true;
+    opWrapper.wrappedFunction = fn;
+    return opWrapper as Op<T>;
 }
 
 function ref(uri: string) {
