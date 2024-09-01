@@ -1,4 +1,5 @@
-import { init, op } from './clientApi';
+import { init } from './clientApi';
+import { op } from './op';
 import { wrapOpenAI } from './integrations/openai';
 
 // Initialize the API
