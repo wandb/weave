@@ -99,7 +99,6 @@ class WeaveClient {
     async saveImage(imageData: Buffer, imageType: 'png'): Promise<any> {
         const blob = new Blob([imageData], { type: `image/${imageType}` });
         return this.saveFileBlob('PIL.Image.Image', 'image.png', blob);
-
     }
 
     private async processFileQueue() {
