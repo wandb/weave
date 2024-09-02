@@ -27,28 +27,28 @@ export function op<T extends (...args: any[]) => any>(
             return await fn(...args);
         }
 
-        let store = globalClient.stackContext.getStore() || { callStack: [] };
-        store = { ...store, callStack: [...store.callStack] };
+        let stack = globalClient.stackContext.getStore() || [];
+        stack = [...stack];
 
         const startTime = new Date().toISOString();
         const callId = generateCallId();
         let traceId: string;
         let parentId: string | null = null;
 
-        if (store.callStack.length === 0) {
+        if (stack.length === 0) {
             traceId = generateTraceId();
         } else {
-            const parentCall = store.callStack[store.callStack.length - 1];
+            const parentCall = stack[stack.length - 1];
             traceId = parentCall.traceId;
             parentId = parentCall.callId;
         }
 
-        store.callStack.push({ callId, traceId, childSummary: {} });
+        stack.push({ callId, traceId, childSummary: {} });
 
-        const currentCall = store.callStack[store.callStack.length - 1];
-        const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
+        const currentCall = stack[stack.length - 1];
+        const parentCall = stack.length > 1 ? stack[stack.length - 2] : undefined;
 
-        if (!globalClient.quiet && store.callStack.length === 1) {
+        if (!globalClient.quiet && stack.length === 1) {
             console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${callId}`);
         }
 
@@ -82,10 +82,9 @@ export function op<T extends (...args: any[]) => any>(
         globalClient.saveCallStart(startReq);
 
         try {
-            let result = await globalClient.stackContext.run(store, async () => {
+            let result = await globalClient.stackContext.run(stack, async () => {
                 return await fn(...processedArgs);
             });
-
 
             if (options?.streamReducer && Symbol.asyncIterator in result) {
                 const { initialState, reduceFn } = options.streamReducer;
@@ -133,7 +132,7 @@ export function op<T extends (...args: any[]) => any>(
             globalClient.saveCallEnd(endReq);
             throw error;
         } finally {
-            const poppedCall = store.callStack.pop();
+            const poppedCall = stack.pop();
             // sanity checks
             if (poppedCall?.callId !== callId) {
                 console.error('Call stack corruption detected');

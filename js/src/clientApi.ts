@@ -32,8 +32,10 @@ export class WeaveClient {
     traceServerApi: TraceServerApi<any>;
     wandbServerApi: WandbServerApi;
     stackContext = new AsyncLocalStorage<{
-        callStack: { callId: string; traceId: string; childSummary: Record<string, any> }[]
-    }>();
+        callId: string;
+        traceId: string;
+        childSummary: Record<string, any>;
+    }[]>();
     projectId: string;
     callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
     batchProcessTimeout: NodeJS.Timeout | null = null;
