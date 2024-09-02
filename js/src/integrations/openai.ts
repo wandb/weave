@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
-import { weaveImage } from '../clientApi';
 import { op } from '../op';
+import { weaveImage } from '../media';
 
 const openAIStreamReducer = {
     initialState: {
