@@ -5,6 +5,7 @@ import { packageVersion } from "./userAgent";
 import { WeaveClient } from "./clientApi";
 import { WeaveObject, getClassChain } from './weaveObject';
 import { OpOptions, Op, isOp, getOpName, getOpWrappedFunction, OpRef } from './opType';
+import { CallStackEntry } from './clientApi';
 
 export function op<T extends (...args: any[]) => any>(
     fn: T,
@@ -43,7 +44,8 @@ export function op<T extends (...args: any[]) => any>(
             parentId = parentCall.callId;
         }
 
-        stack.push({ callId, traceId, childSummary: {} });
+        const newEntry: CallStackEntry = { callId, traceId, childSummary: {} };
+        stack.push(newEntry);
 
         const currentCall = stack[stack.length - 1];
         const parentCall = stack.length > 1 ? stack[stack.length - 2] : undefined;
@@ -207,8 +209,8 @@ function mergeSummaries(left: Summary, right: Summary): Summary {
 function processSummary(
     result: any,
     summarize: ((result: any) => Record<string, any>) | undefined,
-    currentCall: { childSummary: Summary },
-    parentCall: { childSummary: Summary } | undefined
+    currentCall: CallStackEntry,
+    parentCall: CallStackEntry | undefined
 ) {
     let ownSummary = summarize ? summarize(result) : {};
 
