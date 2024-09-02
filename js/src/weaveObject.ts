@@ -6,6 +6,19 @@ interface WeaveObjectParameters {
     description?: string;
 }
 
+export class ObjectRef {
+    constructor(public projectId: string, public objectId: string, public digest: string) { }
+
+    public uri() {
+        return `weave:///${this.projectId}/object/${this.objectId}:${this.digest}`;
+    }
+
+    public ui_url() {
+        return `https://wandb.ai/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
+    }
+}
+
+
 export class WeaveObject {
     saveAttrNames: string[] = [];
 
