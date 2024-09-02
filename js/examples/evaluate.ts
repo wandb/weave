@@ -1,9 +1,9 @@
 import 'source-map-support/register';
-import { init, wrapOpenAI, op, DatasetFake, Evaluation } from 'weave';
+import { init, wrapOpenAI, op, Dataset, Evaluation } from 'weave';
 
 async function main() {
-    const client = await init('weavejsdev-eval5');
-    const ds = new DatasetFake({
+    const client = await init('weavejsdev-eval6');
+    const ds = new Dataset({
         id: "My Dataset",
         description: "This is a dataset",
         rows: [
@@ -24,7 +24,7 @@ async function main() {
         return input.age
     })
 
-    const results = await evaluation.evaluate(model)
+    const results = await evaluation.evaluate({ model })
     console.log(results)
 
 
