@@ -256,17 +256,6 @@ export class WeaveClient {
         this.scheduleBatchProcessing();
     }
 
-    private createEndReq(callId: string, endTime: string, output: any, summary: Record<string, any>, exception?: string) {
-        return {
-            project_id: this.projectId,
-            id: callId,
-            ended_at: endTime,
-            output,
-            summary,
-            ...(exception && { exception }),
-        };
-    }
-
     private getCallStack(): CallStack {
         return this.stackContext.getStore() || new CallStack();
     }
@@ -335,17 +324,25 @@ export class WeaveClient {
         result = await this.saveMedia(result);
         endTime = endTime ?? new Date();
         const mergedSummary = processSummary(result, summarize, currentCall, parentCall);
-        const endReq = this.createEndReq(currentCall.callId, endTime.toISOString(), result, mergedSummary);
-        await this.saveCallEnd(endReq);
+        await this.saveCallEnd({
+            project_id: this.projectId,
+            id: currentCall.callId,
+            ended_at: endTime.toISOString(),
+            output: result,
+            summary: mergedSummary
+        });
     }
 
     public async finishCallWithException(error: any, currentCall: CallStackEntry, endTime?: Date) {
         endTime = endTime ?? new Date();
-        const endReq = this.createEndReq(currentCall.callId, endTime.toISOString(), null, {},
-            error instanceof Error ? error.message : String(error)
-
-        );
-        await this.saveCallEnd(endReq);
+        await this.saveCallEnd({
+            project_id: this.projectId,
+            id: currentCall.callId,
+            ended_at: endTime.toISOString(),
+            output: null,
+            summary: {},
+            exception: error instanceof Error ? error.message : String(error)
+        });
     }
 }
 
