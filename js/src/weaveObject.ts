@@ -94,23 +94,24 @@ export class Evaluation extends WeaveObject {
         this.predict_and_score = boundOp(this, this.predict_and_score);
     }
 
-    async evaluate(model: Op<any>) {
+    async evaluate({ model }: { model: Op<any> }) {
         const results: Array<{ modelOutput: any, scores: { [key: string]: any }, modelLatency: number }> = [];
-        for await (const item of this.dataset) {
-            const result = await this.predict_and_score(model, item);
+        for await (const example of this.dataset) {
+            const result = await this.predict_and_score({ model, example });
             results.push(result);
         }
         return this.summarizeResults(results);
     }
 
-    async predict_and_score(model: Op<any>, item: Record<string, any>) {
+    async predict_and_score({ model, example }: { model: Op<any>, example: Record<string, any> }) {
         const startTime = new Date();
-        const modelOutput = await model(item);
-        const modelLatency = new Date().getTime() - startTime.getTime();
+        const modelOutput = await model(example);
+        const endTime = new Date();
+        const modelLatency = (endTime.getTime() - startTime.getTime()) / 1000; // Convert to seconds
 
         const scores: { [key: string]: any } = {};
         for (const scorer of this.scorers) {
-            const score = await scorer(modelOutput, item);
+            const score = await scorer(modelOutput, example);
             scores[getOpName(scorer)] = score;
         }
 
@@ -118,8 +119,6 @@ export class Evaluation extends WeaveObject {
     }
 
     private summarizeResults(results: Array<{ modelOutput: any, scores: { [key: string]: any }, modelLatency: number }>) {
-        const summary: Record<string, any> = {};
-
         const summarizeNestedObject = (obj: any, currentPath: string = ''): Record<string, any> => {
             const nestedSummary: Record<string, any> = {};
 

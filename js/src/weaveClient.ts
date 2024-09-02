@@ -266,11 +266,30 @@ export class WeaveClient {
     private async paramsToCallInputs(params: any[], thisArg: any) {
         // Process WeaveImage in inputs
         const processedArgs = await Promise.all(params.map(this.saveMedia));
-        // @ts-ignore
-        const initialInputs = thisArg instanceof WeaveObject ? {
-            this: thisArg
-        } : {};
-        const inputs = processedArgs.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), initialInputs);
+
+        let inputs: Record<string, any> = {};
+
+        // Add 'self' first if thisArg is a WeaveObject
+        if (thisArg instanceof WeaveObject) {
+            inputs['self'] = thisArg;
+        }
+
+        // Handle the special case for the first parameter
+        if (processedArgs.length > 0 &&
+            typeof processedArgs[0] === 'object' &&
+            processedArgs[0] !== null &&
+            !(processedArgs[0] instanceof WeaveObject)) {
+            inputs = { ...inputs, ...processedArgs[0] };
+            for (let i = 1; i < processedArgs.length; i++) {
+                inputs[`arg${i - 1}`] = processedArgs[i];
+            }
+        } else {
+            // If the first parameter is not an object or is a WeaveObject, use the original logic
+            processedArgs.forEach((arg, index) => {
+                inputs[`arg${index}`] = arg;
+            });
+        }
+
         const savedInputs = await this.saveObjectAndOps(inputs);
         return savedInputs;
     }
