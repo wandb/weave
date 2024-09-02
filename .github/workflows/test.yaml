@@ -35,9 +35,9 @@ jobs:
       - name: Prune docker cache
         run: docker system prune -f
       - name: Build unit test image
-        run: python3 docker_build.py build_deps weave-test builder . Dockerfile.test
+        run: python3 weave/legacy/docker_build.py build_deps weave-test builder . weave/legacy/Dockerfile.test
       - name: Build integration test image
-        run: python3 docker_build.py build weave-integration-test . Dockerfile.test
+        run: python3 weave/legacy/docker_build.py build weave-integration-test . weave/legacy/Dockerfile.test
 
   lint:
     name: Python lint
@@ -50,13 +50,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: source /root/venv/bin/activate && pre-commit run --hook-stage=pre-push --all-files
-      - name: Show changes if pre-commit fails
-        if: failure()
-        run: |
-          echo "Files were modified, printing names of changed files"
-          git diff --name-only
-          echo "Failing this step to expand logs in the UI"
-          exit 1
 
   weavejs-lint-compile:
     name: WeaveJS Lint and Compile
@@ -125,15 +118,42 @@ jobs:
           DD_SERVICE: weave-python
           DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
         # This runner specifically runs the tests that use the `client` fixture (those that support clickhouse client tests)
         # However, we skip tests marked with `skip_clickhouse_client`. These should be considered TODOs and an exception
-        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest -m "weave_client and not skip_clickhouse_client" --weave-server=clickhouse --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+        run: |
+          source /root/venv/bin/activate && \
+          cd weave && \
+          pytest -m "weave_client and not skip_clickhouse_client" \
+          --weave-server=clickhouse \
+          --job-num=${{ matrix.job_num }} \
+          --timeout=90 \
+          --ddtrace \
+          --durations=5 \
+          ./integrations ./legacy ./trace_server ./trace ./tests
       - name: Run Python Unit Tests
         env:
           DD_SERVICE: weave-python
           DD_ENV: ci
           WEAVE_SENTRY_ENV: ci
-        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && pip install 'dspy-ai>=0.1.5' && pip install pydantic -U  && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90  ./flow ./integrations ./tests ./legacy/ops_arrow ./legacy/ecosystem ./trace_server ./trace --ddtrace --durations=5
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+        run: |
+          source /root/venv/bin/activate && \
+          pip install 'dspy-ai>=0.1.5' && \
+          pip install pydantic -U && \
+          cd weave && \
+          pytest \
+          --job-num=${{ matrix.job_num }} \
+          --timeout=90 \
+          --ddtrace \
+          --durations=5 \
+          ./integrations ./legacy ./trace_server ./trace ./tests
 
   # nbmake:
   #   name: Run notebooks with nbmake
@@ -186,7 +206,7 @@ jobs:
         # github actions does something funky with the std file descriptors, they end up
         # being closed. tqdm (for example) raises an exception when the descriptor it
         # wants to write to is closed.
-        run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
+        run: nohup ./scripts/weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
         shell: bash
       - name: Cypress run
         # Use the following to run just a single test

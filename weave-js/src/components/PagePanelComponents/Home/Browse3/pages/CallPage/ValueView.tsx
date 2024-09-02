@@ -2,9 +2,9 @@ import React, {useMemo} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {isWeaveRef} from '../../filters/common';
 import {isCustomWeaveTypePayload} from '../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatcher';
-import {isRef} from '../common/util';
 import {
   DataTableView,
   USE_TABLE_FOR_ARRAYS,
@@ -44,7 +44,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   if (data.value === null) {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
-  if (isRef(data.value)) {
+  if (isWeaveRef(data.value)) {
     if (
       opDefRef &&
       opDefRef.scheme === 'weave' &&

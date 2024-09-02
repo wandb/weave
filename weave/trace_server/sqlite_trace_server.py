@@ -6,11 +6,12 @@ import hashlib
 import json
 import sqlite3
 import threading
-from typing import Any, Iterator, Optional, cast
+from typing import Any, Dict, Iterator, Optional, cast
 from zoneinfo import ZoneInfo
 
 import emoji
 
+from weave.trace_server import refs_internal as ri
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.feedback import (
@@ -19,19 +20,16 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.orm import Row, quote_json_path
-from weave.trace_server.refs_internal import (
-    DICT_KEY_EDGE_NAME,
-    LIST_INDEX_EDGE_NAME,
-    OBJECT_ATTR_EDGE_NAME,
-    TABLE_ROW_ID_EDGE_NAME,
-    WEAVE_INTERNAL_SCHEME,
-    InternalObjectRef,
-    InternalTableRef,
-    parse_internal_uri,
+from weave.trace_server.trace_server_common import (
+    get_nested_key,
+    hydrate_calls_with_feedback,
+    make_feedback_query_req,
+    set_nested_key,
 )
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
+from weave.trace_server.validation import object_id_validator
 
 from . import trace_server_interface as tsi
 from .ids import generate_id
@@ -452,7 +450,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             # convert json dump fields into json
             for json_field in ["attributes", "summary", "inputs", "output"]:
                 if call_dict.get(json_field):
-                    call_dict[json_field] = json.loads(call_dict[json_field])
+                    # load json
+                    data = json.loads(call_dict[json_field])
+                    # do ref expansion
+                    if req.expand_columns:
+                        data = self._expand_refs(
+                            {json_field: data}, req.expand_columns
+                        )[json_field]
+                    call_dict[json_field] = data
             # convert empty string display_names to None
             if "display_name" in call_dict and call_dict["display_name"] == "":
                 call_dict["display_name"] = None
@@ -467,8 +472,40 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         raise ValueError(f"Field '{col}' is required for selection")
                     else:
                         call_dict[col] = {}
-            calls.append(tsi.CallSchema(**call_dict))
-        return tsi.CallsQueryRes(calls=calls)
+            calls.append(call_dict)
+
+        if req.include_feedback:
+            feedback_query_req = make_feedback_query_req(req.project_id, calls)
+            feedback = self.feedback_query(feedback_query_req)
+            hydrate_calls_with_feedback(calls, feedback)
+
+        return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
+
+    def _expand_refs(
+        self, data: Dict[str, Any], expand_columns: list[str]
+    ) -> Dict[str, Any]:
+        """
+        Recursively expand refs in the data. Only expand refs if requested in the
+        expand_columns list. expand_columns must be sorted by depth, shallowest first.
+        """
+        cols = sorted(expand_columns, key=lambda x: x.count("."))
+        for col in cols:
+            val = data.get(col)
+            if not val:
+                val = get_nested_key(data, col)
+                if not val:
+                    continue
+
+            if not ri.any_will_be_interpreted_as_ref_str(val):
+                continue
+
+            if not isinstance(ri.parse_internal_uri(val), ri.InternalObjectRef):
+                continue
+
+            derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
+            set_nested_key(data, col, derefed_val)
+
+        return data
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
@@ -552,6 +589,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         json_val = json.dumps(req.obj.val)
         digest = str_digest(json_val)
+
+        # Validate
+        object_id_validator(req.obj.object_id)
 
         req_obj = req.obj
         # TODO: version index isn't right here, what if we delete stuff?
@@ -750,12 +790,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_refs = [parse_internal_uri(r) for r in req.refs]
-        if any(isinstance(r, InternalTableRef) for r in parsed_refs):
+        parsed_refs = [ri.parse_internal_uri(r) for r in req.refs]
+        if any(isinstance(r, ri.InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
-        parsed_obj_refs = cast(list[InternalObjectRef], parsed_refs)
+        parsed_obj_refs = cast(list[ri.InternalObjectRef], parsed_refs)
 
-        def read_ref(r: InternalObjectRef) -> Any:
+        def read_ref(r: ri.InternalObjectRef) -> Any:
             conds = [
                 f"object_id = '{r.name}'",
                 f"digest = '{r.version}'",
@@ -771,17 +811,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
-                if op == DICT_KEY_EDGE_NAME:
+                if op == ri.DICT_KEY_EDGE_NAME:
                     val = val[arg]
-                elif op == OBJECT_ATTR_EDGE_NAME:
+                elif op == ri.OBJECT_ATTR_EDGE_NAME:
                     val = val[arg]
-                elif op == LIST_INDEX_EDGE_NAME:
+                elif op == ri.LIST_INDEX_EDGE_NAME:
                     val = val[int(arg)]
-                elif op == TABLE_ROW_ID_EDGE_NAME:
-                    weave_internal_prefix = WEAVE_INTERNAL_SCHEME + ":///"
+                elif op == ri.TABLE_ROW_ID_EDGE_NAME:
+                    weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
                     if isinstance(val, str) and val.startswith(weave_internal_prefix):
-                        table_ref = parse_internal_uri(val)
-                        if not isinstance(table_ref, InternalTableRef):
+                        table_ref = ri.parse_internal_uri(val)
+                        if not isinstance(table_ref, ri.InternalTableRef):
                             raise ValueError(
                                 "invalid data layout encountered, expected TableRef when resolving id"
                             )

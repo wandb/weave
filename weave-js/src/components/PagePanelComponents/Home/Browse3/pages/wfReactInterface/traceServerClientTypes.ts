@@ -59,6 +59,7 @@ export type TraceCallsQueryReq = {
   sort_by?: SortBy[];
   query?: Query;
   columns?: string[];
+  expand_columns?: string[];
 };
 
 export type TraceCallsQueryRes = {

@@ -60,7 +60,7 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_litellm_quickstart(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
@@ -101,7 +101,7 @@ def test_litellm_quickstart(
 )
 @pytest.mark.asyncio
 async def test_litellm_quickstart_async(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
@@ -144,7 +144,7 @@ async def test_litellm_quickstart_async(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_litellm_quickstart_stream(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
@@ -187,7 +187,7 @@ def test_litellm_quickstart_stream(
 )
 @pytest.mark.asyncio
 async def test_litellm_quickstart_stream_async(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
@@ -231,7 +231,7 @@ async def test_litellm_quickstart_stream_async(
 )
 @pytest.mark.asyncio
 def test_model_predict(
-    client: weave.weave_client.WeaveClient, patch_litellm: None
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     class TranslatorModel(weave.Model):
         model: str

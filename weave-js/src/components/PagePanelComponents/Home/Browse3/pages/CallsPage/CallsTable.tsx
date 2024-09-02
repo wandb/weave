@@ -28,7 +28,6 @@ import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import React, {
   FC,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -39,10 +38,7 @@ import {useHistory} from 'react-router-dom';
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {Tailwind} from '../../../../../Tailwind';
-import {
-  useWeaveflowCurrentRouteContext,
-  WeaveHeaderExtrasContext,
-} from '../../context';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -162,7 +158,6 @@ export const CallsTable: FC<{
   setPaginationModel,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
@@ -508,38 +503,6 @@ export const CallsTable: FC<{
   // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
-  useEffect(() => {
-    if (!isEvaluateTable) {
-      return;
-    }
-    addExtra('compareEvaluations', {
-      node: (
-        <CompareEvaluationsTableButton
-          onClick={() => {
-            history.push(
-              router.compareEvaluationsUri(entity, project, selectedCalls)
-            );
-          }}
-          disabled={selectedCalls.length === 0}
-        />
-      ),
-      order: 1,
-    });
-
-    return () => removeExtra('compareEvaluations');
-  }, [
-    apiRef,
-    addExtra,
-    removeExtra,
-    isEvaluateTable,
-    selectedCalls.length,
-    selectedCalls,
-    tableData,
-    router,
-    entity,
-    project,
-    history,
-  ]);
 
   // We really want to use columns here, but because visibleColumns
   // is a prop to ExportSelector, it causes infinite reloads.
@@ -557,8 +520,6 @@ export const CallsTable: FC<{
       ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
       : [];
   }, [allRowKeys, columnVisibilityModel, tableData]);
-
-  // Register Export Button
 
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
 
@@ -711,6 +672,16 @@ export const CallsTable: FC<{
               }}
             />
           )}
+          {isEvaluateTable && (
+            <CompareEvaluationsTableButton
+              onClick={() => {
+                history.push(
+                  router.compareEvaluationsUri(entity, project, selectedCalls)
+                );
+              }}
+              disabled={selectedCalls.length === 0}
+            />
+          )}
           {!isReadonly && (
             <div className="flex-none">
               <BulkDeleteButton
@@ -735,6 +706,10 @@ export const CallsTable: FC<{
               numTotalCalls={callsTotal}
               disabled={callsTotal === 0}
               visibleColumns={visibleColumns}
+              // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
+              refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+                visibleColumns.includes(col)
+              )}
               callQueryParams={{
                 entity,
                 project,
