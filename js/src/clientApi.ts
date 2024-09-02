@@ -10,6 +10,13 @@ import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { WeaveObject, getClassChain } from './weaveObject';
 import { Op, getOpName, getOpWrappedFunction, isOp, OpRef } from './opType';
 
+// Add this near the top of the file, with other type definitions
+export type CallStackEntry = {
+    callId: string;
+    traceId: string;
+    childSummary: Record<string, any>;
+};
+
 // Create an AsyncLocalStorage instance
 
 
@@ -31,11 +38,7 @@ type CallEndParams = EndedCallSchemaForInsert;
 export class WeaveClient {
     traceServerApi: TraceServerApi<any>;
     wandbServerApi: WandbServerApi;
-    stackContext = new AsyncLocalStorage<{
-        callId: string;
-        traceId: string;
-        childSummary: Record<string, any>;
-    }[]>();
+    stackContext = new AsyncLocalStorage<CallStackEntry[]>();
     projectId: string;
     callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
     batchProcessTimeout: NodeJS.Timeout | null = null;
