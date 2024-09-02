@@ -38,15 +38,17 @@ export class WeaveClient {
     callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
     batchProcessTimeout: NodeJS.Timeout | null = null;
     isBatchProcessing: boolean = false;
+    quiet: boolean = false;
     readonly BATCH_INTERVAL: number = 200;
 
     private fileQueue: Array<{ fileContent: Blob }> = [];
     private isProcessingFiles: boolean = false;
 
-    constructor(traceServerApi: TraceServerApi<any>, wandbServerApi: WandbServerApi, projectId: string) {
+    constructor(traceServerApi: TraceServerApi<any>, wandbServerApi: WandbServerApi, projectId: string, quiet: boolean = false) {
         this.traceServerApi = traceServerApi;
         this.wandbServerApi = wandbServerApi;
         this.projectId = projectId;
+        this.quiet = quiet;
     }
 
     private scheduleBatchProcessing() {
@@ -331,6 +333,7 @@ export function initWithCustomTraceServer(projectName: string, customTraceServer
     globalClient = new WeaveClient(
         customTraceServer as unknown as TraceServerApi<any>,
         {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
-        projectName
+        projectName,
+        true
     );
 }
