@@ -23,12 +23,13 @@ export function op<T extends (...args: any[]) => any>(
         // Use the bound 'this' if available, otherwise use the current 'this'
         const thisArg = options?.bindThis;
 
-        // @ts-ignore
         if (!globalClient) {
             return await fn(...args);
         }
 
-        const store = globalClient.stackContext.getStore() || { callStack: [] };
+        let store = globalClient.stackContext.getStore() || { callStack: [] };
+        store = { ...store, callStack: [...store.callStack] };
+
         const startTime = new Date().toISOString();
         const callId = generateCallId();
         let traceId: string;
@@ -44,7 +45,10 @@ export function op<T extends (...args: any[]) => any>(
 
         store.callStack.push({ callId, traceId, childSummary: {} });
 
-        if (store.callStack.length === 1) {
+        const currentCall = store.callStack[store.callStack.length - 1];
+        const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
+
+        if (!globalClient.quiet && store.callStack.length === 1) {
             console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${callId}`);
         }
 
@@ -82,8 +86,6 @@ export function op<T extends (...args: any[]) => any>(
                 return await fn(...processedArgs);
             });
 
-            const currentCall = store.callStack[store.callStack.length - 1];
-            const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
 
             if (options?.streamReducer && Symbol.asyncIterator in result) {
                 const { initialState, reduceFn } = options.streamReducer;
@@ -131,7 +133,11 @@ export function op<T extends (...args: any[]) => any>(
             globalClient.saveCallEnd(endReq);
             throw error;
         } finally {
-            store.callStack.pop();
+            const poppedCall = store.callStack.pop();
+            // sanity checks
+            if (poppedCall?.callId !== callId) {
+                console.error('Call stack corruption detected');
+            }
         }
     };
 
@@ -164,7 +170,23 @@ function generateCallId(): string {
     return uuidv7();
 }
 
+/**
+ * Represents a summary object with string keys and any type of values.
+ */
 type Summary = Record<string, any>;
+
+/**
+ * Merges two summary objects, combining their values.
+ * 
+ * @param left - The first summary object to merge.
+ * @param right - The second summary object to merge.
+ * @returns A new summary object containing the merged values.
+ * 
+ * This function performs a deep merge of two summary objects:
+ * - For numeric values, it adds them together.
+ * - For nested objects, it recursively merges them.
+ * - For other types, the left value "wins".
+ */
 function mergeSummaries(left: Summary, right: Summary): Summary {
     const result: Summary = { ...right };
     for (const [key, leftValue] of Object.entries(left)) {

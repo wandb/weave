@@ -233,8 +233,10 @@ describe('Op Flow', () => {
 
         const midOp = op(
             async (x: number, y: number) => {
-                const res1 = await leafOp(x);
-                const res2 = await leafOp(y);
+                const [res1, res2] = await Promise.all([
+                    leafOp(x),
+                    leafOp(y)
+                ]);
                 return res1 + res2;
             },
             {
@@ -245,8 +247,10 @@ describe('Op Flow', () => {
 
         const rootOp = op(
             async (a: number, b: number, c: number) => {
-                const res1 = await midOp(a, b);
-                const res2 = await leafOp(c);
+                const [res1, res2] = await Promise.all([
+                    midOp(a, b),
+                    leafOp(c)
+                ]);
                 return res1 + res2;
             },
             {
@@ -282,16 +286,33 @@ describe('Op Flow', () => {
         const leafCalls = calls.filter(call => call.op_name.includes('leafOp'));
         expect(leafCalls).toHaveLength(3);
 
-        // Check individual leaf calls
-        expect(leafCalls[0].summary).toEqual({ leaf: { count: 1, sum: 1 } });
-        expect(leafCalls[1].summary).toEqual({ leaf: { count: 1, sum: 2 } });
-        expect(leafCalls[2].summary).toEqual({ leaf: { count: 1, sum: 3 } });
+        const leafCallsUnderMid = leafCalls.filter(call => call.parent_id === midCall?.id);
+        const leafCallUnderRoot = leafCalls.find(call => call.parent_id === rootCall?.id);
+
+        expect(leafCallsUnderMid).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ summary: { leaf: { count: 1, sum: 1 } } }),
+                expect.objectContaining({ summary: { leaf: { count: 1, sum: 2 } } })
+            ])
+        );
+        expect(leafCallsUnderMid).toHaveLength(2);
+
+        expect(leafCallUnderRoot).toEqual(
+            expect.objectContaining({ summary: { leaf: { count: 1, sum: 3 } } })
+        );
+
+        // Ensure we have exactly these three summaries
+        expect(leafCalls).toHaveLength(3);
 
         // Check parent-child relationships
         expect(midCall?.parent_id).toBe(rootCall?.id);
-        expect(leafCalls[0].parent_id).toBe(midCall?.id);
-        expect(leafCalls[1].parent_id).toBe(midCall?.id);
-        expect(leafCalls[2].parent_id).toBe(rootCall?.id);
+        expect(leafCallsUnderMid).toHaveLength(2);
+        expect(leafCallUnderRoot).toBeDefined();
+
+        // Ensure all leaf calls have either midCall or rootCall as parent
+        leafCalls.forEach(call => {
+            expect(call.parent_id === midCall?.id || call.parent_id === rootCall?.id).toBeTruthy();
+        });
 
         // Check that all calls have the same trace_id
         const traceId = rootCall?.trace_id;

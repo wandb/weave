@@ -1,13 +1,21 @@
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 export let packageVersion: string;
 
-try {
-    const packageJson = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8'));
+const twoLevelsUp = join(__dirname, '..', '..', 'package.json');
+const oneLevelUp = join(__dirname, '..', 'package.json');
+
+if (existsSync(twoLevelsUp)) {
+    // This is the case in the built npm package
+    const packageJson = JSON.parse(readFileSync(twoLevelsUp, 'utf8'));
     packageVersion = packageJson.version;
-} catch (error) {
-    console.warn('Failed to read package.json:', error);
+} else if (existsSync(oneLevelUp)) {
+    // This is the case in dev
+    const packageJson = JSON.parse(readFileSync(oneLevelUp, 'utf8'));
+    packageVersion = packageJson.version;
+} else {
+    console.warn('Failed to find package.json');
     packageVersion = 'unknown';
 }
 
