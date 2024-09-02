@@ -5,7 +5,7 @@ import { packageVersion } from "./userAgent";
 import { WeaveClient } from "./clientApi";
 import { WeaveObject, getClassChain } from './weaveObject';
 import { OpOptions, Op, isOp, getOpName, getOpWrappedFunction, OpRef } from './opType';
-import { CallStackEntry } from './clientApi';
+import { CallStackEntry, CallStack } from './clientApi';
 
 export function op<T extends (...args: any[]) => any>(
     fn: T,
@@ -28,31 +28,26 @@ export function op<T extends (...args: any[]) => any>(
             return await fn(...args);
         }
 
-        let stack = globalClient.stackContext.getStore() || [];
-        stack = [...stack];
+        let callStack = globalClient.stackContext.getStore() || new CallStack();
 
         const startTime = new Date().toISOString();
         const callId = generateCallId();
         let traceId: string;
         let parentId: string | null = null;
+        const parentCall = callStack.currentCall();
 
-        if (stack.length === 0) {
+        if (!parentCall) {
             traceId = generateTraceId();
+            if (!globalClient.quiet) {
+                console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${callId}`);
+            }
         } else {
-            const parentCall = stack[stack.length - 1];
             traceId = parentCall.traceId;
             parentId = parentCall.callId;
         }
 
-        const newEntry: CallStackEntry = { callId, traceId, childSummary: {} };
-        stack.push(newEntry);
-
-        const currentCall = stack[stack.length - 1];
-        const parentCall = stack.length > 1 ? stack[stack.length - 2] : undefined;
-
-        if (!globalClient.quiet && stack.length === 1) {
-            console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${callId}`);
-        }
+        const currentCall: CallStackEntry = { callId, traceId, childSummary: {} };
+        callStack = callStack.push(currentCall);
 
         // Process WeaveImage in inputs
         const processedArgs = await Promise.all(args.map(processWeaveValues));
@@ -84,7 +79,7 @@ export function op<T extends (...args: any[]) => any>(
         globalClient.saveCallStart(startReq);
 
         try {
-            let result = await globalClient.stackContext.run(stack, async () => {
+            let result = await globalClient.stackContext.run(callStack, async () => {
                 return await fn(...processedArgs);
             });
 
@@ -134,9 +129,9 @@ export function op<T extends (...args: any[]) => any>(
             globalClient.saveCallEnd(endReq);
             throw error;
         } finally {
-            const poppedCall = stack.pop();
-            // sanity checks
-            if (poppedCall?.callId !== callId) {
+            // Sanity check using currentCall()
+            const currentCallEntry = callStack.currentCall();
+            if (currentCallEntry?.callId !== callId) {
                 console.error('Call stack corruption detected');
             }
         }
