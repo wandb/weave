@@ -1,5 +1,5 @@
 import { boundOp } from "./op";
-import { Op } from './opType';
+import { Op, getOpName } from './opType';
 
 interface WeaveObjectParameters {
     id?: string;
@@ -91,25 +91,81 @@ export class Evaluation extends WeaveObject {
         this.dataset = parameters.dataset;
         this.scorers = parameters.scorers;
         this.evaluate = boundOp(this, this.evaluate);
+        this.predict_and_score = boundOp(this, this.predict_and_score);
     }
 
     async evaluate(model: Op<any>) {
-        const results: Array<{ item: any, modelOutput: any, scores: { [key: string]: any } }> = [];
+        const results: Array<{ modelOutput: any, scores: { [key: string]: any }, modelLatency: number }> = [];
         for await (const item of this.dataset) {
-            const modelOutput = await model(item);
-
-            const scores: { [key: string]: any } = {};
-            for (const scorer of this.scorers) {
-                const score = await scorer(modelOutput, item);
-                scores[scorer.name] = score;
-            }
-            results.push({ item, modelOutput, scores });
+            const result = await this.predict_and_score(model, item);
+            results.push(result);
         }
-        return results
+        return this.summarizeResults(results);
+    }
+
+    async predict_and_score(model: Op<any>, item: Record<string, any>) {
+        const startTime = new Date();
+        const modelOutput = await model(item);
+        const modelLatency = new Date().getTime() - startTime.getTime();
+
+        const scores: { [key: string]: any } = {};
+        for (const scorer of this.scorers) {
+            const score = await scorer(modelOutput, item);
+            scores[getOpName(scorer)] = score;
+        }
+
+        return { modelOutput, scores, modelLatency };
+    }
+
+    private summarizeResults(results: Array<{ modelOutput: any, scores: { [key: string]: any }, modelLatency: number }>) {
+        const summary: Record<string, any> = {};
+
+        const summarizeNestedObject = (obj: any, currentPath: string = ''): Record<string, any> => {
+            const nestedSummary: Record<string, any> = {};
+
+            for (const [key, value] of Object.entries(obj)) {
+                const newPath = currentPath ? `${currentPath}.${key}` : key;
+
+                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                    nestedSummary[key] = summarizeNestedObject(value, newPath);
+                } else {
+                    const values = results.map(result => {
+                        const keys = newPath.split('.');
+                        return keys.reduce((acc: any, k) => acc && acc[k], result);
+                    });
+
+                    const columnSummary = this.summarizeColumn(values);
+                    if (Object.keys(columnSummary).length > 0) {
+                        nestedSummary[key] = columnSummary;
+                    }
+                }
+            }
+
+            return nestedSummary;
+        };
+
+        // Use the first result as a template for the structure
+        const templateResult = results[0];
+        return summarizeNestedObject(templateResult);
+    }
+
+    private summarizeColumn(values: any[]): Record<string, number> {
+        if (values.every(v => typeof v === 'boolean')) {
+            const trueCount = values.filter(v => v).length;
+            return {
+                true_count: trueCount,
+                true_fraction: trueCount / values.length
+            };
+        } else if (values.every(v => typeof v === 'number')) {
+            const sum = values.reduce((acc, v) => acc + v, 0);
+            return {
+                mean: sum / values.length
+            };
+        }
+        return {};
     }
 }
 
-// TODO: match python
 export function getClassChain(instance: WeaveObject): string[] {
     const bases: string[] = [];
     let currentProto = Object.getPrototypeOf(instance);
