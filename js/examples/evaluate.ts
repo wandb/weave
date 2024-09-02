@@ -2,7 +2,7 @@ import 'source-map-support/register';
 import { init, wrapOpenAI, op, DatasetFake, Evaluation } from 'weave';
 
 async function main() {
-    const client = await init('weavejsdev-eval1');
+    const client = await init('weavejsdev-eval5');
     const ds = new DatasetFake({
         id: "My Dataset",
         description: "This is a dataset",

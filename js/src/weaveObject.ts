@@ -14,13 +14,14 @@ export class ObjectRef {
     }
 
     public ui_url() {
-        return `https://wandb.ai/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
+        return `https://wandb.ai/${this.projectId}/weave/ops/${this.objectId}/versions/${this.digest}`;
     }
 }
 
 
 export class WeaveObject {
     saveAttrNames: string[] = [];
+    __savedRef?: ObjectRef | Promise<ObjectRef>;
 
     constructor(private baseParameters: WeaveObjectParameters) { }
 
