@@ -80,7 +80,5 @@ export function op<T extends (...args: any[]) => any>(
 }
 
 export function boundOp(bindThis: any, fn: (...args: any[]) => any) {
-    const thisClass = getClassChain(bindThis)[0];
-    // return op(fn, { originalFunction: fn, name: `${thisClass}.${fn.name}`, bindThis });
     return op(fn.bind(bindThis), { originalFunction: fn, bindThis });
 }
