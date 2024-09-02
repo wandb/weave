@@ -10,7 +10,6 @@ import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { WeaveObject, getClassChain } from './weaveObject';
 import { Op, getOpName, getOpWrappedFunction, isOp, OpRef } from './opType';
 
-// Add this near the top of the file, with other type definitions
 export type CallStackEntry = {
     callId: string;
     traceId: string;
@@ -32,9 +31,6 @@ export class CallStack {
 
 }
 
-// Create an AsyncLocalStorage instance
-
-
 class ObjectRef {
     constructor(public projectId: string, public objectId: string, public digest: string) { }
 
@@ -51,9 +47,9 @@ type CallStartParams = StartedCallSchemaForInsert;
 type CallEndParams = EndedCallSchemaForInsert;
 
 export class WeaveClient {
+    private stackContext = new AsyncLocalStorage<CallStack>();
     traceServerApi: TraceServerApi<any>;
     wandbServerApi: WandbServerApi;
-    stackContext = new AsyncLocalStorage<CallStack>();
     projectId: string;
     callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
     batchProcessTimeout: NodeJS.Timeout | null = null;
@@ -223,7 +219,6 @@ export class WeaveClient {
         };
     }
 
-
     private async processFileQueue() {
         if (this.isProcessingFiles || this.fileQueue.length === 0) return;
 
@@ -244,6 +239,15 @@ export class WeaveClient {
         }
 
         this.isProcessingFiles = false;
+    }
+
+    // Add these new methods
+    getCallStack(): CallStack {
+        return this.stackContext.getStore() || new CallStack();
+    }
+
+    runWithCallStack<T>(callStack: CallStack, fn: () => T): T {
+        return this.stackContext.run(callStack, fn);
     }
 }
 

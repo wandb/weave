@@ -28,7 +28,7 @@ export function op<T extends (...args: any[]) => any>(
             return await fn(...args);
         }
 
-        let callStack = globalClient.stackContext.getStore() || new CallStack();
+        let callStack = globalClient.getCallStack();
 
         const startTime = new Date().toISOString();
         const callId = generateCallId();
@@ -79,7 +79,7 @@ export function op<T extends (...args: any[]) => any>(
         globalClient.saveCallStart(startReq);
 
         try {
-            let result = await globalClient.stackContext.run(callStack, async () => {
+            let result = await globalClient.runWithCallStack(callStack, async () => {
                 return await fn(...processedArgs);
             });
 
