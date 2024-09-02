@@ -5,7 +5,7 @@ import { AsyncLocalStorage } from 'async_hooks';
 import { packageVersion } from "./userAgent";
 import { Api as TraceServerApi, StartedCallSchemaForInsert, EndedCallSchemaForInsert } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
-import { WeaveObject, getClassChain } from './weaveObject';
+import { WeaveObject, ObjectRef, getClassChain } from './weaveObject';
 import { Op, getOpName, getOpWrappedFunction, isOp, OpRef } from './opType';
 import { isWeaveImage } from './media';
 
@@ -53,18 +53,6 @@ class CallStack {
         }
     }
 
-}
-
-class ObjectRef {
-    constructor(public projectId: string, public objectId: string, public digest: string) { }
-
-    public uri() {
-        return `weave:///${this.projectId}/object/${this.objectId}:${this.digest}`;
-    }
-
-    public ui_url() {
-        return `https://wandb.ai/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
-    }
 }
 
 type CallStartParams = StartedCallSchemaForInsert;
