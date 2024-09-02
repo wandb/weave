@@ -17,6 +17,21 @@ export type CallStackEntry = {
     childSummary: Record<string, any>;
 };
 
+export class CallStack {
+    private stack: CallStackEntry[] = [];
+
+    push(entry: CallStackEntry): CallStack {
+        const newStack = new CallStack();
+        newStack.stack = [...this.stack, entry];
+        return newStack;
+    }
+
+    currentCall(): CallStackEntry | undefined {
+        return this.stack[this.stack.length - 1];
+    }
+
+}
+
 // Create an AsyncLocalStorage instance
 
 
@@ -38,7 +53,7 @@ type CallEndParams = EndedCallSchemaForInsert;
 export class WeaveClient {
     traceServerApi: TraceServerApi<any>;
     wandbServerApi: WandbServerApi;
-    stackContext = new AsyncLocalStorage<CallStackEntry[]>();
+    stackContext = new AsyncLocalStorage<CallStack>();
     projectId: string;
     callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
     batchProcessTimeout: NodeJS.Timeout | null = null;
