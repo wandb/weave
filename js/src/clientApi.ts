@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { uuidv7 } from 'uuidv7';
 import { AsyncLocalStorage } from 'async_hooks';
 
+import { packageVersion } from "./userAgent";
 import { Api as TraceServerApi, StartedCallSchemaForInsert, EndedCallSchemaForInsert } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
@@ -116,6 +117,7 @@ export class WeaveClient {
             }))
         };
 
+
         try {
             await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(batchReq);
         } catch (error) {
@@ -177,7 +179,6 @@ export class WeaveClient {
             _bases: classChain.slice(1),
             ...saveAttrs
         }
-        console.log("SAVE VALUE", JSON.stringify(saveValue, undefined, 2))
         const response = await this.traceServerApi.obj.objCreateObjCreatePost({
             obj: {
                 project_id: this.projectId,
@@ -234,7 +235,7 @@ export class WeaveClient {
         this.scheduleBatchProcessing();
     }
 
-    public createEndReq(callId: string, endTime: string, output: any, summary: Record<string, any>, exception?: string) {
+    private createEndReq(callId: string, endTime: string, output: any, summary: Record<string, any>, exception?: string) {
         return {
             project_id: this.projectId,
             id: callId,
@@ -278,6 +279,56 @@ export class WeaveClient {
 
     runWithCallStack<T>(callStack: CallStack, fn: () => T): T {
         return this.stackContext.run(callStack, fn);
+    }
+
+    async paramsToCallInputs(params: any[], thisArg: any) {
+        // Process WeaveImage in inputs
+        const processedArgs = await Promise.all(params.map(processWeaveValues));
+        // @ts-ignore
+        const initialInputs = thisArg instanceof WeaveObject ? {
+            this: thisArg
+        } : {};
+        const inputs = processedArgs.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), initialInputs);
+        const savedInputs = await this.saveObjectAndOps(inputs);
+        return savedInputs;
+    }
+
+    async startCall(opRef: OpRef, params: any[], thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime?: Date) {
+        const inputs = await this.paramsToCallInputs(params, thisArg);
+        startTime = startTime ?? new Date();
+        const startReq = {
+            project_id: this.projectId,
+            id: currentCall.callId,
+            op_name: opRef.uri(),
+            trace_id: currentCall.traceId,
+            parent_id: parentCall?.callId,
+            started_at: startTime.toISOString(),
+            attributes: {
+                weave: {
+                    client_version: packageVersion,
+                    source: 'js-sdk'
+                }
+            },
+            inputs
+        }
+        this.saveCallStart(startReq);
+    }
+
+    async finishCall(result: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, summarize?: (result: any) => Record<string, any>, endTime?: Date) {
+        result = await processWeaveValues(result);
+        endTime = endTime ?? new Date();
+        const mergedSummary = processSummary(result, summarize, currentCall, parentCall);
+        const endReq = this.createEndReq(currentCall.callId, endTime.toISOString(), result, mergedSummary);
+        await this.saveCallEnd(endReq);
+    }
+
+    async finishCallWithException(error: any, currentCall: CallStackEntry, endTime?: Date) {
+        endTime = endTime ?? new Date();
+        const endReq = this.createEndReq(currentCall.callId, endTime.toISOString(), null, {},
+            error instanceof Error ? error.message : String(error)
+
+        );
+        await this.saveCallEnd(endReq);
     }
 }
 
@@ -390,4 +441,67 @@ export function initWithCustomTraceServer(projectName: string, customTraceServer
         projectName,
         true
     );
+}
+
+/**
+ * Represents a summary object with string keys and any type of values.
+ */
+type Summary = Record<string, any>;
+
+/**
+ * Merges two summary objects, combining their values.
+ * 
+ * @param left - The first summary object to merge.
+ * @param right - The second summary object to merge.
+ * @returns A new summary object containing the merged values.
+ * 
+ * This function performs a deep merge of two summary objects:
+ * - For numeric values, it adds them together.
+ * - For nested objects, it recursively merges them.
+ * - For other types, the left value "wins".
+ */
+function mergeSummaries(left: Summary, right: Summary): Summary {
+    const result: Summary = { ...right };
+    for (const [key, leftValue] of Object.entries(left)) {
+        if (key in result) {
+            if (typeof leftValue === 'number' && typeof result[key] === 'number') {
+                result[key] = leftValue + result[key];
+            } else if (typeof leftValue === 'object' && typeof result[key] === 'object') {
+                result[key] = mergeSummaries(leftValue, result[key]);
+            } else {
+                result[key] = leftValue;
+            }
+        } else {
+            result[key] = leftValue;
+        }
+    }
+    return result;
+}
+
+function processSummary(
+    result: any,
+    summarize: ((result: any) => Record<string, any>) | undefined,
+    currentCall: CallStackEntry,
+    parentCall: CallStackEntry | undefined
+) {
+    let ownSummary = summarize ? summarize(result) : {};
+
+    if (ownSummary.usage) {
+        for (const model in ownSummary.usage) {
+            if (typeof ownSummary.usage[model] === 'object') {
+                ownSummary.usage[model] = {
+                    requests: 1,
+                    ...ownSummary.usage[model],
+                };
+            }
+        }
+    }
+
+    const mergedSummary = mergeSummaries(ownSummary, currentCall.childSummary);
+
+    if (parentCall) {
+        parentCall.childSummary = mergeSummaries(mergedSummary, parentCall.childSummary);
+    }
+
+    return mergedSummary;
 }
