@@ -6,6 +6,7 @@ export type Op<T extends (...args: any[]) => any> = {
     wrappedFunction: T;
     __boundThis?: WeaveObject;
     __name: string;
+    __savedRef?: OpRef | Promise<OpRef>;
 } & T;
 interface StreamReducer<T, R> {
     initialState: R;
@@ -37,5 +38,9 @@ export class OpRef {
 
     public uri() {
         return `weave:///${this.projectId}/op/${this.objectId}:${this.digest}`;
+    }
+
+    public ui_url() {
+        return `https://wandb.ai/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
     }
 }

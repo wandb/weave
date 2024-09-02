@@ -20,9 +20,9 @@ export function op<T extends (...args: any[]) => any>(
             return await fn(...params);
         }
 
-        const opRef = await globalClient.saveOp(opWrapper);
         const { newStack, currentCall, parentCall } = globalClient.pushNewCall();
-        await globalClient.startCall(opRef, params, thisArg, currentCall, parentCall);
+        const startTime = new Date();
+        const startCallPromise = globalClient.startCall(opWrapper, params, thisArg, currentCall, parentCall, startTime);
 
         try {
             let result = await globalClient.runWithCallStack(newStack, async () => {
@@ -42,7 +42,8 @@ export function op<T extends (...args: any[]) => any>(
                             }
                         } finally {
                             if (globalClient) { // Check if globalClient still exists
-                                await globalClient.finishCall(state, currentCall, parentCall, options?.summarize);
+                                const endTime = new Date();
+                                await globalClient.finishCall(state, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
                             }
                         }
                     }
@@ -50,12 +51,14 @@ export function op<T extends (...args: any[]) => any>(
 
                 return wrappedIterator as unknown as ReturnType<T>;
             } else {
-                await globalClient.finishCall(result, currentCall, parentCall, options?.summarize);
+                const endTime = new Date();
+                globalClient.finishCall(result, currentCall, parentCall, options?.summarize, endTime, startCallPromise);
                 return result;
             }
         } catch (error) {
             console.error(`Op ${actualOpName} failed:`, error);
-            await globalClient.finishCallWithException(error, currentCall);
+            const endTime = new Date();
+            globalClient.finishCallWithException(error, currentCall, endTime, startCallPromise);
             throw error;
         } finally {
             // No need to do anything here.
