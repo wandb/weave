@@ -175,30 +175,37 @@ export class WeaveClient {
 
 
     private async saveObject(obj: WeaveObject, objId?: string): Promise<any> {
-        const classChain = getClassChain(obj);
-        const className = classChain[0];
-        if (!objId) {
-            objId = obj.id() ?? className
+        if (obj.__savedRef) {
+            return obj.__savedRef;
         }
 
-        let saveAttrs = obj.saveAttrs();
-        saveAttrs = await this.saveObjectAndOps(saveAttrs);
-        const saveValue = {
-            _type: classChain[0],
-            _bases: classChain.slice(1),
-            ...saveAttrs
-        }
-        const response = await this.traceServerApi.obj.objCreateObjCreatePost({
-            obj: {
-                project_id: this.projectId,
-                object_id: objId,
-                val: saveValue
+        obj.__savedRef = (async () => {
+            const classChain = getClassChain(obj);
+            const className = classChain[0];
+            if (!objId) {
+                objId = obj.id() ?? className
             }
-        });
-        // TODO: work in batch, return immediately
-        const ref = new ObjectRef(this.projectId, objId, response.data.digest);
-        console.log(`Saved object: ${ref.ui_url()}`);
-        return ref;
+
+            let saveAttrs = obj.saveAttrs();
+            saveAttrs = await this.saveObjectAndOps(saveAttrs);
+            const saveValue = {
+                _type: classChain[0],
+                _bases: classChain.slice(1),
+                ...saveAttrs
+            }
+            const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+                obj: {
+                    project_id: this.projectId,
+                    object_id: objId,
+                    val: saveValue
+                }
+            });
+            const ref = new ObjectRef(this.projectId, objId, response.data.digest);
+            console.log(`Saved object: ${ref.ui_url()}`);
+            return ref;
+        })();
+
+        return obj.__savedRef;
     }
 
     private async saveObjectAndOps(val: any): Promise<any> {
@@ -269,27 +276,37 @@ export class WeaveClient {
     }
 
     public async saveOp(op: Op<(...args: any[]) => any>): Promise<any> {
-        const objId = getOpName(op);
-        const opFn = getOpWrappedFunction(op);
-        const saveValue = await this.saveFileBlob('Op', 'obj.py', new Blob([opFn.toString()]))
-        const response = await this.traceServerApi.obj.objCreateObjCreatePost({
-            obj: {
-                project_id: this.projectId,
-                object_id: objId,
-                val: saveValue
-            }
-        });
-        // TODO: work in batch, return immediately
-        return new OpRef(this.projectId, objId, response.data.digest);
+        if (op.__savedRef) {
+            return op.__savedRef;
+        }
+        op.__savedRef = (async () => {
+            const objId = getOpName(op);
+            const opFn = getOpWrappedFunction(op);
+            const saveValue = await this.saveFileBlob('Op', 'obj.py', new Blob([opFn.toString()]))
+            const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+                obj: {
+                    project_id: this.projectId,
+                    object_id: objId,
+                    val: saveValue
+                }
+            });
+            const ref = new OpRef(this.projectId, objId, response.data.digest);
+
+            console.log('Saved op: ', ref.ui_url());
+            return ref;
+        })();
+        return op.__savedRef;
     }
 
 
-    public async startCall(opRef: OpRef, params: any[], thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime?: Date) {
+    public async startCall(opRef: OpRef | Op<any>, params: any[], thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime: Date) {
+        if (isOp(opRef)) {
+            opRef = await this.saveOp(opRef);
+        }
         if (!this.quiet && parentCall == null) {
             console.log(`🍩 https://wandb.ai/${this.projectId}/r/call/${currentCall.callId}`);
         }
         const inputs = await this.paramsToCallInputs(params, thisArg);
-        startTime = startTime ?? new Date();
         const startReq = {
             project_id: this.projectId,
             id: currentCall.callId,
@@ -305,12 +322,13 @@ export class WeaveClient {
             },
             inputs
         }
-        this.saveCallStart(startReq);
+        return this.saveCallStart(startReq);
     }
 
-    public async finishCall(result: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, summarize?: (result: any) => Record<string, any>, endTime?: Date) {
+    public async finishCall(result: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, summarize: undefined | ((result: any) => Record<string, any>), endTime: Date, startCallPromise: Promise<void>) {
+        // ensure end is logged after start is logged
+        await startCallPromise;
         result = await this.saveMedia(result);
-        endTime = endTime ?? new Date();
         const mergedSummary = processSummary(result, summarize, currentCall, parentCall);
         await this.saveCallEnd({
             project_id: this.projectId,
@@ -321,8 +339,9 @@ export class WeaveClient {
         });
     }
 
-    public async finishCallWithException(error: any, currentCall: CallStackEntry, endTime?: Date) {
-        endTime = endTime ?? new Date();
+    public async finishCallWithException(error: any, currentCall: CallStackEntry, endTime: Date, startCallPromise: Promise<void>) {
+        // ensure end is logged after start is logged
+        await startCallPromise;
         await this.saveCallEnd({
             project_id: this.projectId,
             id: currentCall.callId,
