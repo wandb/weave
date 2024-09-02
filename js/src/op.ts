@@ -1,6 +1,5 @@
-import { globalClient } from "./clientApi";
-
 import { getClassChain } from './weaveObject';
+import { globalClient } from './clientApi';
 import { OpOptions, Op } from './opType';
 
 export function op<T extends (...args: any[]) => any>(
