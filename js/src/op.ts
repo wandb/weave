@@ -1,4 +1,3 @@
-import { getClassChain } from './weaveObject';
 import { globalClient } from './clientApi';
 import { OpOptions, Op } from './opType';
 

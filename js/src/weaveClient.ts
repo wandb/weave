@@ -23,7 +23,7 @@ function generateCallId(): string {
     return uuidv7();
 }
 
-export class CallStack {
+class CallStack {
     private stack: CallStackEntry[] = [];
 
     constructor(stack: CallStackEntry[] = []) {
@@ -72,14 +72,14 @@ type CallEndParams = EndedCallSchemaForInsert;
 
 export class WeaveClient {
     private stackContext = new AsyncLocalStorage<CallStack>();
-    traceServerApi: TraceServerApi<any>;
-    wandbServerApi: WandbServerApi;
-    projectId: string;
-    callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
-    batchProcessTimeout: NodeJS.Timeout | null = null;
-    isBatchProcessing: boolean = false;
-    quiet: boolean = false;
-    readonly BATCH_INTERVAL: number = 200;
+    private traceServerApi: TraceServerApi<any>;
+    private wandbServerApi: WandbServerApi;
+    private projectId: string;
+    private callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
+    private batchProcessTimeout: NodeJS.Timeout | null = null;
+    private isBatchProcessing: boolean = false;
+    private quiet: boolean = false;
+    private readonly BATCH_INTERVAL: number = 200;
 
     private fileQueue: Array<{ fileContent: Blob }> = [];
     private isProcessingFiles: boolean = false;
@@ -89,8 +89,7 @@ export class WeaveClient {
         this.wandbServerApi = wandbServerApi;
         this.projectId = projectId;
         this.quiet = quiet;
-        // Bind processWeaveValues to the instance
-        this.processWeaveValues = this.processWeaveValues.bind(this);
+        this.saveMedia = this.saveMedia.bind(this);
     }
 
     private scheduleBatchProcessing() {
@@ -130,6 +129,29 @@ export class WeaveClient {
         }
     }
 
+    private async processFileQueue() {
+        if (this.isProcessingFiles || this.fileQueue.length === 0) return;
+
+        this.isProcessingFiles = true;
+
+        while (this.fileQueue.length > 0) {
+            const { fileContent } = this.fileQueue.shift()!;
+
+            try {
+                const fileCreateRes = await this.traceServerApi.file.fileCreateFileCreatePost({
+                    project_id: this.projectId,
+                    // @ts-ignore
+                    file: fileContent
+                });
+            } catch (error) {
+                console.error('Error saving file:', error);
+            }
+        }
+
+        this.isProcessingFiles = false;
+    }
+
+
     private computeDigest(data: Buffer): string {
         // Must match python server algorithm in clickhouse_trace_server_batched.py
         const hasher = crypto.createHash('sha256');
@@ -139,7 +161,7 @@ export class WeaveClient {
         return base64EncodedHash.replace(/-/g, 'X').replace(/_/g, 'Y').replace(/=/g, '');
     }
 
-    async saveFileBlob(typeName: string, fileName: string, fileContent: Blob): Promise<any> {
+    private async saveFileBlob(typeName: string, fileName: string, fileContent: Blob): Promise<any> {
         const buffer = await fileContent.arrayBuffer().then(Buffer.from);
         const digest = this.computeDigest(buffer);
 
@@ -158,13 +180,13 @@ export class WeaveClient {
         return placeholder;
     }
 
-    async saveImage(imageData: Buffer, imageType: 'png'): Promise<any> {
+    private async saveImage(imageData: Buffer, imageType: 'png'): Promise<any> {
         const blob = new Blob([imageData], { type: `image/${imageType}` });
         return this.saveFileBlob('PIL.Image.Image', 'image.png', blob);
     }
 
 
-    async saveObject(obj: WeaveObject, objId?: string): Promise<any> {
+    private async saveObject(obj: WeaveObject, objId?: string): Promise<any> {
         const classChain = getClassChain(obj);
         const className = classChain[0];
         if (!objId) {
@@ -191,22 +213,7 @@ export class WeaveClient {
         return ref;
     }
 
-    async saveOp(op: Op<(...args: any[]) => any>): Promise<any> {
-        const objId = getOpName(op);
-        const opFn = getOpWrappedFunction(op);
-        const saveValue = await this.saveFileBlob('Op', 'obj.py', new Blob([opFn.toString()]))
-        const response = await this.traceServerApi.obj.objCreateObjCreatePost({
-            obj: {
-                project_id: this.projectId,
-                object_id: objId,
-                val: saveValue
-            }
-        });
-        // TODO: work in batch, return immediately
-        return new OpRef(this.projectId, objId, response.data.digest);
-    }
-
-    async saveObjectAndOps(val: any): Promise<any> {
+    private async saveObjectAndOps(val: any): Promise<any> {
         if (Array.isArray(val)) {
             return Promise.all(val.map(item => this.saveObjectAndOps(item)));
         } else if (val instanceof WeaveObject) {
@@ -224,12 +231,27 @@ export class WeaveClient {
         }
     }
 
-    public saveCallStart(callStart: CallStartParams) {
+    private saveMedia = async (value: any): Promise<any> => {
+        if (isWeaveImage(value)) {
+            return await this.saveImage(value.data, value.imageType);
+        } else if (Array.isArray(value)) {
+            return Promise.all(value.map(this.saveMedia));
+        } else if (typeof value === 'object' && value !== null) {
+            const processed: Record<string, any> = {};
+            for (const [key, val] of Object.entries(value)) {
+                processed[key] = await this.saveMedia(val);
+            }
+            return processed;
+        }
+        return value;
+    }
+
+    private saveCallStart(callStart: CallStartParams) {
         this.callQueue.push({ mode: 'start', data: { start: callStart } });
         this.scheduleBatchProcessing();
     }
 
-    public saveCallEnd(callEnd: CallEndParams) {
+    private saveCallEnd(callEnd: CallEndParams) {
         this.callQueue.push({ mode: 'end', data: { end: callEnd } });
         this.scheduleBatchProcessing();
     }
@@ -245,60 +267,21 @@ export class WeaveClient {
         };
     }
 
-    private async processFileQueue() {
-        if (this.isProcessingFiles || this.fileQueue.length === 0) return;
-
-        this.isProcessingFiles = true;
-
-        while (this.fileQueue.length > 0) {
-            const { fileContent } = this.fileQueue.shift()!;
-
-            try {
-                const fileCreateRes = await this.traceServerApi.file.fileCreateFileCreatePost({
-                    project_id: this.projectId,
-                    // @ts-ignore
-                    file: fileContent
-                });
-            } catch (error) {
-                console.error('Error saving file:', error);
-            }
-        }
-
-        this.isProcessingFiles = false;
-    }
-
-    // Add these new methods
     private getCallStack(): CallStack {
         return this.stackContext.getStore() || new CallStack();
     }
 
-    pushNewCall() {
+    public pushNewCall() {
         return this.getCallStack().pushNewCall();
     }
 
-    runWithCallStack<T>(callStack: CallStack, fn: () => T): T {
+    public runWithCallStack<T>(callStack: CallStack, fn: () => T): T {
         return this.stackContext.run(callStack, fn);
     }
 
-    // Change this method to an arrow function to preserve 'this' context
-    processWeaveValues = async (value: any): Promise<any> => {
-        if (isWeaveImage(value)) {
-            return await this.saveImage(value.data, value.imageType);
-        } else if (Array.isArray(value)) {
-            return Promise.all(value.map(this.processWeaveValues));
-        } else if (typeof value === 'object' && value !== null) {
-            const processed: Record<string, any> = {};
-            for (const [key, val] of Object.entries(value)) {
-                processed[key] = await this.processWeaveValues(val);
-            }
-            return processed;
-        }
-        return value;
-    }
-
-    async paramsToCallInputs(params: any[], thisArg: any) {
+    private async paramsToCallInputs(params: any[], thisArg: any) {
         // Process WeaveImage in inputs
-        const processedArgs = await Promise.all(params.map(this.processWeaveValues));
+        const processedArgs = await Promise.all(params.map(this.saveMedia));
         // @ts-ignore
         const initialInputs = thisArg instanceof WeaveObject ? {
             this: thisArg
@@ -308,7 +291,23 @@ export class WeaveClient {
         return savedInputs;
     }
 
-    async startCall(opRef: OpRef, params: any[], thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime?: Date) {
+    public async saveOp(op: Op<(...args: any[]) => any>): Promise<any> {
+        const objId = getOpName(op);
+        const opFn = getOpWrappedFunction(op);
+        const saveValue = await this.saveFileBlob('Op', 'obj.py', new Blob([opFn.toString()]))
+        const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+            obj: {
+                project_id: this.projectId,
+                object_id: objId,
+                val: saveValue
+            }
+        });
+        // TODO: work in batch, return immediately
+        return new OpRef(this.projectId, objId, response.data.digest);
+    }
+
+
+    public async startCall(opRef: OpRef, params: any[], thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime?: Date) {
         if (!this.quiet && parentCall == null) {
             console.log(`🍩 https://wandb.ai/${this.projectId}/r/call/${currentCall.callId}`);
         }
@@ -332,15 +331,15 @@ export class WeaveClient {
         this.saveCallStart(startReq);
     }
 
-    async finishCall(result: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, summarize?: (result: any) => Record<string, any>, endTime?: Date) {
-        result = await this.processWeaveValues(result);
+    public async finishCall(result: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, summarize?: (result: any) => Record<string, any>, endTime?: Date) {
+        result = await this.saveMedia(result);
         endTime = endTime ?? new Date();
         const mergedSummary = processSummary(result, summarize, currentCall, parentCall);
         const endReq = this.createEndReq(currentCall.callId, endTime.toISOString(), result, mergedSummary);
         await this.saveCallEnd(endReq);
     }
 
-    async finishCallWithException(error: any, currentCall: CallStackEntry, endTime?: Date) {
+    public async finishCallWithException(error: any, currentCall: CallStackEntry, endTime?: Date) {
         endTime = endTime ?? new Date();
         const endReq = this.createEndReq(currentCall.callId, endTime.toISOString(), null, {},
             error instanceof Error ? error.message : String(error)
