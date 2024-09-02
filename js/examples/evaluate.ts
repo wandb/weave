@@ -25,7 +25,7 @@ async function main() {
     })
 
     const results = await evaluation.evaluate({ model })
-    console.log(results)
+    console.log(JSON.stringify(results, null, 2))
 
 
 }
