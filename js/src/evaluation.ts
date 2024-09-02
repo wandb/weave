@@ -32,15 +32,29 @@ export class Evaluation extends WeaveObject {
 
     async predict_and_score({ model, example }: { model: Op<any>, example: Record<string, any> }) {
         const startTime = new Date();
-        const modelOutput = await model(example);
+        let modelSucceeded = false;
+        let modelOutput;
+        try {
+            modelOutput = await model(example);
+            modelSucceeded = true;
+        } catch (e) {
+            console.log(e)
+        }
         const endTime = new Date();
         const modelLatency = (endTime.getTime() - startTime.getTime()) / 1000; // Convert to seconds
 
         const scores: { [key: string]: any } = {};
-        for (const scorer of this.scorers) {
-            const score = await scorer(modelOutput, example);
-            scores[getOpName(scorer)] = score;
+        if (modelSucceeded) {
+            for (const scorer of this.scorers) {
+                const score = await scorer(modelOutput, example);
+                if (modelSucceeded) {
+                    scores[getOpName(scorer)] = score;
+                } else {
+                    scores[getOpName(scorer)] = undefined;
+                }
+            }
         }
+
 
         return { modelOutput, scores, modelLatency };
     }
@@ -58,7 +72,7 @@ export class Evaluation extends WeaveObject {
                     const values = results.map(result => {
                         const keys = newPath.split('.');
                         return keys.reduce((acc: any, k) => acc && acc[k], result);
-                    });
+                    }).filter(v => v !== undefined);
 
                     const columnSummary = this.summarizeColumn(values);
                     if (Object.keys(columnSummary).length > 0) {
@@ -70,22 +84,26 @@ export class Evaluation extends WeaveObject {
             return nestedSummary;
         };
 
-        // Use the first result as a template for the structure
-        const templateResult = results[0];
+        // Find the first result with valid scores to use as a template
+        const templateResult = results.find(r => r.scores && Object.keys(r.scores).length > 0) || results[0];
         return summarizeNestedObject(templateResult);
     }
 
     private summarizeColumn(values: any[]): Record<string, number> {
+        if (values.length === 0) {
+            return {}; // Return an empty object if there are no valid values
+        }
+
         if (values.every(v => typeof v === 'boolean')) {
             const trueCount = values.filter(v => v).length;
             return {
                 true_count: trueCount,
-                true_fraction: trueCount / values.length
+                true_fraction: values.length > 0 ? trueCount / values.length : 0
             };
         } else if (values.every(v => typeof v === 'number')) {
             const sum = values.reduce((acc, v) => acc + v, 0);
             return {
-                mean: sum / values.length
+                mean: values.length > 0 ? sum / values.length : 0
             };
         }
         return {};
