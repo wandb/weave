@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { AsyncLocalStorage } from 'async_hooks';
 
-import { Api as TraceServerApi } from './traceServerApi';
+import { Api as TraceServerApi, StartedCallSchemaForInsert, EndedCallSchemaForInsert } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { WeaveObject, getClassChain } from './weaveObject';
@@ -12,9 +12,6 @@ import { Op, getOpName, getOpWrappedFunction, isOp, OpRef } from './opType';
 
 // Create an AsyncLocalStorage instance
 
-export const asyncLocalStorage = new AsyncLocalStorage<{
-    callStack: { callId: string; traceId: string; childSummary: Record<string, any> }[]
-}>();
 
 class ObjectRef {
     constructor(public projectId: string, public objectId: string, public digest: string) { }
@@ -28,10 +25,15 @@ class ObjectRef {
     }
 }
 
+type CallStartParams = StartedCallSchemaForInsert;
+type CallEndParams = EndedCallSchemaForInsert;
 
 export class WeaveClient {
     traceServerApi: TraceServerApi<any>;
     wandbServerApi: WandbServerApi;
+    stackContext = new AsyncLocalStorage<{
+        callStack: { callId: string; traceId: string; childSummary: Record<string, any> }[]
+    }>();
     projectId: string;
     callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
     batchProcessTimeout: NodeJS.Timeout | null = null;
@@ -47,12 +49,12 @@ export class WeaveClient {
         this.projectId = projectId;
     }
 
-    scheduleBatchProcessing() {
+    private scheduleBatchProcessing() {
         if (this.batchProcessTimeout || this.isBatchProcessing) return;
         this.batchProcessTimeout = setTimeout(() => this.processBatch(), this.BATCH_INTERVAL);
     }
 
-    async processBatch() {
+    private async processBatch() {
         if (this.isBatchProcessing || this.callQueue.length === 0) {
             this.batchProcessTimeout = null;
             return;
@@ -178,16 +180,24 @@ export class WeaveClient {
         }
     }
 
+    public saveCallStart(callStart: CallStartParams) {
+        this.callQueue.push({ mode: 'start', data: { start: callStart } });
+        this.scheduleBatchProcessing();
+    }
+
+    public saveCallEnd(callEnd: CallEndParams) {
+        this.callQueue.push({ mode: 'end', data: { end: callEnd } });
+        this.scheduleBatchProcessing();
+    }
+
     public createEndReq(callId: string, endTime: string, output: any, summary: Record<string, any>, exception?: string) {
         return {
-            end: {
-                project_id: this.projectId,
-                id: callId,
-                ended_at: endTime,
-                output,
-                summary,
-                ...(exception && { exception }),
-            }
+            project_id: this.projectId,
+            id: callId,
+            ended_at: endTime,
+            output,
+            summary,
+            ...(exception && { exception }),
         };
     }
 
