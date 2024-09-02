@@ -1,6 +1,3 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import * as crypto from 'crypto';
 import { uuidv7 } from 'uuidv7';
 import { AsyncLocalStorage } from 'async_hooks';
@@ -11,6 +8,7 @@ import { WandbServerApi } from './wandbServerApi';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
 import { WeaveObject, getClassChain } from './weaveObject';
 import { Op, getOpName, getOpWrappedFunction, isOp, OpRef } from './opType';
+import { readApiKeyFromNetrc } from './settings';
 
 export type CallStackEntry = {
     callId: string;
@@ -334,26 +332,6 @@ export class WeaveClient {
 
 // Global client instance
 export let globalClient: WeaveClient | null = null;
-
-function readApiKeyFromNetrc(host: string): string | undefined {
-    const netrcPath = path.join(os.homedir(), '.netrc');
-    if (!fs.existsSync(netrcPath)) {
-        return undefined;
-    }
-
-    const netrcContent = fs.readFileSync(netrcPath, 'utf-8');
-    const lines = netrcContent.split('\n');
-    let foundMachine = false;
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-        if (trimmedLine.startsWith('machine') && trimmedLine.includes(host)) {
-            foundMachine = true;
-        } else if (foundMachine && trimmedLine.startsWith('password')) {
-            return trimmedLine.split(' ')[1];
-        }
-    }
-    return undefined;
-}
 
 export async function init(projectName: string): Promise<WeaveClient> {
     const host = 'https://api.wandb.ai';
