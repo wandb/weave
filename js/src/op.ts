@@ -2,7 +2,7 @@ import { uuidv7 } from 'uuidv7';
 import { globalClient, processWeaveValues } from "./clientApi";
 import { packageVersion } from "./userAgent";
 
-import { WeaveClient, asyncLocalStorage } from "./clientApi";
+import { WeaveClient } from "./clientApi";
 import { WeaveObject, getClassChain } from './weaveObject';
 import { OpOptions, Op, isOp, getOpName, getOpWrappedFunction, OpRef } from './opType';
 
@@ -28,7 +28,7 @@ export function op<T extends (...args: any[]) => any>(
             return await fn(...args);
         }
 
-        const store = asyncLocalStorage.getStore() || { callStack: [] };
+        const store = globalClient.stackContext.getStore() || { callStack: [] };
         const startTime = new Date().toISOString();
         const callId = generateCallId();
         let traceId: string;
@@ -56,51 +56,38 @@ export function op<T extends (...args: any[]) => any>(
         } : {};
         const inputs = processedArgs.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), initialInputs);
         const savedInputs = await globalClient.saveObjectAndOps(inputs);
-        console.log('savedInputs', savedInputs);
-        // const savedInputs: { [key: string]: any } = {};
-        // for (const [key, value] of Object.entries(inputs)) {
-        //     if (value instanceof WeaveObject) {
-        //         savedInputs[key] = (await globalClient.saveObject(value)).uri();
-        //     } else if (isOp(value)) {
-        //         savedInputs[key] = (await saveOp(globalClient, value)).uri();
-        //     } else {
-        //         savedInputs[key] = value;
-        //     }
-        // }
 
         const opRef = await globalClient.saveOp(opWrapper);
 
         const startReq = {
-            start: {
-                project_id: globalClient.projectId,
-                id: callId,
-                op_name: opRef.uri(),
-                trace_id: traceId,
-                parent_id: parentId,
-                started_at: startTime,
-                attributes: {
-                    weave: {
-                        client_version: packageVersion,
-                        source: 'js-sdk'
-                    }
-                },
-                inputs: savedInputs
-            }
-        };
+            project_id: globalClient.projectId,
+            id: callId,
+            op_name: opRef.uri(),
+            trace_id: traceId,
+            parent_id: parentId,
+            started_at: startTime,
+            attributes: {
+                weave: {
+                    client_version: packageVersion,
+                    source: 'js-sdk'
+                }
+            },
+            inputs: savedInputs
+        }
 
-        globalClient.callQueue.push({ mode: 'start', data: startReq });
-        globalClient.scheduleBatchProcessing();
+        globalClient.saveCallStart(startReq);
 
         try {
-            let result = await asyncLocalStorage.run(store, async () => {
+            let result = await globalClient.stackContext.run(store, async () => {
                 return await fn(...processedArgs);
             });
+
+            const currentCall = store.callStack[store.callStack.length - 1];
+            const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
 
             if (options?.streamReducer && Symbol.asyncIterator in result) {
                 const { initialState, reduceFn } = options.streamReducer;
                 let state = initialState;
-                const currentCall = store.callStack[store.callStack.length - 1];
-                const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
 
                 const wrappedIterator = {
                     [Symbol.asyncIterator]: async function* () {
@@ -115,8 +102,7 @@ export function op<T extends (...args: any[]) => any>(
                                 const endTime = new Date().toISOString();
                                 const mergedSummary = processSummary(state, options?.summarize, currentCall, parentCall);
                                 const endReq = globalClient.createEndReq(callId, endTime, state, mergedSummary);
-                                globalClient.callQueue.push({ mode: 'end', data: endReq });
-                                globalClient.scheduleBatchProcessing();
+                                globalClient.saveCallEnd(endReq);
                             }
                             // If globalClient is null, we do nothing, as requested
                         }
@@ -127,12 +113,9 @@ export function op<T extends (...args: any[]) => any>(
             } else {
                 result = await processWeaveValues(result);
                 const endTime = new Date().toISOString();
-                const currentCall = store.callStack[store.callStack.length - 1];
-                const parentCall = store.callStack.length > 1 ? store.callStack[store.callStack.length - 2] : undefined;
                 const mergedSummary = processSummary(result, options?.summarize, currentCall, parentCall);
                 const endReq = globalClient.createEndReq(callId, endTime, result, mergedSummary);
-                globalClient.callQueue.push({ mode: 'end', data: endReq });
-                globalClient.scheduleBatchProcessing();
+                globalClient.saveCallEnd(endReq);
                 return result;
             }
         } catch (error) {
@@ -145,8 +128,7 @@ export function op<T extends (...args: any[]) => any>(
                 {},
                 error instanceof Error ? error.message : String(error)
             );
-            globalClient.callQueue.push({ mode: 'end', data: endReq });
-            globalClient.scheduleBatchProcessing();
+            globalClient.saveCallEnd(endReq);
             throw error;
         } finally {
             store.callStack.pop();
