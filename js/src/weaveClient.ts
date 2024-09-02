@@ -309,6 +309,9 @@ export class WeaveClient {
     }
 
     async startCall(opRef: OpRef, params: any[], thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime?: Date) {
+        if (!this.quiet && parentCall == null) {
+            console.log(`🍩 https://wandb.ai/${this.projectId}/r/call/${currentCall.callId}`);
+        }
         const inputs = await this.paramsToCallInputs(params, thisArg);
         startTime = startTime ?? new Date();
         const startReq = {
