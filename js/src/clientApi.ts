@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { uuidv7 } from 'uuidv7';
 import { AsyncLocalStorage } from 'async_hooks';
 
 import { Api as TraceServerApi, StartedCallSchemaForInsert, EndedCallSchemaForInsert } from './traceServerApi';
@@ -16,17 +17,42 @@ export type CallStackEntry = {
     childSummary: Record<string, any>;
 };
 
+function generateTraceId(): string {
+    return uuidv7();
+}
+
+function generateCallId(): string {
+    return uuidv7();
+}
+
 export class CallStack {
     private stack: CallStackEntry[] = [];
 
-    push(entry: CallStackEntry): CallStack {
-        const newStack = new CallStack();
-        newStack.stack = [...this.stack, entry];
-        return newStack;
+    constructor(stack: CallStackEntry[] = []) {
+        this.stack = stack;
     }
 
-    currentCall(): CallStackEntry | undefined {
-        return this.stack[this.stack.length - 1];
+    pushNewCall(): { currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, newStack: CallStack } {
+        const parentCall = this.stack[this.stack.length - 1];
+
+        const callId = generateCallId();
+        let traceId: string;
+        let parentId: string | null = null;
+        if (!parentCall) {
+            traceId = generateTraceId();
+        } else {
+            traceId = parentCall.traceId;
+            parentId = parentCall.callId;
+        }
+
+        const newCall: CallStackEntry = { callId, traceId, childSummary: {} };
+
+        const newStack = new CallStack([...this.stack, newCall]);
+        return {
+            currentCall: newCall,
+            parentCall,
+            newStack
+        }
     }
 
 }
@@ -242,8 +268,12 @@ export class WeaveClient {
     }
 
     // Add these new methods
-    getCallStack(): CallStack {
+    private getCallStack(): CallStack {
         return this.stackContext.getStore() || new CallStack();
+    }
+
+    pushNewCall() {
+        return this.getCallStack().pushNewCall();
     }
 
     runWithCallStack<T>(callStack: CallStack, fn: () => T): T {

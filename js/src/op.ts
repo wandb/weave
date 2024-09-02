@@ -13,6 +13,7 @@ export function op<T extends (...args: any[]) => any>(
 ): Op<(...args: Parameters<T>) => Promise<ReturnType<T>>> {
     const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
     let actualOpName = fnName;
+    const thisArg = options?.bindThis;
     if (options?.bindThis) {
         actualOpName = `${options.bindThis.className()}.${fnName}`;
     }
@@ -20,37 +21,15 @@ export function op<T extends (...args: any[]) => any>(
         actualOpName = options.name;
     }
 
-    const opWrapper = async function (...args: Parameters<T>): Promise<ReturnType<T>> {
-        // Use the bound 'this' if available, otherwise use the current 'this'
-        const thisArg = options?.bindThis;
-
+    const opWrapper = async function (...params: Parameters<T>): Promise<ReturnType<T>> {
         if (!globalClient) {
-            return await fn(...args);
+            return await fn(...params);
         }
 
-        let callStack = globalClient.getCallStack();
-
-        const startTime = new Date().toISOString();
-        const callId = generateCallId();
-        let traceId: string;
-        let parentId: string | null = null;
-        const parentCall = callStack.currentCall();
-
-        if (!parentCall) {
-            traceId = generateTraceId();
-            if (!globalClient.quiet) {
-                console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${callId}`);
-            }
-        } else {
-            traceId = parentCall.traceId;
-            parentId = parentCall.callId;
-        }
-
-        const currentCall: CallStackEntry = { callId, traceId, childSummary: {} };
-        callStack = callStack.push(currentCall);
+        const opRef = await globalClient.saveOp(opWrapper);
 
         // Process WeaveImage in inputs
-        const processedArgs = await Promise.all(args.map(processWeaveValues));
+        const processedArgs = await Promise.all(params.map(processWeaveValues));
         // @ts-ignore
         const initialInputs = thisArg instanceof WeaveObject ? {
             this: thisArg
@@ -58,7 +37,12 @@ export function op<T extends (...args: any[]) => any>(
         const inputs = processedArgs.reduce((acc, arg, index) => ({ ...acc, [`arg${index}`]: arg }), initialInputs);
         const savedInputs = await globalClient.saveObjectAndOps(inputs);
 
-        const opRef = await globalClient.saveOp(opWrapper);
+        const { newStack, currentCall, parentCall } = globalClient.pushNewCall();
+        const callId = currentCall.callId;
+        const traceId = currentCall.traceId;
+        const parentId = parentCall?.callId;
+
+        const startTime = new Date().toISOString();
 
         const startReq = {
             project_id: globalClient.projectId,
@@ -79,7 +63,7 @@ export function op<T extends (...args: any[]) => any>(
         globalClient.saveCallStart(startReq);
 
         try {
-            let result = await globalClient.runWithCallStack(callStack, async () => {
+            let result = await globalClient.runWithCallStack(newStack, async () => {
                 return await fn(...processedArgs);
             });
 
@@ -129,11 +113,7 @@ export function op<T extends (...args: any[]) => any>(
             globalClient.saveCallEnd(endReq);
             throw error;
         } finally {
-            // Sanity check using currentCall()
-            const currentCallEntry = callStack.currentCall();
-            if (currentCallEntry?.callId !== callId) {
-                console.error('Call stack corruption detected');
-            }
+            // No need to do anything here.
         }
     };
 
