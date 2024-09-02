@@ -6,6 +6,46 @@ import { Dataset } from "./dataset";
 interface EvaluationParameters extends WeaveObjectParameters {
     dataset: Dataset;
     scorers: Op<any>[];
+    maxConcurrency?: number;
+}
+
+async function* asyncParallelMap<T, U>(
+    asyncIterator: AsyncIterable<T>,
+    fn: (item: T, ...args: any[]) => Promise<U>,
+    fnParams: (item: T) => any[],
+    maxConcurrency: number
+) {
+    const itemPromiseMap: Map<T, Promise<{ item: T, result: Awaited<U> }>> = new Map();
+    async function runOne(item: T) {
+        return {
+            item,
+            // @ts-ignore
+            result: await fn(...fnParams(item))
+        }
+    }
+    let nDone = 0;
+    for await (const item of asyncIterator) {
+        if (itemPromiseMap.size >= maxConcurrency) {
+            const done = await Promise.race(itemPromiseMap.values());
+            yield {
+                ...done,
+                nRunning: itemPromiseMap.size,
+                nDone: ++nDone
+            }
+            itemPromiseMap.delete(done.item);
+        }
+        const prom = runOne(item);
+        itemPromiseMap.set(item, prom);
+    }
+    while (itemPromiseMap.size > 0) {
+        const done = await Promise.race(itemPromiseMap.values());
+        yield {
+            ...done,
+            nRunning: itemPromiseMap.size,
+            nDone: ++nDone
+        }
+        itemPromiseMap.delete(done.item);
+    }
 }
 
 export class Evaluation extends WeaveObject {
@@ -21,12 +61,19 @@ export class Evaluation extends WeaveObject {
         this.predict_and_score = boundOp(this, this.predict_and_score);
     }
 
-    async evaluate({ model }: { model: Op<any> }) {
+    async evaluate({ model, maxConcurrency = 5 }: { model: Op<any>, maxConcurrency?: number }) {
         const results: Array<{ modelOutput: any, scores: { [key: string]: any }, modelLatency: number }> = [];
-        for await (const example of this.dataset) {
-            const result = await this.predict_and_score({ model, example });
+
+        for await (const { result, nRunning, nDone } of asyncParallelMap(
+            this.dataset,
+            this.predict_and_score,
+            (item) => ([{ model, example: item }]),
+            maxConcurrency,
+        )) {
             results.push(result);
+            console.log(`Evaluated ${nDone} of ${this.dataset.length} examples, ${nRunning} running`);
         }
+
         return this.summarizeResults(results);
     }
 

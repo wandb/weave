@@ -17,6 +17,10 @@ export class Dataset extends WeaveObject {
         this.rows = parameters.rows;
     }
 
+    get length(): number {
+        return this.rows.length;
+    }
+
     async *[Symbol.asyncIterator](): AsyncIterator<any> {
         for (const item of this.rows) {
             yield item;
