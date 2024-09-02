@@ -62,7 +62,7 @@ describe('OpenAI Integration', () => {
         const calls = await getCalls(inMemoryTraceServer, testProjectName);
         expect(calls).toHaveLength(1);
         expect(calls[0].op_name).toContain('openai.chat.completions.create');
-        expect(calls[0].inputs).toEqual({ arg0: { messages } });
+        expect(calls[0].inputs).toEqual({ messages });
         expect(calls[0].output).toMatchObject({
             object: opResult.object,
             model: opResult.model,
@@ -83,7 +83,7 @@ describe('OpenAI Integration', () => {
             }
         });
         // Ensure stream_options is not present in the logged call for non-streaming requests
-        expect(calls[0].inputs.arg0).not.toHaveProperty('stream_options');
+        expect(calls[0].inputs).not.toHaveProperty('stream_options');
     });
 
     test('streaming chat completion basic', async () => {
@@ -125,7 +125,7 @@ describe('OpenAI Integration', () => {
         const calls = await getCalls(inMemoryTraceServer, testProjectName);
         expect(calls).toHaveLength(1);
         expect(calls[0].op_name).toContain('openai.chat.completions.create');
-        expect(calls[0].inputs).toEqual({ arg0: { messages, stream: true } });
+        expect(calls[0].inputs).toEqual({ messages, stream: true });
         expect(calls[0].output).toMatchObject({
             choices: [{
                 message: {
@@ -241,7 +241,7 @@ describe('OpenAI Integration', () => {
         const calls = await getCalls(inMemoryTraceServer, testProjectName);
         expect(calls).toHaveLength(1);
         expect(calls[0].op_name).toContain('openai.chat.completions.create');
-        expect(calls[0].inputs).toEqual({ arg0: { messages, functions } });
+        expect(calls[0].inputs).toEqual({ messages, functions });
         expect(calls[0].output).toMatchObject({
             object: opResult.object,
             model: opResult.model,

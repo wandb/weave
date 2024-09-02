@@ -201,7 +201,7 @@ export class WeaveClient {
                 }
             });
             const ref = new ObjectRef(this.projectId, objId, response.data.digest);
-            console.log(`Saved object: ${ref.ui_url()}`);
+            // console.log(`Saved object: ${ref.ui_url()}`);
             return ref;
         })();
 
@@ -311,7 +311,7 @@ export class WeaveClient {
             });
             const ref = new OpRef(this.projectId, objId, response.data.digest);
 
-            console.log('Saved op: ', ref.ui_url());
+            // console.log('Saved op: ', ref.ui_url());
             return ref;
         })();
         return op.__savedRef;

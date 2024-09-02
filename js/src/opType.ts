@@ -41,6 +41,6 @@ export class OpRef {
     }
 
     public ui_url() {
-        return `https://wandb.ai/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
+        return `https://wandb.ai/${this.projectId}/weave/ops/${this.objectId}/versions/${this.digest}`;
     }
 }
