@@ -6,7 +6,7 @@ import { packageVersion } from "./userAgent";
 import { Api as TraceServerApi, StartedCallSchemaForInsert, EndedCallSchemaForInsert } from './traceServerApi';
 import { WandbServerApi } from './wandbServerApi';
 import { WeaveObject, ObjectRef, getClassChain } from './weaveObject';
-import { Op, getOpName, getOpWrappedFunction, isOp, OpRef } from './opType';
+import { Op, getOpName, getOpWrappedFunction, isOp, OpRef, ParameterNamesOption } from './opType';
 import { isWeaveImage } from './media';
 import { Table, TableRef, TableRowRef } from './table';
 import { computeDigest } from './digest';
@@ -276,33 +276,24 @@ export class WeaveClient {
         return this.stackContext.run(callStack, fn);
     }
 
-    private async paramsToCallInputs(params: any[], thisArg: any) {
+    private async paramsToCallInputs(params: any[], thisArg: any, parameterNames: ParameterNamesOption) {
         let inputs: Record<string, any> = {};
 
         // Add 'self' first if thisArg is a WeaveObject
         if (thisArg instanceof WeaveObject) {
             inputs['self'] = thisArg;
         }
-        params.forEach((arg, index) => {
-            inputs[`arg${index}`] = arg;
-        });
-
-        // This is no good, getting rid of it.
-        // // Handle the special case for the first parameter
-        // if (params.length > 0 &&
-        //     typeof params[0] === 'object' &&
-        //     params[0] !== null &&
-        //     !(params[0] instanceof WeaveObject)) {
-        //     inputs = { ...inputs, ...params[0] };
-        //     for (let i = 1; i < params.length; i++) {
-        //         inputs[`arg${i - 1}`] = params[i];
-        //     }
-        // } else {
-        //     // If the first parameter is not an object or is a WeaveObject, use the original logic
-        //     params.forEach((arg, index) => {
-        //         inputs[`arg${index}`] = arg;
-        //     });
-        // }
+        if (parameterNames === 'useParam0Object') {
+            inputs = { ...inputs, ...params[0] };
+        } else if (parameterNames) {
+            params.forEach((arg, index) => {
+                inputs[parameterNames[index]] = arg;
+            })
+        } else {
+            params.forEach((arg, index) => {
+                inputs[`arg${index}`] = arg;
+            });
+        }
 
         return await this.saveWeaveValues(inputs);
     }
@@ -331,8 +322,8 @@ export class WeaveClient {
     }
 
 
-    public async startCall(opRef: OpRef | Op<any>, params: any[], thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime: Date) {
-        const inputs = await this.paramsToCallInputs(params, thisArg);
+    public async startCall(opRef: OpRef | Op<any>, params: any[], parameterNames: ParameterNamesOption, thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime: Date) {
+        const inputs = await this.paramsToCallInputs(params, thisArg, parameterNames);
         if (isOp(opRef)) {
             opRef = await this.saveOp(opRef);
         }

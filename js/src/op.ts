@@ -25,7 +25,7 @@ export function op<T extends (...args: any[]) => any>(
         if (!globalClient.quiet && parentCall == null) {
             console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`);
         }
-        const startCallPromise = globalClient.startCall(opWrapper, params, thisArg, currentCall, parentCall, startTime);
+        const startCallPromise = globalClient.startCall(opWrapper, params, options?.parameterNames, thisArg, currentCall, parentCall, startTime);
 
         try {
             let result = await globalClient.runWithCallStack(newStack, async () => {
