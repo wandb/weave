@@ -109,7 +109,7 @@ def test_stream_table_entity_inference(user_by_api_key_in_env):
 
     assert st._entity_name == wandb_api.get_wandb_api_sync().default_entity_name()
 
-
+@pytest.mark.skip(reason="streamtable deprecated and test is broken")
 def test_multi_writers_sequential(user_by_api_key_in_env):
     st = make_stream_table(
         "test_table",

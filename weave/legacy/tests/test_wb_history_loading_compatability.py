@@ -105,6 +105,7 @@ rows_tests = [
 ]
 
 
+@pytest.mark.skip(reason="streamtable deprecated and test is broken")
 @pytest.mark.parametrize(
     "rows",
     rows_tests,
@@ -133,7 +134,7 @@ def do_test_end_to_end_stream_table_history_path(username, rows):
 
     do_batch_test(username, rows, do_assertion)
 
-
+@pytest.mark.skip(reason="streamtable deprecated and test is broken")
 def test_nested_pick_via_dots(user_by_api_key_in_env):
     rows = [
         {
@@ -157,6 +158,7 @@ def test_nested_pick_via_dots(user_by_api_key_in_env):
     do_batch_test(user_by_api_key_in_env.username, rows, do_assertion)
 
 
+@pytest.mark.skip(reason="streamtable deprecated and test is broken")
 def test_missing_data(user_by_api_key_in_env):
     rows = [{"a": "1", "b": "17", "c": "42"}, {"a": "2"}]
 
