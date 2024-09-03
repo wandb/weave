@@ -1,5 +1,6 @@
 import { WeaveObject } from "./weaveObject";
 
+export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
 
 export type Op<T extends (...args: any[]) => any> = {
     __isOp: true;
@@ -8,6 +9,7 @@ export type Op<T extends (...args: any[]) => any> = {
     __name: string;
     __savedRef?: OpRef | Promise<OpRef>;
 } & T;
+
 interface StreamReducer<T, R> {
     initialState: R;
     reduceFn: (state: R, chunk: T) => R;
@@ -19,6 +21,7 @@ export interface OpOptions<T extends (...args: any[]) => any> {
     originalFunction?: T;
     summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
     bindThis?: WeaveObject;
+    parameterNames?: ParameterNamesOption;
 }
 
 export function isOp(value: any): value is Op<any> {
@@ -31,6 +34,10 @@ export function getOpWrappedFunction<T extends (...args: any[]) => any>(opValue:
 
 export function getOpName(opValue: Op<any>): string {
     return opValue.__name;
+}
+
+export function getOpParameterNames(opValue: Op<any>): ParameterNamesOption {
+    return opValue.__parameterNames;
 }
 
 export class OpRef {
