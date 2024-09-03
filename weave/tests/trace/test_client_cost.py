@@ -105,7 +105,8 @@ def test_cost_apis(client):
     if res[0]["effective_date"].year == 2021:
         assert res[1]["effective_date"].year == 1998
     else:
-        assert res[0]["effective_date"].year == 2021
+        assert res[1]["effective_date"].year == 2021
+        assert res[0]["effective_date"].year == 1998
 
     # query with limit and offset
     res = client.query_costs(llm_ids=["my_model_to_delete3"], limit=1)
