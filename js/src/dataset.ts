@@ -1,4 +1,4 @@
-import { WeaveObject, WeaveObjectParameters } from "./weaveObject";
+import { WeaveObject, WeaveObjectParameters, ObjectRef } from "./weaveObject";
 import { Table } from "./table";
 
 interface DatasetParameters extends WeaveObjectParameters {
@@ -18,6 +18,12 @@ export class Dataset extends WeaveObject {
         this.rows = new Table(parameters.rows);
     }
 
+    async save(): Promise<ObjectRef> {
+        // Need require because of circular dependency
+        const client = require('./clientApi').globalClient;
+        return client.saveObject(this);
+    }
+
     get length(): number {
         return this.rows.length;
     }
@@ -29,6 +35,6 @@ export class Dataset extends WeaveObject {
     }
 
     row(index: number) {
-        this.rows.row(index)
+        return this.rows.row(index)
     }
 }

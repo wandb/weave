@@ -176,7 +176,7 @@ export class WeaveClient {
     }
 
 
-    private async saveObject(obj: WeaveObject, objId?: string): Promise<any> {
+    public async saveObject(obj: WeaveObject, objId?: string): Promise<any> {
         if (obj.__savedRef) {
             return obj.__savedRef;
         }
@@ -189,7 +189,7 @@ export class WeaveClient {
             }
 
             let saveAttrs = obj.saveAttrs();
-            saveAttrs = await this.saveObjectAndOps(saveAttrs);
+            saveAttrs = await this.saveWeaveValues(saveAttrs);
             // Frontend does this overly specific check for datasets, so we need to add both _type and _class_name
             // for now.
             //   data._type === 'Dataset' &&
@@ -217,29 +217,34 @@ export class WeaveClient {
     }
 
     private async saveTable(table: Table): Promise<TableRef> {
+        console.log("ROWS", table.rows);
+        const rows = await this.saveWeaveValues(table.rows);
+        // console.log("ROWS", JSON.stringify(rows, null, 2));
         const response = await this.traceServerApi.table.tableCreateTableCreatePost({
             table: {
                 project_id: this.projectId,
-                rows: table.rows
+                rows
             }
         });
         const ref = new TableRef(this.projectId, response.data.digest);
         return ref;
     }
 
-    private async saveObjectAndOps(val: any): Promise<any> {
+    private async saveWeaveValues(val: any): Promise<any> {
         if (Array.isArray(val)) {
-            return Promise.all(val.map(item => this.saveObjectAndOps(item)));
+            return Promise.all(val.map(item => this.saveWeaveValues(item)));
         } else if (val instanceof WeaveObject) {
             return (await this.saveObject(val)).uri();
         } else if (val instanceof Table) {
             return (await this.saveTable(val)).uri();
+        } else if (isWeaveImage(val)) {
+            return (await this.saveImage(val.data, val.imageType));
         } else if (isOp(val)) {
             return (await this.saveOp(val)).uri();
         } else if (typeof val === 'object' && val !== null) {
             const result: { [key: string]: any } = {};
             for (const [key, value] of Object.entries(val)) {
-                result[key] = await this.saveObjectAndOps(value);
+                result[key] = await this.saveWeaveValues(value);
             }
             return result;
         } else {
@@ -311,7 +316,7 @@ export class WeaveClient {
             });
         }
 
-        const savedInputs = await this.saveObjectAndOps(inputs);
+        const savedInputs = await this.saveWeaveValues(inputs);
         return savedInputs;
     }
 
