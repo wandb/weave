@@ -5,6 +5,7 @@ const sentences = [
     "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
     "Pounits are a bright green color and are more savory than sweet.",
     "Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them.",
+    "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
 ]
 const labels = [
     { "fruit": "neoskizzles", "color": "purple", "flavor": "candy" },
@@ -15,15 +16,6 @@ const examples = [
     { "id": "0", "sentence": sentences[0], "target": labels[0] },
     { "id": "1", "sentence": sentences[1], "target": labels[1] },
     { "id": "2", "sentence": sentences[2], "target": labels[2] },
-    { "id": "3", "sentence": sentences[0], "target": labels[0] },
-    { "id": "4", "sentence": sentences[1], "target": labels[1] },
-    { "id": "5", "sentence": sentences[2], "target": labels[2] },
-    { "id": "6", "sentence": sentences[0], "target": labels[0] },
-    { "id": "7", "sentence": sentences[1], "target": labels[1] },
-    { "id": "8", "sentence": sentences[2], "target": labels[2] },
-    { "id": "9", "sentence": sentences[0], "target": labels[0] },
-    { "id": "10", "sentence": sentences[1], "target": labels[1] },
-    { "id": "11", "sentence": sentences[2], "target": labels[2] },
 ]
 
 const openaiClient = wrapOpenAI()
@@ -41,11 +33,14 @@ const model = op(async function myModel(input) {
     if (result == null) {
         throw new Error("No response from model")
     }
+    if (input.id == "3") {
+        throw new Error("This is an error")
+    }
     return JSON.parse(result)
 })
 
 async function main() {
-    await init('weavejsdev-introeval5');
+    await init('weavejsdev-evalwithimage');
     const ds = new Dataset({
         id: "Fruit Dataset",
         rows: examples
@@ -58,6 +53,18 @@ async function main() {
                     correct: modelOutput.fruit == datasetItem.target.fruit
                 }
             }),
+            op(async function genImage(modelOutput: any, datasetItem: any) {
+                const result = await openaiClient.images.generate({
+                    prompt: `A fruit that's ${modelOutput.color} and ${modelOutput.flavor}`,
+                    n: 1,
+                    size: "256x256",
+                    response_format: "b64_json"
+                });
+                return result.data[0];
+                // console.log('RESULT', result)
+                // const buffer = Buffer.from(result.data[0].b64_json!, 'base64')
+                // return weaveImage({ data: buffer, imageType: 'png' })
+            })
         ]
     })
 

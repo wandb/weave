@@ -16,5 +16,9 @@ export function weaveImage({ data, imageType }: { data: Buffer, imageType: 'png'
 
 // Function to check if a value is a WeaveImage
 export function isWeaveImage(value: any): value is WeaveImage {
-    return value && value._weaveType === 'Image' && Buffer.isBuffer(value.data) && value.imageType === 'png';
+    return value && value._weaveType === 'Image';
+}
+
+export function isMedia(value: any): value is WeaveImage {
+    return isWeaveImage(value);
 }

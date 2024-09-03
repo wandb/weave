@@ -2,6 +2,7 @@ import { WeaveObject, WeaveObjectParameters } from "./weaveObject";
 import { Op, getOpName } from "./opType";
 import { boundOp } from "./op";
 import { Dataset } from "./dataset";
+import { isMedia } from "./media";
 import cliProgress from 'cli-progress';
 
 interface EvaluationParameters extends WeaveObjectParameters {
@@ -129,7 +130,7 @@ export class Evaluation extends WeaveObject {
             for (const [key, value] of Object.entries(obj)) {
                 const newPath = currentPath ? `${currentPath}.${key}` : key;
 
-                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                if (typeof value === 'object' && value !== null && !Array.isArray(value) && !isMedia(value)) {
                     nestedSummary[key] = summarizeNestedObject(value, newPath);
                 } else {
                     const values = results.map(result => {
