@@ -189,8 +189,14 @@ export class WeaveClient {
 
             let saveAttrs = obj.saveAttrs();
             saveAttrs = await this.saveObjectAndOps(saveAttrs);
+            // Frontend does this overly specific check for datasets, so we need to add both _type and _class_name
+            // for now.
+            //   data._type === 'Dataset' &&
+            //   data._class_name === 'Dataset' &&
+            //   _.isEqual(data._bases, ['Object', 'BaseModel'])
             const saveValue = {
-                _type: classChain[0],
+                _type: className,
+                _class_name: className,
                 _bases: classChain.slice(1),
                 ...saveAttrs
             }
