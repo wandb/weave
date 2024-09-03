@@ -14,23 +14,20 @@ from flask.testing import FlaskClient
 
 import weave
 from weave.legacy.weave import client as client_legacy
-from weave.legacy.weave import context_state, environment, io_service, serialize
+from weave.legacy.weave import context_state, environment, io_service, logs, serialize
 from weave.legacy.weave.language_features.tagging.tag_store import (
     isolated_tagging_context,
 )
-from weave.trace import weave_init
+from weave.tests import fixture_fakewandb
+from weave.tests.trace.trace_server_clickhouse_conftest import *
+from weave.tests.wandb_system_tests_conftest import *
+from weave.trace import autopatch, weave_init
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     sqlite_trace_server,
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
-
-from .legacy.weave import logs
-from .tests import fixture_fakewandb
-from .tests.trace.trace_server_clickhouse_conftest import *
-from .tests.wandb_system_tests_conftest import *
-from .trace import autopatch
 
 logs.configure_logger()
 
