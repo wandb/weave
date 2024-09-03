@@ -68,9 +68,6 @@ export class WeaveClient {
     private isBatchProcessing: boolean = false;
     private readonly BATCH_INTERVAL: number = 200;
 
-    private fileQueue: Array<{ fileContent: Blob }> = [];
-    private isProcessingFiles: boolean = false;
-
     public projectId: string;
     public quiet: boolean = false;
 
@@ -118,29 +115,6 @@ export class WeaveClient {
         }
     }
 
-    private async processFileQueue() {
-        if (this.isProcessingFiles || this.fileQueue.length === 0) return;
-
-        this.isProcessingFiles = true;
-
-        while (this.fileQueue.length > 0) {
-            const { fileContent } = this.fileQueue.shift()!;
-
-            try {
-                const fileCreateRes = await this.traceServerApi.file.fileCreateFileCreatePost({
-                    project_id: this.projectId,
-                    // @ts-ignore
-                    file: fileContent
-                });
-            } catch (error) {
-                console.error('Error saving file:', error);
-            }
-        }
-
-        this.isProcessingFiles = false;
-    }
-
-
     private computeDigest(data: Buffer): string {
         // Must match python server algorithm in clickhouse_trace_server_batched.py
         const hasher = crypto.createHash('sha256');
@@ -163,8 +137,15 @@ export class WeaveClient {
             load_op: 'NO_LOAD_OP'
         };
 
-        this.fileQueue.push({ fileContent });
-        this.processFileQueue();
+        try {
+            await this.traceServerApi.file.fileCreateFileCreatePost({
+                project_id: this.projectId,
+                // @ts-ignore
+                file: fileContent
+            });
+        } catch (error) {
+            console.error('Error saving file:', error);
+        }
 
         return placeholder;
     }
