@@ -555,6 +555,7 @@ def _transform_external_field_to_internal_field(
     # validate field
     if (
         field not in all_columns
+        and field != "*"
         and field.lower() != "count(*)"
         and not any(
             # Checks that a column is in the field, allows prefixed columns to be used

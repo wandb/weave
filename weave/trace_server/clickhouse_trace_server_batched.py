@@ -280,9 +280,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
+            necessary_cost_columns = ["started_at", "summary_dump"]
             columns = [
-                *[col for col in columns if col != "summary_dump"],
-                "summary_dump",
+                *[col for col in columns if col not in necessary_cost_columns],
+                *necessary_cost_columns,
             ]
         for col in columns:
             cq.add_field(col)

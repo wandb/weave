@@ -66,7 +66,7 @@ def test_simple_op(client):
     # assert client._ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     fetched_call = calls[0]
     digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
@@ -232,7 +232,7 @@ def test_graph_call_ordering(client):
     for i in range(10):
         my_op(i)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 10
 
     # We want to preserve insert order
