@@ -87,7 +87,12 @@ def make_derived_summary_fields(
     weave_summary["status"] = status
 
     if ended_at and started_at:
-        weave_summary["latency_us"] = (ended_at - started_at).microseconds
+        days = (ended_at - started_at).days
+        seconds = (ended_at - started_at).seconds
+        milliseconds = (ended_at - started_at).microseconds // 1000
+        weave_summary["latency_ms"] = (
+            days * 24 * 60 * 60 + seconds
+        ) * 1000 + milliseconds
 
     if display_name:
         weave_summary["display_name"] = display_name
