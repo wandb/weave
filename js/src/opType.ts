@@ -4,7 +4,7 @@ export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
 
 export type Op<T extends (...args: any[]) => any> = {
     __isOp: true;
-    wrappedFunction: T;
+    __wrappedFunction: T;
     __boundThis?: WeaveObject;
     __name: string;
     __savedRef?: OpRef | Promise<OpRef>;
@@ -29,7 +29,7 @@ export function isOp(value: any): value is Op<any> {
 }
 
 export function getOpWrappedFunction<T extends (...args: any[]) => any>(opValue: Op<T>): T {
-    return opValue.wrappedFunction;
+    return opValue.__wrappedFunction;
 }
 
 export function getOpName(opValue: Op<any>): string {
