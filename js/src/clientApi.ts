@@ -1,3 +1,5 @@
+import pLimit from 'p-limit';
+
 import { WeaveClient } from "./weaveClient";
 import { readApiKeyFromNetrc } from './settings';
 import { WandbServerApi } from './wandbServerApi';
@@ -25,11 +27,23 @@ export async function init(projectName: string): Promise<WeaveClient> {
         const defaultEntityName = await wandbServerApi.defaultEntityName();
         const projectId = `${defaultEntityName}/${projectName}`;
 
+        // Limit to N concurrent requests to traceServer
+        const limit = pLimit(20);
+        const concurrencyLimitedFetch = (() => {
+            return (...fetchParams: Parameters<typeof fetch>) => {
+                return limit(() => {
+                    // console.log(`Active: ${limit.activeCount} Pending: ${limit.pendingCount}`);
+                    return fetch(...fetchParams);
+                });
+            }
+        })()
+
         const traceServerApi = new TraceServerApi({
             baseUrl: 'https://trace.wandb.ai',
             baseApiParams: {
                 headers: headers,
             },
+            customFetch: concurrencyLimitedFetch
         });
 
         globalClient = new WeaveClient(traceServerApi, wandbServerApi, projectId);
