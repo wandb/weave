@@ -194,7 +194,10 @@ export class WeaveClient {
         }
 
         table.__savedRef = (async () => {
-            const rows = await this.saveWeaveValues(table.rows);
+            const rowsWithoutRefs = table.rows.map(row => {
+                return { ...row, __savedRef: undefined }
+            })
+            const rows = await this.saveWeaveValues(rowsWithoutRefs);
             const response = await this.traceServerApi.table.tableCreateTableCreatePost({
                 table: {
                     project_id: this.projectId,
