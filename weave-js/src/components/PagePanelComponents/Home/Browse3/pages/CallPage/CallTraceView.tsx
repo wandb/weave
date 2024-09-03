@@ -355,7 +355,9 @@ export const useCallFlattenedTraceTree = (
     undefined,
     undefined,
     undefined,
-    columns
+    columns,
+    undefined,
+    {refetchOnDelete: true}
   );
   const traceCallsResult = useMemo(
     () => traceCalls.result ?? [],

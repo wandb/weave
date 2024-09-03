@@ -146,7 +146,7 @@ const CallPageInnerVertical: FC<{
     if (!callComplete.loading && callComplete.result) {
       setCurrentCall(callComplete.result);
     }
-  }, [callComplete]);
+  }, [callComplete.loading, callComplete.result]);
 
   const callTabs = useCallTabs(currentCall);
 
