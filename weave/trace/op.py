@@ -44,13 +44,16 @@ try:
 except ImportError:
     ANTHROPIC_NOT_GIVEN = None
 
-try:
-    # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
-    from mistralai.types.basemodel import UNSET  # type: ignore
+# try:
+#     # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
+#     from mistralai.types.basemodel import UNSET  # type: ignore
 
-    MISTRAL_NOT_GIVEN = UNSET  # type: ignore
-except ImportError:
-    MISTRAL_NOT_GIVEN = None
+#     MISTRAL_NOT_GIVEN = UNSET  # type: ignore
+# except ImportError:
+#     MISTRAL_NOT_GIVEN = None
+
+MISTRAL_NOT_GIVEN = None
+
 
 try:
     from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
