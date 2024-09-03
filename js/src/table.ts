@@ -7,20 +7,35 @@ export class TableRef {
 
 }
 
+export class TableRowRef {
+    constructor(public projectId: string, public digest: string, public rowDigest: string) { }
+
+    public uri() {
+        return `weave:///${this.projectId}/table/${this.digest}/id/${this.rowDigest}`;
+    }
+
+}
+
+type TableRow = Record<string, any> & {
+    __savedRef?: TableRowRef | Promise<TableRowRef>;
+}
+
 export class Table {
-    constructor(public rows: Record<string, any>[]) { }
+    __savedRef?: TableRef | Promise<TableRef>;
+
+    constructor(public rows: TableRow[]) { }
 
     get length(): number {
         return this.rows.length;
     }
 
     async *[Symbol.asyncIterator](): AsyncIterator<any> {
-        for (const item of this.rows) {
-            yield item;
+        for (let i = 0; i < this.length; i++) {
+            yield this.row(i);
         }
     }
 
-    row(index: number) {
+    row(index: number): TableRow {
         return this.rows[index];
     }
 }

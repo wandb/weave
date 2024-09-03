@@ -8,7 +8,8 @@ import { WandbServerApi } from './wandbServerApi';
 import { WeaveObject, ObjectRef, getClassChain } from './weaveObject';
 import { Op, getOpName, getOpWrappedFunction, isOp, OpRef } from './opType';
 import { isWeaveImage } from './media';
-import { Table, TableRef } from './table';
+import { Table, TableRef, TableRowRef } from './table';
+import { computeDigest } from './digest';
 
 export type CallStackEntry = {
     callId: string;
@@ -61,7 +62,7 @@ type CallEndParams = EndedCallSchemaForInsert;
 
 export class WeaveClient {
     private stackContext = new AsyncLocalStorage<CallStack>();
-    private traceServerApi: TraceServerApi<any>;
+    public traceServerApi: TraceServerApi<any>;
     private wandbServerApi: WandbServerApi;
     private callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
     private batchProcessTimeout: NodeJS.Timeout | null = null;
@@ -115,18 +116,9 @@ export class WeaveClient {
         }
     }
 
-    private computeDigest(data: Buffer): string {
-        // Must match python server algorithm in clickhouse_trace_server_batched.py
-        const hasher = crypto.createHash('sha256');
-        hasher.update(data);
-        const hashBytes = hasher.digest();
-        const base64EncodedHash = hashBytes.toString('base64url');
-        return base64EncodedHash.replace(/-/g, 'X').replace(/_/g, 'Y').replace(/=/g, '');
-    }
-
     private async saveFileBlob(typeName: string, fileName: string, fileContent: Blob): Promise<any> {
         const buffer = await fileContent.arrayBuffer().then(Buffer.from);
-        const digest = this.computeDigest(buffer);
+        const digest = computeDigest(buffer);
 
         const placeholder = {
             _type: 'CustomWeaveType',
@@ -197,20 +189,48 @@ export class WeaveClient {
     }
 
     private async saveTable(table: Table): Promise<TableRef> {
-        const rows = await this.saveWeaveValues(table.rows);
-        const response = await this.traceServerApi.table.tableCreateTableCreatePost({
-            table: {
+        if (table.__savedRef) {
+            return table.__savedRef;
+        }
+
+        table.__savedRef = (async () => {
+            const rows = await this.saveWeaveValues(table.rows);
+            const response = await this.traceServerApi.table.tableCreateTableCreatePost({
+                table: {
+                    project_id: this.projectId,
+                    rows
+                }
+            });
+            const ref = new TableRef(this.projectId, response.data.digest);
+            return ref;
+        })();
+        const tableQueryPromise = (async () => {
+            const tableRef = await table.__savedRef;
+            const tableQueryRes = await this.traceServerApi.table.tableQueryTableQueryPost({
                 project_id: this.projectId,
-                rows
+                digest: tableRef?.digest!,
+            })
+            return {
+                tableDigest: tableRef?.digest!,
+                tableQueryResult: tableQueryRes.data
             }
-        });
-        const ref = new TableRef(this.projectId, response.data.digest);
-        return ref;
+        })();
+        for (let i = 0; i < table.rows.length; i++) {
+            const row = table.rows[i];
+            row.__savedRef = (async () => {
+                const { tableDigest, tableQueryResult } = await tableQueryPromise;
+                return new TableRowRef(this.projectId, tableDigest, tableQueryResult.rows[i].digest);
+            })();
+        }
+
+        return table.__savedRef;
     }
 
     private async saveWeaveValues(val: any): Promise<any> {
         if (Array.isArray(val)) {
             return Promise.all(val.map(item => this.saveWeaveValues(item)));
+        } else if (val != null && val.__savedRef) {
+            return (await val.__savedRef).uri();
         } else if (val instanceof WeaveObject) {
             return (await this.saveObject(val)).uri();
         } else if (val instanceof Table) {
@@ -260,22 +280,26 @@ export class WeaveClient {
         if (thisArg instanceof WeaveObject) {
             inputs['self'] = thisArg;
         }
+        params.forEach((arg, index) => {
+            inputs[`arg${index}`] = arg;
+        });
 
-        // Handle the special case for the first parameter
-        if (params.length > 0 &&
-            typeof params[0] === 'object' &&
-            params[0] !== null &&
-            !(params[0] instanceof WeaveObject)) {
-            inputs = { ...inputs, ...params[0] };
-            for (let i = 1; i < params.length; i++) {
-                inputs[`arg${i - 1}`] = params[i];
-            }
-        } else {
-            // If the first parameter is not an object or is a WeaveObject, use the original logic
-            params.forEach((arg, index) => {
-                inputs[`arg${index}`] = arg;
-            });
-        }
+        // This is no good, getting rid of it.
+        // // Handle the special case for the first parameter
+        // if (params.length > 0 &&
+        //     typeof params[0] === 'object' &&
+        //     params[0] !== null &&
+        //     !(params[0] instanceof WeaveObject)) {
+        //     inputs = { ...inputs, ...params[0] };
+        //     for (let i = 1; i < params.length; i++) {
+        //         inputs[`arg${i - 1}`] = params[i];
+        //     }
+        // } else {
+        //     // If the first parameter is not an object or is a WeaveObject, use the original logic
+        //     params.forEach((arg, index) => {
+        //         inputs[`arg${index}`] = arg;
+        //     });
+        // }
 
         return await this.saveWeaveValues(inputs);
     }
@@ -305,10 +329,10 @@ export class WeaveClient {
 
 
     public async startCall(opRef: OpRef | Op<any>, params: any[], thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime: Date) {
+        const inputs = await this.paramsToCallInputs(params, thisArg);
         if (isOp(opRef)) {
             opRef = await this.saveOp(opRef);
         }
-        const inputs = await this.paramsToCallInputs(params, thisArg);
         const startReq = {
             project_id: this.projectId,
             id: currentCall.callId,
