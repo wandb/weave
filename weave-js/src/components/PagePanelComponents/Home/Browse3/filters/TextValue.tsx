@@ -5,13 +5,14 @@ import {TextField} from '../../../../Form/TextField';
 type TextValueProps = {
   value: string;
   onSetValue: (value: string) => void;
+  type?: string;
 };
 
-export const TextValue = ({value, onSetValue}: TextValueProps) => {
+export const TextValue = ({value, onSetValue, type}: TextValueProps) => {
   // TODO: Need to debounce the value change.
   return (
     <div className="min-w-[200px]">
-      <TextField value={value} onChange={onSetValue} />
+      <TextField type={type} value={value} onChange={onSetValue} />
     </div>
   );
 };

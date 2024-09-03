@@ -1,7 +1,8 @@
 import {checkWeaveNotebookOutputs} from '../../notebooks';
 
-describe('../examples/reference/control/Object Picker.ipynb notebook test', () => {
-    it('passes', () =>
-        checkWeaveNotebookOutputs('../examples/reference/control/Object Picker.ipynb')
-    );
+describe('../weave/legacy/examples/reference/control/Object Picker.ipynb notebook test', () => {
+  it('passes', () =>
+    checkWeaveNotebookOutputs(
+      '../weave/legacy/examples/reference/control/Object Picker.ipynb'
+    ));
 });

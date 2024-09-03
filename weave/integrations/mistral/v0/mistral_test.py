@@ -190,7 +190,7 @@ def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) 
 )
 @pytest.mark.asyncio
 async def test_mistral_quickstart_with_stream_async(
-    client: weave.weave_client.WeaveClient,
+    client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     from mistralai.async_client import MistralAsyncClient
 

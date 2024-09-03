@@ -17,10 +17,9 @@ from typing import (
     runtime_checkable,
 )
 
-from weave import call_context
-from weave.client_context import weave_client as weave_client_context
-from weave.legacy import context_state
-from weave.trace import box, settings
+from weave.legacy.weave import context_state
+from weave.trace import box, call_context, settings
+from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -28,7 +27,7 @@ from weave.trace.refs import ObjectRef
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
-    from weave.weave_client import Call, CallsIter
+    from weave.trace.weave_client import Call, CallsIter
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
@@ -48,10 +47,14 @@ except ImportError:
 try:
     # https://github.com/search?q=repo:mistralai/client-python%20Final&type=code
     from mistralai.types.basemodel import UNSET  # type: ignore
-
     MISTRAL_NOT_GIVEN = UNSET  # type: ignore
 except ImportError:
     MISTRAL_NOT_GIVEN = None
+    
+try:
+    from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
+except ImportError:
+    CEREBRAS_NOT_GIVEN = None
 
 
 def print_call_link(call: "Call") -> None:
@@ -70,6 +73,7 @@ def value_is_sentinel(param: Any) -> bool:
         or param.default is COHERE_NOT_GIVEN
         or param.default is ANTHROPIC_NOT_GIVEN
         or param.default is MISTRAL_NOT_GIVEN
+        or param.default is CEREBRAS_NOT_GIVEN
     )
 
 
@@ -327,7 +331,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     ```
     """
     if context_state.get_loading_built_ins():
-        from weave.legacy.decorator_op import op as legacy_op
+        from weave.legacy.weave.decorator_op import op as legacy_op
 
         return legacy_op(*args, **kwargs)  # type: ignore
 

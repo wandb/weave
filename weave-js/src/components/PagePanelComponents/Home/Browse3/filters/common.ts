@@ -8,8 +8,11 @@ import {
   GridFilterItem,
   GridFilterModel,
 } from '@mui/x-data-grid-pro';
+import {isWeaveObjectRef} from '@wandb/weave/react';
 import _ from 'lodash';
 
+import {parseRefMaybe} from '../../Browse2/SmallRef';
+import {WEAVE_REF_PREFIX} from '../pages/wfReactInterface/constants';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
@@ -124,6 +127,10 @@ export const isValuelessOperator = (operator: string) => {
   return VALUELESS_OPERATORS.has(operator);
 };
 
+export const isNumericOperator = (operator: string) => {
+  return operator.startsWith('(number):');
+};
+
 export type SelectOperatorOption = {
   value: string;
   label: string;
@@ -219,8 +226,35 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = {
   'attributes.weave.sys_version': 'Python version used',
 };
 
-export const isWeaveRef = (value: any): boolean => {
-  return typeof value === 'string' && value.startsWith('weave:///');
+// Create a unique symbol for RefString
+const WeaveRefStringSymbol = Symbol('WeaveRefString');
+
+// Define RefString type using the unique symbol
+export type WeaveRefString = string & {[WeaveRefStringSymbol]: never};
+
+const isRefPrefixedString = (value: any): boolean => {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  if (value.startsWith(WEAVE_REF_PREFIX)) {
+    return true;
+  }
+  return false;
+};
+
+/**
+ * `isWeaveRef` is a very conservative check that will ensure the passed
+ * in value is a valid ref string - capabable of being safely parsed into
+ * a Weave ref object. It ensures that the value is a string with the correct
+ * prefix, is parsible, and matches the latest "weave trace" style refs. It
+ * should be used as the appropriate type guard before parsing a ref.
+ */
+export const isWeaveRef = (value: any): value is WeaveRefString => {
+  if (!isRefPrefixedString(value)) {
+    return false;
+  }
+  const parsed = parseRefMaybe(value);
+  return parsed ? isWeaveObjectRef(parsed) : false;
 };
 
 export const getStringList = (value: any): string[] => {

@@ -95,7 +95,6 @@ sentence = "There are many fruits that were found on the recently discovered pla
 extract_fruit(sentence)
 ```
 
-
 ## Contributing
 
 Interested in pulling back the hood or contributing? Awesome, before you dive in, here's what you need to know.

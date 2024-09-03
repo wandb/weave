@@ -18,4 +18,4 @@ yarn && yarn run cypress open
 
 Start the weave server with 
 
-bash weave_server_test.sh
+bash scripts/weave_server_test.sh

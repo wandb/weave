@@ -24,7 +24,9 @@ export const FeedbackGridInner = ({
       field: 'feedback_type',
       headerName: 'Type',
       renderCell: params => (
-        <FeedbackTypeChip feedbackType={params.row.feedback_type} />
+        <div className="overflow-hidden">
+          <FeedbackTypeChip feedbackType={params.row.feedback_type} />
+        </div>
       ),
     },
     {
@@ -45,6 +47,7 @@ export const FeedbackGridInner = ({
     {
       field: 'created_at',
       headerName: 'Timestamp',
+      minWidth: 120,
       width: 120,
       renderCell: params => (
         <Timestamp value={params.row.created_at} format="relative" />
@@ -59,6 +62,7 @@ export const FeedbackGridInner = ({
     {
       field: 'wb_user_id',
       headerName: 'Creator',
+      minWidth: 150,
       width: 150,
       // Might be confusing to enable as-is, because the user sees name /
       // email but the underlying data is userId.
@@ -100,6 +104,7 @@ export const FeedbackGridInner = ({
   const rows = feedback;
   return (
     <StyledDataGrid
+      autosizeOnMount
       // Start Column Menu
       // ColumnMenu is only needed when we have other actions
       // such as filtering.

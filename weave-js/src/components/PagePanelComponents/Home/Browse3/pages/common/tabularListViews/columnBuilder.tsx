@@ -16,6 +16,7 @@ import {ExpandHeader} from '../../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../../Browse2/NotApplicable';
 import {SmallRef} from '../../../../Browse2/SmallRef';
 import {CellFilterWrapper} from '../../../filters/CellFilterWrapper';
+import {isWeaveRef} from '../../../filters/common';
 import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '../../../typeViews/CustomWeaveTypeDispatcher';
 import {
@@ -31,7 +32,6 @@ import {
   isTableRef,
   makeRefExpandedPayload,
 } from '../../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {isRef} from '../util';
 import {buildTree} from './buildTree';
 
 /**
@@ -137,7 +137,7 @@ export function prepareFlattenedDataForTable<T>(
 function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
   return Object.fromEntries(
     Object.entries(flattened).map(([key, val]) => {
-      if (isRef(val)) {
+      if (isWeaveRef(val)) {
         const parsedRef = parseRef(val);
         if (isWeaveObjectRef(parsedRef)) {
           if (parsedRef.weaveKind === 'table') {
@@ -150,7 +150,7 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
                   lookupPath.join('.') + '.' + EXPANDED_REF_REF_KEY;
                 if (parentKey in flattened) {
                   const parentVal = flattened[parentKey];
-                  if (isRef(parentVal)) {
+                  if (isWeaveRef(parentVal)) {
                     parentRef = parentVal;
                   }
                   break;
@@ -160,7 +160,11 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
               if (parentRef) {
                 const newVal: ExpandedRefWithValueAsTableRef =
                   makeRefExpandedPayload(
-                    parentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/' + attr,
+                    parentRef +
+                      '/' +
+                      OBJECT_ATTR_EDGE_NAME +
+                      '/' +
+                      encodeURIComponent(attr),
                     val
                   );
                 return [key, newVal];

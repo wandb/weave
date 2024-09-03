@@ -28,7 +28,6 @@ import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import React, {
   FC,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -39,10 +38,7 @@ import {useHistory} from 'react-router-dom';
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {Tailwind} from '../../../../../Tailwind';
-import {
-  useWeaveflowCurrentRouteContext,
-  WeaveHeaderExtrasContext,
-} from '../../context';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -162,7 +158,6 @@ export const CallsTable: FC<{
   setPaginationModel,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
@@ -508,38 +503,6 @@ export const CallsTable: FC<{
   // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
-  useEffect(() => {
-    if (!isEvaluateTable) {
-      return;
-    }
-    addExtra('compareEvaluations', {
-      node: (
-        <CompareEvaluationsTableButton
-          onClick={() => {
-            history.push(
-              router.compareEvaluationsUri(entity, project, selectedCalls)
-            );
-          }}
-          disabled={selectedCalls.length === 0}
-        />
-      ),
-      order: 1,
-    });
-
-    return () => removeExtra('compareEvaluations');
-  }, [
-    apiRef,
-    addExtra,
-    removeExtra,
-    isEvaluateTable,
-    selectedCalls.length,
-    selectedCalls,
-    tableData,
-    router,
-    entity,
-    project,
-    history,
-  ]);
 
   // We really want to use columns here, but because visibleColumns
   // is a prop to ExportSelector, it causes infinite reloads.
@@ -552,98 +515,13 @@ export const CallsTable: FC<{
     return Array.from(keysSet);
   }, [tableData]);
 
-  // Register Export Button
-  useEffect(() => {
-    const visibleColumns =
-      tableData.length > 0
-        ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
-        : [];
-    addExtra('exportButton', {
-      node: (
-        <ExportSelector
-          selectedCalls={selectedCalls}
-          numTotalCalls={callsTotal}
-          disabled={callsTotal === 0}
-          visibleColumns={visibleColumns}
-          callQueryParams={{
-            entity,
-            project,
-            filter: effectiveFilter,
-            gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
-            gridSort: sortModel,
-          }}
-          rightmostButton={isReadonly}
-        />
-      ),
-      order: 2,
-    });
+  const visibleColumns = useMemo(() => {
+    return tableData.length > 0
+      ? allRowKeys.filter(col => columnVisibilityModel?.[col] !== false)
+      : [];
+  }, [allRowKeys, columnVisibilityModel, tableData]);
 
-    return () => removeExtra('exportButton');
-  }, [
-    selectedCalls,
-    callsTotal,
-    tableData,
-    allRowKeys,
-    columnVisibilityModel,
-    entity,
-    project,
-    isReadonly,
-    effectiveFilter,
-    filterModel,
-    sortModel,
-    addExtra,
-    removeExtra,
-  ]);
-
-  // Register Delete Button
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
-  useEffect(() => {
-    if (isReadonly) {
-      return;
-    }
-    addExtra('deleteSelectedCalls', {
-      node: (
-        <BulkDeleteButton
-          onClick={() => setDeleteConfirmModalOpen(true)}
-          disabled={selectedCalls.length === 0}
-        />
-      ),
-      order: 3,
-    });
-
-    return () => removeExtra('deleteSelectedCalls');
-  }, [addExtra, removeExtra, selectedCalls, isEvaluateTable, isReadonly]);
-
-  useEffect(() => {
-    if (isReadonly) {
-      return;
-    }
-    addExtra('deleteSelectedCallsModal', {
-      node: (
-        <ConfirmDeleteModal
-          calls={tableData
-            .filter(row => selectedCalls.includes(row.id))
-            .map(traceCallToUICallSchema)}
-          confirmDelete={deleteConfirmModalOpen}
-          setConfirmDelete={setDeleteConfirmModalOpen}
-          onDeleteCallback={() => {
-            setSelectedCalls([]);
-          }}
-        />
-      ),
-      order: -1,
-    });
-    return () => removeExtra('deleteSelectedCallsModal');
-  }, [
-    addExtra,
-    removeExtra,
-    selectedCalls,
-    deleteConfirmModalOpen,
-    isReadonly,
-    entity,
-    project,
-    tableData,
-  ]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -700,7 +578,7 @@ export const CallsTable: FC<{
       filterListItems={
         <Tailwind style={{display: 'contents'}}>
           {!hideOpSelector && (
-            <div style={{flex: '0 0 auto'}}>
+            <div className="flex-none">
               <ListItem sx={{minWidth: 190, width: 320}}>
                 <FormControl fullWidth>
                   <Autocomplete
@@ -794,14 +672,64 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          {columnVisibilityModel && setColumnVisibilityModel && (
-            <div style={{flex: '0 0 auto'}}>
-              <ManageColumnsButton
-                columnInfo={columns}
-                columnVisibilityModel={columnVisibilityModel}
-                setColumnVisibilityModel={setColumnVisibilityModel}
+          {isEvaluateTable && (
+            <CompareEvaluationsTableButton
+              onClick={() => {
+                history.push(
+                  router.compareEvaluationsUri(entity, project, selectedCalls)
+                );
+              }}
+              disabled={selectedCalls.length === 0}
+            />
+          )}
+          {!isReadonly && (
+            <div className="flex-none">
+              <BulkDeleteButton
+                onClick={() => setDeleteConfirmModalOpen(true)}
+                disabled={selectedCalls.length === 0}
+              />
+              <ConfirmDeleteModal
+                calls={tableData
+                  .filter(row => selectedCalls.includes(row.id))
+                  .map(traceCallToUICallSchema)}
+                confirmDelete={deleteConfirmModalOpen}
+                setConfirmDelete={setDeleteConfirmModalOpen}
+                onDeleteCallback={() => {
+                  setSelectedCalls([]);
+                }}
               />
             </div>
+          )}
+          <div className="flex-none">
+            <ExportSelector
+              selectedCalls={selectedCalls}
+              numTotalCalls={callsTotal}
+              disabled={callsTotal === 0}
+              visibleColumns={visibleColumns}
+              // Remove cols from expandedRefs if it's not in visibleColumns (probably just inputs.example)
+              refColumnsToExpand={Array.from(expandedRefCols).filter(col =>
+                visibleColumns.includes(col)
+              )}
+              callQueryParams={{
+                entity,
+                project,
+                filter: effectiveFilter,
+                gridFilter: filterModel ?? DEFAULT_FILTER_CALLS,
+                gridSort: sortModel,
+              }}
+            />
+          </div>
+          {columnVisibilityModel && setColumnVisibilityModel && (
+            <>
+              <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
+              <div className="flex-none">
+                <ManageColumnsButton
+                  columnInfo={columns}
+                  columnVisibilityModel={columnVisibilityModel}
+                  setColumnVisibilityModel={setColumnVisibilityModel}
+                />
+              </div>
+            </>
           )}
         </Tailwind>
       }>
