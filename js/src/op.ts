@@ -22,6 +22,9 @@ export function op<T extends (...args: any[]) => any>(
 
         const { newStack, currentCall, parentCall } = globalClient.pushNewCall();
         const startTime = new Date();
+        if (!globalClient.quiet && parentCall == null) {
+            console.log(`🍩 https://wandb.ai/${globalClient.projectId}/r/call/${currentCall.callId}`);
+        }
         const startCallPromise = globalClient.startCall(opWrapper, params, thisArg, currentCall, parentCall, startTime);
 
         try {
@@ -56,7 +59,7 @@ export function op<T extends (...args: any[]) => any>(
                 return result;
             }
         } catch (error) {
-            console.error(`Op ${actualOpName} failed:`, error);
+            // console.error(`Op ${actualOpName} failed:`, error);
             const endTime = new Date();
             globalClient.finishCallWithException(error, currentCall, endTime, startCallPromise);
             throw error;

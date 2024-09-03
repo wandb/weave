@@ -2,6 +2,7 @@ import { WeaveObject, WeaveObjectParameters } from "./weaveObject";
 import { Op, getOpName } from "./opType";
 import { boundOp } from "./op";
 import { Dataset } from "./dataset";
+import cliProgress from 'cli-progress';
 
 interface EvaluationParameters extends WeaveObjectParameters {
     dataset: Dataset;
@@ -27,24 +28,24 @@ async function* asyncParallelMap<T, U>(
     for await (const item of asyncIterator) {
         if (itemPromiseMap.size >= maxConcurrency) {
             const done = await Promise.race(itemPromiseMap.values());
+            itemPromiseMap.delete(done.item);
             yield {
                 ...done,
                 nRunning: itemPromiseMap.size,
                 nDone: ++nDone
             }
-            itemPromiseMap.delete(done.item);
         }
         const prom = runOne(item);
         itemPromiseMap.set(item, prom);
     }
     while (itemPromiseMap.size > 0) {
         const done = await Promise.race(itemPromiseMap.values());
+        itemPromiseMap.delete(done.item);
         yield {
             ...done,
             nRunning: itemPromiseMap.size,
             nDone: ++nDone
         }
-        itemPromiseMap.delete(done.item);
     }
 }
 
@@ -64,6 +65,19 @@ export class Evaluation extends WeaveObject {
     async evaluate({ model, maxConcurrency = 5 }: { model: Op<any>, maxConcurrency?: number }) {
         const results: Array<{ modelOutput: any, scores: { [key: string]: any }, modelLatency: number }> = [];
 
+        const progressBar = new cliProgress.SingleBar({
+            format: 'Evaluating |{bar}| {percentage}% | ETA: {eta}s | {modelErrors} errors | {value}/{total} examples | {running} running',
+            barCompleteChar: '\u2588',
+            barIncompleteChar: '\u2591',
+            hideCursor: true
+        });
+
+        progressBar.start(this.dataset.length, 0, {
+            running: 0,
+            modelErrors: 0
+        });
+
+        let modelErrors = 0;
         for await (const { result, nRunning, nDone } of asyncParallelMap(
             this.dataset,
             this.predict_and_score,
@@ -71,30 +85,32 @@ export class Evaluation extends WeaveObject {
             maxConcurrency,
         )) {
             results.push(result);
-            console.log(`Evaluated ${nDone} of ${this.dataset.length} examples, ${nRunning} running`);
+            modelErrors += result.modelError;
+            progressBar.update(nDone, { running: nRunning, modelErrors });
         }
+
+        progressBar.stop();
 
         return this.summarizeResults(results);
     }
 
     async predict_and_score({ model, example }: { model: Op<any>, example: Record<string, any> }) {
         const startTime = new Date();
-        let modelSucceeded = false;
         let modelOutput;
+        let modelError = 0;
         try {
             modelOutput = await model(example);
-            modelSucceeded = true;
         } catch (e) {
-            console.log(e)
+            modelError = 1;
         }
         const endTime = new Date();
         const modelLatency = (endTime.getTime() - startTime.getTime()) / 1000; // Convert to seconds
 
         const scores: { [key: string]: any } = {};
-        if (modelSucceeded) {
+        if (!modelError) {
             for (const scorer of this.scorers) {
                 const score = await scorer(modelOutput, example);
-                if (modelSucceeded) {
+                if (!modelError) {
                     scores[getOpName(scorer)] = score;
                 } else {
                     scores[getOpName(scorer)] = undefined;
@@ -103,7 +119,7 @@ export class Evaluation extends WeaveObject {
         }
 
 
-        return { modelOutput, scores, modelLatency };
+        return { modelOutput, scores, modelLatency, modelError };
     }
 
     private summarizeResults(results: Array<{ modelOutput: any, scores: { [key: string]: any }, modelLatency: number }>) {

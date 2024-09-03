@@ -63,15 +63,16 @@ export class WeaveClient {
     private stackContext = new AsyncLocalStorage<CallStack>();
     private traceServerApi: TraceServerApi<any>;
     private wandbServerApi: WandbServerApi;
-    private projectId: string;
     private callQueue: Array<{ mode: 'start' | 'end', data: any }> = [];
     private batchProcessTimeout: NodeJS.Timeout | null = null;
     private isBatchProcessing: boolean = false;
-    private quiet: boolean = false;
     private readonly BATCH_INTERVAL: number = 200;
 
     private fileQueue: Array<{ fileContent: Blob }> = [];
     private isProcessingFiles: boolean = false;
+
+    public projectId: string;
+    public quiet: boolean = false;
 
     constructor(traceServerApi: TraceServerApi<any>, wandbServerApi: WandbServerApi, projectId: string, quiet: boolean = false) {
         this.traceServerApi = traceServerApi;
@@ -341,9 +342,6 @@ export class WeaveClient {
     public async startCall(opRef: OpRef | Op<any>, params: any[], thisArg: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, startTime: Date) {
         if (isOp(opRef)) {
             opRef = await this.saveOp(opRef);
-        }
-        if (!this.quiet && parentCall == null) {
-            console.log(`🍩 https://wandb.ai/${this.projectId}/r/call/${currentCall.callId}`);
         }
         const inputs = await this.paramsToCallInputs(params, thisArg);
         const startReq = {
