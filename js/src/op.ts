@@ -71,9 +71,9 @@ export function op<T extends (...args: any[]) => any>(
     opWrapper.__name = actualOpName;
     opWrapper.__isOp = true as true;
     if (options?.originalFunction) {
-        opWrapper.wrappedFunction = options.originalFunction;
+        opWrapper.__wrappedFunction = options.originalFunction;
     } else {
-        opWrapper.wrappedFunction = fn;
+        opWrapper.__wrappedFunction = fn;
     }
 
     if (options?.bindThis !== undefined) {
@@ -83,6 +83,6 @@ export function op<T extends (...args: any[]) => any>(
     return opWrapper as Op<T>;
 }
 
-export function boundOp(bindThis: any, fn: (...args: any[]) => any) {
-    return op(fn.bind(bindThis), { originalFunction: fn, bindThis });
+export function boundOp(bindThis: any, fn: (...args: any[]) => any, options?: OpOptions<any>) {
+    return op(fn.bind(bindThis), { originalFunction: fn, bindThis, ...options });
 }
