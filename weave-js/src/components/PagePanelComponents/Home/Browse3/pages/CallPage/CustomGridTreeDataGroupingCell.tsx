@@ -37,9 +37,9 @@ CallOrCountRow.displayName = 'S.CallOrCountRow';
  * lines connecting the cells, expanding/collapsing the tree, etc).
  */
 export const CustomGridTreeDataGroupingCell: FC<
-  GridRenderCellParams & {onClick?: (event: MouseEvent) => void}
+  GridRenderCellParams & {onClick?: (event: MouseEvent) => void} & {hiddenRowCount: number}
 > = props => {
-  const {id, field, rowNode, row} = props;
+  const {id, field, rowNode, row, hiddenRowCount} = props;
   const {isParentRow} = row;
   const call = row.call as CallSchema;
   const apiRef = useGridApiContext();
@@ -175,7 +175,7 @@ export const CustomGridTreeDataGroupingCell: FC<
       </Box>
       <CallOrCountRow>
         {isHiddenCount ? (
-          <Box>{row.count.toLocaleString()} hidden calls</Box>
+          <Box>{hiddenRowCount.toLocaleString()} hidden calls</Box>
         ) : (
           <>
             <Box

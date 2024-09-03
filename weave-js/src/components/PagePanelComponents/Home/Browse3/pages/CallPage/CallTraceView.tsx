@@ -26,9 +26,10 @@ export const CallTraceView: FC<{
   call: CallSchema;
   selectedCall: CallSchema;
   rows: Row[];
+  hiddenRowCount: number;
   forcedExpandKeys: Set<string>;
   path?: string;
-}> = ({call, selectedCall, rows, forcedExpandKeys, path}) => {
+}> = ({call, selectedCall, rows, hiddenRowCount, forcedExpandKeys, path}) => {
   const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
@@ -53,6 +54,7 @@ export const CallTraceView: FC<{
       renderCell: params => (
         <CustomGridTreeDataGroupingCell
           {...params}
+          hiddenRowCount={hiddenRowCount}
           onClick={event => {
             setExpandKeys(curr => {
               if (curr.has(params.row.id)) {
@@ -329,10 +331,8 @@ const getIndexWithinSameNameSiblings = (
   return indexWithinSameNameSiblings;
 };
 
-export const useCallFlattenedTraceTree = (
-  call: CallSchema,
-  selectedPath: string | null
-) => {
+const useGetChildren = (call: CallSchema) => {
+  /* get all children of a call */
   const {useCalls} = useWFHooks();
   const columns = useMemo(
     () => [
@@ -350,6 +350,44 @@ export const useCallFlattenedTraceTree = (
     call.project,
     {
       traceId: call.traceId,
+      parentIds: [call.callId],
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    columns,
+    undefined,
+    {refetchOnDelete: true}
+  );
+
+  return useMemo(() => {
+    return {children: traceCalls.result ?? [], loading: traceCalls.loading};
+  }, [traceCalls.result, traceCalls.loading])
+}
+
+export const useCallFlattenedTraceTree = (
+  call: CallSchema,
+  selectedPath: string | null
+) => {
+  const {useCalls, useCallsStats} = useWFHooks();
+  const columns = useMemo(
+    () => [
+      'parent_id',
+      'started_at',
+      'ended_at',
+      'display_name',
+      'summary',
+      'exception',
+    ],
+    []
+  );
+  const traceCalls = useCalls(
+    call.entity,
+    call.project,
+    {
+      traceId: call.traceId,
+      parentIds: [call.callId],
     },
     undefined,
     undefined,
@@ -379,138 +417,165 @@ export const useCallFlattenedTraceTree = (
     }
     return lookup;
   }, [traceCallsResult]);
-  return useMemo(() => {
-    let selectedCall = null;
-    let selectedCallSimilarity = Number.POSITIVE_INFINITY;
 
-    const rows: Row[] = [];
-    // Ascend to the root
-    let currentCall: CallSchema | null = call;
-    let lastCall: CallSchema = call;
+  console.log(traceCallsResult)
+  console.log(childCallLookup)
+  console.log(traceCallMap)
 
-    let pathPrefix = '';
-    while (currentCall != null) {
-      lastCall = currentCall;
-      const idx = getIndexWithinSameNameSiblings(
-        currentCall,
-        traceCallMap,
-        childCallLookup
-      );
-      pathPrefix = updatePath(pathPrefix, currentCall.spanName, idx);
-      currentCall = currentCall.parentId
-        ? traceCallMap[currentCall.parentId]
-        : null;
-    }
+  const {children, loading} = useGetChildren(call);
 
-    // Add a parent row
-    const parentCall = call.parentId ? traceCallMap[call.parentId] : null;
-    if (parentCall) {
-      rows.push({
-        id: parentCall.callId,
-        call: parentCall,
-        status: parentCall.rawSpan.status_code,
-        hierarchy: [parentCall.callId],
-        path: '',
-        isTraceRootCall: parentCall.callId === lastCall.callId,
-        isParentRow: true,
-      });
-    }
+  console.log(children, loading)
 
-    // Descend to the leaves
-    const queue: Array<{
-      targetCall: CallSchema;
-      parentHierarchy: string[];
-      path: string;
-    }> = [
-      {
-        targetCall: call,
-        parentHierarchy: call.parentId ? [call.parentId] : [],
-        path: pathPrefix,
-      },
-    ];
-    while (queue.length > 0) {
-      const {targetCall, parentHierarchy, path} = queue.shift()!;
-      const newHierarchy = [...parentHierarchy, targetCall.callId];
-      const idx = getIndexWithinSameNameSiblings(
-        targetCall,
-        traceCallMap,
-        childCallLookup
-      );
-      const newPath = updatePath(path, targetCall.spanName, idx);
-      const similarity = scorePathSimilarity(newPath, selectedPath ?? '');
-      if (similarity < selectedCallSimilarity) {
-        selectedCall = targetCall;
-        selectedCallSimilarity = similarity;
-      }
-      rows.push({
-        id: targetCall.callId,
-        call: targetCall,
-        status: targetCall.rawSpan.status_code,
-        hierarchy: newHierarchy,
-        path: newPath,
-        isTraceRootCall: targetCall.callId === lastCall.callId,
-      });
-      const childIds = childCallLookup[targetCall.callId] ?? [];
-      const childCalls = _.sortBy(
-        childIds.map(c => traceCallMap[c]).filter(c => c),
-        [getCallSortExampleRow, getCallSortStartTime]
-      );
-      childCalls.forEach(c =>
-        queue.push({
-          targetCall: c,
-          parentHierarchy: newHierarchy,
-          path: newPath,
-        })
-      );
-    }
+  const stats = useCallsStats(call.entity, call.project, {traceId: call.traceId, parentIds: [call.callId]})
 
-    if (parentCall) {
-      const childrenOfParent = childCallLookup[parentCall.callId];
-      const siblingCount = childrenOfParent ? childrenOfParent.length - 1 : 0;
-      if (siblingCount) {
-        rows.push({
-          id: 'HIDDEN_SIBLING_COUNT',
-          count: siblingCount,
-          hierarchy: [call.parentId!, 'HIDDEN_SIBLING_COUNT'],
-        });
-      }
-    }
+  console.log(stats)
 
-    // Update status indicators to reflect status of descendants.
-    const errorCalls = traceCallsResult.filter(
-      c => c.rawSpan.status_code === 'ERROR'
-    );
-    if (errorCalls.length) {
-      const ancestors = new Set<string>();
-      for (const errorCall of errorCalls) {
-        let ancestorCall = errorCall.parentId
-          ? traceCallMap[errorCall.parentId]
-          : null;
-        while (ancestorCall != null && !ancestors.has(ancestorCall.callId)) {
-          ancestors.add(ancestorCall.callId);
-          ancestorCall = ancestorCall.parentId
-            ? traceCallMap[ancestorCall.parentId]
-            : null;
-        }
-      }
-      for (const row of rows) {
-        if (
-          'status' in row &&
-          row.status === 'SUCCESS' &&
-          ancestors.has(row.id)
-        ) {
-          row.status = 'DESCENDANT_ERROR';
-        }
-      }
-    }
+  const rows: Row[] = useMemo(() => {
+    return children.map(c => ({
+      id: c.callId,
+      call: c,
+      status: c.rawSpan.status_code,
+      hierarchy: [call.callId, c.callId],
+      path: updatePath(call.spanName, c.spanName, getIndexWithinSameNameSiblings(c, traceCallMap, childCallLookup)),
+      isTraceRootCall: c.callId === call.callId,
+    }))
+  }, [children, call])
 
-    if (!selectedCall) {
-      selectedCall = call;
-    }
+  // recursively query for all children of children
+
+
+  // return useMemo(() => {
+  //   let selectedCall = null;
+  //   let selectedCallSimilarity = Number.POSITIVE_INFINITY;
+
+  //   const rows: Row[] = [];
+  //   // Ascend to the root
+  //   let currentCall: CallSchema | null = call;
+  //   let lastCall: CallSchema = call;
+
+  //   let pathPrefix = '';
+  //   while (currentCall != null) {
+  //     lastCall = currentCall;
+  //     const idx = getIndexWithinSameNameSiblings(
+  //       currentCall,
+  //       traceCallMap,
+  //       childCallLookup
+  //     );
+  //     pathPrefix = updatePath(pathPrefix, currentCall.spanName, idx);
+  //     currentCall = currentCall.parentId
+  //       ? traceCallMap[currentCall.parentId]
+  //       : null;
+  //   }
+
+  //   // Add a parent row
+  //   const parentCall = call.parentId ? traceCallMap[call.parentId] : null;
+  //   if (parentCall) {
+  //     rows.push({
+  //       id: parentCall.callId,
+  //       call: parentCall,
+  //       status: parentCall.rawSpan.status_code,
+  //       hierarchy: [parentCall.callId],
+  //       path: '',
+  //       isTraceRootCall: parentCall.callId === lastCall.callId,
+  //       isParentRow: true,
+  //     });
+  //   }
+
+  //   // Descend to the leaves
+  //   const queue: Array<{
+  //     targetCall: CallSchema;
+  //     parentHierarchy: string[];
+  //     path: string;
+  //   }> = [
+  //     {
+  //       targetCall: call,
+  //       parentHierarchy: call.parentId ? [call.parentId] : [],
+  //       path: pathPrefix,
+  //     },
+  //   ];
+  //   while (queue.length > 0) {
+  //     const {targetCall, parentHierarchy, path} = queue.shift()!;
+  //     const newHierarchy = [...parentHierarchy, targetCall.callId];
+  //     const idx = getIndexWithinSameNameSiblings(
+  //       targetCall,
+  //       traceCallMap,
+  //       childCallLookup
+  //     );
+  //     const newPath = updatePath(path, targetCall.spanName, idx);
+  //     const similarity = scorePathSimilarity(newPath, selectedPath ?? '');
+  //     if (similarity < selectedCallSimilarity) {
+  //       selectedCall = targetCall;
+  //       selectedCallSimilarity = similarity;
+  //     }
+  //     rows.push({
+  //       id: targetCall.callId,
+  //       call: targetCall,
+  //       status: targetCall.rawSpan.status_code,
+  //       hierarchy: newHierarchy,
+  //       path: newPath,
+  //       isTraceRootCall: targetCall.callId === lastCall.callId,
+  //     });
+  //     const childIds = childCallLookup[targetCall.callId] ?? [];
+  //     const childCalls = _.sortBy(
+  //       childIds.map(c => traceCallMap[c]).filter(c => c),
+  //       [getCallSortExampleRow, getCallSortStartTime]
+  //     );
+  //     childCalls.forEach(c =>
+  //       queue.push({
+  //         targetCall: c,
+  //         parentHierarchy: newHierarchy,
+  //         path: newPath,
+  //       })
+  //     );
+  //   }
+
+  //   if (parentCall) {
+  //     const childrenOfParent = childCallLookup[parentCall.callId];
+  //     const siblingCount = childrenOfParent ? childrenOfParent.length - 1 : 0;
+  //     if (siblingCount) {
+  //       rows.push({
+  //         id: 'HIDDEN_SIBLING_COUNT',
+  //         count: siblingCount,
+  //         hierarchy: [call.parentId!, 'HIDDEN_SIBLING_COUNT'],
+  //       });
+  //     }
+  //   }
+
+  //   // Update status indicators to reflect status of descendants.
+  //   const errorCalls = traceCallsResult.filter(
+  //     c => c.rawSpan.status_code === 'ERROR'
+  //   );
+  //   if (errorCalls.length) {
+  //     const ancestors = new Set<string>();
+  //     for (const errorCall of errorCalls) {
+  //       let ancestorCall = errorCall.parentId
+  //         ? traceCallMap[errorCall.parentId]
+  //         : null;
+  //       while (ancestorCall != null && !ancestors.has(ancestorCall.callId)) {
+  //         ancestors.add(ancestorCall.callId);
+  //         ancestorCall = ancestorCall.parentId
+  //           ? traceCallMap[ancestorCall.parentId]
+  //           : null;
+  //       }
+  //     }
+  //     for (const row of rows) {
+  //       if (
+  //         'status' in row &&
+  //         row.status === 'SUCCESS' &&
+  //         ancestors.has(row.id)
+  //       ) {
+  //         row.status = 'DESCENDANT_ERROR';
+  //       }
+  //     }
+  //   }
+
+  //   if (!selectedCall) {
+  //     selectedCall = call;
+  //   }
 
     // Epand the path to the selected call.
     const expandKeys = new Set<string>();
-    let callToExpand: CallSchema | null = selectedCall;
+    let callToExpand: CallSchema | null = call;
     while (callToExpand != null) {
       expandKeys.add(callToExpand.callId);
       callToExpand = callToExpand.parentId
@@ -518,13 +583,17 @@ export const useCallFlattenedTraceTree = (
         : null;
     }
 
-    return {rows, selectedCall, expandKeys, loading: traceCalls.loading};
-  }, [
-    call,
-    childCallLookup,
-    traceCallMap,
-    traceCallsResult,
-    selectedPath,
-    traceCalls.loading,
-  ]);
+  //   return {rows, selectedCall, expandKeys, loading: traceCalls.loading};
+  // }, [
+  //   call,
+  //   childCallLookup,
+  //   traceCallMap,
+  //   traceCallsResult,
+  //   selectedPath,
+  //   traceCalls.loading,
+  // ]);
+  
+  return useMemo(() => {
+    return {rows, rowCount: stats.result?.count, selectedCall: call, expandKeys, loading: traceCalls.loading || loading};
+  }, [call, traceCalls.loading, rows, stats.result?.count, loading])
 };

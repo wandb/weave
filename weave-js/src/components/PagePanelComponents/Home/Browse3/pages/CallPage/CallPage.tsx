@@ -124,7 +124,9 @@ const CallPageInnerVertical: FC<{
   ]);
 
   const tree = useCallFlattenedTraceTree(call, path ?? null);
-  const {rows, expandKeys, loading} = tree;
+  const {rows, rowCount, expandKeys, loading} = tree;
+  
+  console.log('rows', rows)
 
   const {selectedCall} = tree;
   const callComplete = useCall({
@@ -180,6 +182,7 @@ const CallPageInnerVertical: FC<{
             call={call}
             selectedCall={currentCall}
             rows={rows}
+            hiddenRowCount={rowCount ?? 0}
             forcedExpandKeys={expandKeys}
             path={path}
           />
