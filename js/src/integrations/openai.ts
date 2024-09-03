@@ -79,6 +79,7 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any) {
         },
         {
             name: 'openai.chat.completions.create',
+            parameterNames: 'useParam0Object',
             summarize: (result) => ({
                 usage: {
                     [result.model]: result.usage
