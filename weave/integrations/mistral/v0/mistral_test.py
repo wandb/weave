@@ -79,7 +79,9 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_mistral_quickstart_async(client: weave.trace.weave_client.WeaveClient) -> None:
+async def test_mistral_quickstart_async(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     from mistralai.async_client import MistralAsyncClient
 
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
@@ -130,7 +132,9 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_mistral_quickstart_with_stream(client: weave.trace.weave_client.WeaveClient) -> None:
+def test_mistral_quickstart_with_stream(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     from mistralai.client import MistralClient
 
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/

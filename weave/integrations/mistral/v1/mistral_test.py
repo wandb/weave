@@ -86,7 +86,9 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_mistral_quickstart_async(client: weave.trace.weave_client.WeaveClient) -> None:
+async def test_mistral_quickstart_async(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -140,7 +142,9 @@ Each of these cheeses offers a unique taste and texture, so the "best" one is a 
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_mistral_quickstart_with_stream(client: weave.trace.weave_client.WeaveClient) -> None:
+def test_mistral_quickstart_with_stream(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
