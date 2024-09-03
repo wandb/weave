@@ -27,6 +27,7 @@ from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
 from weave.trace.serializer import get_serializer_for_obj
 from weave.trace.table import Table
+from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_interface import (
@@ -150,6 +151,9 @@ class Call:
     summary: Optional[dict] = None
     display_name: Optional[str] = None
     attributes: Optional[dict] = None
+    started_at: Optional[datetime.datetime] = None
+    ended_at: Optional[datetime.datetime] = None
+    deleted_at: Optional[datetime.datetime] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
@@ -299,6 +303,9 @@ def make_client_call(
         summary=dict(server_call.summary) if server_call.summary is not None else None,
         display_name=server_call.display_name,
         attributes=server_call.attributes,
+        started_at=server_call.started_at,
+        ended_at=server_call.ended_at,
+        deleted_at=server_call.deleted_at,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -450,7 +457,7 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(
+    def get_calls(
         self,
         filter: Optional[CallsFilter] = None,
         include_costs: Optional[bool] = False,
@@ -462,8 +469,18 @@ class WeaveClient:
             self.server, self._project_id(), filter, include_costs or False
         )
 
+    @deprecated(new_name="get_calls")
+    def calls(
+        self,
+        filter: Optional[CallsFilter] = None,
+        include_costs: Optional[bool] = False,
+    ) -> CallsIter:
+        return self.get_calls(filter=filter, include_costs=include_costs)
+
     @trace_sentry.global_trace_sentry.watch()
-    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+    def get_call(
+        self, call_id: str, include_costs: Optional[bool] = False
+    ) -> WeaveObject:
         response = self.server.calls_query(
             CallsQueryReq(
                 project_id=self._project_id(),
@@ -475,6 +492,10 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = response.calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
+
+    @deprecated(new_name="get_call")
+    def cll(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+        return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
@@ -648,7 +669,7 @@ class WeaveClient:
             )
         )
 
-    def feedback(
+    def get_feedback(
         self,
         query: Optional[Union[Query, str]] = None,
         *,
@@ -663,10 +684,10 @@ class WeaveClient:
             # Fetch a specific feedback object.
             # Note that this still returns a collection, which is expected
             # to contain zero or one item(s).
-            client.feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+            client.get_feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
 
             # Find all feedback objects with a specific reaction.
-            client.feedback(reaction="👍", limit=10)
+            client.get_feedback(reaction="👍", limit=10)
             ```
 
         Args:
@@ -721,6 +742,19 @@ class WeaveClient:
             offset=offset,
             limit=limit,
             show_refs=True,
+        )
+
+    @deprecated(new_name="get_feedback")
+    def feedback(
+        self,
+        query: Optional[Union[Query, str]] = None,
+        *,
+        reaction: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> FeedbackQuery:
+        return self.get_feedback(
+            query=query, reaction=reaction, offset=offset, limit=limit
         )
 
     def add_costs(self, costs: Dict[str, CostCreateInput]) -> CostCreateRes:
@@ -947,7 +981,7 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(CallsFilter(op_names=[op_ref.uri()]))
+        return self.get_calls(CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(self, filter: Optional[ObjectVersionFilter] = None) -> list[ObjSchema]:

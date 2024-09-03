@@ -143,7 +143,9 @@ class InternalCallRef:
         return u
 
 
-def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
+def parse_internal_uri(
+    uri: str,
+) -> Union[InternalObjectRef, InternalTableRef, InternalCallRef]:
     if uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
         path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
         parts = path.split("/")
@@ -181,6 +183,9 @@ def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
             version=version,
             extra=extra,
         )
+    elif kind == "call":
+        id_ = remaining[0]
+        return InternalCallRef(project_id=project_id, id=id_)
     else:
         raise InvalidInternalRef(f"Unknown ref kind: {kind}")
 

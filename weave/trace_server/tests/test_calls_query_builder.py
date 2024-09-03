@@ -282,7 +282,9 @@ def assert_sql(cq: CallsQuery, exp_query, exp_params):
 
 
 def test_query_light_column_with_costs() -> None:
-    cq = CallsQuery(project_id="project", include_costs=True)
+    cq = CallsQuery(
+        project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True
+    )
     cq.add_field("id")
     cq.add_field("started_at")
     cq.set_hardcoded_filter(
@@ -292,125 +294,124 @@ def test_query_light_column_with_costs() -> None:
             )
         )
     )
-
     assert_sql(
         cq,
         """
         WITH
-            filtered_calls AS
-                (SELECT calls_merged.id AS id
+            filtered_calls AS (
+                SELECT calls_merged.id AS id
                 FROM calls_merged
                 WHERE project_id = {pb_1:String}
-                GROUP BY (project_id,
-                            id)
-                HAVING (
-                    ((any(calls_merged.deleted_at) IS NULL))
-                AND
-                    (any(calls_merged.op_name) IN {pb_0:Array(String)})
-                )),
-            all_calls AS
-                (SELECT calls_merged.id AS id,
-                        any(calls_merged.started_at) AS started_at
+                GROUP BY (project_id, id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                        AND (any(calls_merged.op_name) IN {pb_0:Array(String)}))),
+            all_calls AS (
+                SELECT
+                    calls_merged.id AS id,
+                    any(calls_merged.started_at) AS started_at
                 FROM calls_merged
                 WHERE project_id = {pb_2:String}
                     AND (id IN filtered_calls)
-                GROUP BY (project_id,
-                            id)), -- From the all_calls we get the usage data for LLMs
-            llm_usage AS
-                (SELECT id,
-                        started_at,
-                        ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
-                        arrayJoin(JSONExtractKeysAndValuesRaw(usage_raw)) AS kv,
-                        kv.1 AS llm_id,
-                        JSONExtractInt(kv.2, 'requests') AS requests,
-                        if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'input_tokens')) AS prompt_tokens,
-                        if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'output_tokens')) AS completion_tokens,
-                        JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
-                FROM all_calls
-                WHERE (NOT ((usage_raw = {pb_3:String})))), -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-            ranked_prices AS
-                (SELECT llm_usage.id,
-                        llm_usage.llm_id,
-                        llm_usage.requests,
-                        llm_usage.prompt_tokens,
-                        llm_usage.completion_tokens,
-                        llm_usage.total_tokens,
-                        llm_usage.started_at,
-                        llm_token_prices.id,
-                        llm_token_prices.pricing_level,
-                        llm_token_prices.pricing_level_id,
-                        llm_token_prices.provider_id,
-                        llm_token_prices.llm_id,
-                        llm_token_prices.effective_date,
-                        llm_token_prices.prompt_token_cost,
-                        llm_token_prices.completion_token_cost,
-                        llm_token_prices.prompt_token_cost_unit,
-                        llm_token_prices.completion_token_cost_unit,
-                        llm_token_prices.created_by,
-                        llm_token_prices.created_at,
-                        ROW_NUMBER() OVER (PARTITION BY llm_usage.id, llm_usage.llm_id
-                            ORDER BY CASE -- Order by pricing level then by effective_date
-                                -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_NAME THEN 1
-                                WHEN llm_token_prices.pricing_level = 'project'
-                                    AND llm_token_prices.pricing_level_id = 'project' THEN 2
-                                WHEN llm_token_prices.pricing_level = 'default'
-                                    AND llm_token_prices.pricing_level_id = 'default' THEN 3
+                GROUP BY (project_id, id)),
+            -- From the all_calls we get the usage data for LLMs
+            llm_usage AS (
+                SELECT
+                    *,
+                    ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
+                    arrayJoin(
+                        if(usage_raw != '',
+                        JSONExtractKeysAndValuesRaw(usage_raw),
+                        [('weave_dummy_llm_id', '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}')])
+                    ) AS kv,
+                    kv.1 AS llm_id,
+                    JSONExtractInt(kv.2, 'requests') AS requests,
+                    if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'input_tokens')) AS prompt_tokens,
+                    if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'output_tokens')) AS completion_tokens,
+                    JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+                FROM all_calls),
+            -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
+            ranked_prices AS (
+                SELECT
+                    *,
+                    llm_token_prices.id,
+                    llm_token_prices.pricing_level,
+                    llm_token_prices.pricing_level_id,
+                    llm_token_prices.provider_id,
+                    llm_token_prices.llm_id,
+                    llm_token_prices.effective_date,
+                    llm_token_prices.prompt_token_cost,
+                    llm_token_prices.completion_token_cost,
+                    llm_token_prices.prompt_token_cost_unit,
+                    llm_token_prices.completion_token_cost_unit,
+                    llm_token_prices.created_by,
+                    llm_token_prices.created_at,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY llm_usage.id, llm_usage.llm_id
+                        ORDER BY
+                            CASE
+                                -- Order by effective_date
+                                WHEN llm_usage.started_at >= llm_token_prices.effective_date THEN 1
+                                ELSE 2
+                            END,
+                            CASE
+                                -- Order by pricing level then by effective_date
+                                -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_PARAM THEN 1
+                                WHEN llm_token_prices.pricing_level = 'project' AND llm_token_prices.pricing_level_id = 'UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=' THEN 2
+                                WHEN llm_token_prices.pricing_level = 'default' AND llm_token_prices.pricing_level_id = 'default' THEN 3
                                 ELSE 4
-                            END, llm_token_prices.effective_date DESC) AS rank
+                            END,
+                            llm_token_prices.effective_date DESC
+                    ) AS rank
                 FROM llm_usage
-                LEFT JOIN llm_token_prices ON (llm_usage.llm_id = llm_token_prices.llm_id)
-                WHERE (llm_usage.started_at >= llm_token_prices.effective_date)), -- Discard all but the top-ranked prices for each llm_id and call id
-            top_ranked_prices AS
-                (SELECT id,
-                        pricing_level,
-                        pricing_level_id,
-                        provider_id,
-                        llm_id,
-                        effective_date,
-                        prompt_token_cost,
-                        completion_token_cost,
-                        prompt_token_cost_unit,
-                        completion_token_cost_unit,
-                        created_by,
-                        created_at
-                FROM ranked_prices
-                WHERE (rank = {pb_4:UInt64})), -- Join with the top-ranked prices to get the token costs
-            usage_with_costs AS
-                (SELECT llm_usage.id,
-                        llm_usage.llm_id,
-                        llm_usage.requests,
-                        llm_usage.prompt_tokens,
-                        llm_usage.completion_tokens,
-                        llm_usage.total_tokens,
-                        top_ranked_prices.pricing_level,
-                        top_ranked_prices.pricing_level_id,
-                        top_ranked_prices.provider_id,
-                        top_ranked_prices.llm_id,
-                        top_ranked_prices.effective_date,
-                        top_ranked_prices.prompt_token_cost,
-                        top_ranked_prices.completion_token_cost,
-                        top_ranked_prices.prompt_token_cost_unit,
-                        top_ranked_prices.completion_token_cost_unit,
-                        top_ranked_prices.created_by,
-                        top_ranked_prices.created_at,
-                        prompt_tokens * prompt_token_cost AS prompt_tokens_cost,
-                        completion_tokens * completion_token_cost AS completion_tokens_cost
-                FROM llm_usage
-                LEFT JOIN top_ranked_prices ON ((llm_usage.id = top_ranked_prices.id) AND (llm_usage.llm_id = top_ranked_prices.llm_id)))
-        -- Final Select, which just pulls all the data from all_calls, and adds a costs object
-        SELECT all_calls.id,
-            all_calls.started_at,
-            concat(left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_cost":', toString(prompt_tokens_cost), ',', '"completion_tokens_cost":', toString(completion_tokens_cost), ',', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}') AS summary_dump
-        FROM all_calls
-        JOIN usage_with_costs ON (all_calls.id = usage_with_costs.id)
-        GROUP BY all_calls.id,
-                all_calls.started_at
+                LEFT JOIN llm_token_prices ON (llm_usage.llm_id = llm_token_prices.llm_id))
+            -- Final Select, which just selects the correct fields, and adds a costs object
+            SELECT
+                id,
+                started_at,
+                if( any(llm_id) = 'weave_dummy_llm_id',
+                any(summary_dump),
+                concat(
+                    left(any(summary_dump), length(any(summary_dump)) - 1),
+                    ',"weave":{',
+                        '"costs":',
+                        concat(
+                            '{',
+                            arrayStringConcat(
+                                groupUniqArray(
+                                    concat(
+                                        '"', toString(llm_id), '":{',
+                                        '"prompt_tokens":', toString(prompt_tokens), ',',
+                                        '"completion_tokens":', toString(completion_tokens), ',',
+                                        '"requests":', toString(requests), ',',
+                                        '"total_tokens":', toString(total_tokens), ',',
+                                        '"cost_per_prompt_token":', toString(prompt_token_cost), ',',
+                                        '"cost_per_completion_token":', toString(completion_token_cost), ',',
+                                        '"prompt_tokens_cost":', toString(prompt_tokens * prompt_token_cost), ',',
+                                        '"completion_tokens_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit),  '",',
+                                        '"completion_token_cost_unit":"', toString(completion_token_cost_unit),  '",',
+                                        '"effective_date":"', toString(effective_date),  '",',
+                                        '"provider_id":"', toString(provider_id),  '",',
+                                        '"pricing_level":"', toString(pricing_level),  '",',
+                                        '"pricing_level_id":"', toString(pricing_level_id),  '",',
+                                        '"created_by":"', toString(created_by),  '",',
+                                        '"created_at":"', toString(created_at),
+                                    '"}'
+                                    )
+                                ), ','
+                            ),
+                            '} }'
+                        ),
+                    '}' )
+                ) AS summary_dump
+            FROM ranked_prices
+            WHERE (rank = {pb_3:UInt64})
+            GROUP BY id, started_at
         """,
         {
             "pb_0": ["a", "b"],
-            "pb_1": "project",
-            "pb_2": "project",
-            "pb_3": "{}",
-            "pb_4": 1,
+            "pb_1": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
+            "pb_2": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
+            "pb_3": 1,
         },
     )

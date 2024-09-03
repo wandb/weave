@@ -81,6 +81,8 @@ from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
 from .trace_server_common import (
     LRUCache,
     get_nested_key,
+    hydrate_calls_with_feedback,
+    make_feedback_query_req,
     set_nested_key,
 )
 from .trace_server_interface_util import (
@@ -277,9 +279,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
+            necessary_cost_columns = ["started_at", "summary_dump"]
             columns = [
-                *[col for col in columns if col != "summary_dump"],
-                "summary_dump",
+                *[col for col in columns if col not in necessary_cost_columns],
+                *necessary_cost_columns,
             ]
         for col in columns:
             cq.add_field(col)
@@ -307,13 +310,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         select_columns = [c.field for c in cq.select_fields]
 
-        if not req.expand_columns:
+        if not req.expand_columns and not req.include_feedback:
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(
                     _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
                 )
 
         else:
+            expand_columns = req.expand_columns or []
             ref_cache = LRUCache(max_size=1000)
 
             batch_size = 10
@@ -326,14 +330,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 if len(batch) >= batch_size:
                     hydrated_batch = self._hydrate_calls(
-                        req.project_id, batch, req.expand_columns, ref_cache
+                        req.project_id,
+                        batch,
+                        expand_columns,
+                        req.include_feedback or False,
+                        ref_cache,
                     )
                     for call in hydrated_batch:
                         yield tsi.CallSchema.model_validate(call)
 
                     # *** Dynamic Batch Size ***
                     # count the number of columns at each depth
-                    depths = Counter(col.count(".") for col in req.expand_columns)
+                    depths = Counter(col.count(".") for col in expand_columns)
                     # take the max number of columns at any depth
                     max_count_at_ref_depth = max(depths.values())
                     # divide max refs that we can resolve 1000 refs at any depth
@@ -343,7 +351,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     batch = []
 
             hydrated_batch = self._hydrate_calls(
-                req.project_id, batch, req.expand_columns, ref_cache
+                req.project_id,
+                batch,
+                expand_columns,
+                req.include_feedback or False,
+                ref_cache,
             )
             for call in hydrated_batch:
                 yield tsi.CallSchema.model_validate(call)
@@ -353,12 +365,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         project_id: str,
         calls: list[dict[str, Any]],
         expand_columns: list[str],
+        include_feedback: bool,
         ref_cache: LRUCache,
     ) -> list[dict[str, Any]]:
         if len(calls) == 0:
             return calls
 
-        calls = self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
+        self._expand_call_refs(project_id, calls, expand_columns, ref_cache)
+        if include_feedback:
+            feedback_query_req = make_feedback_query_req(project_id, calls)
+            feedback = self.feedback_query(feedback_query_req)
+            hydrate_calls_with_feedback(calls, feedback)
+
         return calls
 
     def _get_refs_to_resolve(
@@ -378,7 +396,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     continue
 
                 ref = ri.parse_internal_uri(val)
-                if isinstance(ref, ri.InternalTableRef):
+                if not isinstance(ref, ri.InternalObjectRef):
                     continue
 
                 refs_to_resolve[(i, col)] = ref
@@ -390,7 +408,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         calls: list[dict[str, Any]],
         expand_columns: list[str],
         ref_cache: LRUCache,
-    ) -> list[dict[str, Any]]:
+    ) -> None:
         # format expand columns by depth, iterate through each batch in order
         expand_column_by_depth = defaultdict(list)
         for col in expand_columns:
@@ -410,8 +428,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if isinstance(val, dict) and "_ref" not in val:
                     val["_ref"] = ref.uri()
                 set_nested_key(calls[i], col, val)
-
-        return calls
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
