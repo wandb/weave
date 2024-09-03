@@ -30,7 +30,10 @@
       "tsx",
       "json",
       "node"
-    ]
+    ],
+    "moduleNameMapper": {
+      "p-limit": "<rootDir>/src/__tests__/pLimitMock.js"
+    }
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",
