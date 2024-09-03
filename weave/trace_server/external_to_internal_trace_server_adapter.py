@@ -327,6 +327,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         res = self._ref_apply(self._internal_trace_server.cost_query, req)
+        # Extend this to account for ORG ID when org level costs are implemented
         for cost in res.results:
             if "pricing_level_id" in cost:
                 if cost["pricing_level_id"] != req.project_id:

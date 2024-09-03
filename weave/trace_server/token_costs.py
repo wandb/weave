@@ -7,7 +7,6 @@ from .clickhouse_schema import SelectableCHCallSchema
 from .errors import InvalidRequest
 from .orm import Column, ColumnType, ParamBuilder, PreparedSelect, Table
 from .validation import (
-    validate_purge_req_in,
     validate_purge_req_multiple,
     validate_purge_req_one,
 )
@@ -447,7 +446,7 @@ def is_project_id_sql_injection_safe(project_id: str) -> None:
         raise ValueError("Invalid project_id", project_id)
 
 
-MESSAGE_INVALID_PURGE = "Can only purge by specifying one or more cost ids"
+MESSAGE_INVALID_COST_PURGE = "Can only purge costs by specifying one or more cost ids"
 
 
 def validate_cost_purge_req(req: tsi.CostPurgeReq) -> None:
@@ -455,12 +454,10 @@ def validate_cost_purge_req(req: tsi.CostPurgeReq) -> None:
     expr = req.query.expr_.model_dump()
     keys = list(expr.keys())
     if len(keys) != 1:
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
-    if keys[0] == "eq_":
-        validate_purge_req_one(expr, MESSAGE_INVALID_PURGE)
-    elif keys[0] == "in_":
-        validate_purge_req_in(expr, MESSAGE_INVALID_PURGE)
+        raise InvalidRequest(MESSAGE_INVALID_COST_PURGE)
+    if keys[0] in ["eq_", "in_"]:
+        validate_purge_req_one(expr, MESSAGE_INVALID_COST_PURGE, keys[0])
     elif keys[0] == "or_":
-        validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_PURGE)
+        validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_COST_PURGE)
     else:
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
+        raise InvalidRequest(MESSAGE_INVALID_COST_PURGE)

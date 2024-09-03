@@ -1197,12 +1197,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if req.query
                 else {
                     "$eq": [
-                        {"$literal": "1"},
-                        {"$literal": "1"},
-                    ]
-                },
-                {
-                    "$eq": [
                         {"$getField": "pricing_level_id"},
                         {"$literal": req.project_id},
                     ],

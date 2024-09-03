@@ -37,7 +37,9 @@ def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
             )
 
 
-MESSAGE_INVALID_PURGE = "Can only purge feedback by specifying one or more ids"
+MESSAGE_INVALID_FEEDBACK_PURGE = (
+    "Can only purge feedback by specifying one or more feedback ids"
+)
 
 
 def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:
@@ -45,10 +47,10 @@ def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:
     expr = req.query.expr_.model_dump()
     keys = list(expr.keys())
     if len(keys) != 1:
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
+        raise InvalidRequest(MESSAGE_INVALID_FEEDBACK_PURGE)
     if keys[0] == "eq_":
-        validate_purge_req_one(expr, MESSAGE_INVALID_PURGE)
+        validate_purge_req_one(expr, MESSAGE_INVALID_FEEDBACK_PURGE)
     elif keys[0] == "or_":
-        validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_PURGE)
+        validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_FEEDBACK_PURGE)
     else:
-        raise InvalidRequest(MESSAGE_INVALID_PURGE)
+        raise InvalidRequest(MESSAGE_INVALID_FEEDBACK_PURGE)
