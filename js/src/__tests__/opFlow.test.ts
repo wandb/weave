@@ -186,7 +186,7 @@ describe('Op Flow', () => {
 
         expect(calls).toHaveLength(1);
         expect(calls[0].op_name).toContain('openai.chat.completions.create');
-        expect(calls[0].inputs).toEqual({ messages: [{ role: 'user', content: 'Hello, AI!' }] });
+        expect(calls[0].inputs).toEqual({ arg0: { messages: [{ role: 'user', content: 'Hello, AI!' }] } });
         expect(calls[0].output).toEqual({
             id: expect.any(String),
             object: "chat.completion",
