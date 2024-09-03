@@ -30,16 +30,11 @@
       "tsx",
       "json",
       "node"
-    ],
-    "moduleNameMapper": {
-      "p-limit": "<rootDir>/src/__tests__/pLimitMock.js"
-    }
+    ]
   },
   "dependencies": {
-    "@types/uuid": "^10.0.0",
     "cli-progress": "^3.12.0",
     "openai": "^4.57.0",
-    "p-limit": "^6.1.0",
     "uuidv7": "^1.0.1"
   },
   "devDependencies": {
