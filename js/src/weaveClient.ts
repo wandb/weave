@@ -79,7 +79,6 @@ export class WeaveClient {
         this.wandbServerApi = wandbServerApi;
         this.projectId = projectId;
         this.quiet = quiet;
-        this.saveMedia = this.saveMedia.bind(this);
     }
 
     private scheduleBatchProcessing() {
@@ -217,9 +216,7 @@ export class WeaveClient {
     }
 
     private async saveTable(table: Table): Promise<TableRef> {
-        console.log("ROWS", table.rows);
         const rows = await this.saveWeaveValues(table.rows);
-        // console.log("ROWS", JSON.stringify(rows, null, 2));
         const response = await this.traceServerApi.table.tableCreateTableCreatePost({
             table: {
                 project_id: this.projectId,
@@ -252,20 +249,6 @@ export class WeaveClient {
         }
     }
 
-    private saveMedia = async (value: any): Promise<any> => {
-        if (isWeaveImage(value)) {
-            return await this.saveImage(value.data, value.imageType);
-        } else if (Array.isArray(value)) {
-            return Promise.all(value.map(this.saveMedia));
-        } else if (typeof value === 'object' && value !== null) {
-            const processed: Record<string, any> = {};
-            for (const [key, val] of Object.entries(value)) {
-                processed[key] = await this.saveMedia(val);
-            }
-            return processed;
-        }
-        return value;
-    }
 
     private saveCallStart(callStart: CallStartParams) {
         this.callQueue.push({ mode: 'start', data: { start: callStart } });
@@ -290,9 +273,6 @@ export class WeaveClient {
     }
 
     private async paramsToCallInputs(params: any[], thisArg: any) {
-        // Process WeaveImage in inputs
-        const processedArgs = await Promise.all(params.map(this.saveMedia));
-
         let inputs: Record<string, any> = {};
 
         // Add 'self' first if thisArg is a WeaveObject
@@ -301,23 +281,22 @@ export class WeaveClient {
         }
 
         // Handle the special case for the first parameter
-        if (processedArgs.length > 0 &&
-            typeof processedArgs[0] === 'object' &&
-            processedArgs[0] !== null &&
-            !(processedArgs[0] instanceof WeaveObject)) {
-            inputs = { ...inputs, ...processedArgs[0] };
-            for (let i = 1; i < processedArgs.length; i++) {
-                inputs[`arg${i - 1}`] = processedArgs[i];
+        if (params.length > 0 &&
+            typeof params[0] === 'object' &&
+            params[0] !== null &&
+            !(params[0] instanceof WeaveObject)) {
+            inputs = { ...inputs, ...params[0] };
+            for (let i = 1; i < params.length; i++) {
+                inputs[`arg${i - 1}`] = params[i];
             }
         } else {
             // If the first parameter is not an object or is a WeaveObject, use the original logic
-            processedArgs.forEach((arg, index) => {
+            params.forEach((arg, index) => {
                 inputs[`arg${index}`] = arg;
             });
         }
 
-        const savedInputs = await this.saveWeaveValues(inputs);
-        return savedInputs;
+        return await this.saveWeaveValues(inputs);
     }
 
     public async saveOp(op: Op<(...args: any[]) => any>): Promise<any> {
@@ -370,7 +349,7 @@ export class WeaveClient {
     public async finishCall(result: any, currentCall: CallStackEntry, parentCall: CallStackEntry | undefined, summarize: undefined | ((result: any) => Record<string, any>), endTime: Date, startCallPromise: Promise<void>) {
         // ensure end is logged after start is logged
         await startCallPromise;
-        result = await this.saveMedia(result);
+        result = await this.saveWeaveValues(result);
         const mergedSummary = processSummary(result, summarize, currentCall, parentCall);
         await this.saveCallEnd({
             project_id: this.projectId,
