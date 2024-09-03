@@ -5,9 +5,22 @@ interface DatasetParameters extends WeaveObjectParameters {
     rows: Record<string, any>[];
 }
 
+export class DatasetRowRef {
+    constructor(public projectId: string, public objId: string, public digest: string, public rowDigest: string) { }
+
+    public uri() {
+        return `weave:///${this.projectId}/object/${this.objId}:${this.digest}/attr/rows/id/${this.rowDigest}`;
+    }
+
+}
+
+type DatasetRow = Record<string, any> & {
+    __savedRef?: DatasetRowRef | Promise<DatasetRowRef>;
+}
+
 export class Dataset extends WeaveObject {
     saveAttrNames = ['rows'];
-    private rows: Table;
+    public rows: Table;
 
     constructor(parameters: DatasetParameters) {
         const baseParameters = {
@@ -29,12 +42,19 @@ export class Dataset extends WeaveObject {
     }
 
     async *[Symbol.asyncIterator](): AsyncIterator<any> {
-        for await (const item of this.rows) {
-            yield item;
+        for (let i = 0; i < this.length; i++) {
+            yield this.row(i);
         }
     }
 
-    row(index: number) {
-        return this.rows.row(index)
+    row(index: number): DatasetRow {
+        const tableRow = this.rows.row(index);
+        const datasetRow: DatasetRow = { ...tableRow, __savedRef: undefined };
+        if (this.__savedRef && tableRow.__savedRef) {
+            datasetRow.__savedRef = Promise.all([this.__savedRef, tableRow.__savedRef]).then(([ref, tableRowRef]) => {
+                return new DatasetRowRef(ref.projectId, ref.objectId, ref.digest, tableRowRef.rowDigest);
+            });
+        }
+        return datasetRow;
     }
 }
