@@ -59,8 +59,8 @@ export class Evaluation extends WeaveObject {
         super(parameters);
         this.dataset = parameters.dataset;
         this.scorers = parameters.scorers;
-        this.evaluate = boundOp(this, this.evaluate);
-        this.predict_and_score = boundOp(this, this.predict_and_score);
+        this.evaluate = boundOp(this, this.evaluate, { parameterNames: 'useParam0Object' });
+        this.predict_and_score = boundOp(this, this.predict_and_score, { parameterNames: 'useParam0Object' });
     }
 
     async evaluate({ model, maxConcurrency = 5 }: { model: Op<any>, maxConcurrency?: number }) {
