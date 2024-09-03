@@ -2,17 +2,14 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import { DesktopWindow } from '../../../src/components/DesktopImage'
 import TracingCallsMacroImage from '@site/static/img/tracing_calls_macro.png';
+import BasicCallImage from '@site/static/img/screenshots/basic_call.png';
 
 # Calls
 
 <DesktopWindow 
   images={[
     TracingCallsMacroImage,
-    TracingCallsMacroImage,
-    TracingCallsMacroImage,
-    TracingCallsMacroImage,
-    TracingCallsMacroImage,
-    TracingCallsMacroImage,
+    BasicCallImage,
   ]}
   alt="Screenshot of many calls"
   title="Weave Calls"
@@ -31,7 +28,11 @@ Furthermore, a call can have children calls (and a parent call), forming a tree 
 ## Create a Call
 
 <Tabs groupId="client-layer">
-    {/* <TabItem value="web_app" label="Web App">Use Command + C to copy.</TabItem> */}
+    {/* <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem> */}
     <TabItem value="python_oo" label="High Level Python">
     Weave can automatically track calls to [LLM Providers and Frameworks](../integrations/index.md) with a single line of code: `weave.init('project_name')`.
     However, you often have existing code that you want to track. In that case, decorate them with @weave.op to get started!
@@ -57,8 +58,12 @@ def my_function(name: str):
 print(my_function.call("World"))
 ```
     </TabItem>
-    <TabItem value="python_binding" label="Low Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="service_api" label="Service API">Use Ctrl + C to copy.</TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
 </Tabs>
 
 
@@ -111,12 +116,52 @@ Common Questions / Variations:
 * Cost?
 
 ## View a Call
-
 <Tabs groupId="client-layer">
-    <TabItem value="web_app" label="Web App">Use Command + C to copy.</TabItem>
-    <TabItem value="python_oo" label="High Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="python_binding" label="Low Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="service_api" label="Service API">Use Ctrl + C to copy.</TabItem>
+    <TabItem value="web_app" label="Web App">
+    To view a call in the web app:
+    1. Navigate to your project's "Traces" tab
+    2. Find the call you want to view in the list
+    3. Click on the call to open its details page
+    
+    The details page will show the call's inputs, outputs, runtime, and any additional attributes or metadata.
+    
+    ![View Call in Web App](https://docs.wandb.ai/images/view_call_web_app.png)
+    </TabItem>
+    <TabItem value="python_sdk" label="Python">
+    To view a call using the high-level Python API:
+
+    ```python
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Get a specific call by its ID
+    call = client.get_call("call-uuid-here")
+    ```
+
+    # Review the `get_call` documentation [here](../../reference/python-sdk/weave/trace/weave_client.md).
+    </TabItem>
+    <TabItem value="service_api" label="HTTP API">
+    To view a call using the Service API, you can make a GET request to the appropriate endpoint:
+http://localhost:3000/reference/service-api/call-read-call-read-post
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/read' \
+        -H 'Content-Type: application/json' \
+        -H 'Accept: application/json' \
+        -H 'Authorization: Basic BASE_64_ENCODED_AUTH' \
+        -d '{
+        "project_id": "string",
+        "id": "string",
+    }'
+    ```
+
+    Replace `{entity}`, `{project}`, and `{call_id}` with your actual values, and `YOUR_API_KEY` with your Weights & Biases API key.
+
+    The response will be a JSON object containing the call details.
+
+    For more information on the Service API, please refer to our [API Documentation](https://docs.wandb.ai/ref/api).
+    </TabItem>
 </Tabs>
 
 
@@ -125,37 +170,77 @@ Common Questions / Variations:
 ### Set Display Name
 
 <Tabs groupId="client-layer">
-    <TabItem value="web_app" label="Web App">Use Command + C to copy.</TabItem>
-    <TabItem value="python_oo" label="High Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="python_binding" label="Low Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="service_api" label="Service API">Use Ctrl + C to copy.</TabItem>
+    <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem>
+    <TabItem value="python_oo" label="High Level Python">
+    TODO: Description and code for how to use the higher-level, object oriented API.
+    </TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
 </Tabs>
 
 ### Add Feedback 
 
 <Tabs groupId="client-layer">
-    <TabItem value="web_app" label="Web App">Use Command + C to copy.</TabItem>
-    <TabItem value="python_oo" label="High Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="python_binding" label="Low Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="service_api" label="Service API">Use Ctrl + C to copy.</TabItem>
+    <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem>
+    <TabItem value="python_oo" label="High Level Python">
+    TODO: Description and code for how to use the higher-level, object oriented API.
+    </TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
 </Tabs>
 
 ### Delete a Call
 
 <Tabs groupId="client-layer">
-    <TabItem value="web_app" label="Web App">Use Command + C to copy.</TabItem>
-    <TabItem value="python_oo" label="High Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="python_binding" label="Low Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="service_api" label="Service API">Use Ctrl + C to copy.</TabItem>
+    <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem>
+    <TabItem value="python_oo" label="High Level Python">
+    TODO: Description and code for how to use the higher-level, object oriented API.
+    </TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
 </Tabs>
 
 ## Query Calls
 
 <Tabs groupId="client-layer">
-    <TabItem value="web_app" label="Web App">Use Command + C to copy.</TabItem>
-    <TabItem value="python_oo" label="High Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="python_binding" label="Low Level Python">Use Command + C to copy.</TabItem>
-    <TabItem value="service_api" label="Service API">Use Ctrl + C to copy.</TabItem>
+    <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem>
+    <TabItem value="python_oo" label="High Level Python">
+    TODO: Description and code for how to use the higher-level, object oriented API.
+    </TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
 </Tabs>
 
 ## Compare Calls

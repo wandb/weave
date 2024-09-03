@@ -1,0 +1,16 @@
+{
+    "screenshots": [
+        {
+            "url": "https://wandb.ai/timssweeney/weave-docs/weave/calls/0191a037-bc0d-7b81-8943-2afa4f372d7c",
+            "output_path": "./static/img/screenshots/basic_call.png",
+            "selector": "body",
+            "viewport_size": [1920, 1080],
+            "clicks": ["#onetrust-reject-all-handler", "[data-testid='KeyboardArrowRightIcon']", "[data-testid='KeyboardArrowRightIcon']", "body"],
+            "delay": 5,
+            "local_storage": {
+                "weaveflow-tracetree-width-number": 345
+            },
+            "zoom": 1.5
+        }
+    ]
+}
