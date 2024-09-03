@@ -20,7 +20,6 @@ from weave.legacy.weave.language_features.tagging.tag_store import (
 )
 from weave.tests import fixture_fakewandb
 from weave.tests.trace.trace_server_clickhouse_conftest import *
-from weave.tests.wandb_system_tests_conftest import *
 from weave.trace import autopatch, weave_init
 from weave.trace_server import (
     clickhouse_trace_server_batched,
