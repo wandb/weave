@@ -1,4 +1,5 @@
 import { WeaveObject, WeaveObjectParameters } from "./weaveObject";
+import { Table } from "./table";
 
 interface DatasetParameters extends WeaveObjectParameters {
     rows: Record<string, any>[];
@@ -6,7 +7,7 @@ interface DatasetParameters extends WeaveObjectParameters {
 
 export class Dataset extends WeaveObject {
     saveAttrNames = ['rows'];
-    private rows: Record<string, any>[];
+    private rows: Table;
 
     constructor(parameters: DatasetParameters) {
         const baseParameters = {
@@ -14,7 +15,7 @@ export class Dataset extends WeaveObject {
             description: parameters.description
         }
         super(baseParameters);
-        this.rows = parameters.rows;
+        this.rows = new Table(parameters.rows);
     }
 
     get length(): number {
@@ -22,12 +23,12 @@ export class Dataset extends WeaveObject {
     }
 
     async *[Symbol.asyncIterator](): AsyncIterator<any> {
-        for (const item of this.rows) {
+        for await (const item of this.rows) {
             yield item;
         }
     }
 
     row(index: number) {
-        return this.rows[index];
+        this.rows.row(index)
     }
 }

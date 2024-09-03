@@ -8,6 +8,7 @@ import { WandbServerApi } from './wandbServerApi';
 import { WeaveObject, ObjectRef, getClassChain } from './weaveObject';
 import { Op, getOpName, getOpWrappedFunction, isOp, OpRef } from './opType';
 import { isWeaveImage } from './media';
+import { Table, TableRef } from './table';
 
 export type CallStackEntry = {
     callId: string;
@@ -208,11 +209,24 @@ export class WeaveClient {
         return obj.__savedRef;
     }
 
+    private async saveTable(table: Table): Promise<TableRef> {
+        const response = await this.traceServerApi.table.tableCreateTableCreatePost({
+            table: {
+                project_id: this.projectId,
+                rows: table.rows
+            }
+        });
+        const ref = new TableRef(this.projectId, response.data.digest);
+        return ref;
+    }
+
     private async saveObjectAndOps(val: any): Promise<any> {
         if (Array.isArray(val)) {
             return Promise.all(val.map(item => this.saveObjectAndOps(item)));
         } else if (val instanceof WeaveObject) {
             return (await this.saveObject(val)).uri();
+        } else if (val instanceof Table) {
+            return (await this.saveTable(val)).uri();
         } else if (isOp(val)) {
             return (await this.saveOp(val)).uri();
         } else if (typeof val === 'object' && val !== null) {
