@@ -277,9 +277,7 @@ def get_source_or_fallback(fn: typing.Callable) -> str:
         def {func_name}{sig_str}:
             ... # Code-capture unavailable for this op
         """
-    )[
-        1:
-    ]  # skip first newline char
+    )[1:]  # skip first newline char
 
     try:
         return get_source_notebook_safe(fn)
