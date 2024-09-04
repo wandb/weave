@@ -1,6 +1,7 @@
 import shutil
 import typing
 from typing import Union
+
 import numpy as np
 import pytest
 
