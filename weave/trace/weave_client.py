@@ -4,6 +4,7 @@ import platform
 import re
 import sys
 import typing
+from concurrent.futures import Future
 from functools import lru_cache
 from typing import Any, Dict, Iterator, Optional, Sequence, Union
 
@@ -13,6 +14,7 @@ from requests import HTTPError
 from weave import version
 from weave.legacy.weave import ref_base, urls
 from weave.trace import call_context, trace_sentry
+from weave.trace.async_job_queue import AsyncJobQueue
 from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
@@ -364,6 +366,7 @@ class AttributesDict(dict):
 
 class WeaveClient:
     server: TraceServerInterface
+    async_job_queue: AsyncJobQueue
 
     """
     A client for interacting with the Weave trace server.
@@ -386,6 +389,7 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
+        self.async_job_queue = AsyncJobQueue()
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -569,22 +573,30 @@ class WeaveClient:
 
         current_wb_run_id = safe_current_wb_run_id()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
-        start = StartedCallSchemaForInsert(
-            project_id=self._project_id(),
-            id=call_id,
-            op_name=op_str,
-            display_name=display_name,
-            trace_id=trace_id,
-            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
-            parent_id=parent_id,
-            inputs=to_json(inputs_with_refs, self._project_id(), self.server),
-            attributes=attributes,
-            wb_run_id=current_wb_run_id,
-        )
-        self.server.call_start(CallStartReq(start=start))
 
         if use_stack:
             call_context.push_call(call)
+
+        def submit_call_start(inputs_json_future: Future[dict[str, Any]]) -> None:
+            inputs_json = inputs_json_future.result()
+            start = StartedCallSchemaForInsert(
+                project_id=self._project_id(),
+                id=call_id,
+                op_name=op_str,
+                display_name=display_name,
+                trace_id=trace_id,
+                started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                parent_id=parent_id,
+                inputs=inputs_json,
+                attributes=attributes,
+                wb_run_id=current_wb_run_id,
+            )
+            self.server.call_start(CallStartReq(start=start))
+
+        inputs_future = self.async_job_queue.submit_job(
+            to_json, inputs_with_refs, self._project_id(), self.server
+        )
+        inputs_future.add_done_callback(submit_call_start)
 
         return call
 
@@ -628,18 +640,25 @@ class WeaveClient:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
 
-        self.server.call_end(
-            CallEndReq(
-                end=EndedCallSchemaForInsert(
-                    project_id=self._project_id(),
-                    id=call.id,  # type: ignore
-                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-                    output=to_json(output, self._project_id(), self.server),
-                    summary=summary,
-                    exception=exception_str,
+        def submit_call_end(output_json_future: Future[Any]) -> None:
+            output_json = output_json_future.result()
+            self.server.call_end(
+                CallEndReq(
+                    end=EndedCallSchemaForInsert(
+                        project_id=self._project_id(),
+                        id=call.id,  # type: ignore
+                        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                        output=output_json,
+                        summary=summary,
+                        exception=exception_str,
+                    )
                 )
             )
+
+        output_future = self.async_job_queue.submit_job(
+            to_json, output, self._project_id(), self.server
         )
+        output_future.add_done_callback(submit_call_end)
 
         # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only
