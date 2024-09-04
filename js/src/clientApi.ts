@@ -1,5 +1,5 @@
 import { WeaveClient } from "./weaveClient";
-import { readApiKeyFromNetrc } from './settings';
+import { getApiKey } from './settings';
 import { WandbServerApi } from './wandbServerApi';
 import { Api as TraceServerApi } from './traceServerApi';
 import { InMemoryTraceServer } from './inMemoryTraceServer';
@@ -10,11 +10,8 @@ export let globalClient: WeaveClient | null = null;
 
 export async function init(projectName: string): Promise<WeaveClient> {
     const host = 'https://api.wandb.ai';
-    const apiKey = readApiKeyFromNetrc('api.wandb.ai');
+    const apiKey = getApiKey();
 
-    if (!apiKey) {
-        throw new Error("API key not found in .netrc file");
-    }
 
     const headers: Record<string, string> = {
         'User-Agent': `W&B Internal JS Client ${process.env.VERSION || 'unknown'}`,
