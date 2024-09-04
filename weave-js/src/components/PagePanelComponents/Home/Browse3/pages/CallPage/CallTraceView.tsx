@@ -8,6 +8,7 @@ import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
+import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CallStatusType} from '../common/StatusChip';
@@ -15,6 +16,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {scorePathSimilarity, updatePath} from './pathPreservation';
+
 
 const CallTrace = styled.div`
   overflow: auto;
@@ -107,6 +109,15 @@ export const CallTraceView: FC<{
           )
         );
       }
+      userEvents.callTreeCellClicked({
+        callId: rowCall.callId,
+        entity: rowCall.entity,
+        project: rowCall.project,
+        traceId: rowCall.traceId,
+        path: params.row.path,
+        isParentRow: params.row.isParentRow,
+        heirarchyDepth: params.row.hierarchy.length,
+      });
     },
     [
       call.callId,
