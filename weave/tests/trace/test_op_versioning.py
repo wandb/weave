@@ -551,7 +551,7 @@ def some_d(v: Union[SomeClass, SomeOtherClass]):
 """
 
 
-def test_op_no_repeats(client, strict_op_saving):
+def test_op_no_repeats(client):
     @weave.op()
     def some_d(v: Union[SomeClass, SomeOtherClass]):
         return SomeClass()
