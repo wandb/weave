@@ -2,6 +2,21 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
+const apiKeyNotFoundMessage = `
+wandb API key not found.
+
+Go to https://wandb.ai/authorize to get your API key.
+
+You can either:
+
+1. Set the WANDB_API_KEY environment variable.
+2. Add your API key to your .netrc file, in a stanza like this:
+
+    machine api.wandb.ai
+        login user
+        password <your-wandb-api-key>
+`
+
 export function readApiKeyFromNetrc(host: string): string | undefined {
     const netrcPath = path.join(os.homedir(), '.netrc');
     if (!fs.existsSync(netrcPath)) {
@@ -20,4 +35,15 @@ export function readApiKeyFromNetrc(host: string): string | undefined {
         }
     }
     return undefined;
+}
+
+export function getApiKey(): string {
+    let apiKey = process.env.WANDB_API_KEY;
+    if (!apiKey) {
+        apiKey = readApiKeyFromNetrc('api.wandb.ai');
+    }
+    if (!apiKey) {
+        throw new Error(apiKeyNotFoundMessage);
+    }
+    return apiKey;
 }
