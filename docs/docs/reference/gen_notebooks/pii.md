@@ -41,7 +41,7 @@ For this use-case. We will leverage Anthropic's claude-3-sonnet to perform senti
 !pip install cryptography                   # to encrypt our data
 ```
 
-# Method 0: Setup
+# Setup
 
 
 ```python
@@ -64,10 +64,28 @@ Let's load our initial PII data. For demonstration purposes, we'll use a dataset
 
 
 ```python
-import json
-with open('10_pii_data.json') as f:
-    pii_data = json.load(f)
+import requests
+
+url = "https://raw.githubusercontent.com/wandb/weave/0379eac49b9509bd613d1fcce4227651202370c5/docs/notebooks/10_pii_data.json"
+response = requests.get(url)
+pii_data = response.json()
 ```
+
+# Using Weave Safely with PII Data
+
+## During Testing
+- Log anonymized data to check PII detection
+- Track PII handling processes with Weave traces
+- Measure anonymization performance without exposing real PII
+
+## In Production
+- Never log raw PII
+- Encrypt sensitive fields before logging
+
+## Encryption Tips
+- Use reversible encryption for data you need to decrypt later
+- Apply one-way hashing for unique IDs you don't need to reverse
+- Consider specialized encryption for data you need to analyze while encrypted
 
 # Method 1: 
 
@@ -126,7 +144,7 @@ cleaned_text = clean_pii_with_regex(test_text)
 print(cleaned_text)
 ```
 
-# Method 2: Setup
+# Method 2: Weave Model Setup
 
 In this example, we'll create a [Weave Model](https://wandb.github.io/weave/guides/core-types/models) which is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates.
 In this model, we will include our predict function where the Anthropic API will be called.
@@ -190,6 +208,8 @@ Will be:
  "My name is <PERSON>"
 ```
 Presidio comes with a built-in [list of recognizable entities](https://microsoft.github.io/presidio/supported_entities/). We can select the ones that are important for our use case. In the below example, we are only looking at redicating names and phone numbers from our text:
+
+![](./pii_media/redact.png)
 
 
 ```python
@@ -269,6 +289,8 @@ Will be:
 ```
 
 To effectively utilize Presidio, we must supply references to our custom operators. These operators will direct Presidio to the functions responsible for swapping PII with fake data.
+
+![](./pii_media/replace.png)
 
 
 ```python
@@ -370,6 +392,8 @@ for entry in pii_data:
 # (Optional) Encrypting our data
 
 In addition to anonymizing PII, we can add an extra layer of security by encrypting our data using the cryptography library's [Fernet](https://cryptography.io/en/latest/fernet/) symmetric encryption. This approach ensures that even if the anonymized data is intercepted, it remains unreadable without the encryption key.
+
+![](./pii_media/encrypt.png)
 
 
 ```python
