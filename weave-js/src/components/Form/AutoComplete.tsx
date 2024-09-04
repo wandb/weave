@@ -7,7 +7,6 @@ import {
   MOON_100,
   MOON_800,
   MOON_250,
-  MOON_500,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
 import {createTheme, ThemeProvider} from '@mui/material/styles';
@@ -70,12 +69,6 @@ const getStyles = (props: AdditionalProps) => {
           option: {
             padding: '6px 10px',
             margin: '0 6px',
-            display: '-webkit-box',
-            WebkitBoxOrient: 'vertical',
-            WebkitLineClamp: 5,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'normal',
             borderRadius: '4px',
             cursor: 'pointer',
             backgroundColor: 'transparent',
@@ -89,6 +82,14 @@ const getStyles = (props: AdditionalProps) => {
             },
             '&:hover': {
               backgroundColor: MOON_100,
+            },
+          },
+          clearIndicator: {
+            borderRadius: '4px',
+            width: '24px',
+            height: '24px',
+            '&:hover': {
+              backgroundColor: '#f5f5f5',
             },
           },
         },
@@ -114,23 +115,6 @@ const getStyles = (props: AdditionalProps) => {
               },
             },
           },
-          // {
-          //   height: HEIGHTS[size],
-          //   padding: PADDING[size],
-          //   fontSize: FONT_SIZES[size],
-          //   color: MOON_800,
-          //   '&& fieldset': {
-          //     borderColor: MOON_250,
-          //   },
-          //   '&&:hover fieldset': {
-          //     borderColor: hexToRGB(TEAL_500, 0.4),
-          //     borderWidth: '2px',
-          //   },
-          //   '&&.Mui-focused fieldset': {
-          //     borderColor: hexToRGB(TEAL_500, 0.64),
-          //     borderWidth: '2px',
-          //   },
-          // },
         },
       },
     },
