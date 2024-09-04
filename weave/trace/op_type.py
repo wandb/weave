@@ -404,26 +404,16 @@ def _get_code_deps(
                     import_code.append(import_line)
 
         else:
-            print(
-                "NON FN",
-                var_value,
-                type(var_value),
-                getattr(var_value, "__name__", None),
-                getattr(var_value, "__module__", None),
-                fn.__module__,
-            )
             if (
                 hasattr(var_value, "__name__")
                 and hasattr(var_value, "__module__")
                 and var_value.__module__ != fn.__module__
             ):
-                print("HERE", var_value.__module__, fn.__module__)
                 import_line = f"from {var_value.__module__} import {var_value.__name__}"
                 if var_value.__name__ != var_name:
                     import_line += f"as {var_name}"
                 import_code.append(import_line)
             else:
-                print("VAR_VALUE", var_value)
                 try:
                     # This relies on old Weave type mechanism.
                     # TODO: Update to use new Weave trace serialization mechanism.

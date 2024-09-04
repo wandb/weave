@@ -536,7 +536,6 @@ class SomeClass:
 
 
 EXPECTED_NO_REPEATS_CODE = """import weave
-from typing import Union
 
 class SomeOtherClass:
     pass
@@ -546,14 +545,18 @@ class SomeClass:
         return SomeOtherClass()
 
 @weave.op()
-def some_d(v: Union[SomeClass, SomeOtherClass]):
+def some_d(v):
+    a = SomeOtherClass()
+    b = SomeClass()
     return SomeClass()
 """
 
 
 def test_op_no_repeats(client):
     @weave.op()
-    def some_d(v: Union[SomeClass, SomeOtherClass]):
+    def some_d(v):
+        a = SomeOtherClass()
+        b = SomeClass()
         return SomeClass()
 
     some_d(SomeClass())
