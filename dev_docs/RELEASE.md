@@ -25,4 +25,4 @@ git push origin v0.<x>.<x>
 
 9. Go to github, and click the release tag and click `Draft a New Release`. Select the new tag, and click generate release notes. Publish the release.
 
-10. Finally, anounce that merge freeze is over
+10. Finally, announce that merge freeze is over
