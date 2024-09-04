@@ -17,7 +17,6 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {scorePathSimilarity, updatePath} from './pathPreservation';
 
-
 const CallTrace = styled.div`
   overflow: auto;
   height: 100%;
