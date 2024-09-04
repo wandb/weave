@@ -454,28 +454,27 @@ function makeCodeText(
     return codeStr;
   }
   if (Object.values(filter).some(value => value !== undefined)) {
-    codeStr += `   "filter": {\n`;
+    codeStr += `   "filter": {`;
     if (filter.opVersionRefs) {
-      codeStr += `      "op_names": ["${filter.opVersionRefs.join(
-        '", "'
-      )}"],\n`;
+      codeStr += `"op_names": ["${filter.opVersionRefs.join('", "')}"],`;
     }
     if (filter.runIds) {
-      codeStr += `      "run_ids": ["${filter.runIds.join('", "')}"],\n`;
+      codeStr += `"run_ids": ["${filter.runIds.join('", "')}"],`;
     }
     if (filter.userIds) {
-      codeStr += `      "user_ids": ["${filter.userIds.join('", "')}"],\n`;
+      codeStr += `"user_ids": ["${filter.userIds.join('", "')}"],`;
     }
     if (filter.traceId) {
-      codeStr += `      "trace_id": "${filter.traceId}",\n`;
+      codeStr += `"trace_id": "${filter.traceId}",`;
     }
     if (filter.traceRootsOnly) {
-      codeStr += `      "trace_roots_only": True,\n`;
+      codeStr += `"trace_roots_only": True,`;
     }
     if (filter.parentIds) {
-      codeStr += `      "parent_ids": ["${filter.parentIds.join('", "')}"],\n`;
+      codeStr += `"parent_ids": ["${filter.parentIds.join('", "')}"],`;
     }
-    codeStr += `   },\n`;
+    codeStr = codeStr.slice(0, -1);
+    codeStr += `},\n`;
   }
   if (query) {
     codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;
