@@ -407,6 +407,7 @@ def _get_code_deps(
             print(
                 "NON FN",
                 var_value,
+                type(var_value),
                 getattr(var_value, "__name__", None),
                 getattr(var_value, "__module__", None),
                 fn.__module__,
