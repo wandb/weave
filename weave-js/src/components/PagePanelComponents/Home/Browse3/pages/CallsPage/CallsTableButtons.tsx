@@ -454,7 +454,28 @@ function makeCodeText(
     return codeStr;
   }
   if (Object.values(filter).some(value => value !== undefined)) {
-    codeStr += `   "filter": ${JSON.stringify(filter, null, 0)},\n`;
+    codeStr += `   "filter": {\n`;
+    if (filter.opVersionRefs) {
+      codeStr += `      "op_names": ["${filter.opVersionRefs.join(
+        '", "'
+      )}"],\n`;
+    }
+    if (filter.runIds) {
+      codeStr += `      "run_ids": ["${filter.runIds.join('", "')}"],\n`;
+    }
+    if (filter.userIds) {
+      codeStr += `      "user_ids": ["${filter.userIds.join('", "')}"],\n`;
+    }
+    if (filter.traceId) {
+      codeStr += `      "trace_id": "${filter.traceId}",\n`;
+    }
+    if (filter.traceRootsOnly) {
+      codeStr += `      "trace_roots_only": True,\n`;
+    }
+    if (filter.parentIds) {
+      codeStr += `      "parent_ids": ["${filter.parentIds.join('", "')}"],\n`;
+    }
+    codeStr += `   },\n`;
   }
   if (query) {
     codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;
