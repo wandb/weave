@@ -4,7 +4,8 @@ import threading
 from concurrent.futures import Future
 from typing import Any, Callable, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class AsyncJobQueue:
     """A queue for managing asynchronous job execution.
@@ -22,6 +23,9 @@ class AsyncJobQueue:
         max_workers (int): The maximum number of worker threads to use. Defaults to 5.
     """
 
+    _shutdown_lock: threading.Lock
+    _is_shutdown: bool
+
     def __init__(self, max_workers: int = 5) -> None:
         """Initializes the AsyncJobQueue with the specified number of workers."""
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
@@ -29,7 +33,9 @@ class AsyncJobQueue:
         self._is_shutdown = False
         atexit.register(self.shutdown)
 
-    def submit_job(self, func: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
+    def submit_job(
+        self, func: Callable[..., T], *args: Any, **kwargs: Any
+    ) -> Future[T]:
         """Submits a job to be executed asynchronously.
 
         Args:
