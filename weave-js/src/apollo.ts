@@ -26,7 +26,9 @@ const authMiddleware = new ApolloLink((operation, forward) => {
   });
 });
 
-export const apolloClient = new ApolloClient({
+// This is a hard-coded client that is used in the old weave.wandb.ai and should
+// be removed with that codebase. Using this is INVALID in any proper wandb app.
+export const deprecatedApolloClientDoNotUse = new ApolloClient({
   link: ApolloLink.from([authMiddleware, httpLink]),
   cache: new InMemoryCache(),
 });
