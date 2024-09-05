@@ -12,7 +12,7 @@ import useMousetrap from 'react-hook-mousetrap';
 import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
 import {StateInspector} from 'reinspect';
 
-import {apolloClient} from './apollo';
+import {deprecatedApolloClientDoNotUse} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
 import {Browse2} from './components/PagePanelComponents/Home/Browse2';
@@ -162,7 +162,7 @@ const BrowseWrapper: FC = props => (
 
 const basename = getConfig().PREFIX;
 ReactDOM.render(
-  <ApolloProvider client={apolloClient}>
+  <ApolloProvider client={deprecatedApolloClientDoNotUse}>
     <Router basename={basename}>
       <Switch>
         <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
