@@ -617,10 +617,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def objs_delete(self, req: tsi.ObjsDeleteReq) -> tsi.ObjsDeleteRes:
+        assert_non_null_wb_user_id(req)
         deleted_at = datetime.datetime.now()
         for object_id in req.object_ids:
             ch_obj = ObjsDeleteCHInsertable(
                 project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
                 object_id=object_id,
                 deleted_at=deleted_at,
             )

@@ -376,8 +376,11 @@ class ObjQueryRes(BaseModel):
 
 
 class ObjsDeleteReq(BaseModel):
+    # wb_user_id is automatically populated by the server
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
     project_id: str
-    object_ids: List[str]
+    object_ids: str
 
 
 class ObjsDeleteRes(BaseModel):
