@@ -250,6 +250,12 @@ export function regexMatchHighlight(
     pieces.push(str.substring(0, match.index));
     pieces.push(match[0]);
     str = str.substring(match.index + match[0].length);
+
+    // If they are the same, it means the regex matched a zero-length string at the same position.
+    // In this case, we need to advance the regex index to avoid an infinite loop.
+    if (match.index === regex.lastIndex) {
+      regex.lastIndex++;
+    }
   }
   return fuzzyMatchHighlightPieces(pieces, matchStyle);
 }
