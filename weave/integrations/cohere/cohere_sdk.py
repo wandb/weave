@@ -1,5 +1,6 @@
 import importlib
 import typing
+from functools import wraps
 
 import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
@@ -32,6 +33,38 @@ def cohere_accumulator(
 def cohere_wrapper(name: str) -> typing.Callable:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         op = weave.op()(fn)
+        op.name = name  # type: ignore
+        return op
+
+    return wrapper
+
+
+def cohere_wrapper_v2(name: str) -> typing.Callable:
+    def wrapper(fn: typing.Callable) -> typing.Callable:
+        def _post_process_response(fn: typing.Callable) -> typing.Any:
+            @wraps(fn)
+            def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+                response = fn(*args, **kwargs)
+                
+                try:
+                    from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
+                    from cohere.v2.types.usage import Usage
+
+                    # Create a new instance with modified `usage`
+                    response_dict = response.dict()
+                    response_dict["usage"] = Usage(
+                        billed_units=response.model_extra["meta"]["billed_units"],
+                        tokens=response.model_extra["meta"]["tokens"],
+                    )
+                    response = NonStreamedChatResponse2(**response_dict)
+                except:
+                    pass # prompt to upgrade cohere sdk
+
+                return response
+
+            return _wrapper
+
+        op = weave.op()(_post_process_response(fn))
         op.name = name  # type: ignore
         return op
 
@@ -76,13 +109,13 @@ cohere_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("cohere"),
             "ClientV2.chat",
-            cohere_wrapper("cohere.ClientV2.chat"),
+            cohere_wrapper_v2("cohere.ClientV2.chat"),
         ),
         # Add patch for cohre v2 async chat method
         SymbolPatcher(
             lambda: importlib.import_module("cohere"),
             "AsyncClientV2.chat",
-            cohere_wrapper("cohere.AsyncClientV2.chat"),
+            cohere_wrapper_v2("cohere.AsyncClientV2.chat"),
         ),
     ]
 )
