@@ -25,6 +25,7 @@ from weave.trace.refs import (
 from weave.trace.serialize import from_json
 from weave.trace.table import Table
 from weave.trace_server.trace_server_interface import (
+    ObjDeleteReq,
     ObjReadReq,
     TableQueryReq,
     TableRowFilter,
@@ -118,6 +119,20 @@ class Traceable:
         self.mutations = None
         raise NotImplementedError("Traceable.save not implemented")
         # return self.server.mutate(self.ref, mutations)
+
+    def delete(self) -> None:
+        if self.ref is None:
+            raise ValueError("Cannot delete object that is not saved")
+        if not isinstance(self.ref, ObjectRef):
+            raise ValueError("Cannot delete non-object ref")
+        ref: ObjectRef = typing.cast(ObjectRef, self.ref)
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=f"{ref.entity}/{ref.project}",
+                object_id=ref.name,
+                digest=ref.digest,
+            )
+        )
 
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
