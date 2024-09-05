@@ -66,6 +66,7 @@ from .clickhouse_schema import (
     CallStartCHInsertable,
     CallUpdateCHInsertable,
     ObjCHInsertable,
+    ObjsDeleteCHInsertable,
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
@@ -614,6 +615,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+
+    def objs_delete(self, req: tsi.ObjsDeleteReq) -> tsi.ObjsDeleteRes:
+        deleted_at = datetime.datetime.now()
+        for object_id in req.object_ids:
+            ch_obj = ObjsDeleteCHInsertable(
+                project_id=req.project_id,
+                object_id=object_id,
+                deleted_at=deleted_at,
+            )
+
+            self._insert(
+                "object_versions",
+                data=[list(ch_obj.model_dump().values())],
+                column_names=list(ch_obj.model_fields.keys()),
+            )
+        return tsi.ObjsDeleteRes()
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
@@ -1320,11 +1337,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             PARTITION BY project_id,
                             kind,
                             object_id,
-                            digest
+                            digest,
+                            deleted_at
                             ORDER BY created_at ASC
                         ) AS rn
                     FROM object_versions
-                    WHERE project_id = {{project_id: String}}
+                    WHERE project_id = {{project_id: String}} AND deleted_at IS NULL
                 )
                 WHERE rn = 1
             )

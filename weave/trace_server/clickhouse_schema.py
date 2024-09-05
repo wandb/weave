@@ -151,3 +151,21 @@ class SelectableCHObjSchema(BaseModel):
     digest: str
     version_index: int
     is_latest: int
+
+
+class ObjsDeleteCHInsertable(BaseModel):
+    project_id: str
+    object_id: typing.List[str]
+    wb_user_id: str
+
+    deleted_at: datetime.datetime
+
+    # required types
+    input_refs: typing.List[str] = Field(default_factory=list)
+    output_refs: typing.List[str] = Field(default_factory=list)
+
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _object_id_v = field_validator("object_id")(validation.object_id_validator)
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
