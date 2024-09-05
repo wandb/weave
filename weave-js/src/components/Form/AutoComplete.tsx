@@ -7,6 +7,7 @@ import {
   MOON_100,
   MOON_800,
   MOON_250,
+  MOON_500,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
 import {createTheme, ThemeProvider} from '@mui/material/styles';
@@ -43,6 +44,7 @@ const getStyles = (props: AdditionalProps) => {
               height: HEIGHTS[size],
               padding: PADDING[size],
               fontSize: FONT_SIZES[size],
+              fontFamily: 'Source Sans Pro',
               color: MOON_800,
               '&& fieldset': {
                 borderColor: MOON_250,
@@ -63,6 +65,10 @@ const getStyles = (props: AdditionalProps) => {
               '&.Mui-focused fieldset': {
                 borderColor: hexToRGB(TEAL_500, 0.64),
                 borderWidth: '2px',
+              },
+              '& input::placeholder': {
+                color: MOON_500,
+                opacity: 1,
               },
             },
           },
@@ -90,29 +96,6 @@ const getStyles = (props: AdditionalProps) => {
             height: '24px',
             '&:hover': {
               backgroundColor: '#f5f5f5',
-            },
-          },
-        },
-      },
-      MuiOutlinedInput: {
-        styleOverrides: {
-          root: {
-            '& .MuiOutlinedInput-root': {
-              height: HEIGHTS[size],
-              padding: PADDING[size],
-              fontSize: FONT_SIZES[size],
-              color: MOON_800,
-              '&& fieldset': {
-                borderColor: MOON_250,
-              },
-              '&&:hover fieldset': {
-                borderColor: hexToRGB(TEAL_500, 0.4),
-                borderWidth: '2px',
-              },
-              '&&.Mui-focused fieldset': {
-                borderColor: hexToRGB(TEAL_500, 0.64),
-                borderWidth: '2px',
-              },
             },
           },
         },
