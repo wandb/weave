@@ -243,7 +243,7 @@ export function regexMatchHighlight(
   const pieces = [];
   while (str) {
     const match = regex.exec(str);
-    if (!match) {
+    if (!match || !match[0]) {
       pieces.push(str);
       break;
     }
