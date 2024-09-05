@@ -444,7 +444,9 @@ function makeCodeText(
 
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
-    codeStr += `   "call_ids": ["${filteredCallIds.join('", "')}"],\n`;
+    codeStr += `   "filter": {"call_ids": ["${filteredCallIds.join(
+      '", "'
+    )}"]},\n`;
     if (expandColumns.length > 0) {
       const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
       codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
@@ -465,7 +467,7 @@ function makeCodeText(
       codeStr += `"user_ids": ["${filter.userIds.join('", "')}"],`;
     }
     if (filter.traceId) {
-      codeStr += `"trace_id": "${filter.traceId}",`;
+      codeStr += `"trace_ids": ["${filter.traceId}"],`;
     }
     if (filter.traceRootsOnly) {
       codeStr += `"trace_roots_only": True,`;
