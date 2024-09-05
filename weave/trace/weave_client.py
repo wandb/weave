@@ -4,7 +4,6 @@ import platform
 import re
 import sys
 import typing
-from concurrent.futures import Future
 from functools import lru_cache
 from typing import Any, Dict, Iterator, Optional, Sequence, Union
 
@@ -54,6 +53,7 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TraceServerInterface,
 )
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -574,29 +574,26 @@ class WeaveClient:
         current_wb_run_id = safe_current_wb_run_id()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
+        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        project_id = self._project_id()
+
+        self.async_job_queue.submit_job(
+            send_start_call,
+            project_id=project_id,
+            call_id=call_id,
+            op_str=op_str,
+            trace_id=trace_id,
+            started_at=started_at,
+            display_name=display_name,
+            parent_id=parent_id,
+            inputs_with_refs=inputs_with_refs,
+            attributes=attributes,
+            current_wb_run_id=current_wb_run_id,
+            server=self.server,
+        )
+
         if use_stack:
             call_context.push_call(call)
-
-        def submit_call_start(inputs_json_future: Future[dict[str, Any]]) -> None:
-            inputs_json = inputs_json_future.result()
-            start = StartedCallSchemaForInsert(
-                project_id=self._project_id(),
-                id=call_id,
-                op_name=op_str,
-                display_name=display_name,
-                trace_id=trace_id,
-                started_at=datetime.datetime.now(tz=datetime.timezone.utc),
-                parent_id=parent_id,
-                inputs=inputs_json,
-                attributes=attributes,
-                wb_run_id=current_wb_run_id,
-            )
-            self.server.call_start(CallStartReq(start=start))
-
-        inputs_future = self.async_job_queue.submit_job(
-            to_json, inputs_with_refs, self._project_id(), self.server
-        )
-        inputs_future.add_done_callback(submit_call_start)
 
         return call
 
@@ -640,25 +637,18 @@ class WeaveClient:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
 
-        def submit_call_end(output_json_future: Future[Any]) -> None:
-            output_json = output_json_future.result()
-            self.server.call_end(
-                CallEndReq(
-                    end=EndedCallSchemaForInsert(
-                        project_id=self._project_id(),
-                        id=call.id,  # type: ignore
-                        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-                        output=output_json,
-                        summary=summary,
-                        exception=exception_str,
-                    )
-                )
-            )
-
-        output_future = self.async_job_queue.submit_job(
-            to_json, output, self._project_id(), self.server
+        project_id = (self._project_id(),)
+        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        self.async_job_queue.submit_job(
+            send_end_call,
+            project_id=project_id,
+            call_id=call.id,
+            ended_at=ended_at,
+            output=output,
+            summary=summary,
+            exception_str=exception_str,
+            server=self.server,
         )
-        output_future.add_done_callback(submit_call_end)
 
         # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only
@@ -970,6 +960,65 @@ class WeaveClient:
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
+
+    def flush(self) -> None:
+        self.async_job_queue.flush()
+        if isinstance(self.server, RemoteHTTPTraceServer):
+            if self.server.should_batch:
+                self.server.call_processor.wait_until_all_processed()
+
+
+def send_start_call(
+    project_id: str,
+    call_id: str,
+    op_str: str,
+    trace_id: str,
+    started_at: datetime.datetime,
+    display_name: Optional[str],
+    parent_id: Optional[str],
+    inputs_with_refs: dict[str, Any],
+    attributes: dict[str, Any],
+    current_wb_run_id: Optional[str],
+    server: TraceServerInterface,
+) -> None:
+    inputs_json = to_json(inputs_with_refs, project_id, server)
+    start = StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        op_name=op_str,
+        display_name=display_name,
+        trace_id=trace_id,
+        started_at=started_at,
+        parent_id=parent_id,
+        inputs=inputs_json,
+        attributes=attributes,
+        wb_run_id=current_wb_run_id,
+    )
+    server.call_start(CallStartReq(start=start))
+
+
+def send_end_call(
+    project_id: str,
+    call_id: str,
+    ended_at: datetime.datetime,
+    output: Any,
+    summary: dict[str, Any],
+    exception_str: Optional[str],
+    server: TraceServerInterface,
+) -> None:
+    output_json = to_json(output, project_id, server)
+    server.call_end(
+        CallEndReq(
+            end=EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=ended_at,
+                output=output_json,
+                summary=summary,
+                exception=exception_str,
+            )
+        )
+    )
 
 
 def safe_current_wb_run_id() -> Optional[str]:

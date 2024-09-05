@@ -18,6 +18,8 @@ class AsyncJobQueue:
         executor (concurrent.futures.ThreadPoolExecutor): The executor used to run jobs.
         _shutdown_lock (threading.Lock): A lock to ensure thread-safe shutdown.
         _is_shutdown (bool): A flag indicating whether the queue has been shut down.
+        _active_jobs (set): A set to keep track of active jobs and callbacks.
+        _jobs_lock (threading.Lock): A lock to ensure thread-safe job tracking.
 
     Args:
         max_workers (int): The maximum number of worker threads to use. Defaults to 5.
@@ -25,12 +27,16 @@ class AsyncJobQueue:
 
     _shutdown_lock: threading.Lock
     _is_shutdown: bool
+    _active_jobs: set
+    _jobs_lock: threading.Lock
 
     def __init__(self, max_workers: int = 5) -> None:
         """Initializes the AsyncJobQueue with the specified number of workers."""
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self._shutdown_lock = threading.Lock()
         self._is_shutdown = False
+        self._active_jobs = set()
+        self._jobs_lock = threading.Lock()
         atexit.register(self.shutdown)
 
     def submit_job(
@@ -52,7 +58,18 @@ class AsyncJobQueue:
         with self._shutdown_lock:
             if self._is_shutdown:
                 raise RuntimeError("AsyncJobQueue has been shut down")
-            return self.executor.submit(func, *args, **kwargs)
+
+            future = self.executor.submit(func, *args, **kwargs)
+
+            with self._jobs_lock:
+                self._active_jobs.add(future)
+
+            def callback(f: Future[T]) -> None:
+                with self._jobs_lock:
+                    self._active_jobs.remove(f)
+
+            future.add_done_callback(callback)
+            return future
 
     def shutdown(self, wait: bool = True) -> None:
         """Shuts down the executor and cleans up resources.
@@ -72,3 +89,16 @@ class AsyncJobQueue:
     def __del__(self) -> None:
         """Ensures the executor is shut down when the object is deleted."""
         self.shutdown(wait=False)
+
+    def flush(self) -> None:
+        """Waits for all currently submitted jobs to complete.
+
+        This method blocks until all active jobs in the queue have finished executing.
+        It does not prevent new jobs from being submitted while waiting.
+        """
+        while True:
+            with self._jobs_lock:
+                if not self._active_jobs:
+                    break
+            # Wait for a short time before checking again to avoid busy-waiting
+            concurrent.futures.wait(list(self._active_jobs), timeout=0.1)

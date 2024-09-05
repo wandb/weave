@@ -1208,6 +1208,8 @@ def test_summary_tokens_cost(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
 
+    client.flush()
+
     call = list(models.calls())[0]
 
     assert call.summary["usage"] == {
