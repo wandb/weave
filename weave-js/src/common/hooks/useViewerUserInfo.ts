@@ -1,10 +1,14 @@
-import {gql, TypedDocumentNode, useApolloClient} from '@apollo/client';
+import {
+  ApolloClient,
+  gql,
+  TypedDocumentNode,
+  useApolloClient,
+} from '@apollo/client';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {opRootViewer, opUserUserInfo} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {useEffect, useState} from 'react';
 
-import {deprecatedApolloClientDoNotUse} from '../../apollo';
 import {useIsMounted} from './useIsMounted';
 
 type UserInfo = Record<string, any>;
@@ -104,11 +108,14 @@ export const UPDATE_USER_INFO = gql(`
   }
 `) as TypedDocumentNode<any, {userInfo: string}>;
 
-export const updateUserInfo = (userInfo: UserInfo) => {
+export const updateUserInfo = (
+  userInfo: UserInfo,
+  apolloClient: ApolloClient<object>
+) => {
   const variables = {
     userInfo: JSON.stringify(userInfo),
   };
-  return deprecatedApolloClientDoNotUse.mutate({
+  return apolloClient.mutate({
     mutation: UPDATE_USER_INFO,
     variables,
   });
