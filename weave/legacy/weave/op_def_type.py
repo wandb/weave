@@ -237,6 +237,7 @@ def get_code_deps(
                 dependencies are available for the function body.
             warnings: list[str], any warnings that occurred during the process.
     """
+    print("USING OP DEF TYPE VERSION")
     # Generates repeats.
     warnings: list[str] = []
 

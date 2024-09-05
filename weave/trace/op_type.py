@@ -312,6 +312,15 @@ def get_code_deps(
                 dependencies are available for the function body.
             warnings: list[str], any warnings that occurred during the process.
     """
+    return _get_code_deps(fn, artifact, {}, depth)
+
+
+def _get_code_deps(
+    fn: Union[typing.Callable, type],  # A function or a class
+    artifact: artifact_fs.FilesystemArtifact,
+    seen: dict[Union[Callable, type], bool],
+    depth: int = 0,
+) -> GetCodeDepsResult:
     warnings: list[str] = []
     if depth > 20:
         warnings = [
@@ -358,17 +367,19 @@ def get_code_deps(
             import_code.append(import_line)
         elif isinstance(var_value, (py_types.FunctionType, Op, type)):
             if var_value.__module__ == fn.__module__:
-                result = get_code_deps(var_value, artifact, depth + 1)
-                fn_warnings = result["warnings"]
-                fn_import_code = result["import_code"]
-                fn_code = result["code"]
+                if not var_value in seen:
+                    seen[var_value] = True
+                    result = _get_code_deps(var_value, artifact, seen, depth + 1)
+                    fn_warnings = result["warnings"]
+                    fn_import_code = result["import_code"]
+                    fn_code = result["code"]
 
-                import_code += fn_import_code
+                    import_code += fn_import_code
 
-                code += fn_code
-                code.append(get_source_notebook_safe(var_value))
+                    code += fn_code
+                    code.append(get_source_notebook_safe(var_value))
 
-                warnings += fn_warnings
+                    warnings += fn_warnings
             else:
                 # For now, if the function is in another module.
                 # we just import it. This is ok for libraries, but not
