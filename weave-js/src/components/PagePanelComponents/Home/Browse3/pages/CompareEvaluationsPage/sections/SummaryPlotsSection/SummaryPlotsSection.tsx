@@ -16,8 +16,10 @@ import {
   resolveSummaryMetricValueForEvaluateCall,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
-import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
+import { MultiPlotBarChart } from './MultiPlotBarChart';
+
+const PAGER_HEIGHT = 40; // Make sure this matches the PAGER_HEIGHT in MultiPlotBarChart
 
 /**
  * Summary plots produce plots to summarize evaluation comparisons.
@@ -26,6 +28,7 @@ export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const plotlyRadarData = useNormalizedPlotDataFromMetrics(props.state);
+  const plotHeight = PLOT_HEIGHT - PAGER_HEIGHT;
 
   return (
     <VerticalBox
@@ -55,27 +58,26 @@ export const SummaryPlots: React.FC<{
         }}>
         <Box
           sx={{
-            flex: '1 2 ' + PLOT_HEIGHT + 'px',
-            height: PLOT_HEIGHT,
+            flex: '1 1 ' + plotHeight + 'px',
+            height: plotHeight,
             borderRadius: BOX_RADIUS,
             border: STANDARD_BORDER,
             overflow: 'hidden',
             alignContent: 'center',
-            width: PLOT_HEIGHT,
+            width: plotHeight,
           }}>
-          <PlotlyRadarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+          <PlotlyRadarPlot height={plotHeight} data={plotlyRadarData} />
         </Box>
         <Box
           sx={{
             flex: '2 1 ' + PLOT_HEIGHT + 'px',
             height: PLOT_HEIGHT,
             overflow: 'hidden',
-            borderRadius: BOX_RADIUS,
-            border: STANDARD_BORDER,
-            padding: PLOT_PADDING,
-            width: PLOT_HEIGHT,
+            width: PLOT_HEIGHT * 2,
+            display: 'flex',
+            flexDirection: 'column',
           }}>
-          <PlotlyBarPlot height={PLOT_HEIGHT} data={plotlyRadarData} />
+          <MultiPlotBarChart height={PLOT_HEIGHT} data={plotlyRadarData} />
         </Box>
       </HorizontalBox>
     </VerticalBox>
