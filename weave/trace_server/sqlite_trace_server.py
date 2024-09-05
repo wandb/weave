@@ -672,6 +672,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.ObjQueryRes(objs=objs)
 
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            for object_id in req.object_ids:
+                cursor.execute(
+                    "DELETE FROM objects WHERE project_id = ? AND object_id = ?",
+                    (req.project_id, object_id),
+                )
+            conn.commit()
+        return tsi.ObjDeleteRes()
+
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         insert_rows = []

@@ -40,12 +40,12 @@ from weave.trace_server.trace_server_interface import (
     CallUpdateReq,
     EndedCallSchemaForInsert,
     ObjCreateReq,
+    ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
     ObjSchema,
     ObjSchemaForInsert,
-    ObjsDeleteReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
@@ -753,9 +753,13 @@ class WeaveClient:
             query=query, reaction=reaction, offset=offset, limit=limit
         )
 
-    def delete_objects(self, object_ids: list[str]) -> None:
-        self.server.objs_delete(
-            ObjsDeleteReq(project_id=self._project_id(), object_ids=object_ids)
+    def delete_object(self, object: ObjectRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object.name,
+                digest=object.digest,
+            )
         )
 
     ################ Internal Helpers ################

@@ -153,13 +153,16 @@ class SelectableCHObjSchema(BaseModel):
     is_latest: int
 
 
-class ObjsDeleteCHInsertable(BaseModel):
+class ObjDeleteCHInsertable(BaseModel):
     project_id: str
     object_id: str
-    wb_user_id: str
+    digest: str
+    kind: str
+
+    refs: typing.List[str] = Field(default_factory=list)
+    val_dump: str
 
     deleted_at: datetime.datetime
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _object_id_v = field_validator("object_id")(validation.object_id_validator)
-    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
