@@ -110,7 +110,7 @@ export const UPDATE_USER_INFO = gql(`
 
 export const updateUserInfo = (
   userInfo: UserInfo,
-  apolloClient: ApolloClient<object>
+  apolloClient: ApolloClient<any>
 ) => {
   const variables = {
     userInfo: JSON.stringify(userInfo),
