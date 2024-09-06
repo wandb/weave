@@ -159,9 +159,6 @@ class ObjDeleteCHInsertable(BaseModel):
     digest: str
     kind: str
 
-    refs: typing.List[str] = Field(default_factory=list)
-    val_dump: str
-
     deleted_at: datetime.datetime
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
