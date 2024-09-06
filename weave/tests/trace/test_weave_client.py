@@ -1355,3 +1355,63 @@ def test_calls_stream_table_ref_expansion(client):
     calls = list(calls)
     assert len(calls) == 1
     assert calls[0].output["table"] == o.table.table_ref.uri()
+
+
+def test_object_deletion(client):
+    # Simple case, delete a single version of an object
+    obj = {"a": 5}
+    weave_obj = client.save(obj, "my-obj")
+    assert client.get(weave_obj.ref) == obj
+
+    client.delete_object(weave_obj.ref)
+    with pytest.raises(
+        (
+            weave.trace_server.sqlite_trace_server.NotFoundError,
+            weave.trace_server.clickhouse_trace_server_batched.NotFoundError,
+        )
+    ):
+        client.get(weave_obj.ref)
+
+    # create 3 versions of the object
+    obj["a"] = 6
+    weave_obj2 = client.save(obj, "my-obj")
+    obj["a"] = 7
+    weave_obj3 = client.save(obj, "my-obj")
+    obj["a"] = 8
+    weave_obj4 = client.save(obj, "my-obj")
+
+    # delete weave_obj3 with class method
+    weave_obj3.delete()
+
+    # make sure we can't get the deleted object
+    with pytest.raises(
+        (
+            weave.trace_server.sqlite_trace_server.NotFoundError,
+            weave.trace_server.clickhouse_trace_server_batched.NotFoundError,
+        )
+    ):
+        client.get(weave_obj3.ref)
+
+    # count the number of versions of the object
+    versions = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj"],
+        )
+    )
+    assert len(versions.objs) == 2
+
+    # make sure we can still get the existing object versions
+    assert client.get(weave_obj4.ref)
+    assert client.get(weave_obj2.ref)
+
+    weave_obj4.delete()
+    weave_obj2.delete()
+
+    versions = client.server.objs_query(
+        req=tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            names=["my-obj"],
+        )
+    )
+    assert len(versions.objs) == 0

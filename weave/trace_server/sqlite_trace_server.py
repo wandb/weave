@@ -676,11 +676,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
-            for object_id in req.object_ids:
-                cursor.execute(
-                    "DELETE FROM objects WHERE project_id = ? AND object_id = ?",
-                    (req.project_id, object_id),
-                )
+            cursor.execute(
+                """
+                UPDATE objects SET deleted_at = CURRENT_TIMESTAMP
+                WHERE project_id = ? AND
+                    object_id = ? AND
+                    digest = ?
+                """,
+                (req.project_id, req.object_id, req.digest),
+            )
             conn.commit()
         return tsi.ObjDeleteRes()
 
