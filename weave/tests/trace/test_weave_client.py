@@ -247,6 +247,17 @@ def test_pydantic(client):
 def test_call_create(client):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
+
+    client.flush()
+
+
+
+
+
+
+
+    
+    
     result = client.get_call(call.id)
     expected = weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -1347,6 +1358,8 @@ def test_calls_stream_table_ref_expansion(client):
         return {"a": a, "table": o.table}
 
     f(1)
+
+    client.flush()
 
     calls = client.server.calls_query_stream(
         req=tsi.CallsQueryReq(

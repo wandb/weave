@@ -318,7 +318,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         )
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
+            # use_async_insert=False
         )
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
