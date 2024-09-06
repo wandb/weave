@@ -108,6 +108,7 @@ const config: Config = {
         anonymizeIP: true,
       },
     ],
+    'plugin-image-zoom',
   ],
 
   themes: [
@@ -119,11 +120,7 @@ const config: Config = {
       },
     ],
     "docusaurus-theme-openapi-docs",
-    
   ],
-  markdown: {
-    mermaid: true,
-  },
   themeConfig: {
     // Replace with your project's social card
     image: "img/logo-large-padded.png",
