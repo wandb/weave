@@ -9,7 +9,6 @@ export const useProjectSidebar = (
   viewingRestricted: boolean,
   hasModelsData: boolean,
   hasWeaveData: boolean,
-  isLargeWorkspaceModeEnabled: boolean,
   hasTraceBackend: boolean = true
 ): FancyPageSidebarItem[] => {
   // Should show models sidebar items if we have models data or if we don't have a trace backend
@@ -55,14 +54,6 @@ export const useProjectSidebar = (
             isShown: !isWeaveOnly,
             isDisabled: viewingRestricted,
             iconName: IconNames.Table,
-          },
-          {
-            type: 'button' as const,
-            name: 'Charts',
-            slug: 'charts',
-            isShown: isLargeWorkspaceModeEnabled && isModelsOnly,
-            isDisabled: viewingRestricted,
-            iconName: IconNames.ChartVerticalBars,
           },
           {
             type: 'button' as const,
@@ -217,7 +208,6 @@ export const useProjectSidebar = (
     return onlyShownItems;
   }, [
     isLoading,
-    isLargeWorkspaceModeEnabled,
     isModelsOnly,
     isWeaveOnly,
     showWeaveSidebarItems,
