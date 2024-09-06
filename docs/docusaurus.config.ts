@@ -3,7 +3,6 @@ import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
 
-
 const config: Config = {
   title: "W&B Weave",
   tagline: "Confidently ship LLM applications.",
@@ -68,35 +67,59 @@ const config: Config = {
           ],
         ]
       : []),
-      [
-        // See https://github.com/PaloAltoNetworks/docusaurus-openapi-docs
-        'docusaurus-plugin-openapi-docs',
-        {
-          id: "api", // plugin id
-          docsPluginId: "classic", // configured for preset-classic
-          config: {
-            weave: {
-              specPath: "./scripts/.cache/service_api_openapi_docs.json",
-              outputDir: "docs/reference/service-api",
-              sidebarOptions: {
-                groupPathsBy: 'tag',
-                sidebarCollapsed: false,
-              }
-            } satisfies OpenApiPlugin.Options,
-          }
+    [
+      // See https://github.com/PaloAltoNetworks/docusaurus-openapi-docs
+      "docusaurus-plugin-openapi-docs",
+      {
+        id: "api", // plugin id
+        docsPluginId: "classic", // configured for preset-classic
+        config: {
+          weave: {
+            specPath: "./scripts/.cache/service_api_openapi_docs.json",
+            outputDir: "docs/reference/service-api",
+            sidebarOptions: {
+              groupPathsBy: "tag",
+              sidebarCollapsed: false,
+            },
+          } satisfies OpenApiPlugin.Options,
         },
-      ],
-      'docusaurus-plugin-sass',
-      'plugin-image-zoom',
+      },
+    ],
+    "docusaurus-plugin-sass",
+    [
+      "@docusaurus/plugin-google-tag-manager",
+      {
+        containerId: "GTM-NM4PR4J9",
+      },
+    ],
+    [
+      "@docusaurus/plugin-google-gtag",
+      {
+        id: "gtag-1",
+        trackingID: "G-JH1SJHJQXJ",
+        anonymizeIP: true,
+      },
+    ],
+    [
+      "@docusaurus/plugin-google-gtag",
+      {
+        id: "gtag-2",
+        trackingID: "G-0J3TM1K4Z4",
+        anonymizeIP: true,
+      },
+    ],
   ],
 
   themes: [
-    [require.resolve("@easyops-cn/docusaurus-search-local"), ({
-      // https://github.com/easyops-cn/docusaurus-search-local?tab=readme-ov-file
-      docsRouteBasePath: "/",
-    })],
+    [
+      require.resolve("@easyops-cn/docusaurus-search-local"),
+      {
+        // https://github.com/easyops-cn/docusaurus-search-local?tab=readme-ov-file
+        docsRouteBasePath: "/",
+      },
+    ],
     "docusaurus-theme-openapi-docs",
-    '@docusaurus/theme-mermaid'
+    
   ],
   markdown: {
     mermaid: true,
@@ -138,7 +161,7 @@ const config: Config = {
               sidebarId: "serviceApiSidebar",
               label: "Service API",
             },
-          ]
+          ],
         },
         {
           position: "left",
@@ -153,17 +176,17 @@ const config: Config = {
               href: "https://github.com/wandb/weave/releases",
               label: "Release Changelog",
             },
-          ]
+          ],
         },
         {
-          type: 'search',
-          position: 'right',
+          type: "search",
+          position: "right",
         },
         {
-          to: 'https://wandb.ai/home',
-          label: 'Open App',
-          position: 'right',
-          className: 'button button--secondary button--med margin-right--sm',
+          to: "https://wandb.ai/home",
+          label: "Open App",
+          position: "right",
+          className: "button button--secondary button--med margin-right--sm",
         },
       ],
     },
