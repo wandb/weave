@@ -9,6 +9,7 @@ import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
@@ -119,13 +120,20 @@ const MAX_DELETED_CALLS_TO_SHOW = 10;
 
 export const ConfirmDeleteModal: FC<{
   calls: CallSchema[];
+  deleteTargetType?: string;
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
   onDeleteCallback?: () => void;
-}> = ({calls, confirmDelete, setConfirmDelete, onDeleteCallback}) => {
+}> = ({
+  calls,
+  deleteTargetType,
+  confirmDelete,
+  setConfirmDelete,
+  onDeleteCallback,
+}) => {
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const userInfoLoaded = !viewerLoading ? userInfo : null;
-  const {loading: orgNameLoading, orgName} = useOrgName({
+  const {orgName} = useOrgName({
     entityName: userInfoLoaded?.username ?? '',
     skip: viewerLoading,
   });
@@ -136,6 +144,10 @@ export const ConfirmDeleteModal: FC<{
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+  const deleteTargetStr = maybePluralizeWord(
+    calls.length,
+    deleteTargetType ?? 'call'
+  );
 
   // Deletion requires constant entity/project, break calls into groups
   const makeProjectGroups = (mixedCalls: CallSchema[]) => {
@@ -150,7 +162,7 @@ export const ConfirmDeleteModal: FC<{
 
   const onDelete = () => {
     if (calls.length === 0) {
-      setError('No call(s) selected');
+      setError(`No ${deleteTargetStr} selected`);
       return;
     }
     setDeleteLoading(true);
@@ -180,7 +192,7 @@ export const ConfirmDeleteModal: FC<{
         closePeek();
       })
       .catch(() => {
-        setError(`Error deleting call(s)`);
+        setError(`Error deleting ${deleteTargetStr}`);
         setDeleteLoading(false);
       });
   };
@@ -194,15 +206,12 @@ export const ConfirmDeleteModal: FC<{
       }}
       maxWidth="xs"
       fullWidth>
-      <DialogTitle>Delete {calls.length > 1 ? 'calls' : 'call'}</DialogTitle>
+      <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
       <DialogContent style={{overflow: 'hidden'}}>
         {error != null ? (
           <p style={{color: 'red'}}>{error}</p>
         ) : (
-          <p>
-            Are you sure you want to delete
-            {calls.length > 1 ? ' these calls' : ' this call'}?
-          </p>
+          <p>Are you sure you want to delete these {deleteTargetStr}?</p>
         )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
           <CallNameRow key={call.callId}>
@@ -223,9 +232,9 @@ export const ConfirmDeleteModal: FC<{
       <DialogActions $align="left">
         <Button
           variant="destructive"
-          disabled={error != null || deleteLoading || orgNameLoading}
+          disabled={error != null || deleteLoading}
           onClick={onDelete}>
-          {calls.length > 1 ? 'Delete calls' : 'Delete call'}
+          {`Delete ${deleteTargetStr}`}
         </Button>
         <Button
           variant="ghost"

@@ -693,6 +693,7 @@ export const CallsTable: FC<{
                   .filter(row => selectedCalls.includes(row.id))
                   .map(traceCallToUICallSchema)}
                 confirmDelete={deleteConfirmModalOpen}
+                deleteTargetType={isEvaluateTable ? 'evaluation' : 'call'}
                 setConfirmDelete={setDeleteConfirmModalOpen}
                 onDeleteCallback={() => {
                   setSelectedCalls([]);
