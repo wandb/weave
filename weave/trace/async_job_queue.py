@@ -93,12 +93,15 @@ class AsyncJobQueue:
     def flush(self) -> None:
         """Waits for all currently submitted jobs to complete.
 
-        This method blocks until all active jobs in the queue have finished executing.
-        It does not prevent new jobs from being submitted while waiting.
+        This method blocks until all active jobs in the queue at the time of calling
+        have finished executing. It prevents new jobs from interfering with the flush operation.
         """
-        while True:
-            with self._jobs_lock:
-                if not self._active_jobs:
-                    break
-            # Wait for a short time before checking again to avoid busy-waiting
-            concurrent.futures.wait(list(self._active_jobs), timeout=0.1)
+        with self._jobs_lock:
+            active_jobs = set(self._active_jobs)  # Create a copy of active jobs
+
+        while active_jobs:
+            done, active_jobs = concurrent.futures.wait(
+                active_jobs, timeout=0.1, return_when=concurrent.futures.FIRST_COMPLETED
+            )
+            # Remove completed jobs from our local set
+            active_jobs = active_jobs - done
