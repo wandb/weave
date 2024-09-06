@@ -1,11 +1,15 @@
 import asyncio
-from playwright.async_api import async_playwright
-from typing import Optional, Tuple, List, Dict
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, List, Optional, Tuple
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from playwright.async_api import async_playwright
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 async def generate_screenshot_from_browser(
     url: str,
@@ -15,7 +19,7 @@ async def generate_screenshot_from_browser(
     clicks: Optional[List[str]] = None,
     delay: Optional[float] = None,
     local_storage: Optional[Dict[str, str]] = None,
-    zoom: Optional[float] = None
+    zoom: Optional[float] = None,
 ) -> None:
     """
     Generate a screenshot from a web page using a headless browser.
@@ -48,12 +52,17 @@ async def generate_screenshot_from_browser(
         page = await context.new_page()
 
         if viewport_size:
-            await page.set_viewport_size({"width": viewport_size[0], "height": viewport_size[1]})
+            await page.set_viewport_size(
+                {"width": viewport_size[0], "height": viewport_size[1]}
+            )
 
         if local_storage:
-            await context.add_init_script("""
+            await context.add_init_script(
+                """
                 Object.assign(window.localStorage, %s);
-            """ % json.dumps(local_storage))
+            """
+                % json.dumps(local_storage)
+            )
 
         try:
             await page.goto(url)
@@ -90,31 +99,36 @@ async def generate_screenshot_from_browser(
         finally:
             await browser.close()
 
+
 def generate_screenshot(screenshot_spec):
     try:
-        asyncio.run(generate_screenshot_from_browser(
-            screenshot_spec['url'],
-            screenshot_spec['output_path'],
-            selector=screenshot_spec.get('selector'),
-            viewport_size=tuple(screenshot_spec.get('viewport_size', [])),
-            clicks=screenshot_spec.get('clicks'),
-            delay=screenshot_spec.get('delay'),
-            local_storage=screenshot_spec.get('local_storage'),
-            zoom=screenshot_spec.get('zoom')
-        ))
+        asyncio.run(
+            generate_screenshot_from_browser(
+                screenshot_spec["url"],
+                screenshot_spec["output_path"],
+                selector=screenshot_spec.get("selector"),
+                viewport_size=tuple(screenshot_spec.get("viewport_size", [])),
+                clicks=screenshot_spec.get("clicks"),
+                delay=screenshot_spec.get("delay"),
+                local_storage=screenshot_spec.get("local_storage"),
+                zoom=screenshot_spec.get("zoom"),
+            )
+        )
     except Exception as e:
         logging.error(f"Failed to generate screenshot: {str(e)}")
 
+
 def generate_screenshots_from_spec(spec_filepath):
     try:
-        with open(spec_filepath, 'r') as f:
+        with open(spec_filepath, "r") as f:
             spec = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logging.error(f"Error reading or parsing spec file: {str(e)}")
         return
 
     with ThreadPoolExecutor() as executor:
-        executor.map(generate_screenshot, spec['screenshots'])
+        executor.map(generate_screenshot, spec["screenshots"])
+
 
 if __name__ == "__main__":
     generate_screenshots_from_spec("./scripts/screenshot_spec.json")
