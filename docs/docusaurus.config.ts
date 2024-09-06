@@ -108,6 +108,7 @@ const config: Config = {
         anonymizeIP: true,
       },
     ],
+    'plugin-image-zoom',
   ],
 
   themes: [
@@ -120,7 +121,6 @@ const config: Config = {
     ],
     "docusaurus-theme-openapi-docs",
   ],
-
   themeConfig: {
     // Replace with your project's social card
     image: "img/logo-large-padded.png",
@@ -236,6 +236,13 @@ const config: Config = {
           block: { start: "highlight-start", end: "highlight-end" },
         },
       ],
+    },
+    imageZoom: {
+      // CSS selector to apply the plugin to, defaults to '.markdown img'
+      selector: '.markdown img',
+      // Optional medium-zoom options
+      // see: https://www.npmjs.com/package/medium-zoom#options
+      options: {},
     },
   } satisfies Preset.ThemeConfig,
 };
