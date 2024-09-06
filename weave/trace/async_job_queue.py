@@ -12,34 +12,40 @@ class AsyncJobQueue:
 
     This class provides a thread-safe way to submit and execute jobs asynchronously
     using a ThreadPoolExecutor. It ensures proper shutdown of the executor when the
-    object is deleted or when the program exits.
+    object is deleted or when the program exits. If jobs are submitted after shutdown,
+    the queue will restart automatically.
 
     Attributes:
         executor (concurrent.futures.ThreadPoolExecutor): The executor used to run jobs.
         _lock (threading.Lock): A lock to ensure thread-safe operations.
         _is_shutdown (bool): A flag indicating whether the queue has been shut down.
         _active_jobs (set): A set to keep track of active jobs and callbacks.
+        _max_workers (int): The maximum number of worker threads to use.
 
     Args:
         max_workers (int): The maximum number of worker threads to use. Defaults to 5.
     """
 
-    _lock: threading.Lock
-    _is_shutdown: bool
-    _active_jobs: set
-
     def __init__(self, max_workers: int = 5) -> None:
-        """Initializes the AsyncJobQueue with the specified number of workers."""
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        self._max_workers = max_workers
         self._lock = threading.Lock()
-        self._is_shutdown = False
-        self._active_jobs = set()
-        atexit.register(self.shutdown)
+        self._is_shutdown = True
+        self._start()
+
+    def _start(self) -> None:
+        """Initializes or reinitializes the executor."""
+        with self._lock:
+            self._active_jobs = set()
+            self._is_shutdown = False
+            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers)
+            atexit.register(self._shutdown)
 
     def submit_job(
         self, func: Callable[..., T], *args: Any, **kwargs: Any
     ) -> Future[T]:
         """Submits a job to be executed asynchronously.
+
+        If the queue has been shut down, it will be restarted automatically.
 
         Args:
             func: The function to be executed.
@@ -48,13 +54,10 @@ class AsyncJobQueue:
 
         Returns:
             A Future representing the execution of the job.
-
-        Raises:
-            RuntimeError: If the queue has been shut down.
         """
         with self._lock:
             if self._is_shutdown:
-                raise RuntimeError("AsyncJobQueue has been shut down")
+                self._start()
 
             future = self.executor.submit(func, *args, **kwargs)
             self._active_jobs.add(future)
@@ -66,7 +69,7 @@ class AsyncJobQueue:
             future.add_done_callback(callback)
             return future
 
-    def shutdown(self, wait: bool = True) -> None:
+    def _shutdown(self, wait: bool = True) -> None:
         """Shuts down the executor and cleans up resources.
 
         This method ensures that the executor is shut down only once and in a thread-safe manner.
@@ -79,12 +82,14 @@ class AsyncJobQueue:
             if not self._is_shutdown:
                 self.flush()  # Flush before shutting down
                 self.executor.shutdown(wait=wait)
+                self._active_jobs.clear()
                 self._is_shutdown = True
-                atexit.unregister(self.shutdown)  # Remove the atexit handler
+                del self.executor
+                atexit.unregister(self._shutdown)  # Remove the atexit handler
 
     def __del__(self) -> None:
         """Ensures the executor is shut down when the object is deleted."""
-        self.shutdown(wait=False)
+        self._shutdown(wait=False)
 
     def flush(self) -> None:
         """Waits for all currently submitted jobs to complete.
