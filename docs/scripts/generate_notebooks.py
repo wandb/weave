@@ -1,5 +1,6 @@
 from nbconvert import MarkdownExporter
-
+from nbconvert.preprocessors import ClearOutputPreprocessor
+from nbconvert import NotebookExporter
 
 def make_header(notebook_path):
     github_uri = "wandb/weave/blob/master/docs"
@@ -22,8 +23,12 @@ def make_header(notebook_path):
 
 
 def export_notebook(notebook_path, output_path):
-    exporter = MarkdownExporter()
-    output, resources = exporter.from_filename(notebook_path)
+
+    notebook_exporter = NotebookExporter()
+    notebook_exporter.preprocessors = [ClearOutputPreprocessor()]
+    notebook_content, _ = notebook_exporter.from_filename(notebook_path)
+    markdown_exporter = MarkdownExporter()
+    output, _ = markdown_exporter.from_notebook_node(notebook_content)
 
     extract_meta = ""
     meta_mark_start = "<!-- docusaurus_head_meta::start\n"
