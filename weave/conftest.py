@@ -334,6 +334,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
 
     def __getattribute__(self, name):
         attr = super().__getattribute__(name)
+
         if callable(attr) and not name.startswith("_") and name != "flush":
 
             def wrapper(*args, **kwargs):
@@ -341,6 +342,10 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                 return attr(*args, **kwargs)
 
             return wrapper
+        
+        if name == "server":
+            self.flush()
+            
         return attr
 
 
