@@ -303,7 +303,6 @@ async def test_evaluation_data_topology(client):
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
-            sort_by=[tsi.SortBy(field="started_at", direction="asc")],
         )
     )
     flattened = flatten_calls(calls.calls)
