@@ -49,6 +49,7 @@ export const useCallsForQuery = (
     offset,
     sortBy,
     filterBy,
+    undefined,
     expandedColumns,
     {
       refetchOnDelete: true,

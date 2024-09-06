@@ -31,8 +31,8 @@ class LLMUsageSchema(TypedDict, total=False):
 class LLMCostSchema(LLMUsageSchema):
     prompt_tokens_cost: Optional[float]
     completion_tokens_cost: Optional[float]
-    prompt_token_cost: Optional[float]
-    completion_token_cost: Optional[float]
+    cost_per_prompt_token: Optional[float]
+    cost_per_completion_token: Optional[float]
     prompt_token_cost_unit: Optional[str]
     completion_token_cost_unit: Optional[str]
     effective_date: Optional[str]
@@ -43,11 +43,22 @@ class LLMCostSchema(LLMUsageSchema):
     created_by: Optional[str]
 
 
+class FeedbackDict(TypedDict, total=False):
+    id: str
+    feedback_type: str
+    weave_ref: str
+    payload: Dict[str, Any]
+    creator: Optional[str]
+    created_at: Optional[datetime.datetime]
+    wb_user_id: Optional[str]
+
+
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
     status: Optional[Literal["success", "error", "running"]]
     nice_trace_name: Optional[str]
     latency: Optional[int]
     costs: Optional[Dict[str, LLMCostSchema]]
+    feedback: Optional[List[FeedbackDict]]
 
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
@@ -246,7 +257,16 @@ class CallsQueryReq(BaseModel):
     # Sort by multiple fields
     sort_by: Optional[List[SortBy]] = None
     query: Optional[Query] = None
-    include_costs: Optional[bool] = False
+    include_costs: Optional[bool] = Field(
+        default=False,
+        description="Beta, subject to change. If true, the response will"
+        " include any model costs for each call.",
+    )
+    include_feedback: Optional[bool] = Field(
+        default=False,
+        description="Beta, subject to change. If true, the response will"
+        " include feedback for each call.",
+    )
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
