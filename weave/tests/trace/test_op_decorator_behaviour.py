@@ -232,8 +232,6 @@ async def test_async_method_calls(client, weave_obj):
     for x in range(3):
         await weave_obj.amethod.call(x)
 
-    client.flush()
-
     calls = weave_obj.amethod.calls()
     calls = list(calls)
 

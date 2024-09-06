@@ -300,6 +300,50 @@ def strict_op_saving():
 #     )
 
 
+class TestOnlyFlushingRemoteHTTPTraceServer(
+    remote_http_trace_server.RemoteHTTPTraceServer
+):
+    """
+    A RemoteHTTPTraceServer that flushes any time a method is called.
+    This ensures that all writes are flushed before any read operation,
+    which is useful for tests that write data and then immediately read it back.
+    """
+
+    def __getattribute__(self, name):
+        attr = super().__getattribute__(name)
+        if callable(attr) and not name.startswith("_"):
+
+            def wrapper(*args, **kwargs):
+                self.flush()
+                return attr(*args, **kwargs)
+
+            return wrapper
+        return attr
+
+    def flush(self):
+        if self.should_batch:
+            self.call_processor.wait_until_all_processed()
+
+
+class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
+    """
+    A WeaveClient that flushes any time a method is called.
+    This ensures that all writes are flushed before any read operation,
+    which is useful for tests that write data and then immediately read it back.
+    """
+
+    def __getattribute__(self, name):
+        attr = super().__getattribute__(name)
+        if callable(attr) and not name.startswith("_"):
+
+            def wrapper(*args, **kwargs):
+                self.flush()
+                return attr(*args, **kwargs)
+
+            return wrapper
+        return attr
+
+
 @pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     inited_client = None
@@ -317,9 +361,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            # use_async_insert=False
-        )
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
@@ -327,15 +369,13 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
             ch_server, DummyIdConverter(), entity
         )
     elif weave_server_flag.startswith("http"):
-        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
-            weave_server_flag
-        )
+        remote_server = TestOnlyFlushingRemoteHTTPTraceServer(weave_server_flag)
         server = remote_server
     elif weave_server_flag == ("prod"):
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = weave_client.WeaveClient(entity, project, server)
+        client = TestOnlyFlushingWeaveClient(entity, project, server)
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:

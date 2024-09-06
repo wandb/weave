@@ -298,8 +298,6 @@ async def test_evaluation_data_topology(client):
     model2 = SimpleModelWithConfidence()
     await evaluation.evaluate(model2)
 
-    client.flush()
-
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
