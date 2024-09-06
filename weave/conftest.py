@@ -311,7 +311,7 @@ class TestOnlyFlushingRemoteHTTPTraceServer(
 
     def __getattribute__(self, name):
         attr = super().__getattribute__(name)
-        if callable(attr) and not name.startswith("_"):
+        if callable(attr) and not name.startswith("_") and name != "flush":
 
             def wrapper(*args, **kwargs):
                 self.flush()
@@ -334,7 +334,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
 
     def __getattribute__(self, name):
         attr = super().__getattribute__(name)
-        if callable(attr) and not name.startswith("_"):
+        if callable(attr) and not name.startswith("_") and name != "flush":
 
             def wrapper(*args, **kwargs):
                 self.flush()

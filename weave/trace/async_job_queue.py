@@ -35,9 +35,11 @@ class AsyncJobQueue:
     def _start(self) -> None:
         """Initializes or reinitializes the executor."""
         with self._lock:
-            self._active_jobs = set()
+            self._active_jobs: set[Future] = set()
             self._is_shutdown = False
-            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers)
+            self.executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=self._max_workers
+            )
             atexit.register(self._shutdown)
 
     def submit_job(
