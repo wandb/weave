@@ -11,7 +11,6 @@ import requests
 import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
-from weave.legacy.weave import op_def
 from weave.tests.trace.util import DatetimeMatcher, RegexStringMatcher
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
@@ -543,25 +542,6 @@ def test_opdef(client):
     assert isinstance(weave_client.get_ref(add2), refs.OpRef)
     assert res == 4
     assert len(list(client.get_calls())) == 1
-
-
-@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_saveload_op(client):
-    @weave.op()
-    def add2(x, y):
-        return x + y
-
-    @weave.op()
-    def add3(x, y, z):
-        return x + y + z
-
-    obj = {"a": add2, "b": add3}
-    ref = client._save_object(obj, "my-ops")
-    obj2 = client.get(ref)
-    assert isinstance(obj2["a"], op_def.OpDef)
-    assert obj2["a"].name == "op-add2"
-    assert isinstance(obj2["b"], op_def.OpDef)
-    assert obj2["b"].name == "op-add3"
 
 
 def test_object_mismatch_project_ref(client):
