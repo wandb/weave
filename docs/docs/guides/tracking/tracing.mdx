@@ -1,0 +1,309 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import { DesktopWindow } from '../../../src/components/DesktopImage'
+import TracingCallsMacroImage from '@site/static/img/tracing_calls_macro.png';
+import BasicCallImage from '@site/static/img/screenshots/basic_call.png';
+
+# Calls
+
+<DesktopWindow 
+  images={[
+    TracingCallsMacroImage,
+    BasicCallImage,
+  ]}
+  alt="Screenshot of many calls"
+  title="Weave Calls"
+/>
+
+
+:::info[Calls]
+Calls are the fundamental building block in Weave. 
+They represent a single execution of a function, including the inputs (aka arguments), outputs (aka return value), and any relevant metadata such as duration, execptions, llm usage, etc.
+Calls are a superset of the industry standard [OpenTelemetry](https://opentelemetry.io/docs/concepts/what-is-opentelemetry/) and [OpenTracing](https://opentracing.io/) standards.
+A call can belong to a trace, which is a collection of calls that belonging to the same execution context.
+Furthermore, a call can have children calls (and a parent call), forming a tree structure.
+:::
+
+
+## Create a Call
+
+<Tabs groupId="client-layer">
+    {/* <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem> */}
+    <TabItem value="python_oo" label="High Level Python">
+    Weave can automatically track calls to [LLM Providers and Frameworks](../integrations/index.md) with a single line of code: `weave.init('project_name')`.
+    However, you often have existing code that you want to track. In that case, decorate them with @weave.op to get started!
+```python showLineNumbers
+# highlight-next-line
+# Import Weave
+# highlight-next-line
+import weave
+
+# highlight-next-line
+# Initialize Weave Tracing
+# highlight-next-line
+weave.init('intro-example')
+
+# highlight-next-line
+# Decorate your function
+# highlight-next-line
+@weave.op
+def my_function(name: str):
+    return f"Hello, {name}!"
+
+# Call your function
+print(my_function.call("World"))
+```
+    </TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
+</Tabs>
+
+
+## Add additional attributes
+
+When calling tracked functions, you can add additional metadata to the call by using the `weave.attributes` context manager.
+
+For example, you can add a `user_id` to each call and then filter calls by user. In the example below, any function called within the context manager will have the `user_id` attribute set to `lukas` and `env` attribute set to `production`.
+
+```python
+import weave
+import json
+from openai import OpenAI
+
+@weave.op()
+def extract_fruit(sentence: str) -> dict:
+    client = OpenAI()
+
+    response = client.chat.completions.create(
+    model="gpt-3.5-turbo-1106",
+    messages=[
+        {
+            "role": "system",
+            "content": "You will be provided with unstructured data, and your task is to parse it one JSON dictionary with fruit, color and flavor as keys."
+        },
+        {
+            "role": "user",
+            "content": sentence
+        }
+        ],
+        temperature=0.7,
+        response_format={ "type": "json_object" }
+    )
+    extracted = response.choices[0].message.content
+    return json.loads(extracted)
+
+weave.init('intro-example')
+sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
+
+# highlight-next-line
+with weave.attributes({'user_id': 'lukas', 'env': 'production'}):
+    extract_fruit(sentence)
+```
+
+Common Questions / Variations:
+* Display Name
+* Images
+* Ops
+* Attributes
+* Cost?
+
+## View a Call
+<Tabs groupId="client-layer">
+    <TabItem value="web_app" label="Web App">
+    To view a call in the web app:
+    1. Navigate to your project's "Traces" tab
+    2. Find the call you want to view in the list
+    3. Click on the call to open its details page
+    
+    The details page will show the call's inputs, outputs, runtime, and any additional attributes or metadata.
+    
+    ![View Call in Web App](https://docs.wandb.ai/images/view_call_web_app.png)
+    </TabItem>
+    <TabItem value="python_sdk" label="Python">
+    To view a call using the high-level Python API:
+
+    ```python
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Get a specific call by its ID
+    call = client.get_call("call-uuid-here")
+    ```
+
+    # Review the `get_call` documentation [here](../../reference/python-sdk/weave/trace/weave_client.md).
+    </TabItem>
+    <TabItem value="service_api" label="HTTP API">
+    To view a call using the Service API, you can make a GET request to the appropriate endpoint:
+http://localhost:3000/reference/service-api/call-read-call-read-post
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/read' \
+        -H 'Content-Type: application/json' \
+        -H 'Accept: application/json' \
+        -H 'Authorization: Basic BASE_64_ENCODED_AUTH' \
+        -d '{
+        "project_id": "string",
+        "id": "string",
+    }'
+    ```
+
+    Replace `{entity}`, `{project}`, and `{call_id}` with your actual values, and `YOUR_API_KEY` with your Weights & Biases API key.
+
+    The response will be a JSON object containing the call details.
+
+    For more information on the Service API, please refer to our [API Documentation](https://docs.wandb.ai/ref/api).
+    </TabItem>
+</Tabs>
+
+
+## Update a Call
+
+### Set Display Name
+
+<Tabs groupId="client-layer">
+    <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem>
+    <TabItem value="python_oo" label="High Level Python">
+    TODO: Description and code for how to use the higher-level, object oriented API.
+    </TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
+</Tabs>
+
+### Add Feedback 
+
+<Tabs groupId="client-layer">
+    <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem>
+    <TabItem value="python_oo" label="High Level Python">
+    TODO: Description and code for how to use the higher-level, object oriented API.
+    </TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
+</Tabs>
+
+### Delete a Call
+
+<Tabs groupId="client-layer">
+    <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem>
+    <TabItem value="python_oo" label="High Level Python">
+    TODO: Description and code for how to use the higher-level, object oriented API.
+    </TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
+</Tabs>
+
+## Query Calls
+
+<Tabs groupId="client-layer">
+    <TabItem value="web_app" label="Web App">
+    :::warning[TODO]
+    IMAGE
+    :::
+    </TabItem>
+    <TabItem value="python_oo" label="High Level Python">
+    TODO: Description and code for how to use the higher-level, object oriented API.
+    </TabItem>
+    <TabItem value="python_binding" label="Low Level Python">
+    TODO: Description and code for how to use the lower-level, API language binding API.
+    </TabItem>
+    <TabItem value="service_api" label="Service API">
+    TODO: Description and code fo how to use the Service API (probably via CURL) - and link to Service Docs
+    </TabItem>
+</Tabs>
+
+## Compare Calls
+
+:::info[Comming Soon]
+:::
+
+## Call FAQ
+
+
+## Call Technical Details
+### Schema
+
+Please see the [schema](../../reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface#class-callschema) for a complete list of fields.
+
+
+| Property | Type | Description |
+|----------|------|-------------|
+| id | string (uuid) | Unique identifier for the call |
+| project_id | string (optional) | Associated project identifier |
+| op_name | string | Name of the operation (can be a reference) |
+| display_name | string (optional) | User-friendly name for the call |
+| trace_id | string (uuid) | Identifier for the trace this call belongs to |
+| parent_id | string (uuid) | Identifier of the parent call |
+| started_at | datetime | Timestamp when the call started |
+| attributes | Dict[str, Any] | User-defined metadata about the call |
+| inputs | Dict[str, Any] | Input parameters for the call |
+| ended_at | datetime (optional) | Timestamp when the call ended |
+| exception | string (optional) | Error message if the call failed |
+| output | Any (optional) | Result of the call |
+| summary | Optional[SummaryMap] | Post-execution summary information |
+| wb_user_id | Optional[str] | Associated Weights & Biases user ID |
+| wb_run_id | Optional[str] | Associated Weights & Biases run ID |
+| deleted_at | datetime (optional) | Timestamp of call deletion, if applicable |
+
+The table above outlines the key properties of a Call in Weave. Each property plays a crucial role in tracking and managing function calls:
+
+- The `id`, `trace_id`, and `parent_id` fields help in organizing and relating calls within the system.
+- Timing information (`started_at`, `ended_at`) allows for performance analysis.
+- The `attributes` and `inputs` fields provide context for the call, while `output` and `summary` capture the results.
+- Integration with Weights & Biases is facilitated through `wb_user_id` and `wb_run_id`.
+
+This comprehensive set of properties enables detailed tracking and analysis of function calls throughout your project.
+
+
+Calculated Fields:
+    * Cost
+    * Duration
+    * Status
+
+### Relationships
+
+```mermaid
+classDiagram
+    direction RL
+    Op --> Call : Produces
+    Trace --> Call : Contains
+    Call --> Call : Invokes Children
+    Call --> Feedback : has
+    Call --> Object : Produces Output
+    Object --> Call : Consumes Input
+    Call --> WB Run : Called During
+    Call --> WB User : Called By
+```
+
+
