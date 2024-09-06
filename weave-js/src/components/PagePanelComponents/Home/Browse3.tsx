@@ -165,9 +165,9 @@ const browse3Paths = (projectRoot: string) => [
 export const Browse3: FC<{
   hideHeader?: boolean;
   headerOffset?: number;
+  gorillaApolloEndpoint?: string;
   navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
-  gorillaApolloEndpoint?: string;
 }> = props => {
   // const weaveContext = useWeaveContext();
   // useEffect(() => {
