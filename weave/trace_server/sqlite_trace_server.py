@@ -13,7 +13,7 @@ import emoji
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import InvalidRequest, NotFoundError, ObjectDeletedError
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
@@ -43,10 +43,6 @@ from .trace_server_interface_util import (
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
-
-
-class NotFoundError(Exception):
-    pass
 
 
 _conn_cursor: contextvars.ContextVar[
@@ -642,10 +638,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
+            include_deleted=True,
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
-
+        if objs[0].deleted_at is not None:
+            raise ObjectDeletedError(
+                f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
+            )
         return tsi.ObjReadRes(obj=objs[0])
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
@@ -1023,11 +1023,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         project_id: str,
         conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
+        include_deleted: bool = False,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
-        pred = " AND ".join(conditions or ["1 = 1"])
+        conditions = conditions or ["1 = 1"]
+        if not include_deleted:
+            conditions.append("deleted_at IS NULL")
+        pred = " AND ".join(conditions)
         cursor.execute(
-            """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
+            """SELECT * FROM objects WHERE project_id = ? AND """
             + pred
             + " ORDER BY created_at ASC",
             (project_id,),
@@ -1046,6 +1050,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     digest=row[7],
                     version_index=row[8],
                     is_latest=row[9],
+                    deleted_at=row[10],
                 )
             )
 

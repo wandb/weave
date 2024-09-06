@@ -1364,12 +1364,7 @@ def test_object_deletion(client):
     assert client.get(weave_obj.ref) == obj
 
     client.delete_object(weave_obj.ref)
-    with pytest.raises(
-        (
-            weave.trace_server.sqlite_trace_server.NotFoundError,
-            weave.trace_server.clickhouse_trace_server_batched.NotFoundError,
-        )
-    ):
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         client.get(weave_obj.ref)
 
     # create 3 versions of the object
@@ -1384,12 +1379,7 @@ def test_object_deletion(client):
     weave_obj3.delete()
 
     # make sure we can't get the deleted object
-    with pytest.raises(
-        (
-            weave.trace_server.sqlite_trace_server.NotFoundError,
-            weave.trace_server.clickhouse_trace_server_batched.NotFoundError,
-        )
-    ):
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         client.get(weave_obj3.ref)
 
     # count the number of versions of the object
@@ -1415,3 +1405,27 @@ def test_object_deletion(client):
         )
     )
     assert len(versions.objs) == 0
+
+
+def test_recursive_object_deletion(client):
+    # Create a bunch of objects that refer to each other
+    obj1 = {"a": 5}
+    obj1_ref = client.save(obj1, "obj1").ref
+
+    obj2 = {"b": obj1_ref}
+    obj2_ref = client.save(obj2, "obj2").ref
+
+    obj3 = {"c": obj2_ref}
+    obj3_ref = client.save(obj3, "obj3").ref
+
+    # Delete obj1
+    client.get(obj1_ref).delete()
+
+    # Make sure we can't get obj1
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
+        client.get(obj1_ref)
+
+    # Make sure we can get obj2, but the ref to object 1 should return None
+    assert client.get(obj2_ref) == {"b": None}
+    # Object2 should store the ref to object2, as instantiated
+    assert client.get(obj3_ref) == {"c": obj2}

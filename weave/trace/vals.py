@@ -24,6 +24,7 @@ from weave.trace.refs import (
 )
 from weave.trace.serialize import from_json
 from weave.trace.table import Table
+from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
     ObjDeleteReq,
     ObjReadReq,
@@ -503,14 +504,19 @@ def make_trace_obj(
     if isinstance(val, ObjectRef):
         new_ref = val
         extra = val.extra
-        read_res = server.obj_read(
-            ObjReadReq(
-                project_id=f"{val.entity}/{val.project}",
-                object_id=val.name,
-                digest=val.digest,
+        try:
+            read_res = server.obj_read(
+                ObjReadReq(
+                    project_id=f"{val.entity}/{val.project}",
+                    object_id=val.name,
+                    digest=val.digest,
+                )
             )
-        )
-        val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
+            val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
+        except ObjectDeletedError:
+            # Catch error case where an object has been deleted. Val here is likely
+            # part of a nested object, return None to indicate a deleted object.
+            val = None
 
     if isinstance(val, Table):
         val_ref = val.ref

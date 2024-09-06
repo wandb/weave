@@ -54,6 +54,7 @@ from weave.trace_server.calls_query_builder import (
     HardCodedFilter,
     combine_conditions,
 )
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server.ids import generate_id
 
 from . import clickhouse_trace_server_migrator as wf_migrator
@@ -101,10 +102,6 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
-
-
-class NotFoundError(Exception):
-    pass
 
 
 CallCHInsertable = Union[
@@ -581,10 +578,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append("digest = {version_digest: String}")
                 parameters["version_digest"] = req.digest
         objs = self._select_objs_query(
-            req.project_id, conditions=conds, parameters=parameters
+            req.project_id,
+            conditions=conds,
+            parameters=parameters,
+            include_deleted=True,
         )
+        print("objs", objs)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+
+        # Handle deleted objects explicitly
+        if objs[0].deleted_at is not None:
+            raise ObjectDeletedError(
+                f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
+            )
 
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
 
@@ -625,7 +632,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             kind="object",
             deleted_at=deleted_at,
             val_dump="",
-            refs=[],
         )
         self._insert(
             "object_versions",
@@ -941,6 +947,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters[version_param_key] = ref.version
 
             if len(conds) > 0:
+                conds += ["deleted_at IS NULL"]
                 conditions = [combine_conditions(conds, "OR")]
                 objs = self._select_objs_query(
                     project_id=project_id_scope,
@@ -1285,9 +1292,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
         parameters: Optional[Dict[str, Any]] = None,
+        include_deleted: bool = False,
     ) -> list[SelectableCHObjSchema]:
         if not conditions:
             conditions = ["1 = 1"]
+        if not include_deleted:
+            conditions.append("deleted_at IS NULL")
 
         conditions_part = combine_conditions(conditions, "AND")
 
@@ -1313,7 +1323,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _version_index_plus_1,
                 version_index,
                 version_count,
-                is_latest
+                is_latest,
+                deleted_at
             FROM (
                 SELECT project_id,
                     object_id,
@@ -1332,7 +1343,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     ) AS _version_index_plus_1,
                     _version_index_plus_1 - 1 AS version_index,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
+                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest,
+                    deleted_at
                 FROM (
                     SELECT *,
                         row_number() OVER (
@@ -1345,7 +1357,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     FROM object_versions
                     WHERE project_id = {{project_id: String}}
                 )
-                WHERE rn = 1 AND deleted_at IS NULL
+                WHERE rn = 1
             )
             WHERE project_id = {{project_id: String}} AND
                 {conditions_part}
@@ -1373,6 +1385,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "version_index",
                                 "version_count",
                                 "is_latest",
+                                "deleted_at",
                             ],
                             row,
                         )
