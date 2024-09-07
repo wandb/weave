@@ -6,6 +6,8 @@ from typing import Any, Callable, TypeVar
 
 T = TypeVar("T")
 
+MAX_WORKER_DEFAULT = 2**6
+
 
 class AsyncJobQueue:
     """A queue for managing asynchronous job execution.
@@ -26,7 +28,7 @@ class AsyncJobQueue:
         max_workers (int): The maximum number of worker threads to use. Defaults to 5.
     """
 
-    def __init__(self, max_workers: int = 5) -> None:
+    def __init__(self, max_workers: int = MAX_WORKER_DEFAULT) -> None:
         self._max_workers = max_workers
         self._lock = threading.Lock()
         self._is_shutdown = True

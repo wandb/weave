@@ -969,6 +969,10 @@ class WeaveClient:
             if self.server.should_batch:
                 self.server.call_processor.wait_until_all_processed()
 
+    def __del__(self) -> None:
+        self._cleanup()
+        atexit.unregister(self._cleanup)
+
     def _cleanup(self) -> None:
         self.flush()
         self.async_job_queue.shutdown(wait=True)
