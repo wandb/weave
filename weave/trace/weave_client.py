@@ -971,7 +971,7 @@ class WeaveClient:
 
     def _cleanup(self) -> None:
         self.flush()
-        self.async_job_queue._shutdown(wait=True)
+        self.async_job_queue.shutdown(wait=True)
 
 
 def send_start_call(

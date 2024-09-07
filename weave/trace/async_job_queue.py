@@ -42,7 +42,7 @@ class AsyncJobQueue:
             self.executor = concurrent.futures.ThreadPoolExecutor(
                 max_workers=self._max_workers, thread_name_prefix="AsyncJobQueue"
             )
-            atexit.register(self._shutdown)
+            atexit.register(self.shutdown)
 
     def submit_job(
         self, func: Callable[..., T], *args: Any, **kwargs: Any
@@ -76,7 +76,7 @@ class AsyncJobQueue:
         future.add_done_callback(callback)
         return future
 
-    def _shutdown(self, wait: bool = True) -> None:
+    def shutdown(self, wait: bool = True) -> None:
         """Shuts down the executor and cleans up resources.
 
         This method ensures that the executor is shut down only once and in a thread-safe manner.
@@ -89,7 +89,7 @@ class AsyncJobQueue:
             if self._is_shutdown:
                 return
             self._is_shutdown = True
-            atexit.unregister(self._shutdown)  # Remove the atexit handler
+            atexit.unregister(self.shutdown)  # Remove the atexit handler
 
         self.flush()  # Flush outside the lock
         self.executor.shutdown(wait=wait)
@@ -99,7 +99,7 @@ class AsyncJobQueue:
 
     def __del__(self) -> None:
         """Ensures the executor is shut down when the object is deleted."""
-        self._shutdown(wait=False)
+        self.shutdown(wait=False)
 
     def flush(self) -> None:
         """Waits for all currently submitted jobs to complete.
