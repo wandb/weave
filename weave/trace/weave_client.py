@@ -637,7 +637,7 @@ class WeaveClient:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
 
-        project_id = (self._project_id(),)
+        project_id = self._project_id()
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         self.async_job_queue.submit_job(
             send_end_call,

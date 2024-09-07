@@ -333,19 +333,21 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     """
 
     def __getattribute__(self, name):
-        attr = super().__getattribute__(name)
+        self_super = super()
+        attr = self_super.__getattribute__(name)
 
         if callable(attr) and not name.startswith("_") and name != "flush":
 
             def wrapper(*args, **kwargs):
-                self.flush()
+                self_super.flush()
                 return attr(*args, **kwargs)
 
             return wrapper
         
         if name == "server":
             if not (hasattr(self, "_is_flushing") and self._is_flushing):
-                self.flush()
+                self._is_flushing = True
+                self_super.flush()
 
         return attr
 
@@ -376,12 +378,14 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         )
     elif weave_server_flag.startswith("http"):
         remote_server = TestOnlyFlushingRemoteHTTPTraceServer(weave_server_flag)
+        # remote_server = remote_http_trace_server.RemoteHTTPTraceServer(weave_server_flag)
         server = remote_server
     elif weave_server_flag == ("prod"):
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
         client = TestOnlyFlushingWeaveClient(entity, project, server)
+        # client = weave_client.WeaveClient(entity, project, server)
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
