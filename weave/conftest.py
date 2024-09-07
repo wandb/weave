@@ -343,7 +343,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                 return attr(*args, **kwargs)
 
             return wrapper
-        
+
         if name == "server":
             if not (hasattr(self, "_is_flushing") and self._is_flushing):
                 self._is_flushing = True

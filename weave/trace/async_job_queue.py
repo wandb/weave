@@ -65,8 +65,9 @@ class AsyncJobQueue:
             self._active_jobs.add(future)
 
             def callback(f: Future[T]) -> None:
-                if f.exception():
-                    raise f.exception()
+                exception = f.exception()
+                if exception:
+                    raise exception
                 with self._lock:
                     self._active_jobs.remove(f)
 
