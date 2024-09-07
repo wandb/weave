@@ -5,15 +5,12 @@ import random
 import shutil
 import tempfile
 import typing
-from typing import Generator
 
 import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from flask.testing import FlaskClient
-
-from weave.trace.client_context import context_state
 
 import weave
 
@@ -31,32 +28,22 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 
 # from .legacy.weave import logs
-# from .tests import fixture_fakewandb
+from .tests import fixture_fakewandb
 from .tests.trace.trace_server_clickhouse_conftest import *
-
-# from .tests.wandb_system_tests_conftest import *
+from .tests.wandb_system_tests_conftest import *
 from .trace import autopatch
 
-# logs.configure_logger()
+logs.configure_logger()
 
 # Lazy mode was the default for a long time. Eager is now the default for the user API.
 # A lot of tests are written to expect lazy mode, so just make lazy mode the default for
 # tests.
-# context_state._eager_mode.set(False)
+context_state._eager_mode.set(False)
 
 # A lot of tests rely on weave.legacy.weave.ops.* being in scope. Importing this here
 # makes that work...
 
 ### Disable datadog engine tracing
-
-
-def pytest_addoption(parser):
-    parser.addoption(
-        "--weave-server",
-        action="store",
-        default="sqlite",
-        help="Specify the client object to use: sqlite or clickhouse",
-    )
 
 
 class FakeTracer:
@@ -83,8 +70,8 @@ def guard(*args, **kwargs):
 # socket.socket = guard
 
 
-# def pytest_sessionstart(session):
-#     context_state.disable_analytics()
+def pytest_sessionstart(session):
+    context_state.disable_analytics()
 
 
 @pytest.fixture()
@@ -117,7 +104,7 @@ def pytest_collection_modifyitems(config, items):
 def pre_post_each_test(test_artifact_dir, caplog):
     # TODO: can't get this to work. I was trying to setup pytest log capture
     # to use our custom log stuff, so that it indents nested logs properly.
-    # caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
+    caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
     # Tests rely on full cache mode right now.
     os.environ["WEAVE_CACHE_MODE"] = "full"
     os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
@@ -128,8 +115,8 @@ def pre_post_each_test(test_artifact_dir, caplog):
     except (FileNotFoundError, OSError):
         pass
     os.environ["WEAVE_LOCAL_ARTIFACT_DIR"] = test_artifact_dir
-    # with isolated_tagging_context():
-    yield
+    with isolated_tagging_context():
+        yield
     del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
 
 
@@ -172,6 +159,13 @@ def cereal_csv():
 def eager_mode():
     with context_state.eager_execution():
         yield
+
+
+@pytest.fixture()
+def fake_wandb():
+    setup_response = fixture_fakewandb.setup()
+    yield setup_response
+    fixture_fakewandb.teardown(setup_response)
 
 
 @pytest.fixture()
