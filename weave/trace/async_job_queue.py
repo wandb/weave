@@ -30,15 +30,17 @@ class AsyncJobQueue:
         self._max_workers = max_workers
         self._lock = threading.Lock()
         self._is_shutdown = True
+        self._active_jobs: set[Future] = set()
         self._start()
 
     def _start(self) -> None:
         """Initializes or reinitializes the executor."""
         with self._lock:
-            self._active_jobs: set[Future] = set()
+            if not self._is_shutdown:
+                return
             self._is_shutdown = False
             self.executor = concurrent.futures.ThreadPoolExecutor(
-                max_workers=self._max_workers
+                max_workers=self._max_workers, thread_name_prefix="AsyncJobQueue"
             )
             atexit.register(self._shutdown)
 
@@ -64,15 +66,15 @@ class AsyncJobQueue:
             future = self.executor.submit(func, *args, **kwargs)
             self._active_jobs.add(future)
 
-            def callback(f: Future[T]) -> None:
-                exception = f.exception()
-                if exception:
-                    raise exception
-                with self._lock:
-                    self._active_jobs.remove(f)
+        def callback(f: Future[T]) -> None:
+            with self._lock:
+                self._active_jobs.remove(f)
+            exception = f.exception()
+            if exception:
+                print(f"Job failed with exception: {exception}")
 
-            future.add_done_callback(callback)
-            return future
+        future.add_done_callback(callback)
+        return future
 
     def _shutdown(self, wait: bool = True) -> None:
         """Shuts down the executor and cleans up resources.
@@ -84,13 +86,16 @@ class AsyncJobQueue:
                   If False, outstanding jobs are cancelled and the executor is shut down immediately.
         """
         with self._lock:
-            if not self._is_shutdown:
-                self.flush()  # Flush before shutting down
-                self.executor.shutdown(wait=wait)
-                self._active_jobs.clear()
-                self._is_shutdown = True
-                del self.executor
-                atexit.unregister(self._shutdown)  # Remove the atexit handler
+            if self._is_shutdown:
+                return
+            self._is_shutdown = True
+            atexit.unregister(self._shutdown)  # Remove the atexit handler
+
+        self.flush()  # Flush outside the lock
+        self.executor.shutdown(wait=wait)
+
+        with self._lock:
+            self._active_jobs.clear()
 
     def __del__(self) -> None:
         """Ensures the executor is shut down when the object is deleted."""
@@ -102,12 +107,12 @@ class AsyncJobQueue:
         This method blocks until all active jobs in the queue at the time of calling
         have finished executing. It prevents new jobs from interfering with the flush operation.
         """
+        active_jobs = []
         with self._lock:
-            active_jobs = set(self._active_jobs)  # Create a copy of active jobs
+            active_jobs = list(self._active_jobs)
 
-        while active_jobs:
-            done, active_jobs = concurrent.futures.wait(
-                active_jobs, timeout=0.1, return_when=concurrent.futures.FIRST_COMPLETED
-            )
-            # Remove completed jobs from our local set
-            active_jobs = active_jobs - done
+        for future in concurrent.futures.as_completed(active_jobs):
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Job failed during flush: {e}")

@@ -1,3 +1,4 @@
+import atexit
 import dataclasses
 import datetime
 import platform
@@ -391,6 +392,7 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         self.async_job_queue = AsyncJobQueue()
         self.ensure_project_exists = ensure_project_exists
+        atexit.register(self._cleanup)
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -966,6 +968,10 @@ class WeaveClient:
         if isinstance(self.server, RemoteHTTPTraceServer):
             if self.server.should_batch:
                 self.server.call_processor.wait_until_all_processed()
+
+    def _cleanup(self) -> None:
+        self.flush()
+        self.async_job_queue._shutdown(wait=True)
 
 
 def send_start_call(
