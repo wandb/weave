@@ -135,6 +135,10 @@ def map_to_refs(obj: Any) -> Any:
 
 @dataclasses.dataclass
 class Call:
+    """
+    A Call represents a single operation that was executed as part of a trace.
+    """
+
     op_name: str
     trace_id: str
     project_id: str
@@ -189,10 +193,27 @@ class Call:
         )
 
     def delete(self) -> bool:
+        """
+        Delete the call.
+        """
         client = weave_client_context.require_weave_client()
         return client.delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
+        """
+        Set the display name for the call.
+
+        Args:
+            name: The display name to set for the call.
+
+        Example:
+
+        ```python
+        result, call = my_function.call("World")
+        call.set_display_name("My Custom Display Name")
+        ```
+        """
+
         if name == "":
             raise ValueError(
                 "Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name."
@@ -489,7 +510,7 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @deprecated(new_name="get_call")
-    def cll(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
+    def call(self, call_id: str, include_costs: Optional[bool] = False) -> WeaveObject:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
