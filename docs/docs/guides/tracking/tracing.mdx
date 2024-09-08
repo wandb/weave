@@ -2,6 +2,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import { DesktopWindow } from '../../../src/components/DesktopImage'
 import TracingCallsMacroImage from '@site/static/img/screenshots/calls_macro.png';
+import TracingCallsFilterImage from '@site/static/img/screenshots/calls_filter.png';
 import BasicCallImage from '@site/static/img/screenshots/basic_call.png';
 
 # Calls
@@ -10,105 +11,463 @@ import BasicCallImage from '@site/static/img/screenshots/basic_call.png';
   images={[
     TracingCallsMacroImage,
     BasicCallImage,
+    TracingCallsFilterImage,
   ]}
   alt="Screenshot of many calls"
   title="Weave Calls"
 />
 
-Calls is a powerful feature in Weave that allows you to track the inputs and outputs of functions seamlessly. Follow these steps to get started:
 
-To track specific functions, decorate them with @weave.op(). This decorator tells Weave to monitor the inputs, outputs, and any code changes for the function. Now, every call to this function will be tracked and logged. Additionally, weave tracks how functions relate by keeping track of parent and children calls and building a trace tree.
+:::info[Calls]
+Calls are the fundamental building block in Weave. 
+They represent a single execution of a function, including the inputs (aka arguments), outputs (aka return value), and any relevant metadata such as duration, execptions, llm usage, etc.
+Those familiar with the [OpenTelemetry](https://opentelemetry.io) data model will find Calls to be quite similar.
+A Call can belong to a Trace, which is a collection of calls that belong to the same execution context.
+Furthermore, a Call can have children Calls (and a parent Call), forming a tree structure.
+:::
 
-```python
+
+## Create a Call
+
+Calls can be created using a number of different methods:
+
+1. Automatically by integrations with common LLM libraries
+2. Captured at runtime by Python decorators
+3. Manually created by directly using the API
+
+### 1. Automatic Tracking of LLM Libraries
+
+The vast majority of Weave users will be using one of many standard LLM libraries, such as `openai`, `anthropic`, `cohere`, `mistral`, etc. 
+Weave automatically tracks [calls to these libraries](../integrations/index.md). All you need to do is call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) once at the beginning of your program.
+
+```python showLineNumbers
+# highlight-next-line
+# Import Weave
 # highlight-next-line
 import weave
+
 from openai import OpenAI
-import requests, random
-PROMPT="""Emulate the Pokedex from early Pokémon episodes. State the name of the Pokemon and then describe it.
-        Your tone is informative yet sassy, blending factual details with a touch of dry humor. Be concise, no more than 3 sentences. """
-POKEMON = ['pikachu', 'charmander', 'squirtle', 'bulbasaur', 'jigglypuff', 'meowth', 'eevee']
+client = OpenAI()
 
 # highlight-next-line
-@weave.op()
-def get_pokemon_data(pokemon_name):
-    url = f"https://pokeapi.co/api/v2/pokemon/{pokemon_name}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        name = data["name"]
-        types = [t["type"]["name"] for t in data["types"]]
-        species_url = data["species"]["url"]
-        species_response = requests.get(species_url)
-        evolved_from = "Unknown"
-        if species_response.status_code == 200:
-            species_data = species_response.json()
-            if species_data["evolves_from_species"]:
-                evolved_from = species_data["evolves_from_species"]["name"]
-        return {"name": name, "types": types, "evolved_from": evolved_from}
-    else:
-        return None
-
-# highlight-next-line
-@weave.op()
-def pokedex(name: str, prompt: str) -> str:
-    client = OpenAI()
-    data = get_pokemon_data(name)
-    if not data: return "Error: Unable to fetch data"
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system","content": prompt},
-            {"role": "user", "content": str(data)}
-        ],
-        temperature=0.7,
-        max_tokens=100,
-        top_p=1
-    )
-    return response.choices[0].message.content
-
+# Initialize Weave Tracing
 # highlight-next-line
 weave.init('intro-example')
-# Get data for a specific Pokémon
-pokemon_data = pokedex(random.choice(POKEMON), PROMPT)
+
+response = client.chat.completions.create(
+  model="gpt-4",
+  messages=[
+    {
+      "role": "user",
+      "content": "How are you?"
+    }
+  ],
+  temperature=0.8,
+  max_tokens=64,
+  top_p=1
+)
 ```
 
-## Add additional attributes
+### 2. Manual Call Tracking
 
-When calling tracked functions, you can add additional metadata to the call by using the `weave.attributes` context manager.
+However, often LLM applications have additional logic (such as pre/post processing, prompts, etc.) that you want to track.
+Weave allows you to manually track these calls using the [`@weave.op`](../../reference/python-sdk/weave/index.md#function-op) decorator. For example:
 
-For example, you can add a `user_id` to each call and then filter calls by user. In the example below, any function called within the context manager will have the `user_id` attribute set to `lukas` and `env` attribute set to `production`.
-
-```python
+```python showLineNumbers
+# highlight-next-line
+# Import Weave
+# highlight-next-line
 import weave
-import json
-from openai import OpenAI
 
-@weave.op()
-def extract_fruit(sentence: str) -> dict:
-    client = OpenAI()
+# highlight-next-line
+# Initialize Weave Tracing
+# highlight-next-line
+weave.init('intro-example')
 
-    response = client.chat.completions.create(
-    model="gpt-3.5-turbo-1106",
-    messages=[
+# highlight-next-line
+# Decorate your function
+# highlight-next-line
+@weave.op
+def my_function(name: str):
+    return f"Hello, {name}!"
+
+# Call your function
+print(my_function.call("World"))
+```
+
+#### Call Display Name
+
+Sometimes you may want to override the display name of a call. You can achieve this in one of two ways:
+
+1. Change the display name on a per-call basis. This uses the [`Op.call`](../../reference/python-sdk/weave/trace/weave.trace.op.md#function-call) method to return a `Call` object, which you can then use to set the display name using [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#function-set_display_name).
+```python showLineNumbers
+# highlight-next-line
+# Use the `call` method which 
+result, call = my_function.call("World")
+call.set_display_name("My Custom Display Name")
+```
+
+2. (Coming soon) Change the display name for all Calls of a given Op:
+
+```python showLineNumbers
+@weave.op(display_name="My Custom Display Name")
+def my_function(name: str):
+    return f"Hello, {name}!"
+```
+
+**Technical Note:** "Calls" are produced by "Ops". An Op is a function or method that is decorated with `@weave.op`. 
+By default, the Op's name is the function name, and the associated calls will have the same display name. The above example shows how to override the display name for all Calls of a given Op.
+Sometimes, users wish to override the name of the Op itself. This can be achieved by assigning to the `name` property of the Op, before any calls are logged.
+
+```python showLineNumbers
+@weave.op(display_name="My Custom Display Name")
+def my_function(name: str):
+    return f"Hello, {name}!"
+
+my_function.name = "My Custom Display Name"
+```
+
+
+#### Attributes
+When calling tracked functions, you can add additional metadata to the call by using the [`weave.attributes`](../../reference/python-sdk/weave/index.md#function-attributes) context manager. In the example below, we add an `env` attribute to the call specified as `'production'`.
+
+```python showLineNumbers
+# ... continued from above ...
+
+# highlight-next-line
+# Add additional "attributes" to the call
+# highlight-next-line
+with weave.attributes({'env': 'production'}):
+    print(my_function.call("World"))
+```
+
+### 3. Manual Call Tracking
+
+You can also manually create Calls using the API directly.
+* Start a call: [POST `/call/start`](../../reference/service-api/call-start-call-start-post.api.mdx)
+* End a call: [POST `/call/end`](../../reference/service-api/call-end-call-end-post.api.mdx)
+
+For example:
+
+```bash
+curl -L 'https://trace.wandb.ai/call/start' \
+-H 'Content-Type: application/json' \
+-H 'Accept: application/json' \
+-d '{
+  "start": {
+    "project_id": "string",
+    "id": "string",
+    "op_name": "string",
+    "display_name": "string",
+    "trace_id": "string",
+    "parent_id": "string",
+    "started_at": "2024-09-08T20:07:34.849Z",
+    "attributes": {},
+    "inputs": {},
+    "wb_run_id": "string"
+  }
+}'
+```
+
+
+
+## View a Call
+<Tabs groupId="client-layer">
+    <TabItem value="web_app" label="Web App">
+    To view a call in the web app:
+    1. Navigate to your project's "Traces" tab
+    2. Find the call you want to view in the list
+    3. Click on the call to open its details page
+    
+    The details page will show the call's inputs, outputs, runtime, and any additional attributes or metadata.
+    
+    ![View Call in Web App](../../../static/img/screenshots/basic_call.png)
+    </TabItem>
+    <TabItem value="python_sdk" label="Python">
+    To view a call using the Python API, you can use the [`get_call`](../../reference/python-sdk/weave/trace/weave.trace.weave_client#method-get_call) method:
+
+    ```python
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Get a specific call by its ID
+    call = client.get_call("call-uuid-here")
+
+    print(call)
+    ```
+
+    </TabItem>
+    <TabItem value="service_api" label="HTTP API">
+    To view a call using the Service API, you can make a request to the [`/call/read`](../../reference/service-api/call-read-call-read-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/read' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "project_id": "string",
+        "id": "string",
+    }'
+    ```
+    </TabItem>
+</Tabs>
+
+
+## Update a Call
+
+Calls are mostly immutable once created, however, there are a few mutations which are supported:
+* [Set Display Name](#set-display-name)
+* [Add Feedback](#add-feedback)
+* [Delete a Call](#delete-a-call)
+
+All of these mutations can be performed from the UI by navigating to the call detail page:
+
+![Update Call in Web App](../../../static/img/call_edit_screenshot.png)
+
+### Set Display Name
+
+<Tabs groupId="client-layer">
+    <TabItem value="python_sdk" label="Python">
+    In order to set the display name of a call, you can use the [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#function-set_display_name) method.
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Get a specific call by its ID
+    call = client.get_call("call-uuid-here")
+
+    # Set the display name of the call
+    call.set_display_name("My Custom Display Name")
+    ```
+    </TabItem>
+    <TabItem value="service_api" label="HTTP API">
+    To set the display name of a call using the Service API, you can make a request to the [`/call/update`](../../reference/service-api/call-update-call-update-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/update' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "project_id": "string",
+        "call_id": "string",
+        "display_name": "string",
+    }'
+    ```
+    </TabItem>
+</Tabs>
+
+### Add Feedback 
+
+Please see the [Feedback Documentation](./feedback.md) for more details.
+
+### Delete a Call
+
+<Tabs groupId="client-layer">
+    <TabItem value="python_sdk" label="Python">
+    To delete a call using the Python API, you can use the [`Call.delete`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#function-delete) method.
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Get a specific call by its ID
+    call = client.get_call("call-uuid-here")
+    
+    # Delete the call
+    call.delete()
+    ```
+
+    </TabItem>
+    <TabItem value="service_api" label="HTTP API">
+    To delete a call using the Service API, you can make a request to the [`/call/delete`](../../reference/service-api/call-delete-call-delete-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/calls/delete' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "project_id": "string",
+        "call_ids": [
+            "string"
+        ],
+    }'
+    ```
+    </TabItem>
+</Tabs>
+
+## Query & Export Calls
+
+<DesktopWindow 
+  images={[
+    TracingCallsFilterImage,
+  ]}
+  alt="Screenshot of many calls"
+  title="Weave Calls"
+/>
+
+The `/calls` page of your project ("Traces" tab) contains a table view of all the Calls in your project. From there, you can:
+* Sort
+* Filter
+* Export
+
+![Calls Table View](../../../static/img/export_modal.png)
+
+The Export Modal (shown above) allows you to export your data in a number of formats, as well as shows the Python & CURL equivalents for the selected calls!
+The easiest way to get started is to construct a view in the UI, then learn more about the export API via the generated code snippets.
+
+
+<Tabs groupId="client-layer">
+    <TabItem value="python_sdk" label="Python">
+    To fetch calls using the Python API, you can use the [`client.calls`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-calls) method:
+
+    ```python
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Fetch calls
+    calls = client.calls(filter=...)
+    ```
+
+    :::info[Notice: Evolving APIs]
+    Currently, it is easier to use the lower-level [`calls_query_stream`](../../reference/python-sdk/weave/trace_server_bindings/weave.trace_server_bindings.remote_http_trace_server#method-calls_query_stream) API as it is more flexible and powerful.
+    In the near future, we will move all functionality to the above client API.
+
+    ```python
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    calls = client.server.calls_query_stream({
+        "project_id": "",
+        "filter": {},
+        "query": {},
+        "sort_by": [],
+    })
+    ```
+    :::
+    </TabItem>
+    <TabItem value="service_api" label="HTTP API">
+    The most powerful query layer is at the Service API. To fetch calls using the Service API, you can make a request to the [`/calls/stream_query`](../../reference/service-api/calls-query-stream-calls-stream-query-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/calls/stream_query' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+    "project_id": "string",
+    "filter": {
+        "op_names": [
+            "string"
+        ],
+        "input_refs": [
+            "string"
+        ],
+        "output_refs": [
+            "string"
+        ],
+        "parent_ids": [
+            "string"
+        ],
+        "trace_ids": [
+            "string"
+        ],
+        "call_ids": [
+            "string"
+        ],
+        "trace_roots_only": true,
+        "wb_user_ids": [
+            "string"
+        ],
+        "wb_run_ids": [
+            "string"
+        ]
+    },
+    "limit": 100,
+    "offset": 0,
+    "sort_by": [
         {
-            "role": "system",
-            "content": "You will be provided with unstructured data, and your task is to parse it one JSON dictionary with fruit, color and flavor as keys."
-        },
-        {
-            "role": "user",
-            "content": sentence
+        "field": "string",
+        "direction": "asc"
         }
-        ],
-        temperature=0.7,
-        response_format={ "type": "json_object" }
-    )
-    extracted = response.choices[0].message.content
-    return json.loads(extracted)
+    ],
+    "query": {
+        "$expr": {}
+    },
+    "include_costs": true,
+    "include_feedback": true,
+    "columns": [
+        "string"
+    ],
+    "expand_columns": [
+        "string"
+    ]
+    }'
+    ```
+    </TabItem>
+</Tabs>
 
-weave.init('intro-example')
-sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
+{/* ## Compare Calls
 
-# highlight-next-line
-with weave.attributes({'user_id': 'lukas', 'env': 'production'}):
-    extract_fruit(sentence)
-```
+:::info[Comming Soon]
+::: */}
+
+## Call FAQ
+
+{/* TODO:
+Common Questions / Variations:
+* Images
+* Ops
+* Cost?
+* General data model
+*/}
+
+#### Call Schema
+
+Please see the [schema](../../reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface#class-callschema) for a complete list of fields.
+
+
+| Property | Type | Description |
+|----------|------|-------------|
+| id | string (uuid) | Unique identifier for the call |
+| project_id | string (optional) | Associated project identifier |
+| op_name | string | Name of the operation (can be a reference) |
+| display_name | string (optional) | User-friendly name for the call |
+| trace_id | string (uuid) | Identifier for the trace this call belongs to |
+| parent_id | string (uuid) | Identifier of the parent call |
+| started_at | datetime | Timestamp when the call started |
+| attributes | Dict[str, Any] | User-defined metadata about the call |
+| inputs | Dict[str, Any] | Input parameters for the call |
+| ended_at | datetime (optional) | Timestamp when the call ended |
+| exception | string (optional) | Error message if the call failed |
+| output | Any (optional) | Result of the call |
+| summary | Optional[SummaryMap] | Post-execution summary information |
+| wb_user_id | Optional[str] | Associated Weights & Biases user ID |
+| wb_run_id | Optional[str] | Associated Weights & Biases run ID |
+| deleted_at | datetime (optional) | Timestamp of call deletion, if applicable |
+
+The table above outlines the key properties of a Call in Weave. Each property plays a crucial role in tracking and managing function calls:
+
+- The `id`, `trace_id`, and `parent_id` fields help in organizing and relating calls within the system.
+- Timing information (`started_at`, `ended_at`) allows for performance analysis.
+- The `attributes` and `inputs` fields provide context for the call, while `output` and `summary` capture the results.
+- Integration with Weights & Biases is facilitated through `wb_user_id` and `wb_run_id`.
+
+This comprehensive set of properties enables detailed tracking and analysis of function calls throughout your project.
+
+
+Calculated Fields:
+    * Cost
+    * Duration
+    * Status
+
+
