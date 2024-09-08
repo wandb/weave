@@ -38,6 +38,7 @@ sidebar_label: trace_server_interface
 - [`trace_server_interface.Feedback`](#class-feedback)
 - [`trace_server_interface.FeedbackCreateReq`](#class-feedbackcreatereq)
 - [`trace_server_interface.FeedbackCreateRes`](#class-feedbackcreateres)
+- [`trace_server_interface.FeedbackDict`](#class-feedbackdict)
 - [`trace_server_interface.FeedbackPayloadNoteReq`](#class-feedbackpayloadnotereq)
 - [`trace_server_interface.FeedbackPayloadReactionReq`](#class-feedbackpayloadreactionreq)
 - [`trace_server_interface.FeedbackPurgeReq`](#class-feedbackpurgereq)
@@ -96,7 +97,7 @@ sidebar_label: trace_server_interface
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L190"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L201"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallEndReq`
 
@@ -110,7 +111,7 @@ sidebar_label: trace_server_interface
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L194"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L205"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallEndRes`
 
@@ -121,7 +122,7 @@ sidebar_label: trace_server_interface
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L198"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L209"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallReadReq`
 
@@ -137,7 +138,7 @@ sidebar_label: trace_server_interface
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L204"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L215"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallReadRes`
 
@@ -151,7 +152,7 @@ sidebar_label: trace_server_interface
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L61"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L72"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallSchema`
 
@@ -179,7 +180,7 @@ sidebar_label: trace_server_interface
 - `deleted_at`: `typing.Optional[datetime.datetime]`
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L101"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L112"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `serialize_typed_dicts`
 
@@ -194,7 +195,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L181"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L192"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallStartReq`
 
@@ -208,7 +209,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L185"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L196"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallStartRes`
 
@@ -223,7 +224,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L276"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L296"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallUpdateReq`
 
@@ -240,7 +241,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L288"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L308"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallUpdateRes`
 
@@ -251,7 +252,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L208"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L219"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallsDeleteReq`
 
@@ -267,7 +268,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L216"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L227"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallsDeleteRes`
 
@@ -278,7 +279,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L220"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L231"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallsFilter`
 
@@ -300,7 +301,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L241"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L252"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallsQueryReq`
 
@@ -317,12 +318,13 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 - `sort_by`: `typing.Optional[typing.List[SortBy]]`
 - `query`: `typing.Optional[weave.trace_server.interface.query.Query]`
 - `include_costs`: `typing.Optional[bool]`
+- `include_feedback`: `typing.Optional[bool]`
 - `columns`: `typing.Optional[typing.List[str]]`
 - `expand_columns`: `typing.Optional[typing.List[str]]`
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L262"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L282"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallsQueryRes`
 
@@ -336,7 +338,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L266"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L286"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallsQueryStatsReq`
 
@@ -352,7 +354,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L272"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L292"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `CallsQueryStatsRes`
 
@@ -366,7 +368,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L136"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L147"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `EndedCallSchemaForInsert`
 
@@ -384,7 +386,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 - `summary`: `<class 'SummaryInsertMap'>`
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L152"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L163"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `serialize_typed_dicts`
 
@@ -399,7 +401,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L569"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L589"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `EnsureProjectExistsRes`
 
@@ -426,7 +428,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L518"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L538"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Feedback`
 
@@ -447,7 +449,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L492"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L512"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FeedbackCreateReq`
 
@@ -466,7 +468,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L511"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L531"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FeedbackCreateRes`
 
@@ -483,7 +485,20 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L488"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L46"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+## <kbd>class</kbd> `FeedbackDict`
+
+
+
+
+
+
+
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L508"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FeedbackPayloadNoteReq`
 
@@ -497,7 +512,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L484"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L504"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FeedbackPayloadReactionReq`
 
@@ -511,7 +526,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L541"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L561"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FeedbackPurgeReq`
 
@@ -526,7 +541,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L546"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L566"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FeedbackPurgeRes`
 
@@ -537,7 +552,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L523"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L543"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FeedbackQueryReq`
 
@@ -556,7 +571,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L536"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L556"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FeedbackQueryRes`
 
@@ -570,7 +585,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L560"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L580"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FileContentReadReq`
 
@@ -585,7 +600,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L565"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L585"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FileContentReadRes`
 
@@ -599,7 +614,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L550"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L570"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FileCreateReq`
 
@@ -615,7 +630,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L556"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L576"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `FileCreateRes`
 
@@ -655,7 +670,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L324"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L344"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ObjCreateReq`
 
@@ -669,7 +684,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L328"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L348"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ObjCreateRes`
 
@@ -683,7 +698,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L349"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L369"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ObjQueryReq`
 
@@ -698,7 +713,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L354"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L374"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ObjQueryRes`
 
@@ -712,7 +727,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L332"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L352"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ObjReadReq`
 
@@ -728,7 +743,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L338"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L358"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ObjReadRes`
 
@@ -742,7 +757,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L157"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L168"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ObjSchema`
 
@@ -765,7 +780,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L170"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L181"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ObjSchemaForInsert`
 
@@ -781,7 +796,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L342"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L362"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ObjectVersionFilter`
 
@@ -798,7 +813,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L292"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L312"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `OpCreateReq`
 
@@ -812,7 +827,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L296"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L316"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `OpCreateRes`
 
@@ -826,7 +841,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L315"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L335"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `OpQueryReq`
 
@@ -841,7 +856,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L320"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L340"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `OpQueryRes`
 
@@ -855,7 +870,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L300"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L320"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `OpReadReq`
 
@@ -871,7 +886,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L306"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L326"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `OpReadRes`
 
@@ -885,7 +900,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L310"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L330"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `OpVersionFilter`
 
@@ -900,7 +915,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L476"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L496"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `RefsReadBatchReq`
 
@@ -914,7 +929,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L480"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L500"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `RefsReadBatchRes`
 
@@ -928,7 +943,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L232"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L243"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `SortBy`
 
@@ -943,7 +958,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L109"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L120"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `StartedCallSchemaForInsert`
 
@@ -967,7 +982,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L53"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L64"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `SummaryInsertMap`
 
@@ -980,7 +995,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L57"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L68"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `SummaryMap`
 
@@ -993,7 +1008,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L417"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L437"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableAppendSpec`
 
@@ -1007,7 +1022,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L413"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L433"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableAppendSpecPayload`
 
@@ -1021,7 +1036,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L358"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L378"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableCreateReq`
 
@@ -1035,7 +1050,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L456"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L476"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableCreateRes`
 
@@ -1049,7 +1064,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L434"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L454"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableInsertSpec`
 
@@ -1063,7 +1078,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L429"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L449"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableInsertSpecPayload`
 
@@ -1078,7 +1093,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L425"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L445"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TablePopSpec`
 
@@ -1092,7 +1107,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L421"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L441"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TablePopSpecPayload`
 
@@ -1106,7 +1121,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L464"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L484"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableQueryReq`
 
@@ -1124,7 +1139,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L472"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L492"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableQueryRes`
 
@@ -1138,7 +1153,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L460"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L480"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableRowFilter`
 
@@ -1152,7 +1167,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L451"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L471"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableRowSchema`
 
@@ -1167,7 +1182,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L176"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L187"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableSchemaForInsert`
 
@@ -1182,7 +1197,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L441"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L461"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableUpdateReq`
 
@@ -1198,7 +1213,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L447"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L467"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TableUpdateRes`
 
@@ -1212,7 +1227,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L573"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L593"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `TraceServerInterface`
 
@@ -1224,7 +1239,7 @@ serialize_typed_dicts(v: Dict[str, Any]) → Dict[str, Any]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L581"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L601"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `call_end`
 
@@ -1238,7 +1253,7 @@ call_end(req: CallEndReq) → CallEndRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L582"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L602"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `call_read`
 
@@ -1252,7 +1267,7 @@ call_read(req: CallReadReq) → CallReadRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L580"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L600"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `call_start`
 
@@ -1266,7 +1281,7 @@ call_start(req: CallStartReq) → CallStartRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L587"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L607"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `call_update`
 
@@ -1280,7 +1295,7 @@ call_update(req: CallUpdateReq) → CallUpdateRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L585"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L605"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `calls_delete`
 
@@ -1294,7 +1309,7 @@ calls_delete(req: CallsDeleteReq) → CallsDeleteRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L583"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L603"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `calls_query`
 
@@ -1308,7 +1323,7 @@ calls_query(req: CallsQueryReq) → CallsQueryRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L586"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L606"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `calls_query_stats`
 
@@ -1322,7 +1337,7 @@ calls_query_stats(req: CallsQueryStatsReq) → CallsQueryStatsRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L584"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L604"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `calls_query_stream`
 
@@ -1336,7 +1351,7 @@ calls_query_stream(req: CallsQueryReq) → Iterator[CallSchema]
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L574"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L594"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `ensure_project_exists`
 
@@ -1350,7 +1365,7 @@ ensure_project_exists(entity: str, project: str) → EnsureProjectExistsRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L604"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L624"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `feedback_create`
 
@@ -1364,7 +1379,7 @@ feedback_create(req: FeedbackCreateReq) → FeedbackCreateRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L606"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L626"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `feedback_purge`
 
@@ -1378,7 +1393,7 @@ feedback_purge(req: FeedbackPurgeReq) → FeedbackPurgeRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L605"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L625"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `feedback_query`
 
@@ -1392,7 +1407,7 @@ feedback_query(req: FeedbackQueryReq) → FeedbackQueryRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L603"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L623"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `file_content_read`
 
@@ -1406,7 +1421,7 @@ file_content_read(req: FileContentReadReq) → FileContentReadRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L602"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L622"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `file_create`
 
@@ -1420,7 +1435,7 @@ file_create(req: FileCreateReq) → FileCreateRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L595"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L615"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `obj_create`
 
@@ -1434,7 +1449,7 @@ obj_create(req: ObjCreateReq) → ObjCreateRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L596"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L616"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `obj_read`
 
@@ -1448,7 +1463,7 @@ obj_read(req: ObjReadReq) → ObjReadRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L597"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L617"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `objs_query`
 
@@ -1462,7 +1477,7 @@ objs_query(req: ObjQueryReq) → ObjQueryRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L590"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L610"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `op_create`
 
@@ -1476,7 +1491,7 @@ op_create(req: OpCreateReq) → OpCreateRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L591"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L611"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `op_read`
 
@@ -1490,7 +1505,7 @@ op_read(req: OpReadReq) → OpReadRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L592"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L612"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `ops_query`
 
@@ -1504,7 +1519,7 @@ ops_query(req: OpQueryReq) → OpQueryRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L601"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L621"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `refs_read_batch`
 
@@ -1518,7 +1533,7 @@ refs_read_batch(req: RefsReadBatchReq) → RefsReadBatchRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L598"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L618"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `table_create`
 
@@ -1532,7 +1547,7 @@ table_create(req: TableCreateReq) → TableCreateRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L600"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L620"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `table_query`
 
@@ -1546,7 +1561,7 @@ table_query(req: TableQueryReq) → TableQueryRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L599"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L619"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `table_update`
 
@@ -1561,7 +1576,7 @@ table_update(req: TableUpdateReq) → TableUpdateRes
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L46"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace_server/trace_server_interface.py#L56"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `WeaveSummarySchema`
 
