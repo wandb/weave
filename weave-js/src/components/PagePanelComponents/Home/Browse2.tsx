@@ -22,7 +22,6 @@ import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 import {Browse2ObjectPage} from './Browse2/Browse2ObjectPage';
 import {Browse2ObjectTypePage} from './Browse2/Browse2ObjectTypePage';
-import {Browse2ObjectVersionItemPage} from './Browse2/Browse2ObjectVersionItemPage';
 import {Browse2ProjectPage} from './Browse2/Browse2ProjectPage';
 import {Browse2TracePage} from './Browse2/Browse2TracePage';
 import {Browse2TracesPage} from './Browse2/Browse2TracesPage';
@@ -171,10 +170,6 @@ const Browse2Mounted: FC = props => {
           </Route>
           <Route path={`/:entity/:project/trace`}>
             <Browse2TracesPage />
-          </Route>
-          <Route
-            path={`/:entity/:project/:rootType/:objName/:objVersion/:refExtra*`}>
-            <Browse2ObjectVersionItemPage />
           </Route>
           <Route path={`/:entity/:project/:rootType/:objName`}>
             <Browse2ObjectPage />
