@@ -30,6 +30,7 @@ The top-level functions and classes for working with Weave.
 - [`call_context.get_current_call`](#function-get_current_call): Get the Call object for the currently executing Op, within that Op.
 - [`api.finish`](#function-finish): Stops logging to weave.
 - [`op.op`](#function-op): A decorator to weave op-ify a function or method.  Works for both sync and async.
+- [`api.attributes`](#function-attributes): Context manager for setting attributes on a call.
 
 
 ---
@@ -167,7 +168,7 @@ print(mycall.id)
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L246"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/api.py#L256"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `finish`
 
@@ -181,7 +182,7 @@ Following finish, calls of weave.op() decorated functions will no longer be logg
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L296"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L327"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `op`
 
@@ -213,6 +214,28 @@ async def extract():
      )
 
 await extract()  # calls the function and tracks the call in the Weave UI
+``` 
+
+---
+
+<a href="https://github.com/wandb/weave/blob/master/docs/weave/trace/api/attributes#L186"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+
+### <kbd>function</kbd> `attributes`
+
+```python
+attributes(attributes: dict[str, Any]) → Iterator
+```
+
+Context manager for setting attributes on a call. 
+
+
+
+**Example:**
+ 
+
+```python
+with weave.attributes({'env': 'production'}):
+     print(my_function.call("World"))
 ``` 
 
 ---
