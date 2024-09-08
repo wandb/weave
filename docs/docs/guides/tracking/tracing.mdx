@@ -13,32 +13,28 @@ import BasicCallImage from '@site/static/img/screenshots/basic_call.png';
     BasicCallImage,
     TracingCallsFilterImage,
   ]}
-  alt="Screenshot of many calls"
+  alt="Screenshot of Weave Calls"
   title="Weave Calls"
 />
 
-
 :::info[Calls]
-Calls are the fundamental building block in Weave. 
-They represent a single execution of a function, including the inputs (aka arguments), outputs (aka return value), and any relevant metadata such as duration, execptions, llm usage, etc.
-Those familiar with the [OpenTelemetry](https://opentelemetry.io) data model will find Calls to be quite similar.
-A Call can belong to a Trace, which is a collection of calls that belong to the same execution context.
-Furthermore, a Call can have children Calls (and a parent Call), forming a tree structure.
+Calls are the fundamental building block in Weave. They represent a single execution of a function, including:
+- Inputs (arguments)
+- Outputs (return value) 
+- Metadata (duration, exceptions, LLM usage, etc.)
+
+Calls are similar to spans in the [OpenTelemetry](https://opentelemetry.io) data model. A Call can:
+- Belong to a Trace (a collection of calls in the same execution context)
+- Have parent and child Calls, forming a tree structure
 :::
 
+## Creating Calls
 
-## Create a Call
-
-Calls can be created using a number of different methods:
-
-1. Automatically by integrations with common LLM libraries
-2. Captured at runtime by Python decorators
-3. Manually created by directly using the API
+There are three main ways to create Calls in Weave:
 
 ### 1. Automatic Tracking of LLM Libraries
 
-The vast majority of Weave users will be using one of many standard LLM libraries, such as `openai`, `anthropic`, `cohere`, `mistral`, etc. 
-Weave automatically tracks [calls to these libraries](../integrations/index.md). All you need to do is call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) once at the beginning of your program.
+Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`, `anthropic`, `cohere`, and `mistral`. Simply call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) at the start of your program:
 
 ```python showLineNumbers
 # highlight-next-line
@@ -171,7 +167,7 @@ curl -L 'https://trace.wandb.ai/call/start' \
 
 
 
-## View a Call
+## Viewing Calls
 <Tabs groupId="client-layer">
     <TabItem value="web_app" label="Web App">
     To view a call in the web app:
@@ -215,7 +211,7 @@ curl -L 'https://trace.wandb.ai/call/start' \
 </Tabs>
 
 
-## Update a Call
+## Updating Calls
 
 Calls are mostly immutable once created, however, there are a few mutations which are supported:
 * [Set Display Name](#set-display-name)
@@ -286,7 +282,7 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
 
     </TabItem>
     <TabItem value="service_api" label="HTTP API">
-    To delete a call using the Service API, you can make a request to the [`/call/delete`](../../reference/service-api/calls-delete-calls-delete-post.api.mdx) endpoint.
+    To delete a call using the Service API, you can make a request to the [`/calls/delete`](../../reference/service-api/calls-delete-calls-delete-post.api.mdx) endpoint.
 
     ```bash
     curl -L 'https://trace.wandb.ai/calls/delete' \
@@ -302,7 +298,7 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
     </TabItem>
 </Tabs>
 
-## Query & Export Calls
+## Querying & Exporting Calls
 
 <DesktopWindow 
   images={[
