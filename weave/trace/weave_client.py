@@ -135,9 +135,7 @@ def map_to_refs(obj: Any) -> Any:
 
 @dataclasses.dataclass
 class Call:
-    """
-    A Call represents a single operation that was executed as part of a trace.
-    """
+    """A Call represents a single operation that was executed as part of a trace."""
 
     op_name: str
     trace_id: str
@@ -193,9 +191,7 @@ class Call:
         )
 
     def delete(self) -> bool:
-        """
-        Delete the call.
-        """
+        """Delete the call."""
         client = weave_client_context.require_weave_client()
         return client.delete_call(call=self)
 
@@ -213,7 +209,6 @@ class Call:
         call.set_display_name("My Custom Display Name")
         ```
         """
-
         if name == "":
             raise ValueError(
                 "Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name."

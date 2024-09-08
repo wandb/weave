@@ -99,7 +99,7 @@ print(my_function.call("World"))
 
 Sometimes you may want to override the display name of a call. You can achieve this in one of two ways:
 
-1. Change the display name on a per-call basis. This uses the [`Op.call`](../../reference/python-sdk/weave/trace/weave.trace.op.md#function-call) method to return a `Call` object, which you can then use to set the display name using [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#function-set_display_name).
+1. Change the display name on a per-call basis. This uses the [`Op.call`](../../reference/python-sdk/weave/trace/weave.trace.op.md#function-call) method to return a `Call` object, which you can then use to set the display name using [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-set_display_name).
 ```python showLineNumbers
 # highlight-next-line
 # Use the `call` method which 
@@ -230,7 +230,7 @@ All of these mutations can be performed from the UI by navigating to the call de
 
 <Tabs groupId="client-layer">
     <TabItem value="python_sdk" label="Python">
-    In order to set the display name of a call, you can use the [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#function-set_display_name) method.
+    In order to set the display name of a call, you can use the [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-set_display_name) method.
 
     ```python showLineNumbers
     import weave
@@ -269,7 +269,7 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
 
 <Tabs groupId="client-layer">
     <TabItem value="python_sdk" label="Python">
-    To delete a call using the Python API, you can use the [`Call.delete`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#function-delete) method.
+    To delete a call using the Python API, you can use the [`Call.delete`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-delete) method.
 
     ```python showLineNumbers
     import weave
@@ -286,7 +286,7 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
 
     </TabItem>
     <TabItem value="service_api" label="HTTP API">
-    To delete a call using the Service API, you can make a request to the [`/call/delete`](../../reference/service-api/call-delete-call-delete-post.api.mdx) endpoint.
+    To delete a call using the Service API, you can make a request to the [`/call/delete`](../../reference/service-api/calls-delete-calls-delete-post.api.mdx) endpoint.
 
     ```bash
     curl -L 'https://trace.wandb.ai/calls/delete' \

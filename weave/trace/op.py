@@ -1,6 +1,4 @@
-"""
-Defines the Op protocol and related functions.
-"""
+"""Defines the Op protocol and related functions."""
 
 import inspect
 import typing

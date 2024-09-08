@@ -20,5 +20,5 @@ generate_notebooks_docs:
 generate_doc_images:
 	python scripts/generate_images.py
 
-generate_reference_docs: generate_service_api_docs generate_python_sdk_docs generate_notebooks_docs generate_doc_images
+generate_all: generate_service_api_docs generate_python_sdk_docs generate_notebooks_docs generate_doc_images
 	yarn build
