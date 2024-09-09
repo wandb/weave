@@ -4,6 +4,7 @@ import pytest
 
 import weave
 from weave import Evaluation, Model
+from weave.tests.trace.util import AnyIntMatcher
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -392,7 +393,12 @@ async def test_evaluation_data_topology(client):
                 "prompt_tokens": 11,
                 "total_tokens": 39,
             }
-        }
+        },
+        "weave": {
+            "latency_ms": AnyIntMatcher(),
+            "trace_name": "SimpleModelWithConfidence.predict",
+            "status": "success",
+        },
     }
 
     # Prediction
@@ -464,7 +470,12 @@ async def test_evaluation_data_topology(client):
                 ]
                 * 2,
             }
-        }
+        },
+        "weave": {
+            "latency_ms": AnyIntMatcher(),
+            "trace_name": "Evaluation.evaluate",
+            "status": "success",
+        },
     }
 
     # Summarizers
