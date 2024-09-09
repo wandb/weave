@@ -1,4 +1,5 @@
 import datetime
+from enum import Enum
 from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
@@ -53,10 +54,17 @@ class FeedbackDict(TypedDict, total=False):
     wb_user_id: Optional[str]
 
 
+class TraceStatus(str, Enum):
+    SUCCESS = "success"
+    ERROR = "error"
+    RUNNING = "running"
+
+
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
-    status: Optional[Literal["success", "error", "running"]]
-    nice_trace_name: Optional[str]
-    latency: Optional[int]
+    status: Optional[TraceStatus]
+    trace_name: Optional[str]
+    # latency in milliseconds
+    latency_ms: Optional[int]
     costs: Optional[Dict[str, LLMCostSchema]]
     feedback: Optional[List[FeedbackDict]]
 
