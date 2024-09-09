@@ -438,56 +438,65 @@ function makeCodeText(
   expandColumns: string[],
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
 ) {
+  const SPACER = '  ';
   let codeStr = `import weave\nassert weave.__version__ >= "0.50.14", "Please upgrade weave!" \n\nclient = weave.init("${entity}/${project}")`;
   codeStr += `\ncalls = client.server.calls_query_stream({\n`;
-  codeStr += `   "project_id": "${entity}/${project}",\n`;
+  codeStr += `${SPACER}"project_id": "${entity}/${project}",\n`;
 
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
-    codeStr += `   "filter": {"call_ids": ["${filteredCallIds.join(
+    codeStr += `${SPACER}"filter": {\n${SPACER}${SPACER}"call_ids": ["${filteredCallIds.join(
       '", "'
-    )}"]},\n`;
+    )}"]\n${SPACER}},\n`;
     if (expandColumns.length > 0) {
       const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
-      codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
+      codeStr += `${SPACER}"expand_columns": ${expandColumnsStr},\n`;
     }
     // specifying call_ids ignores other filters, return early
     codeStr += `})`;
     return codeStr;
   }
   if (Object.values(filter).some(value => value !== undefined)) {
-    codeStr += `   "filter": {`;
+    codeStr += `${SPACER}"filter": {\n`;
     if (filter.opVersionRefs) {
-      codeStr += `"op_names": ["${filter.opVersionRefs.join('", "')}"],`;
+      codeStr += `${SPACER.repeat(2)}"op_names": ["${filter.opVersionRefs.join(
+        '", "'
+      )}"\n`;
     }
     if (filter.runIds) {
-      codeStr += `"run_ids": ["${filter.runIds.join('", "')}"],`;
+      codeStr += `${SPACER.repeat(2)}"run_ids": ["${filter.runIds.join(
+        '", "'
+      )}"\n`;
     }
     if (filter.userIds) {
-      codeStr += `"user_ids": ["${filter.userIds.join('", "')}"],`;
+      codeStr += `${SPACER.repeat(2)}"user_ids": ["${filter.userIds.join(
+        '", "'
+      )}"\n`;
     }
     if (filter.traceId) {
-      codeStr += `"trace_ids": ["${filter.traceId}"],`;
+      codeStr += `${SPACER.repeat(2)}"trace_ids": ["${filter.traceId}"],\n`;
     }
     if (filter.traceRootsOnly) {
-      codeStr += `"trace_roots_only": True,`;
+      codeStr += `${SPACER.repeat(2)}"trace_roots_only": True,\n`;
     }
     if (filter.parentIds) {
-      codeStr += `"parent_ids": ["${filter.parentIds.join('", "')}"],`;
+      codeStr += `${SPACER.repeat(2)}"parent_ids": ["${filter.parentIds.join(
+        '", "'
+      )}"\n`;
     }
-    codeStr = codeStr.slice(0, -1);
-    codeStr += `},\n`;
+    codeStr = codeStr.slice(0, -2);
+    codeStr += `\n${SPACER}},\n`;
   }
   if (query) {
-    codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;
+    codeStr += `${SPACER}"query": ${JSON.stringify(query, null, 0)},\n`;
   }
   if (expandColumns.length > 0) {
     const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
-    codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
+    codeStr += `${SPACER}"expand_columns": ${expandColumnsStr},\n`;
   }
 
   if (sortBy.length > 0) {
-    codeStr += `   "sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
+    codeStr += `${SPACER}"sort_by": ${JSON.stringify(sortBy, null, 0)},\n`;
   }
 
   codeStr += `})`;
