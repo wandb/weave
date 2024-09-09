@@ -35,8 +35,8 @@ def cohere_accumulator_v2(
     acc: typing.Optional[dict],
     value: typing.Any,
 ) -> "NonStreamedChatResponse2":
-    from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
     from cohere.v2.types.assistant_message_response import AssistantMessageResponse
+    from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
 
     def _accumulate_content(
         prev: str,
@@ -48,7 +48,7 @@ def cohere_accumulator_v2(
 
     if acc is None:
         acc = NonStreamedChatResponse2(
-            id = value.id,
+            id=value.id,
             finish_reason=None,
             prompt=None,
             message=AssistantMessageResponse(
@@ -64,18 +64,17 @@ def cohere_accumulator_v2(
     if value is None:
         return acc
 
-    if value.type=="content-start" and value.delta.message.content.type=="text":
-        if len(acc.message.content)==value.index:
+    if value.type == "content-start" and value.delta.message.content.type == "text":
+        if len(acc.message.content) == value.index:
             acc.message.content.append(value.delta.message.content.text)
 
-    if value.type=="content-delta":
+    if value.type == "content-delta":
         _content = _accumulate_content(
-            acc.message.content[value.index],
-            value.delta.message.content.text
+            acc.message.content[value.index], value.delta.message.content.text
         )
         acc.message.content[value.index] = _content
 
-    if value.type=="message-end":
+    if value.type == "message-end":
         acc = acc.copy(
             update={
                 "finish_reason": value.delta.finish_reason,
@@ -101,9 +100,11 @@ def cohere_wrapper_v2(name: str) -> typing.Callable:
             @wraps(fn)
             def _wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
                 response = fn(*args, **kwargs)
-                
+
                 try:
-                    from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
+                    from cohere.v2.types.non_streamed_chat_response2 import (
+                        NonStreamedChatResponse2,
+                    )
                     from cohere.v2.types.usage import Usage
 
                     # Create a new instance with modified `usage`
@@ -114,7 +115,7 @@ def cohere_wrapper_v2(name: str) -> typing.Callable:
                     )
                     response = NonStreamedChatResponse2(**response_dict)
                 except:
-                    pass # prompt to upgrade cohere sdk
+                    pass  # prompt to upgrade cohere sdk
 
                 return response
 
@@ -141,8 +142,7 @@ def cohere_stream_wrapper_v2(name: str) -> typing.Callable:
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return add_accumulator(
-            op, 
-            make_accumulator=lambda inputs: cohere_accumulator_v2
+            op, make_accumulator=lambda inputs: cohere_accumulator_v2
         )
 
     return wrapper
