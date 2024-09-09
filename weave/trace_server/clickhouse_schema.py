@@ -134,6 +134,8 @@ class ObjCHInsertable(BaseModel):
     refs: typing.List[str]
     val_dump: str
     digest: str
+    deleted_at: typing.Optional[datetime.datetime]
+    created_at: typing.Optional[datetime.datetime]
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _object_id_v = field_validator("object_id")(validation.object_id_validator)
@@ -152,15 +154,3 @@ class SelectableCHObjSchema(BaseModel):
     version_index: int
     is_latest: int
     deleted_at: typing.Optional[datetime.datetime]
-
-
-class ObjDeleteCHInsertable(BaseModel):
-    project_id: str
-    object_id: str
-    digest: str
-    kind: str
-
-    deleted_at: datetime.datetime
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _object_id_v = field_validator("object_id")(validation.object_id_validator)

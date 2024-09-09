@@ -67,7 +67,6 @@ from .clickhouse_schema import (
     CallStartCHInsertable,
     CallUpdateCHInsertable,
     ObjCHInsertable,
-    ObjDeleteCHInsertable,
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
@@ -583,11 +582,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
             include_deleted=True,
         )
-        print("objs", objs)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
-        # Handle deleted objects explicitly
         if objs[0].deleted_at is not None:
             raise ObjectDeletedError(
                 f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
@@ -624,14 +621,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        # To ensure no data is deleted, read obj from db first, then
+        # create payload with deleted_at and insert
+        db_obj = self.obj_read(
+            tsi.ObjReadReq(
+                project_id=req.project_id,
+                object_id=req.object_id,
+                digest=req.digest,
+            )
+        ).obj
+
         deleted_at = datetime.datetime.now()
-        ch_obj = ObjDeleteCHInsertable(
+        ch_obj = ObjCHInsertable(
             project_id=req.project_id,
             object_id=req.object_id,
             digest=req.digest,
-            kind="object",
+            kind=get_kind(db_obj.val),
+            val_dump=json.dumps(db_obj.val),
+            refs=extract_refs_from_values(db_obj.val),
+            base_object_class=get_base_object_class(db_obj.val),
             deleted_at=deleted_at,
-            val_dump="",
+            created_at=db_obj.created_at,
         )
         self._insert(
             "object_versions",
@@ -1339,11 +1349,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         PARTITION BY project_id,
                         kind,
                         object_id
-                        ORDER BY created_at ASC
+                        ORDER BY deleted_at DESC, created_at ASC
                     ) AS _version_index_plus_1,
                     _version_index_plus_1 - 1 AS version_index,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest,
+                    -- is_latest should never be true if deleted_at is not null
+                    if(_version_index_plus_1 = version_count AND deleted_at IS NULL, 1, 0) AS is_latest,
                     deleted_at
                 FROM (
                     SELECT *,
@@ -1352,10 +1363,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             kind,
                             object_id,
                             digest
-                            ORDER BY created_at DESC
+                            ORDER BY deleted_at DESC, created_at DESC
                         ) AS rn
-                    FROM object_versions
+                    FROM object_versions 
                     WHERE project_id = {{project_id: String}}
+                        -- ensures that row_number() does not count deleted versions
+                        -- AND deleted_at IS NULL
                 )
                 WHERE rn = 1
             )
