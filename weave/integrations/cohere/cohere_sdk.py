@@ -8,6 +8,7 @@ from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
     from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
+    from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
 
 
 def cohere_accumulator(
@@ -27,6 +28,61 @@ def cohere_accumulator(
         if value.event_type == "stream-end" and value.is_finished:
             if value.response:
                 acc = value.response
+    return acc
+
+
+def cohere_accumulator_v2(
+    acc: typing.Optional[dict],
+    value: typing.Any,
+) -> "NonStreamedChatResponse2":
+    from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
+    from cohere.v2.types.assistant_message_response import AssistantMessageResponse
+
+    def _accumulate_content(
+        prev: str,
+        content: str,
+    ):
+        if isinstance(prev, str) and isinstance(content, str):
+            prev += content
+        return prev
+
+    if acc is None:
+        acc = NonStreamedChatResponse2(
+            id = value.id,
+            finish_reason=None,
+            prompt=None,
+            message=AssistantMessageResponse(
+                role=value.delta.message.role,
+                tool_calls=value.delta.message.tool_calls,
+                tool_plan=value.delta.message.tool_plan,
+                content=value.delta.message.content,
+                citations=value.delta.message.citations,
+            ),
+            usage=None,
+        )
+
+    if value is None:
+        return acc
+
+    if value.type=="content-start" and value.delta.message.content.type=="text":
+        if len(acc.message.content)==value.index:
+            acc.message.content.append(value.delta.message.content.text)
+
+    if value.type=="content-delta":
+        _content = _accumulate_content(
+            acc.message.content[value.index],
+            value.delta.message.content.text
+        )
+        acc.message.content[value.index] = _content
+
+    if value.type=="message-end":
+        acc = acc.copy(
+            update={
+                "finish_reason": value.delta.finish_reason,
+                "usage": value.delta.usage,
+            }
+        )
+
     return acc
 
 
@@ -80,6 +136,18 @@ def cohere_stream_wrapper(name: str) -> typing.Callable:
     return wrapper
 
 
+def cohere_stream_wrapper_v2(name: str) -> typing.Callable:
+    def wrapper(fn: typing.Callable) -> typing.Callable:
+        op = weave.op()(fn)
+        op.name = name  # type: ignore
+        return add_accumulator(
+            op, 
+            make_accumulator=lambda inputs: cohere_accumulator_v2
+        )
+
+    return wrapper
+
+
 cohere_patcher = MultiPatcher(
     [
         SymbolPatcher(
@@ -116,6 +184,18 @@ cohere_patcher = MultiPatcher(
             lambda: importlib.import_module("cohere"),
             "AsyncClientV2.chat",
             cohere_wrapper_v2("cohere.AsyncClientV2.chat"),
+        ),
+        # Add patch for chat_stream method v2
+        SymbolPatcher(
+            lambda: importlib.import_module("cohere"),
+            "ClientV2.chat_stream",
+            cohere_stream_wrapper_v2("cohere.ClientV2.chat_stream"),
+        ),
+        # Add patch for async chat_stream method v2
+        SymbolPatcher(
+            lambda: importlib.import_module("cohere"),
+            "AsyncClientV2.chat_stream",
+            cohere_stream_wrapper_v2("cohere.AsyncClientV2.chat_stream"),
         ),
     ]
 )
