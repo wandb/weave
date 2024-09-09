@@ -1,16 +1,17 @@
-import React from 'react';
 import Autocomplete, {AutocompleteProps} from '@mui/material/Autocomplete';
+import {createTheme, ThemeProvider} from '@mui/material/styles';
+import React from 'react';
+
 import {
-  TEAL_500,
-  TEAL_600,
-  TEAL_300,
   MOON_100,
-  MOON_800,
   MOON_250,
   MOON_500,
+  MOON_800,
+  TEAL_300,
+  TEAL_500,
+  TEAL_600,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
-import {createTheme, ThemeProvider} from '@mui/material/styles';
 
 const HEIGHTS = {
   small: '24px',
@@ -117,7 +118,7 @@ type AdditionalProps = {
   size?: SelectSize;
 };
 
-export const AutoComplete = <Option, multiple, disableClearable, freeSolo>(
+export const AutoComplete = <Option,>(
   props: AutocompleteProps<Option, boolean, boolean, boolean> & AdditionalProps
 ) => {
   return (
