@@ -134,12 +134,15 @@ class ObjCHInsertable(BaseModel):
     refs: typing.List[str]
     val_dump: str
     digest: str
-    deleted_at: typing.Optional[datetime.datetime]
-    created_at: typing.Optional[datetime.datetime]
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _object_id_v = field_validator("object_id")(validation.object_id_validator)
     _refs = field_validator("refs")(validation.refs_list_validator)
+
+
+class ObjDeleteCHInsertable(ObjCHInsertable):
+    deleted_at: datetime.datetime
+    created_at: datetime.datetime
 
 
 class SelectableCHObjSchema(BaseModel):

@@ -67,6 +67,7 @@ from .clickhouse_schema import (
     CallStartCHInsertable,
     CallUpdateCHInsertable,
     ObjCHInsertable,
+    ObjDeleteCHInsertable,
     SelectableCHCallSchema,
     SelectableCHObjSchema,
 )
@@ -586,6 +587,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         if objs[0].deleted_at is not None:
+            # this does not get propogated to the client
             raise ObjectDeletedError(
                 f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
             )
@@ -632,7 +634,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ).obj
 
         deleted_at = datetime.datetime.now()
-        ch_obj = ObjCHInsertable(
+        ch_obj = ObjDeleteCHInsertable(
             project_id=req.project_id,
             object_id=req.object_id,
             digest=req.digest,
@@ -1324,6 +1326,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 project_id,
                 object_id,
                 created_at,
+                deleted_at,
                 kind,
                 base_object_class,
                 refs,
@@ -1333,12 +1336,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _version_index_plus_1,
                 version_index,
                 version_count,
-                is_latest,
-                deleted_at
+                is_latest
             FROM (
                 SELECT project_id,
                     object_id,
                     created_at,
+                    deleted_at,
                     kind,
                     base_object_class,
                     refs,
@@ -1349,13 +1352,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         PARTITION BY project_id,
                         kind,
                         object_id
-                        ORDER BY deleted_at DESC, created_at ASC
+                        ORDER BY created_at ASC
                     ) AS _version_index_plus_1,
                     _version_index_plus_1 - 1 AS version_index,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    -- is_latest should never be true if deleted_at is not null
-                    if(_version_index_plus_1 = version_count AND deleted_at IS NULL, 1, 0) AS is_latest,
-                    deleted_at
+                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
                 FROM (
                     SELECT *,
                         row_number() OVER (
@@ -1363,14 +1364,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             kind,
                             object_id,
                             digest
-                            ORDER BY deleted_at DESC, created_at DESC
+                            ORDER BY created_at DESC
                         ) AS rn
-                    FROM object_versions 
+                    FROM object_versions
                     WHERE project_id = {{project_id: String}}
-                        -- ensures that row_number() does not count deleted versions
-                        -- AND deleted_at IS NULL
                 )
-                WHERE rn = 1
+                WHERE rn = 1 AND deleted_at IS NULL
             )
             WHERE project_id = {{project_id: String}} AND
                 {conditions_part}
@@ -1388,6 +1387,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "project_id",
                                 "object_id",
                                 "created_at",
+                                "deleted_at",
                                 "kind",
                                 "base_object_class",
                                 "refs",
@@ -1398,7 +1398,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 "version_index",
                                 "version_count",
                                 "is_latest",
-                                "deleted_at",
                             ],
                             row,
                         )
