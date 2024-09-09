@@ -1,3 +1,4 @@
+import {ApolloProvider} from '@apollo/client';
 import {Home} from '@mui/icons-material';
 import {
   AppBar,
@@ -17,6 +18,7 @@ import {
   GridSortModel,
 } from '@mui/x-data-grid-pro';
 import {LicenseInfo} from '@mui/x-license-pro';
+import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/heuristics';
 import {opVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import _ from 'lodash';
@@ -163,6 +165,7 @@ const browse3Paths = (projectRoot: string) => [
 export const Browse3: FC<{
   hideHeader?: boolean;
   headerOffset?: number;
+  gorillaApolloEndpoint?: string;
   navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
@@ -174,23 +177,29 @@ export const Browse3: FC<{
   //     weaveContext.client.setPolling(previousPolling);
   //   };
   // }, [props.projectRoot, weaveContext]);
+  const apolloClient = useMemo(
+    () => makeGorillaApolloClient(props.gorillaApolloEndpoint),
+    [props.gorillaApolloEndpoint]
+  );
   return (
-    <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
-      <Switch>
-        <Route
-          path={[
-            ...browse3Paths(props.projectRoot(':entity', ':project')),
-            `/${URL_BROWSE3}/:entity`,
-            `/${URL_BROWSE3}`,
-          ]}>
-          <Browse3Mounted
-            hideHeader={props.hideHeader}
-            headerOffset={props.headerOffset}
-            navigateAwayFromProject={props.navigateAwayFromProject}
-          />
-        </Route>
-      </Switch>
-    </Browse3WeaveflowRouteContextProvider>
+    <ApolloProvider client={apolloClient}>
+      <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
+        <Switch>
+          <Route
+            path={[
+              ...browse3Paths(props.projectRoot(':entity', ':project')),
+              `/${URL_BROWSE3}/:entity`,
+              `/${URL_BROWSE3}`,
+            ]}>
+            <Browse3Mounted
+              hideHeader={props.hideHeader}
+              headerOffset={props.headerOffset}
+              navigateAwayFromProject={props.navigateAwayFromProject}
+            />
+          </Route>
+        </Switch>
+      </Browse3WeaveflowRouteContextProvider>
+    </ApolloProvider>
   );
 };
 

@@ -232,6 +232,28 @@ export function fuzzyMatchHighlight(
   return fuzzyMatchHighlightPieces(fuzzyMatchSplit(str, query), matchStyle);
 }
 
+export function regexMatchHighlight(
+  str: string,
+  regex: RegExp | null,
+  matchStyle: {[key: string]: string} = {fontWeight: 'bold'}
+): React.ReactFragment {
+  if (!regex) {
+    return str;
+  }
+  const pieces = [];
+  while (str) {
+    const match = regex.exec(str);
+    if (!match || !match[0]) {
+      pieces.push(str);
+      break;
+    }
+    pieces.push(str.substring(0, match.index));
+    pieces.push(match[0]);
+    str = str.substring(match.index + match[0].length);
+  }
+  return fuzzyMatchHighlightPieces(pieces, matchStyle);
+}
+
 export function preferExactMatch<T>(
   objs: T[],
   matchStr: string,
