@@ -37,17 +37,13 @@ There are three main ways to create Calls in Weave:
 Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`, `anthropic`, `cohere`, and `mistral`. Simply call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) at the start of your program:
 
 ```python showLineNumbers
-# highlight-next-line
 # Import Weave
-# highlight-next-line
 import weave
 
 from openai import OpenAI
 client = OpenAI()
 
-# highlight-next-line
 # Initialize Weave Tracing
-# highlight-next-line
 weave.init('intro-example')
 
 response = client.chat.completions.create(
@@ -70,19 +66,13 @@ However, often LLM applications have additional logic (such as pre/post processi
 Weave allows you to manually track these calls using the [`@weave.op`](../../reference/python-sdk/weave/index.md#function-op) decorator. For example:
 
 ```python showLineNumbers
-# highlight-next-line
 # Import Weave
-# highlight-next-line
 import weave
 
-# highlight-next-line
 # Initialize Weave Tracing
-# highlight-next-line
 weave.init('intro-example')
 
-# highlight-next-line
 # Decorate your function
-# highlight-next-line
 @weave.op
 def my_function(name: str):
     return f"Hello, {name}!"
@@ -97,7 +87,6 @@ Sometimes you may want to override the display name of a call. You can achieve t
 
 1. Change the display name on a per-call basis. This uses the [`Op.call`](../../reference/python-sdk/weave/trace/weave.trace.op.md#function-call) method to return a `Call` object, which you can then use to set the display name using [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-set_display_name).
 ```python showLineNumbers
-# highlight-next-line
 # Use the `call` method which 
 result, call = my_function.call("World")
 call.set_display_name("My Custom Display Name")
@@ -130,9 +119,7 @@ When calling tracked functions, you can add additional metadata to the call by u
 ```python showLineNumbers
 # ... continued from above ...
 
-# highlight-next-line
 # Add additional "attributes" to the call
-# highlight-next-line
 with weave.attributes({'env': 'production'}):
     print(my_function.call("World"))
 ```
