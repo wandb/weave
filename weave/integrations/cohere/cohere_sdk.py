@@ -41,7 +41,7 @@ def cohere_accumulator_v2(
     def _accumulate_content(
         prev: str,
         content: str,
-    ):
+    ) -> str:
         if isinstance(prev, str) and isinstance(content, str):
             prev += content
         return prev
@@ -65,17 +65,18 @@ def cohere_accumulator_v2(
         return acc
 
     if value.type == "content-start" and value.delta.message.content.type == "text":
-        if len(acc.message.content) == value.index:
-            acc.message.content.append(value.delta.message.content.text)
+        if len(acc.message.content) == value.index:  # type: ignore
+            acc.message.content.append(value.delta.message.content.text)  # type: ignore
 
     if value.type == "content-delta":
         _content = _accumulate_content(
-            acc.message.content[value.index], value.delta.message.content.text
+            acc.message.content[value.index],  # type: ignore
+            value.delta.message.content.text,  # type: ignore
         )
-        acc.message.content[value.index] = _content
+        acc.message.content[value.index] = _content  # type: ignore
 
     if value.type == "message-end":
-        acc = acc.copy(
+        acc = acc.copy(  # type: ignore
             update={
                 "finish_reason": value.delta.finish_reason,
                 "usage": value.delta.usage,
