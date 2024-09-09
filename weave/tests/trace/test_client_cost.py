@@ -62,23 +62,23 @@ def test_cost_apis(client):
     # query costs by id
     res = client.query_costs(cost_ids[2][0])
     assert len(res) == 1
-    assert res[0]["llm_id"] == "my_model_to_delete3"
+    assert res[0].llm_id == "my_model_to_delete3"
 
     # query costs by llm_id
     res = client.query_costs(llm_ids=["my_model_to_delete2"])
     assert len(res) == 1
-    assert res[0]["llm_id"] == "my_model_to_delete2"
-    assert res[0]["provider_id"] == "josiah"
+    assert res[0].llm_id == "my_model_to_delete2"
+    assert res[0].provider_id == "josiah"
 
     # query costs by llm_id
     res = client.query_costs(llm_ids=["my_model_to_delete", "my_model_to_delete4"])
     assert len(res) == 2
-    if res[0]["llm_id"] == "my_model_to_delete":
-        assert res[0]["completion_token_cost_unit"] == "USD"
-        assert res[1]["completion_token_cost_unit"] == "doubleoons"
+    if res[0].llm_id == "my_model_to_delete":
+        assert res[0].completion_token_cost_unit == "USD"
+        assert res[1].completion_token_cost_unit == "doubleoons"
     else:
-        assert res[0]["completion_token_cost_unit"] == "doubleoons"
-        assert res[1]["completion_token_cost_unit"] == "USD"
+        assert res[0].completion_token_cost_unit == "doubleoons"
+        assert res[1].completion_token_cost_unit == "USD"
 
     # Add another cost of the same llm_id
     costs = {
@@ -102,11 +102,11 @@ def test_cost_apis(client):
     # query multiple costs by llm_id
     res = client.query_costs(llm_ids=["my_model_to_delete3"])
     assert len(res) == 2
-    if res[0]["effective_date"].year == 2021:
-        assert res[1]["effective_date"].year == 1998
+    if res[0].effective_date.year == 2021:
+        assert res[1].effective_date.year == 1998
     else:
-        assert res[1]["effective_date"].year == 2021
-        assert res[0]["effective_date"].year == 1998
+        assert res[1].effective_date.year == 2021
+        assert res[0].effective_date.year == 1998
 
     # query with limit and offset
     res = client.query_costs(llm_ids=["my_model_to_delete3"], limit=1)
@@ -142,7 +142,7 @@ def test_cost_apis(client):
     client.purge_costs([id[0] for id in cost_ids])
     res = client.query_costs()
     assert len(res) == 1
-    assert res[0]["id"] == last_id
+    assert res[0].id == last_id
 
     # purge last cost
     client.purge_costs(last_id)

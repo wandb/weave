@@ -270,7 +270,7 @@ def get_ranked_prices(
 
     Returns something like the following:
     1 row
-        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_cost, completion_tokens_cost, ... }, llm_2: { prompt_tokens_cost, completion_tokens_cost, ... } } } ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_total_cost, completion_tokens_total_cost, ... }, llm_2: { prompt_tokens_total_cost, completion_tokens_total_cost, ... } } } ]
 """
 
 
@@ -284,7 +284,7 @@ def final_call_select_with_cost(
 
     # These two objects are used to construct the costs object
     # We add two more fields in addition to this
-    # prompt_tokens_cost and completion_tokens_cost
+    # prompt_tokens_total_cost and completion_tokens_total_cost
     cost_string_fields = [
         "prompt_token_cost_unit",
         "completion_token_cost_unit",
@@ -311,10 +311,10 @@ def final_call_select_with_cost(
             ],
             # These numeric fields are derived or mapped to another name
             """
-            '"cost_per_prompt_token":', toString(prompt_token_cost), ',',
-            '"cost_per_completion_token":', toString(completion_token_cost), ',',
-            '"prompt_tokens_cost":', toString(prompt_tokens * prompt_token_cost), ',',
-            '"completion_tokens_cost":', toString(completion_tokens * completion_token_cost), ',',
+            '"prompt_token_cost":', toString(prompt_token_cost), ',',
+            '"completion_token_cost":', toString(completion_token_cost), ',',
+            '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',',
+            '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
         """,
         ]
     )
@@ -409,7 +409,7 @@ def cost_query(
             pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 2 ]
     Finally it joins the rows with rank 1 together and constructs the costs object
     1 row
-        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_cost, completion_tokens_cost, ... }, llm_2: { prompt_tokens_cost, completion_tokens_cost, ... } } } ]
+        [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_total_cost, completion_tokens_total_cost, ... }, llm_2: { prompt_tokens_total_cost, completion_tokens_total_cost, ... } } } ]
     """
     raw_sql = f"""
         -- From the all_calls we get the usage data for LLMs

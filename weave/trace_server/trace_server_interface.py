@@ -29,10 +29,10 @@ class LLMUsageSchema(TypedDict, total=False):
 
 
 class LLMCostSchema(LLMUsageSchema):
-    prompt_tokens_cost: Optional[float]
-    completion_tokens_cost: Optional[float]
-    cost_per_prompt_token: Optional[float]
-    cost_per_completion_token: Optional[float]
+    prompt_tokens_total_cost: Optional[float]
+    completion_tokens_total_cost: Optional[float]
+    prompt_token_cost: Optional[float]
+    completion_token_cost: Optional[float]
     prompt_token_cost_unit: Optional[str]
     completion_token_cost_unit: Optional[str]
     effective_date: Optional[str]
@@ -591,12 +591,22 @@ class EnsureProjectExistsRes(BaseModel):
 
 
 class CostCreateInput(BaseModel):
-    prompt_token_cost: Optional[float] = 0.015
-    completion_token_cost: Optional[float] = 0.015
-    prompt_token_cost_unit: Optional[str] = "USD"
-    completion_token_cost_unit: Optional[str] = "USD"
-    effective_date: Optional[datetime.datetime] = None
-    provider_id: Optional[str] = None
+    prompt_token_cost: float
+    completion_token_cost: float
+    prompt_token_cost_unit: Optional[str] = Field(
+        "USD", description="The unit of the cost for the prompt tokens"
+    )
+    completion_token_cost_unit: Optional[str] = Field(
+        "USD", description="The unit of the cost for the completion tokens"
+    )
+    effective_date: Optional[datetime.datetime] = Field(
+        None,
+        description="The date after which the cost is effective for, will default to the current date if not provided",
+    )
+    provider_id: Optional[str] = Field(
+        None,
+        description="The provider of the LLM, e.g. 'openai' or 'mistral'. If not provided, the provider_id will be set to 'default'",
+    )
 
 
 class CostCreateReq(BaseModel):
@@ -614,7 +624,18 @@ class CostQueryReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     fields: Optional[list[str]] = Field(
         default=None,
-        examples=[["id", "llm_id", "prompt_token_cost", "completion_token_cost"]],
+        examples=[
+            [
+                "id",
+                "llm_id",
+                "prompt_token_cost",
+                "completion_token_cost",
+                "prompt_token_cost_unit",
+                "completion_token_cost_unit",
+                "effective_date",
+                "provider_id",
+            ]
+        ],
     )
     query: Optional[Query] = None
     # TODO: From FeedbackQueryReq,
@@ -625,9 +646,21 @@ class CostQueryReq(BaseModel):
     offset: Optional[int] = Field(default=None, examples=[0])
 
 
+class CostQueryOutput(BaseModel):
+    id: Optional[str] = Field(default=None, examples=["2341-asdf-asdf"])
+    llm_id: Optional[str] = Field(default=None, examples=["gpt4"])
+    prompt_token_cost: Optional[float] = Field(default=None, examples=[1.0])
+    completion_token_cost: Optional[float] = Field(default=None, examples=[1.0])
+    prompt_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
+    completion_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
+    effective_date: Optional[datetime.datetime] = Field(
+        default=None, examples=["2024-01-01T00:00:00Z"]
+    )
+    provider_id: Optional[str] = Field(default=None, examples=["openai"])
+
+
 class CostQueryRes(BaseModel):
-    # Note: this is not a list of costs because user can request any fields.
-    results: list[dict[str, Any]]
+    results: list[CostQueryOutput]
 
 
 class CostPurgeReq(BaseModel):

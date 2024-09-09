@@ -42,6 +42,7 @@ from weave.trace_server.trace_server_interface import (
     CostCreateReq,
     CostCreateRes,
     CostPurgeReq,
+    CostQueryOutput,
     CostQueryReq,
     EndedCallSchemaForInsert,
     ObjCreateReq,
@@ -811,7 +812,7 @@ class WeaveClient:
         llm_ids: Optional[list[str]] = None,
         offset: int = 0,
         limit: int = 100,
-    ) -> list[dict[str, Any]]:
+    ) -> list[CostQueryOutput]:
         """Query project for costs.
 
         Examples:

@@ -1168,11 +1168,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "created_at": created_at,
                 "pricing_level": "project",
                 "pricing_level_id": req.project_id,
-                "provider_id": cost.provider_id if cost.provider_id else llm_id,
+                "provider_id": cost.provider_id if cost.provider_id else "default",
                 "llm_id": llm_id,
-                "effective_date": cost.effective_date
-                if cost.effective_date
-                else created_at,
+                "effective_date": (
+                    cost.effective_date if cost.effective_date else created_at
+                ),
                 "prompt_token_cost": cost.prompt_token_cost,
                 "completion_token_cost": cost.completion_token_cost,
                 "prompt_token_cost_unit": cost.prompt_token_cost_unit,
@@ -1193,14 +1193,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         expr = {
             "$and": [
-                req.query.expr_
-                if req.query
-                else {
-                    "$eq": [
-                        {"$getField": "pricing_level_id"},
-                        {"$literal": req.project_id},
-                    ],
-                },
+                (
+                    req.query.expr_
+                    if req.query
+                    else {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": req.project_id},
+                        ],
+                    }
+                ),
                 {
                     "$eq": [
                         {"$getField": "pricing_level"},
@@ -1210,7 +1212,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ]
         }
         query_with_pricing_level = tsi.Query(**{"$expr": expr})
-
         query = LLM_TOKEN_PRICES_TABLE.select()
         query = query.fields(req.fields)
         query = query.where(query_with_pricing_level)
