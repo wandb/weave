@@ -1364,12 +1364,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             kind,
                             object_id,
                             digest
-                            ORDER BY created_at DESC
+                            ORDER BY created_at ASC
                         ) AS rn
                     FROM object_versions
                     WHERE project_id = {{project_id: String}}
                 )
-                WHERE rn = 1 AND deleted_at IS NULL
+                WHERE rn = 1
             )
             WHERE project_id = {{project_id: String}} AND
                 {conditions_part}
