@@ -19,6 +19,7 @@ from weave.trace.refs import (
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
     ObjectRef,
+    OpRef,
     RefWithExtra,
     TableRef,
 )
@@ -124,8 +125,8 @@ class Traceable:
     def delete(self) -> None:
         if self.ref is None:
             raise ValueError("Cannot delete object that is not saved")
-        if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Cannot delete non-object ref")
+        if not isinstance(self.ref, (ObjectRef, OpRef)):
+            raise ValueError("Cannot delete refs other than objects and ops")
         ref: ObjectRef = typing.cast(ObjectRef, self.ref)
         self.server.obj_delete(
             ObjDeleteReq(

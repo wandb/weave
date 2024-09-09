@@ -590,7 +590,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         if objs[0].deleted_at is not None:
-            # this does not get propogated to the client
+            # TODO: this 500's, we want the error to get propogated to the client...
             raise ObjectDeletedError(
                 f"Obj {req.object_id}:{req.digest} was deleted at {objs[0].deleted_at}"
             )
@@ -1454,13 +1454,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         ORDER BY created_at ASC
                     ) AS _version_index_plus_1,
                     _version_index_plus_1 - 1 AS version_index,
-                    row_number() OVER (
-                        PARTITION BY project_id, kind, object_id
-                        ORDER BY (deleted_at IS NOT NULL), created_at ASC
-                    ) AS alive_version_index,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    COUNT(*) OVER (PARTITION BY project_id, kind, object_id ORDER BY (deleted_at is not NULL)) AS deleted_count,
-                    if(alive_version_index = (version_count - deleted_count), 1, 0) AS is_latest
+                    CASE
+                        WHEN ROW_NUMBER() OVER (
+                            PARTITION BY project_id, kind, object_id
+                            ORDER BY created_at DESC
+                        ) = 1 AND deleted_at IS NULL
+                        THEN 1
+                        ELSE 0
+                    END AS is_latest
                 FROM (
                     SELECT *,
                         row_number() OVER (

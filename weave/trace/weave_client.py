@@ -687,6 +687,26 @@ class WeaveClient:
             )
         )
 
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_object(self, object: ObjectRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object.name,
+                digest=object.digest,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_op(self, op: OpRef) -> None:
+        self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op.name,
+                digest=op.digest,
+            )
+        )
+
     def get_feedback(
         self,
         query: Optional[Union[Query, str]] = None,
@@ -773,15 +793,6 @@ class WeaveClient:
     ) -> FeedbackQuery:
         return self.get_feedback(
             query=query, reaction=reaction, offset=offset, limit=limit
-        )
-
-    def delete_object(self, object: ObjectRef) -> None:
-        self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self._project_id(),
-                object_id=object.name,
-                digest=object.digest,
-            )
         )
 
     def add_costs(self, costs: Dict[str, CostCreateInput]) -> CostCreateRes:
