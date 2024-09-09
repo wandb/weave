@@ -1349,14 +1349,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     digest,
                     if (kind = 'op', 1, 0) AS is_op,
                     row_number() OVER (
-                        PARTITION BY project_id,
-                        kind,
-                        object_id
+                        PARTITION BY project_id, kind, object_id
                         ORDER BY created_at ASC
                     ) AS _version_index_plus_1,
                     _version_index_plus_1 - 1 AS version_index,
+                    row_number() OVER (
+                        PARTITION BY project_id, kind, object_id
+                        ORDER BY (deleted_at IS NOT NULL), created_at ASC
+                    ) AS alive_version_index,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
+                    COUNT(*) OVER (PARTITION BY project_id, kind, object_id ORDER BY (deleted_at is not NULL)) AS deleted_count,
+                    if(alive_version_index = (version_count - deleted_count), 1, 0) AS is_latest
                 FROM (
                     SELECT *,
                         row_number() OVER (
