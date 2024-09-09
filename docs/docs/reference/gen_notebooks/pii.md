@@ -144,7 +144,7 @@ cleaned_text = clean_pii_with_regex(test_text)
 print(cleaned_text)
 ```
 
-# Method 2: Weave Model Setup
+# Method 2: Microsoft Presidio
 
 In this example, we'll create a [Weave Model](https://wandb.github.io/weave/guides/core-types/models) which is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates.
 In this model, we will include our predict function where the Anthropic API will be called.
@@ -156,6 +156,7 @@ Once you run this code you will receive a link to the Weave project page
 import weave
 import asyncio
 from anthropic import AsyncAnthropic
+import json
 
 # Weave model / predict function
 class sentiment_analysis_model(weave.Model):
@@ -489,7 +490,6 @@ model = sentiment_analysis_model(
     temperature=0
 )
 
-faker = my_faker()
 for entry in pii_data:
     encrypted_input = EncryptedSentimentAnalysisInput.encrypt(entry["text"])
     await model.predict(encrypted_input)
