@@ -390,16 +390,17 @@ for entry in pii_data:
   (await model.predict(anonymized_entry))
 ```
 
-# (Optional) Encrypting our data
-
-In addition to anonymizing PII, we can add an extra layer of security by encrypting our data using the cryptography library's [Fernet](https://cryptography.io/en/latest/fernet/) symmetric encryption. This approach ensures that even if the anonymized data is intercepted, it remains unreadable without the encryption key.
+<details>
+<summary> (Optional) Encrypting our data </summary>
 
 ![](./pii_media/encrypt.png)
 
+In addition to anonymizing PII, we can add an extra layer of security by encrypting our data using the cryptography library's [Fernet](https://cryptography.io/en/latest/fernet/) symmetric encryption. This approach ensures that even if the anonymized data is intercepted, it remains unreadable without the encryption key.
 
 ```python
 import os
 from cryptography.fernet import Fernet
+from pydantic import BaseModel, ValidationInfo, model_validator
 
 def get_fernet_key():
     # Check if the key exists in environment variables
@@ -415,11 +416,6 @@ def get_fernet_key():
         key = key.encode()
     
     return key
-```
-
-
-```python
-from pydantic import BaseModel, ValidationInfo, model_validator
 
 cipher_suite = Fernet(get_fernet_key())
 
