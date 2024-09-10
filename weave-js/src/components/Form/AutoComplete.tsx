@@ -11,6 +11,7 @@ import {
   TEAL_400,
   TEAL_500,
   TEAL_600,
+  MOON_900,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
 
@@ -37,6 +38,7 @@ const PADDING = {
 
 const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
+  console.log(props.isDarkMode);
   const customTheme = createTheme({
     components: {
       MuiAutocomplete: {
@@ -127,13 +129,11 @@ const getStyles = (props: AdditionalProps) => {
             border: `1px solid ${MOON_250}`, // Customize the border color and style
             borderRadius: '4px', // Add border radius if needed
             boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)', // Apply the box-shadow
+            backgroundColor: props.isDarkMode ? MOON_100 : 'white', // seems to be inverting in dark mode. so moon_100 == moon_900
           },
           // Add border to the dropdown (listbox)
           // listbox: {
-          //   border: `1px solid ${MOON_250}`, // Customize the border color and style
-          //   borderRadius: '4px', // Add border radius if needed
-          //   boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)', // Optional: add a box-shadow
-          //   // backgroundColor: '#fff', // Optional: background color for the dropdown
+          //   backgroundColor: props.isDarkMode ? MOON_900 : '#fff', // Conditional background for dark mode
           // },
         },
       },
@@ -152,6 +152,7 @@ type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 
 type AdditionalProps = {
   size?: SelectSize;
+  isDarkMode?: boolean;
 };
 
 export const AutoComplete = <Option,>(
