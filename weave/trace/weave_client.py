@@ -966,19 +966,23 @@ class WeaveClient:
             if ref.project == self.project:
                 return
             remove_ref(obj)
+        # Must defer import here to avoid circular import
+        from weave.flow.obj import Object
 
-        if isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        if isinstance(obj, Object):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
             ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
+        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+            obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self._save_nested_objects(v)
         elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):
             obj_rec = dataclass_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
-            ref = self._save_object_basic(obj_rec, name or get_obj_name(obj_rec))
-            obj.__dict__["ref"] = ref
         elif isinstance(obj, Table):
             table_ref = self._save_table(obj)
             obj.ref = table_ref

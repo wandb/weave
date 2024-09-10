@@ -313,7 +313,6 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     assert result[1] == weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -340,7 +339,6 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        deleted_at=None,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
