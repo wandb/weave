@@ -922,6 +922,26 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     res.objs.map(convertTraceServerObjectVersionToSchema)
 );
 
+const useObjectDeleteFunc = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const objectsDelete = useCallback(
+    (key: ObjectVersionKey) => {
+      return getTsClient().objectDelete({
+        project_id: projectIdFromParts({
+          entity: key.entity,
+          project: key.project,
+        }),
+        object_id: key.objectId,
+        digest: key.versionHash,
+      });
+    },
+    [getTsClient]
+  );
+
+  return objectsDelete;
+};
+
 const useRefsReadBatch = makeTraceServerEndpointHook<
   'readBatch',
   [string[], {skip?: boolean}?],
@@ -1510,6 +1530,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useOpVersion,
   useOpVersions,
   useObjectVersion,
+  useObjectDeleteFunc,
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,

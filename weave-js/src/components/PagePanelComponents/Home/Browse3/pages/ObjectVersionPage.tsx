@@ -1,9 +1,19 @@
+import {
+  Dialog,
+  DialogActions as MaterialDialogActions,
+  DialogContent as MaterialDialogContent,
+  DialogTitle as MaterialDialogTitle,
+} from '@material-ui/core';
 import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import {Button} from '@wandb/weave/components/Button';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
+import styled from 'styled-components';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {LoadingDots} from '../../../../LoadingDots';
+import {useClosePeek} from '../context';
 import {NotFoundPanel} from '../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
@@ -124,60 +134,82 @@ const ObjectVersionPageInner: React.FC<{
     return viewerData;
   }, [viewerData]);
 
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
   return (
     <SimplePageLayoutWithHeader
       title={objectVersionText(objectName, objectVersionIndex)}
       headerContent={
-        <SimpleKeyValueTable
-          data={{
-            [refExtra ? 'Parent Object' : 'Name']: (
-              <>
-                {objectName}{' '}
-                {objectVersions.loading ? (
-                  <LoadingDots />
-                ) : (
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          width="100%">
+          <Box flexGrow={1}>
+            <SimpleKeyValueTable
+              data={{
+                [refExtra ? 'Parent Object' : 'Name']: (
                   <>
-                    [
-                    <ObjectVersionsLink
-                      entity={entityName}
-                      project={projectName}
-                      filter={{
-                        objectName,
-                      }}
-                      versionCount={objectVersionCount}
-                      neverPeek
-                      variant="secondary"
-                    />
-                    ]
+                    {objectName}{' '}
+                    {objectVersions.loading ? (
+                      <LoadingDots />
+                    ) : (
+                      <>
+                        [
+                        <ObjectVersionsLink
+                          entity={entityName}
+                          project={projectName}
+                          filter={{
+                            objectName,
+                          }}
+                          versionCount={objectVersionCount}
+                          neverPeek
+                          variant="secondary"
+                        />
+                        ]
+                      </>
+                    )}
                   </>
-                )}
-              </>
-            ),
-            Version: <>{objectVersionIndex}</>,
-            ...(baseObjectClass
-              ? {
-                  Category: (
-                    <TypeVersionCategoryChip
-                      baseObjectClass={baseObjectClass}
-                    />
-                  ),
-                }
-              : {}),
-            ...(refExtra
-              ? {
-                  Subpath: refExtra,
-                }
-              : {}),
-            // 'Type Version': (
-            //   <TypeVersionLink
-            //     entityName={entityName}
-            //     projectName={projectName}
-            //     typeName={typeName}
-            //     version={typeVersionHash}
-            //   />
-            // ),
-          }}
-        />
+                ),
+                Version: <>{objectVersionIndex}</>,
+                ...(baseObjectClass
+                  ? {
+                      Category: (
+                        <TypeVersionCategoryChip
+                          baseObjectClass={baseObjectClass}
+                        />
+                      ),
+                    }
+                  : {}),
+                ...(refExtra
+                  ? {
+                      Subpath: refExtra,
+                    }
+                  : {}),
+                // 'Type Version': (
+                //   <TypeVersionLink
+                //     entityName={entityName}
+                //     projectName={projectName}
+                //     typeName={typeName}
+                //     version={typeVersionHash}
+                //   />
+                // ),
+              }}
+            />
+          </Box>
+          <Box>
+            <Button
+              icon="delete"
+              variant="ghost"
+              onClick={() => setDeleteModalOpen(true)}
+            />
+          </Box>
+          <DeleteModal
+            object={objectVersion}
+            open={deleteModalOpen}
+            onClose={() => setDeleteModalOpen(false)}
+          />
+        </Stack>
       }
       // menuItems={[
       //   {
@@ -498,5 +530,98 @@ const OpVersionCallsLink: React.FC<{
       />
       ]
     </>
+  );
+};
+
+const DialogContent = styled(MaterialDialogContent)`
+  padding: 0 32px !important;
+`;
+DialogContent.displayName = 'S.DialogContent';
+
+const DialogTitle = styled(MaterialDialogTitle)`
+  padding: 32px 32px 16px 32px !important;
+
+  h2 {
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 30px;
+  }
+`;
+DialogTitle.displayName = 'S.DialogTitle';
+
+const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
+  justify-content: ${({$align}) =>
+    $align === 'left' ? 'flex-start' : 'flex-end'} !important;
+  padding: 32px 32px 32px 32px !important;
+`;
+DialogActions.displayName = 'S.DialogActions';
+
+const DeleteModal: React.FC<{
+  object: ObjectVersionSchema;
+  open: boolean;
+  onClose: () => void;
+}> = ({object, open, onClose}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const objectDelete = useObjectDeleteFunc();
+  const closePeek = useClosePeek();
+
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const deleteTargetStr = object.baseObjectClass ?? 'object';
+
+  const onDelete = () => {
+    setDeleteLoading(true);
+    objectDelete(object)
+      .then(() => {
+        onClose();
+        closePeek();
+      })
+      .catch(err => {
+        setError(err.message);
+      })
+      .finally(() => {
+        setDeleteLoading(false);
+      });
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={() => {
+        onClose();
+        setError(null);
+      }}
+      maxWidth="xs"
+      fullWidth>
+      <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
+      <DialogContent style={{overflow: 'hidden'}}>
+        {error != null ? (
+          <p style={{color: 'red'}}>{error}</p>
+        ) : (
+          <p>Are you sure you want to delete?</p>
+        )}
+        <span style={{fontSize: '16px', fontWeight: '600'}}>
+          {object.objectId}:v{object.versionIndex}
+        </span>
+      </DialogContent>
+      <DialogActions $align="left">
+        <Button
+          variant="destructive"
+          disabled={error != null || deleteLoading}
+          onClick={onDelete}>
+          {`Delete ${deleteTargetStr}`}
+        </Button>
+        <Button
+          variant="ghost"
+          disabled={deleteLoading}
+          onClick={() => {
+            onClose();
+            setError(null);
+          }}>
+          Cancel
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
