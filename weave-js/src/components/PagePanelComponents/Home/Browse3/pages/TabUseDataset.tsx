@@ -43,7 +43,7 @@ ${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
   }
 
   return (
-    <Box m={2}>
+    <Box>
       <Alert icon="lightbulb-info">
         See{' '}
         <DocLink

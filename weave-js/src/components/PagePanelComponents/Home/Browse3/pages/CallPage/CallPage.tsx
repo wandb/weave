@@ -19,6 +19,7 @@ import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallChat, isCallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
@@ -60,6 +61,18 @@ const useCallTabs = (call: CallSchema) => {
                 project={call.project}
                 evaluationCallIds={[call.callId]}
               />
+            ),
+          },
+        ]
+      : []),
+    ...(isCallChat(call)
+      ? [
+          {
+            label: 'Chat',
+            content: (
+              <Tailwind style={{height: '100%', overflow: 'auto'}}>
+                <CallChat call={call} />
+              </Tailwind>
             ),
           },
         ]

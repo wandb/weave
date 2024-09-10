@@ -7,19 +7,64 @@ import {abbreviateRef} from '../../../../../util/refs';
 import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
+import {usePrompt} from './PromptPage/hooks';
+import {Data, Placeholder} from './PromptPage/types';
 
 type TabUsePromptProps = {
   name: string;
   uri: string;
+  entityName: string;
   projectName: string;
+  data: Data;
 };
 
-export const TabUsePrompt = ({name, uri, projectName}: TabUsePromptProps) => {
+const getDefaultValue = (placeholder: Placeholder): string => {
+  if (placeholder.default != null) {
+    return placeholder.default;
+  }
+  if (placeholder.type === 'string') {
+    return '';
+  }
+  if (placeholder.type === 'number') {
+    return '0';
+  }
+  return '';
+};
+
+const getParams = (placeholders: Placeholder[]): Record<string, any> => {
+  const params: Record<string, string> = {};
+  for (const placeholder of placeholders) {
+    params[placeholder.name] = getDefaultValue(placeholder);
+  }
+  return params;
+};
+
+export const TabUsePrompt = ({
+  name,
+  uri,
+  entityName,
+  projectName,
+  data,
+}: TabUsePromptProps) => {
+  // We'll load the actual prompt object to get placeholder information
+  const {loading, prompt} = usePrompt(entityName, projectName, data);
+  if (loading) {
+    // TODO: Maybe show a loading indicator here
+    return null;
+  }
+
+  if (!prompt) {
+    return null;
+  }
+
+  const params = getParams(prompt.placeholders);
+
   const pythonName = isValidVarName(name) ? name : 'prompt';
   const ref = parseRef(uri);
   const isParentObject = !ref.artifactRefExtra;
   const label = isParentObject ? 'prompt version' : 'prompt';
 
+  // TODO: Simplify if no params.
   const longExample = `import weave
 from openai import OpenAI
 
@@ -45,13 +90,13 @@ class MyModel(weave.Model):
 
 mymodel = MyModel(model_name="gpt-3.5-turbo", prompt=${pythonName})
 
-# TODO: Params
-params = {}
+# Replace with desired parameter values
+params = ${JSON.stringify(params, null, 2)}
 print(mymodel.predict(params))
 `;
 
   return (
-    <Box m={2}>
+    <Box>
       <Alert icon="lightbulb-info">
         See{' '}
         <DocLink

@@ -50,11 +50,11 @@ export const EMPTY_PROPS_PROMPTS: EmptyProps = {
     'You can use prompts to try different instructions for your LLM, tracking edits and their impact on performance.',
   moreInformation: (
     <>
-      Learn{' '}
+      {/* Learn{' '}
       <TargetBlank href="http://wandb.me/weave_prompts">
         prompt basics
       </TargetBlank>
-      .
+      . */}
     </>
   ),
 };

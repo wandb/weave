@@ -1,6 +1,6 @@
 """Defines the custom Messages weave type."""
 
-from weave.flow.prompt import Messages
+from weave.flow.prompt.prompt import Messages
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
 

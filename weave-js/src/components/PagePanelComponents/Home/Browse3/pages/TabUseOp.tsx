@@ -16,7 +16,7 @@ export const TabUseOp = ({name, uri}: TabUseOpProps) => {
   const pythonName = isValidVarName(name) ? name : 'op';
 
   return (
-    <Box m={2}>
+    <Box>
       <Alert icon="lightbulb-info">
         See{' '}
         <DocLink

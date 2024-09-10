@@ -72,7 +72,7 @@ class ObjectRef(RefWithExtra):
         """Convert back to higher level object."""
         class_name = getattr(obj, "_class_name", None)
         if "Prompt" == class_name:
-            from weave.flow.prompt import Prompt
+            from weave.flow.prompt.prompt import Prompt
 
             return Prompt.from_obj(obj)
         return obj

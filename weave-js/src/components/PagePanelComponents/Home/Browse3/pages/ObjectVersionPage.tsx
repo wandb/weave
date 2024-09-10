@@ -23,6 +23,7 @@ import {
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
+import {PromptTab} from './PromptPage/PromptTab';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
@@ -38,7 +39,6 @@ import {
   KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
-import {PromptPage} from './PromptPage/PromptPage';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
@@ -214,50 +214,53 @@ const ObjectVersionPageInner: React.FC<{
               {
                 label: 'Prompt',
                 content: (
-                  <Box sx={{p: 2}}>
+                  <ScrollableTabContent>
                     {data.loading ? (
                       <CenteredAnimatedLoader />
                     ) : (
-                      <PromptPage
+                      <PromptTab
                         entity={entityName}
                         project={projectName}
                         data={viewerDataAsObject}
                       />
                     )}
-                  </Box>
+                  </ScrollableTabContent>
                 ),
               },
             ]
           : []),
-
-        {
-          label: 'Values',
-          content: (
-            <ScrollableTabContent>
-              <Box
-                sx={{
-                  flex: '0 0 auto',
-                  height: '100%',
-                }}>
-                {data.loading ? (
-                  <CenteredAnimatedLoader />
-                ) : (
-                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <CustomWeaveTypeProjectContext.Provider
-                      value={{entity: entityName, project: projectName}}>
-                      <ObjectViewerSection
-                        title=""
-                        data={viewerDataAsObject}
-                        noHide
-                        isExpanded
-                      />
-                    </CustomWeaveTypeProjectContext.Provider>
-                  </WeaveCHTableSourceRefContext.Provider>
-                )}
-              </Box>
-            </ScrollableTabContent>
-          ),
-        },
+        ...(!showPromptTab
+          ? [
+              {
+                label: 'Values',
+                content: (
+                  <ScrollableTabContent>
+                    <Box
+                      sx={{
+                        flex: '0 0 auto',
+                        height: '100%',
+                      }}>
+                      {data.loading ? (
+                        <CenteredAnimatedLoader />
+                      ) : (
+                        <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                          <CustomWeaveTypeProjectContext.Provider
+                            value={{entity: entityName, project: projectName}}>
+                            <ObjectViewerSection
+                              title=""
+                              data={viewerDataAsObject}
+                              noHide
+                              isExpanded
+                            />
+                          </CustomWeaveTypeProjectContext.Provider>
+                        </WeaveCHTableSourceRefContext.Provider>
+                      )}
+                    </Box>
+                  </ScrollableTabContent>
+                ),
+              },
+            ]
+          : []),
         {
           label: 'Use',
           content: (
@@ -266,7 +269,9 @@ const ObjectVersionPageInner: React.FC<{
                 <TabUsePrompt
                   name={objectName}
                   uri={refUri}
+                  entityName={entityName}
                   projectName={projectName}
+                  data={viewerDataAsObject}
                 />
               ) : baseObjectClass === 'Dataset' ? (
                 <TabUseDataset

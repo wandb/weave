@@ -30,7 +30,7 @@ os.environ["WF_TRACE_SERVER_URL"] = "http://127.0.0.1:6345"
   const codeFeedback = `call.feedback.add("correctness", {"value": 4})`;
 
   return (
-    <Box m={2}>
+    <Box>
       <Alert icon="lightbulb-info">
         See{' '}
         <DocLink path="guides/tracking/tracing" text="Weave docs on tracing" />{' '}
