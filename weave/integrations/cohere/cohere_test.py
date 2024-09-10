@@ -5,7 +5,6 @@ import pytest
 
 import weave
 from weave.integrations.integration_utilities import _get_call_output, op_name_from_ref
-from weave.trace_server import trace_server_interface as tsi
 
 cohere_model = "command"  # You can change this to a specific model if needed
 
@@ -405,9 +404,9 @@ async def test_cohere_async_stream_v2(
             if event.type == "message-end":
                 finish_reason = event.delta.finish_reason
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
 
     assert call.exception is None and call.ended_at is not None
     assert call.started_at < call.ended_at
