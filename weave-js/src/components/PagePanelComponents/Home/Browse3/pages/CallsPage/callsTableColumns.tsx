@@ -42,7 +42,7 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
 
-const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -262,7 +262,7 @@ function buildCallsTableColumns(
     //   },
     // },
     {
-      field: 'summary.weave.status',
+      field: 'status',
       headerName: 'Status',
       headerAlign: 'center',
       sortable: false,
