@@ -13,7 +13,6 @@ import {
   TEAL_600,
 } from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/globals.styles';
-import {Hidden} from '@material-ui/core';
 
 const HEIGHTS = {
   small: '24px',
@@ -59,7 +58,7 @@ const getStyles = (props: AdditionalProps) => {
               '&& fieldset': {
                 borderColor: MOON_250,
               },
-              '&&.Mui-focused fieldset': {
+              '&.Mui-focused fieldset': {
                 borderColor: TEAL_400,
                 borderWidth: '2px',
               },
@@ -70,10 +69,6 @@ const getStyles = (props: AdditionalProps) => {
               },
               '&:hover fieldset': {
                 borderColor: hexToRGB(TEAL_500, 0.4),
-                borderWidth: '2px',
-              },
-              '&.Mui-focused fieldset': {
-                borderColor: hexToRGB(TEAL_500, 0.64),
                 borderWidth: '2px',
               },
               '& input::placeholder': {
@@ -101,7 +96,7 @@ const getStyles = (props: AdditionalProps) => {
             },
           },
           option: {
-            padding: '6px 10px',
+            paddingLeft: '10px',
             margin: '0 6px',
             borderRadius: '4px',
             cursor: 'pointer',
