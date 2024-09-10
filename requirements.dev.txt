@@ -24,3 +24,4 @@ build
 twine
 lazydocs
 nbconvert
+tox==4.18.1
