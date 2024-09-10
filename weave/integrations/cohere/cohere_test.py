@@ -4,7 +4,8 @@ import cohere
 import pytest
 
 import weave
-from weave.integrations.integration_utilities import op_name_from_ref
+from weave.integrations.integration_utilities import _get_call_output, op_name_from_ref
+from weave.trace_server import trace_server_interface as tsi
 
 cohere_model = "command"  # You can change this to a specific model if needed
 
