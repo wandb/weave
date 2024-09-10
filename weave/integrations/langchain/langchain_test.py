@@ -313,7 +313,7 @@ def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
         ("langchain.Chain.RunnableSequence", 0),
         ("langchain.Chain.RunnableParallel_context_question", 1),
         ("langchain.Chain.RunnableSequence", 2),
-        ("langchain.Retriever.Retriever", 3),
+        ("langchain.Retriever.VectorStoreRetriever", 3),
         ("langchain.Chain.format_docs", 3),
         ("langchain.Chain.RunnablePassthrough", 2),
         ("langchain.Prompt.ChatPromptTemplate", 1),
