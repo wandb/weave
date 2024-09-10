@@ -355,7 +355,7 @@ function buildCallsTableColumns(
   cols.push(startedAtCol);
 
   cols.push({
-    field: 'summary.weave.tokens',
+    field: 'tokens',
     headerName: 'Tokens',
     width: 100,
     minWidth: 100,
@@ -376,7 +376,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'summary.weave.cost',
+    field: 'cost',
     headerName: 'Cost',
     width: 100,
     minWidth: 100,
@@ -397,7 +397,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'summary.weave.latency',
+    field: 'latency',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,
