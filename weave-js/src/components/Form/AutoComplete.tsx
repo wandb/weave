@@ -58,6 +58,7 @@ const getStyles = (props: AdditionalProps) => {
                 borderWidth: '2px',
               },
               borderColor: MOON_250,
+              borderWidth: '1px',
               '& .MuiInputBase-input': {
                 whiteSpace: 'nowrap',
                 textOverflow: 'ellipsis',
@@ -91,12 +92,15 @@ const getStyles = (props: AdditionalProps) => {
             },
           },
           option: {
-            paddingLeft: '10px',
+            borderColor: MOON_250,
+            borderWidth: '1px',
+            paddingLeft: '10px !important',
             margin: '0 6px',
             borderRadius: '4px',
             cursor: 'pointer',
             backgroundColor: 'transparent',
             color: MOON_800,
+            fontSize: FONT_SIZES[size],
             '&[aria-selected="true"]': {
               backgroundColor: `${hexToRGB(TEAL_300, 0.32)} !important`,
               color: TEAL_600,
@@ -118,6 +122,19 @@ const getStyles = (props: AdditionalProps) => {
               backgroundColor: '#f5f5f5',
             },
           },
+          // Add styles for the Paper component that wraps the dropdown
+          paper: {
+            border: `1px solid ${MOON_250}`, // Customize the border color and style
+            borderRadius: '4px', // Add border radius if needed
+            boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)', // Apply the box-shadow
+          },
+          // Add border to the dropdown (listbox)
+          // listbox: {
+          //   border: `1px solid ${MOON_250}`, // Customize the border color and style
+          //   borderRadius: '4px', // Add border radius if needed
+          //   boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)', // Optional: add a box-shadow
+          //   // backgroundColor: '#fff', // Optional: background color for the dropdown
+          // },
         },
       },
     },
