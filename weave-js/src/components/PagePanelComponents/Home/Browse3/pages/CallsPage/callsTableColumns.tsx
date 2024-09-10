@@ -42,7 +42,7 @@ import {
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
 
-const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage'];
+const HIDDEN_DYNAMIC_COLUMN_PREFIXES = ['summary.usage', 'summary.weave'];
 
 export const useCallsTableColumns = (
   entity: string,
@@ -262,7 +262,7 @@ function buildCallsTableColumns(
     //   },
     // },
     {
-      field: 'summary.weave.status',
+      field: 'status',
       headerName: 'Status',
       headerAlign: 'center',
       sortable: false,
@@ -355,7 +355,7 @@ function buildCallsTableColumns(
   cols.push(startedAtCol);
 
   cols.push({
-    field: 'summary.weave.tokens',
+    field: 'tokens',
     headerName: 'Tokens',
     width: 100,
     minWidth: 100,
@@ -376,7 +376,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'summary.weave.cost',
+    field: 'cost',
     headerName: 'Cost',
     width: 100,
     minWidth: 100,
@@ -397,7 +397,7 @@ function buildCallsTableColumns(
   });
 
   cols.push({
-    field: 'summary.weave.latency',
+    field: 'latency',
     headerName: 'Latency',
     width: 100,
     minWidth: 100,
