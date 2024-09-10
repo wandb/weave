@@ -45,6 +45,8 @@ const getStyles = (props: AdditionalProps) => {
         styleOverrides: {
           root: {
             '& .MuiOutlinedInput-root': {
+              // display: 'flex',
+              // alignItems: 'center',
               height: HEIGHTS[size],
               padding: PADDING[size],
               fontSize: FONT_SIZES[size],
@@ -59,8 +61,6 @@ const getStyles = (props: AdditionalProps) => {
                 borderColor: TEAL_400,
                 borderWidth: '2px',
               },
-              borderColor: MOON_250,
-              borderWidth: '1px',
               '& .MuiInputBase-input': {
                 whiteSpace: 'nowrap',
                 textOverflow: 'ellipsis',
