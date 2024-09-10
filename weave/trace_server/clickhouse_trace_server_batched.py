@@ -1476,6 +1476,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             WHERE project_id = {{project_id: String}} AND
                 {conditions_part}
+            ORDER BY created_at ASC
             {limit_part}
         """,
             {"project_id": project_id, **parameters},
