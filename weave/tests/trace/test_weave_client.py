@@ -12,7 +12,7 @@ import weave
 import weave.trace_server.trace_server_interface as tsi
 from weave import Evaluation
 from weave.legacy.weave import op_def
-from weave.tests.trace.util import DatetimeMatcher, RegexStringMatcher
+from weave.tests.trace.util import AnyIntMatcher, DatetimeMatcher, RegexStringMatcher
 from weave.trace import refs, weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
@@ -257,7 +257,13 @@ def test_call_create(client):
         id=call.id,
         output="hello",
         exception=None,
-        summary={},
+        summary={
+            "weave": {
+                "status": "success",
+                "trace_name": "x",
+                "latency_ms": AnyIntMatcher(),
+            }
+        },
         _children=[],
         attributes={
             "weave": {
@@ -299,6 +305,12 @@ def test_calls_query(client):
                 "sys_version": sys.version,
             },
         },
+        summary={
+            "weave": {
+                "status": "running",
+                "trace_name": "x",
+            }
+        },
         started_at=DatetimeMatcher(),
         ended_at=None,
         deleted_at=None,
@@ -319,6 +331,12 @@ def test_calls_query(client):
                 "os_release": platform.release(),
                 "sys_version": sys.version,
             },
+        },
+        summary={
+            "weave": {
+                "status": "running",
+                "trace_name": "x",
+            }
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
@@ -1260,10 +1278,10 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 4000000,
             "requests": 2,
             "total_tokens": 0,
-            "prompt_tokens_cost": pytest.approx(60),
-            "completion_tokens_cost": pytest.approx(240),
-            "cost_per_prompt_token": 3e-05,
-            "cost_per_completion_token": 6e-05,
+            "prompt_tokens_total_cost": pytest.approx(60),
+            "completion_tokens_total_cost": pytest.approx(240),
+            "prompt_token_cost": 3e-05,
+            "completion_token_cost": 6e-05,
             "prompt_token_cost_unit": "USD",
             "completion_token_cost_unit": "USD",
             "provider_id": "openai",
@@ -1279,10 +1297,10 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 5000000,
             "requests": 1,
             "total_tokens": 0,
-            "prompt_tokens_cost": pytest.approx(15),
-            "completion_tokens_cost": pytest.approx(75),
-            "cost_per_prompt_token": 5e-06,
-            "cost_per_completion_token": 1.5e-05,
+            "prompt_tokens_total_cost": pytest.approx(15),
+            "completion_tokens_total_cost": pytest.approx(75),
+            "prompt_token_cost": 5e-06,
+            "completion_token_cost": 1.5e-05,
             "prompt_token_cost_unit": "USD",
             "completion_token_cost_unit": "USD",
             "provider_id": "openai",
@@ -1294,7 +1312,11 @@ def test_summary_tokens_cost(client):
 
     # for no cost call, there should be no cost information
     # currently that means no weave object in the summary
-    assert noCostCallSummary.get("weave", "bah") == "bah"
+    assert noCostCallSummary["weave"] == {
+        "status": "success",
+        "trace_name": "models",
+        "latency_ms": AnyIntMatcher(),
+    }
 
 
 @pytest.mark.skip_clickhouse_client
@@ -1319,8 +1341,15 @@ def test_summary_tokens_cost_sqlite(client):
     noCostCallSummary = callsNoCost[0].summary
     withCostCallSummary = callsWithCost[0].summary
 
-    assert noCostCallSummary is None
-    assert withCostCallSummary is None
+    weave_summary = {
+        "weave": {
+            "status": "running",
+            "trace_name": "x",
+        }
+    }
+
+    assert noCostCallSummary == weave_summary
+    assert withCostCallSummary == weave_summary
 
 
 def test_ref_in_dict(client):
