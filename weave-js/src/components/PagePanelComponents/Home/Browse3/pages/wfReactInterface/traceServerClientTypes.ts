@@ -108,7 +108,6 @@ export type TraceCallsQueryReq = {
   sort_by?: SortBy[];
   query?: Query;
   columns?: string[];
-  include_costs?: boolean;
   expand_columns?: string[];
   include_costs?: boolean;
 };

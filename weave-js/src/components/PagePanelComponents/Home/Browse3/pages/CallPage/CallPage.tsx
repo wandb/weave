@@ -30,14 +30,11 @@ export const CallPage: FC<{
 }> = props => {
   const {useCall} = useWFHooks();
 
-  const call = useCall(
-    {
-      entity: props.entity,
-      project: props.project,
-      callId: props.callId,
-    },
-    {includeCosts: false}
-  );
+  const call = useCall({
+    entity: props.entity,
+    project: props.project,
+    callId: props.callId,
+  });
 
   if (call.loading) {
     return <CenteredAnimatedLoader />;

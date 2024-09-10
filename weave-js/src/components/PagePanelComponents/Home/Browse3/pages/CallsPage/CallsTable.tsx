@@ -237,8 +237,7 @@ export const CallsTable: FC<{
     filterModelResolved,
     sortModelResolved,
     paginationModelResolved,
-    expandedRefCols,
-    false
+    expandedRefCols
   );
 
   // Here, we only update our local state once the calls have loaded.
@@ -867,11 +866,7 @@ const useParentIdOptions = (
           project,
           callId: effectiveFilter.parentId,
         }
-      : null,
-
-    {
-      includeCosts: false,
-    }
+      : null
   );
   return useMemo(() => {
     if (parentCall.loading || parentCall.result == null) {
