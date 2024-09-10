@@ -23,8 +23,8 @@ export type LLMUsageSchema = {
 
 export type LLMCostSchema = LLMUsageSchema & {
   // Cost for request
-  prompt_tokens_cost?: number;
-  completion_tokens_cost?: number;
+  prompt_tokens_total_cost?: number;
+  completion_tokens_total_cost?: number;
 
   // Cost per unit
   prompt_token_cost?: number;
@@ -110,6 +110,7 @@ export type TraceCallsQueryReq = {
   columns?: string[];
   include_costs?: boolean;
   expand_columns?: string[];
+  include_costs?: boolean;
 };
 
 export type TraceCallsQueryRes = {
