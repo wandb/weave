@@ -90,7 +90,9 @@ def test_litellm_quickstart(
         model_usage = summary["usage"][output["model"]]
         assert model_usage["requests"] == 1
         assert (
-            output["usage"]["completion_tokens"] == model_usage["completion_tokens"] == 31
+            output["usage"]["completion_tokens"]
+            == model_usage["completion_tokens"]
+            == 31
         )
         assert output["usage"]["prompt_tokens"] == model_usage["prompt_tokens"] == 13
         assert output["usage"]["total_tokens"] == model_usage["total_tokens"] == 44
