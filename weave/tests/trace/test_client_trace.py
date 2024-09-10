@@ -14,7 +14,12 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 from weave import Thread, ThreadPoolExecutor
-from weave.tests.trace.util import DatetimeMatcher
+from weave.tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    FuzzyDateTimeMatcher,
+    MaybeStringMatcher,
+)
 from weave.trace import weave_client
 from weave.trace.object_record import ObjectRecord
 from weave.trace.vals import MissingSelfInstanceError
@@ -78,7 +83,13 @@ def test_simple_op(client):
         inputs={"a": 5},
         exception=None,
         output=6,
-        summary={},
+        summary={
+            "weave": {
+                "status": "success",
+                "trace_name": "my_op",
+                "latency_ms": AnyIntMatcher(),
+            }
+        },
         attributes={
             "weave": {
                 "client_version": weave.version.VERSION,
@@ -132,23 +143,6 @@ def test_trace_server_call_start_and_end(client):
         start.started_at.isoformat(timespec="milliseconds")
     )
 
-    class FuzzyDateTimeMatcher:
-        def __init__(self, dt):
-            self.dt = dt
-
-        def __eq__(self, other):
-            # Checks within 1ms
-            return abs((self.dt - other).total_seconds()) < 0.001
-
-    class MaybeStringMatcher:
-        def __init__(self, s):
-            self.s = s
-
-        def __eq__(self, other):
-            if other is None:
-                return True
-            return self.s == other
-
     assert res.call.model_dump() == {
         "project_id": client._project_id(),
         "id": call_id,
@@ -161,7 +155,12 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": None,
-        "summary": None,
+        "summary": {
+            "weave": {
+                "trace_name": "test_name",
+                "status": "running",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
@@ -200,7 +199,14 @@ def test_trace_server_call_start_and_end(client):
         "attributes": {"a": 5},
         "inputs": {"b": 5},
         "output": {"d": 5},
-        "summary": {"c": 5},
+        "summary": {
+            "c": 5,
+            "weave": {
+                "trace_name": "test_name",
+                "latency_ms": AnyIntMatcher(),
+                "status": "success",
+            },
+        },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,

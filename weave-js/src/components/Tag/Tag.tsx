@@ -8,6 +8,7 @@ import {RemoveAction} from './RemoveAction';
 import {TagTooltip} from './TagTooltip';
 import {
   getRandomTagColor,
+  getTagColorByString,
   getTagColorClass,
   getTagHoverClass,
   isTagLabelTruncated,
@@ -22,12 +23,18 @@ export const DEFAULT_TAG_ICON = 'tag';
 export function useTagClasses({
   color,
   isInteractive,
+  label,
 }: {
   color?: TagColorName;
   isInteractive?: boolean;
+  label?: string;
 }) {
-  const defaultColorRef = React.useRef(color ?? getRandomTagColor());
-  const tagColor = color ?? defaultColorRef.current;
+  const randomColor = useRef(color || label ? undefined : getRandomTagColor());
+  const labelHashColor = useMemo(
+    () => (!color && label ? getTagColorByString(label) : undefined),
+    [label, color]
+  );
+  const tagColor = color ?? labelHashColor ?? randomColor.current;
 
   return useMemo(
     () =>
@@ -60,7 +67,7 @@ export const Tag: FC<TagProps> = ({
   Wrapper = Tailwind,
   isInteractive = false,
 }) => {
-  const classes = useTagClasses({color, isInteractive});
+  const classes = useTagClasses({color, isInteractive, label});
 
   const nakedTag = (
     <div
@@ -94,7 +101,7 @@ export const RemovableTag: FC<RemovableTagProps> = ({
 }) => {
   const labelRef = useRef<HTMLParagraphElement>(null);
   const isTooltipEnabled = isTagLabelTruncated(labelRef);
-  const classes = useTagClasses({color, isInteractive: true});
+  const classes = useTagClasses({color, isInteractive: true, label});
 
   const nakedTag = (
     <TagTooltip value={label} disabled={!isTooltipEnabled}>

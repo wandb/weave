@@ -444,7 +444,9 @@ function makeCodeText(
 
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
-    codeStr += `   "call_ids": ["${filteredCallIds.join('", "')}"],\n`;
+    codeStr += `   "filter": {"call_ids": ["${filteredCallIds.join(
+      '", "'
+    )}"]},\n`;
     if (expandColumns.length > 0) {
       const expandColumnsStr = JSON.stringify(expandColumns, null, 0);
       codeStr += `   "expand_columns": ${expandColumnsStr},\n`;
@@ -453,24 +455,28 @@ function makeCodeText(
     codeStr += `})`;
     return codeStr;
   }
-
-  if (filter.opVersionRefs) {
-    codeStr += `   "op_names": ["${filter.opVersionRefs.join('", "')}"],\n`;
-  }
-  if (filter.runIds) {
-    codeStr += `   "run_ids": ["${filter.runIds.join('", "')}"],\n`;
-  }
-  if (filter.userIds) {
-    codeStr += `   "user_ids": ["${filter.userIds.join('", "')}"],\n`;
-  }
-  if (filter.traceId) {
-    codeStr += `   "trace_id": "${filter.traceId}",\n`;
-  }
-  if (filter.traceRootsOnly) {
-    codeStr += `   "trace_roots_only": True,\n`;
-  }
-  if (filter.parentIds) {
-    codeStr += `   "parent_ids": ["${filter.parentIds.join('", "')}"],\n`;
+  if (Object.values(filter).some(value => value !== undefined)) {
+    codeStr += `   "filter": {`;
+    if (filter.opVersionRefs) {
+      codeStr += `"op_names": ["${filter.opVersionRefs.join('", "')}"],`;
+    }
+    if (filter.runIds) {
+      codeStr += `"run_ids": ["${filter.runIds.join('", "')}"],`;
+    }
+    if (filter.userIds) {
+      codeStr += `"user_ids": ["${filter.userIds.join('", "')}"],`;
+    }
+    if (filter.traceId) {
+      codeStr += `"trace_ids": ["${filter.traceId}"],`;
+    }
+    if (filter.traceRootsOnly) {
+      codeStr += `"trace_roots_only": True,`;
+    }
+    if (filter.parentIds) {
+      codeStr += `"parent_ids": ["${filter.parentIds.join('", "')}"],`;
+    }
+    codeStr = codeStr.slice(0, -1);
+    codeStr += `},\n`;
   }
   if (query) {
     codeStr += `   "query": ${JSON.stringify(query, null, 0)},\n`;

@@ -55,6 +55,7 @@ from weave.trace_server.calls_query_builder import (
     combine_conditions,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.trace_server_common import make_derived_summary_fields
 
 from . import clickhouse_trace_server_migrator as wf_migrator
 from . import environment as wf_env
@@ -77,8 +78,10 @@ from .feedback import (
     validate_feedback_purge_req,
 )
 from .orm import ParamBuilder, Row
+from .token_costs import LLM_TOKEN_PRICES_TABLE, validate_cost_purge_req
 from .trace_server_common import (
     LRUCache,
+    empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
     make_feedback_query_req,
@@ -278,9 +281,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
+            necessary_cost_columns = ["started_at", "summary_dump"]
             columns = [
-                *[col for col in columns if col != "summary_dump"],
-                "summary_dump",
+                *[col for col in columns if col not in necessary_cost_columns],
+                *necessary_cost_columns,
             ]
         for col in columns:
             cq.add_field(col)
@@ -1152,6 +1156,104 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise ValueError("Missing chunks")
         return tsi.FileContentReadRes(content=b"".join(chunks))
 
+    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+        assert_non_null_wb_user_id(req)
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
+
+        costs = []
+        for llm_id, cost in req.costs.items():
+            cost_id = generate_id()
+
+            row: Row = {
+                "id": cost_id,
+                "created_by": req.wb_user_id,
+                "created_at": created_at,
+                "pricing_level": "project",
+                "pricing_level_id": req.project_id,
+                "provider_id": cost.provider_id if cost.provider_id else "default",
+                "llm_id": llm_id,
+                "effective_date": (
+                    cost.effective_date if cost.effective_date else created_at
+                ),
+                "prompt_token_cost": cost.prompt_token_cost,
+                "completion_token_cost": cost.completion_token_cost,
+                "prompt_token_cost_unit": cost.prompt_token_cost_unit,
+                "completion_token_cost_unit": cost.completion_token_cost_unit,
+            }
+
+            costs.append((cost_id, llm_id))
+
+            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
+                database_type="clickhouse"
+            )
+            self._insert(
+                LLM_TOKEN_PRICES_TABLE.name, prepared.data, prepared.column_names
+            )
+
+        return tsi.CostCreateRes(ids=costs)
+
+    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+        expr = {
+            "$and": [
+                (
+                    req.query.expr_
+                    if req.query
+                    else {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": req.project_id},
+                        ],
+                    }
+                ),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": "project"},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        query = LLM_TOKEN_PRICES_TABLE.select()
+        query = query.fields(req.fields)
+        query = query.where(query_with_pricing_level)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        prepared = query.prepare(database_type="clickhouse")
+        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
+            query_result.result_rows, prepared.fields
+        )
+        return tsi.CostQueryRes(results=results)
+
+    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+        validate_cost_purge_req(req)
+
+        expr = {
+            "$and": [
+                req.query.expr_,
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": "project"},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+
+        query = LLM_TOKEN_PRICES_TABLE.purge()
+        query = query.where(query_with_pricing_level)
+        prepared = query.prepare(database_type="clickhouse")
+        self.ch_client.query(prepared.sql, prepared.parameters)
+        return tsi.CostPurgeRes()
+
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req)
@@ -1511,48 +1613,66 @@ def _raw_call_dict_to_ch_call(
     return SelectableCHCallSchema.model_validate(call)
 
 
-def _empty_str_to_none(val: Optional[str]) -> Optional[str]:
-    return val if val != "" else None
-
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
+    started_at = _ensure_datetimes_have_tz(ch_call.started_at)
+    ended_at = _ensure_datetimes_have_tz(ch_call.ended_at)
+    summary = _nullable_any_dump_to_any(ch_call.summary_dump)
+    display_name = empty_str_to_none(ch_call.display_name)
     return tsi.CallSchema(
         project_id=ch_call.project_id,
         id=ch_call.id,
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
         op_name=ch_call.op_name,
-        started_at=_ensure_datetimes_have_tz(ch_call.started_at),
-        ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
+        started_at=started_at,
+        ended_at=ended_at,
         attributes=_dict_dump_to_dict(ch_call.attributes_dump or "{}"),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump or "{}"),
         output=_nullable_any_dump_to_any(ch_call.output_dump),
-        summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
+        summary=make_derived_summary_fields(
+            summary=summary or {},
+            op_name=ch_call.op_name,
+            started_at=started_at,
+            ended_at=ended_at,
+            exception=ch_call.exception,
+            display_name=display_name,
+        ),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
-        display_name=_empty_str_to_none(ch_call.display_name),
+        display_name=display_name,
     )
 
 
 # Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: Dict) -> Dict:
+    summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
+    started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
+    ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
+    display_name = empty_str_to_none(ch_call_dict.get("display_name"))
     return dict(
         project_id=ch_call_dict.get("project_id"),
         id=ch_call_dict.get("id"),
         trace_id=ch_call_dict.get("trace_id"),
         parent_id=ch_call_dict.get("parent_id"),
         op_name=ch_call_dict.get("op_name"),
-        started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
-        ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
+        started_at=started_at,
+        ended_at=ended_at,
         attributes=_dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
         inputs=_dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
         output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
-        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
+        summary=make_derived_summary_fields(
+            summary=summary or {},
+            op_name=ch_call_dict.get("op_name", ""),
+            started_at=started_at,
+            ended_at=ended_at,
+            exception=ch_call_dict.get("exception"),
+            display_name=display_name,
+        ),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
-        display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
+        display_name=display_name,
     )
 
 

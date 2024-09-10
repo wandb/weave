@@ -1,4 +1,5 @@
 import datetime
+from enum import Enum
 from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
@@ -29,8 +30,8 @@ class LLMUsageSchema(TypedDict, total=False):
 
 
 class LLMCostSchema(LLMUsageSchema):
-    prompt_tokens_cost: Optional[float]
-    completion_tokens_cost: Optional[float]
+    prompt_tokens_total_cost: Optional[float]
+    completion_tokens_total_cost: Optional[float]
     prompt_token_cost: Optional[float]
     completion_token_cost: Optional[float]
     prompt_token_cost_unit: Optional[str]
@@ -53,10 +54,17 @@ class FeedbackDict(TypedDict, total=False):
     wb_user_id: Optional[str]
 
 
+class TraceStatus(str, Enum):
+    SUCCESS = "success"
+    ERROR = "error"
+    RUNNING = "running"
+
+
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
-    status: Optional[Literal["success", "error", "running"]]
-    nice_trace_name: Optional[str]
-    latency: Optional[int]
+    status: Optional[TraceStatus]
+    trace_name: Optional[str]
+    # latency in milliseconds
+    latency_ms: Optional[int]
     costs: Optional[Dict[str, LLMCostSchema]]
     feedback: Optional[List[FeedbackDict]]
 
@@ -590,6 +598,88 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
+class CostCreateInput(BaseModel):
+    prompt_token_cost: float
+    completion_token_cost: float
+    prompt_token_cost_unit: Optional[str] = Field(
+        "USD", description="The unit of the cost for the prompt tokens"
+    )
+    completion_token_cost_unit: Optional[str] = Field(
+        "USD", description="The unit of the cost for the completion tokens"
+    )
+    effective_date: Optional[datetime.datetime] = Field(
+        None,
+        description="The date after which the cost is effective for, will default to the current date if not provided",
+    )
+    provider_id: Optional[str] = Field(
+        None,
+        description="The provider of the LLM, e.g. 'openai' or 'mistral'. If not provided, the provider_id will be set to 'default'",
+    )
+
+
+class CostCreateReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    costs: Dict[str, CostCreateInput]
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+# Returns a list of tuples of (llm_id, cost_id)
+class CostCreateRes(BaseModel):
+    ids: list[tuple[str, str]]
+
+
+class CostQueryReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    fields: Optional[list[str]] = Field(
+        default=None,
+        examples=[
+            [
+                "id",
+                "llm_id",
+                "prompt_token_cost",
+                "completion_token_cost",
+                "prompt_token_cost_unit",
+                "completion_token_cost_unit",
+                "effective_date",
+                "provider_id",
+            ]
+        ],
+    )
+    query: Optional[Query] = None
+    # TODO: From FeedbackQueryReq,
+    # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
+    # TODO: Might be nice to have shortcut for single field and implied ASC direction
+    sort_by: Optional[List[SortBy]] = None
+    limit: Optional[int] = Field(default=None, examples=[10])
+    offset: Optional[int] = Field(default=None, examples=[0])
+
+
+class CostQueryOutput(BaseModel):
+    id: Optional[str] = Field(default=None, examples=["2341-asdf-asdf"])
+    llm_id: Optional[str] = Field(default=None, examples=["gpt4"])
+    prompt_token_cost: Optional[float] = Field(default=None, examples=[1.0])
+    completion_token_cost: Optional[float] = Field(default=None, examples=[1.0])
+    prompt_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
+    completion_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
+    effective_date: Optional[datetime.datetime] = Field(
+        default=None, examples=["2024-01-01T00:00:00Z"]
+    )
+    provider_id: Optional[str] = Field(default=None, examples=["openai"])
+
+
+class CostQueryRes(BaseModel):
+    results: list[CostQueryOutput]
+
+
+class CostPurgeReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    query: Query
+
+
+class CostPurgeRes(BaseModel):
+    pass
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -610,6 +700,11 @@ class TraceServerInterface(Protocol):
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
     def op_read(self, req: OpReadReq) -> OpReadRes: ...
     def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
+
+    # Cost API
+    def cost_create(self, req: CostCreateReq) -> CostCreateRes: ...
+    def cost_query(self, req: CostQueryReq) -> CostQueryRes: ...
+    def cost_purge(self, req: CostPurgeReq) -> CostPurgeRes: ...
 
     # Obj API
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
