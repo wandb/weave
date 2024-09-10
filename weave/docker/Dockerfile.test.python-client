@@ -1,5 +1,5 @@
 # Should match version in integration_test/package.json
-FROM python:3.9.11
+FROM python:3.9.11 as builder
 
 RUN apt update
 RUN apt -y install python3-venv python3-dev gcc g++ xz-utils
@@ -13,4 +13,3 @@ RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activat
     pip install \"spacy>=3.0.0,<4.0.0\" && python3 -m spacy download en_core_web_sm"
 
 ENTRYPOINT "/bin/bash"
-
