@@ -197,7 +197,8 @@ const ObjectVersionPageInner: React.FC<{
               }}
             />
           </Box>
-          <Box>
+
+          <Box mr={1}>
             <Button
               icon="delete"
               variant="ghost"

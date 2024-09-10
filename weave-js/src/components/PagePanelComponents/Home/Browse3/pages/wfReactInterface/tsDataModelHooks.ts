@@ -891,41 +891,79 @@ const convertTraceServerObjectVersionToSchema = (
   };
 };
 
-const useRootObjectVersions = makeTraceServerEndpointHook(
-  'objsQuery',
-  (
-    entity: string,
-    project: string,
-    filter: ObjectVersionFilter,
-    limit?: number,
-    opts?: {skip?: boolean}
-  ) => ({
-    params: {
+const useRootObjectVersions = (
+  entity: string,
+  project: string,
+  filter: ObjectVersionFilter,
+  limit?: number,
+  opts?: {skip?: boolean}
+): LoadableWithError<ObjectVersionSchema[]> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const [objectVersionRes, setObjectVersionRes] = useState<
+    LoadableWithError<ObjectVersionSchema[]>
+  >({
+    loading: false,
+    error: null,
+    result: null,
+  });
+  const deepFilter = useDeepMemo(filter);
+
+  const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      return;
+    }
+    setObjectVersionRes({loading: true, error: null, result: null});
+    loadingRef.current = true;
+
+    const req: traceServerTypes.TraceObjQueryReq = {
       project_id: projectIdFromParts({entity, project}),
       filter: {
-        base_object_classes: filter.baseObjectClasses,
-        object_ids: filter.objectIds,
-        latest_only: filter.latestOnly,
+        base_object_classes: deepFilter.baseObjectClasses,
+        object_ids: deepFilter.objectIds,
+        latest_only: deepFilter.latestOnly,
         is_op: false,
       },
-    },
-    skip: opts?.skip,
-  }),
-  (
-    res,
-    inputEntity,
-    inputProject,
-    filter,
-    limit,
-    opts
-  ): ObjectVersionSchema[] =>
-    res.objs.map(convertTraceServerObjectVersionToSchema)
-);
+    };
+    const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
+      loadingRef.current = false;
+      setObjectVersionRes({
+        loading: false,
+        error: null,
+        result: res.objs.map(convertTraceServerObjectVersionToSchema),
+      });
+    };
+    const onError = (e: any) => {
+      loadingRef.current = false;
+      console.error(e);
+      setObjectVersionRes({loading: false, error: e, result: null});
+    };
+    getTsClient().objsQuery(req).then(onSuccess).catch(onError);
+  }, [deepFilter, getTsClient, opts?.skip, entity, project]);
+
+  useEffect(() => {
+    doFetch();
+  }, [doFetch]);
+
+  useEffect(() => {
+    return getTsClient().registerOnObjectListener(doFetch);
+  }, [getTsClient, doFetch]);
+
+  return useMemo(() => {
+    if (opts?.skip) {
+      return {loading: false, error: null, result: null};
+    }
+    if (objectVersionRes == null || loadingRef.current) {
+      return {loading: true, error: null, result: null};
+    }
+    return objectVersionRes;
+  }, [objectVersionRes, opts?.skip]);
+};
 
 const useObjectDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
-  const objectsDelete = useCallback(
+  const objectDelete = useCallback(
     (key: ObjectVersionKey) => {
       return getTsClient().objectDelete({
         project_id: projectIdFromParts({
@@ -939,7 +977,7 @@ const useObjectDeleteFunc = () => {
     [getTsClient]
   );
 
-  return objectsDelete;
+  return objectDelete;
 };
 
 const useRefsReadBatch = makeTraceServerEndpointHook<
