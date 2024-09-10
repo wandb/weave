@@ -1454,15 +1454,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         ORDER BY created_at ASC
                     ) AS _version_index_plus_1,
                     _version_index_plus_1 - 1 AS version_index,
+                    row_number() OVER (
+                        PARTITION BY project_id, kind, object_id
+                        ORDER BY (deleted_at IS NULL) DESC, created_at DESC
+                    ) AS row_num,
                     count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
-                    CASE
-                        WHEN ROW_NUMBER() OVER (
-                            PARTITION BY project_id, kind, object_id
-                            ORDER BY created_at DESC
-                        ) = 1 AND deleted_at IS NULL
-                        THEN 1
-                        ELSE 0
-                    END AS is_latest
+                    if (row_num = 1, 1, 0) AS is_latest
                 FROM (
                     SELECT *,
                         row_number() OVER (
