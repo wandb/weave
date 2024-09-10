@@ -39,11 +39,6 @@ const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
   const customTheme = createTheme({
     components: {
-      MuiInputBase: {
-        styleOverrides: {
-          root: {overflow: 'hidden'},
-        },
-      },
       MuiAutocomplete: {
         styleOverrides: {
           root: {
@@ -101,6 +96,7 @@ const getStyles = (props: AdditionalProps) => {
             borderRadius: '4px',
             cursor: 'pointer',
             backgroundColor: 'transparent',
+            color: MOON_800,
             '&[aria-selected="true"]': {
               backgroundColor: `${hexToRGB(TEAL_300, 0.32)} !important`,
               color: TEAL_600,
