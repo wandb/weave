@@ -1,5 +1,53 @@
 import {Query} from './traceServerClientInterface/query';
 
+type ExtraKeysAllowed = {
+  [key: string]: any;
+};
+
+type WeaveSummarySchema = {
+  cost?: {[key: string]: LLMCostSchema};
+} & ExtraKeysAllowed;
+
+export type LLMUsageSchema = {
+  // Should collapse prompt and input? Ideally yes, but
+  // back compat is a concern.
+  prompt_tokens?: number;
+  input_tokens?: number;
+  // Should collapse completion and output? Ideally yes, but
+  // back compat is a concern.
+  completion_tokens?: number;
+  output_tokens?: number;
+  requests?: number;
+  total_tokens?: number;
+} & ExtraKeysAllowed;
+
+export type LLMCostSchema = LLMUsageSchema & {
+  // Cost for request
+  prompt_tokens_total_cost?: number;
+  completion_tokens_total_cost?: number;
+
+  // Cost per unit
+  prompt_token_cost?: number;
+  completion_token_cost?: number;
+  prompt_token_cost_unit?: string;
+  completion_token_cost_unit?: string;
+
+  effective_date?: string;
+  provider_id?: string;
+  pricing_level?: string;
+  pricing_level_id?: string;
+  created_at?: string;
+  created_by?: string;
+};
+
+type SummaryInsertMap = {
+  usage?: {[key: string]: LLMUsageSchema};
+} & ExtraKeysAllowed;
+
+type SummaryMap = {
+  weave?: WeaveSummarySchema;
+} & SummaryInsertMap;
+
 export type KeyedDictType = {
   [key: string]: any;
   _keys?: string[];
@@ -21,13 +69,14 @@ export type TraceCallSchema = {
   // freely assigned to any other variable without any type checking. This way,
   // we can ensure that we handle all possible types.
   output?: unknown;
-  summary?: KeyedDictType;
+  summary?: SummaryMap;
   wb_run_id?: string;
   wb_user_id?: string;
 };
 export type TraceCallReadReq = {
   project_id: string;
   id: string;
+  include_costs?: boolean;
 };
 
 export type TraceCallReadSuccess = {
@@ -60,6 +109,7 @@ export type TraceCallsQueryReq = {
   query?: Query;
   columns?: string[];
   expand_columns?: string[];
+  include_costs?: boolean;
 };
 
 export type TraceCallsQueryRes = {

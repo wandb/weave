@@ -159,7 +159,10 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
+const useCall = (
+  key: CallKey | null,
+  opts?: {includeCosts?: boolean}
+): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const cachedCall = key ? callCache.get(key) : null;
@@ -174,13 +177,14 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         .callRead({
           project_id: projectIdFromParts(deepKey),
           id: deepKey.callId,
+          include_costs: opts?.includeCosts,
         })
         .then(res => {
           loadingRef.current = false;
           setCallRes(res);
         });
     }
-  }, [deepKey, getTsClient]);
+  }, [deepKey, getTsClient, opts?.includeCosts]);
 
   useEffect(() => {
     doFetch();
@@ -239,7 +243,7 @@ const useCallsNoExpansion = (
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
   columns?: string[],
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  opts?: {skip?: boolean; refetchOnDelete?: boolean; includeCosts?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -271,6 +275,7 @@ const useCallsNoExpansion = (
       sort_by: sortBy,
       query,
       columns,
+      include_costs: opts?.includeCosts,
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -288,6 +293,7 @@ const useCallsNoExpansion = (
     deepFilter,
     limit,
     opts?.skip,
+    opts?.includeCosts,
     getTsClient,
     offset,
     sortBy,
@@ -367,7 +373,7 @@ const useCalls = (
   query?: Query,
   columns?: string[],
   expandedRefColumns?: Set<string>,
-  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+  opts?: {skip?: boolean; refetchOnDelete?: boolean; includeCosts?: boolean}
 ): Loadable<CallSchema[]> => {
   const calls = useCallsNoExpansion(
     entity,
