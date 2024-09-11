@@ -35,10 +35,13 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     if isinstance(obj, Path):
         # only support image files for now
         if obj.suffix in [".png", ".jpg", ".jpeg", ".gif", ".tiff"]:
-            # Load the image
-            from PIL import Image
+            # Load the image, if PIL is available
+            try:
+                from PIL import Image
 
-            obj = Image.open(obj)
+                obj = Image.open(obj)
+            except ImportError:
+                pass
 
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
