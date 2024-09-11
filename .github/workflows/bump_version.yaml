@@ -9,19 +9,10 @@ name: bump-python-sdk-version
 
 on:
   workflow_dispatch:
-    inputs:
-      bump_type:
-        description: "Version bump type (major, minor, patch)"
-        required: true
-        default: "patch"
-        options:
-          - "patch"
-          - "minor"
-          - "major"
 
 jobs:
   build-assets:
-    name: Bump Python SDK Version
+    name: Bump and Tag Python SDK Patch Version
     runs-on: ubuntu-8core
     timeout-minutes: 10
     environment:
@@ -40,17 +31,17 @@ jobs:
           git config --global user.email weave@wandb.com
       - id: install_bump
         run: pip install --upgrade bump-my-version
-      - id: bump_version
+      - id: drop_pre_release
+        # First we drop the pre-release tag since X.Y.Z-dev0 has lower precedence than X.Y.Z
+        # This is the commit we will release from
         run: |
-          bump-my-version bump ${{ github.event.inputs.bump_type }} ./weave/version.py --tag --commit
-          git push
-          git push --tags
-      - id: start_next_development_cycle
-        # This might seem weird to bump patch and then pre_n, but since semver
-        # dictates that pre-release versions have lower precedence, this ensures
-        # that the next commit on main will have a pre-release version.
+          bump-my-version bump pre_l ./weave/version.py --tag --commit
+      - id: bump_version_and_add_pre_release
+        # Next we bump the version to the next pre-release version. Effectively
+        # starting the next development cycle. X.Y.Z -> X.Y.(Z + 1)-dev0
         run: |
-          bump-my-version bump patch ./weave/version.py
-          bump-my-version bump pre_n ./weave/version.py --commit
+          bump-my-version bump patch ./weave/version.py --commit
+      - id: push_changes
+        run: 
           git push
           git push --tags
