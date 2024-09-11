@@ -2,17 +2,17 @@ import dataclasses
 import inspect
 import operator
 import typing
+from functools import partial
 from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
-from weave.client_context.weave_client import get_weave_client
-from weave.table import Table
 from weave.trace import box
+from weave.trace.client_context.weave_client import get_weave_client
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op import Op, maybe_bind_method
+from weave.trace.op import Op, call, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -23,6 +23,7 @@ from weave.trace.refs import (
     TableRef,
 )
 from weave.trace.serialize import from_json
+from weave.trace.table import Table
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
@@ -291,7 +292,13 @@ class WeaveTable(Traceable):
 
             for item in response.rows:
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
-                yield make_trace_obj(item.val, new_ref, self.server, self.root)
+                res = from_json(
+                    item.val,
+                    self.table_ref.entity + "/" + self.table_ref.project,
+                    self.server,
+                )
+                res = make_trace_obj(res, new_ref, self.server, self.root)
+                yield res
 
             if len(response.rows) < page_size:
                 break
@@ -572,6 +579,7 @@ def make_trace_obj(
             raise MissingSelfInstanceError(
                 f"{val.name} Op requires a bound self instance. Must be called from an instance method."
             )
+        val.call = partial(call, val, parent)
         val = maybe_bind_method(val, parent)
     box_val = box.box(val)
     if isinstance(box_val, pydantic_v1.BaseModel) or isinstance(val, Op):

@@ -1,7 +1,7 @@
 import datetime
 import typing
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from . import validation
 
@@ -16,7 +16,9 @@ class CallStartCHInsertable(BaseModel):
     attributes_dump: str
     inputs_dump: str
     input_refs: typing.List[str]
-    output_refs: typing.List[str] = []  # sadly, this is required
+    output_refs: typing.List[str] = Field(
+        default_factory=list
+    )  # sadly, this is required
     display_name: typing.Optional[str] = None
 
     wb_user_id: typing.Optional[str] = None
@@ -41,7 +43,9 @@ class CallEndCHInsertable(BaseModel):
     exception: typing.Optional[str] = None
     summary_dump: str
     output_dump: str
-    input_refs: typing.List[str] = []  # sadly, this is required
+    input_refs: typing.List[str] = Field(
+        default_factory=list
+    )  # sadly, this is required
     output_refs: typing.List[str]
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
@@ -58,8 +62,8 @@ class CallDeleteCHInsertable(BaseModel):
     deleted_at: datetime.datetime
 
     # required types
-    input_refs: typing.List[str] = []
-    output_refs: typing.List[str] = []
+    input_refs: typing.List[str] = Field(default_factory=list)
+    output_refs: typing.List[str] = Field(default_factory=list)
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -77,8 +81,8 @@ class CallUpdateCHInsertable(BaseModel):
     display_name: typing.Optional[str] = None
 
     # required types
-    input_refs: typing.List[str] = []
-    output_refs: typing.List[str] = []
+    input_refs: typing.List[str] = Field(default_factory=list)
+    output_refs: typing.List[str] = Field(default_factory=list)
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -105,8 +109,11 @@ class SelectableCHCallSchema(BaseModel):
     ended_at: typing.Optional[datetime.datetime] = None
     exception: typing.Optional[str] = None
 
-    attributes_dump: str
-    inputs_dump: str
+    # attributes and inputs are required on call schema, but can be
+    # optionally selected when querying
+    attributes_dump: typing.Optional[str] = None
+    inputs_dump: typing.Optional[str] = None
+
     output_dump: typing.Optional[str] = None
     summary_dump: typing.Optional[str] = None
 

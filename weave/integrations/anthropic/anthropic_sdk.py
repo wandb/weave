@@ -1,12 +1,16 @@
 import importlib
 import typing
 from functools import wraps
+from typing import Any, Union
+
+from typing_extensions import AsyncIterator, Iterator
 
 import weave
-from weave.trace.op_extensions.accumulator import add_accumulator
+from weave.trace.op_extensions.accumulator import _IteratorWrapper, add_accumulator
 from weave.trace.patcher import MultiPatcher, SymbolPatcher
 
 if typing.TYPE_CHECKING:
+    from anthropic.lib.streaming import MessageStream
     from anthropic.types import Message, MessageStreamEvent
 
 
@@ -109,6 +113,78 @@ def create_wrapper_async(
     return wrapper
 
 
+## This part of the code is for dealing with the other way
+## of streaming, by calling Messages.stream
+## this has 2 options: event based or text based.
+## This code handles both cases by patching the _IteratorWrapper
+## and adding a text_stream property to it.
+
+
+def anthropic_stream_accumulator(
+    acc: typing.Optional["Message"],
+    value: "MessageStream",
+) -> "Message":
+    from anthropic.lib.streaming._types import MessageStopEvent
+
+    if acc is None:
+        acc = ""
+    if isinstance(value, MessageStopEvent):
+        acc = value.message
+    return acc
+
+
+class AnthropicIteratorWrapper(_IteratorWrapper):
+    def __getattr__(self, name: str) -> Any:
+        """Delegate all other attributes to the wrapped iterator."""
+        if name in [
+            "_iterator_or_ctx_manager",
+            "_on_yield",
+            "_on_error",
+            "_on_close",
+            "_on_finished_called",
+            "_call_on_error_once",
+            "text_stream",
+        ]:
+            return object.__getattribute__(self, name)
+        return getattr(self._iterator_or_ctx_manager, name)
+
+    def __stream_text__(self) -> Union[Iterator[str], AsyncIterator[str]]:
+        if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
+            return self.__async_stream_text__()
+        else:
+            return self.__sync_stream_text__()
+
+    def __sync_stream_text__(self) -> Iterator[str]:  # type: ignore
+        for chunk in self:  # type: ignore
+            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
+                yield chunk.delta.text  # type: ignore
+
+    async def __async_stream_text__(self) -> AsyncIterator[str]:  # type: ignore
+        async for chunk in self:  # type: ignore
+            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
+                yield chunk.delta.text  # type: ignore
+
+    @property
+    def text_stream(self) -> Union[Iterator[str], AsyncIterator[str]]:
+        return self.__stream_text__()
+
+
+def create_stream_wrapper(
+    name: str,
+) -> typing.Callable[[typing.Callable], typing.Callable]:
+    def wrapper(fn: typing.Callable) -> typing.Callable:
+        op = weave.op()(fn)
+        op.name = name  # type: ignore
+        return add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda _: anthropic_stream_accumulator,
+            should_accumulate=lambda _: True,
+            iterator_wrapper=AnthropicIteratorWrapper,  # type: ignore
+        )
+
+    return wrapper
+
+
 anthropic_patcher = MultiPatcher(
     [
         # Patch the sync messages.create method for all messages.create methods
@@ -121,6 +197,16 @@ anthropic_patcher = MultiPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "AsyncMessages.create",
             create_wrapper_async(name="anthropic.AsyncMessages.create"),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("anthropic.resources.messages"),
+            "Messages.stream",
+            create_stream_wrapper(name="anthropic.Messages.stream"),
+        ),
+        SymbolPatcher(
+            lambda: importlib.import_module("anthropic.resources.messages"),
+            "AsyncMessages.stream",
+            create_stream_wrapper(name="anthropic.AsyncMessages.stream"),
         ),
     ]
 )

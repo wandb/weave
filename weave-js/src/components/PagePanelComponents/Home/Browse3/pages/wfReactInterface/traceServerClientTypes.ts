@@ -59,6 +59,7 @@ export type TraceCallsQueryReq = {
   sort_by?: SortBy[];
   query?: Query;
   columns?: string[];
+  expand_columns?: string[];
 };
 
 export type TraceCallsQueryRes = {
@@ -202,7 +203,7 @@ export type TraceFileContentReadReq = {
 };
 
 export type TraceFileContentReadRes = {
-  content: string;
+  content: ArrayBuffer;
 };
 
 export enum ContentType {

@@ -1,3 +1,5 @@
+"""Defines the Op protocol and related functions."""
+
 import inspect
 import typing
 from functools import partial, wraps
@@ -17,10 +19,9 @@ from typing import (
     runtime_checkable,
 )
 
-from weave import call_context
-from weave.client_context import weave_client as weave_client_context
-from weave.legacy import context_state
-from weave.trace import box, settings
+from weave.legacy.weave import context_state
+from weave.trace import box, call_context, settings
+from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
@@ -28,7 +29,7 @@ from weave.trace.refs import ObjectRef
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
-    from weave.weave_client import Call, CallsIter
+    from weave.trace.weave_client import Call, CallsIter
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
@@ -44,6 +45,11 @@ try:
     from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
 except ImportError:
     ANTHROPIC_NOT_GIVEN = None
+
+try:
+    from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
+except ImportError:
+    CEREBRAS_NOT_GIVEN = None
 
 
 def print_call_link(call: "Call") -> None:
@@ -61,6 +67,8 @@ def value_is_sentinel(param: Any) -> bool:
         or param.default is OPENAI_NOT_GIVEN
         or param.default is COHERE_NOT_GIVEN
         or param.default is ANTHROPIC_NOT_GIVEN
+        or param.default is CEREBRAS_NOT_GIVEN
+        or param.default is Ellipsis
     )
 
 
@@ -116,6 +124,15 @@ class Op(Protocol):
     __call__: Callable[..., Any]
     __self__: Any
 
+    # `_tracing_enabled` is a runtime-only flag that can be used to disable
+    # call tracing for an op. It is not persisted as a property of the op, but is
+    # respected by the current execution context. It is an underscore property
+    # because it is not intended to be used by users directly, but rather assists
+    # with internal Weave behavior. If we find a need to expose this to users, we
+    # should consider a more user-friendly API (perhaps a setter/getter) & whether
+    # it disables child ops as well.
+    _tracing_enabled: bool
+
 
 def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
     if func._on_output_handler is not None:
@@ -155,7 +172,6 @@ def _create_call(func: Op, *args: Any, **kwargs: Any) -> "Call":
     # If/When we do memoization, this would be a good spot
 
     parent_call = call_context.get_current_call()
-    client._save_nested_objects(inputs_with_defaults)
     attributes = call_attributes.get()
 
     return client.create_call(
@@ -233,12 +249,39 @@ def call(op: Op, *args: Any, **kwargs: Any) -> tuple[Any, "Call"]:
     Executes the op and returns both the result and a Call representing the execution.
 
     This function will never raise.  Any errors are captured in the Call object.
+
+    This method is automatically bound to any function decorated with `@weave.op`,
+    allowing for usage like:
+
+    ```python
+    @weave.op
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    result, call = add.call(1, 2)
+    ```
     """
     c = _create_call(op, *args, **kwargs)
     return _execute_call(op, c, *args, __should_raise=False, **kwargs)
 
 
 def calls(op: Op) -> "CallsIter":
+    """
+    Get an iterator over all calls to this op.
+
+    This method is automatically bound to any function decorated with `@weave.op`,
+    allowing for usage like:
+
+    ```python
+    @weave.op
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    calls = add.calls()
+    for call in calls:
+        print(call)
+    ```
+    """
     client = weave_client_context.require_weave_client()
     return client._op_calls(op)
 
@@ -310,7 +353,7 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
     ```
     """
     if context_state.get_loading_built_ins():
-        from weave.legacy.decorator_op import op as legacy_op
+        from weave.legacy.weave.decorator_op import op as legacy_op
 
         return legacy_op(*args, **kwargs)  # type: ignore
 
@@ -329,6 +372,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                         return await func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
                         return await func(*args, **kwargs)
+                    if not wrapper._tracing_enabled:  # type: ignore
+                        return await func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     res, _ = await _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
                     return res
@@ -339,6 +384,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
                     if settings.should_disable_weave():
                         return func(*args, **kwargs)
                     if weave_client_context.get_weave_client() is None:
+                        return func(*args, **kwargs)
+                    if not wrapper._tracing_enabled:  # type: ignore
                         return func(*args, **kwargs)
                     call = _create_call(wrapper, *args, **kwargs)  # type: ignore
                     res, _ = _execute_call(wrapper, call, *args, **kwargs)  # type: ignore
@@ -366,6 +413,8 @@ def op(*args: Any, **kwargs: Any) -> Union[Callable[[Any], Op], Op]:
 
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
+
+            wrapper._tracing_enabled = True  # type: ignore
 
             return cast(Op, wrapper)
 
@@ -405,3 +454,6 @@ def maybe_unbind_method(oplike: Union[Op, MethodType, partial]) -> Op:
         op = oplike
 
     return cast(Op, op)
+
+
+__docspec__ = [call, calls]

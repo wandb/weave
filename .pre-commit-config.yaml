@@ -19,11 +19,6 @@ repos:
           [types-pkg-resources==0.1.3, types-all, wandb>=0.15.5]
         # You have to exclude in 3 places. 1) here. 2) mypi.ini exclude, 3) follow_imports = skip for each module in mypy.ini
         exclude: (.*pyi$)|(weave/legacy)|(weave/tests)
-  # Turn pyright back off, duplicative of mypy
-  # - repo: https://github.com/RobertCraigie/pyright-python
-  #   rev: v1.1.341
-  #   hooks:
-  #   - id: pyright
   - repo: local
     hooks:
       - id: jupyter-nb-clear-output

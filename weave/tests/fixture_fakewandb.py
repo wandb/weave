@@ -11,20 +11,18 @@ from urllib import parse
 import wandb
 
 import weave
-from weave import util
+from weave.legacy.tests.util.tag_test_util import op_add_tag
 
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should
 # mock wandb_api instead probably.
-from weave.legacy import io_service, wandb_api, wandb_client_api
-from weave.legacy.artifact_wandb import (
+from weave.legacy.weave import io_service, util, wandb_api, wandb_client_api
+from weave.legacy.weave.artifact_wandb import (
     WandbArtifact,
     WandbArtifactManifest,
     WeaveWBArtifactByIDURI,
     WeaveWBArtifactURI,
 )
-
-from .tag_test_util import op_add_tag
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacits/test_res_1fwmcd3q:v0"
 ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
@@ -435,7 +433,7 @@ def teardown(setup_response: SetupResponse):
     setup_response.fake_io.cleanup()
     wandb_client_api.wandb_public_api = setup_response.old_wandb_api_wandb_public_api
     io_service.get_sync_client = setup_response.orig_io_service_client  # type: ignore
-    wandb.Artifact = OriginalArtifactSymbol
+    wandb.Artifact = OriginalArtifactSymbol  # type: ignore
 
 
 entity_payload = {

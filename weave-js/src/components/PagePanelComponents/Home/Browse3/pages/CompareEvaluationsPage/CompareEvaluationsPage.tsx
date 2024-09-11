@@ -14,6 +14,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {useEvaluationsFilter} from '../CallsPage/evaluationsFilter';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
@@ -95,7 +96,10 @@ export const CompareEvaluationsPage: React.FC<
               }
               selectedInputDigest={selectedInputDigest ?? undefined}
               setSelectedInputDigest={setSelectedInputDigest}>
-              <CompareEvaluationsPageInner />
+              <CustomWeaveTypeProjectContext.Provider
+                value={{entity: props.entity, project: props.project}}>
+                <CompareEvaluationsPageInner />
+              </CustomWeaveTypeProjectContext.Provider>
             </CompareEvaluationsProvider>
           ),
         },
