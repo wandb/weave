@@ -38,15 +38,12 @@ const PADDING = {
 
 const getStyles = (props: AdditionalProps) => {
   const size = props.size ?? 'medium';
-  console.log(props.isDarkMode);
   const customTheme = createTheme({
     components: {
       MuiAutocomplete: {
         styleOverrides: {
           root: {
             '& .MuiOutlinedInput-root': {
-              // display: 'flex',
-              // alignItems: 'center',
               height: HEIGHTS[size],
               padding: PADDING[size],
               fontSize: FONT_SIZES[size],
@@ -126,11 +123,12 @@ const getStyles = (props: AdditionalProps) => {
           },
           // menu dropdown
           paper: {
-            border: `1px solid ${MOON_250}`, // Customize the border color and style
-            borderRadius: '4px', // Add border radius if needed
-            boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)', // Apply the box-shadow
-            backgroundColor: props.isDarkMode ? MOON_100 : 'white', // we invert in dark mode automatically unless we want
+            border: `1px solid ${MOON_250}`,
+            borderRadius: '4px',
+            boxShadow: '0 12px 24px rgba(0, 0, 0, 0.16)',
+            // we invert in dark mode automatically unless we want
             //to use night-aware and override all other styles. so moon_100 == moon_900
+            backgroundColor: props.isDarkMode ? MOON_100 : 'white',
           },
         },
       },
