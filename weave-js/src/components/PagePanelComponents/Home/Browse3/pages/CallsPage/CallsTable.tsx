@@ -68,6 +68,7 @@ import {
   BulkDeleteButton,
   CompareEvaluationsTableButton,
   ExportSelector,
+  LivePollingButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
 import {WFHighLevelCallFilter} from './callsTableFilter';
@@ -567,6 +568,8 @@ export const CallsTable: FC<{
     [callsLoading, setPaginationModel]
   );
 
+  const [isPolling, setIsPolling] = useState(false);
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -721,7 +724,7 @@ export const CallsTable: FC<{
           </div>
           {columnVisibilityModel && setColumnVisibilityModel && (
             <>
-              <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>
+              <ButtonDivider />
               <div className="flex-none">
                 <ManageColumnsButton
                   columnInfo={columns}
@@ -731,6 +734,11 @@ export const CallsTable: FC<{
               </div>
             </>
           )}
+          <ButtonDivider />
+          <LivePollingButton
+            isPolling={isPolling}
+            onClick={() => setIsPolling(!isPolling)}
+          />
         </Tailwind>
       }>
       <StyledDataGrid
@@ -851,6 +859,10 @@ export const CallsTable: FC<{
       />
     </FilterLayoutTemplate>
   );
+};
+
+const ButtonDivider = () => {
+  return <div className="h-24 flex-none border-l-[1px] border-moon-250"></div>;
 };
 
 const useParentIdOptions = (

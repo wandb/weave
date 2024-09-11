@@ -402,6 +402,36 @@ export const BulkDeleteButton: FC<{
   );
 };
 
+export const LivePollingButton: FC<{
+  isPolling: boolean;
+  onClick: () => void;
+}> = ({isPolling, onClick}) => {
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <Button
+        variant={isPolling ? 'primary' : 'ghost'}
+        size="medium"
+        onClick={onClick}
+        tooltip={isPolling ? 'Pause live updates' : 'Enable live updates'}
+        icon={isPolling ? 'pause' : 'play'}>
+        <span
+          style={{
+            width: '40px',
+            display: 'inline-block',
+            textAlign: 'center',
+          }}>
+          {isPolling ? 'Pause' : 'Live'}
+        </span>
+      </Button>
+    </Box>
+  );
+};
+
 function initiateDownloadFromBlob(blob: Blob, fileName: string) {
   const downloadUrl = URL.createObjectURL(blob);
   // Create a download link and click it
