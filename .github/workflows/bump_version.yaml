@@ -34,16 +34,16 @@ jobs:
         with:
           token: ${{ secrets.WANDBMACHINE_GITHUB_TOKEN }}
           fetch-depth: 0
-      - id: "Setup Git"
+      - id: setup_git
         run: |
           git config --global user.name 'Weave Build Bot'
           git config --global user.email weave@wandb.com
-      - id: "Bump the version"
+      - id: bump_version
         run: |
           bump-my-version bump ${{ github.event.inputs.bump_type }} ./weave/version.py --tag --commit
           git push
           git push --tags
-      - id: "Start the next development cycle"
+      - id: start_next_development_cycle
         # This might seem weird to bump patch and then pre_n, but since semver
         # dictates that pre-release versions have lower precedence, this ensures
         # that the next commit on main will have a pre-release version.
