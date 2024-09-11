@@ -64,6 +64,40 @@ const getRefs = (data: Data): string[] => {
 
 type RefValues = Record<string, any>; // ref URI to value
 
+// Returns a ref or undefined from a path like "value.something[0].nested" or "value.nested" and an object
+const getRefFromObjectPath = (obj: any, path: string) => {
+  // path is something like "value.something[0].nested" or "value.nested"
+  return path.split('.').reduce((acc: any, pathPart: string) => {
+    // pathPart is something like "something[0]" or "something"
+    // Parses "something[0]" to ["something[0]", "something", "[0]", "0"]
+    // Parses "something" to ["something", "something", undefined, undefined]
+    const parsedPath = pathPart.match(
+      /^([a-zA-Z_$][0-9a-zA-Z_$]*)(\[(\d+)\])?$/
+    );
+
+    if (parsedPath) {
+      let property = parsedPath[1]; // e.g., "something"
+      let index = parsedPath[3]; // e.g., "0"
+
+      // If acc is undefined, return undefined, or get the property if it exists
+      if (acc && acc[property]) {
+        // Get the property first
+        acc = acc[property];
+        if (isWeaveRef(acc)) {
+          return acc;
+        }
+        if (index !== undefined) {
+          // Get the array element if index is present
+          return acc[parseInt(index)];
+        }
+        return acc;
+      }
+    }
+    // If the property is not found, set acc to undefined, because we can't resolve the path
+    return undefined;
+  }, obj);
+};
+
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({
   apiRef,
@@ -89,6 +123,22 @@ export const ObjectViewer = ({
   const addExpandedRef = useCallback((path: string, ref: string) => {
     setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
   }, []);
+
+  // For each expanded id, if it is not in the `expandedRefs` state,
+  // We check if it resolves to a ref and if so we add it to the `expandedRefs` state.
+  // We need this, because expandAll adds a bunch of ids to expandedIds, but not to expandedRefs.
+  for (const id of expandedIds) {
+    if (typeof id === 'number') {
+      continue;
+    }
+    if (!(id in expandedRefs)) {
+      // ref is a ref or undefined
+      const ref = getRefFromObjectPath(resolvedData, id);
+      if (isWeaveRef(ref)) {
+        addExpandedRef(id, ref);
+      }
+    }
+  }
 
   // `refs` is the union of `dataRefs` and the refs in `expandedRefs`.
   const refs = useMemo(() => {
