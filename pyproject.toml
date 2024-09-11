@@ -145,5 +145,5 @@ message = "Release version: {current_version} → {new_version}"
 commit_args = ""
 
 [tool.bumpversion.parts.pre_l]
-values = ["dev", "final"]
-optional_value = "final"
+values = ["dev"]
+

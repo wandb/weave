@@ -15,9 +15,9 @@ on:
         required: true
         default: "patch"
         options:
-          - "major"
-          - "minor"
           - "patch"
+          - "minor"
+          - "major"
 
 jobs:
   build-assets:
@@ -38,13 +38,13 @@ jobs:
         run: |
           git config --global user.name 'Weave Build Bot'
           git config --global user.email weave@wandb.com
-      - id: "Drop Pre-Release"
-        run: |
-          bump-my-version bump pre_l ./weave/version.py --tag --commit
-          git push
-          git push --tags
       - id: "Bump the version"
         run: |
           bump-my-version bump ${{ github.event.inputs.bump_type }} ./weave/version.py --tag --commit
+          git push
+          git push --tags
+      - id: "Start the next development cycle"
+        run: |
+          bump-my-version bump pre_n ./weave/version.py --tag --commit
           git push
           git push --tags
