@@ -19,10 +19,11 @@ repos:
           [types-pkg-resources==0.1.3, types-all, wandb>=0.15.5]
         # You have to exclude in 3 places. 1) here. 2) mypi.ini exclude, 3) follow_imports = skip for each module in mypy.ini
         exclude: (.*pyi$)|(weave/legacy)|(weave/tests)
-  - repo: local
-    hooks:
-      - id: jupyter-nb-clear-output
-        name: jupyter-nb-clear-output
-        files: ^examples/.*\.ipynb$
-        language: system
-        entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
+  # This is legacy Weave when we were building a notebook product.
+  # - repo: local
+  #   hooks:
+  #     - id: jupyter-nb-clear-output
+  #       name: jupyter-nb-clear-output
+  #       files: ^examples/.*\.ipynb$
+  #       language: system
+  #       entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
