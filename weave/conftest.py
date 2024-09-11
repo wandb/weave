@@ -300,36 +300,26 @@ def strict_op_saving():
 #     )
 
 
-class TestOnlyFlushingRemoteHTTPTraceServer(
-    remote_http_trace_server.RemoteHTTPTraceServer
-):
-    """
-    A RemoteHTTPTraceServer that flushes any time a method is called.
-    This ensures that all writes are flushed before any read operation,
-    which is useful for tests that write data and then immediately read it back.
-    """
-
-    def __getattribute__(self, name):
-        attr = super().__getattribute__(name)
-        if callable(attr) and not name.startswith("_") and name != "flush":
-
-            def wrapper(*args, **kwargs):
-                self.flush()
-                return attr(*args, **kwargs)
-
-            return wrapper
-        return attr
-
-    def flush(self):
-        if self.should_batch:
-            self.call_processor.wait_until_all_processed()
-
-
 class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     """
-    A WeaveClient that flushes any time a method is called.
-    This ensures that all writes are flushed before any read operation,
-    which is useful for tests that write data and then immediately read it back.
+    A WeaveClient that automatically flushes after every method call.
+
+    This subclass overrides the behavior of the standard WeaveClient to ensure
+    that all write operations are immediately flushed to the underlying storage
+    before any subsequent read operation is performed. This is particularly
+    useful in testing scenarios where data is written and then immediately read
+    back, as it eliminates potential race conditions or inconsistencies that
+    might arise from delayed writes.
+
+    The flush operation is applied to all public methods (those not starting with
+    an underscore) except for the 'flush' method itself, to avoid infinite recursion.
+    This aggressive flushing strategy may impact performance and should primarily
+    be used in testing environments rather than production scenarios.
+
+    Note: Due to this, the test suite essentially "blocks" on every operation. So
+    if we are to test timing, this might not be the best choice. As an alternative,
+    we could explicitly call flush() in every single test that reads data, before the
+    read operation(s) are performed.
     """
 
     def __getattribute__(self, name):
@@ -373,15 +363,15 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
             ch_server, DummyIdConverter(), entity
         )
     elif weave_server_flag.startswith("http"):
-        remote_server = TestOnlyFlushingRemoteHTTPTraceServer(weave_server_flag)
-        # remote_server = remote_http_trace_server.RemoteHTTPTraceServer(weave_server_flag)
+        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
+            weave_server_flag
+        )
         server = remote_server
     elif weave_server_flag == ("prod"):
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
         client = TestOnlyFlushingWeaveClient(entity, project, server)
-        # client = weave_client.WeaveClient(entity, project, server)
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
