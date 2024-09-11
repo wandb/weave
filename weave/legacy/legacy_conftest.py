@@ -132,7 +132,7 @@ def io_server_factory():
 
 @pytest.fixture()
 def http_server_test_client(app):
-    from . import weave_server
+    from .. import weave_server
 
     app = weave_server.make_app()
     flask_client = app.test_client()
