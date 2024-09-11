@@ -2,6 +2,6 @@
 -r requirements.dev.txt
 -r requirements.ecosystem.txt
 -r requirements.engine.txt
--r requirements.python_client.test.txt
+-r requirements.test.txt
 -r requirements.legacy.test.txt
 -r requirements.txt
