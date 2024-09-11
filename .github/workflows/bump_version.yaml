@@ -21,7 +21,7 @@ on:
 
 jobs:
   build-assets:
-    name: Build frontend assets
+    name: Bump Python SDK Version
     runs-on: ubuntu-8core
     timeout-minutes: 10
     environment:
