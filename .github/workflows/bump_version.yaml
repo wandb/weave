@@ -42,7 +42,9 @@ jobs:
         run: |
           bump-my-version bump pre_l ./weave/version.py --tag --commit
           git push
+          git push --tags
       - id: "Bump the version"
         run: |
           bump-my-version bump ${{ github.event.inputs.bump_type }} ./weave/version.py --tag --commit
           git push
+          git push --tags
