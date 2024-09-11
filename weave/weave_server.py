@@ -441,9 +441,17 @@ def frontend_env():
     }
 
 
+def legacy_weave_redirect():
+    return redirect("https://wandb.github.io/weave/", code=302)
+
+
 @blueprint.route("/__frontend", defaults={"path": None})
 @blueprint.route("/__frontend/<path:path>")
 def frontend(path):
+    # Redirect to the new docs site
+    if not environment.env_is_ci():
+        return legacy_weave_redirect()
+
     """Serve the frontend with a simple fileserver over HTTP."""
     # We serve up a dynamic env.js file before all other js.
     if path is not None and path.endswith("env.js"):
@@ -462,6 +470,10 @@ def frontend(path):
 @blueprint.route("/", defaults={"path": None})
 @blueprint.route("/<path:path>")
 def root_frontend(path):
+    # Redirect to the new docs site
+    if not environment.env_is_ci():
+        return legacy_weave_redirect()
+
     if request.args.get("unsetBetaVersion") is not None:
         resp = redirect_without_query_param("unsetBetaVersion")
         resp.set_cookie("betaVersion", "", max_age=0)
