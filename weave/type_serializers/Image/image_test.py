@@ -114,10 +114,18 @@ def test_image_from_path(client: WeaveClient) -> None:
         exp_bytes = img.tobytes()
 
         @weave.op
-        def save_image(path: Path) -> None:
+        def save_image(path: Path) -> dict:
             return {"out-img-path": path}
 
         save_image(Path(path_str))
 
         call = save_image.calls()[0]
         assert call.output["out-img-path"].tobytes() == exp_bytes
+
+        @weave.op
+        def save_stuff_with_image_embedded(path: Path) -> dict:
+            return {"out": f"Some random text + a path: {path}"}
+
+        save_stuff_with_image_embedded(Path(path_str))
+        call = save_stuff_with_image_embedded.calls()[0]
+        assert call.output["out"] == f"Some random text + a path: {path_str}"
