@@ -23,3 +23,6 @@ uvicorn>=0.27.0
 fastapi>=0.110.0
 tqdm>=4.66.3  # CVE 2024-34062
 cryptography>=42.0.7  # CVE 2023-23931
+
+# SQL Generation Tests
+sqlparse
