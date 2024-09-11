@@ -37,7 +37,6 @@ There are three main ways to create Calls in Weave:
 Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`, `anthropic`, `cohere`, and `mistral`. Simply call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) at the start of your program:
 
 ```python showLineNumbers
-# Import Weave
 import weave
 
 from openai import OpenAI
@@ -60,13 +59,12 @@ response = client.chat.completions.create(
 )
 ```
 
-### 2. Manual Call Tracking
+### 2. Decorating Functions
 
 However, often LLM applications have additional logic (such as pre/post processing, prompts, etc.) that you want to track.
 Weave allows you to manually track these calls using the [`@weave.op`](../../reference/python-sdk/weave/index.md#function-op) decorator. For example:
 
 ```python showLineNumbers
-# Import Weave
 import weave
 
 # Initialize Weave Tracing
@@ -77,7 +75,7 @@ weave.init('intro-example')
 def my_function(name: str):
     return f"Hello, {name}!"
 
-# Call your function
+# Call your function -- Weave will automatically track inputs and outputs
 print(my_function.call("World"))
 ```
 
@@ -87,7 +85,6 @@ Sometimes you may want to override the display name of a call. You can achieve t
 
 1. Change the display name on a per-call basis. This uses the [`Op.call`](../../reference/python-sdk/weave/trace/weave.trace.op.md#function-call) method to return a `Call` object, which you can then use to set the display name using [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-set_display_name).
 ```python showLineNumbers
-# Use the `call` method which 
 result, call = my_function.call("World")
 call.set_display_name("My Custom Display Name")
 ```
@@ -127,30 +124,53 @@ with weave.attributes({'env': 'production'}):
 ### 3. Manual Call Tracking
 
 You can also manually create Calls using the API directly.
-* Start a call: [POST `/call/start`](../../reference/service-api/call-start-call-start-post.api.mdx)
-* End a call: [POST `/call/end`](../../reference/service-api/call-end-call-end-post.api.mdx)
 
-For example:
+<Tabs groupId="client-layer">
+    <TabItem value="python_sdk" label="Python">
+    ```python showLineNumbers
+    import weave
 
-```bash
-curl -L 'https://trace.wandb.ai/call/start' \
--H 'Content-Type: application/json' \
--H 'Accept: application/json' \
--d '{
-  "start": {
-    "project_id": "string",
-    "id": "string",
-    "op_name": "string",
-    "display_name": "string",
-    "trace_id": "string",
-    "parent_id": "string",
-    "started_at": "2024-09-08T20:07:34.849Z",
-    "attributes": {},
-    "inputs": {},
-    "wb_run_id": "string"
-  }
-}'
-```
+    # Initialize Weave Tracing
+    weave.init('intro-example')
+
+    def my_function(name: str):
+        # Start a call
+        call = weave.create_call(op="my_function", inputs={"name": name})
+
+        # ... your function code ...
+
+        # End a call
+        weave.finish_call(call, output="Hello, World!")
+
+    # Call your function
+    print(my_function("World"))
+    ```
+    </TabItem>
+    <TabItem value="service_api" label="HTTP API">
+    * Start a call: [POST `/call/start`](../../reference/service-api/call-start-call-start-post.api.mdx)
+    * End a call: [POST `/call/end`](../../reference/service-api/call-end-call-end-post.api.mdx)
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/start' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "start": {
+            "project_id": "string",
+            "id": "string",
+            "op_name": "string",
+            "display_name": "string",
+            "trace_id": "string",
+            "parent_id": "string",
+            "started_at": "2024-09-08T20:07:34.849Z",
+            "attributes": {},
+            "inputs": {},
+            "wb_run_id": "string"
+        }
+    }
+    ```
+    </TabItem>
+</Tabs>
+
 
 
 

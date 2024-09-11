@@ -13,7 +13,8 @@ import typing
 from _ast import AsyncFunctionDef, ExceptHandler
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
-from weave.legacy.weave import artifact_fs, context_state, errors, storage
+from weave import context_state
+from weave.legacy.weave import artifact_fs, errors, storage
 from weave.trace.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -539,15 +540,14 @@ def load_instance(
     )
 
     sys.path.insert(0, os.path.abspath(module_dir))
-    with context_state.no_op_register():
-        try:
-            mod = __import__(import_name, fromlist=[module_dir])
-        except Exception as e:
-            print("Op loading exception. This might be fine!", e)
-            import traceback
+    try:
+        mod = __import__(import_name, fromlist=[module_dir])
+    except Exception as e:
+        print("Op loading exception. This might be fine!", e)
+        import traceback
 
-            traceback.print_exc()
-            return None
+        traceback.print_exc()
+        return None
     sys.path.pop(0)
 
     # In the case where the saved op calls another op, we will have multiple

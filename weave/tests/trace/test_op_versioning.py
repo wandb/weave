@@ -269,7 +269,7 @@ def pony(v: int):
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_op_versioning_closure_dict_ops(strict_op_saving, eager_mode, client):
+def test_op_versioning_closure_dict_ops(strict_op_saving, client):
     @weave.op()
     def cat(v: int):
         print("hello from cat()")
@@ -324,7 +324,7 @@ def pony(v: int):
 
 
 @pytest.mark.skip("custom objs not working with new weave_client")
-def test_op_versioning_mixed(strict_op_saving, eager_mode, client):
+def test_op_versioning_mixed(strict_op_saving, client):
     @weave.op()
     def cat(v: int):
         print("hello from cat()")
