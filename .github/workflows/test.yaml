@@ -75,8 +75,6 @@ jobs:
 
   test2:
     name: Tox tests
-    needs:
-      - build-container
     runs-on: ubuntu-latest
     strategy:
       matrix:
