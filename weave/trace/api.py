@@ -185,6 +185,16 @@ def output_of(obj: Any) -> Optional[weave_client.Call]:
 
 @contextlib.contextmanager
 def attributes(attributes: dict[str, Any]) -> Iterator:
+    """
+    Context manager for setting attributes on a call.
+
+    Example:
+
+    ```python
+    with weave.attributes({'env': 'production'}):
+        print(my_function.call("World"))
+    ```
+    """
     cur_attributes = {**context.call_attributes.get()}
     cur_attributes.update(attributes)
 
