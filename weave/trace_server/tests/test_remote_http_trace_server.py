@@ -1,17 +1,13 @@
 import datetime
 import unittest
-import uuid
 from unittest.mock import patch
 
 import requests
 from pydantic import ValidationError
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.remote_http_trace_server import RemoteHTTPTraceServer
-
-
-def generate_id() -> str:
-    return str(uuid.uuid4())
+from weave.trace_server.ids import generate_id
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 
 def generate_start(id) -> tsi.StartedCallSchemaForInsert:

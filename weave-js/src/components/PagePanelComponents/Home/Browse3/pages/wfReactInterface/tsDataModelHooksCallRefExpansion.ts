@@ -9,7 +9,7 @@ import * as _ from 'lodash';
 import {useEffect, useMemo, useState} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {isRef} from '../common/util';
+import {isWeaveRef} from '../../filters/common';
 import {refDataCache} from './cache';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -125,12 +125,9 @@ export const useClientSideCallRefExpansion = (
             value = value[EXPANDED_REF_VAL_KEY];
             path.push(EXPANDED_REF_VAL_KEY);
           }
-          if (isRef(value) && refsDataMap.has(value)) {
+          if (isWeaveRef(value) && refsDataMap.has(value)) {
             const refObj = refsDataMap.get(value);
-            _.set(call, path, {
-              [EXPANDED_REF_REF_KEY]: value,
-              [EXPANDED_REF_VAL_KEY]: refObj,
-            });
+            _.set(call, path, makeRefExpandedPayload(value, refObj));
           }
         });
         return call;
@@ -149,6 +146,33 @@ export const useClientSideCallRefExpansion = (
     };
   }, [expandedCalls, isExpanding]);
 };
+
+export type ExpandedRefWithValue<T = any> = {
+  [EXPANDED_REF_REF_KEY]: string;
+  [EXPANDED_REF_VAL_KEY]: T;
+};
+
+export const makeRefExpandedPayload = <T = any>(
+  originalRef: string,
+  refData: T
+): ExpandedRefWithValue<T> => {
+  return {
+    [EXPANDED_REF_REF_KEY]: originalRef,
+    [EXPANDED_REF_VAL_KEY]: refData,
+  };
+};
+
+export const isExpandedRefWithValue = (
+  ref: any
+): ref is ExpandedRefWithValue => {
+  return (
+    typeof ref === 'object' &&
+    ref !== null &&
+    EXPANDED_REF_REF_KEY in ref &&
+    EXPANDED_REF_VAL_KEY in ref
+  );
+};
+
 export const directFetchRefsData = async (
   refUris: string[],
   client: traceServerClient.TraceServerClient
@@ -181,7 +205,7 @@ export const isTableRef = (ref: any): boolean => {
   if (typeof ref !== 'string') {
     return false;
   }
-  if (!isRef(ref)) {
+  if (!isWeaveRef(ref)) {
     return false;
   }
   const parsed = parseRef(ref);
@@ -195,7 +219,7 @@ export const isExpandableRef = (ref: any): boolean => {
   if (typeof ref !== 'string') {
     return false;
   }
-  if (!isRef(ref)) {
+  if (!isWeaveRef(ref)) {
     return false;
   }
   const parsed = parseRef(ref);

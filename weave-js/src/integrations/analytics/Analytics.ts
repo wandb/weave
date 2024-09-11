@@ -42,7 +42,7 @@ export const Analytics = {
     // only hit Sentry in prod
     const envIsProd =
       (window as any)?.CONFIG?.ENVIRONMENT_NAME === 'production';
-    const captureMessage = envIsProd ? Sentry.captureMessage : console.warn;
+    const captureMessage = envIsProd ? Sentry.captureMessage : () => {};
 
     // these represent conditions where expected behavior will fail
     // known conditions are that `window.analytics.track` exists but the service is

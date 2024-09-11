@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
-
 # Track data flows and app metadata
 
 In the [Track LLM inputs & outputs](/quickstart) tutorial, the basics of tracking the inputs and outputs of your LLMs was covered.
@@ -10,7 +5,6 @@ In the [Track LLM inputs & outputs](/quickstart) tutorial, the basics of trackin
 In this tutorial you will learn how to:
 - **Track data** as it flows though your application
 - **Track metadata** at call time
-- **Export data** that was logged to Weave
 
 ## Tracking nested function calls
 
@@ -110,4 +104,4 @@ To track system attributes, such as a System Prompt, we recommend using [weave M
 
 ## What's next?
 
-- Follow the [Build an Evaluation pipeline tutorial](/tutorial-eval) to start iteratively improving your applications.
+- Follow the [App Versioning tutorial](/tutorial-weave_models) to capture, version and organize ad-hoc prompt, model, and application changes.

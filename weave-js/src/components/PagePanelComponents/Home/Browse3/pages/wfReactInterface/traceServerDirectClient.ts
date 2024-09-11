@@ -16,6 +16,7 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 
 import {
+  ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
@@ -91,7 +92,7 @@ export class DirectTraceServerClient {
     const res = this.makeRequest<TraceCallsQueryReq, string>(
       '/calls/stream_query',
       req,
-      true
+      'text'
     );
     return new Promise((resolve, reject) => {
       res
@@ -156,6 +157,53 @@ export class DirectTraceServerClient {
     });
   }
 
+  /*
+  This implementation of the calls stream query is a convenience in order
+  to explicitly handle large streams of data. It should be kept in close
+  sync with makeRequest.
+  */
+
+  public callsStreamDownload(
+    req: TraceCallsQueryReq,
+    contentType: ContentType = ContentType.any
+  ): Promise<Blob> {
+    const url = `${this.baseUrl}/calls/stream_query`;
+    const reqBody = JSON.stringify(req);
+
+    const headers: {[key: string]: string} = {
+      'Content-Type': 'application/json',
+      // This is a dummy auth header, the trace server requires
+      // that we send a basic auth header, but it uses cookies for
+      // authentication.
+      Authorization: 'Basic ' + btoa(':'),
+      Accept: contentType,
+    };
+    const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
+    if (useAdminPrivileges) {
+      headers['use-admin-privileges'] = 'true';
+    }
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Fetch the text data using streams
+        // eslint-disable-next-line wandb/no-unprefixed-urls
+        const response = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: reqBody,
+        });
+        // TODO: support streaming data into a memory buffer, this .blob() method
+        // is incomplete, add paging/stream construction of this blob or string. More info here:
+        // https://stackoverflow.com/questions/28307789/is-there-any-limitation-on-javascript-max-blob-size
+        const blob = await response.blob();
+        resolve(blob);
+      } catch (error) {
+        reject(new Error(`Error downloading data: ${error}`));
+      }
+    });
+  }
+
   public callRead(req: TraceCallReadReq): Promise<TraceCallReadRes> {
     return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
       '/call/read',
@@ -212,10 +260,10 @@ export class DirectTraceServerClient {
   public fileContent(
     req: TraceFileContentReadReq
   ): Promise<TraceFileContentReadRes> {
-    const res = this.makeRequest<TraceFileContentReadReq, string>(
+    const res = this.makeRequest<TraceFileContentReadReq, ArrayBuffer>(
       '/files/content',
       req,
-      true
+      'arrayBuffer'
     );
     return new Promise((resolve, reject) => {
       res
@@ -231,7 +279,8 @@ export class DirectTraceServerClient {
   private makeRequest = async <QT, ST>(
     endpoint: string,
     req: QT,
-    returnText?: boolean
+    responseReturnType: 'json' | 'text' | 'arrayBuffer' = 'json',
+    contentType?: ContentType
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
     const reqBody = JSON.stringify(req);
@@ -271,10 +320,16 @@ export class DirectTraceServerClient {
       body: reqBody,
     })
       .then(response => {
-        if (returnText) {
+        if (responseReturnType === 'text') {
           return response.text();
+        } else if (responseReturnType === 'arrayBuffer') {
+          return response.arrayBuffer();
+        } else if (responseReturnType === 'json') {
+          return response.json();
+        } else {
+          // Should never happen with correct type checking
+          throw new Error('Invalid responseReturnType: ' + responseReturnType);
         }
-        return response.json();
       })
       .then(res => {
         try {

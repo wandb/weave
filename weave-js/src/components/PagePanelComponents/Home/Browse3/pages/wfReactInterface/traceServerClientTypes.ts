@@ -58,6 +58,8 @@ export type TraceCallsQueryReq = {
   offset?: number;
   sort_by?: SortBy[];
   query?: Query;
+  columns?: string[];
+  expand_columns?: string[];
 };
 
 export type TraceCallsQueryRes = {
@@ -201,5 +203,21 @@ export type TraceFileContentReadReq = {
 };
 
 export type TraceFileContentReadRes = {
-  content: string;
+  content: ArrayBuffer;
+};
+
+export enum ContentType {
+  csv = 'text/csv',
+  tsv = 'text/tab-separated-values',
+  any = '*/*',
+  jsonl = 'application/jsonl',
+  json = 'application/json',
+}
+
+export const fileExtensions = {
+  [ContentType.csv]: 'csv',
+  [ContentType.tsv]: 'tsv',
+  [ContentType.jsonl]: 'jsonl',
+  [ContentType.any]: 'jsonl',
+  [ContentType.json]: 'json',
 };

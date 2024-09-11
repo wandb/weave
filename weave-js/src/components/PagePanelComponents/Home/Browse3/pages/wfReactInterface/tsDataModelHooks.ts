@@ -27,7 +27,7 @@ import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {Query} from './traceServerClientInterface/query';
 import * as traceServerTypes from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
-import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
+import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
   CallFilter,
   CallKey,
@@ -42,6 +42,7 @@ import {
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
+  Refetchable,
   RefMutation,
   TableQuery,
   WFDataModelHooksInterface,
@@ -211,13 +212,19 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         loading: true,
         result: null,
       };
-    } else {
+    } else if (result?.callId === key?.callId) {
       if (result) {
         callCache.set(key, result);
       }
       return {
         loading: false,
         result,
+      };
+    } else {
+      // Stale call result
+      return {
+        loading: false,
+        result: null,
       };
     }
   }, [cachedCall, callRes, key]);
@@ -231,6 +238,7 @@ const useCallsNoExpansion = (
   offset?: number,
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
+  columns?: string[],
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -262,6 +270,7 @@ const useCallsNoExpansion = (
       offset,
       sort_by: sortBy,
       query,
+      columns,
     };
     const onSuccess = (res: traceServerTypes.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -283,6 +292,7 @@ const useCallsNoExpansion = (
     offset,
     sortBy,
     query,
+    columns,
   ]);
 
   // register doFetch as a callback after deletion
@@ -324,22 +334,27 @@ const useCallsNoExpansion = (
         result: [],
       };
     } else {
-      allResults.forEach(call => {
-        callCache.set(
-          {
-            entity,
-            project,
-            callId: call.callId,
-          },
-          call
-        );
-      });
+      // Check if the query contained a column request. Only cache calls
+      // if no columns were requested, only then are we guaranteed to get
+      // all the call data
+      if (!columns) {
+        allResults.forEach(call => {
+          callCache.set(
+            {
+              entity,
+              project,
+              callId: call.callId,
+            },
+            call
+          );
+        });
+      }
       return {
         loading: false,
         result,
       };
     }
-  }, [callRes, entity, project, opts?.skip]);
+  }, [callRes, entity, project, opts?.skip, columns]);
 };
 
 const useCalls = (
@@ -350,6 +365,7 @@ const useCalls = (
   offset?: number,
   sortBy?: traceServerTypes.SortBy[],
   query?: Query,
+  columns?: string[],
   expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> => {
@@ -361,6 +377,7 @@ const useCalls = (
     offset,
     sortBy,
     query,
+    columns,
     opts
   );
 
@@ -511,9 +528,54 @@ const useCallUpdateFunc = () => {
   return callUpdate;
 };
 
+const useCallsExport = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const downloadCallsExport = useCallback(
+    (
+      entity: string,
+      project: string,
+      contentType: traceServerTypes.ContentType,
+      filter: CallFilter,
+      limit?: number,
+      offset?: number,
+      sortBy?: traceServerTypes.SortBy[],
+      query?: Query,
+      columns?: string[],
+      expandedRefCols?: string[]
+    ) => {
+      const req: traceServerTypes.TraceCallsQueryReq = {
+        project_id: projectIdFromParts({entity, project}),
+        filter: {
+          op_names: filter.opVersionRefs,
+          input_refs: filter.inputObjectVersionRefs,
+          output_refs: filter.outputObjectVersionRefs,
+          parent_ids: filter.parentIds,
+          trace_ids: filter.traceId ? [filter.traceId] : undefined,
+          call_ids: filter.callIds,
+          trace_roots_only: filter.traceRootsOnly,
+          wb_run_ids: filter.runIds,
+          wb_user_ids: filter.userIds,
+        },
+        limit,
+        offset,
+        sort_by: sortBy,
+        query,
+        columns: columns ?? undefined,
+        expand_columns: expandedRefCols ?? undefined,
+      };
+      return getTsClient().callsStreamDownload(req, contentType);
+    },
+    [getTsClient]
+  );
+
+  return downloadCallsExport;
+};
+
 const useFeedback = (
-  key: FeedbackKey | null
-): LoadableWithError<traceServerTypes.Feedback[]> => {
+  key: FeedbackKey | null,
+  sortBy?: traceServerTypes.SortBy[]
+): LoadableWithError<traceServerTypes.Feedback[]> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
 
   const [result, setResult] = useState<
@@ -523,10 +585,18 @@ const useFeedback = (
     result: null,
     error: null,
   });
+  const [doReload, setDoReload] = useState(false);
+  const refetch = useCallback(() => {
+    setDoReload(true);
+  }, [setDoReload]);
 
   const deepKey = useDeepMemo(key);
 
   useEffect(() => {
+    let mounted = true;
+    if (doReload) {
+      setDoReload(false);
+    }
     if (!deepKey) {
       return;
     }
@@ -542,20 +612,29 @@ const useFeedback = (
             $eq: [{$getField: 'weave_ref'}, {$literal: deepKey.weaveRef}],
           },
         },
-        sort_by: [{field: 'created_at', direction: 'desc'}],
+        sort_by: sortBy ?? [{field: 'created_at', direction: 'desc'}],
       })
       .then(res => {
+        if (!mounted) {
+          return;
+        }
         if ('result' in res) {
           setResult({loading: false, result: res.result, error: null});
         }
         // TODO: handle error case
       })
       .catch(err => {
+        if (!mounted) {
+          return;
+        }
         setResult({loading: false, result: null, error: err});
       });
-  }, [deepKey, getTsClient]);
+    return () => {
+      mounted = false;
+    };
+  }, [deepKey, getTsClient, doReload, sortBy]);
 
-  return result;
+  return {...result, refetch};
 };
 
 const useOpVersion = (
@@ -604,6 +683,13 @@ const useOpVersion = (
     if (opVersionRes == null || loadingRef.current) {
       return {
         loading: true,
+        result: null,
+      };
+    }
+
+    if (opVersionRes.obj == null) {
+      return {
+        loading: false,
         result: null,
       };
     }
@@ -683,7 +769,7 @@ const useOpVersions = makeTraceServerEndpointHook<
 const useFileContent = makeTraceServerEndpointHook<
   'fileContent',
   [string, string, string, {skip?: boolean}?],
-  string
+  ArrayBuffer
 >(
   'fileContent',
   (
@@ -747,6 +833,13 @@ const useObjectVersion = (
     if (objectVersionRes == null || loadingRef.current) {
       return {
         loading: true,
+        result: null,
+      };
+    }
+
+    if (objectVersionRes.obj == null) {
+      return {
+        loading: false,
         result: null,
       };
     }
@@ -905,6 +998,7 @@ const useChildCallsForCompare = (
     undefined,
     undefined,
     undefined,
+    undefined,
     {skip: skipParent}
   );
 
@@ -922,6 +1016,7 @@ const useChildCallsForCompare = (
       parentIds: subParentCallIds,
       opVersionRefs: selectedOpVersionRef ? [selectedOpVersionRef] : [],
     },
+    undefined,
     undefined,
     undefined,
     undefined,
@@ -961,12 +1056,16 @@ const useRefsData = (
     const sUris: string[] = [];
     const tUris: string[] = [];
     refUrisDeep
-      .map(uri => ({uri, ref: refUriToObjectVersionKey(uri)}))
+      .map(uri => {
+        return {uri, ref: refUriToObjectVersionKey(uri)};
+      })
       .forEach(({uri, ref}, ndx) => {
-        if (ref.scheme === 'weave' && ref.weaveKind === 'table') {
-          tUris.push(uri);
-        } else {
-          sUris.push(uri);
+        if (ref) {
+          if (ref.scheme === 'weave' && ref.weaveKind === 'table') {
+            tUris.push(uri);
+          } else {
+            sUris.push(uri);
+          }
         }
       });
     return [sUris, tUris];
@@ -994,7 +1093,7 @@ const useRefsData = (
   if (tableRefUris.length > 1) {
     throw new Error('Multiple table refs not supported');
   } else if (tableRefUris.length === 1) {
-    const tableRef = refUriToObjectVersionKey(tableRefUris[0]);
+    const tableRef = refUriToObjectVersionKey(tableRefUris[0])!;
     tableUriProjectId = tableRef.entity + '/' + tableRef.project;
     tableUriDigest = tableRef.objectId;
   }
@@ -1121,6 +1220,9 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
       return null;
     }
     const result = query.result[0];
+    if (result == null) {
+      return null;
+    }
     const ref = parseRef(opVersionRef);
     if (isWeaveObjectRef(ref)) {
       return {
@@ -1131,12 +1233,27 @@ const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
     }
     return null;
   }, [opVersionRef, query.result]);
-  const text = useFileContent(
+  const arrayBuffer = useFileContent(
     fileSpec?.entity ?? '',
     fileSpec?.project ?? '',
     fileSpec?.digest ?? '',
     {skip: fileSpec == null}
   );
+  const text = useMemo(() => {
+    if (arrayBuffer.loading || query.loading) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+    return {
+      loading: false,
+      result: arrayBuffer.result
+        ? new TextDecoder().decode(arrayBuffer.result)
+        : null,
+    };
+  }, [arrayBuffer.loading, arrayBuffer.result, query.loading]);
+
   return text;
 };
 
@@ -1346,7 +1463,7 @@ export const traceCallToUICallSchema = (
       opName.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
       opName.startsWith(WEAVE_REF_PREFIX)
     ) {
-      return refUriToOpVersionKey(opName).opId;
+      return opVersionRefOpName(opName);
     }
     if (opName.startsWith(WEAVE_PRIVATE_PREFIX)) {
       return privateRefToSimpleName(opName);
@@ -1389,6 +1506,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCallsStats,
   useCallsDeleteFunc,
   useCallUpdateFunc,
+  useCallsExport,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

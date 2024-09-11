@@ -13,20 +13,25 @@ import _ from 'lodash';
 import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {flattenObject} from '../../../Browse2/browse2Util';
+import {
+  isWeaveObjectRef,
+  parseRef,
+  WeaveObjectRef,
+} from '../../../../../../react';
+import {flattenObjectPreservingWeaveTypes} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
 
 // Controls the maximum number of rows to display in the table
-const MAX_ROWS = 1000;
+const MAX_ROWS = 10_000;
 
 // Controls whether to use a table for arrays or not.
 export const USE_TABLE_FOR_ARRAYS = false;
@@ -52,6 +57,11 @@ export const WeaveCHTable: FC<{
   const fetchQuery = useValueOfRefUri(props.tableRefUri, {
     limit: MAX_ROWS + 1,
   });
+
+  const parsedRef = useMemo(
+    () => parseRef(props.tableRefUri) as WeaveObjectRef,
+    [props.tableRefUri]
+  );
 
   // Determines if the table itself is truncated
   const isTruncated = useMemo(() => {
@@ -96,16 +106,19 @@ export const WeaveCHTable: FC<{
   );
 
   return (
-    <DataTableView
-      data={sourceRows ?? []}
-      loading={fetchQuery.loading}
-      isTruncated={isTruncated}
-      // Display key is "val" as the resulting rows have metadata/ref
-      // information outside of the actual data
-      displayKey="val"
-      onLinkClick={onClickEnabled ? onClick : undefined}
-      fullHeight={props.fullHeight}
-    />
+    <CustomWeaveTypeProjectContext.Provider
+      value={{entity: parsedRef.entityName, project: parsedRef.projectName}}>
+      <DataTableView
+        data={sourceRows ?? []}
+        loading={fetchQuery.loading}
+        isTruncated={isTruncated}
+        // Display key is "val" as the resulting rows have metadata/ref
+        // information outside of the actual data
+        displayKey="val"
+        onLinkClick={onClickEnabled ? onClick : undefined}
+        fullHeight={props.fullHeight}
+      />
+    </CustomWeaveTypeProjectContext.Provider>
   );
 };
 
@@ -133,7 +146,7 @@ export const DataTableView: FC<{
       if (val == null) {
         return {};
       } else if (typeof val === 'object' && !Array.isArray(val)) {
-        return flattenObject(val);
+        return flattenObjectPreservingWeaveTypes(val);
       }
       return {'': val};
     });

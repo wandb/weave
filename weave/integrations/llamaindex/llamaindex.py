@@ -1,6 +1,6 @@
-from weave import client_context
+from weave.trace.client_context import weave_client as weave_client_context
 from weave.trace.patcher import Patcher
-from weave.weave_client import Call
+from weave.trace.weave_client import Call
 
 TRANSFORM_EMBEDDINGS = False
 ALLOWED_ROOT_EVENT_TYPES = ("query",)
@@ -58,7 +58,7 @@ if not import_failed:
         ) -> str:
             """Run when an event starts and return id of event."""
             # Get a handle to the internal graph client.
-            gc = client_context.weave_client.require_weave_client()
+            gc = weave_client_context.require_weave_client()
 
             # Check to see if the event is an exception.
             if event_type == CBEventType.EXCEPTION:
@@ -111,7 +111,7 @@ if not import_failed:
         ) -> None:
             """Run when an event ends."""
             # Get a handle to the internal graph client.
-            gc = client_context.weave_client.require_weave_client()
+            gc = weave_client_context.require_weave_client()
 
             # If the event is in the call map, finish the call.
             if event_id in self._call_map:

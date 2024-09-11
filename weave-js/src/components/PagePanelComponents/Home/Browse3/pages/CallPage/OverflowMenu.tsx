@@ -9,11 +9,13 @@ import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
+import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {useClosePeek} from '../../context';
+import {isEvaluateOp} from '../common/heuristics';
 import {CopyableId} from '../common/Id';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -125,7 +127,7 @@ export const ConfirmDeleteModal: FC<{
 }> = ({calls, confirmDelete, setConfirmDelete, onDeleteCallback}) => {
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const userInfoLoaded = !viewerLoading ? userInfo : null;
-  const {loading: orgNameLoading, orgName} = useOrgName({
+  const {orgName} = useOrgName({
     entityName: userInfoLoaded?.username ?? '',
     skip: viewerLoading,
   });
@@ -134,8 +136,9 @@ export const ConfirmDeleteModal: FC<{
   const closePeek = useClosePeek();
 
   const [deleteLoading, setDeleteLoading] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
+
+  const deleteTargetStr = makeDeleteTargetStr(calls);
 
   // Deletion requires constant entity/project, break calls into groups
   const makeProjectGroups = (mixedCalls: CallSchema[]) => {
@@ -150,7 +153,7 @@ export const ConfirmDeleteModal: FC<{
 
   const onDelete = () => {
     if (calls.length === 0) {
-      setError('No call(s) selected');
+      setError(`No ${deleteTargetStr} selected`);
       return;
     }
     setDeleteLoading(true);
@@ -180,7 +183,7 @@ export const ConfirmDeleteModal: FC<{
         closePeek();
       })
       .catch(() => {
-        setError(`Error deleting call(s)`);
+        setError(`Error deleting ${deleteTargetStr}`);
         setDeleteLoading(false);
       });
   };
@@ -194,15 +197,12 @@ export const ConfirmDeleteModal: FC<{
       }}
       maxWidth="xs"
       fullWidth>
-      <DialogTitle>Delete {calls.length > 1 ? 'calls' : 'call'}</DialogTitle>
+      <DialogTitle>Delete {deleteTargetStr}</DialogTitle>
       <DialogContent style={{overflow: 'hidden'}}>
         {error != null ? (
           <p style={{color: 'red'}}>{error}</p>
         ) : (
-          <p>
-            Are you sure you want to delete
-            {calls.length > 1 ? ' these calls' : ' this call'}?
-          </p>
+          <p>Are you sure you want to delete?</p>
         )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
           <CallNameRow key={call.callId}>
@@ -223,9 +223,9 @@ export const ConfirmDeleteModal: FC<{
       <DialogActions $align="left">
         <Button
           variant="destructive"
-          disabled={error != null || deleteLoading || orgNameLoading}
+          disabled={error != null || deleteLoading}
           onClick={onDelete}>
-          {calls.length > 1 ? 'Delete calls' : 'Delete call'}
+          {`Delete ${deleteTargetStr}`}
         </Button>
         <Button
           variant="ghost"
@@ -246,4 +246,32 @@ const callDisplayName = (call: CallSchema) => {
     return call.displayName;
   }
   return call.spanName;
+};
+
+const makeDeleteTargetStr = (calls: CallSchema[]) => {
+  if (calls.length === 0) {
+    return 'calls';
+  }
+
+  let evaluationCount = 0;
+  for (const call of calls) {
+    if (isEvaluateOp(call.spanName)) {
+      ++evaluationCount;
+    }
+  }
+
+  if (evaluationCount > 0) {
+    if (evaluationCount === calls.length) {
+      // All evaluations
+      return maybePluralizeWord(calls.length, 'evaluation');
+    }
+    // Mixed calls and evaluations
+    return (
+      maybePluralizeWord(evaluationCount, 'evaluation') +
+      ' and ' +
+      maybePluralizeWord(calls.length - evaluationCount, 'call')
+    );
+  }
+  // All calls
+  return maybePluralizeWord(calls.length, 'call');
 };

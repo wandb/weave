@@ -1,8 +1,3 @@
----
-sidebar_position: 1
-hide_table_of_contents: true
----
-
 # LiteLLM
 
 Weave automatically tracks and logs LLM calls made via LiteLLM, after `weave.init()` is called.
