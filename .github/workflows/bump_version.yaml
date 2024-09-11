@@ -1,5 +1,12 @@
 name: bump-python-sdk-version
 
+# This workflow is used to bump the version of the Weave Python SDK.
+# It will take 2 steps:
+# 1. Drop the pre-release tag and push a new commit to the main branch.
+# 2. Bump the version to the next pre-release version and push a new commit to the main branch.
+#
+# see weave/version.py for more details on the versioning scheme.
+
 on:
   workflow_dispatch:
     inputs:
