@@ -76,8 +76,8 @@ const getRefFromObjectPath = (obj: any, path: string) => {
     );
 
     if (parsedPath) {
-      let property = parsedPath[1]; // e.g., "something"
-      let index = parsedPath[3]; // e.g., "0"
+      const property = parsedPath[1]; // e.g., "something"
+      const index = parsedPath[3]; // e.g., "0"
 
       // If acc is undefined, return undefined, or get the property if it exists
       if (acc && acc[property]) {
@@ -88,7 +88,7 @@ const getRefFromObjectPath = (obj: any, path: string) => {
         }
         if (index !== undefined) {
           // Get the array element if index is present
-          return acc[parseInt(index)];
+          return acc[parseInt(index, 10)];
         }
         return acc;
       }
