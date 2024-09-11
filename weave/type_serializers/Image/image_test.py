@@ -1,3 +1,7 @@
+import os
+import tempfile
+from pathlib import Path
+
 from PIL import Image
 
 import weave
@@ -100,3 +104,20 @@ def test_image_as_call_io_refs(client: WeaveClient) -> None:
     assert image_as_solo_output_call.output.tobytes() == exp_bytes
     assert image_as_input_and_output_part_call.inputs["in_img"].tobytes() == exp_bytes
     assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
+
+
+def test_image_from_path(client: WeaveClient) -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        path_str = os.path.join(temp_dir, "img.png")
+        img = Image.new("RGB", (512, 512), "purple")
+        img.save(path_str)
+        exp_bytes = img.tobytes()
+
+        @weave.op
+        def save_image(path: Path) -> None:
+            return {"out-img-path": path}
+
+        save_image(Path(path_str))
+
+        call = save_image.calls()[0]
+        assert call.output["out-img-path"].tobytes() == exp_bytes
