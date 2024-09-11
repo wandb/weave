@@ -438,9 +438,16 @@ class CallsQuery(BaseModel):
         """
 
         if self.include_costs:
+            # TODO: We should unify the calls query order by fields to be orm sort by fields
+            order_by_fields = [
+                tsi.SortBy(
+                    field=sort_by.field.field, direction=sort_by.direction.lower()
+                )
+                for sort_by in self.order_fields
+            ]
             raw_sql += f""",
             all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
-            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields])}
+            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
 
         else:

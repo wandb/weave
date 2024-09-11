@@ -1,20 +1,11 @@
 import os
-from typing import Any
 
 import pytest
 from cerebras.cloud.sdk import AsyncCerebras, Cerebras
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
 
 model = "llama3.1-8b"  # Cerebras model
-
-
-def _get_call_output(call: tsi.CallSchema) -> Any:
-    call_output = call.output
-    if isinstance(call_output, str) and call_output.startswith("weave://"):
-        return weave.ref(call_output).get()
-    return call_output
 
 
 @pytest.mark.skip_clickhouse_client
@@ -33,11 +24,12 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     exp = "The capital of France is Paris."
     assert response.choices[0].message.content.strip() == exp
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content.strip() == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == response.id
@@ -68,11 +60,12 @@ async def test_cerebras_async(client: weave.trace.weave_client.WeaveClient) -> N
     exp = "The capital of France is Paris."
     assert response.choices[0].message.content.strip() == exp
 
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
-    call = res.calls[0]
+    calls = list(client.calls())
+    assert len(calls) == 1
+    call = calls[0]
+
     assert call.exception is None and call.ended_at is not None
-    output = _get_call_output(call)
+    output = call.output
     assert output.choices[0].message.content.strip() == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == response.id
