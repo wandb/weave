@@ -55,6 +55,7 @@ def test_call_update_out_of_order(client: weave_client.WeaveClient):
             start=tsi.StartedCallSchemaForInsert(
                 project_id=project_id,
                 id=call_id,
+                trace_id=call_id,
                 started_at=datetime.datetime.now(),
                 op_name="test_op_name",
                 attributes={},
