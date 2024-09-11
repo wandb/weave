@@ -1,5 +1,9 @@
 """Defines the custom Image weave type."""
 
+from pathlib import Path
+
+from pydantic import BaseModel, ConfigDict
+
 from weave.trace import serializer
 from weave.trace.custom_objs import MemTraceFilesArtifact
 
@@ -11,6 +15,14 @@ try:
     dependencies_met = True
 except ImportError:
     pass
+
+
+class PathImage(BaseModel):
+    # model confid allow_arbitrary_types=True to allow PIL Image.Image
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    img: Image.Image
+    path: Path
 
 
 def save(obj: "Image.Image", artifact: MemTraceFilesArtifact, name: str) -> None:

@@ -5,6 +5,7 @@ import re
 import sys
 import typing
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, Iterator, Optional, Sequence, Union
 
 import pydantic
@@ -58,6 +59,7 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TraceServerInterface,
 )
+from weave.type_serializers.Image.image import PathImage
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -550,9 +552,10 @@ class WeaveClient:
             op_str = op
 
         inputs_redacted = redact_sensitive_keys(inputs)
+        inputs_paths_converted = convert_paths_to_images(inputs_redacted)
 
-        self._save_nested_objects(inputs_redacted)
-        inputs_with_refs = map_to_refs(inputs_redacted)
+        self._save_nested_objects(inputs_paths_converted)
+        inputs_with_refs = map_to_refs(inputs_paths_converted)
         call_id = generate_id()
 
         if parent is None and use_stack:
@@ -614,6 +617,7 @@ class WeaveClient:
     def finish_call(
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
+        output = convert_paths_to_images(output)
         self._save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
@@ -1189,6 +1193,26 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > 128:
         res = res[:128]
     return res
+
+
+def convert_paths_to_images(obj: Any) -> Any:
+    """Convert paths to PathImage objects if they are image files."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            obj[k] = convert_paths_to_images(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            convert_paths_to_images(v)
+    elif isinstance(obj, Path):
+        if obj.suffix in [".png", ".jpg", ".jpeg", ".gif", ".tiff"]:
+            # Load the image, if PIL is available
+            try:
+                from PIL import Image
+
+                return PathImage(img=Image.open(obj), path=obj)
+            except ImportError:
+                pass
+    return obj
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]
