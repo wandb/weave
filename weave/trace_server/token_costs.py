@@ -278,6 +278,7 @@ def final_call_select_with_cost(
     param_builder: ParamBuilder,
     price_table_alias: str,
     select_fields: list[str],
+    order_fields: list[tsi.SortBy],
 ) -> PreparedSelect:
     # We filter out summary_dump, because we add costs to summary dump in the select statement
     final_select_fields = [field for field in select_fields if field != "summary_dump"]
@@ -370,6 +371,7 @@ def final_call_select_with_cost(
             tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
         )
         .group_by(final_select_fields)
+        .order_by(order_fields)
     )
 
     final_prepared_query = final_query.prepare(
@@ -387,6 +389,7 @@ def cost_query(
     call_table_alias: str,
     project_id: str,
     select_fields: list[str],
+    order_fields: list[tsi.SortBy],
 ) -> str:
     """
     This function takes something like the following:
@@ -419,7 +422,7 @@ def cost_query(
         ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql})
 
         -- Final Select, which just selects the correct fields, and adds a costs object
-        {final_call_select_with_cost(pb, 'ranked_prices', select_fields).sql}
+        {final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields).sql}
     """
     return raw_sql
 
